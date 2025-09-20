@@ -156,8 +156,10 @@ class AdminPanel {
             this.exportIPData();
         });
 
-        // IP Tracking refresh
+        // Debug button for testing
         document.getElementById('refreshIPTrackingBtn').addEventListener('click', () => {
+            console.log('🔍 Debug: Current IP tracking data:', this.ipTrackingData);
+            console.log('🔍 Debug: Current IP analysis:', this.ipAnalysis);
             this.loadIPTracking();
         });
     }
@@ -860,50 +862,249 @@ class AdminPanel {
         this.renderIPAnalysis();
     }
 
-    renderIPAnalysis(data = null) {
+    renderIPAnalysis() {
+        console.log('Rendering IP Analysis:', this.ipAnalysis);
+        
         // Update statistics
-        document.getElementById('uniqueIPCount').textContent = data ? data.uniqueIPCount : '-';
-        document.getElementById('totalSessions').textContent = data ? data.totalSessions : '-';
-        document.getElementById('avgSessionDuration').textContent = data ? `${data.avgSessionDuration} dk` : '-';
+        document.getElementById('uniqueIPCount').textContent = this.ipAnalysis ? this.ipAnalysis.uniqueIPs : '-';
+        document.getElementById('totalSessions').textContent = this.ipAnalysis ? this.ipAnalysis.totalSessions : '-';
+        document.getElementById('avgSessionDuration').textContent = this.ipAnalysis ? this.ipAnalysis.avgSessionDuration + ' dk' : '-';
+        document.getElementById('suspiciousIPs').textContent = this.ipAnalysis ? this.ipAnalysis.suspiciousIPs : '-';
 
         // Render top IPs
         const topIPsContainer = document.getElementById('topIPsList');
-        if (data && data.topIPs.length > 0) {
-            topIPsContainer.innerHTML = data.topIPs.map(([ip, count]) => `
-                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
-                    <span class="font-mono text-sm">${ip}</span>
-                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-                        ${count} oturum
-                    </span>
-                </div>
-            `).join('');
-        } else {
-            topIPsContainer.innerHTML = '<div class="text-center text-gray-500 py-4">Veri bulunamadı</div>';
+        if (topIPsContainer) {
+            if (this.ipAnalysis && this.ipAnalysis.topIPs && this.ipAnalysis.topIPs.length > 0) {
+                topIPsContainer.innerHTML = this.ipAnalysis.topIPs.slice(0, 10).map(ip => `
+                    <div class="flex justify-between items-center p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg mb-2">
+                        <div class="flex-1">
+                            <div class="font-mono text-sm font-semibold text-gray-900">${ip.ip}</div>
+                            <div class="text-xs text-gray-600">${ip.sessions} oturum • ${Array.from(ip.users).join(', ')}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-gray-500">${new Date(ip.lastSeen).toLocaleDateString('tr-TR')}</div>
+                            ${ip.isSuspicious ? '<div class="text-xs text-red-600 font-semibold">⚠️ Şüpheli</div>' : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                topIPsContainer.innerHTML = '<div class="text-center text-gray-500 py-8">Henüz IP verisi bulunamadı</div>';
+            }
         }
 
         // Render timeline
         const timelineContainer = document.getElementById('ipTimeline');
-        if (data && data.timeline.length > 0) {
-            timelineContainer.innerHTML = data.timeline.map(log => {
-                const loginTime = new Date(log.login_time).toLocaleString('tr-TR');
-                const duration = log.session_duration ? `${Math.round(log.session_duration / 60)} dk` : 'Devam ediyor';
-                
-                return `
-                    <div class="flex justify-between items-center p-2 border-l-4 border-blue-500 bg-blue-50">
-                        <div class="flex-1">
-                            <div class="font-mono text-sm">${log.ip_address}</div>
-                            <div class="text-xs text-gray-600">${log.username || log.user_id}</div>
+        if (timelineContainer) {
+            if (this.ipAnalysis && this.ipAnalysis.timeline && this.ipAnalysis.timeline.length > 0) {
+                timelineContainer.innerHTML = this.ipAnalysis.timeline.slice(0, 20).map(ip => {
+                    const lastSeen = new Date(ip.last_seen).toLocaleString('tr-TR');
+                    return `
+                        <div class="flex justify-between items-center p-3 border-b border-gray-200 hover:bg-gray-50">
+                            <div class="flex-1">
+                                <div class="font-mono text-sm font-semibold text-gray-900">${ip.ip_address}</div>
+                                <div class="text-xs text-gray-600">${ip.username || 'Bilinmeyen'} • ${ip.login_count || 1} giriş</div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-xs text-gray-500">${lastSeen}</div>
+                                ${ip.is_blocked ? '<div class="text-xs text-red-600 font-semibold">🚫 Engelli</div>' : '<div class="text-xs text-green-600 font-semibold">✅ Aktif</div>'}
+                            </div>
                         </div>
-                        <div class="text-right">
-                            <div class="text-xs text-gray-600">${loginTime}</div>
-                            <div class="text-xs text-gray-500">${duration}</div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        } else {
-            timelineContainer.innerHTML = '<div class="text-center text-gray-500 py-4">Timeline verisi bulunamadı</div>';
+                    `;
+                }).join('');
+            } else {
+                timelineContainer.innerHTML = '<div class="text-center text-gray-500 py-8">Henüz aktivite verisi bulunamadı</div>';
+            }
         }
+    }
+
+    filterIPs(filter) {
+        console.log('Filtering IPs:', filter);
+        
+        // Update button styles
+        document.querySelectorAll('[id^="filter"]').forEach(btn => {
+            btn.classList.remove('bg-blue-600', 'text-white');
+            btn.classList.add('bg-gray-200', 'text-gray-700');
+        });
+        
+        const activeButton = document.getElementById(`filter${filter.charAt(0).toUpperCase() + filter.slice(1)}IPs`);
+        if (activeButton) {
+            activeButton.classList.remove('bg-gray-200', 'text-gray-700');
+            activeButton.classList.add('bg-blue-600', 'text-white');
+        }
+
+        // Filter data based on filter type
+        let filteredData = this.ipTrackingData || [];
+        
+        if (filter !== 'all') {
+            const now = new Date();
+            const filterDate = new Date();
+            
+            switch (filter) {
+                case 'today':
+                    filterDate.setHours(0, 0, 0, 0);
+                    break;
+                case 'week':
+                    filterDate.setDate(now.getDate() - 7);
+                    break;
+                case 'month':
+                    filterDate.setMonth(now.getMonth() - 1);
+                    break;
+            }
+            
+            filteredData = filteredData.filter(ip => {
+                const lastSeen = new Date(ip.last_seen);
+                return lastSeen >= filterDate;
+            });
+        }
+
+        // Re-analyze with filtered data
+        this.analyzeIPDataWithFilter(filteredData);
+    }
+
+    analyzeIPDataWithFilter(filteredData) {
+        if (!filteredData || filteredData.length === 0) {
+            this.ipAnalysis = {
+                uniqueIPs: 0,
+                totalSessions: 0,
+                avgSessionDuration: 0,
+                suspiciousIPs: 0,
+                topIPs: [],
+                timeline: []
+            };
+            this.renderIPAnalysis();
+            return;
+        }
+
+        const ipStats = {};
+        let totalSessions = 0;
+        let totalDuration = 0;
+        let suspiciousCount = 0;
+
+        filteredData.forEach(ip => {
+            const ipAddress = ip.ip_address;
+            if (!ipStats[ipAddress]) {
+                ipStats[ipAddress] = {
+                    ip: ipAddress,
+                    sessions: 0,
+                    totalDuration: 0,
+                    lastSeen: ip.last_seen,
+                    users: new Set(),
+                    isSuspicious: false
+                };
+            }
+            
+            ipStats[ipAddress].sessions += ip.login_count || 1;
+            totalSessions += ip.login_count || 1;
+            
+            if (ip.username) {
+                ipStats[ipAddress].users.add(ip.username);
+            }
+            
+            if (new Date(ip.last_seen) > new Date(ipStats[ipAddress].lastSeen)) {
+                ipStats[ipAddress].lastSeen = ip.last_seen;
+            }
+
+            // Detect suspicious activity
+            if (ipStats[ipAddress].sessions > 10 || ipStats[ipAddress].users.size > 3) {
+                ipStats[ipAddress].isSuspicious = true;
+                suspiciousCount++;
+            }
+        });
+
+        this.ipAnalysis = {
+            uniqueIPs: Object.keys(ipStats).length,
+            totalSessions: totalSessions,
+            avgSessionDuration: totalSessions > 0 ? Math.round(totalDuration / totalSessions / 60) : 0,
+            suspiciousIPs: suspiciousCount,
+            topIPs: Object.values(ipStats)
+                .sort((a, b) => b.sessions - a.sessions),
+            timeline: filteredData
+                .sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen))
+                .slice(0, 50)
+        };
+
+        this.renderIPAnalysis();
+    }
+
+    sortIPs(sortBy) {
+        console.log('Sorting IPs by:', sortBy);
+        
+        if (!this.ipAnalysis || !this.ipAnalysis.topIPs) return;
+        
+        let sortedIPs = [...this.ipAnalysis.topIPs];
+        
+        switch (sortBy) {
+            case 'sessions':
+                sortedIPs.sort((a, b) => b.sessions - a.sessions);
+                break;
+            case 'lastSeen':
+                sortedIPs.sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen));
+                break;
+            case 'users':
+                sortedIPs.sort((a, b) => b.users.size - a.users.size);
+                break;
+            case 'suspicious':
+                sortedIPs.sort((a, b) => {
+                    if (a.isSuspicious && !b.isSuspicious) return -1;
+                    if (!a.isSuspicious && b.isSuspicious) return 1;
+                    return 0;
+                });
+                break;
+        }
+        
+        this.ipAnalysis.topIPs = sortedIPs;
+        this.renderIPAnalysis();
+    }
+
+    searchIPs(searchTerm) {
+        console.log('Searching IPs:', searchTerm);
+        
+        if (!searchTerm.trim()) {
+            // Reset to original data
+            this.analyzeIPData();
+            return;
+        }
+        
+        const filteredData = (this.ipTrackingData || []).filter(ip => {
+            const searchLower = searchTerm.toLowerCase();
+            return (
+                ip.ip_address.toLowerCase().includes(searchLower) ||
+                (ip.username && ip.username.toLowerCase().includes(searchLower))
+            );
+        });
+        
+        this.analyzeIPDataWithFilter(filteredData);
+    }
+
+    exportIPData() {
+        console.log('Exporting IP Data');
+        
+        if (!this.ipTrackingData || this.ipTrackingData.length === 0) {
+            alert('Dışa aktarılacak veri bulunamadı');
+            return;
+        }
+        
+        const csvContent = [
+            ['Kullanıcı', 'IP Adresi', 'İlk Görülme', 'Son Görülme', 'Giriş Sayısı', 'Durum'],
+            ...this.ipTrackingData.map(ip => [
+                ip.username || 'Bilinmeyen',
+                ip.ip_address,
+                new Date(ip.first_seen).toLocaleString('tr-TR'),
+                new Date(ip.last_seen).toLocaleString('tr-TR'),
+                ip.login_count || 1,
+                ip.is_blocked ? 'Engelli' : 'Aktif'
+            ])
+        ].map(row => row.join(',')).join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `ip_tracking_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     updateStats() {
@@ -962,30 +1163,42 @@ class AdminPanel {
     // IP Tracking Functions
     async loadIPTracking() {
         try {
-            console.log('Loading IP tracking data...');
+            console.log('🔄 Loading IP tracking data...');
             
             if (window.supabase) {
+                console.log('📡 Fetching from Supabase...');
                 const { data, error } = await window.supabase
                     .from('user_ip_tracking')
-                    .select('*')
+                    .select(`
+                        *,
+                        users!inner(username)
+                    `)
                     .order('last_seen', { ascending: false });
 
                 if (error) {
-                    console.error('Supabase IP tracking error:', error);
+                    console.error('❌ Supabase IP tracking error:', error);
                     throw error;
                 }
                 
-                console.log('IP tracking data loaded:', data);
+                console.log('✅ IP tracking data loaded from Supabase:', data);
                 this.ipTrackingData = data || [];
             } else {
                 // Fallback to local storage
+                console.log('💾 Using local storage fallback...');
                 this.ipTrackingData = JSON.parse(localStorage.getItem('ipTrackingData') || '[]');
-                console.log('Using local storage IP tracking data:', this.ipTrackingData);
+                console.log('📦 Local storage IP tracking data:', this.ipTrackingData);
             }
 
+            console.log('📊 Total IP tracking records:', this.ipTrackingData.length);
             this.renderIPTracking();
+            
+            // Also trigger IP analysis if we're on the IP Analysis tab
+            if (this.currentTab === 'ipAnalysis') {
+                console.log('🔍 Triggering IP analysis...');
+                this.analyzeIPData();
+            }
         } catch (error) {
-            console.error('Error loading IP tracking:', error);
+            console.error('❌ Error loading IP tracking:', error);
             this.ipTrackingData = [];
             this.renderIPTracking();
         }
