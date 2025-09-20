@@ -87,6 +87,11 @@ class AdminPanel {
         document.getElementById(`${tabName}-tab`).classList.remove('hidden');
 
         this.currentTab = tabName;
+        
+        // Load data when switching to specific tabs
+        if (tabName === 'ipAnalysis') {
+            await this.loadIPAnalysis();
+        }
     }
 
     async loadUsers() {
@@ -468,21 +473,50 @@ class AdminPanel {
         container.innerHTML = '';
 
         if (this.logs.length === 0) {
-            container.innerHTML = '<p class="text-gray-500 text-center py-8">Henüz log bulunmuyor.</p>';
+            container.innerHTML = '<div class="text-center text-gray-500 py-8">Henüz IP log kaydı bulunmuyor.</div>';
             return;
         }
 
         this.logs.forEach(log => {
             const logDiv = document.createElement('div');
-            logDiv.className = 'bg-gray-50 border border-gray-200 rounded p-3 text-sm';
+            logDiv.className = 'bg-white rounded-lg shadow p-4 mb-3';
+            
+            const loginTime = new Date(log.login_time).toLocaleString('tr-TR');
+            const userAgent = log.user_agent ? log.user_agent.substring(0, 60) + '...' : 'Bilinmiyor';
             
             logDiv.innerHTML = `
-                <div class="flex justify-between items-center">
-                    <div>
-                        <span class="font-medium text-gray-900">${log.user_id}</span>
-                        <span class="text-gray-500 ml-2">${log.ip_address}</span>
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-2 mb-2">
+                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                                ${log.username || log.user_id || 'Bilinmeyen'}
+                            </span>
+                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+                                ${log.ip_address}
+                            </span>
+                        </div>
+                        <div class="text-sm text-gray-600 mb-1">
+                            <strong>Giriş Zamanı:</strong> ${loginTime}
+                        </div>
+                        <div class="text-sm text-gray-600 mb-1">
+                            <strong>User Agent:</strong> ${userAgent}
+                        </div>
+                        ${log.logout_time ? `
+                            <div class="text-sm text-gray-600 mb-1">
+                                <strong>Çıkış Zamanı:</strong> ${new Date(log.logout_time).toLocaleString('tr-TR')}
+                            </div>
+                        ` : ''}
+                        ${log.session_duration ? `
+                            <div class="text-sm text-gray-600">
+                                <strong>Oturum Süresi:</strong> ${Math.floor(log.session_duration / 60)} dakika
+                            </div>
+                        ` : ''}
                     </div>
-                    <span class="text-gray-400">${new Date(log.login_time).toLocaleString('tr-TR')}</span>
+                    <div class="text-right">
+                        <span class="text-xs text-gray-500">
+                            ID: ${log.id ? log.id.substring(0, 8) : 'N/A'}
+                        </span>
+                    </div>
                 </div>
             `;
             
@@ -490,19 +524,103 @@ class AdminPanel {
         });
     }
 
-    updateStats() {
-        const totalUsers = this.users.length;
-        const activeUsers = this.users.filter(u => u.is_active).length;
-        const expiringUsers = this.users.filter(u => {
-            const daysLeft = this.getTrialDaysLeft(u.trial_end);
-            return daysLeft !== null && daysLeft <= 3 && daysLeft > 0;
-        }).length;
-        const pendingMessages = this.messages.filter(m => m.status === 'pending').length;
+    async loadIPAnalysis() {
+        try {
+            // Load logs first
+            await this.loadLogs();
+            
+            // Analyze IP data
+            this.analyzeIPData();
+        } catch (error) {
+            console.error('Error loading IP analysis:', error);
+        }
+    }
 
-        document.getElementById('totalUsers').textContent = totalUsers;
-        document.getElementById('activeUsers').textContent = activeUsers;
-        document.getElementById('expiringUsers').textContent = expiringUsers;
-        document.getElementById('pendingMessages').textContent = pendingMessages;
+    analyzeIPData() {
+        if (this.logs.length === 0) {
+            this.renderIPAnalysis();
+            return;
+        }
+
+        // Calculate statistics
+        const uniqueIPs = new Set(this.logs.map(log => log.ip_address));
+        const totalSessions = this.logs.length;
+        
+        // Calculate average session duration
+        const sessionsWithDuration = this.logs.filter(log => log.session_duration);
+        const avgDuration = sessionsWithDuration.length > 0 
+            ? sessionsWithDuration.reduce((sum, log) => sum + log.session_duration, 0) / sessionsWithDuration.length
+            : 0;
+
+        // Count IP usage
+        const ipCounts = {};
+        this.logs.forEach(log => {
+            ipCounts[log.ip_address] = (ipCounts[log.ip_address] || 0) + 1;
+        });
+
+        // Sort IPs by usage
+        const topIPs = Object.entries(ipCounts)
+            .sort(([,a], [,b]) => b - a)
+            .slice(0, 10);
+
+        // Create timeline data
+        const timeline = this.logs
+            .sort((a, b) => new Date(a.login_time) - new Date(b.login_time))
+            .slice(-20); // Last 20 sessions
+
+        this.renderIPAnalysis({
+            uniqueIPCount: uniqueIPs.size,
+            totalSessions: totalSessions,
+            avgSessionDuration: Math.round(avgDuration / 60), // minutes
+            topIPs: topIPs,
+            timeline: timeline
+        });
+    }
+
+    renderIPAnalysis(data = null) {
+        // Update statistics
+        document.getElementById('uniqueIPCount').textContent = data ? data.uniqueIPCount : '-';
+        document.getElementById('totalSessions').textContent = data ? data.totalSessions : '-';
+        document.getElementById('avgSessionDuration').textContent = data ? `${data.avgSessionDuration} dk` : '-';
+
+        // Render top IPs
+        const topIPsContainer = document.getElementById('topIPsList');
+        if (data && data.topIPs.length > 0) {
+            topIPsContainer.innerHTML = data.topIPs.map(([ip, count]) => `
+                <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <span class="font-mono text-sm">${ip}</span>
+                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
+                        ${count} oturum
+                    </span>
+                </div>
+            `).join('');
+        } else {
+            topIPsContainer.innerHTML = '<div class="text-center text-gray-500 py-4">Veri bulunamadı</div>';
+        }
+
+        // Render timeline
+        const timelineContainer = document.getElementById('ipTimeline');
+        if (data && data.timeline.length > 0) {
+            timelineContainer.innerHTML = data.timeline.map(log => {
+                const loginTime = new Date(log.login_time).toLocaleString('tr-TR');
+                const duration = log.session_duration ? `${Math.round(log.session_duration / 60)} dk` : 'Devam ediyor';
+                
+                return `
+                    <div class="flex justify-between items-center p-2 border-l-4 border-blue-500 bg-blue-50">
+                        <div class="flex-1">
+                            <div class="font-mono text-sm">${log.ip_address}</div>
+                            <div class="text-xs text-gray-600">${log.username || log.user_id}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-gray-600">${loginTime}</div>
+                            <div class="text-xs text-gray-500">${duration}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            timelineContainer.innerHTML = '<div class="text-center text-gray-500 py-4">Timeline verisi bulunamadı</div>';
+        }
     }
 }
 
@@ -524,5 +642,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     document.getElementById('refreshLogsBtn').addEventListener('click', async () => {
         await adminPanel.loadLogs();
+    });
+    
+    document.getElementById('refreshIPAnalysisBtn').addEventListener('click', async () => {
+        await adminPanel.loadIPAnalysis();
     });
 });

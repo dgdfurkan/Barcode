@@ -108,10 +108,6 @@ CREATE TABLE user_data (
 
 ## 👥 Kullanım
 
-### Demo Hesaplar
-- **Kullanıcı:** `demo.test` / **Şifre:** `demo123`
-- **Admin:** `admin.test` / **Şifre:** `admin123`
-
 ### Kullanıcı Girişi
 1. `index.html` sayfasını açın
 2. Kullanıcı adı ve şifre girin

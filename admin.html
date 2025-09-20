@@ -112,7 +112,10 @@
                         Mesajlar
                     </button>
                     <button class="tab-button py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="logs">
-                        Loglar
+                        IP Logları
+                    </button>
+                    <button class="tab-button py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="ipAnalysis">
+                        IP Analizi
                     </button>
                     <button class="tab-button py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="settings">
                         Ayarlar
@@ -171,6 +174,48 @@
                     </div>
                     <div id="logsList" class="space-y-2 max-h-96 overflow-y-auto">
                         <!-- Logs will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- IP Analysis Tab -->
+                <div id="ipAnalysis-tab" class="tab-content hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-medium text-gray-900">IP Analizi</h3>
+                        <button id="refreshIPAnalysisBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                            Yenile
+                        </button>
+                    </div>
+                    
+                    <!-- IP Statistics -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <div class="text-2xl font-bold text-blue-600" id="uniqueIPCount">-</div>
+                            <div class="text-sm text-blue-800">Benzersiz IP</div>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-4">
+                            <div class="text-2xl font-bold text-green-600" id="totalSessions">-</div>
+                            <div class="text-sm text-green-800">Toplam Oturum</div>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-4">
+                            <div class="text-2xl font-bold text-purple-600" id="avgSessionDuration">-</div>
+                            <div class="text-sm text-purple-800">Ort. Oturum Süresi</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Top IPs -->
+                    <div class="bg-white rounded-lg shadow p-4 mb-4">
+                        <h4 class="font-medium text-gray-900 mb-3">En Çok Kullanılan IP'ler</h4>
+                        <div id="topIPsList" class="space-y-2">
+                            <!-- Top IPs will be loaded here -->
+                        </div>
+                    </div>
+                    
+                    <!-- IP Activity Timeline -->
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <h4 class="font-medium text-gray-900 mb-3">IP Aktivite Zaman Çizelgesi</h4>
+                        <div id="ipTimeline" class="space-y-2 max-h-64 overflow-y-auto">
+                            <!-- Timeline will be loaded here -->
+                        </div>
                     </div>
                 </div>
 

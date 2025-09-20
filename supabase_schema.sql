@@ -134,14 +134,15 @@ CREATE POLICY "Admins can view all messages" ON messages
     );
 
 -- Insert demo users
+-- Insert sample users (remove these in production)
 INSERT INTO users (username, password, company, trial_end, is_admin) VALUES
-('demo.test', 'demo123', 'Demo Şirketi', '2025-12-31 23:59:59+00', false),
-('admin.test', 'admin123', 'Admin Panel', '2025-12-31 23:59:59+00', true);
+('sample.user', 'secure_password_123', 'Sample Company', '2025-12-31 23:59:59+00', false),
+('admin.user', 'admin_secure_password_456', 'Admin Company', '2025-12-31 23:59:59+00', true);
 
--- Insert demo user data
+-- Insert sample user data
 INSERT INTO user_data (username, data) VALUES
-('demo.test', '{"products": [], "settings": {"showDuplicates": false, "theme": "light", "searchHistory": [], "showDefaultProducts": true}, "statistics": {"totalSearches": 0, "totalProducts": 0, "lastLogin": null}}'),
-('admin.test', '{"products": [], "settings": {"showDuplicates": false, "theme": "light", "searchHistory": [], "showDefaultProducts": true}, "statistics": {"totalSearches": 0, "totalProducts": 0, "lastLogin": null}}');
+('sample.user', '{"products": [], "settings": {"showDuplicates": false, "theme": "light", "searchHistory": [], "showDefaultProducts": true}, "statistics": {"totalSearches": 0, "totalProducts": 0, "lastLogin": null}}'),
+('admin.user', '{"products": [], "settings": {"showDuplicates": false, "theme": "light", "searchHistory": [], "showDefaultProducts": true}, "statistics": {"totalSearches": 0, "totalProducts": 0, "lastLogin": null}}');
 
 -- Functions for updating timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()

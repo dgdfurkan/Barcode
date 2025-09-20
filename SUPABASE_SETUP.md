@@ -35,7 +35,7 @@ const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE';
 
 ## 📋 **Adım 5: Test Et**
 
-1. Demo hesabıyla giriş yap (`demo.test` / `demo123`)
+1. Test hesabıyla giriş yap (admin panelinden oluşturulan hesap)
 2. Admin panelinde yeni kullanıcı oluştur
 3. Kullanıcıların Supabase'de göründüğünü kontrol et
 

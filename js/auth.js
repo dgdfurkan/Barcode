@@ -29,26 +29,6 @@ function initSupabase() {
     }
 }
 
-// Demo users for testing (will be replaced by Supabase)
-const DEMO_USERS = {
-    'demo.test': {
-        password: 'demo123',
-        company: 'Demo Şirketi',
-        trialEnd: '2025-12-31',
-        allowedIPs: ['*'],
-        isActive: true,
-        isAdmin: false
-    },
-    'admin.test': {
-        password: 'admin123',
-        company: 'Admin Panel',
-        trialEnd: '2025-12-31',
-        allowedIPs: ['*'],
-        isActive: true,
-        isAdmin: true
-    }
-};
-
 // Get client IP address
 async function getClientIP() {
     try {
@@ -167,10 +147,7 @@ async function login(username, password) {
             }
         }
         
-        // Fallback to demo users for testing
-        if (!user && DEMO_USERS[username]) {
-            user = DEMO_USERS[username];
-        }
+        // No fallback users - only Supabase users allowed
         
         if (!user) {
             throw new Error('Kullanıcı bulunamadı!');
@@ -290,6 +267,46 @@ function checkAuth() {
 
 // Logout function
 function logout() {
+    // Get current session for logging
+    const session = JSON.parse(localStorage.getItem('userSession') || '{}');
+    
+    // Log logout time to IP logs
+    if (session.username) {
+        try {
+            const ipLogs = JSON.parse(localStorage.getItem('ipLogs') || '[]');
+            const lastLog = ipLogs.find(log => 
+                log.user_id === session.username && 
+                !log.logout_time
+            );
+            
+            if (lastLog) {
+                const logoutTime = new Date();
+                const loginTime = new Date(lastLog.login_time);
+                const sessionDuration = Math.floor((logoutTime - loginTime) / 1000); // seconds
+                
+                lastLog.logout_time = logoutTime.toISOString();
+                lastLog.session_duration = sessionDuration;
+                
+                localStorage.setItem('ipLogs', JSON.stringify(ipLogs));
+                
+                // Also update Supabase if available
+                if (window.supabase && lastLog.id) {
+                    window.supabase
+                        .from('ip_logs')
+                        .update({
+                            logout_time: logoutTime.toISOString(),
+                            session_duration: sessionDuration
+                        })
+                        .eq('id', lastLog.id)
+                        .then(() => console.log('Logout logged to Supabase'))
+                        .catch(err => console.warn('Supabase logout log error:', err));
+                }
+            }
+        } catch (error) {
+            console.warn('Logout logging error:', error);
+        }
+    }
+    
     localStorage.removeItem('userSession');
     localStorage.removeItem('authToken');
     
