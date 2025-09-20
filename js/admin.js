@@ -32,7 +32,7 @@ class AdminPanel {
         // Load initial data
         await this.loadUsers();
         await this.loadMessages();
-        await this.loadLogs();
+        await this.loadIPTracking();
 
         // Update stats
         this.updateStats();
@@ -306,7 +306,8 @@ class AdminPanel {
         const email = document.getElementById('newEmail').value;
         const trialDays = parseInt(document.getElementById('newTrialDays').value);
         const trialEndInput = document.getElementById('newTrialEnd').value;
-        const ips = document.getElementById('newIPs').value.split(',').map(ip => ip.trim()).filter(ip => ip);
+        const maxIPCount = parseInt(document.getElementById('newMaxIPCount').value) || 5;
+        const ipTrackingEnabled = document.getElementById('newIPTrackingEnabled').checked;
 
         try {
             let trialEnd;
@@ -326,7 +327,8 @@ class AdminPanel {
                 company: company,
                 contact_email: email,
                 trial_end: trialEnd.toISOString(),
-                allowed_ips: ips.length > 0 ? ips : ['*'],
+                max_ip_count: maxIPCount,
+                ip_tracking_enabled: ipTrackingEnabled,
                 is_active: true,
                 created_at: new Date().toISOString()
             };
@@ -787,93 +789,12 @@ class AdminPanel {
         this.renderMessages();
     }
 
-    async loadLogs() {
-        try {
-            // Try Supabase first
-            if (window.supabase) {
-                const { data, error } = await window.supabase
-                    .from('ip_logs')
-                    .select('*')
-                    .order('login_time', { ascending: false })
-                    .limit(100);
-                
-                if (!error && data) {
-                    this.logs = data;
-                }
-            }
 
-            // Fallback to local storage
-            if (this.logs.length === 0) {
-                const localLogs = JSON.parse(localStorage.getItem('ipLogs') || '[]');
-                this.logs = localLogs.slice(-100); // Son 100 log
-            }
-
-            this.renderLogs();
-        } catch (error) {
-            console.error('Error loading logs:', error);
-        }
-    }
-
-    renderLogs() {
-        const container = document.getElementById('logsList');
-        container.innerHTML = '';
-
-        if (this.logs.length === 0) {
-            container.innerHTML = '<div class="text-center text-gray-500 py-8">Henüz IP log kaydı bulunmuyor.</div>';
-            return;
-        }
-
-        this.logs.forEach(log => {
-            const logDiv = document.createElement('div');
-            logDiv.className = 'bg-white rounded-lg shadow p-4 mb-3';
-            
-            const loginTime = new Date(log.login_time).toLocaleString('tr-TR');
-            const userAgent = log.user_agent ? log.user_agent.substring(0, 60) + '...' : 'Bilinmiyor';
-            
-            logDiv.innerHTML = `
-                <div class="flex justify-between items-start">
-                    <div class="flex-1">
-                        <div class="flex items-center space-x-2 mb-2">
-                            <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium">
-                                ${log.username || log.user_id || 'Bilinmeyen'}
-                            </span>
-                            <span class="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
-                                ${log.ip_address}
-                            </span>
-                        </div>
-                        <div class="text-sm text-gray-600 mb-1">
-                            <strong>Giriş Zamanı:</strong> ${loginTime}
-                        </div>
-                        <div class="text-sm text-gray-600 mb-1">
-                            <strong>User Agent:</strong> ${userAgent}
-                        </div>
-                        ${log.logout_time ? `
-                            <div class="text-sm text-gray-600 mb-1">
-                                <strong>Çıkış Zamanı:</strong> ${new Date(log.logout_time).toLocaleString('tr-TR')}
-                            </div>
-                        ` : ''}
-                        ${log.session_duration ? `
-                            <div class="text-sm text-gray-600">
-                                <strong>Oturum Süresi:</strong> ${Math.floor(log.session_duration / 60)} dakika
-                            </div>
-                        ` : ''}
-                    </div>
-                    <div class="text-right">
-                        <span class="text-xs text-gray-500">
-                            ID: ${log.id ? log.id.substring(0, 8) : 'N/A'}
-                        </span>
-                    </div>
-                </div>
-            `;
-            
-            container.appendChild(logDiv);
-        });
-    }
 
     async loadIPAnalysis() {
         try {
-            // Load logs first
-            await this.loadLogs();
+            // Load IP tracking data
+            await this.loadIPTracking();
             
             // Analyze IP data
             this.analyzeIPData();
@@ -883,7 +804,7 @@ class AdminPanel {
     }
 
     analyzeIPData() {
-        if (this.logs.length === 0) {
+        if (!this.ipTrackingData || this.ipTrackingData.length === 0) {
             this.renderIPAnalysis();
             return;
         }
@@ -893,38 +814,33 @@ class AdminPanel {
         let totalDuration = 0;
         let suspiciousCount = 0;
 
-        this.logs.forEach(log => {
-            const ip = log.ip_address;
-            if (!ipStats[ip]) {
-                ipStats[ip] = {
-                    ip: ip,
+        this.ipTrackingData.forEach(ip => {
+            const ipAddress = ip.ip_address;
+            if (!ipStats[ipAddress]) {
+                ipStats[ipAddress] = {
+                    ip: ipAddress,
                     sessions: 0,
                     totalDuration: 0,
-                    lastSeen: log.login_time,
+                    lastSeen: ip.last_seen,
                     users: new Set(),
                     isSuspicious: false
                 };
             }
             
-            ipStats[ip].sessions++;
-            totalSessions++;
+            ipStats[ipAddress].sessions += ip.login_count || 1;
+            totalSessions += ip.login_count || 1;
             
-            if (log.session_duration) {
-                ipStats[ip].totalDuration += log.session_duration;
-                totalDuration += log.session_duration;
+            if (ip.username) {
+                ipStats[ipAddress].users.add(ip.username);
             }
             
-            if (log.username) {
-                ipStats[ip].users.add(log.username);
-            }
-            
-            if (new Date(log.login_time) > new Date(ipStats[ip].lastSeen)) {
-                ipStats[ip].lastSeen = log.login_time;
+            if (new Date(ip.last_seen) > new Date(ipStats[ipAddress].lastSeen)) {
+                ipStats[ipAddress].lastSeen = ip.last_seen;
             }
 
             // Detect suspicious activity
-            if (ipStats[ip].sessions > 10 || ipStats[ip].users.size > 3) {
-                ipStats[ip].isSuspicious = true;
+            if (ipStats[ipAddress].sessions > 10 || ipStats[ipAddress].users.size > 3) {
+                ipStats[ipAddress].isSuspicious = true;
                 suspiciousCount++;
             }
         });
@@ -936,8 +852,8 @@ class AdminPanel {
             suspiciousIPs: suspiciousCount,
             topIPs: Object.values(ipStats)
                 .sort((a, b) => b.sessions - a.sessions),
-            timeline: this.logs
-                .sort((a, b) => new Date(b.login_time) - new Date(a.login_time))
+            timeline: this.ipTrackingData
+                .sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen))
                 .slice(0, 50)
         };
 

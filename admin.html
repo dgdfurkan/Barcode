@@ -111,9 +111,6 @@
                     <button class="tab-button py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="messages">
                         Mesajlar
                     </button>
-                    <button class="tab-button py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="logs">
-                        IP Logları
-                    </button>
                     <button class="tab-button py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="ipAnalysis">
                         IP Analizi
                     </button>
@@ -181,18 +178,6 @@
                     </div>
                 </div>
 
-                <!-- Logs Tab -->
-                <div id="logs-tab" class="tab-content hidden">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-medium text-gray-900">Sistem Logları</h3>
-                        <button id="refreshLogsBtn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm">
-                            Yenile
-                        </button>
-                    </div>
-                    <div id="logsList" class="space-y-2 max-h-96 overflow-y-auto">
-                        <!-- Logs will be loaded here -->
-                    </div>
-                </div>
 
                 <!-- IP Analysis Tab -->
                 <div id="ipAnalysis-tab" class="tab-content hidden">
@@ -523,6 +508,18 @@
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Test Bitiş Tarihi</label>
                     <input type="datetime-local" id="newTrialEnd" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Maksimum IP Sayısı</label>
+                    <input type="number" id="newMaxIPCount" min="1" max="50" value="5" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    <p class="text-xs text-gray-500 mt-1">Kullanıcının kullanabileceği maksimum farklı IP sayısı</p>
+                </div>
+                <div>
+                    <label class="flex items-center">
+                        <input type="checkbox" id="newIPTrackingEnabled" checked class="mr-2">
+                        <span class="text-sm font-medium text-gray-700">IP Takibi Aktif</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1">Bu kullanıcı için IP takibi yapılsın mı?</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Test Süresi (gün) - Alternatif</label>
