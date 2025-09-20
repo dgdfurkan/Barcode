@@ -184,6 +184,14 @@ async function login(username, password) {
         if (!checkTrialExpiry(trialEnd)) {
             throw new Error('Test süreniz dolmuş! Lütfen destek ile iletişime geçin.');
         }
+
+        // IP Tracking Check
+        if (user.ip_tracking_enabled !== false) {
+            const ipTrackingResult = await checkIPTracking(user.id, clientIP, user.max_ip_count || 5);
+            if (!ipTrackingResult.success) {
+                throw new Error(`IP sınırı aşıldı! Maksimum ${user.max_ip_count || 5} farklı IP kullanabilirsiniz.`);
+            }
+        }
         
         // Log IP (if Supabase available)
         if (supabase && user.id) {
@@ -430,6 +438,87 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+// IP Tracking Functions
+async function checkIPTracking(userId, clientIP, maxIPCount) {
+    try {
+        if (supabase) {
+            // Use Supabase function
+            const { data, error } = await supabase.rpc('track_user_ip', {
+                p_user_id: userId,
+                p_ip_address: clientIP
+            });
+
+            if (error) throw error;
+            return data;
+        } else {
+            // Fallback to local storage
+            const ipTrackingData = JSON.parse(localStorage.getItem('ipTrackingData') || '[]');
+            
+            // Check if IP already exists for this user
+            const existingIP = ipTrackingData.find(ip => 
+                ip.user_id === userId && ip.ip_address === clientIP
+            );
+
+            if (existingIP) {
+                // Update existing IP
+                existingIP.last_seen = new Date().toISOString();
+                existingIP.login_count = (existingIP.login_count || 0) + 1;
+                localStorage.setItem('ipTrackingData', JSON.stringify(ipTrackingData));
+                
+                return {
+                    success: true,
+                    message: 'IP güncellendi',
+                    is_new: false
+                };
+            } else {
+                // Check if user has reached max IP count
+                const userIPs = ipTrackingData.filter(ip => 
+                    ip.user_id === userId && !ip.is_blocked
+                );
+
+                if (userIPs.length >= maxIPCount) {
+                    return {
+                        success: false,
+                        message: 'Maksimum IP sayısı aşıldı',
+                        ip_count: userIPs.length,
+                        max_ip: maxIPCount,
+                        is_new: false
+                    };
+                }
+
+                // Add new IP
+                const newIP = {
+                    id: Date.now().toString(),
+                    user_id: userId,
+                    ip_address: clientIP,
+                    first_seen: new Date().toISOString(),
+                    last_seen: new Date().toISOString(),
+                    login_count: 1,
+                    is_blocked: false
+                };
+
+                ipTrackingData.push(newIP);
+                localStorage.setItem('ipTrackingData', JSON.stringify(ipTrackingData));
+
+                return {
+                    success: true,
+                    message: 'Yeni IP eklendi',
+                    ip_count: userIPs.length + 1,
+                    max_ip: maxIPCount,
+                    is_new: true
+                };
+            }
+        }
+    } catch (error) {
+        console.error('IP tracking error:', error);
+        return {
+            success: false,
+            message: 'IP takibi hatası',
+            is_new: false
+        };
+    }
+}
 
 // Export functions for use in other pages
 window.authUtils = {

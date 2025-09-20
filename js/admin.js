@@ -87,6 +87,79 @@ class AdminPanel {
                 this.setQuickDuration(btn);
             });
         });
+
+        // Edit User Modal
+        document.getElementById('closeEditUserModal').addEventListener('click', () => {
+            document.getElementById('editUserModal').classList.add('hidden');
+        });
+
+        document.getElementById('cancelEditUser').addEventListener('click', () => {
+            document.getElementById('editUserModal').classList.add('hidden');
+        });
+
+        document.getElementById('editUserForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.updateUser();
+        });
+
+        // Toggle password visibility
+        document.getElementById('toggleEditPassword').addEventListener('click', () => {
+            this.togglePasswordVisibility('editPassword', 'toggleEditPassword');
+        });
+
+        // Message filter buttons
+        document.getElementById('filterAllMessages').addEventListener('click', () => {
+            this.filterMessages('all');
+        });
+
+        document.getElementById('filterPendingMessages').addEventListener('click', () => {
+            this.filterMessages('pending');
+        });
+
+        document.getElementById('filterApprovedMessages').addEventListener('click', () => {
+            this.filterMessages('approved');
+        });
+
+        document.getElementById('filterRejectedMessages').addEventListener('click', () => {
+            this.filterMessages('rejected');
+        });
+
+        // IP Analysis filter buttons
+        document.getElementById('filterAllIPs').addEventListener('click', () => {
+            this.filterIPs('all');
+        });
+
+        document.getElementById('filterTodayIPs').addEventListener('click', () => {
+            this.filterIPs('today');
+        });
+
+        document.getElementById('filterWeekIPs').addEventListener('click', () => {
+            this.filterIPs('week');
+        });
+
+        document.getElementById('filterMonthIPs').addEventListener('click', () => {
+            this.filterIPs('month');
+        });
+
+        // IP Analysis sort
+        document.getElementById('ipSortBy').addEventListener('change', (e) => {
+            this.sortIPs(e.target.value);
+        });
+
+        // IP Search
+        document.getElementById('ipSearchInput').addEventListener('input', (e) => {
+            this.searchIPs(e.target.value);
+        });
+
+        // Export IP Data
+        document.getElementById('exportIPData').addEventListener('click', () => {
+            this.exportIPData();
+        });
+
+        // IP Tracking refresh
+        document.getElementById('refreshIPTrackingBtn').addEventListener('click', () => {
+            this.loadIPTracking();
+        });
     }
 
     async switchTab(tabName) {
@@ -111,6 +184,7 @@ class AdminPanel {
         // Load data when switching to specific tabs
         if (tabName === 'ipAnalysis') {
             await this.loadIPAnalysis();
+            await this.loadIPTracking();
         }
     }
 
@@ -200,6 +274,7 @@ class AdminPanel {
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div class="flex space-x-2">
+                        <button onclick="adminPanel.editUser('${user.username}')" class="text-green-600 hover:text-green-900">Düzenle</button>
                         <button onclick="adminPanel.extendTrial('${user.username}')" class="text-blue-600 hover:text-blue-900">Uzat</button>
                         <button onclick="adminPanel.toggleUser('${user.username}')" class="text-yellow-600 hover:text-yellow-900">
                             ${user.is_active ? 'Deaktif Et' : 'Aktif Et'}
@@ -399,6 +474,131 @@ class AdminPanel {
         }
     }
 
+    editUser(username) {
+        const user = this.users.find(u => u.username === username);
+        if (!user) return;
+
+        // Store current username for modal
+        this.currentEditUser = username;
+
+        // Fill form with user data
+        document.getElementById('editUsername').value = user.username;
+        document.getElementById('editPassword').value = user.password || '';
+        document.getElementById('editCompany').value = user.company || '';
+        document.getElementById('editEmail').value = user.contact_email || '';
+        
+        // Set trial end date
+        if (user.trial_end) {
+            const trialEnd = new Date(user.trial_end);
+            const localTime = new Date(trialEnd.getTime() - (trialEnd.getTimezoneOffset() * 60000));
+            document.getElementById('editTrialEnd').value = localTime.toISOString().slice(0, 16);
+        }
+        
+        document.getElementById('editIPs').value = (user.allowed_ips || user.allowedIPs || []).join(', ');
+        document.getElementById('editMaxIPCount').value = user.max_ip_count || 5;
+        document.getElementById('editIPTrackingEnabled').checked = user.ip_tracking_enabled !== false;
+        document.getElementById('editIsActive').checked = user.is_active || user.isActive || false;
+
+        // Show modal
+        document.getElementById('editUserModal').classList.remove('hidden');
+    }
+
+    async updateUser() {
+        const username = this.currentEditUser;
+        if (!username) return;
+
+        const password = document.getElementById('editPassword').value;
+        const company = document.getElementById('editCompany').value;
+        const email = document.getElementById('editEmail').value;
+        const trialEndInput = document.getElementById('editTrialEnd').value;
+        const ips = document.getElementById('editIPs').value.split(',').map(ip => ip.trim()).filter(ip => ip);
+        const maxIPCount = parseInt(document.getElementById('editMaxIPCount').value) || 5;
+        const ipTrackingEnabled = document.getElementById('editIPTrackingEnabled').checked;
+        const isActive = document.getElementById('editIsActive').checked;
+
+        try {
+            let trialEnd;
+            if (trialEndInput) {
+                trialEnd = new Date(trialEndInput);
+            } else {
+                trialEnd = new Date();
+                trialEnd.setDate(trialEnd.getDate() + 30); // Default 30 days
+            }
+
+            const updatedUser = {
+                password: password,
+                company: company,
+                contact_email: email,
+                trial_end: trialEnd.toISOString(),
+                allowed_ips: ips.length > 0 ? ips : ['*'],
+                max_ip_count: maxIPCount,
+                ip_tracking_enabled: ipTrackingEnabled,
+                is_active: isActive
+            };
+
+            // Update in Supabase
+            if (window.supabase) {
+                await window.supabase
+                    .from('users')
+                    .update(updatedUser)
+                    .eq('username', username);
+            }
+
+            // Update local
+            const localUsers = JSON.parse(localStorage.getItem('LOCAL_USERS') || '{}');
+            if (localUsers[username]) {
+                localUsers[username] = {
+                    ...localUsers[username],
+                    password: password,
+                    company: company,
+                    trialEnd: trialEnd.toISOString(),
+                    allowedIPs: ips.length > 0 ? ips : ['*'],
+                    isActive: isActive
+                };
+                localStorage.setItem('LOCAL_USERS', JSON.stringify(localUsers));
+            }
+
+            // Update in memory
+            const user = this.users.find(u => u.username === username);
+            if (user) {
+                Object.assign(user, updatedUser);
+            }
+
+            this.renderUsers();
+            this.updateStats();
+
+            // Close modal
+            document.getElementById('editUserModal').classList.add('hidden');
+
+            alert('Kullanıcı başarıyla güncellendi!');
+        } catch (error) {
+            console.error('Error updating user:', error);
+            alert('Kullanıcı güncellenirken hata oluştu: ' + error.message);
+        }
+    }
+
+    togglePasswordVisibility(inputId, buttonId) {
+        const input = document.getElementById(inputId);
+        const button = document.getElementById(buttonId);
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            button.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+                </svg>
+            `;
+        } else {
+            input.type = 'password';
+            button.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+            `;
+        }
+    }
+
     async toggleUser(username) {
         try {
             const user = this.users.find(u => u.username === username);
@@ -486,7 +686,18 @@ class AdminPanel {
             return;
         }
 
-        this.messages.forEach(message => {
+        // Filter messages based on current filter
+        let filteredMessages = this.messages;
+        if (this.currentMessageFilter && this.currentMessageFilter !== 'all') {
+            filteredMessages = this.messages.filter(message => message.status === this.currentMessageFilter);
+        }
+
+        if (filteredMessages.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-center py-8">Bu kategoride mesaj bulunmuyor.</p>';
+            return;
+        }
+
+        filteredMessages.forEach(message => {
             const messageDiv = document.createElement('div');
             messageDiv.className = 'bg-white border border-gray-200 rounded-lg p-4';
             
@@ -509,8 +720,12 @@ class AdminPanel {
                           message.status === 'approved' ? 'Onaylandı' : 'Reddedildi'}
                     </span>
                     <div class="flex space-x-2">
-                        <button onclick="adminPanel.updateMessageStatus('${message.id}', 'approved')" class="text-green-600 hover:text-green-800 text-sm">Onayla</button>
-                        <button onclick="adminPanel.updateMessageStatus('${message.id}', 'rejected')" class="text-red-600 hover:text-red-800 text-sm">Reddet</button>
+                        ${message.status === 'pending' ? `
+                            <button onclick="adminPanel.updateMessageStatus('${message.id}', 'approved')" class="text-green-600 hover:text-green-800 text-sm">Onayla</button>
+                            <button onclick="adminPanel.updateMessageStatus('${message.id}', 'rejected')" class="text-red-600 hover:text-red-800 text-sm">Reddet</button>
+                        ` : `
+                            <button onclick="adminPanel.updateMessageStatus('${message.id}', 'pending')" class="text-blue-600 hover:text-blue-800 text-sm">Bekletmeye Al</button>
+                        `}
                     </div>
                 </div>
             `;
@@ -551,6 +766,25 @@ class AdminPanel {
             console.error('Error updating message status:', error);
             alert('Mesaj durumu güncellenirken hata oluştu: ' + error.message);
         }
+    }
+
+    filterMessages(filter) {
+        this.currentMessageFilter = filter;
+        
+        // Update filter button states
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('bg-blue-600', 'text-white');
+            btn.classList.add('bg-gray-300', 'text-gray-700');
+        });
+        
+        // Highlight active filter
+        const activeButton = document.getElementById(`filter${filter.charAt(0).toUpperCase() + filter.slice(1)}Messages`);
+        if (activeButton) {
+            activeButton.classList.remove('bg-gray-300', 'text-gray-700');
+            activeButton.classList.add('bg-blue-600', 'text-white');
+        }
+        
+        this.renderMessages();
     }
 
     async loadLogs() {
@@ -654,39 +888,60 @@ class AdminPanel {
             return;
         }
 
-        // Calculate statistics
-        const uniqueIPs = new Set(this.logs.map(log => log.ip_address));
-        const totalSessions = this.logs.length;
-        
-        // Calculate average session duration
-        const sessionsWithDuration = this.logs.filter(log => log.session_duration);
-        const avgDuration = sessionsWithDuration.length > 0 
-            ? sessionsWithDuration.reduce((sum, log) => sum + log.session_duration, 0) / sessionsWithDuration.length
-            : 0;
+        const ipStats = {};
+        let totalSessions = 0;
+        let totalDuration = 0;
+        let suspiciousCount = 0;
 
-        // Count IP usage
-        const ipCounts = {};
         this.logs.forEach(log => {
-            ipCounts[log.ip_address] = (ipCounts[log.ip_address] || 0) + 1;
+            const ip = log.ip_address;
+            if (!ipStats[ip]) {
+                ipStats[ip] = {
+                    ip: ip,
+                    sessions: 0,
+                    totalDuration: 0,
+                    lastSeen: log.login_time,
+                    users: new Set(),
+                    isSuspicious: false
+                };
+            }
+            
+            ipStats[ip].sessions++;
+            totalSessions++;
+            
+            if (log.session_duration) {
+                ipStats[ip].totalDuration += log.session_duration;
+                totalDuration += log.session_duration;
+            }
+            
+            if (log.username) {
+                ipStats[ip].users.add(log.username);
+            }
+            
+            if (new Date(log.login_time) > new Date(ipStats[ip].lastSeen)) {
+                ipStats[ip].lastSeen = log.login_time;
+            }
+
+            // Detect suspicious activity
+            if (ipStats[ip].sessions > 10 || ipStats[ip].users.size > 3) {
+                ipStats[ip].isSuspicious = true;
+                suspiciousCount++;
+            }
         });
 
-        // Sort IPs by usage
-        const topIPs = Object.entries(ipCounts)
-            .sort(([,a], [,b]) => b - a)
-            .slice(0, 10);
-
-        // Create timeline data
-        const timeline = this.logs
-            .sort((a, b) => new Date(a.login_time) - new Date(b.login_time))
-            .slice(-20); // Last 20 sessions
-
-        this.renderIPAnalysis({
-            uniqueIPCount: uniqueIPs.size,
+        this.ipAnalysis = {
+            uniqueIPs: Object.keys(ipStats).length,
             totalSessions: totalSessions,
-            avgSessionDuration: Math.round(avgDuration / 60), // minutes
-            topIPs: topIPs,
-            timeline: timeline
-        });
+            avgSessionDuration: totalSessions > 0 ? Math.round(totalDuration / totalSessions / 60) : 0,
+            suspiciousIPs: suspiciousCount,
+            topIPs: Object.values(ipStats)
+                .sort((a, b) => b.sessions - a.sessions),
+            timeline: this.logs
+                .sort((a, b) => new Date(b.login_time) - new Date(a.login_time))
+                .slice(0, 50)
+        };
+
+        this.renderIPAnalysis();
     }
 
     renderIPAnalysis(data = null) {
@@ -786,6 +1041,167 @@ class AdminPanel {
         if (daysLeft <= 3) return 'text-orange-600';
         
         return 'text-green-600';
+    }
+
+    // IP Tracking Functions
+    async loadIPTracking() {
+        try {
+            if (window.supabase) {
+                const { data, error } = await window.supabase
+                    .from('user_ip_tracking')
+                    .select(`
+                        *,
+                        users!inner(username, company)
+                    `)
+                    .order('last_seen', { ascending: false });
+
+                if (error) throw error;
+                this.ipTrackingData = data || [];
+            } else {
+                // Fallback to local storage
+                this.ipTrackingData = JSON.parse(localStorage.getItem('ipTrackingData') || '[]');
+            }
+
+            this.renderIPTracking();
+        } catch (error) {
+            console.error('Error loading IP tracking:', error);
+            this.ipTrackingData = [];
+            this.renderIPTracking();
+        }
+    }
+
+    renderIPTracking() {
+        // Update statistics
+        const totalTracked = this.ipTrackingData.length;
+        const blockedCount = this.ipTrackingData.filter(ip => ip.is_blocked).length;
+        const violationsCount = this.ipTrackingData.filter(ip => ip.login_count > 10).length;
+
+        document.getElementById('totalTrackedIPs').textContent = totalTracked;
+        document.getElementById('blockedIPs').textContent = blockedCount;
+        document.getElementById('maxIPViolations').textContent = violationsCount;
+
+        // Render table
+        const tbody = document.getElementById('ipTrackingTable');
+        tbody.innerHTML = '';
+
+        this.ipTrackingData.forEach(ip => {
+            const row = document.createElement('tr');
+            const statusClass = ip.is_blocked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800';
+            const statusText = ip.is_blocked ? 'Engellenen' : 'Aktif';
+            
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">${ip.users?.username || 'Bilinmeyen'}</div>
+                    <div class="text-sm text-gray-500">${ip.users?.company || ''}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">${ip.ip_address}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">${new Date(ip.first_seen).toLocaleString('tr-TR')}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">${new Date(ip.last_seen).toLocaleString('tr-TR')}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">${ip.login_count}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 py-1 rounded-full text-xs font-medium ${statusClass}">
+                        ${statusText}
+                    </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div class="flex space-x-2">
+                        ${ip.is_blocked ? 
+                            `<button onclick="adminPanel.unblockIP('${ip.id}')" class="text-green-600 hover:text-green-900">Engeli Kaldır</button>` :
+                            `<button onclick="adminPanel.blockIPTracking('${ip.id}')" class="text-red-600 hover:text-red-900">Engelle</button>`
+                        }
+                        <button onclick="adminPanel.deleteIPTracking('${ip.id}')" class="text-gray-600 hover:text-gray-900">Sil</button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    async blockIPTracking(ipId) {
+        if (confirm('Bu IP adresini engellemek istediğinizden emin misiniz?')) {
+            try {
+                if (window.supabase) {
+                    const { error } = await window.supabase
+                        .from('user_ip_tracking')
+                        .update({ is_blocked: true })
+                        .eq('id', ipId);
+
+                    if (error) throw error;
+                } else {
+                    // Local storage fallback
+                    const index = this.ipTrackingData.findIndex(ip => ip.id === ipId);
+                    if (index !== -1) {
+                        this.ipTrackingData[index].is_blocked = true;
+                        localStorage.setItem('ipTrackingData', JSON.stringify(this.ipTrackingData));
+                    }
+                }
+
+                await this.loadIPTracking();
+                alert('IP adresi engellendi!');
+            } catch (error) {
+                console.error('Error blocking IP:', error);
+                alert('IP engellenirken hata oluştu!');
+            }
+        }
+    }
+
+    async unblockIP(ipId) {
+        try {
+            if (window.supabase) {
+                const { error } = await window.supabase
+                    .from('user_ip_tracking')
+                    .update({ is_blocked: false })
+                    .eq('id', ipId);
+
+                if (error) throw error;
+            } else {
+                // Local storage fallback
+                const index = this.ipTrackingData.findIndex(ip => ip.id === ipId);
+                if (index !== -1) {
+                    this.ipTrackingData[index].is_blocked = false;
+                    localStorage.setItem('ipTrackingData', JSON.stringify(this.ipTrackingData));
+                }
+            }
+
+            await this.loadIPTracking();
+            alert('IP engeli kaldırıldı!');
+        } catch (error) {
+            console.error('Error unblocking IP:', error);
+            alert('IP engeli kaldırılırken hata oluştu!');
+        }
+    }
+
+    async deleteIPTracking(ipId) {
+        if (confirm('Bu IP kaydını silmek istediğinizden emin misiniz?')) {
+            try {
+                if (window.supabase) {
+                    const { error } = await window.supabase
+                        .from('user_ip_tracking')
+                        .delete()
+                        .eq('id', ipId);
+
+                    if (error) throw error;
+                } else {
+                    // Local storage fallback
+                    this.ipTrackingData = this.ipTrackingData.filter(ip => ip.id !== ipId);
+                    localStorage.setItem('ipTrackingData', JSON.stringify(this.ipTrackingData));
+                }
+
+                await this.loadIPTracking();
+                alert('IP kaydı silindi!');
+            } catch (error) {
+                console.error('Error deleting IP tracking:', error);
+                alert('IP kaydı silinirken hata oluştu!');
+            }
+        }
     }
 }
 

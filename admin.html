@@ -159,6 +159,23 @@
                             Yenile
                         </button>
                     </div>
+                    
+                    <!-- Message Filter -->
+                    <div class="mb-4 flex space-x-2">
+                        <button id="filterAllMessages" class="filter-btn px-3 py-1 bg-blue-600 text-white rounded-md text-sm">
+                            Tümü
+                        </button>
+                        <button id="filterPendingMessages" class="filter-btn px-3 py-1 bg-gray-300 text-gray-700 rounded-md text-sm">
+                            Bekleyen
+                        </button>
+                        <button id="filterApprovedMessages" class="filter-btn px-3 py-1 bg-gray-300 text-gray-700 rounded-md text-sm">
+                            Onaylanan
+                        </button>
+                        <button id="filterRejectedMessages" class="filter-btn px-3 py-1 bg-gray-300 text-gray-700 rounded-md text-sm">
+                            Reddedilen
+                        </button>
+                    </div>
+                    
                     <div id="messagesList" class="space-y-4">
                         <!-- Messages will be loaded here -->
                     </div>
@@ -179,42 +196,207 @@
 
                 <!-- IP Analysis Tab -->
                 <div id="ipAnalysis-tab" class="tab-content hidden">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-medium text-gray-900">IP Analizi</h3>
-                        <button id="refreshIPAnalysisBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
-                            Yenile
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900">IP Analizi & Güvenlik</h3>
+                            <p class="text-sm text-gray-600 mt-1">Kullanıcı aktivitelerini ve güvenlik durumunu izleyin</p>
+                        </div>
+                        <button id="refreshIPAnalysisBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center space-x-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            <span>Yenile</span>
                         </button>
                     </div>
-                    
-                    <!-- IP Statistics -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div class="bg-blue-50 rounded-lg p-4">
-                            <div class="text-2xl font-bold text-blue-600" id="uniqueIPCount">-</div>
-                            <div class="text-sm text-blue-800">Benzersiz IP</div>
-                        </div>
-                        <div class="bg-green-50 rounded-lg p-4">
-                            <div class="text-2xl font-bold text-green-600" id="totalSessions">-</div>
-                            <div class="text-sm text-green-800">Toplam Oturum</div>
-                        </div>
-                        <div class="bg-purple-50 rounded-lg p-4">
-                            <div class="text-2xl font-bold text-purple-600" id="avgSessionDuration">-</div>
-                            <div class="text-sm text-purple-800">Ort. Oturum Süresi</div>
+
+                    <!-- Filter Section -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+                        <div class="flex flex-wrap gap-3 items-center">
+                            <div class="flex items-center space-x-2">
+                                <label class="text-sm font-medium text-gray-700">Filtrele:</label>
+                                <button id="filterAllIPs" class="ip-filter-btn px-3 py-1 bg-blue-600 text-white rounded-md text-sm">
+                                    Tümü
+                                </button>
+                                <button id="filterTodayIPs" class="ip-filter-btn px-3 py-1 bg-gray-300 text-gray-700 rounded-md text-sm">
+                                    Bugün
+                                </button>
+                                <button id="filterWeekIPs" class="ip-filter-btn px-3 py-1 bg-gray-300 text-gray-700 rounded-md text-sm">
+                                    Bu Hafta
+                                </button>
+                                <button id="filterMonthIPs" class="ip-filter-btn px-3 py-1 bg-gray-300 text-gray-700 rounded-md text-sm">
+                                    Bu Ay
+                                </button>
+                            </div>
+                            <div class="flex items-center space-x-2 ml-auto">
+                                <label class="text-sm font-medium text-gray-700">Sırala:</label>
+                                <select id="ipSortBy" class="border border-gray-300 rounded-md px-2 py-1 text-sm">
+                                    <option value="activity">Aktivite</option>
+                                    <option value="sessions">Oturum Sayısı</option>
+                                    <option value="duration">Ortalama Süre</option>
+                                    <option value="lastSeen">Son Görülme</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
-                    
-                    <!-- Top IPs -->
-                    <div class="bg-white rounded-lg shadow p-4 mb-4">
-                        <h4 class="font-medium text-gray-900 mb-3">En Çok Kullanılan IP'ler</h4>
-                        <div id="topIPsList" class="space-y-2">
-                            <!-- Top IPs will be loaded here -->
+
+                    <!-- Statistics Cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-2xl font-bold" id="uniqueIPCount">-</div>
+                                    <div class="text-sm opacity-90">Benzersiz IP</div>
+                                </div>
+                                <svg class="w-8 h-8 opacity-80" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-2xl font-bold" id="totalSessions">-</div>
+                                    <div class="text-sm opacity-90">Toplam Oturum</div>
+                                </div>
+                                <svg class="w-8 h-8 opacity-80" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-4 text-white">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-2xl font-bold" id="avgSessionDuration">-</div>
+                                    <div class="text-sm opacity-90">Ort. Süre</div>
+                                </div>
+                                <svg class="w-8 h-8 opacity-80" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg p-4 text-white">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <div class="text-2xl font-bold" id="suspiciousIPs">-</div>
+                                    <div class="text-sm opacity-90">Şüpheli IP</div>
+                                </div>
+                                <svg class="w-8 h-8 opacity-80" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                </svg>
+                            </div>
                         </div>
                     </div>
-                    
-                    <!-- IP Activity Timeline -->
-                    <div class="bg-white rounded-lg shadow p-4">
-                        <h4 class="font-medium text-gray-900 mb-3">IP Aktivite Zaman Çizelgesi</h4>
-                        <div id="ipTimeline" class="space-y-2 max-h-64 overflow-y-auto">
+
+                    <!-- IP List with Advanced Features -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                        <div class="p-4 border-b border-gray-200">
+                            <div class="flex justify-between items-center">
+                                <h4 class="text-lg font-semibold text-gray-900">IP Detayları</h4>
+                                <div class="flex items-center space-x-2">
+                                    <input type="text" id="ipSearchInput" placeholder="IP ara..." class="border border-gray-300 rounded-md px-3 py-1 text-sm">
+                                    <button id="exportIPData" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded-md text-sm">
+                                        Dışa Aktar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Adresi</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kullanıcı</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Oturumlar</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Toplam Süre</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Son Aktivite</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ipDetailsTable" class="bg-white divide-y divide-gray-200">
+                                    <!-- IP details will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Activity Timeline -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
+                        <div class="p-4 border-b border-gray-200">
+                            <h4 class="text-lg font-semibold text-gray-900">Aktivite Zaman Çizelgesi</h4>
+                        </div>
+                        <div id="ipTimeline" class="p-4 max-h-96 overflow-y-auto">
                             <!-- Timeline will be loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- IP Tracking & Security -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mt-6">
+                        <div class="p-4 border-b border-gray-200">
+                            <div class="flex justify-between items-center">
+                                <h4 class="text-lg font-semibold text-gray-900">IP Takibi & Güvenlik</h4>
+                                <button id="refreshIPTrackingBtn" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md text-sm">
+                                    Yenile
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <!-- IP Tracking Stats -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                <div class="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg p-4 text-white">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-2xl font-bold" id="totalTrackedIPs">-</div>
+                                            <div class="text-sm opacity-90">Takip Edilen IP</div>
+                                        </div>
+                                        <svg class="w-8 h-8 opacity-80" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="bg-gradient-to-r from-teal-500 to-teal-600 rounded-lg p-4 text-white">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-2xl font-bold" id="blockedIPs">-</div>
+                                            <div class="text-sm opacity-90">Engellenen IP</div>
+                                        </div>
+                                        <svg class="w-8 h-8 opacity-80" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 018.367 8.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="bg-gradient-to-r from-pink-500 to-pink-600 rounded-lg p-4 text-white">
+                                    <div class="flex items-center justify-between">
+                                        <div>
+                                            <div class="text-2xl font-bold" id="maxIPViolations">-</div>
+                                            <div class="text-sm opacity-90">IP Sınırı Aşımı</div>
+                                        </div>
+                                        <svg class="w-8 h-8 opacity-80" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- IP Tracking Table -->
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kullanıcı</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Adresi</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İlk Görülme</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Son Görülme</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Giriş Sayısı</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ipTrackingTable" class="bg-white divide-y divide-gray-200">
+                                        <!-- IP tracking data will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -304,6 +486,92 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div id="editUserModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Kullanıcı Düzenle</h3>
+                    <button id="closeEditUserModal" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <form id="editUserForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Kullanıcı Adı</label>
+                        <input type="text" id="editUsername" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" readonly>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Şifre</label>
+                        <div class="flex">
+                            <input type="password" id="editPassword" class="flex-1 border-gray-300 rounded-l-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                            <button type="button" id="toggleEditPassword" class="px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 hover:bg-gray-100">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Şirket</label>
+                        <input type="text" id="editCompany" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">E-posta</label>
+                        <input type="email" id="editEmail" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Test Bitiş Tarihi</label>
+                        <input type="datetime-local" id="editTrialEnd" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">İzin Verilen IP'ler</label>
+                        <input type="text" id="editIPs" placeholder="IP1, IP2, IP3 (boş bırakırsanız tüm IP'ler)" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Maksimum IP Sayısı</label>
+                        <input type="number" id="editMaxIPCount" min="1" max="50" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="5">
+                        <p class="text-xs text-gray-500 mt-1">Kullanıcının kullanabileceği maksimum farklı IP sayısı</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="editIPTrackingEnabled" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <span class="ml-2 text-sm text-gray-700">IP Takibi Aktif</span>
+                        </label>
+                        <p class="text-xs text-gray-500 mt-1">Bu kullanıcı için IP takibi yapılsın mı?</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="editIsActive" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <span class="ml-2 text-sm text-gray-700">Aktif Kullanıcı</span>
+                        </label>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" id="cancelEditUser" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors">
+                            İptal
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                            Güncelle
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
