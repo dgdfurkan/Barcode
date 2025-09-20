@@ -147,7 +147,16 @@ async function login(username, password) {
             }
         }
         
-        // No fallback users - only Supabase users allowed
+        // Fallback: Check localStorage for admin user
+        if (!user) {
+            const localUsersData = localStorage.getItem('LOCAL_USERS');
+            if (localUsersData) {
+                const localUsers = JSON.parse(localUsersData);
+                if (localUsers[username]) {
+                    user = localUsers[username];
+                }
+            }
+        }
         
         if (!user) {
             throw new Error('Kullanıcı bulunamadı!');

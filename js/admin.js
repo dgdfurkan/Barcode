@@ -43,9 +43,9 @@ class AdminPanel {
         const tabContents = document.querySelectorAll('.tab-content');
 
         tabButtons.forEach(button => {
-            button.addEventListener('click', () => {
+            button.addEventListener('click', async () => {
                 const tabName = button.dataset.tab;
-                this.switchTab(tabName);
+                await this.switchTab(tabName);
             });
         });
 
@@ -67,9 +67,29 @@ class AdminPanel {
             e.preventDefault();
             this.addUser();
         });
+
+        // Extend Trial Modal
+        document.getElementById('closeExtendTrialModal').addEventListener('click', () => {
+            document.getElementById('extendTrialModal').classList.add('hidden');
+        });
+
+        document.getElementById('cancelExtendTrial').addEventListener('click', () => {
+            document.getElementById('extendTrialModal').classList.add('hidden');
+        });
+
+        document.getElementById('confirmExtendTrial').addEventListener('click', () => {
+            this.confirmExtendTrial();
+        });
+
+        // Quick duration buttons
+        document.querySelectorAll('.quick-duration-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.setQuickDuration(btn);
+            });
+        });
     }
 
-    switchTab(tabName) {
+    async switchTab(tabName) {
         // Update button states
         document.querySelectorAll('.tab-button').forEach(btn => {
             btn.classList.remove('active', 'border-blue-500', 'text-blue-600');
@@ -110,21 +130,34 @@ class AdminPanel {
                 }
             }
 
-            // Fallback: Load from localStorage for demo
-            const localUsersData = localStorage.getItem('LOCAL_USERS');
-            if (localUsersData) {
-                const localUsers = JSON.parse(localUsersData);
-                this.users = Object.keys(localUsers).map(username => ({
-                    username: username,
-                    company: localUsers[username].company,
-                    trial_end: localUsers[username].trialEnd,
-                    is_active: localUsers[username].isActive,
-                    allowed_ips: localUsers[username].allowedIPs,
+            // Fallback: Create default admin user if no data
+            if (this.users.length === 0) {
+                this.users = [{
+                    username: 'admin.test',
+                    company: 'Admin Panel',
+                    trial_end: '2025-12-31T23:59:59Z',
+                    is_active: true,
+                    allowed_ips: ['*'],
+                    is_admin: true,
                     created_at: new Date().toISOString()
-                }));
+                }];
+                
+                // Save to localStorage for persistence
+                const localUsers = {
+                    'admin.test': {
+                        password: 'admin123',
+                        company: 'Admin Panel',
+                        trialEnd: '2025-12-31',
+                        allowedIPs: ['*'],
+                        isActive: true,
+                        isAdmin: true
+                    }
+                };
+                localStorage.setItem('LOCAL_USERS', JSON.stringify(localUsers));
             }
 
             this.renderUsers();
+            this.updateStats();
         } catch (error) {
             console.error('Error loading users:', error);
         }
@@ -154,10 +187,16 @@ class AdminPanel {
                     <div class="text-sm text-gray-500">${user.company || '-'}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm text-gray-500">${user.trial_end ? new Date(user.trial_end).toLocaleDateString('tr-TR') : '-'}</div>
+                    <div class="text-sm text-gray-500">${user.trial_end ? new Date(user.trial_end).toLocaleString('tr-TR', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }) : '-'}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="text-sm font-medium ${statusClass}">${statusText}</span>
+                    <span class="text-sm font-medium ${this.getTrialStatusClass(user.trial_end)}">${this.getTrialStatusText(user.trial_end)}</span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div class="flex space-x-2">
@@ -199,6 +238,7 @@ class AdminPanel {
             
             // Use datetime-local input if provided, otherwise use trial days
             if (trialEndInput) {
+                // datetime-local input yerel saat formatında gelir, direkt kullan
                 trialEnd = new Date(trialEndInput);
             } else {
                 trialEnd = new Date();
@@ -251,17 +291,83 @@ class AdminPanel {
         }
     }
 
-    async extendTrial(username) {
-        const days = prompt(`${username} kullanıcısı için kaç gün uzatmak istiyorsunuz?`, '7');
-        if (!days || isNaN(days)) return;
+    extendTrial(username) {
+        const user = this.users.find(u => u.username === username);
+        if (!user) return;
+
+        // Store current username for modal
+        this.currentExtendUser = username;
+
+        const currentEnd = user.trial_end ? new Date(user.trial_end) : new Date();
+        
+        // Mevcut tarihi yerel saat olarak göster (datetime-local input için)
+        const localTime = new Date(currentEnd.getTime() - (currentEnd.getTimezoneOffset() * 60000));
+        const currentEndString = localTime.toISOString().slice(0, 16);
+
+        // Update modal content
+        document.getElementById('extendTrialUsername').textContent = username;
+        document.getElementById('extendTrialCurrentEnd').textContent = currentEnd.toLocaleString('tr-TR');
+        document.getElementById('extendTrialNewEnd').value = currentEndString;
+
+        // Show modal
+        document.getElementById('extendTrialModal').classList.remove('hidden');
+    }
+
+    setQuickDuration(button) {
+        const username = this.currentExtendUser;
+        if (!username) return;
+
+        const user = this.users.find(u => u.username === username);
+        if (!user) return;
+
+        // Mevcut bitiş tarihini al
+        const currentEnd = user.trial_end ? new Date(user.trial_end) : new Date();
+        const newEnd = new Date(currentEnd);
+
+        // Get duration from button data attributes
+        const hours = button.dataset.hours;
+        const days = button.dataset.days;
+
+        if (hours) {
+            // Mevcut bitiş tarihine saat ekle (millisecond cinsinden)
+            newEnd.setTime(newEnd.getTime() + (parseInt(hours) * 60 * 60 * 1000));
+        } else if (days) {
+            // Mevcut bitiş tarihine gün ekle (millisecond cinsinden)
+            newEnd.setTime(newEnd.getTime() + (parseInt(days) * 24 * 60 * 60 * 1000));
+        }
+
+        // Yerel saat olarak göster (datetime-local input için)
+        const localTime = new Date(newEnd.getTime() - (newEnd.getTimezoneOffset() * 60000));
+        const newEndString = localTime.toISOString().slice(0, 16);
+        document.getElementById('extendTrialNewEnd').value = newEndString;
+
+        // Visual feedback - highlight the clicked button
+        document.querySelectorAll('.quick-duration-btn').forEach(btn => {
+            btn.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-200');
+        });
+        button.classList.add('ring-2', 'ring-blue-500', 'bg-blue-200');
+    }
+
+    async confirmExtendTrial() {
+        const username = this.currentExtendUser;
+        if (!username) return;
+
+        const newEndString = document.getElementById('extendTrialNewEnd').value;
+        if (!newEndString) {
+            alert('Lütfen yeni bitiş tarihi seçin!');
+            return;
+        }
 
         try {
+            // datetime-local input yerel saat formatında gelir, UTC'ye çevir
+            const newEnd = new Date(newEndString);
+            if (isNaN(newEnd.getTime())) {
+                alert('Geçersiz tarih formatı!');
+                return;
+            }
+
             const user = this.users.find(u => u.username === username);
             if (!user) return;
-
-            const currentEnd = user.trial_end ? new Date(user.trial_end) : new Date();
-            const newEnd = new Date(currentEnd);
-            newEnd.setDate(newEnd.getDate() + parseInt(days));
 
             // Update in Supabase
             if (window.supabase) {
@@ -272,8 +378,10 @@ class AdminPanel {
             }
 
             // Update local
-            if (window.LOCAL_USERS && window.LOCAL_USERS[username]) {
-                window.LOCAL_USERS[username].trialEnd = newEnd.toISOString();
+            const localUsers = JSON.parse(localStorage.getItem('LOCAL_USERS') || '{}');
+            if (localUsers[username]) {
+                localUsers[username].trialEnd = newEnd.toISOString();
+                localStorage.setItem('LOCAL_USERS', JSON.stringify(localUsers));
             }
 
             // Update in memory
@@ -281,7 +389,10 @@ class AdminPanel {
             this.renderUsers();
             this.updateStats();
 
-            alert(`Test süresi ${days} gün uzatıldı!`);
+            // Close modal
+            document.getElementById('extendTrialModal').classList.add('hidden');
+
+            alert(`Test süresi ${newEnd.toLocaleString('tr-TR')} olarak güncellendi!`);
         } catch (error) {
             console.error('Error extending trial:', error);
             alert('Süre uzatılırken hata oluştu: ' + error.message);
@@ -358,6 +469,7 @@ class AdminPanel {
             console.log('Sorted messages:', this.messages);
 
             this.renderMessages();
+            this.updateStats();
         } catch (error) {
             console.error('Error loading messages:', error);
         }
@@ -621,6 +733,59 @@ class AdminPanel {
         } else {
             timelineContainer.innerHTML = '<div class="text-center text-gray-500 py-4">Timeline verisi bulunamadı</div>';
         }
+    }
+
+    updateStats() {
+        const totalUsers = this.users.length;
+        const activeUsers = this.users.filter(u => u.is_active).length;
+        const expiringUsers = this.users.filter(u => {
+            const daysLeft = this.getTrialDaysLeft(u.trial_end);
+            return daysLeft !== null && daysLeft <= 3 && daysLeft > 0;
+        }).length;
+        const pendingMessages = this.messages.filter(m => m.status === 'pending').length;
+
+        document.getElementById('totalUsers').textContent = totalUsers;
+        document.getElementById('activeUsers').textContent = activeUsers;
+        document.getElementById('expiringUsers').textContent = expiringUsers;
+        document.getElementById('pendingMessages').textContent = pendingMessages;
+    }
+
+    getTrialStatusText(trialEnd) {
+        if (!trialEnd) return 'Süresiz';
+        
+        const daysLeft = this.getTrialDaysLeft(trialEnd);
+        
+        if (daysLeft === null) return 'Geçersiz';
+        if (daysLeft <= 0) return 'Süresi Doldu';
+        
+        const now = new Date();
+        const endDate = new Date(trialEnd);
+        const diffTime = endDate - now;
+        
+        const days = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const minutes = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
+        
+        if (days > 0) {
+            return `${days} gün ${hours} saat`;
+        } else if (hours > 0) {
+            return `${hours} saat ${minutes} dakika`;
+        } else {
+            return `${minutes} dakika`;
+        }
+    }
+
+    getTrialStatusClass(trialEnd) {
+        if (!trialEnd) return 'text-gray-500';
+        
+        const daysLeft = this.getTrialDaysLeft(trialEnd);
+        
+        if (daysLeft === null) return 'text-gray-500';
+        if (daysLeft <= 0) return 'text-red-600';
+        if (daysLeft <= 1) return 'text-red-600';
+        if (daysLeft <= 3) return 'text-orange-600';
+        
+        return 'text-green-600';
     }
 }
 
