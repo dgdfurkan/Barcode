@@ -1051,10 +1051,7 @@ class AdminPanel {
             if (window.supabase) {
                 const { data, error } = await window.supabase
                     .from('user_ip_tracking')
-                    .select(`
-                        *,
-                        users!inner(username, company)
-                    `)
+                    .select('*')
                     .order('last_seen', { ascending: false });
 
                 if (error) {
@@ -1099,8 +1096,8 @@ class AdminPanel {
             
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm font-medium text-gray-900">${ip.users?.username || 'Bilinmeyen'}</div>
-                    <div class="text-sm text-gray-500">${ip.users?.company || ''}</div>
+                    <div class="text-sm font-medium text-gray-900">${ip.username || 'Bilinmeyen'}</div>
+                    <div class="text-sm text-gray-500">${ip.user_id || ''}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm text-gray-900">${ip.ip_address}</div>
