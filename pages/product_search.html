@@ -1,0 +1,3218 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Ürün Barkod Arama - Product Barcode Search</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../assets/logo.png">
+    <link rel="apple-touch-icon" href="../assets/logo.png">
+    
+    <link rel="stylesheet" href="../css/main.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script src="temp_products.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/user-manager.js"></script>
+<script type="module" src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Fproductba5734back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.8"></script>
+</head>
+<body class="bg-background min-h-screen">
+    <!-- Header Section -->
+    <header class="bg-surface border-b border-border shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-3">
+                    <div>
+                        <img src="../assets/logo.png" alt="Logo" class="w-8 h-8 object-contain">
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-text-primary">GunduzDev</h1>
+                        <p class="text-sm text-text-secondary">Ürün Barkod Arama Sistemi</p>
+                    </div>
+                </div>
+                
+                <!-- User Info -->
+                <div class="flex items-center space-x-4">
+                    <button id="addProductBtn" class="btn-primary text-sm mr-2">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        Ürün Ekle
+                    </button>
+                    <button id="settingsBtn" class="btn-secondary text-sm">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        Ayarlar
+                    </button>
+                    <div class="text-right">
+                        <p class="text-lg font-semibold text-text-primary" id="userName">Yükleniyor...</p>
+                        <p class="text-sm text-text-secondary" id="userCompany">Yükleniyor...</p>
+                        <div id="trialBannerHeader" class="bg-gradient-to-r from-red-500 to-red-600 text-black px-3 py-1 rounded-full text-xs font-medium">
+                            <span id="trialBannerHeaderText" class="text-black">⏰ Test Süreniz</span>
+                        </div>
+                    </div>
+                    <button id="contactBtn" class="btn-secondary text-sm mr-2">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                        </svg>
+                        İletişim
+                    </button>
+                    <button id="logoutBtn" class="btn-secondary text-sm">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                        Çıkış
+                    </button>
+                    <div class="w-10 h-10 rounded-full overflow-hidden">
+                        <img src="../assets/GunduzDevLogo.png" alt="GunduzDev Logo" class="w-full h-full object-cover">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Trial Countdown Banner -->
+        <div id="trialBanner" class="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-lg shadow-lg mb-6 hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white bg-opacity-20 p-2 rounded-full">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold">⏰ Test Süreniz</h3>
+                        <p class="text-sm opacity-90" id="trialBannerText">Yükleniyor...</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-2xl font-bold" id="trialBannerCountdown">--</div>
+                    <div class="text-xs opacity-80" id="trialBannerUnit">gün</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Section -->
+        <section class="mb-8">
+            <div class="bg-surface rounded-xl border border-border shadow-sm p-6">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="bg-primary-50 rounded-lg p-2">
+                        <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-semibold text-text-primary">Ürün Arama</h2>
+                        <p class="text-sm text-text-secondary">Ürün adını yazarak barkod bilgilerine ulaşın</p>
+                    </div>
+                </div>
+                
+                <!-- Search Input -->
+                <div class="relative">
+                    <input type="text" id="searchInput" placeholder="Ürün adını yazın veya tablo verisi yapıştırın... (örn: Nesfit, Coca Cola)" class="input-field pl-12 text-lg h-14" autocomplete="off" />
+                    <div class="absolute left-4 top-1/2 transform -translate-y-1/2">
+                        <svg class="w-5 h-5 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <button id="clearSearch" class="absolute right-4 top-1/2 transform -translate-y-1/2 text-secondary-400 hover:text-text-primary transition-colors hidden">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                
+                <!-- Search Tips -->
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <span class="text-xs text-text-secondary">İpucu:</span>
+                    <span class="inline-flex items-center px-2 py-1 rounded-md bg-primary-50 text-primary text-xs">
+                        Virgülle ayırarak birden fazla terim arayabilirsiniz
+                    </span>
+                    <span class="inline-flex items-center px-2 py-1 rounded-md bg-accent-50 text-accent text-xs">
+                        Türkçe karakterler desteklenir
+                    </span>
+                    <span class="inline-flex items-center px-2 py-1 rounded-md bg-green-50 text-green-700 text-xs">
+                        Tablo formatında veri yapıştırabilirsiniz
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="hidden">
+            <div class="bg-surface rounded-xl border border-border shadow-sm p-8">
+                <div class="flex items-center justify-center space-x-3">
+                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    <span class="text-text-secondary">Ürünler yükleniyor...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <section id="resultsSection" class="hidden">
+            <div class="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+                <!-- Results Header -->
+                <div class="bg-secondary-50 px-6 py-4 border-b border-border">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="bg-accent-100 rounded-lg p-2">
+                                <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-text-primary">Arama Sonuçları</h3>
+                                <p id="resultCount" class="text-sm text-text-secondary">0 ürün bulundu</p>
+                            </div>
+                        </div>
+                        <button id="exportResults" class="btn-secondary text-sm hidden">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Dışa Aktar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Desktop Table View -->
+                <div class="hidden md:block">
+                    <table class="w-full">
+                        <thead class="bg-secondary-50">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-sm font-semibold text-text-primary border-b border-border">
+                                    Ürün Adı
+                                </th>
+                                <th class="px-6 py-4 text-left text-sm font-semibold text-text-primary border-b border-border">
+                                    Barkod Bilgileri
+                                </th>
+                                <th class="px-6 py-4 text-left text-sm font-semibold text-text-primary border-b border-border">
+                                    Raf Konumu
+                                </th>
+                                <th class="px-6 py-4 text-center text-sm font-semibold text-text-primary border-b border-border w-20">
+                                    Stok
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody" class="divide-y divide-border">
+                            <!-- Results will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile Card View -->
+                <div id="mobileResults" class="md:hidden divide-y divide-border">
+                    <!-- Mobile cards will be populated here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- No Results State -->
+        <div id="noResultsState" class="hidden">
+            <div class="bg-surface rounded-xl border border-border shadow-sm p-12 text-center">
+                <div class="bg-secondary-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-text-primary mb-2">Sonuç Bulunamadı</h3>
+                <p class="text-text-secondary mb-4">Aradığınız kriterlere uygun ürün bulunamadı.</p>
+                <div class="text-sm text-text-secondary space-y-1">
+                    <p>• Ürün adını doğru yazdığınızdan emin olun</p>
+                    <p>• Farklı anahtar kelimeler deneyin</p>
+                    <p>• Virgülle ayırarak birden fazla terim arayabilirsiniz</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Initial State -->
+        <div id="initialState">
+            <div class="bg-surface rounded-xl border border-border shadow-sm p-12 text-center">
+                <div class="bg-primary-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
+                    <svg class="w-10 h-10 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-text-primary mb-3">Ürün Barkod Arama Sistemi</h3>
+                <p class="text-text-secondary mb-6 max-w-md mx-auto">
+                    Ürün adını yazarak hızlıca barkod bilgilerine ulaşın. Sistem Türkçe karakterleri destekler ve virgülle ayırarak birden fazla terim arayabilirsiniz.
+                </p>
+                
+                <!-- Random Sample Products with Ticker Animation -->
+                <div class="ticker-viewport max-w-6xl mx-auto">
+                    <div id="tickerTrack" class="ticker-track">
+                        <!-- Random products will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Add Product Modal -->
+    <div id="addProductModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-surface rounded-xl border border-border shadow-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-text-primary">🛍️ Ürün Ekle</h3>
+                <button id="closeAddProduct" class="text-text-secondary hover:text-text-primary">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <h4 class="font-medium text-blue-700 mb-2">📋 HTML Tablo Verisi</h4>
+                    <p class="text-sm text-blue-600 mb-3">Aşağıdaki alana HTML tablo verisini yapıştırın:</p>
+                    <textarea id="htmlTableInput" 
+                              placeholder="HTML tablo verisini buraya yapıştırın..." 
+                              class="w-full h-24 p-3 border border-gray-300 rounded-lg text-sm font-mono resize-none"></textarea>
+                </div>
+                
+                <div class="flex space-x-2">
+                    <button id="parseHtmlTable" class="btn-primary text-sm">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Verileri Analiz Et
+                    </button>
+                    <button id="clearHtmlInput" class="btn-secondary text-sm">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                        Temizle
+                    </button>
+                </div>
+                
+                <div id="parsedProducts" class="hidden">
+                    <div class="bg-green-50 rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-medium text-green-700">✅ Analiz Sonuçları</h4>
+                            <button id="viewAllProducts" class="btn-secondary text-xs">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                                </svg>
+                                Tümünü Gör
+                            </button>
+                        </div>
+                        <div id="parsedProductsPreview" class="space-y-1 max-h-32 overflow-y-auto border border-green-200 rounded-lg p-2 bg-white text-xs"></div>
+                    </div>
+                    
+                    <div class="flex space-x-2 mt-4">
+                        <button id="addAllProducts" class="btn-primary text-sm">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                            </svg>
+                            Tümünü Ekle
+                        </button>
+                        <button id="addSelectedProducts" class="btn-accent text-sm">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            Seçilenleri Ekle
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product List Modal -->
+    <div id="productListModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-surface rounded-xl border border-border shadow-lg max-w-6xl w-full mx-4 h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between p-6 pb-4">
+                <h3 class="text-lg font-semibold text-text-primary">📋 Ürün Listesi</h3>
+                <button id="closeProductList" class="text-text-secondary hover:text-text-primary">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto px-6 pb-4">
+                <div class="border border-gray-200 rounded-lg p-4 bg-white h-full overflow-y-auto">
+                    <div id="fullProductList" class="space-y-2"></div>
+                </div>
+            </div>
+            
+            <div class="flex space-x-2 p-6 pt-4">
+                <button id="selectAllProducts" class="btn-secondary text-sm">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Tümünü Seç
+                </button>
+                <button id="addSelectedFromList" class="btn-primary text-sm">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    Seçilenleri Ekle
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact Modal -->
+    <div id="contactModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-surface rounded-xl border border-border shadow-lg p-6 max-w-md w-full mx-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-text-primary">📞 İletişim</h3>
+                <button id="closeContact" class="text-text-secondary hover:text-text-primary">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <h4 class="font-medium text-blue-700 mb-2">💬 Mesaj Gönder</h4>
+                    <p class="text-sm text-blue-600 mb-3">Test süresi uzatma, hesap oluşturma veya destek taleplerinizi gönderebilirsiniz.</p>
+                    
+                    <form id="contactForm" class="space-y-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Mesaj Türü</label>
+                            <select id="messageType" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="trial_extension">Test Süresi Uzatma</option>
+                                <option value="account_request">Hesap Oluşturma</option>
+                                <option value="support">Teknik Destek</option>
+                                <option value="feature_request">Özellik Talebi</option>
+                                <option value="other">Diğer</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Mesajınız</label>
+                            <textarea id="messageContent" rows="4" 
+                                      placeholder="Mesajınızı buraya yazın..." 
+                                      class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"></textarea>
+                        </div>
+                        
+                        <div class="flex space-x-2">
+                            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-black py-3 px-4 rounded-lg text-sm font-medium border border-blue-700 shadow-sm">
+                                <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                                </svg>
+                                Gönder
+                            </button>
+                            <button type="button" id="cancelContact" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-3 px-4 rounded-lg text-sm font-medium border border-gray-400 shadow-sm">
+                                İptal
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="bg-green-50 rounded-lg p-4">
+                    <h4 class="font-medium text-green-700 mb-2">📧 Direkt İletişim</h4>
+                    <p class="text-sm text-green-600 mb-2">Acil durumlar için:</p>
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        <span class="text-sm text-green-700">support@example.com</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Product Management Modal -->
+    <div id="productManagementModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-surface rounded-xl border border-border shadow-lg p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-text-primary">Ürün Yönetimi</h3>
+                <button id="closeProductManagement" class="text-text-secondary hover:text-text-primary">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto">
+                <div class="mb-4 flex justify-between items-center">
+                    <div class="flex space-x-2">
+                        <button id="selectAllProducts" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm">
+                            Tümünü Seç
+                        </button>
+                        <button id="deselectAllProducts" class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-3 rounded-lg text-sm">
+                            Seçimi Kaldır
+                        </button>
+                        <button id="deleteSelectedProducts" class="bg-red-600 hover:bg-red-700 text-white py-2 px-3 rounded-lg text-sm">
+                            Seçilenleri Sil
+                        </button>
+                    </div>
+                    <div class="text-sm text-text-secondary">
+                        <span id="selectedCount">0</span> / <span id="totalCount">0</span> seçili
+                    </div>
+                </div>
+                
+                <div id="productsList" class="space-y-2">
+                    <!-- Products will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-surface rounded-xl border border-border shadow-lg p-6 max-w-md w-full mx-4">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-text-primary">Ayarlar</h3>
+                <button id="closeSettings" class="text-text-secondary hover:text-text-primary">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="bg-accent-50 rounded-lg p-4">
+                    <h4 class="font-medium text-accent mb-2">Arama Ayarları</h4>
+                    <label class="flex items-center space-x-3 cursor-pointer">
+                        <input type="checkbox" id="showDuplicates" class="w-4 h-4 text-accent bg-gray-100 border-gray-300 rounded focus:ring-accent focus:ring-2">
+                        <span class="text-sm text-text-secondary">Aynı isim ve barkoda sahip ürünleri göster</span>
+                    </label>
+                </div>
+                
+                <div class="bg-primary-50 rounded-lg p-4">
+                    <h4 class="font-medium text-primary mb-2">Veri Bilgileri</h4>
+                    <div class="text-sm text-text-secondary space-y-1">
+                        <p>Toplam ürün sayısı: <span id="totalProducts" class="font-medium">-</span></p>
+                        <p>Tekrar eden ürünler: <span id="duplicateProducts" class="font-medium">-</span></p>
+                        <p>Veri dosyası: <span class="font-mono text-xs">temp_products.js</span></p>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <h4 class="font-medium text-blue-600 mb-3">Ürün Yönetimi</h4>
+                    <div class="space-y-3">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="showDefaultProducts" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2">
+                            <span class="text-sm text-text-secondary">Varsayılan ürünleri göster</span>
+                        </label>
+                        <div class="flex space-x-2">
+                            <button id="manageProductsBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm">
+                                Ürünleri Yönet
+                            </button>
+                            <button id="exportProductsBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg text-sm">
+                                Dışa Aktar
+                            </button>
+                        </div>
+                        <button id="forceReloadDefaultsBtn" class="w-full bg-orange-600 hover:bg-orange-700 text-white py-2 px-3 rounded-lg text-sm">
+                            Varsayılan Ürünleri Yeniden Yükle
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="bg-green-50 rounded-lg p-4">
+                    <h4 class="font-medium text-green-700 mb-2">Veri Güncelleme</h4>
+                    <p class="text-sm text-green-600 mb-3">Ana products.json dosyasını güncellediyseniz:</p>
+                    <div class="flex space-x-2">
+                        <button id="refreshData" class="btn-primary text-sm">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Verileri Yenile
+                        </button>
+                        <button id="analyzeDuplicates" class="btn-secondary text-sm">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                            Analiz Et
+                        </button>
+                        <button id="cleanDuplicates" class="btn-accent text-sm">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            Temizle
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-surface border-t border-border mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+                <div class="text-sm text-text-secondary">
+                    © 2025 GunduzDev. Tüm hakları saklıdır.
+                </div>
+                <div class="flex items-center space-x-6 text-sm text-text-secondary">
+                    <span>Versiyon 1.0.0</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Global variables
+        let products = [];
+        let currentResults = [];
+        let randomProductsInterval;
+        let outOfStockProducts = new Set(); // Track out of stock product IDs
+        
+        // Ticker system variables
+        let tickerAnimationId;
+        let tickerPosition = 0;
+        let tickerSpeed = 50; // pixels per second
+        let lastTickerTime = 0;
+
+        // DOM elements
+        const searchInput = document.getElementById('searchInput');
+        const clearSearch = document.getElementById('clearSearch');
+        const loadingState = document.getElementById('loadingState');
+        const resultsSection = document.getElementById('resultsSection');
+        const noResultsState = document.getElementById('noResultsState');
+        const initialState = document.getElementById('initialState');
+        const resultsTableBody = document.getElementById('resultsTableBody');
+        const mobileResults = document.getElementById('mobileResults');
+        const resultCount = document.getElementById('resultCount');
+        const exportResults = document.getElementById('exportResults');
+
+        // Code128 Character Map
+        const CODE128_CHARSET = {
+            ' ': 0, '!': 1, '"': 2, '#': 3, '$': 4, '%': 5, '&': 6, "'": 7,
+            '(': 8, ')': 9, '*': 10, '+': 11, ',': 12, '-': 13, '.': 14, '/': 15,
+            '0': 16, '1': 17, '2': 18, '3': 19, '4': 20, '5': 21, '6': 22, '7': 23,
+            '8': 24, '9': 25, ':': 26, ';': 27, '<': 28, '=': 29, '>': 30, '?': 31,
+            '@': 32, 'A': 33, 'B': 34, 'C': 35, 'D': 36, 'E': 37, 'F': 38, 'G': 39,
+            'H': 40, 'I': 41, 'J': 42, 'K': 43, 'L': 44, 'M': 45, 'N': 46, 'O': 47,
+            'P': 48, 'Q': 49, 'R': 50, 'S': 51, 'T': 52, 'U': 53, 'V': 54, 'W': 55,
+            'X': 56, 'Y': 57, 'Z': 58, '[': 59, '\\': 60, ']': 61, '^': 62, '_': 63,
+            '`': 64, 'a': 65, 'b': 66, 'c': 67, 'd': 68, 'e': 69, 'f': 70, 'g': 71,
+            'h': 72, 'i': 73, 'j': 74, 'k': 75, 'l': 76, 'm': 77, 'n': 78, 'o': 79,
+            'p': 80, 'q': 81, 'r': 82, 's': 83, 't': 84, 'u': 85, 'v': 86, 'w': 87,
+            'x': 88, 'y': 89, 'z': 90, '{': 91, '|': 92, '}': 93, '~': 94, 'DEL': 95
+        };
+
+        // Code128 Bar patterns
+        const CODE128_PATTERNS = [
+            '11011001100', '11001101100', '11001100110', '10010011000', '10010001100', '10001001100', '10011001000', '10011000100',
+            '10001100100', '11001001000', '11001000100', '11000100100', '10110011100', '10011011100', '10011001110', '10111001100',
+            '10011101100', '10011100110', '11001110010', '11001011100', '11001001110', '11011100100', '11001110100', '11101101110',
+            '11101001100', '11100101100', '11100100110', '11101100100', '11100110100', '11100110010', '11011011000', '11011000110',
+            '11000110110', '10100011000', '10001011000', '10001000110', '10110001000', '10001101000', '10001100010', '11010001000',
+            '11000101000', '11000100010', '10110111000', '10110001110', '10001101110', '10111011000', '10111000110', '10001110110',
+            '11101110110', '11010001110', '11000101110', '11011101000', '11011100010', '11011101110', '11101011000', '11101000110',
+            '11100010110', '11101101000', '11101100010', '11100011010', '11101111010', '11001000010', '11110001010', '10100110000',
+            '10100001100', '10010110000', '10010000110', '10000101100', '10000100110', '10110010000', '10110000100', '10011010000',
+            '10011000010', '10000110100', '10000110010', '11000010010', '11001010000', '11110111010', '11000010100', '10001111010',
+            '10100111100', '10010111100', '10010011110', '10111100100', '10011110100', '10011110010', '11110100100', '11110010100',
+            '11110010010', '11011011110', '11011110110', '11110110110', '10101111000', '10100011110', '10001011110', '10111101000',
+            '10111100010', '11110101000', '11110100010', '10111011110', '10111101110', '11101011110', '11110101110', '11010000100',
+            '11010010000', '11010011100', '1100011101011'
+        ];
+
+        // Generate Code128 Barcode SVG
+        function generateCode128SVG(text, width = 300, height = 80) {
+            try {
+                let checksum = 104; // Start B
+                let encoded = [];
+                
+                // Add start character (Start B = 104)
+                encoded.push(CODE128_PATTERNS[104]);
+                
+                // Encode each character
+                for (let i = 0; i < text.length; i++) {
+                    const char = text.charAt(i);
+                    const value = CODE128_CHARSET[char];
+                    if (value !== undefined) {
+                        encoded.push(CODE128_PATTERNS[value]);
+                        checksum += value * (i + 1);
+                    }
+                }
+                
+                // Add checksum
+                checksum = checksum % 103;
+                encoded.push(CODE128_PATTERNS[checksum]);
+                
+                // Add stop pattern
+                encoded.push('1100011101011');
+                
+                // Generate SVG
+                const barString = encoded.join('');
+                const barWidth = width / barString.length;
+                
+                let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`;
+                svg += `<rect width="${width}" height="${height}" fill="white"/>`;
+                
+                let x = 0;
+                for (let i = 0; i < barString.length; i++) {
+                    if (barString[i] === '1') {
+                        svg += `<rect x="${x}" y="5" width="${barWidth}" height="${height - 25}" fill="black"/>`;
+                    }
+                    x += barWidth;
+                }
+                
+                // Add text below barcode
+                svg += `<text x="${width/2}" y="${height - 5}" text-anchor="middle" font-family="monospace" font-size="12" fill="black">${text}</text>`;
+                svg += '</svg>';
+                
+                return svg;
+            } catch (error) {
+                console.error('Barcode generation error:', error);
+                return `<div class="bg-red-100 text-red-800 p-2 rounded text-xs">Barkod oluşturulamadı</div>`;
+            }
+        }
+
+        // Create barcode navigation component
+        function createBarcodeNavigation(product) {
+            const barcodes = product.barcodes;
+            
+            // If only one barcode, show it without navigation
+            if (barcodes.length === 1) {
+                return `
+                    <div class="barcode-item bg-gray-50 rounded-lg p-3 border">
+                        <div class="barcode-visual mb-2">
+                            ${generateCode128SVG(barcodes[0].code, 200, 60)}
+                        </div>
+                        <div class="text-xs space-y-1">
+                            <div class="font-mono font-medium">${barcodes[0].code}</div>
+                            <div class="text-gray-600">${barcodes[0].size} - ${barcodes[0].variant}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Multiple barcodes - show navigation
+            const navigationId = `nav-${product.id}`;
+            return `
+                <div class="barcode-navigation" data-product-id="${product.id}">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Barkodlar (${barcodes.length})</span>
+                        <div class="flex items-center space-x-2">
+                            <span class="barcode-counter text-xs text-gray-600">1 / ${barcodes.length}</span>
+                            <button class="barcode-nav-btn barcode-prev" data-direction="prev" disabled>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                </svg>
+                            </button>
+                            <button class="barcode-nav-btn barcode-next" data-direction="next">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="barcode-container">
+                        ${barcodes.map((barcode, index) => `
+                            <div class="barcode-item bg-gray-50 rounded-lg p-3 border ${index > 0 ? 'hidden' : ''}" data-index="${index}">
+                                <div class="barcode-visual mb-2">
+                                    ${generateCode128SVG(barcode.code, 200, 60)}
+                                </div>
+                                <div class="text-xs space-y-1">
+                                    <div class="font-mono font-medium">${barcode.code}</div>
+                                    <div class="text-gray-600">${barcode.size} - ${barcode.variant}</div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Initialize barcode navigation
+        function initializeBarcodeNavigation() {
+            document.addEventListener('click', (e) => {
+                if (e.target.closest('.barcode-nav-btn')) {
+                    const btn = e.target.closest('.barcode-nav-btn');
+                    const navigation = btn.closest('.barcode-navigation');
+                    const productId = navigation.dataset.productId;
+                    const product = products.find(p => p.id.toString() === productId);
+                    const direction = btn.dataset.direction;
+                    
+                    if (product && direction) {
+                        navigateBarcodes(navigation, product.barcodes, direction);
+                    }
+                }
+            });
+        }
+
+        // Navigate through barcodes (single barcode at a time)
+        function navigateBarcodes(navigation, barcodes, direction) {
+            const container = navigation.querySelector('.barcode-container');
+            const items = container.querySelectorAll('.barcode-item');
+            const counter = navigation.querySelector('.barcode-counter');
+            const prevBtn = navigation.querySelector('.barcode-prev');
+            const nextBtn = navigation.querySelector('.barcode-next');
+            
+            // Find currently visible item
+            const visibleItems = Array.from(items).filter(item => !item.classList.contains('hidden'));
+            const currentIndex = Array.from(items).indexOf(visibleItems[0]);
+            
+            let newIndex = currentIndex;
+            
+            if (direction === 'next' && currentIndex < barcodes.length - 1) {
+                newIndex = currentIndex + 1;
+            } else if (direction === 'prev' && currentIndex > 0) {
+                newIndex = currentIndex - 1;
+            }
+            
+            // Hide all items
+            items.forEach(item => item.classList.add('hidden'));
+            
+            // Show new item (single barcode)
+            items[newIndex].classList.remove('hidden');
+            
+            // Update counter
+            counter.textContent = `${newIndex + 1} / ${barcodes.length}`;
+            
+            // Update button states
+            prevBtn.disabled = newIndex === 0;
+            nextBtn.disabled = newIndex >= barcodes.length - 1;
+            
+            prevBtn.classList.toggle('opacity-50', prevBtn.disabled);
+            nextBtn.classList.toggle('opacity-50', nextBtn.disabled);
+        }
+
+        // Load products from embedded JavaScript data
+        // Load products from user data
+        async function loadProducts() {
+            try {
+                // Initialize user data manager if not already done
+                if (!window.userDataManager.currentUser) {
+                    await window.userDataManager.init();
+                }
+                
+                // Get products from user data
+                const userProducts = window.userDataManager.getProducts();
+                
+                // If user has no products, try to load from embedded data as default
+                if (userProducts.length === 0) {
+                    console.log('No user products found, loading defaults...');
+                    
+                    if (typeof PRODUCTS_DATA !== 'undefined' && PRODUCTS_DATA.products) {
+                        console.log('Loading from PRODUCTS_DATA:', PRODUCTS_DATA.products.length, 'products');
+                        // Import default products to user data
+                        PRODUCTS_DATA.products.forEach(product => {
+                            window.userDataManager.addProduct({
+                                ...product,
+                                isDefault: true
+                            });
+                        });
+                        return PRODUCTS_DATA.products;
+                    }
+                    
+                    // Fallback to fetch if embedded data is not available
+                    const response = await fetch('products.json');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    
+                    // Import fetched products to user data
+                    if (data.products) {
+                        data.products.forEach(product => {
+                            window.userDataManager.addProduct({
+                                ...product,
+                                isDefault: true
+                            });
+                        });
+                    }
+                    
+                    return data.products || [];
+                }
+                
+                console.log('Loaded user products:', userProducts.length);
+                return userProducts;
+            } catch (error) {
+                console.error('Error loading products:', error);
+                // Fallback to mock data if all methods fail
+                return getMockProducts();
+            }
+        }
+
+        // Fallback mock data
+        function getMockProducts() {
+            return [
+                {
+                    id: 1,
+                    name: "Nesfit Karışık Meyveli",
+                    category: "Tahıl Ürünleri",
+                    brand: "Nestlé",
+                    image: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=400&auto=format&fit=crop",
+                    barcodes: [
+                        { code: "8690504123456", type: "EAN-13", size: "500g", variant: "Normal" },
+                        { code: "8690504123463", type: "EAN-13", size: "750g", variant: "Büyük Boy" }
+                    ],
+                    shelf: "A-12"
+                },
+                {
+                    id: 2,
+                    name: "Coca Cola 330ml",
+                    category: "İçecekler",
+                    brand: "Coca-Cola",
+                    image: "https://images.pexels.com/photos/50593/coca-cola-cold-drink-soft-drink-coke-50593.jpeg?auto=compress&cs=tinysrgb&w=400",
+                    barcodes: [
+                        { code: "5449000000996", type: "EAN-13", size: "330ml", variant: "Teneke Kutu" }
+                    ],
+                    shelf: "B-05"
+                },
+                {
+                    id: 3,
+                    name: "Türk Kahvesi Kurukahveci",
+                    category: "Kahve",
+                    brand: "Kurukahveci Mehmet Efendi",
+                    image: "https://images.pexels.com/photos/324028/pexels-photo-324028.jpeg?auto=compress&cs=tinysrgb&w=400",
+                    barcodes: [
+                        { code: "8690504333444", type: "EAN-13", size: "100g", variant: "Klasik" },
+                        { code: "8690504333451", type: "EAN-13", size: "250g", variant: "Büyük Paket" },
+                        { code: "8690504333468", type: "EAN-13", size: "500g", variant: "Ekonomik" },
+                        { code: "8690504333475", type: "EAN-13", size: "50g", variant: "Deneme" }
+                    ],
+                    shelf: "E-03"
+                }
+            ];
+        }
+
+        // Generate random sample products with ticker system
+        function generateRandomSampleProducts() {
+            if (products.length === 0) return;
+            
+            const tickerTrack = document.getElementById('tickerTrack');
+            if (!tickerTrack) return;
+            
+            // Clear existing content
+            tickerTrack.innerHTML = '';
+            tickerPosition = 0;
+            
+            // Generate initial cards (enough to fill viewport + extra)
+            const viewportWidth = tickerTrack.parentElement.offsetWidth;
+            const cardWidth = 300; // 280px + 20px margin
+            const initialCardCount = Math.ceil((viewportWidth * 2) / cardWidth) + 2;
+            
+            for (let i = 0; i < initialCardCount; i++) {
+                addRandomTickerCard();
+            }
+            
+            // Start ticker animation
+            startTickerAnimation();
+        }
+        
+        // Add a random ticker card
+        function addRandomTickerCard() {
+            if (products.length === 0) return;
+            
+            const randomProduct = products[Math.floor(Math.random() * products.length)];
+            const barcode = randomProduct.barcodes && randomProduct.barcodes.length > 0 ? randomProduct.barcodes[0].code : '0000000000000';
+            
+            const card = document.createElement('div');
+            card.className = 'ticker-card';
+            card.innerHTML = `
+                <img src="${randomProduct.image}" 
+                     alt="${randomProduct.name}" 
+                     class="ticker-img"
+                     onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                <div class="ticker-name">${randomProduct.name}</div>
+                <div class="ticker-barcode">
+                    ${generateCode128SVG(barcode, 200, 50)}
+                </div>
+            `;
+            
+            document.getElementById('tickerTrack').appendChild(card);
+        }
+        
+        // Start ticker animation
+        function startTickerAnimation() {
+            if (tickerAnimationId) {
+                cancelAnimationFrame(tickerAnimationId);
+            }
+            
+            lastTickerTime = performance.now();
+            tickerAnimationId = requestAnimationFrame(animateTicker);
+        }
+        
+        // Stop ticker animation
+        function stopTickerAnimation() {
+            if (tickerAnimationId) {
+                cancelAnimationFrame(tickerAnimationId);
+                tickerAnimationId = null;
+            }
+        }
+        
+        // Animate ticker
+        function animateTicker(currentTime) {
+            const deltaTime = currentTime - lastTickerTime;
+            lastTickerTime = currentTime;
+            
+            // Calculate movement based on speed and delta time
+            const movement = (tickerSpeed * deltaTime) / 1000;
+            tickerPosition -= movement;
+            
+            // Update position
+            const tickerTrack = document.getElementById('tickerTrack');
+            if (tickerTrack) {
+                tickerTrack.style.transform = `translate3d(${tickerPosition}px, 0, 0)`;
+                
+                // Check if first card is completely out of view
+                const firstCard = tickerTrack.firstElementChild;
+                if (firstCard) {
+                    const cardWidth = 300; // 280px + 20px margin
+                    const cardRight = -tickerPosition + cardWidth;
+                    
+                    if (cardRight < 0) {
+                        // Remove first card and add new one at the end
+                        tickerTrack.removeChild(firstCard);
+                        addRandomTickerCard();
+                        
+                        // Adjust position to maintain smooth flow
+                        tickerPosition += cardWidth;
+                    }
+                }
+            }
+            
+            // Continue animation
+            tickerAnimationId = requestAnimationFrame(animateTicker);
+        }
+
+        // Start random products rotation
+        function startRandomProductsRotation() {
+            // Generate initial ticker
+            generateRandomSampleProducts();
+        }
+
+        // Stop random products rotation
+        function stopRandomProductsRotation() {
+            stopTickerAnimation();
+        }
+
+        // Initialize application
+        async function initializeApp() {
+            showLoading();
+            
+            try {
+                // Load stock state
+                loadStockState();
+                
+                // Load products from JSON
+                products = await loadProducts();
+                console.log(`Loaded ${products.length} products`);
+                
+                // Trial countdown function - FIXED VERSION
+                function updateTrialCountdown(trialEnd) {
+                    if (!trialEnd) {
+                        console.log('❌ No trial end date provided');
+                        return;
+                    }
+                    
+                    console.log('🕐 Calculating countdown for:', trialEnd);
+                    
+                    // Handle different date formats and ensure proper parsing
+                    let trialEndDate;
+                    
+                    try {
+                        if (typeof trialEnd === 'string') {
+                            // If it's just a date string like "2025-12-31", add time
+                            if (trialEnd.includes('T')) {
+                                trialEndDate = new Date(trialEnd);
+                            } else if (trialEnd.includes('-')) {
+                                // Date format like "2025-12-31" - add end of day
+                                trialEndDate = new Date(trialEnd + 'T23:59:59');
+                            } else {
+                                // Try to parse as is
+                                trialEndDate = new Date(trialEnd);
+                            }
+                        } else {
+                            trialEndDate = new Date(trialEnd);
+                        }
+                        
+                        // Validate the date
+                        if (isNaN(trialEndDate.getTime())) {
+                            console.error('❌ Invalid trial end date:', trialEnd);
+                            return;
+                        }
+                        
+                    } catch (error) {
+                        console.error('❌ Error parsing trial end date:', error);
+                        return;
+                    }
+                    
+                    const now = new Date();
+                    const timeLeft = trialEndDate - now;
+                    
+                    console.log('📅 Trial End Date:', trialEndDate.toISOString());
+                    console.log('🕐 Current Date:', now.toISOString());
+                    console.log('⏰ Time Left (ms):', timeLeft);
+                    
+                    if (timeLeft <= 0) {
+                        // Trial expired
+                        console.log('❌ Trial expired');
+                        document.getElementById('trialCountdown').className = 'bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium';
+                        document.getElementById('trialDays').textContent = '0';
+                        document.getElementById('trialHours').className = 'bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium';
+                        document.getElementById('trialHoursText').textContent = '0';
+                        return;
+                    }
+                    
+                    const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    
+                    console.log('📊 Days:', days, 'Hours:', hours, 'Minutes:', minutes);
+                    
+                    // Update days
+                    document.getElementById('trialDays').textContent = days;
+                    if (days <= 3) {
+                        document.getElementById('trialCountdown').className = 'bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium';
+                    } else if (days <= 7) {
+                        document.getElementById('trialCountdown').className = 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium';
+                    } else {
+                        document.getElementById('trialCountdown').className = 'bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium';
+                    }
+                    
+                    // Update hours
+                    document.getElementById('trialHoursText').textContent = hours;
+                    if (hours <= 6) {
+                        document.getElementById('trialHours').className = 'bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium';
+                    } else if (hours <= 12) {
+                        document.getElementById('trialHours').className = 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs font-medium';
+                    } else {
+                        document.getElementById('trialHours').className = 'bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium';
+                    }
+                    
+                    // Update every minute
+                    setTimeout(() => updateTrialCountdown(trialEnd), 60000);
+                }
+                
+                // Make updateTrialCountdown globally available
+                window.updateTrialCountdown = updateTrialCountdown;
+                
+                // Trial banner update function - CLEAN VERSION
+                function updateTrialBanner(trialEnd) {
+                    if (!trialEnd) return;
+                    
+                    // Handle different date formats and ensure proper parsing
+                    let trialEndDate;
+                    
+                    try {
+                        if (typeof trialEnd === 'string') {
+                            // If it's just a date string like "2025-12-31", add time
+                            if (trialEnd.includes('T')) {
+                                trialEndDate = new Date(trialEnd);
+                            } else if (trialEnd.includes('-')) {
+                                // Date format like "2025-12-31" - add end of day
+                                trialEndDate = new Date(trialEnd + 'T23:59:59');
+                            } else {
+                                // Try to parse as is
+                                trialEndDate = new Date(trialEnd);
+                            }
+                        } else {
+                            trialEndDate = new Date(trialEnd);
+                        }
+                        
+                        // Validate the date
+                        if (isNaN(trialEndDate.getTime())) {
+                            return;
+                        }
+                        
+                    } catch (error) {
+                        return;
+                    }
+                    
+                    const now = new Date();
+                    const timeLeft = trialEndDate - now;
+                    
+                    if (timeLeft <= 0) {
+                        // Trial expired
+                        document.getElementById('trialBanner').className = 'bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-lg shadow-lg mb-6';
+                        document.getElementById('trialBannerText').textContent = '❌ Test süreniz doldu! Lütfen destek ile iletişime geçin.';
+                        document.getElementById('trialBannerCountdown').textContent = '0';
+                        document.getElementById('trialBannerUnit').textContent = 'gün';
+                        document.getElementById('trialBanner').classList.remove('hidden');
+                        return;
+                    }
+                    
+                    const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    
+                    // Update banner text
+                    if (days > 0) {
+                        document.getElementById('trialBannerCountdown').textContent = days;
+                        document.getElementById('trialBannerUnit').textContent = 'gün';
+                        
+                        if (days <= 3) {
+                            document.getElementById('trialBanner').className = 'bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-lg shadow-lg mb-6';
+                            document.getElementById('trialBannerText').textContent = `⚠️ Dikkat! Sadece ${days} gün ${hours} saat kaldı`;
+                        } else if (days <= 7) {
+                            document.getElementById('trialBanner').className = 'bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-4 rounded-lg shadow-lg mb-6';
+                            document.getElementById('trialBannerText').textContent = `⏰ Test süreniz ${days} gün ${hours} saat sonra bitiyor`;
+                        } else {
+                            document.getElementById('trialBanner').className = 'bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-lg shadow-lg mb-6';
+                            document.getElementById('trialBannerText').textContent = `🎉 Harika! ${days} gün ${hours} saat kaldı`;
+                        }
+                    } else if (hours > 0) {
+                        document.getElementById('trialBannerText').textContent = `⏰ Son ${hours} saat ${minutes} dakika kaldı!`;
+                        document.getElementById('trialBannerCountdown').textContent = hours;
+                        document.getElementById('trialBannerUnit').textContent = 'saat';
+                        document.getElementById('trialBanner').className = 'bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-lg shadow-lg mb-6';
+                    } else {
+                        document.getElementById('trialBannerText').textContent = `🚨 Son ${minutes} dakika kaldı!`;
+                        document.getElementById('trialBannerCountdown').textContent = minutes;
+                        document.getElementById('trialBannerUnit').textContent = 'dakika';
+                        document.getElementById('trialBanner').className = 'bg-gradient-to-r from-red-500 to-red-600 text-white p-4 rounded-lg shadow-lg mb-6';
+                    }
+                    
+                    // Show banner
+                    document.getElementById('trialBanner').classList.remove('hidden');
+                    
+                    // Update every minute
+                    setTimeout(() => updateTrialBanner(trialEnd), 60000);
+                }
+                
+                // Make updateTrialBanner globally available
+                window.updateTrialBanner = updateTrialBanner;
+                
+                // Header trial banner update function
+                function updateTrialBannerHeader(trialEnd) {
+                    console.log('🎨 updateTrialBannerHeader called with:', trialEnd);
+                    
+                    if (!trialEnd) {
+                        console.log('❌ No trial end date provided');
+                        return;
+                    }
+                    
+                    // Handle different date formats and ensure proper parsing
+                    let trialEndDate;
+                    
+                    try {
+                        if (typeof trialEnd === 'string') {
+                            if (trialEnd.includes('T')) {
+                                trialEndDate = new Date(trialEnd);
+                            } else if (trialEnd.includes('-')) {
+                                trialEndDate = new Date(trialEnd + 'T23:59:59');
+                            } else {
+                                trialEndDate = new Date(trialEnd);
+                            }
+                        } else {
+                            trialEndDate = new Date(trialEnd);
+                        }
+                        
+                        if (isNaN(trialEndDate.getTime())) {
+                            return;
+                        }
+                        
+                    } catch (error) {
+                        return;
+                    }
+                    
+                    const now = new Date();
+                    const timeLeft = trialEndDate - now;
+                    
+                    if (timeLeft <= 0) {
+                        // Trial expired
+                        document.getElementById('trialBannerHeader').className = 'bg-gradient-to-r from-red-500 to-red-600 text-black px-3 py-1 rounded-full text-xs font-medium';
+                        document.getElementById('trialBannerHeaderText').textContent = '❌ Test Süresi Doldu';
+                        document.getElementById('trialBannerHeaderText').className = 'text-black';
+                        document.getElementById('trialBannerHeader').classList.remove('hidden');
+                        return;
+                    }
+                    
+                    const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    
+                    // Update header banner text
+                    if (days > 0) {
+                        if (days <= 3) {
+                            document.getElementById('trialBannerHeader').className = 'bg-gradient-to-r from-red-500 to-red-600 text-black px-3 py-1 rounded-full text-xs font-medium';
+                            document.getElementById('trialBannerHeaderText').textContent = `⚠️ ${days} gün ${hours} saat kaldı`;
+                            document.getElementById('trialBannerHeaderText').className = 'text-black';
+                        } else if (days <= 7) {
+                            document.getElementById('trialBannerHeader').className = 'bg-gradient-to-r from-yellow-500 to-orange-500 text-black px-3 py-1 rounded-full text-xs font-medium';
+                            document.getElementById('trialBannerHeaderText').textContent = `⏰ ${days} gün ${hours} saat kaldı`;
+                            document.getElementById('trialBannerHeaderText').className = 'text-black';
+                        } else {
+                            document.getElementById('trialBannerHeader').className = 'bg-gradient-to-r from-blue-500 to-purple-600 text-black px-3 py-1 rounded-full text-xs font-medium';
+                            document.getElementById('trialBannerHeaderText').textContent = `🎉 ${days} gün ${hours} saat kaldı`;
+                            document.getElementById('trialBannerHeaderText').className = 'text-black';
+                        }
+                    } else if (hours > 0) {
+                        document.getElementById('trialBannerHeaderText').textContent = `⏰ ${hours} saat ${minutes} dakika kaldı`;
+                        document.getElementById('trialBannerHeader').className = 'bg-gradient-to-r from-red-500 to-red-600 text-black px-3 py-1 rounded-full text-xs font-medium';
+                        document.getElementById('trialBannerHeaderText').className = 'text-black';
+                    } else {
+                        document.getElementById('trialBannerHeaderText').textContent = `🚨 ${minutes} dakika kaldı`;
+                        document.getElementById('trialBannerHeader').className = 'bg-gradient-to-r from-red-500 to-red-600 text-black px-3 py-1 rounded-full text-xs font-medium';
+                        document.getElementById('trialBannerHeaderText').className = 'text-black';
+                    }
+                    
+                    // Show header banner
+                    document.getElementById('trialBannerHeader').classList.remove('hidden');
+                    
+                    console.log('🎨 Banner updated successfully!');
+                    
+                    // Update every minute
+                    setTimeout(() => updateTrialBannerHeader(trialEnd), 60000);
+                }
+                
+                // Make updateTrialBannerHeader globally available
+                window.updateTrialBannerHeader = updateTrialBannerHeader;
+                
+                // Initialize barcode navigation
+                initializeBarcodeNavigation();
+                
+                // Generate random sample products
+                generateRandomSampleProducts();
+                
+                // Start random products rotation
+                startRandomProductsRotation();
+                
+                hideLoading();
+                showInitialState();
+            } catch (error) {
+                console.error('Initialization error:', error);
+                hideLoading();
+                showInitialState();
+            }
+        }
+
+        // Stock management functions
+        function saveStockState() {
+            localStorage.setItem('outOfStockProducts', JSON.stringify(Array.from(outOfStockProducts)));
+        }
+
+        function loadStockState() {
+            const saved = localStorage.getItem('outOfStockProducts');
+            if (saved) {
+                outOfStockProducts = new Set(JSON.parse(saved));
+            }
+        }
+
+        function toggleStockStatus(productId) {
+            if (outOfStockProducts.has(productId)) {
+                outOfStockProducts.delete(productId);
+            } else {
+                outOfStockProducts.add(productId);
+            }
+            saveStockState();
+            // Refresh current search results
+            if (searchInput.value.trim()) {
+                performSearch(searchInput.value);
+            }
+        }
+
+        // Advanced text normalization for fuzzy search
+        function normalizeText(text) {
+            if (!text) return '';
+            return text.toLowerCase()
+                .replace(/[ığüşöç]/g, (match) => {
+                    const map = { 'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c' };
+                    return map[match];
+                })
+                .replace(/[^a-z0-9ğüşıöç ]/gi, ' ') // Remove punctuation
+                .replace(/\s+/g, ' ') // Normalize whitespace
+                .trim();
+        }
+
+        // Remove diacritics and normalize text
+        function removeDiacritics(text) {
+            if (!text) return '';
+            return text.toLowerCase()
+                .replace(/[ığüşöç]/g, (match) => {
+                    const map = { 'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c' };
+                    return map[match];
+                });
+        }
+
+        // Tokenize search query
+        function tokenizeQuery(query) {
+            const normalized = normalizeText(query);
+            const tokens = normalized.split(' ')
+                .filter(token => token.length >= 2) // Minimum 2 characters
+                .filter(token => !['ve', 'ile', 'için', 'olan', 'olan', 'gibi', 'kadar', 'daha', 'en', 'çok', 'az'].includes(token)); // Remove stop words
+            return tokens;
+        }
+
+        // Check if all tokens are found in text (order independent) - UNIVERSAL MATCHING
+        function containsAllTokens(text, tokens) {
+            if (!text || !tokens || tokens.length === 0) return false;
+            
+            const normalizedText = normalizeText(text);
+            
+            // Simple and universal: check if each token appears anywhere in the text
+            return tokens.every(token => {
+                // Check if token appears anywhere in the normalized text
+                return normalizedText.includes(token);
+            });
+        }
+
+        // Check for exact product name match (for table data)
+        function isExactProductMatch(productName, searchTerm) {
+            if (!productName || !searchTerm) return false;
+            
+            const normalizedProductName = normalizeText(productName);
+            const normalizedSearchTerm = normalizeText(searchTerm);
+            
+            // Exact match
+            if (normalizedProductName === normalizedSearchTerm) return true;
+            
+            // Check if search term is exactly one of the words in product name
+            const productWords = normalizedProductName.split(' ');
+            return productWords.some(word => word === normalizedSearchTerm);
+        }
+
+        // Simple Levenshtein distance for fuzzy matching
+        function levenshteinDistance(str1, str2) {
+            const matrix = [];
+            for (let i = 0; i <= str2.length; i++) {
+                matrix[i] = [i];
+            }
+            for (let j = 0; j <= str1.length; j++) {
+                matrix[0][j] = j;
+            }
+            for (let i = 1; i <= str2.length; i++) {
+                for (let j = 1; j <= str1.length; j++) {
+                    if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1,
+                            matrix[i][j - 1] + 1,
+                            matrix[i - 1][j] + 1
+                        );
+                    }
+                }
+            }
+            return matrix[str2.length][str1.length];
+        }
+
+        // Parse table format data and extract product names
+        function parseTableData(input) {
+            if (!input || typeof input !== 'string') return input;
+            
+            // Check if input contains table-like structure
+            const hasTableHeaders = input.includes('#') && input.includes('Ürün Adı') && input.includes('Adet');
+            const hasPreviewText = input.includes('Önizleme');
+            
+            if (!hasTableHeaders && !hasPreviewText) {
+                return input; // Return original input if not table format
+            }
+            
+            // Split by lines and process
+            const lines = input.split('\n');
+            const productNames = [];
+            
+            for (let line of lines) {
+                line = line.trim();
+                
+                // Skip empty lines, headers, and preview text
+                if (!line || 
+                    line.includes('#') || 
+                    line.includes('Ürün Adı') || 
+                    line.includes('Adet') ||
+                    line === 'Önizleme') {
+                    continue;
+                }
+                
+                // Extract product name (everything before the last tab or space followed by number)
+                // This handles cases like "Söke Un	2" or "Solo Kağıt Havlu	1"
+                const match = line.match(/^(.+?)\s+\d+\s*$/);
+                if (match) {
+                    const productName = match[1].trim();
+                    if (productName && productName !== 'Önizleme') {
+                        productNames.push(productName);
+                    }
+                } else if (line && !line.match(/^\d+$/)) {
+                    // If no number at the end, treat the whole line as product name
+                    // but skip if it's just a number
+                    if (line !== 'Önizleme') {
+                        productNames.push(line);
+                    }
+                }
+            }
+            
+            // Return comma-separated product names
+            return productNames.join(', ');
+        }
+
+        // Optimized search functionality
+        function performSearch(query) {
+            if (!query.trim()) {
+                showInitialState();
+                return;
+            }
+
+            // Show loading state for better UX
+            showSearchLoading();
+
+            // Parse table data if present
+            const parsedQuery = parseTableData(query);
+            
+            // If parsed query is different from original, split by comma for individual products
+            // Otherwise, split by comma for multiple terms
+            let searchTerms;
+            let isTableData = false;
+            if (parsedQuery !== query) {
+                // Table data was parsed, split by comma to get individual product names
+                searchTerms = parsedQuery.toLowerCase()
+                    .split(',')
+                    .map(term => term.trim())
+                    .filter(term => term.length > 0);
+                isTableData = true;
+            } else {
+                // Normal comma-separated search
+                searchTerms = parsedQuery.toLowerCase()
+                    .split(',')
+                    .map(term => term.trim())
+                    .filter(term => term.length > 0);
+            }
+
+            // Use requestAnimationFrame to prevent UI blocking
+            requestAnimationFrame(() => {
+                const searchResults = performOptimizedSearch(products, searchTerms, isTableData);
+                
+                // Handle grouped results differently
+                if (searchResults.grouped) {
+                    currentResults = [];
+                    searchResults.grouped.forEach(group => {
+                        currentResults = currentResults.concat(group.active, group.outOfStock);
+                    });
+                } else {
+                    currentResults = searchResults.active.concat(searchResults.outOfStock);
+                }
+                
+                displayResults(searchResults);
+            });
+        }
+
+        // Advanced search algorithm with grouped results for comma-separated terms
+        function performOptimizedSearch(products, searchTerms, isTableData = false) {
+            // Filter products based on duplicate setting
+            let filteredProducts = products;
+            if (!showDuplicates) {
+                // Remove duplicates (keep first occurrence)
+                const seen = new Map();
+                filteredProducts = products.filter(product => {
+                    const key = `${product.name.toLowerCase()}_${product.barcodes[0]?.code || ''}`;
+                    if (seen.has(key)) {
+                        return false; // Skip duplicate
+                    }
+                    seen.set(key, product);
+                    return true;
+                });
+            }
+            
+            // If multiple search terms (comma-separated), group results by term
+            if (searchTerms.length > 1) {
+                return performGroupedSearch(filteredProducts, searchTerms, isTableData);
+            }
+            
+            // Single term search - original logic
+            const activeResults = [];
+            const outOfStockResults = [];
+            const maxResults = 100; // Limit results for performance
+            
+            // Tokenize the search query
+            const query = searchTerms.join(' ');
+            const tokens = tokenizeQuery(query);
+            
+            if (tokens.length === 0) {
+                return { active: [], outOfStock: [] };
+            }
+            
+            for (let i = 0; i < filteredProducts.length && (activeResults.length + outOfStockResults.length) < maxResults; i++) {
+                const product = filteredProducts[i];
+                let found = false;
+                
+                // Check each search term individually
+                for (const searchTerm of searchTerms) {
+                    if (isTableData) {
+                        // For table data, use exact product name matching
+                        if (product.name && isExactProductMatch(product.name, searchTerm)) {
+                            found = true;
+                            break;
+                        }
+                    } else {
+                        // For normal search, use token-based matching
+                        const termTokens = tokenizeQuery(searchTerm);
+                        if (termTokens.length === 0) continue;
+                        
+                        // Check ALL fields for ALL tokens
+                        let nameMatch = false;
+                        let brandMatch = false;
+                        let categoryMatch = false;
+                        
+                        // Check product name
+                        if (product.name) {
+                            nameMatch = containsAllTokens(product.name, termTokens);
+                        }
+                        
+                        // Check brand
+                        if (product.brand) {
+                            brandMatch = containsAllTokens(product.brand, termTokens);
+                        }
+                        
+                        // Check category
+                        if (product.category) {
+                            categoryMatch = containsAllTokens(product.category, termTokens);
+                        }
+                        
+                        // Product must match in at least one field with ALL tokens
+                        if (nameMatch || brandMatch || categoryMatch) {
+                            found = true;
+                            break;
+                        }
+                        
+                        // Check barcodes if other fields didn't match
+                        if (!found && product.barcodes && product.barcodes.length > 0) {
+                            for (const barcode of product.barcodes) {
+                                if (barcode.code.includes(searchTerm.replace(/\s+/g, ''))) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (found) break;
+                }
+                
+                if (found) {
+                    if (outOfStockProducts.has(product.id)) {
+                        outOfStockResults.push(product);
+                    } else {
+                        activeResults.push(product);
+                    }
+                }
+            }
+            
+            // Save search to user history
+            if (window.userDataManager && window.userDataManager.currentUser) {
+                const query = searchTerms.join(' ');
+                window.userDataManager.addSearchHistory(query);
+            }
+            
+            return { active: activeResults, outOfStock: outOfStockResults };
+        }
+
+        // Optimized grouped search for comma-separated terms
+        function performGroupedSearch(products, searchTerms, isTableData = false) {
+            const groupedResults = [];
+            const maxResultsPerGroup = 30; // Reduced limit for better performance
+            
+            for (let termIndex = 0; termIndex < searchTerms.length; termIndex++) {
+                const searchTerm = searchTerms[termIndex];
+                const termResults = {
+                    term: searchTerm,
+                    active: [],
+                    outOfStock: []
+                };
+                
+                const termTokens = tokenizeQuery(searchTerm);
+                if (termTokens.length === 0) {
+                    groupedResults.push(termResults);
+                    continue;
+                }
+                
+                // Optimize: Only search through products once per term
+                let foundCount = 0;
+                for (let i = 0; i < products.length && foundCount < maxResultsPerGroup; i++) {
+                    const product = products[i];
+                    let found = false;
+                    
+                    if (isTableData) {
+                        // For table data, use exact product name matching
+                        if (product.name && isExactProductMatch(product.name, searchTerm)) {
+                            found = true;
+                        }
+                    } else {
+                        // For normal search, check ALL fields for ALL tokens
+                        let nameMatch = false;
+                        let brandMatch = false;
+                        let categoryMatch = false;
+                        
+                        // Check product name
+                        if (product.name) {
+                            nameMatch = containsAllTokens(product.name, termTokens);
+                        }
+                        
+                        // Check brand
+                        if (product.brand) {
+                            brandMatch = containsAllTokens(product.brand, termTokens);
+                        }
+                        
+                        // Check category
+                        if (product.category) {
+                            categoryMatch = containsAllTokens(product.category, termTokens);
+                        }
+                        
+                        // Product must match in at least one field with ALL tokens
+                        found = nameMatch || brandMatch || categoryMatch;
+                    }
+                    
+                    if (found) {
+                        foundCount++;
+                        if (outOfStockProducts.has(product.id)) {
+                            termResults.outOfStock.push(product);
+                        } else {
+                            termResults.active.push(product);
+                        }
+                    }
+                }
+                
+                groupedResults.push(termResults);
+            }
+            
+            return { grouped: groupedResults };
+        }
+
+        // Display results
+        function displayResults(searchResults) {
+            // Check if we have grouped results (comma-separated search)
+            if (searchResults.grouped) {
+                displayGroupedResults(searchResults.grouped);
+                return;
+            }
+            
+            // Original single-term search results
+            const activeResults = searchResults.active || [];
+            const outOfStockResults = searchResults.outOfStock || [];
+            const totalResults = activeResults.length + outOfStockResults.length;
+            
+            if (totalResults === 0) {
+                showNoResults();
+                return;
+            }
+
+            showResults();
+            
+            // Show result count with performance info
+            const maxResults = 100;
+            if (totalResults >= maxResults) {
+                resultCount.textContent = `${totalResults} ürün bulundu (İlk ${maxResults} sonuç gösteriliyor)`;
+            } else {
+                resultCount.textContent = `${totalResults} ürün bulundu`;
+            }
+            
+            exportResults.classList.remove('hidden');
+
+            // Desktop table - Active products
+            resultsTableBody.innerHTML = activeResults.map(product => `
+                <tr class="hover:bg-secondary-50 transition-colors">
+                    <td class="px-6 py-4">
+                        <div class="flex items-center space-x-3">
+                            <img src="${product.image}" 
+                                 alt="${product.name}" 
+                                 class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200"
+                                 onclick="showImageModal('${product.image}', '${product.name}')"
+                                 onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                            <div>
+                                <h4 class="font-medium text-text-primary">${product.name}</h4>
+                                <p class="text-sm text-text-secondary">${product.brand || 'Marka Belirtilmemiş'} • ${product.category || 'Kategori Yok'}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        ${createBarcodeNavigation(product)}
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="inline-flex items-center px-2 py-1 rounded-md bg-accent-50 text-accent text-sm font-medium">
+                            ${product.shelf}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <label class="flex items-center justify-center cursor-pointer">
+                            <input type="checkbox" 
+                                   class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
+                                   onchange="toggleStockStatus('${product.id}')">
+                            <span class="ml-2 text-xs text-gray-600">Stok Yok</span>
+                        </label>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Add out of stock section if there are any
+            if (outOfStockResults.length > 0) {
+                resultsTableBody.innerHTML += `
+                    <tr class="bg-gray-100">
+                        <td colspan="4" class="px-6 py-3">
+                            <h4 class="text-sm font-semibold text-gray-700">Stok Yok / Pasif Ürünler</h4>
+                        </td>
+                    </tr>
+                `;
+                
+                resultsTableBody.innerHTML += outOfStockResults.map(product => `
+                    <tr class="bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center space-x-3">
+                                <img src="${product.image}" 
+                                     alt="${product.name}" 
+                                     class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200 opacity-60"
+                                     onclick="showImageModal('${product.image}', '${product.name}')"
+                                     onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                                <div>
+                                    <h4 class="font-medium text-gray-600">${product.name}</h4>
+                                    <p class="text-sm text-gray-500">${product.brand || 'Marka Belirtilmemiş'} • ${product.category || 'Kategori Yok'}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            ${createBarcodeNavigation(product)}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-2 py-1 rounded-md bg-gray-200 text-gray-600 text-sm font-medium">
+                                ${product.shelf}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <label class="flex items-center justify-center cursor-pointer">
+                                <input type="checkbox" 
+                                       class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
+                                       checked
+                                       onchange="toggleStockStatus('${product.id}')">
+                                <span class="ml-2 text-xs text-gray-600">Stok Yok</span>
+                            </label>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            // Mobile cards - Active products
+            mobileResults.innerHTML = activeResults.map(product => `
+                <div class="p-4">
+                    <div class="flex items-start space-x-3 mb-4">
+                        <img src="${product.image}" 
+                             alt="${product.name}" 
+                             class="w-16 h-16 rounded-lg object-cover flex-shrink-0 product-image cursor-pointer hover:scale-105 transition-transform duration-200"
+                             onclick="showImageModal('${product.image}', '${product.name}')"
+                             onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-medium text-text-primary mb-1">${product.name}</h4>
+                            <p class="text-sm text-text-secondary mb-2">${product.brand || 'Marka Belirtilmemiş'} • Raf: ${product.shelf}</p>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <label class="flex items-center cursor-pointer">
+                                <input type="checkbox" 
+                                       class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
+                                       onchange="toggleStockStatus('${product.id}')">
+                                <span class="ml-2 text-xs text-gray-600">Stok Yok</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="w-full">
+                        ${createBarcodeNavigation(product)}
+                    </div>
+                </div>
+            `).join('');
+
+            // Add out of stock section for mobile
+            if (outOfStockResults.length > 0) {
+                mobileResults.innerHTML += `
+                    <div class="p-4 bg-gray-100">
+                        <h4 class="text-sm font-semibold text-gray-700 mb-2">Stok Yok / Pasif Ürünler</h4>
+                    </div>
+                `;
+                
+                mobileResults.innerHTML += outOfStockResults.map(product => `
+                    <div class="p-4 bg-gray-50">
+                        <div class="flex items-start space-x-3 mb-4">
+                            <img src="${product.image}" 
+                                 alt="${product.name}" 
+                                 class="w-16 h-16 rounded-lg object-cover flex-shrink-0 product-image cursor-pointer hover:scale-105 transition-transform duration-200 opacity-60"
+                                 onclick="showImageModal('${product.image}', '${product.name}')"
+                                 onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                            <div class="flex-1 min-w-0">
+                                <h4 class="font-medium text-gray-600 mb-1">${product.name}</h4>
+                                <p class="text-sm text-gray-500 mb-2">${product.brand || 'Marka Belirtilmemiş'} • Raf: ${product.shelf}</p>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <label class="flex items-center cursor-pointer">
+                                    <input type="checkbox" 
+                                           class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
+                                           checked
+                                           onchange="toggleStockStatus('${product.id}')">
+                                    <span class="ml-2 text-xs text-gray-600">Stok Yok</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="w-full">
+                            ${createBarcodeNavigation(product)}
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // Display grouped results for comma-separated search
+        function displayGroupedResults(groupedResults) {
+            let totalResults = 0;
+            let hasAnyResults = false;
+            
+            // Count total results
+            groupedResults.forEach(group => {
+                totalResults += group.active.length + group.outOfStock.length;
+                if (group.active.length > 0 || group.outOfStock.length > 0) {
+                    hasAnyResults = true;
+                }
+            });
+            
+            if (!hasAnyResults) {
+                showNoResults();
+                return;
+            }
+
+            showResults();
+            
+            // Show result count
+            resultCount.textContent = `${totalResults} ürün bulundu (${groupedResults.length} arama terimi)`;
+            exportResults.classList.remove('hidden');
+
+            // Clear previous results
+            resultsTableBody.innerHTML = '';
+            
+            // Display each group
+            groupedResults.forEach((group, groupIndex) => {
+                const groupTotalResults = group.active.length + group.outOfStock.length;
+                
+                if (groupTotalResults === 0) return;
+                
+                // Add group separator (except for first group)
+                if (groupIndex > 0) {
+                    const separator = document.createElement('tr');
+                    separator.innerHTML = `
+                        <td colspan="4" class="px-6 py-8">
+                            <div class="border-t border-gray-200 my-4"></div>
+                        </td>
+                    `;
+                    resultsTableBody.appendChild(separator);
+                }
+                
+                // Add group header
+                const groupHeader = document.createElement('tr');
+                groupHeader.innerHTML = `
+                    <td colspan="4" class="px-6 py-3 bg-gray-50">
+                        <div class="flex items-center space-x-2">
+                            <span class="font-semibold text-gray-800">"${group.term}"</span>
+                            <span class="text-sm text-gray-600">(${groupTotalResults} sonuç)</span>
+                        </div>
+                    </td>
+                `;
+                resultsTableBody.appendChild(groupHeader);
+                
+                // Add active products for this group
+                group.active.forEach(product => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-secondary-50 transition-colors';
+                    row.innerHTML = `
+                        <td class="px-6 py-4">
+                            <div class="flex items-center space-x-3">
+                                <img src="${product.image}" 
+                                     alt="${product.name}" 
+                                     class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200"
+                                     onclick="showImageModal('${product.image}', '${product.name}')"
+                                     onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                                <div>
+                                    <h4 class="font-medium text-text-primary">${product.name}</h4>
+                                    <p class="text-sm text-text-secondary">${product.brand || 'Marka Belirtilmemiş'} • ${product.category || 'Kategori Yok'}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            ${createBarcodeNavigation(product)}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-2 py-1 rounded-md bg-accent-50 text-accent text-sm font-medium">
+                                ${product.shelf}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <label class="flex items-center justify-center cursor-pointer">
+                                <input type="checkbox" 
+                                       class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
+                                       onchange="toggleStockStatus('${product.id}')">
+                                <span class="ml-2 text-xs text-gray-600">Stok Yok</span>
+                            </label>
+                        </td>
+                    `;
+                    resultsTableBody.appendChild(row);
+                });
+                
+                // Add out of stock products for this group
+                group.outOfStock.forEach(product => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-secondary-50 transition-colors opacity-60';
+                    row.innerHTML = `
+                        <td class="px-6 py-4">
+                            <div class="flex items-center space-x-3">
+                                <img src="${product.image}" 
+                                     alt="${product.name}" 
+                                     class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200"
+                                     onclick="showImageModal('${product.image}', '${product.name}')"
+                                     onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                                <div>
+                                    <h4 class="font-medium text-text-primary">${product.name}</h4>
+                                    <p class="text-sm text-text-secondary">${product.brand || 'Marka Belirtilmemiş'} • ${product.category || 'Kategori Yok'}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            ${createBarcodeNavigation(product)}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center px-2 py-1 rounded-md bg-accent-50 text-accent text-sm font-medium">
+                                ${product.shelf}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <label class="flex items-center justify-center cursor-pointer">
+                                <input type="checkbox" 
+                                       class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
+                                       checked
+                                       onchange="toggleStockStatus('${product.id}')">
+                                <span class="ml-2 text-xs text-gray-600">Stok Yok</span>
+                            </label>
+                        </td>
+                    `;
+                    resultsTableBody.appendChild(row);
+                });
+            });
+        }
+
+        // State management functions
+        function showLoading() {
+            hideAllStates();
+            loadingState.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingState.classList.add('hidden');
+        }
+
+        function showResults() {
+            hideAllStates();
+            resultsSection.classList.remove('hidden');
+            stopRandomProductsRotation();
+        }
+
+        function showNoResults() {
+            hideAllStates();
+            noResultsState.classList.remove('hidden');
+            stopRandomProductsRotation();
+        }
+
+        function showInitialState() {
+            hideAllStates();
+            initialState.classList.remove('hidden');
+            exportResults.classList.add('hidden');
+            
+            // Regenerate random products when showing initial state
+            generateRandomSampleProducts();
+            
+            // Restart random products rotation
+            startRandomProductsRotation();
+        }
+
+        function hideAllStates() {
+            loadingState.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+            noResultsState.classList.add('hidden');
+            initialState.classList.add('hidden');
+        }
+
+        // Show search loading state
+        function showSearchLoading() {
+            hideAllStates();
+            loadingState.classList.remove('hidden');
+            loadingState.querySelector('span').textContent = 'Aranıyor...';
+        }
+
+        // Show image modal
+        function showImageModal(imageUrl, productName) {
+            // Create modal overlay
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="relative max-w-4xl max-h-full p-4">
+                    <button class="absolute top-2 right-2 text-white hover:text-gray-300 z-10" onclick="closeImageModal()">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                    <img src="${imageUrl}" 
+                         alt="${productName}" 
+                         class="max-w-full max-h-full object-contain rounded-lg"
+                         onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                    <div class="text-center mt-4">
+                        <h3 class="text-white text-lg font-medium">${productName}</h3>
+                    </div>
+                </div>
+            `;
+            
+            // Close modal on overlay click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeImageModal();
+                }
+            });
+            
+            // Close modal on ESC key
+            const handleEsc = (e) => {
+                if (e.key === 'Escape') {
+                    closeImageModal();
+                }
+            };
+            document.addEventListener('keydown', handleEsc);
+            
+            // Store references for cleanup
+            modal._handleEsc = handleEsc;
+            
+            document.body.appendChild(modal);
+        }
+
+        // Close image modal
+        function closeImageModal() {
+            const modal = document.querySelector('.fixed.inset-0.bg-black.bg-opacity-75');
+            if (modal) {
+                document.removeEventListener('keydown', modal._handleEsc);
+                modal.remove();
+            }
+        }
+
+        // Show notification when table data is parsed
+        function showTableParseNotification() {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-all duration-300';
+            notification.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>Tablo verisi otomatik olarak işlendi!</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Event listeners
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value;
+            
+            // Show/hide clear button
+            if (query.length > 0) {
+                clearSearch.classList.remove('hidden');
+            } else {
+                clearSearch.classList.add('hidden');
+            }
+            
+            // Perform search with optimized debouncing
+            clearTimeout(searchInput.searchTimeout);
+            searchInput.searchTimeout = setTimeout(() => {
+                performSearch(query);
+            }, 150); // Reduced from 300ms to 150ms for faster response
+        });
+
+        // Handle paste events for table data
+        searchInput.addEventListener('paste', (e) => {
+            // Prevent default paste behavior temporarily
+            e.preventDefault();
+            
+            // Get pasted text from clipboard
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            
+            // Parse the pasted data
+            const parsedQuery = parseTableData(pastedText);
+            
+            // Update the input with parsed data
+            searchInput.value = parsedQuery;
+            
+            // Show/hide clear button
+            if (parsedQuery.length > 0) {
+                clearSearch.classList.remove('hidden');
+            } else {
+                clearSearch.classList.add('hidden');
+            }
+            
+            // Show notification if data was parsed
+            if (parsedQuery !== pastedText) {
+                showTableParseNotification();
+            }
+            
+            // Trigger search
+            performSearch(parsedQuery);
+        });
+
+        clearSearch.addEventListener('click', () => {
+            searchInput.value = '';
+            clearSearch.classList.add('hidden');
+            showInitialState();
+            searchInput.focus();
+        });
+
+        exportResults.addEventListener('click', () => {
+            if (currentResults.length === 0) return;
+            
+            // Filter out out of stock products for export
+            const activeProducts = currentResults.filter(product => !outOfStockProducts.has(product.id));
+            
+            if (activeProducts.length === 0) {
+                alert('Dışa aktarılacak aktif ürün bulunamadı.');
+                return;
+            }
+            
+            const csvContent = "data:text/csv;charset=utf-8," 
+                + "Ürün Görseli,Ürün Adı,Barkod\n"
+                + activeProducts.map(product => {
+                    const barcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : '';
+                    return `"${product.image}","${product.name}","${barcode}"`;
+                }).join("\n");
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `urun_arama_sonuclari_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // Add CSS for navigation buttons and marquee animation
+        const style = document.createElement('style');
+        style.textContent = `
+            .barcode-nav-btn {
+                padding: 0.25rem;
+                border-radius: 0.375rem;
+                border: 1px solid #d1d5db;
+                background-color: white;
+                color: #6b7280;
+                transition: all 0.2s;
+                cursor: pointer;
+            }
+            .barcode-nav-btn:hover:not(:disabled) {
+                background-color: #f3f4f6;
+                color: #374151;
+            }
+            .barcode-nav-btn:disabled {
+                cursor: not-allowed;
+                opacity: 0.5;
+            }
+            .barcode-visual svg {
+                width: 100%;
+                height: auto;
+                max-width: 200px;
+            }
+            
+            /* Ticker Animation System */
+            .ticker-viewport {
+                overflow: hidden;
+                height: 140px;
+            }
+            
+            .ticker-track {
+                display: flex;
+                will-change: transform;
+                transform: translate3d(0, 0, 0);
+            }
+            
+            .ticker-card {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                width: 280px;
+                height: 120px;
+                padding: 12px;
+                margin-right: 20px;
+                flex-shrink: 0;
+                background: #f8fafc;
+                border-radius: 12px;
+                border: 1px solid #e2e8f0;
+            }
+            
+            .ticker-img {
+                width: 80px;
+                height: 80px;
+                object-fit: cover;
+                border-radius: 12px;
+                margin-bottom: 6px;
+            }
+            
+            .ticker-name {
+                max-width: 250px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                line-height: 1.2;
+                font-size: 14px;
+                font-weight: 500;
+                color: #374151;
+                margin-bottom: 6px;
+                min-height: 2.4em;
+            }
+            
+            .ticker-barcode {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .ticker-barcode svg {
+                width: 200px;
+                height: 50px;
+            }
+            
+            /* Smooth transitions for random products */
+            .random-product-item {
+                transition: all 0.3s ease-in-out;
+            }
+            
+            /* Marquee container styling */
+            #randomProductsMarquee {
+                transition: opacity 0.3s ease-in-out;
+            }
+            
+            /* Ensure smooth scrolling */
+            .overflow-hidden {
+                overflow: hidden;
+            }
+            
+            /* Performance optimizations */
+            .hover\\:bg-secondary-50 {
+                transition: background-color 0.1s ease;
+            }
+            
+            /* Optimize table rendering */
+            table {
+                table-layout: fixed;
+            }
+            
+            /* Optimize image loading */
+            img {
+                will-change: auto;
+            }
+            
+            /* Optimize animations */
+            .animate-spin {
+                will-change: transform;
+            }
+            
+            /* Optimize text rendering */
+            .text-text-primary, .text-text-secondary {
+                text-rendering: optimizeSpeed;
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Test duplicate analysis
+        function analyzeDuplicates() {
+            console.log('=== DUPLICATE ANALYSIS ===');
+            console.log('Toplam ürün sayısı:', products.length);
+            
+            const seen = new Map();
+            const duplicates = [];
+            const uniqueProducts = [];
+            
+            products.forEach((product, index) => {
+                const name = (product.name || '').toLowerCase();
+                const barcode = product.barcodes && product.barcodes[0] ? product.barcodes[0].code : '';
+                const key = `${name}_${barcode}`;
+                
+                if (seen.has(key)) {
+                    duplicates.push({
+                        index: index,
+                        name: product.name || '',
+                        barcode: barcode,
+                        originalIndex: seen.get(key)
+                    });
+                } else {
+                    seen.set(key, index);
+                    uniqueProducts.push(product);
+                }
+            });
+            
+            console.log('Tekrar eden ürün sayısı:', duplicates.length);
+            console.log('Benzersiz ürün sayısı:', uniqueProducts.length);
+            
+            // İlk 10 tekrar eden ürünü göster
+            console.log('\nİlk 10 tekrar eden ürün:');
+            duplicates.slice(0, 10).forEach((dup, i) => {
+                console.log(`${i+1}. ${dup.name} - ${dup.barcode} (Index: ${dup.index})`);
+            });
+            
+            return { duplicates, uniqueProducts };
+        }
+        
+        // Settings functionality
+        let showDuplicates = false;
+        
+        // Product addition functionality
+        let parsedProducts = [];
+        
+        // Parse HTML table and extract product data
+        function parseHtmlTable(htmlContent) {
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlContent, 'text/html');
+                const rows = doc.querySelectorAll('tbody tr');
+                
+                const products = [];
+                
+                rows.forEach((row, index) => {
+                    try {
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length < 5) return; // Skip incomplete rows
+                        
+                        // Extract barcodes
+                        const barcodeTags = cells[0].querySelectorAll('.ant-tag-blue');
+                        const barcodes = Array.from(barcodeTags).map(tag => ({
+                            code: tag.textContent.trim(),
+                            type: 'EAN-13',
+                            size: 'Standart',
+                            variant: 'Normal'
+                        }));
+                        
+                        if (barcodes.length === 0) return; // Skip if no barcodes
+                        
+                        // Extract image
+                        const imgTag = cells[1].querySelector('img');
+                        const image = imgTag ? imgTag.src : '';
+                        
+                        // Extract product ID
+                        const productId = cells[2].querySelector('.ant-tag')?.textContent.trim() || '';
+                        
+                        // Extract product name
+                        const productName = cells[3].querySelector('.ant-tag')?.textContent.trim() || '';
+                        
+                        // Extract shelf (raf)
+                        const shelf = cells[4].textContent.trim() || '-';
+                        
+                        if (productName && barcodes.length > 0) {
+                            products.push({
+                                id: productId || `new_${Date.now()}_${index}`,
+                                name: productName,
+                                category: 'Genel',
+                                brand: 'Bilinmiyor',
+                                description: productName,
+                                image: image,
+                                barcodes: barcodes,
+                                shelf: shelf,
+                                price: null,
+                                stock: null
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Error parsing row:', error);
+                    }
+                });
+                
+                return products;
+            } catch (error) {
+                console.error('Error parsing HTML table:', error);
+                return [];
+            }
+        }
+        
+        // Check for duplicate products
+        function checkDuplicates(newProducts) {
+            const duplicates = [];
+            const newProductsToAdd = [];
+            
+            newProducts.forEach(newProduct => {
+                const isDuplicate = products.some(existingProduct => {
+                    const existingBarcodes = existingProduct.barcodes.map(b => b.code);
+                    const newBarcodes = newProduct.barcodes.map(b => b.code);
+                    
+                    // Check if any barcode matches
+                    return newBarcodes.some(barcode => existingBarcodes.includes(barcode)) ||
+                           existingProduct.name.toLowerCase() === newProduct.name.toLowerCase();
+                });
+                
+                if (isDuplicate) {
+                    duplicates.push(newProduct);
+                } else {
+                    newProductsToAdd.push(newProduct);
+                }
+            });
+            
+            return { duplicates, newProductsToAdd };
+        }
+        
+        // Add products to the system
+        function addProductsToSystem(productsToAdd) {
+            productsToAdd.forEach(product => {
+                // Add to user data manager
+                window.userDataManager.addProduct(product);
+                
+                // Also add to global products array for backward compatibility
+                products.push(product);
+            });
+            
+            // Update temp_products.js content for backward compatibility
+            const cleanData = { products: products };
+            const jsContent = `const PRODUCTS_DATA = ${JSON.stringify(cleanData, null, 2)};`;
+            
+            // Update the script tag content
+            const scriptTag = document.querySelector('script[src="temp_products.js"]');
+            if (scriptTag) {
+                scriptTag.textContent = jsContent;
+            }
+            
+            // Update settings info
+            updateSettingsInfo();
+        }
+        
+        // Show add product modal
+        function showAddProductModal() {
+            document.getElementById('addProductModal').classList.remove('hidden');
+        }
+        
+        function hideAddProductModal() {
+            document.getElementById('addProductModal').classList.add('hidden');
+            document.getElementById('parsedProducts').classList.add('hidden');
+            document.getElementById('htmlTableInput').value = '';
+            parsedProducts = [];
+        }
+        
+        // Find duplicate products (same name and barcode)
+        function findDuplicateProducts() {
+            const duplicates = [];
+            const seen = new Map();
+            
+            products.forEach(product => {
+                const key = `${product.name.toLowerCase()}_${product.barcodes[0]?.code || ''}`;
+                if (seen.has(key)) {
+                    duplicates.push(product);
+                    if (!seen.get(key).isDuplicate) {
+                        seen.get(key).isDuplicate = true;
+                        duplicates.push(seen.get(key));
+                    }
+                } else {
+                    seen.set(key, product);
+                }
+            });
+            
+            return duplicates;
+        }
+        
+        // Update settings modal info
+        function updateSettingsInfo() {
+            const totalProducts = products.length;
+            const duplicateProducts = findDuplicateProducts().length;
+            
+            document.getElementById('totalProducts').textContent = totalProducts;
+            document.getElementById('duplicateProducts').textContent = duplicateProducts;
+            
+            // Update default products checkbox
+            if (window.userDataManager && window.userDataManager.currentUser) {
+                const settings = window.userDataManager.getSettings();
+                document.getElementById('showDefaultProducts').checked = settings.showDefaultProducts;
+            }
+        }
+
+        // Show product management modal
+        function showProductManagement() {
+            loadProductsForManagement();
+            document.getElementById('productManagementModal').classList.remove('hidden');
+        }
+
+        // Hide product management modal
+        function hideProductManagement() {
+            document.getElementById('productManagementModal').classList.add('hidden');
+        }
+
+        // Load products for management
+        function loadProductsForManagement() {
+            const productsList = document.getElementById('productsList');
+            const totalCount = document.getElementById('totalCount');
+            const selectedCount = document.getElementById('selectedCount');
+            
+            if (!window.userDataManager || !window.userDataManager.currentUser) {
+                productsList.innerHTML = '<p class="text-center text-text-secondary">Kullanıcı verisi yüklenemedi</p>';
+                return;
+            }
+            
+            const userProducts = window.userDataManager.getProducts(true); // Show all products including defaults
+            totalCount.textContent = userProducts.length;
+            selectedCount.textContent = '0';
+            
+            if (userProducts.length === 0) {
+                productsList.innerHTML = '<p class="text-center text-text-secondary">Henüz ürün eklenmemiş</p>';
+                return;
+            }
+            
+            productsList.innerHTML = userProducts.map((product, index) => `
+                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg border">
+                    <input type="checkbox" class="product-checkbox w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2" data-product-id="${product.id}">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-2">
+                            <h4 class="font-medium text-text-primary">${product.name}</h4>
+                            ${product.isDefault ? '<span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">Varsayılan</span>' : ''}
+                        </div>
+                        <div class="text-sm text-text-secondary">
+                            Barkod: ${product.barcodes.map(b => b.code).join(', ')}
+                            ${product.shelf ? ` | Raf: ${product.shelf}` : ''}
+                        </div>
+                    </div>
+                    <button class="delete-single-product text-red-600 hover:text-red-800" data-product-id="${product.id}">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+            
+            // Add event listeners
+            addProductManagementEventListeners();
+        }
+
+        // Add event listeners for product management
+        function addProductManagementEventListeners() {
+            // Checkbox change events
+            document.querySelectorAll('.product-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', updateSelectedCount);
+            });
+            
+            // Single delete buttons
+            document.querySelectorAll('.delete-single-product').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const productId = e.target.closest('button').dataset.productId;
+                    deleteSingleProduct(productId);
+                });
+            });
+        }
+
+        // Update selected count
+        function updateSelectedCount() {
+            const selectedCheckboxes = document.querySelectorAll('.product-checkbox:checked');
+            document.getElementById('selectedCount').textContent = selectedCheckboxes.length;
+        }
+
+        // Delete single product
+        function deleteSingleProduct(productId) {
+            if (confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
+                window.userDataManager.removeProduct(productId);
+                loadProductsForManagement();
+                // Refresh main products array
+                products = window.userDataManager.getProducts();
+                updateSettingsInfo();
+            }
+        }
+
+        // Select all products
+        function selectAllProducts() {
+            document.querySelectorAll('.product-checkbox').forEach(checkbox => {
+                checkbox.checked = true;
+            });
+            updateSelectedCount();
+        }
+
+        // Deselect all products
+        function deselectAllProducts() {
+            document.querySelectorAll('.product-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            updateSelectedCount();
+        }
+
+        // Delete selected products
+        function deleteSelectedProducts() {
+            const selectedCheckboxes = document.querySelectorAll('.product-checkbox:checked');
+            if (selectedCheckboxes.length === 0) {
+                alert('Lütfen silmek istediğiniz ürünleri seçin');
+                return;
+            }
+            
+            if (confirm(`${selectedCheckboxes.length} ürünü silmek istediğinizden emin misiniz?`)) {
+                const productIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.productId);
+                window.userDataManager.removeProducts(productIds);
+                loadProductsForManagement();
+                // Refresh main products array
+                products = window.userDataManager.getProducts();
+                updateSettingsInfo();
+            }
+        }
+
+        // Force reload default products for existing users
+        function forceReloadDefaults() {
+            if (confirm('Varsayılan ürünleri yeniden yüklemek istediğinizden emin misiniz?\n\nBu işlem mevcut ürünlerinizi etkilemez, sadece varsayılan ürünleri ekler.')) {
+                // Clear existing default products
+                if (window.userDataManager && window.userDataManager.currentUser) {
+                    const userProducts = window.userDataManager.getProducts(true);
+                    const nonDefaultProducts = userProducts.filter(p => !p.isDefault);
+                    
+                    // Keep only non-default products
+                    window.userDataManager.userData.products = nonDefaultProducts;
+                    
+                    // Add default products again
+                    if (typeof PRODUCTS_DATA !== 'undefined' && PRODUCTS_DATA.products) {
+                        PRODUCTS_DATA.products.forEach(product => {
+                            window.userDataManager.addProduct({
+                                ...product,
+                                isDefault: true
+                            });
+                        });
+                    }
+                    
+                    // Refresh products and search
+                    products = window.userDataManager.getProducts();
+                    updateSettingsInfo();
+                    
+                    if (searchInput.value.trim()) {
+                        performSearch(searchInput.value);
+                    }
+                    
+                    alert('✅ Varsayılan ürünler başarıyla yeniden yüklendi!');
+                }
+            }
+        }
+        
+        // Show/hide settings modal
+        function showSettings() {
+            updateSettingsInfo();
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+        
+        function hideSettings() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+        
+        // Refresh data from main products.json
+        async function refreshData() {
+            try {
+                const response = await fetch('../products.json');
+                if (!response.ok) throw new Error('Veri yüklenemedi');
+                
+                const data = await response.json();
+                products = data.products || [];
+                
+                // Update temp_products.js
+                const jsContent = `const PRODUCTS_DATA = ${JSON.stringify(data)};`;
+                await fetch('temp_products.js', {
+                    method: 'PUT',
+                    body: jsContent,
+                    headers: { 'Content-Type': 'application/javascript' }
+                }).catch(() => {
+                    console.log('temp_products.js güncellenemedi, sayfa yenilenmeli');
+                });
+                
+                updateSettingsInfo();
+                alert('Veriler başarıyla yenilendi!');
+            } catch (error) {
+                console.error('Veri yenileme hatası:', error);
+                alert('Veri yenileme başarısız: ' + error.message);
+            }
+        }
+        
+        // Clean duplicates and create clean JSON
+        function cleanDuplicates() {
+            const result = analyzeDuplicates();
+            
+            if (result.duplicates.length === 0) {
+                alert('Tekrar eden ürün bulunamadı!');
+                return;
+            }
+            
+            const confirmClean = confirm(
+                `${result.duplicates.length} tekrar eden ürün bulundu!\n\n` +
+                `Toplam: ${products.length} ürün\n` +
+                `Benzersiz: ${result.uniqueProducts.length} ürün\n\n` +
+                `Tekrar eden ürünleri silmek istiyor musunuz?`
+            );
+            
+            if (confirmClean) {
+                // Update products array
+                products.length = 0;
+                products.push(...result.uniqueProducts);
+                
+                // Create clean data
+                const cleanData = { products: result.uniqueProducts };
+                
+                // Update temp_products.js content
+                const jsContent = `const PRODUCTS_DATA = ${JSON.stringify(cleanData, null, 2)};`;
+                
+                // Update the script tag content
+                const scriptTag = document.querySelector('script[src="temp_products.js"]');
+                if (scriptTag) {
+                    scriptTag.textContent = jsContent;
+                }
+                
+                // Download clean JSON for main file
+                const blob = new Blob([JSON.stringify(cleanData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'products_clean.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                // Update settings info
+                updateSettingsInfo();
+                
+                alert(`✅ TEMİZLEME TAMAMLANDI!\n\n` +
+                      `📊 Sonuç: ${result.uniqueProducts.length} benzersiz ürün kaldı\n` +
+                      `🗑️ ${result.duplicates.length} tekrar eden ürün silindi\n\n` +
+                      `Ana products.json dosyasını indirilen products_clean.json ile değiştirin!`);
+            }
+        }
+        
+        // Settings event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add Product button
+            document.getElementById('addProductBtn').addEventListener('click', showAddProductModal);
+            document.getElementById('closeAddProduct').addEventListener('click', hideAddProductModal);
+            
+            // HTML Table parsing
+            document.getElementById('parseHtmlTable').addEventListener('click', () => {
+                const htmlContent = document.getElementById('htmlTableInput').value.trim();
+                if (!htmlContent) {
+                    alert('❌ Lütfen HTML tablo verisini girin!');
+                    return;
+                }
+                
+                parsedProducts = parseHtmlTable(htmlContent);
+                
+                if (parsedProducts.length === 0) {
+                    alert('❌ HTML tablosundan ürün verisi çıkarılamadı!\n\nLütfen doğru HTML formatını kontrol edin.');
+                    return;
+                }
+                
+                // Check for duplicates
+                const { duplicates, newProductsToAdd } = checkDuplicates(parsedProducts);
+                
+                // Display preview
+                const parsedProductsPreview = document.getElementById('parsedProductsPreview');
+                parsedProductsPreview.innerHTML = '';
+                
+                // Show preview (first 5 products)
+                const previewProducts = newProductsToAdd.slice(0, 5);
+                previewProducts.forEach((product, index) => {
+                    const productDiv = document.createElement('div');
+                    productDiv.className = 'flex items-center justify-between p-1 bg-white rounded border text-xs';
+                    productDiv.innerHTML = `
+                        <div class="flex items-center space-x-2">
+                            <img src="${product.image}" alt="${product.name}" class="w-4 h-4 rounded object-cover" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=400&auto=format&fit=crop';">
+                            <div class="truncate">
+                                <div class="font-medium truncate">${product.name}</div>
+                                <div class="text-gray-500 truncate">${product.barcodes.map(b => b.code).join(', ')}</div>
+                            </div>
+                        </div>
+                        <span class="text-green-600 font-medium">✅</span>
+                    `;
+                    parsedProductsPreview.appendChild(productDiv);
+                });
+                
+                if (newProductsToAdd.length > 5) {
+                    const moreDiv = document.createElement('div');
+                    moreDiv.className = 'text-center text-gray-500 text-xs py-1';
+                    moreDiv.textContent = `... ve ${newProductsToAdd.length - 5} ürün daha`;
+                    parsedProductsPreview.appendChild(moreDiv);
+                }
+                
+                // Store full product list for the separate modal
+                window.fullProductList = { newProductsToAdd, duplicates };
+                
+                // Update parsedProducts array
+                parsedProducts = newProductsToAdd;
+                
+                // Show results
+                document.getElementById('parsedProducts').classList.remove('hidden');
+                
+                // Show summary
+                const summary = `📊 Analiz Tamamlandı!\n\n✅ Yeni ürünler: ${newProductsToAdd.length}\n⚠️ Mevcut ürünler: ${duplicates.length}\n\nYeni ürünleri eklemek için "Tümünü Ekle" veya "Seçilenleri Ekle" butonunu kullanın.`;
+                alert(summary);
+            });
+            
+            document.getElementById('clearHtmlInput').addEventListener('click', () => {
+                document.getElementById('htmlTableInput').value = '';
+                document.getElementById('parsedProducts').classList.add('hidden');
+                parsedProducts = [];
+            });
+            
+            document.getElementById('addAllProducts').addEventListener('click', () => {
+                if (parsedProducts.length === 0) {
+                    alert('❌ Eklenebilecek ürün bulunamadı!');
+                    return;
+                }
+                
+                addProductsToSystem(parsedProducts);
+                
+                alert(`🎉 Başarılı!\n\n${parsedProducts.length} yeni ürün sisteme eklendi!\n\nArtık arama yapabilirsiniz.`);
+                
+                hideAddProductModal();
+            });
+            
+            document.getElementById('addSelectedProducts').addEventListener('click', () => {
+                const checkboxes = document.querySelectorAll('.product-checkbox:checked:not(:disabled)');
+                const selectedProducts = Array.from(checkboxes).map(cb => parsedProducts[cb.dataset.index]);
+                
+                if (selectedProducts.length === 0) {
+                    alert('❌ Lütfen eklemek istediğiniz ürünleri seçin!');
+                    return;
+                }
+                
+                addProductsToSystem(selectedProducts);
+                
+                alert(`🎉 Başarılı!\n\n${selectedProducts.length} ürün sisteme eklendi!\n\nArtık arama yapabilirsiniz.`);
+                
+                hideAddProductModal();
+            });
+            
+            // Close modal on overlay click
+            document.getElementById('addProductModal').addEventListener('click', (e) => {
+                if (e.target.id === 'addProductModal') {
+                    hideAddProductModal();
+                }
+            });
+            
+            // Product List Modal
+            document.getElementById('viewAllProducts').addEventListener('click', () => {
+                console.log('View All Products clicked');
+                console.log('window.fullProductList:', window.fullProductList);
+                
+                if (!window.fullProductList) {
+                    alert('❌ Önce ürünleri analiz edin!');
+                    return;
+                }
+                
+                const { newProductsToAdd, duplicates } = window.fullProductList;
+                console.log('newProductsToAdd:', newProductsToAdd.length);
+                console.log('duplicates:', duplicates.length);
+                
+                const fullProductList = document.getElementById('fullProductList');
+                fullProductList.innerHTML = '';
+                
+                // Show new products
+                newProductsToAdd.forEach((product, index) => {
+                    const productDiv = document.createElement('div');
+                    productDiv.className = 'flex items-center justify-between p-3 bg-white rounded-lg border border-green-200 hover:bg-green-50 transition-colors mb-2';
+                    productDiv.innerHTML = `
+                        <div class="flex items-center space-x-3 flex-1 min-w-0">
+                            <input type="checkbox" class="product-checkbox w-4 h-4 text-green-600" data-index="${index}" checked>
+                            <img src="${product.image}" alt="${product.name}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=400&auto=format&fit=crop';">
+                            <div class="flex-1 min-w-0">
+                                <div class="font-medium text-sm text-gray-900 truncate">${product.name}</div>
+                                <div class="text-xs text-gray-500 truncate">${product.barcodes.map(b => b.code).join(', ')}</div>
+                            </div>
+                        </div>
+                        <span class="text-xs text-green-600 font-medium bg-green-100 px-2 py-1 rounded-full flex-shrink-0">✅ Yeni</span>
+                    `;
+                    fullProductList.appendChild(productDiv);
+                });
+                
+                // Show duplicates
+                duplicates.forEach((product, index) => {
+                    const productDiv = document.createElement('div');
+                    productDiv.className = 'flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200 hover:bg-yellow-100 transition-colors mb-2';
+                    productDiv.innerHTML = `
+                        <div class="flex items-center space-x-3 flex-1 min-w-0">
+                            <input type="checkbox" class="product-checkbox w-4 h-4 text-yellow-600" data-index="${newProductsToAdd.length + index}" disabled>
+                            <img src="${product.image}" alt="${product.name}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0 opacity-60" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=400&auto=format&fit=crop';">
+                            <div class="flex-1 min-w-0">
+                                <div class="font-medium text-sm text-gray-600 truncate">${product.name}</div>
+                                <div class="text-xs text-gray-400 truncate">${product.barcodes.map(b => b.code).join(', ')}</div>
+                            </div>
+                        </div>
+                        <span class="text-xs text-yellow-600 font-medium bg-yellow-100 px-2 py-1 rounded-full flex-shrink-0">⚠️ Mevcut</span>
+                    `;
+                    fullProductList.appendChild(productDiv);
+                });
+                
+                console.log('Total items added:', fullProductList.children.length);
+                document.getElementById('productListModal').classList.remove('hidden');
+            });
+            
+            document.getElementById('closeProductList').addEventListener('click', () => {
+                document.getElementById('productListModal').classList.add('hidden');
+            });
+            
+            document.getElementById('selectAllProducts').addEventListener('click', () => {
+                const checkboxes = document.querySelectorAll('#fullProductList .product-checkbox:not(:disabled)');
+                checkboxes.forEach(cb => cb.checked = true);
+            });
+            
+            document.getElementById('addSelectedFromList').addEventListener('click', () => {
+                const checkboxes = document.querySelectorAll('#fullProductList .product-checkbox:checked:not(:disabled)');
+                const selectedProducts = Array.from(checkboxes).map(cb => {
+                    const index = parseInt(cb.dataset.index);
+                    return window.fullProductList.newProductsToAdd[index];
+                });
+                
+                console.log('Selected products:', selectedProducts.length);
+                
+                if (selectedProducts.length === 0) {
+                    alert('❌ Lütfen eklemek istediğiniz ürünleri seçin!');
+                    return;
+                }
+                
+                addProductsToSystem(selectedProducts);
+                
+                alert(`🎉 Başarılı!\n\n${selectedProducts.length} ürün sisteme eklendi!\n\nArtık arama yapabilirsiniz.`);
+                
+                document.getElementById('productListModal').classList.add('hidden');
+                hideAddProductModal();
+            });
+            
+            // Close product list modal on overlay click
+            document.getElementById('productListModal').addEventListener('click', (e) => {
+                if (e.target.id === 'productListModal') {
+                    document.getElementById('productListModal').classList.add('hidden');
+                }
+            });
+            
+            // Settings button
+            document.getElementById('settingsBtn').addEventListener('click', showSettings);
+            document.getElementById('closeSettings').addEventListener('click', hideSettings);
+            document.getElementById('refreshData').addEventListener('click', refreshData);
+            document.getElementById('analyzeDuplicates').addEventListener('click', () => {
+                const result = analyzeDuplicates();
+                alert(`Analiz tamamlandı!\n\nToplam ürün: ${products.length}\nTekrar eden: ${result.duplicates.length}\nBenzersiz: ${result.uniqueProducts.length}\n\nDetayları console'da görebilirsiniz.`);
+            });
+            document.getElementById('cleanDuplicates').addEventListener('click', cleanDuplicates);
+            
+            // Duplicate toggle
+            document.getElementById('showDuplicates').addEventListener('change', (e) => {
+                showDuplicates = e.target.checked;
+                if (searchInput.value.trim()) {
+                    performSearch(searchInput.value);
+                }
+            });
+            
+            // Product management event listeners
+            document.getElementById('manageProductsBtn').addEventListener('click', showProductManagement);
+            document.getElementById('exportProductsBtn').addEventListener('click', exportUserProducts);
+            document.getElementById('forceReloadDefaultsBtn').addEventListener('click', forceReloadDefaults);
+            document.getElementById('closeProductManagement').addEventListener('click', hideProductManagement);
+            document.getElementById('selectAllProducts').addEventListener('click', selectAllProducts);
+            document.getElementById('deselectAllProducts').addEventListener('click', deselectAllProducts);
+            document.getElementById('deleteSelectedProducts').addEventListener('click', deleteSelectedProducts);
+            
+            // Default products toggle
+            document.getElementById('showDefaultProducts').addEventListener('change', (e) => {
+                if (window.userDataManager && window.userDataManager.currentUser) {
+                    window.userDataManager.updateSettings({ showDefaultProducts: e.target.checked });
+                    // Refresh products
+                    products = window.userDataManager.getProducts();
+                    if (searchInput.value.trim()) {
+                        performSearch(searchInput.value);
+                    }
+                }
+            });
+            
+            // Close modal on overlay click
+            document.getElementById('settingsModal').addEventListener('click', (e) => {
+                if (e.target.id === 'settingsModal') {
+                    hideSettings();
+                }
+            });
+        });
+
+        // Initialize app when page loads
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check authentication first
+            const session = window.authUtils.checkAuth();
+            if (!session) {
+                window.location.href = '/index.html';
+                return;
+            }
+            
+            // Prevent admin users from accessing this page
+            if (session.isAdmin) {
+                window.location.href = '../admin.html';
+                return;
+            }
+            
+            // Update user info in header
+            document.getElementById('userName').textContent = session.username;
+            document.getElementById('userCompany').textContent = session.company;
+            
+            // Update trial countdown
+            if (window.updateTrialCountdown) {
+                window.updateTrialCountdown(session.trialEnd);
+            }
+            
+            // Update trial banner
+            if (window.updateTrialBanner) {
+                window.updateTrialBanner(session.trialEnd);
+            }
+            
+            // FORCE UPDATE TRIAL BANNER HEADER - IMMEDIATE CALL
+            console.log('🚀 FORCE CALLING updateTrialBannerHeader with:', session.trialEnd);
+            
+            // Direct call without checking if function exists
+            try {
+                // Get elements directly
+                const bannerElement = document.getElementById('trialBannerHeader');
+                const textElement = document.getElementById('trialBannerHeaderText');
+                
+                if (bannerElement && textElement) {
+                    console.log('✅ Elements found, updating banner...');
+                    
+                    // Calculate time left
+                    const trialEndDate = new Date(session.trialEnd);
+                    const now = new Date();
+                    const timeLeft = trialEndDate - now;
+                    
+                    if (timeLeft > 0) {
+                        const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                        const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                        
+                        console.log(`📊 Time left: ${days} days, ${hours} hours, ${minutes} minutes`);
+                        
+                        // Update banner based on time left
+                        if (days > 0) {
+                            if (days <= 3) {
+                                bannerElement.className = 'bg-gradient-to-r from-red-500 to-red-600 text-black px-3 py-1 rounded-full text-xs font-medium';
+                                textElement.textContent = `⚠️ ${days} gün ${hours} saat kaldı`;
+                            } else if (days <= 7) {
+                                bannerElement.className = 'bg-gradient-to-r from-yellow-500 to-orange-500 text-black px-3 py-1 rounded-full text-xs font-medium';
+                                textElement.textContent = `⏰ ${days} gün ${hours} saat kaldı`;
+                            } else {
+                                bannerElement.className = 'bg-gradient-to-r from-blue-500 to-purple-600 text-black px-3 py-1 rounded-full text-xs font-medium';
+                                textElement.textContent = `🎉 ${days} gün ${hours} saat kaldı`;
+                            }
+                        } else if (hours > 0) {
+                            bannerElement.className = 'bg-gradient-to-r from-red-500 to-red-600 text-black px-3 py-1 rounded-full text-xs font-medium';
+                            textElement.textContent = `⏰ ${hours} saat ${minutes} dakika kaldı`;
+                        } else {
+                            bannerElement.className = 'bg-gradient-to-r from-red-500 to-red-600 text-black px-3 py-1 rounded-full text-xs font-medium';
+                            textElement.textContent = `🚨 ${minutes} dakika kaldı`;
+                        }
+                        
+                        // Show banner
+                        bannerElement.classList.remove('hidden');
+                        textElement.className = 'text-black';
+                        
+                        console.log('🎉 Banner updated successfully!');
+                    } else {
+                        // Trial expired
+                        bannerElement.className = 'bg-gradient-to-r from-red-500 to-red-600 text-black px-3 py-1 rounded-full text-xs font-medium';
+                        textElement.textContent = '❌ Test Süresi Doldu';
+                        textElement.className = 'text-black';
+                        bannerElement.classList.remove('hidden');
+                        console.log('❌ Trial expired');
+                    }
+                } else {
+                    console.log('❌ Banner elements not found!');
+                }
+            } catch (error) {
+                console.error('❌ Error updating banner:', error);
+            }
+            
+            // Initialize user data manager
+            try {
+                await window.userDataManager.init();
+                console.log('User data manager initialized');
+            } catch (error) {
+                console.error('Error initializing user data manager:', error);
+            }
+            
+            // Add logout functionality
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                if (confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
+                    window.authUtils.logout();
+                }
+            });
+            
+            // Add contact functionality
+            document.getElementById('contactBtn').addEventListener('click', () => {
+                document.getElementById('contactModal').classList.remove('hidden');
+            });
+            
+            document.getElementById('closeContact').addEventListener('click', () => {
+                document.getElementById('contactModal').classList.add('hidden');
+            });
+            
+            document.getElementById('cancelContact').addEventListener('click', () => {
+                document.getElementById('contactModal').classList.add('hidden');
+            });
+            
+            // Contact form handler
+            document.getElementById('contactForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const messageType = document.getElementById('messageType').value;
+                const messageContent = document.getElementById('messageContent').value.trim();
+                
+                if (!messageContent) {
+                    alert('Lütfen mesajınızı yazın!');
+                    return;
+                }
+                
+                try {
+                    // Try Supabase first
+                    if (window.supabase) {
+                        const { error } = await window.supabase
+                            .from('messages')
+                            .insert([{
+                                user_id: session.username,
+                                message_type: messageType,
+                                content: messageContent,
+                                status: 'pending'
+                            }]);
+                        
+                        if (error) throw error;
+                    }
+                    
+                    // Save to local storage
+                    const messages = JSON.parse(localStorage.getItem('userMessages') || '[]');
+                    const newMessage = {
+                        id: Date.now(),
+                        user_id: session.username,
+                        message_type: messageType,
+                        content: messageContent,
+                        status: 'pending',
+                        created_at: new Date().toISOString()
+                    };
+                    messages.push(newMessage);
+                    localStorage.setItem('userMessages', JSON.stringify(messages));
+                    
+                    // Also save to a global messages array for admin panel
+                    const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
+                    globalMessages.push(newMessage);
+                    localStorage.setItem('globalMessages', JSON.stringify(globalMessages));
+                    
+                    console.log('Message saved to local storage:', newMessage);
+                    console.log('All messages:', messages);
+                    console.log('Global messages:', globalMessages);
+                    
+                    alert('✅ Mesajınız başarıyla gönderildi!\n\nEn kısa sürede size dönüş yapacağız.');
+                    
+                    // Reset form and close modal
+                    document.getElementById('contactForm').reset();
+                    document.getElementById('contactModal').classList.add('hidden');
+                    
+                } catch (error) {
+                    console.error('Error sending message:', error);
+                    alert('❌ Mesaj gönderilirken hata oluştu. Lütfen tekrar deneyin.');
+                }
+            });
+            
+            // Initialize user data manager
+            try {
+                await window.userDataManager.init();
+                console.log('User data manager initialized');
+            } catch (error) {
+                console.error('Error initializing user data manager:', error);
+            }
+            
+            // Initialize the app
+            await initializeApp();
+        });
+    </script>
+<script id="dhws-dataInjector" src="../public/dhws-data-injector.js"></script>
+</body>
+</html>
