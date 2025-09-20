@@ -1046,6 +1046,8 @@ class AdminPanel {
     // IP Tracking Functions
     async loadIPTracking() {
         try {
+            console.log('Loading IP tracking data...');
+            
             if (window.supabase) {
                 const { data, error } = await window.supabase
                     .from('user_ip_tracking')
@@ -1055,11 +1057,17 @@ class AdminPanel {
                     `)
                     .order('last_seen', { ascending: false });
 
-                if (error) throw error;
+                if (error) {
+                    console.error('Supabase IP tracking error:', error);
+                    throw error;
+                }
+                
+                console.log('IP tracking data loaded:', data);
                 this.ipTrackingData = data || [];
             } else {
                 // Fallback to local storage
                 this.ipTrackingData = JSON.parse(localStorage.getItem('ipTrackingData') || '[]');
+                console.log('Using local storage IP tracking data:', this.ipTrackingData);
             }
 
             this.renderIPTracking();

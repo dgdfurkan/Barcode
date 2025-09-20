@@ -141,6 +141,7 @@ async function login(username, password) {
                 
                 if (!error && data) {
                     user = data;
+                    console.log('User found in Supabase:', user);
                 }
             } catch (error) {
                 console.warn('Supabase error:', error);
@@ -187,7 +188,16 @@ async function login(username, password) {
 
         // IP Tracking Check
         if (user.ip_tracking_enabled !== false) {
+            console.log('IP Tracking Check:', {
+                userId: user.id,
+                username: user.username,
+                clientIP: clientIP,
+                maxIPCount: user.max_ip_count || 5
+            });
+            
             const ipTrackingResult = await checkIPTracking(user.id, clientIP, user.max_ip_count || 5);
+            console.log('IP Tracking Result:', ipTrackingResult);
+            
             if (!ipTrackingResult.success) {
                 throw new Error(`IP sınırı aşıldı! Maksimum ${user.max_ip_count || 5} farklı IP kullanabilirsiniz.`);
             }
@@ -442,6 +452,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // IP Tracking Functions
 async function checkIPTracking(userId, clientIP, maxIPCount) {
     try {
+        console.log('checkIPTracking called with:', { userId, clientIP, maxIPCount });
+        
         if (supabase) {
             // Use Supabase function
             const { data, error } = await supabase.rpc('track_user_ip', {
@@ -449,7 +461,12 @@ async function checkIPTracking(userId, clientIP, maxIPCount) {
                 p_ip_address: clientIP
             });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase IP tracking error:', error);
+                throw error;
+            }
+            
+            console.log('Supabase IP tracking result:', data);
             return data;
         } else {
             // Fallback to local storage
