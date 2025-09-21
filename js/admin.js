@@ -12,6 +12,8 @@ class AdminPanel {
         this.currentIPDetailsSortColumn = null;
         this.currentIPTrackingSortDirection = 'asc';
         this.currentIPTrackingSortColumn = null;
+        this.selectedChatUser = null;
+        this.chatMessages = [];
     }
 
     async init() {
@@ -171,6 +173,14 @@ class AdminPanel {
             this.testSupabaseConnection();
             this.loadIPTracking();
         });
+
+        // Chat event listeners
+        document.getElementById('refreshChat').addEventListener('click', () => this.loadChatUsers());
+        document.getElementById('clearChatBtn').addEventListener('click', () => this.clearChat());
+        document.getElementById('sendAdminMessage').addEventListener('click', () => this.sendAdminMessage());
+        document.getElementById('adminMessageInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.sendAdminMessage();
+        });
     }
 
     async switchTab(tabName) {
@@ -196,6 +206,8 @@ class AdminPanel {
         if (tabName === 'ipAnalysis') {
             await this.loadIPAnalysis();
             await this.loadIPTracking();
+        } else if (tabName === 'chat') {
+            await this.loadChatUsers();
         }
     }
 
@@ -1709,3 +1721,506 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 });
+
+// Chat Functions for AdminPanel
+AdminPanel.prototype.loadChatUsers = async function() {
+    console.log('💬 Loading chat users...');
+    try {
+        if (window.supabase) {
+            console.log('💬 Using Supabase for chat users');
+            // Get all messages, not just pending ones
+            const { data, error } = await window.supabase
+                .from('messages')
+                .select('username, status, created_at, message')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('❌ Supabase error loading chat users:', error);
+                // Fallback to localStorage
+                this.loadChatUsersFromLocalStorage();
+                return;
+            }
+
+            console.log('✅ Messages from Supabase:', data);
+
+            // Get unique users who have sent messages
+            const uniqueUsers = [...new Set(data.map(msg => msg.username))];
+            console.log('✅ Unique users from Supabase:', uniqueUsers);
+            
+            if (uniqueUsers.length === 0) {
+                console.log('⚠️ No users found in Supabase, checking localStorage...');
+                this.loadChatUsersFromLocalStorage();
+            } else {
+                this.renderChatUsers(uniqueUsers);
+            }
+        } else {
+            console.log('💬 Supabase not available, using localStorage');
+            this.loadChatUsersFromLocalStorage();
+        }
+    } catch (error) {
+        console.error('❌ Error loading chat users:', error);
+        this.loadChatUsersFromLocalStorage();
+    }
+};
+
+AdminPanel.prototype.loadChatUsersFromLocalStorage = function() {
+    console.log('💬 Loading chat users from localStorage');
+    const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+    const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+    const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
+    const userMessages = JSON.parse(localStorage.getItem('userMessages') || '[]');
+    
+    const allMessages = [...messages, ...chatMessages, ...globalMessages, ...userMessages];
+    console.log('💬 All messages from localStorage:', allMessages);
+    
+    const uniqueUsers = [...new Set(allMessages.map(msg => msg.username))];
+    console.log('💬 Unique users from localStorage:', uniqueUsers);
+    this.renderChatUsers(uniqueUsers);
+};
+
+AdminPanel.prototype.renderChatUsers = function(users) {
+    console.log('💬 Rendering chat users:', users);
+    const chatUsersList = document.getElementById('chatUsersList');
+    if (!chatUsersList) {
+        console.error('💬 chatUsersList element not found!');
+        return;
+    }
+
+    if (users.length === 0) {
+        console.log('💬 No users to render, showing empty state');
+        chatUsersList.innerHTML = `
+            <div class="p-4 text-center text-gray-500">
+                <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+                <p class="text-sm">Aktif sohbet yok</p>
+            </div>
+        `;
+        return;
+    }
+
+    console.log('💬 Rendering', users.length, 'users');
+    chatUsersList.innerHTML = users.map(username => {
+        const lastMessage = this.getLastMessagePreview(username);
+        return `
+            <div class="p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors" onclick="adminPanel.selectChatUser('${username}')">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                        ${username.charAt(0).toUpperCase()}
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="font-medium text-gray-900">${username}</h4>
+                        <p class="text-xs text-gray-500">${lastMessage}</p>
+                    </div>
+                    <div class="w-2 h-2 bg-red-500 rounded-full"></div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    console.log('💬 Chat users rendered successfully');
+};
+
+AdminPanel.prototype.getLastMessagePreview = function(username) {
+    // Get last message for this user from Supabase or localStorage
+    try {
+        // First try to get from localStorage (faster)
+        const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+        const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+        const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
+        const userMessages = JSON.parse(localStorage.getItem('userMessages') || '[]');
+        
+        const allMessages = [...messages, ...chatMessages, ...globalMessages, ...userMessages];
+        const userMessagesFiltered = allMessages.filter(msg => msg.username === username);
+        
+        if (userMessagesFiltered.length > 0) {
+            const lastMessage = userMessagesFiltered[userMessagesFiltered.length - 1];
+            const messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
+            return messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
+        }
+    } catch (error) {
+        console.error('Error getting last message preview:', error);
+    }
+    return 'Henüz mesaj yok';
+};
+
+AdminPanel.prototype.clearChat = async function() {
+    if (!this.selectedChatUser) {
+        alert('Lütfen önce bir kullanıcı seçin!');
+        return;
+    }
+
+    if (!confirm(`${this.selectedChatUser} kullanıcısının tüm sohbet geçmişini silmek istediğinizden emin misiniz?`)) {
+        return;
+    }
+
+    try {
+        console.log('🗑️ Clearing chat for user:', this.selectedChatUser);
+        
+        // Delete from Supabase first
+        if (window.supabase) {
+            console.log('🗑️ Deleting messages from Supabase for:', this.selectedChatUser);
+            const { error } = await window.supabase
+                .from('messages')
+                .delete()
+                .eq('username', this.selectedChatUser);
+
+            if (error) {
+                console.error('❌ Error deleting messages from Supabase:', error);
+                alert('Supabase\'den mesajlar silinirken hata oluştu: ' + error.message);
+                return;
+            } else {
+                console.log('✅ Messages deleted from Supabase successfully');
+            }
+        }
+
+        // Delete from localStorage
+        console.log('🗑️ Deleting messages from localStorage for:', this.selectedChatUser);
+        const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+        const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+        const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
+        const userMessages = JSON.parse(localStorage.getItem('userMessages') || '[]');
+        
+        const filteredMessages = messages.filter(msg => msg.username !== this.selectedChatUser);
+        const filteredChatMessages = chatMessages.filter(msg => msg.username !== this.selectedChatUser);
+        const filteredGlobalMessages = globalMessages.filter(msg => msg.username !== this.selectedChatUser);
+        const filteredUserMessages = userMessages.filter(msg => msg.username !== this.selectedChatUser);
+        
+        localStorage.setItem('messages', JSON.stringify(filteredMessages));
+        localStorage.setItem('chatMessages', JSON.stringify(filteredChatMessages));
+        localStorage.setItem('globalMessages', JSON.stringify(filteredGlobalMessages));
+        localStorage.setItem('userMessages', JSON.stringify(filteredUserMessages));
+        
+        console.log('✅ Messages deleted from localStorage successfully');
+
+        // Clear UI
+        const chatMessagesArea = document.getElementById('chatMessagesArea');
+        if (chatMessagesArea) {
+            chatMessagesArea.innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                    <p>Sohbet geçmişi temizlendi</p>
+                </div>
+            `;
+        }
+
+        // Reload chat users to update the list
+        await this.loadChatUsers();
+        
+        alert('✅ Sohbet geçmişi başarıyla temizlendi!');
+        
+    } catch (error) {
+        console.error('❌ Error clearing chat:', error);
+        alert('Sohbet temizlenirken hata oluştu: ' + error.message);
+    }
+};
+
+AdminPanel.prototype.selectChatUser = function(username) {
+    this.selectedChatUser = username;
+    this.loadChatMessages(username);
+    this.updateSelectedUserInfo(username);
+    this.showChatInput();
+};
+
+AdminPanel.prototype.updateSelectedUserInfo = function(username) {
+    const selectedUserInfo = document.getElementById('selectedUserInfo');
+    const selectedUserInitial = document.getElementById('selectedUserInitial');
+    const selectedUserName = document.getElementById('selectedUserName');
+    const selectedUserStatus = document.getElementById('selectedUserStatus');
+
+    selectedUserInitial.textContent = username.charAt(0).toUpperCase();
+    selectedUserName.textContent = username;
+    selectedUserStatus.textContent = 'Çevrimiçi';
+    selectedUserInfo.classList.remove('hidden');
+};
+
+AdminPanel.prototype.showChatInput = function() {
+    const chatInputArea = document.getElementById('chatInputArea');
+    chatInputArea.classList.remove('hidden');
+    document.getElementById('adminMessageInput').focus();
+};
+
+AdminPanel.prototype.loadChatMessages = async function(username) {
+    console.log('💬 Loading chat messages for:', username);
+    try {
+        if (window.supabase) {
+            console.log('💬 Using Supabase for chat messages');
+            const { data, error } = await window.supabase
+                .from('messages')
+                .select('*')
+                .eq('username', username)
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                console.error('❌ Supabase error loading chat messages:', error);
+                // Fallback to localStorage
+                this.loadChatMessagesFromLocalStorage(username);
+                return;
+            }
+
+            console.log('✅ Messages for', username, 'from Supabase:', data);
+            
+            if (data && data.length > 0) {
+                this.renderChatMessages(data);
+            } else {
+                console.log('⚠️ No messages in Supabase for', username, ', checking localStorage');
+                this.loadChatMessagesFromLocalStorage(username);
+            }
+        } else {
+            console.log('💬 Supabase not available, using localStorage');
+            this.loadChatMessagesFromLocalStorage(username);
+        }
+    } catch (error) {
+        console.error('❌ Error loading chat messages:', error);
+        this.loadChatMessagesFromLocalStorage(username);
+    }
+};
+
+AdminPanel.prototype.loadChatMessagesFromLocalStorage = function(username) {
+    console.log('💬 Loading chat messages from localStorage for:', username);
+    
+    const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+    const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+    const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
+    const userMessages = JSON.parse(localStorage.getItem('userMessages') || '[]');
+    
+    console.log('💬 All localStorage data:', {
+        messages: messages.length,
+        chatMessages: chatMessages.length,
+        globalMessages: globalMessages.length,
+        userMessages: userMessages.length
+    });
+    
+    const allMessages = [...messages, ...chatMessages, ...globalMessages, ...userMessages];
+    console.log('💬 Combined messages:', allMessages);
+    
+    const userMessagesFiltered = allMessages.filter(msg => msg.username === username);
+    console.log('💬 Filtered messages for', username, ':', userMessagesFiltered);
+    
+    this.renderChatMessages(userMessagesFiltered);
+};
+
+AdminPanel.prototype.renderChatMessages = function(messages) {
+    const chatMessagesArea = document.getElementById('chatMessagesArea');
+    if (!chatMessagesArea) return;
+
+    if (messages.length === 0) {
+        chatMessagesArea.innerHTML = `
+            <div class="text-center text-gray-500 py-8">
+                <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+                <p>Henüz mesaj yok</p>
+            </div>
+        `;
+        return;
+    }
+
+    chatMessagesArea.innerHTML = messages.map((msg, index) => {
+        const time = new Date(msg.created_at).toLocaleTimeString('tr-TR', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        
+        // Get message content from different possible fields
+        const messageContent = msg.message || msg.content || msg.text || 'Mesaj içeriği bulunamadı';
+        
+        if (msg.sender === 'admin') {
+            return `
+                <div class="flex justify-end mb-3 group">
+                    <div class="max-w-xs">
+                        <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
+                            ${messageContent}
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1 text-right flex items-center justify-end space-x-2">
+                            <span>Admin • ${time}</span>
+                            <button onclick="adminPanel.deleteMessage(${index})" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="flex justify-start mb-3 group">
+                    <div class="max-w-xs">
+                        <div class="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm shadow-sm">
+                            ${messageContent}
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1 flex items-center space-x-2">
+                            <span>${msg.username} • ${time}</span>
+                            <button onclick="adminPanel.deleteMessage(${index})" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }).join('');
+
+    // Scroll to bottom
+    chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
+};
+
+AdminPanel.prototype.deleteMessage = async function(messageIndex) {
+    if (!this.selectedChatUser) {
+        alert('Lütfen önce bir kullanıcı seçin!');
+        return;
+    }
+
+    if (!confirm('Bu mesajı silmek istediğinizden emin misiniz?')) {
+        return;
+    }
+
+    try {
+        console.log('🗑️ Deleting message at index:', messageIndex);
+        
+        // Get all messages from localStorage
+        const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+        const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+        const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
+        const userMessages = JSON.parse(localStorage.getItem('userMessages') || '[]');
+        
+        const allMessages = [...messages, ...chatMessages, ...globalMessages, ...userMessages];
+        const userMessagesFiltered = allMessages.filter(msg => msg.username === this.selectedChatUser);
+        const messageToDelete = userMessagesFiltered[messageIndex];
+        
+        if (!messageToDelete) {
+            alert('Mesaj bulunamadı!');
+            return;
+        }
+        
+        console.log('🗑️ Message to delete:', messageToDelete);
+        
+        // Delete from Supabase first
+        if (window.supabase && messageToDelete.id) {
+            console.log('🗑️ Deleting message from Supabase with ID:', messageToDelete.id);
+            const { error } = await window.supabase
+                .from('messages')
+                .delete()
+                .eq('id', messageToDelete.id);
+                
+            if (error) {
+                console.error('❌ Error deleting message from Supabase:', error);
+                alert('Supabase\'den mesaj silinirken hata oluştu: ' + error.message);
+                return;
+            } else {
+                console.log('✅ Message deleted from Supabase successfully');
+            }
+        }
+        
+        // Delete from localStorage
+        console.log('🗑️ Deleting message from localStorage');
+        const filteredMessages = messages.filter(msg => msg !== messageToDelete);
+        const filteredChatMessages = chatMessages.filter(msg => msg !== messageToDelete);
+        const filteredGlobalMessages = globalMessages.filter(msg => msg !== messageToDelete);
+        const filteredUserMessages = userMessages.filter(msg => msg !== messageToDelete);
+        
+        localStorage.setItem('messages', JSON.stringify(filteredMessages));
+        localStorage.setItem('chatMessages', JSON.stringify(filteredChatMessages));
+        localStorage.setItem('globalMessages', JSON.stringify(filteredGlobalMessages));
+        localStorage.setItem('userMessages', JSON.stringify(filteredUserMessages));
+        
+        console.log('✅ Message deleted from localStorage successfully');
+        
+        // Reload messages
+        await this.loadChatMessages(this.selectedChatUser);
+        
+        alert('✅ Mesaj başarıyla silindi!');
+        
+    } catch (error) {
+        console.error('❌ Error deleting message:', error);
+        alert('Mesaj silinirken hata oluştu: ' + error.message);
+    }
+};
+
+AdminPanel.prototype.sendAdminMessage = async function() {
+    const messageInput = document.getElementById('adminMessageInput');
+    const message = messageInput.value.trim();
+    
+    if (!message || !this.selectedChatUser) return;
+
+    // Add message to UI immediately
+    this.addAdminMessageToUI(message);
+    messageInput.value = '';
+
+    // Save to Supabase
+    await this.saveAdminMessageToSupabase(message);
+};
+
+AdminPanel.prototype.addAdminMessageToUI = function(message) {
+    const chatMessagesArea = document.getElementById('chatMessagesArea');
+    const time = new Date().toLocaleTimeString('tr-TR', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.innerHTML = `
+        <div class="flex justify-end mb-3">
+            <div class="max-w-xs">
+                <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
+                    ${message}
+                </div>
+                <div class="text-xs text-gray-500 mt-1 text-right">Admin • ${time}</div>
+            </div>
+        </div>
+    `;
+    
+    chatMessagesArea.appendChild(messageDiv);
+    chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
+};
+
+AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
+    try {
+        if (window.supabase) {
+            console.log('💬 Saving admin message to Supabase:', message);
+            const { data, error } = await window.supabase
+                .from('messages')
+                .insert([{
+                    username: this.selectedChatUser,
+                    message: message,
+                    sender: 'admin',
+                    status: 'approved',
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (error) {
+                console.error('❌ Error saving admin message to Supabase:', error);
+                // Fallback to localStorage
+                this.saveAdminMessageToLocalStorage(message);
+            } else {
+                console.log('✅ Admin message saved to Supabase successfully');
+            }
+        } else {
+            console.log('💬 Supabase not available, saving to localStorage');
+            // Fallback to localStorage
+            this.saveAdminMessageToLocalStorage(message);
+        }
+    } catch (error) {
+        console.error('❌ Error saving admin message:', error);
+        this.saveAdminMessageToLocalStorage(message);
+    }
+};
+
+AdminPanel.prototype.saveAdminMessageToLocalStorage = function(message) {
+    console.log('💬 Saving admin message to localStorage:', message);
+    const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+    messages.push({
+        username: this.selectedChatUser,
+        message: message,
+        sender: 'admin',
+        status: 'approved',
+        created_at: new Date().toISOString()
+    });
+    localStorage.setItem('messages', JSON.stringify(messages));
+    console.log('✅ Admin message saved to localStorage successfully');
+};
