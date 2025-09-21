@@ -2188,6 +2188,7 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
                 .insert([{
                     username: this.selectedChatUser,
                     message: message,
+                    subject: 'Admin Yanıtı', // Add required subject field
                     sender: 'admin',
                     status: 'approved',
                     created_at: new Date().toISOString()

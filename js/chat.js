@@ -296,6 +296,7 @@ class ChatSystem {
                     .insert([{
                         username: this.currentUser,
                         message: message,
+                        subject: 'Sohbet Mesajı', // Add required subject field
                         status: 'pending',
                         created_at: new Date().toISOString()
                     }]);
