@@ -1947,11 +1947,13 @@ AdminPanel.prototype.loadChatMessages = async function(username) {
     try {
         if (window.supabase) {
             console.log('💬 Using Supabase for chat messages');
+            
+            // Get user's chat messages from users table
             const { data, error } = await window.supabase
-                .from('messages')
-                .select('*')
+                .from('users')
+                .select('chat_messages')
                 .eq('username', username)
-                .order('created_at', { ascending: true });
+                .single();
 
             if (error) {
                 console.error('❌ Supabase error loading chat messages:', error);
@@ -1960,12 +1962,14 @@ AdminPanel.prototype.loadChatMessages = async function(username) {
                 return;
             }
 
-            console.log('✅ Messages for', username, 'from Supabase:', data);
+            console.log('✅ Chat messages for', username, 'from Supabase:', data);
             
-            if (data && data.length > 0) {
-                this.renderChatMessages(data);
+            if (data && data.chat_messages) {
+                const chatMessages = JSON.parse(data.chat_messages);
+                console.log('✅ Parsed chat messages:', chatMessages);
+                this.renderChatMessages(chatMessages);
             } else {
-                console.log('⚠️ No messages in Supabase for', username, ', checking localStorage');
+                console.log('⚠️ No chat messages in Supabase for', username, ', checking localStorage');
                 this.loadChatMessagesFromLocalStorage(username);
             }
         } else {
@@ -2019,12 +2023,12 @@ AdminPanel.prototype.renderChatMessages = function(messages) {
     }
 
     chatMessagesArea.innerHTML = messages.map((msg, index) => {
-        const time = new Date(msg.created_at).toLocaleTimeString('tr-TR', { 
+        const time = new Date(msg.timestamp || msg.created_at).toLocaleTimeString('tr-TR', { 
             hour: '2-digit', 
             minute: '2-digit' 
         });
         
-        // Get message content from different possible fields
+        // Get message content
         const messageContent = msg.message || msg.content || msg.text || 'Mesaj içeriği bulunamadı';
         
         if (msg.sender === 'admin') {
@@ -2053,7 +2057,7 @@ AdminPanel.prototype.renderChatMessages = function(messages) {
                             ${messageContent}
                         </div>
                         <div class="text-xs text-gray-500 mt-1 flex items-center space-x-2">
-                            <span>${msg.username} • ${time}</span>
+                            <span>${msg.username || 'Kullanıcı'} • ${time}</span>
                             <button onclick="adminPanel.deleteMessage(${index})" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity">
                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
@@ -2183,23 +2187,45 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
     try {
         if (window.supabase) {
             console.log('💬 Saving admin message to Supabase:', message);
-            const { data, error } = await window.supabase
-                .from('messages')
-                .insert([{
-                    username: this.selectedChatUser,
-                    message: message,
-                    subject: 'Admin Yanıtı', // Add required subject field
-                    sender: 'admin',
-                    status: 'approved',
-                    created_at: new Date().toISOString()
-                }]);
+            
+            // Get current user's chat messages
+            const { data: userData, error: userError } = await window.supabase
+                .from('users')
+                .select('chat_messages')
+                .eq('username', this.selectedChatUser)
+                .single();
 
-            if (error) {
-                console.error('❌ Error saving admin message to Supabase:', error);
+            if (userError) {
+                console.error('❌ Error getting user chat messages:', userError);
+                return;
+            }
+
+            // Parse existing chat messages or create new array
+            let chatMessages = userData.chat_messages ? JSON.parse(userData.chat_messages) : [];
+            
+            // Add admin message
+            chatMessages.push({
+                message: message,
+                sender: 'admin',
+                timestamp: new Date().toISOString(),
+                status: 'delivered'
+            });
+
+            // Update user's chat messages
+            const { error: updateError } = await window.supabase
+                .from('users')
+                .update({ 
+                    chat_messages: JSON.stringify(chatMessages),
+                    last_chat_update: new Date().toISOString()
+                })
+                .eq('username', this.selectedChatUser);
+
+            if (updateError) {
+                console.error('❌ Error updating user chat messages:', updateError);
                 // Fallback to localStorage
                 this.saveAdminMessageToLocalStorage(message);
             } else {
-                console.log('✅ Admin message saved to Supabase successfully');
+                console.log('✅ Admin message saved to user chat successfully');
             }
         } else {
             console.log('💬 Supabase not available, saving to localStorage');

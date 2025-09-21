@@ -291,27 +291,55 @@ class ChatSystem {
     async saveMessageToSupabase(message) {
         try {
             if (window.supabase) {
-                const { data, error } = await window.supabase
-                    .from('messages')
-                    .insert([{
-                        username: this.currentUser,
-                        message: message,
-                        subject: 'Sohbet Mesajı', // Add required subject field
-                        status: 'pending',
-                        created_at: new Date().toISOString()
-                    }]);
+                console.log('💬 Saving user message to Supabase:', message);
+                
+                // Get current user's chat messages
+                const { data: userData, error: userError } = await window.supabase
+                    .from('users')
+                    .select('chat_messages')
+                    .eq('username', this.currentUser)
+                    .single();
 
-                if (error) {
-                    console.error('Error saving message:', error);
+                if (userError) {
+                    console.error('❌ Error getting user chat messages:', userError);
                     // Fallback to localStorage
                     this.saveToLocalStorage(message);
+                    return;
+                }
+
+                // Parse existing chat messages or create new array
+                let chatMessages = userData.chat_messages ? JSON.parse(userData.chat_messages) : [];
+                
+                // Add user message
+                chatMessages.push({
+                    message: message,
+                    sender: 'user',
+                    timestamp: new Date().toISOString(),
+                    status: 'sent'
+                });
+
+                // Update user's chat messages
+                const { error: updateError } = await window.supabase
+                    .from('users')
+                    .update({ 
+                        chat_messages: JSON.stringify(chatMessages),
+                        last_chat_update: new Date().toISOString()
+                    })
+                    .eq('username', this.currentUser);
+
+                if (updateError) {
+                    console.error('❌ Error updating user chat messages:', updateError);
+                    // Fallback to localStorage
+                    this.saveToLocalStorage(message);
+                } else {
+                    console.log('✅ User message saved to chat successfully');
                 }
             } else {
                 // Fallback to localStorage
                 this.saveToLocalStorage(message);
             }
         } catch (error) {
-            console.error('Error saving message:', error);
+            console.error('❌ Error saving message:', error);
             this.saveToLocalStorage(message);
         }
     }
@@ -343,22 +371,36 @@ class ChatSystem {
     async loadChatHistory() {
         try {
             if (window.supabase) {
+                console.log('💬 Loading chat history from Supabase');
+                
+                // Get user's chat messages from users table
                 const { data, error } = await window.supabase
-                    .from('messages')
-                    .select('*')
+                    .from('users')
+                    .select('chat_messages')
                     .eq('username', this.currentUser)
-                    .order('created_at', { ascending: true });
+                    .single();
 
-                if (!error && data) {
-                    data.forEach(msg => {
-                        if (msg.status === 'approved') {
-                            this.addMessage(msg.message, 'user', new Date(msg.created_at).toLocaleTimeString('tr-TR'));
+                if (error) {
+                    console.error('❌ Error loading chat history:', error);
+                    return;
+                }
+
+                if (data && data.chat_messages) {
+                    const chatMessages = JSON.parse(data.chat_messages);
+                    console.log('✅ Loaded chat messages:', chatMessages);
+                    
+                    // Render all messages
+                    chatMessages.forEach(msg => {
+                        if (msg.sender === 'user') {
+                            this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
+                        } else if (msg.sender === 'admin') {
+                            this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
                         }
                     });
                 }
             }
         } catch (error) {
-            console.error('Error loading chat history:', error);
+            console.error('❌ Error loading chat history:', error);
         }
     }
 
@@ -374,21 +416,39 @@ class ChatSystem {
     async checkForNewMessages() {
         try {
             if (window.supabase) {
+                console.log('💬 Checking for new messages');
+                
+                // Get user's chat messages from users table
                 const { data, error } = await window.supabase
-                    .from('messages')
-                    .select('*')
+                    .from('users')
+                    .select('chat_messages, last_chat_update')
                     .eq('username', this.currentUser)
-                    .eq('status', 'approved')
-                    .gte('created_at', new Date(Date.now() - 30000).toISOString());
+                    .single();
 
-                if (!error && data && data.length > 0) {
-                    data.forEach(msg => {
-                        this.addMessage(msg.message, 'admin', new Date(msg.created_at).toLocaleTimeString('tr-TR'));
-                    });
+                if (error) {
+                    console.error('❌ Error checking for new messages:', error);
+                    return;
+                }
+
+                if (data && data.chat_messages) {
+                    const chatMessages = JSON.parse(data.chat_messages);
+                    
+                    // Check if there are new admin messages
+                    const adminMessages = chatMessages.filter(msg => 
+                        msg.sender === 'admin' && 
+                        new Date(msg.timestamp) > new Date(Date.now() - 30000)
+                    );
+                    
+                    if (adminMessages.length > 0) {
+                        console.log('✅ New admin messages found:', adminMessages);
+                        adminMessages.forEach(msg => {
+                            this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
+                        });
+                    }
                 }
             }
         } catch (error) {
-            console.error('Error checking for new messages:', error);
+            console.error('❌ Error checking for new messages:', error);
         }
     }
 
