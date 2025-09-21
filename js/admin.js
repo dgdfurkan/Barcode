@@ -1728,30 +1728,47 @@ AdminPanel.prototype.loadChatUsers = async function() {
     try {
         if (window.supabase) {
             console.log('💬 Using Supabase for chat users');
-            // Get all messages, not just pending ones
-            const { data, error } = await window.supabase
-                .from('messages')
-                .select('username, status, created_at, message')
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('❌ Supabase error loading chat users:', error);
-                // Fallback to localStorage
-                this.loadChatUsersFromLocalStorage();
-                return;
-            }
-
-            console.log('✅ Messages from Supabase:', data);
-
-            // Get unique users who have sent messages
-            const uniqueUsers = [...new Set(data.map(msg => msg.username))];
-            console.log('✅ Unique users from Supabase:', uniqueUsers);
             
-            if (uniqueUsers.length === 0) {
-                console.log('⚠️ No users found in Supabase, checking localStorage...');
-                this.loadChatUsersFromLocalStorage();
-            } else {
+            // First try to get users with chat_messages column
+            const { data: usersData, error: usersError } = await window.supabase
+                .from('users')
+                .select('username, chat_messages, last_chat_update')
+                .not('chat_messages', 'is', null);
+
+            if (usersError && usersError.code === '42703') {
+                console.log('⚠️ chat_messages column does not exist, using messages table');
+                // Fallback to messages table
+                const { data, error } = await window.supabase
+                    .from('messages')
+                    .select('username, status, created_at, message')
+                    .order('created_at', { ascending: false });
+
+                if (error) {
+                    console.error('❌ Supabase error loading chat users:', error);
+                    this.loadChatUsersFromLocalStorage();
+                    return;
+                }
+
+                const uniqueUsers = [...new Set(data.map(msg => msg.username))];
+                console.log('✅ Unique users from messages table:', uniqueUsers);
                 this.renderChatUsers(uniqueUsers);
+            } else if (usersData) {
+                // Filter users who have chat messages
+                const usersWithChat = usersData.filter(user => {
+                    try {
+                        const chatMessages = JSON.parse(user.chat_messages || '[]');
+                        return chatMessages.length > 0;
+                    } catch {
+                        return false;
+                    }
+                });
+                
+                const uniqueUsers = usersWithChat.map(user => user.username);
+                console.log('✅ Unique users with chat messages:', uniqueUsers);
+                this.renderChatUsers(uniqueUsers);
+            } else {
+                console.log('⚠️ No users found, checking localStorage...');
+                this.loadChatUsersFromLocalStorage();
             }
         } else {
             console.log('💬 Supabase not available, using localStorage');
@@ -1948,23 +1965,34 @@ AdminPanel.prototype.loadChatMessages = async function(username) {
         if (window.supabase) {
             console.log('💬 Using Supabase for chat messages');
             
-            // Get user's chat messages from users table
+            // First try to get user's chat messages from users table
             const { data, error } = await window.supabase
                 .from('users')
                 .select('chat_messages')
                 .eq('username', username)
                 .single();
 
-            if (error) {
-                console.error('❌ Supabase error loading chat messages:', error);
-                // Fallback to localStorage
-                this.loadChatMessagesFromLocalStorage(username);
-                return;
-            }
+            if (error && error.code === '42703') {
+                console.log('⚠️ chat_messages column does not exist, using messages table');
+                // Fallback to messages table
+                const { data: messagesData, error: messagesError } = await window.supabase
+                    .from('messages')
+                    .select('*')
+                    .eq('username', username)
+                    .order('created_at', { ascending: true });
 
-            console.log('✅ Chat messages for', username, 'from Supabase:', data);
-            
-            if (data && data.chat_messages) {
+                if (messagesError) {
+                    console.error('❌ Supabase error loading chat messages:', messagesError);
+                    this.loadChatMessagesFromLocalStorage(username);
+                    return;
+                }
+
+                console.log('✅ Messages for', username, 'from messages table:', messagesData);
+                this.renderChatMessages(messagesData);
+            } else if (error) {
+                console.error('❌ Supabase error loading chat messages:', error);
+                this.loadChatMessagesFromLocalStorage(username);
+            } else if (data && data.chat_messages) {
                 const chatMessages = JSON.parse(data.chat_messages);
                 console.log('✅ Parsed chat messages:', chatMessages);
                 this.renderChatMessages(chatMessages);
