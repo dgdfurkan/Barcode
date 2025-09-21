@@ -4,6 +4,7 @@ class ChatSystem {
         this.isOpen = false;
         this.messages = [];
         this.currentUser = null;
+        this.chatSubscription = null;
         this.init();
     }
 
@@ -50,8 +51,9 @@ class ChatSystem {
         // Load chat history
         this.loadChatHistory();
         
-        // Set up real-time updates (simulated)
+        // Set up real-time updates
         this.setupRealTimeUpdates();
+        this.setupChatRealtime();
     }
 
     ensureChatButtonVisible() {
@@ -411,6 +413,77 @@ class ChatSystem {
                 this.checkForNewMessages();
             }
         }, 30000);
+    }
+
+    setupChatRealtime() {
+        if (!window.supabase) return;
+        
+        console.log('🔔 Setting up chat realtime subscription for user:', this.currentUser);
+        
+        // Subscribe to users table changes for this specific user
+        this.chatSubscription = window.supabase
+            .channel('user-chat-updates')
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'users',
+                filter: `username=eq.${this.currentUser}`
+            }, (payload) => {
+                console.log('🔔 Chat update received for user:', payload);
+                this.handleChatUpdate(payload);
+            })
+            .subscribe();
+        
+        console.log('✅ User chat realtime subscription established');
+    }
+
+    handleChatUpdate(payload) {
+        console.log('🔔 Handling chat update for user:', payload.new.username);
+        
+        if (payload.new.chat_messages) {
+            try {
+                const chatMessages = JSON.parse(payload.new.chat_messages);
+                console.log('✅ New chat messages:', chatMessages);
+                
+                // Clear current messages and reload
+                const messagesContainer = document.getElementById('chatMessages');
+                if (messagesContainer) {
+                    messagesContainer.innerHTML = '';
+                }
+                
+                // Reload chat history
+                this.loadChatHistory();
+                
+                // Show notification if chat is closed
+                if (!this.isOpen) {
+                    this.showChatNotification();
+                }
+                
+            } catch (error) {
+                console.error('❌ Error parsing chat messages:', error);
+            }
+        }
+    }
+
+    showChatNotification() {
+        // Show a notification that new message arrived
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+        notification.innerHTML = `
+            <div class="flex items-center space-x-2">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L3 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"></path>
+                </svg>
+                <span>Yeni mesajınız var!</span>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
     }
 
     async checkForNewMessages() {

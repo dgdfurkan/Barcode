@@ -14,6 +14,7 @@ class AdminPanel {
         this.currentIPTrackingSortColumn = null;
         this.selectedChatUser = null;
         this.chatMessages = [];
+        this.chatSubscription = null;
     }
 
     async init() {
@@ -37,6 +38,9 @@ class AdminPanel {
 
         // Initialize tabs
         this.initTabs();
+
+        // Setup realtime chat updates
+        this.setupChatRealtime();
 
         // Load initial data
         await this.loadUsers();
@@ -1723,6 +1727,63 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // Chat Functions for AdminPanel
+AdminPanel.prototype.setupChatRealtime = function() {
+    if (!window.supabase) return;
+    
+    console.log('🔔 Setting up chat realtime subscription');
+    
+    // Subscribe to users table changes for chat_messages
+    this.chatSubscription = window.supabase
+        .channel('chat-updates')
+        .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'users',
+            filter: 'chat_messages=not.is.null'
+        }, (payload) => {
+            console.log('🔔 Chat update received:', payload);
+            this.handleChatUpdate(payload);
+        })
+        .subscribe();
+    
+    console.log('✅ Chat realtime subscription established');
+};
+
+AdminPanel.prototype.handleChatUpdate = function(payload) {
+    console.log('🔔 Handling chat update for user:', payload.new.username);
+    
+    // If we're currently viewing this user's chat, reload messages
+    if (this.selectedChatUser === payload.new.username) {
+        console.log('🔄 Reloading messages for current user');
+        this.loadChatMessages(payload.new.username);
+    }
+    
+    // Reload chat users list to show updated preview
+    console.log('🔄 Reloading chat users list');
+    this.loadChatUsers();
+};
+
+AdminPanel.prototype.triggerRealtimeUpdate = function(username) {
+    console.log('🔔 Triggering realtime update for user:', username);
+    
+    if (window.supabase) {
+        // Update last_chat_update to trigger realtime
+        window.supabase
+            .from('users')
+            .update({ 
+                last_chat_update: new Date().toISOString()
+            })
+            .eq('username', username)
+            .then(({ error }) => {
+                if (error) {
+                    console.error('❌ Error triggering realtime update:', error);
+                } else {
+                    console.log('✅ Realtime update triggered for user:', username);
+                }
+            });
+    }
+};
+
 AdminPanel.prototype.loadChatUsers = async function() {
     console.log('💬 Loading chat users...');
     try {
@@ -1925,6 +1986,9 @@ AdminPanel.prototype.clearChat = async function() {
 
         // Reload chat users to update the list
         await this.loadChatUsers();
+        
+        // Trigger realtime update for user
+        this.triggerRealtimeUpdate(this.selectedChatUser);
         
         alert('✅ Sohbet geçmişi başarıyla temizlendi!');
         
@@ -2165,6 +2229,9 @@ AdminPanel.prototype.deleteMessage = async function(messageIndex) {
         
         // Reload messages
         await this.loadChatMessages(this.selectedChatUser);
+        
+        // Trigger realtime update for user
+        this.triggerRealtimeUpdate(this.selectedChatUser);
         
         alert('✅ Mesaj başarıyla silindi!');
         
