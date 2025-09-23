@@ -602,29 +602,42 @@ class ChatSystem {
         const adminMessages = chatMessages.filter(msg => msg.sender === 'admin');
         
         console.log('🔍 Toplam admin mesajı:', adminMessages.length);
+        console.log('🔍 Admin mesajları detay:', adminMessages);
         
         if (adminMessages.length > 0) {
-            console.log('🔔 OFFLINE admin mesajları bulundu:', adminMessages.length);
+            // UNREAD olan admin mesajlarını bul!
+            const unreadAdminMessages = adminMessages.filter(msg => 
+                msg.userStatus === 'unread' || !msg.userStatus
+            );
             
-            // Son admin mesajı son 24 saat içinde mi?
-            const latestAdminMessage = adminMessages[adminMessages.length - 1];
-            const messageTime = new Date(latestAdminMessage.timestamp);
-            const now = new Date();
-            const hoursDiff = (now - messageTime) / (1000 * 60 * 60);
+            console.log('🔔 UNREAD admin mesajları:', unreadAdminMessages.length);
+            console.log('🔔 UNREAD mesaj detayları:', unreadAdminMessages);
             
-            console.log('🔍 Son admin mesajı zamanı:', latestAdminMessage.timestamp);
-            console.log('🔍 Şu anki zaman:', now.toISOString());
-            console.log('🔍 Saat farkı:', hoursDiff, 'saat');
-            
-            if (hoursDiff < 24) {
-                console.log('🔔 YENİ OFFLINE MESAJ BULUNDU - bildirim gösteriliyor!');
-                this.hasUnreadMessages = true;
-                this.startChatButtonAnimation();
-                this.showUnreadMessageBadge();
-                this.showChatNotification();
-                this.playEnhancedNotificationSound();
+            if (unreadAdminMessages.length > 0) {
+                // En son unread mesaj son 48 saat içinde mi?
+                const latestUnreadMessage = unreadAdminMessages[unreadAdminMessages.length - 1];
+                const messageTime = new Date(latestUnreadMessage.timestamp);
+                const now = new Date();
+                const hoursDiff = (now - messageTime) / (1000 * 60 * 60);
+                
+                console.log('🔍 Son UNREAD admin mesajı:', latestUnreadMessage.message);
+                console.log('🔍 Mesaj zamanı:', latestUnreadMessage.timestamp);
+                console.log('🔍 Şu anki zaman:', now.toISOString());
+                console.log('🔍 Saat farkı:', hoursDiff, 'saat');
+                console.log('🔍 userStatus:', latestUnreadMessage.userStatus);
+                
+                if (hoursDiff < 48) { // 48 saat içindeki unread mesajlar
+                    console.log('🔔 UNREAD ADMIN MESAJI BULUNDU - bildirim gösteriliyor!');
+                    this.hasUnreadMessages = true;
+                    this.startChatButtonAnimation();
+                    this.showUnreadMessageBadge();
+                    this.showChatNotification();
+                    this.playEnhancedNotificationSound();
+                } else {
+                    console.log('⏰ Unread admin mesajı 48 saatten eski, bildirim gösterilmiyor');
+                }
             } else {
-                console.log('⏰ Admin mesajı 24 saatten eski, bildirim gösterilmiyor');
+                console.log('✅ Tüm admin mesajları okunmuş, bildirim yok');
             }
         } else {
             console.log('✅ Admin mesajı yok, offline bildirim yok');
