@@ -54,13 +54,15 @@ class ChatSystem {
         // Clean up any existing notifications from previous session
         this.cleanupExistingNotifications();
         
-        // Load chat history AFTER user status is set
-        console.log('💬 Sayfa yüklendiğinde chat geçmişi yükleniyor...');
-        this.loadChatHistory();
-        
         // Set up real-time updates
         this.setupRealTimeUpdates();
         this.setupChatRealtime();
+        
+        // Load chat history AFTER everything is set up (with delay for Supabase)
+        setTimeout(() => {
+            console.log('💬 Sayfa yüklendiğinde chat geçmişi yükleniyor (delayed)...');
+            this.loadChatHistory();
+        }, 1000);
     }
 
     ensureChatButtonVisible() {
@@ -480,10 +482,11 @@ class ChatSystem {
                         
                         console.log('✅ Rendered', chatMessages.length, 'messages from Supabase');
                         
-                        // İlk yükleme ise sadece mevcut mesajları kaydet, bildirim gösterme
+                        // İlk yükleme ise mevcut mesajları kaydet ama kullanıcı offline'ken gelen mesajları kontrol et
                         if (!this.initialLoadComplete) {
-                            console.log('🔍 INITIAL LOAD - Recording existing messages, NO notifications');
+                            console.log('🔍 INITIAL LOAD - Recording existing messages, checking for offline messages');
                             this.recordExistingMessages(chatMessages);
+                            this.checkForOfflineMessages(chatMessages);
                             this.initialLoadComplete = true;
                         } else {
                             // Sonraki yüklemeler - yeni mesajları kontrol et
@@ -561,7 +564,7 @@ class ChatSystem {
                 this.startChatButtonAnimation();
                 this.showUnreadMessageBadge();
                 this.showChatNotification();
-                this.playNotificationSound();
+                this.playEnhancedNotificationSound();
             } else {
                 console.log('🔔 Chat açık, sadece refresh');
             }
@@ -574,6 +577,30 @@ class ChatSystem {
             const msgId = msg.timestamp + msg.sender + msg.message;
             this.lastKnownMessageIds.add(msgId);
         });
+    }
+
+    checkForOfflineMessages(chatMessages) {
+        // Kullanıcı offline'ken gelen admin mesajları kontrol et
+        const adminMessages = chatMessages.filter(msg => msg.sender === 'admin');
+        
+        if (adminMessages.length > 0) {
+            console.log('🔔 OFFLINE mesajlar bulundu:', adminMessages.length);
+            
+            // Son admin mesajı son 24 saat içinde mi?
+            const latestAdminMessage = adminMessages[adminMessages.length - 1];
+            const messageTime = new Date(latestAdminMessage.timestamp);
+            const now = new Date();
+            const hoursDiff = (now - messageTime) / (1000 * 60 * 60);
+            
+            if (hoursDiff < 24) {
+                console.log('🔔 Yeni offline mesaj bulundu - bildirim gösteriliyor');
+                this.hasUnreadMessages = true;
+                this.startChatButtonAnimation();
+                this.showUnreadMessageBadge();
+                this.showChatNotification();
+                this.playEnhancedNotificationSound();
+            }
+        }
     }
 
     async markUserMessagesAsRead() {
@@ -798,7 +825,7 @@ class ChatSystem {
                     <h4 class="font-semibold text-sm">Yeni Mesaj!</h4>
                     <p class="text-xs opacity-90">Destek ekibinden mesajınız var</p>
                 </div>
-                <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200 transition-colors">
+                <button onclick="event.stopPropagation(); this.parentElement.parentElement.remove();" class="ml-2 text-white hover:text-gray-200 transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
@@ -856,6 +883,45 @@ class ChatSystem {
         }
     }
 
+    playEnhancedNotificationSound() {
+        try {
+            // Create a beautiful WhatsApp-like notification sound
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // First tone
+            const oscillator1 = audioContext.createOscillator();
+            const gainNode1 = audioContext.createGain();
+            oscillator1.connect(gainNode1);
+            gainNode1.connect(audioContext.destination);
+            
+            oscillator1.frequency.setValueAtTime(800, audioContext.currentTime);
+            gainNode1.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode1.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            
+            oscillator1.start(audioContext.currentTime);
+            oscillator1.stop(audioContext.currentTime + 0.3);
+            
+            // Second tone (higher)
+            const oscillator2 = audioContext.createOscillator();
+            const gainNode2 = audioContext.createGain();
+            oscillator2.connect(gainNode2);
+            gainNode2.connect(audioContext.destination);
+            
+            oscillator2.frequency.setValueAtTime(1000, audioContext.currentTime + 0.15);
+            gainNode2.gain.setValueAtTime(0.3, audioContext.currentTime + 0.15);
+            gainNode2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+            
+            oscillator2.start(audioContext.currentTime + 0.15);
+            oscillator2.stop(audioContext.currentTime + 0.4);
+            
+            console.log('🔊 Enhanced notification sound played');
+        } catch (error) {
+            console.log('Enhanced notification sound not supported');
+            // Fallback to simple sound
+            this.playNotificationSound();
+        }
+    }
+
     async checkForNewMessages() {
         try {
             if (window.supabase && this.currentUser) {
@@ -902,7 +968,7 @@ class ChatSystem {
                                 this.startChatButtonAnimation();
                                 this.showUnreadMessageBadge();
                                 this.showChatNotification();
-                                this.playNotificationSound();
+                                this.playEnhancedNotificationSound();
                             }
                             
                             // Refresh entire chat to maintain correct order and status
