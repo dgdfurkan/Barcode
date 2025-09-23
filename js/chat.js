@@ -6,8 +6,8 @@ class ChatSystem {
         this.currentUser = null;
         this.chatSubscription = null;
         this.hasUnreadMessages = false;
-        this.lastMessageCount = 0; // Son bilinen mesaj sayısı
-        this.isFirstLoad = true; // İlk yükleme mi kontrol eder
+        this.initialLoadComplete = false; // İlk yükleme tamamlandı mı
+        this.lastKnownMessageIds = new Set(); // Bilinen mesaj ID'leri
         this.init();
     }
 
@@ -469,13 +469,14 @@ class ChatSystem {
                         
                         console.log('✅ Rendered', chatMessages.length, 'messages from Supabase');
                         
-                        // Check for new admin messages to show notification (sadece ilk yükleme değilse)
-                        if (!this.isFirstLoad) {
-                            this.checkForNewAdminMessages(chatMessages);
+                        // İlk yükleme ise sadece mevcut mesajları kaydet, bildirim gösterme
+                        if (!this.initialLoadComplete) {
+                            console.log('🔍 INITIAL LOAD - Recording existing messages, NO notifications');
+                            this.recordExistingMessages(chatMessages);
+                            this.initialLoadComplete = true;
                         } else {
-                            // İlk yükleme - sadece sayıyı kaydet
-                            this.lastMessageCount = chatMessages.length;
-                            this.isFirstLoad = false;
+                            // Sonraki yüklemeler - yeni mesajları kontrol et
+                            this.checkForNewAdminMessages(chatMessages);
                         }
                         
                     } catch (parseError) {
@@ -516,32 +517,52 @@ class ChatSystem {
         }
     }
 
+    recordExistingMessages(chatMessages) {
+        // Mevcut tüm mesajları kaydet - bu mesajlar için BİLDİRİM YOK
+        this.lastKnownMessageIds.clear();
+        chatMessages.forEach(msg => {
+            const msgId = msg.timestamp + msg.sender + msg.message;
+            this.lastKnownMessageIds.add(msgId);
+        });
+        console.log('📝 Recorded', this.lastKnownMessageIds.size, 'existing messages');
+    }
+
     checkForNewAdminMessages(chatMessages) {
-        // İLK YÜKLEME İSE BİLDİRİM GÖSTERME!
-        if (this.isFirstLoad) {
-            console.log('🔍 First load - no notifications for existing messages');
-            this.lastMessageCount = chatMessages.length;
-            this.isFirstLoad = false;
-            return;
-        }
+        // Gerçekten YENİ olan admin mesajları bul
+        const newAdminMessages = chatMessages.filter(msg => {
+            const msgId = msg.timestamp + msg.sender + msg.message;
+            return msg.sender === 'admin' && !this.lastKnownMessageIds.has(msgId);
+        });
         
-        // Sadece yeni mesajlar varsa bildirim göster
-        if (chatMessages.length > this.lastMessageCount) {
-            const newMessages = chatMessages.slice(this.lastMessageCount);
-            const newAdminMessages = newMessages.filter(msg => msg.sender === 'admin');
+        if (newAdminMessages.length > 0) {
+            console.log('🔔 GERÇEK YENİ admin mesajları:', newAdminMessages);
             
-            if (newAdminMessages.length > 0 && !this.isOpen) {
-                console.log('🔔 NEW admin messages detected:', newAdminMessages);
+            // Yeni mesajları kaydet
+            newAdminMessages.forEach(msg => {
+                const msgId = msg.timestamp + msg.sender + msg.message;
+                this.lastKnownMessageIds.add(msgId);
+            });
+            
+            // Bildirim göster (sadece chat kapalıysa)
+            if (!this.isOpen) {
+                console.log('🔔 Chat kapalı, bildirim gösteriliyor');
                 this.hasUnreadMessages = true;
                 this.startChatButtonAnimation();
                 this.showUnreadMessageBadge();
                 this.showChatNotification();
                 this.playNotificationSound();
+            } else {
+                console.log('🔔 Chat açık, sadece refresh');
             }
+        } else {
+            console.log('✅ Yeni admin mesajı yok');
         }
         
-        // Mesaj sayısını güncelle
-        this.lastMessageCount = chatMessages.length;
+        // Tüm mesajları güncelle
+        chatMessages.forEach(msg => {
+            const msgId = msg.timestamp + msg.sender + msg.message;
+            this.lastKnownMessageIds.add(msgId);
+        });
     }
 
     async markUserMessagesAsRead() {
@@ -846,36 +867,38 @@ class ChatSystem {
                     const currentMessageCount = this.messages.length;
                     const latestMessageCount = latestMessages.length;
                     
-                    if (latestMessageCount > currentMessageCount) {
-                        console.log('🔔 New messages detected, count:', currentMessageCount, '->', latestMessageCount);
+                    // İlk yükleme tamamlanmışsa yeni mesajları kontrol et
+                    if (this.initialLoadComplete) {
+                        // Gerçekten yeni admin mesajları var mı kontrol et
+                        const reallyNewAdminMessages = latestMessages.filter(msg => {
+                            const msgId = msg.timestamp + msg.sender + msg.message;
+                            return msg.sender === 'admin' && !this.lastKnownMessageIds.has(msgId);
+                        });
                         
-                        // Get new messages
-                        const newMessages = latestMessages.slice(currentMessageCount);
-                        
-                        // Check if any new admin messages
-                        const newAdminMessages = newMessages.filter(msg => msg.sender === 'admin');
-                        
-                        if (newAdminMessages.length > 0) {
-                            console.log('🔔 NEW ADMIN MESSAGES FOUND!', newAdminMessages);
+                        if (reallyNewAdminMessages.length > 0) {
+                            console.log('🔔 REAL-TIME: NEW admin messages found!', reallyNewAdminMessages);
+                            
+                            // Yeni mesajları kaydet
+                            reallyNewAdminMessages.forEach(msg => {
+                                const msgId = msg.timestamp + msg.sender + msg.message;
+                                this.lastKnownMessageIds.add(msgId);
+                            });
                             
                             // Show notification if chat is closed
                             if (!this.isOpen) {
-                                console.log('🔔 Chat is closed, showing notification');
+                                console.log('🔔 Chat kapalı, real-time bildirim gösteriliyor');
                                 this.hasUnreadMessages = true;
                                 this.startChatButtonAnimation();
                                 this.showUnreadMessageBadge();
                                 this.showChatNotification();
                                 this.playNotificationSound();
-                            } else {
-                                console.log('🔔 Chat is open, just refreshing');
                             }
+                            
+                            // Refresh entire chat to maintain correct order and status
+                            this.loadChatHistory();
                         }
-                        
-                        // Update message count BEFORE refreshing
-                        this.lastMessageCount = latestMessageCount;
-                        
-                        // Refresh entire chat to maintain correct order and status
-                        this.loadChatHistory();
+                    } else {
+                        console.log('🔍 Initial load not complete, skipping real-time check');
                     }
                     
                     // Also check for status updates (green tick changes)
