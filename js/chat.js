@@ -108,10 +108,45 @@ class ChatSystem {
         if (session && session.username) {
             this.currentUser = session.username;
             this.updateChatHeader();
+            console.log('🔍 Using authenticated user:', this.currentUser);
         } else {
-            // For product search page, use a default user
-            this.currentUser = 'ProductSearchUser';
-            console.log('🔍 Using default user for product search page');
+            // Try to get username from localStorage or URL
+            const storedUsername = localStorage.getItem('currentUser') || localStorage.getItem('username');
+            const sessionData = JSON.parse(localStorage.getItem('session') || '{}');
+            
+            if (sessionData.username) {
+                this.currentUser = sessionData.username;
+                console.log('🔍 Using session username:', this.currentUser);
+            } else if (storedUsername) {
+                this.currentUser = storedUsername;
+                console.log('🔍 Using stored username:', this.currentUser);
+            } else {
+                // Last resort: try to get from any auth-related localStorage
+                const authKeys = ['user', 'authUser', 'loggedInUser'];
+                let foundUser = null;
+                
+                for (const key of authKeys) {
+                    const userData = localStorage.getItem(key);
+                    if (userData) {
+                        try {
+                            const parsed = JSON.parse(userData);
+                            if (parsed.username) {
+                                foundUser = parsed.username;
+                                break;
+                            }
+                        } catch (e) {
+                            if (typeof userData === 'string' && userData.length > 0) {
+                                foundUser = userData;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                this.currentUser = foundUser || 'ProductSearchUser';
+                console.log('🔍 Final username resolution:', this.currentUser);
+            }
+            this.updateChatHeader();
         }
     }
 
@@ -374,8 +409,8 @@ class ChatSystem {
 
     async loadChatHistory() {
         try {
-            if (window.supabase) {
-                console.log('💬 Loading chat history from Supabase');
+            if (window.supabase && this.currentUser && this.currentUser !== 'ProductSearchUser') {
+                console.log('💬 Loading chat history from Supabase for user:', this.currentUser);
                 
                 // Get user's chat messages from users table
                 const { data, error } = await window.supabase
@@ -386,6 +421,8 @@ class ChatSystem {
 
                 if (error) {
                     console.error('❌ Error loading chat history:', error);
+                    // Try localStorage as fallback
+                    this.loadChatHistoryFromLocalStorage();
                     return;
                 }
 
@@ -413,11 +450,66 @@ class ChatSystem {
                     
                     // Scroll to bottom
                     this.scrollToBottom();
+                } else {
+                    console.log('⚠️ No chat messages found in Supabase, trying localStorage');
+                    this.loadChatHistoryFromLocalStorage();
                 }
+            } else {
+                console.log('💬 Using localStorage for chat history');
+                this.loadChatHistoryFromLocalStorage();
             }
         } catch (error) {
             console.error('❌ Error loading chat history:', error);
+            this.loadChatHistoryFromLocalStorage();
         }
+    }
+
+    loadChatHistoryFromLocalStorage() {
+        console.log('💬 Loading chat history from localStorage for user:', this.currentUser);
+        
+        // Try different localStorage keys where messages might be stored
+        const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+        const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+        
+        // Filter messages for current user
+        const userChatMessages = chatMessages.filter(msg => msg.username === this.currentUser);
+        const userMessages = messages.filter(msg => msg.username === this.currentUser);
+        
+        console.log('💬 Found localStorage messages:', {
+            chatMessages: userChatMessages.length,
+            messages: userMessages.length
+        });
+        
+        // Combine and sort all messages
+        const allMessages = [...userChatMessages, ...userMessages];
+        const sortedMessages = allMessages.sort((a, b) => new Date(a.created_at || a.timestamp) - new Date(b.created_at || b.timestamp));
+        
+        // Clear existing messages
+        const messagesContainer = document.getElementById('chatMessages');
+        if (messagesContainer) {
+            messagesContainer.innerHTML = '';
+        }
+        
+        // Render all messages
+        sortedMessages.forEach(msg => {
+            const sender = msg.sender || (msg.message ? 'user' : 'admin');
+            const messageText = msg.message || msg.content;
+            const timestamp = msg.timestamp || msg.created_at;
+            
+            if (messageText) {
+                this.addMessage(
+                    messageText, 
+                    sender, 
+                    new Date(timestamp).toLocaleTimeString('tr-TR'), 
+                    msg.status || 'sent'
+                );
+            }
+        });
+        
+        // Scroll to bottom
+        this.scrollToBottom();
+        
+        console.log('✅ Loaded', sortedMessages.length, 'messages from localStorage');
     }
 
     setupRealTimeUpdates() {
