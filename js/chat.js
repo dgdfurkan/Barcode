@@ -412,52 +412,70 @@ class ChatSystem {
             if (window.supabase && this.currentUser && this.currentUser !== 'ProductSearchUser') {
                 console.log('💬 Loading chat history from Supabase for user:', this.currentUser);
                 
-                // Get user's chat messages from users table
-                const { data, error } = await window.supabase
+                // First check if user exists in Supabase
+                const { data: userData, error: userError } = await window.supabase
                     .from('users')
-                    .select('chat_messages')
+                    .select('username, chat_messages')
                     .eq('username', this.currentUser)
                     .single();
 
-                if (error) {
-                    console.error('❌ Error loading chat history:', error);
-                    // Try localStorage as fallback
+                console.log('🔍 Supabase user lookup result:', { userData, userError });
+
+                if (userError) {
+                    console.error('❌ Error loading user from Supabase:', userError);
+                    console.log('💬 User not found in Supabase, using localStorage');
                     this.loadChatHistoryFromLocalStorage();
                     return;
                 }
 
-                if (data && data.chat_messages) {
-                    const chatMessages = JSON.parse(data.chat_messages);
-                    console.log('✅ Loaded chat messages:', chatMessages);
+                if (userData) {
+                    console.log('✅ User found in Supabase:', userData.username);
                     
-                    // Clear existing messages
-                    const messagesContainer = document.getElementById('chatMessages');
-                    if (messagesContainer) {
-                        messagesContainer.innerHTML = '';
-                    }
-                    
-                    // Update messages array
-                    this.messages = chatMessages;
-                    
-                    // Render all messages
-                    chatMessages.forEach(msg => {
-                        if (msg.sender === 'user') {
-                            this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
-                        } else if (msg.sender === 'admin') {
-                            this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
+                    if (userData.chat_messages) {
+                        try {
+                            const chatMessages = JSON.parse(userData.chat_messages);
+                            console.log('✅ Loaded chat messages from Supabase:', chatMessages);
+                            
+                            // Clear existing messages
+                            const messagesContainer = document.getElementById('chatMessages');
+                            if (messagesContainer) {
+                                messagesContainer.innerHTML = '';
+                            }
+                            
+                            // Update messages array
+                            this.messages = chatMessages;
+                            
+                            // Render all messages
+                            chatMessages.forEach(msg => {
+                                if (msg.sender === 'user') {
+                                    this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
+                                } else if (msg.sender === 'admin') {
+                                    this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
+                                }
+                            });
+                            
+                            // Scroll to bottom
+                            this.scrollToBottom();
+                            
+                            console.log('✅ Rendered', chatMessages.length, 'messages from Supabase');
+                            return; // Success, don't load from localStorage
+                        } catch (parseError) {
+                            console.error('❌ Error parsing chat messages:', parseError);
+                            console.log('💬 Fallback to localStorage due to parse error');
                         }
-                    });
-                    
-                    // Scroll to bottom
-                    this.scrollToBottom();
+                    } else {
+                        console.log('⚠️ User exists but no chat_messages, trying localStorage');
+                    }
                 } else {
-                    console.log('⚠️ No chat messages found in Supabase, trying localStorage');
-                    this.loadChatHistoryFromLocalStorage();
+                    console.log('⚠️ No user data returned from Supabase');
                 }
             } else {
-                console.log('💬 Using localStorage for chat history');
-                this.loadChatHistoryFromLocalStorage();
+                console.log('💬 Using localStorage for chat history (no Supabase or ProductSearchUser)');
             }
+            
+            // Fallback to localStorage
+            this.loadChatHistoryFromLocalStorage();
+            
         } catch (error) {
             console.error('❌ Error loading chat history:', error);
             this.loadChatHistoryFromLocalStorage();
@@ -467,21 +485,55 @@ class ChatSystem {
     loadChatHistoryFromLocalStorage() {
         console.log('💬 Loading chat history from localStorage for user:', this.currentUser);
         
+        // Debug: Check all localStorage keys
+        console.log('🔍 All localStorage keys:');
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            const value = localStorage.getItem(key);
+            console.log(`  ${key}:`, value?.substring(0, 100) + (value?.length > 100 ? '...' : ''));
+        }
+        
         // Try different localStorage keys where messages might be stored
         const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
         const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+        const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
+        const userMessages = JSON.parse(localStorage.getItem('userMessages') || '[]');
+        const adminMessages = JSON.parse(localStorage.getItem('adminMessages') || '[]');
+        
+        console.log('💬 Raw localStorage data:', {
+            chatMessages: chatMessages,
+            messages: messages,
+            globalMessages: globalMessages,
+            userMessages: userMessages,
+            adminMessages: adminMessages
+        });
         
         // Filter messages for current user
         const userChatMessages = chatMessages.filter(msg => msg.username === this.currentUser);
-        const userMessages = messages.filter(msg => msg.username === this.currentUser);
+        const userFilteredMessages = messages.filter(msg => msg.username === this.currentUser);
+        const globalFilteredMessages = globalMessages.filter(msg => msg.username === this.currentUser);
+        const filteredUserMessages = userMessages.filter(msg => msg.username === this.currentUser);
+        const filteredAdminMessages = adminMessages.filter(msg => msg.username === this.currentUser);
         
-        console.log('💬 Found localStorage messages:', {
+        console.log('💬 Filtered messages for user:', this.currentUser, {
             chatMessages: userChatMessages.length,
-            messages: userMessages.length
+            messages: userFilteredMessages.length,
+            globalMessages: globalFilteredMessages.length,
+            userMessages: filteredUserMessages.length,
+            adminMessages: filteredAdminMessages.length
+        });
+        
+        // Also check if there are messages without username filter (current user might be stored differently)
+        console.log('💬 All messages without username filter:', {
+            chatMessagesTotal: chatMessages.length,
+            messagesTotal: messages.length,
+            globalMessagesTotal: globalMessages.length,
+            userMessagesTotal: userMessages.length,
+            adminMessagesTotal: adminMessages.length
         });
         
         // Combine and sort all messages
-        const allMessages = [...userChatMessages, ...userMessages];
+        const allMessages = [...userChatMessages, ...userFilteredMessages, ...globalFilteredMessages, ...filteredUserMessages, ...filteredAdminMessages];
         const sortedMessages = allMessages.sort((a, b) => new Date(a.created_at || a.timestamp) - new Date(b.created_at || b.timestamp));
         
         // Clear existing messages
