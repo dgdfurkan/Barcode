@@ -1761,6 +1761,20 @@ AdminPanel.prototype.handleChatUpdate = function(payload) {
     // Reload chat users list to show updated preview
     console.log('🔄 Reloading chat users list');
     this.loadChatUsers();
+    
+    // Show notification for new messages
+    if (payload.new.chat_messages) {
+        try {
+            const chatMessages = JSON.parse(payload.new.chat_messages);
+            const lastMessage = chatMessages[chatMessages.length - 1];
+            
+            if (lastMessage && lastMessage.sender === 'user') {
+                this.showAdminNotification(payload.new.username, lastMessage.message);
+            }
+        } catch (error) {
+            console.error('❌ Error parsing chat messages for notification:', error);
+        }
+    }
 };
 
 AdminPanel.prototype.triggerRealtimeUpdate = function(username) {
@@ -1856,7 +1870,7 @@ AdminPanel.prototype.loadChatUsersFromLocalStorage = function() {
     this.renderChatUsers(uniqueUsers);
 };
 
-AdminPanel.prototype.renderChatUsers = function(users) {
+AdminPanel.prototype.renderChatUsers = async function(users) {
     console.log('💬 Rendering chat users:', users);
     const chatUsersList = document.getElementById('chatUsersList');
     if (!chatUsersList) {
@@ -1878,8 +1892,10 @@ AdminPanel.prototype.renderChatUsers = function(users) {
     }
 
     console.log('💬 Rendering', users.length, 'users');
-    chatUsersList.innerHTML = users.map(username => {
-        const lastMessage = this.getLastMessagePreview(username);
+    
+    // Render users with async message previews
+    const userElements = await Promise.all(users.map(async (username) => {
+        const lastMessage = await this.getLastMessagePreview(username);
         return `
             <div class="p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors" onclick="adminPanel.selectChatUser('${username}')">
                 <div class="flex items-center space-x-3">
@@ -1894,15 +1910,33 @@ AdminPanel.prototype.renderChatUsers = function(users) {
                 </div>
             </div>
         `;
-    }).join('');
+    }));
     
+    chatUsersList.innerHTML = userElements.join('');
     console.log('💬 Chat users rendered successfully');
 };
 
-AdminPanel.prototype.getLastMessagePreview = function(username) {
-    // Get last message for this user from Supabase or localStorage
+AdminPanel.prototype.getLastMessagePreview = async function(username) {
+    // Get last message for this user from Supabase
     try {
-        // First try to get from localStorage (faster)
+        if (window.supabase) {
+            const { data, error } = await window.supabase
+                .from('users')
+                .select('chat_messages')
+                .eq('username', username)
+                .single();
+
+            if (!error && data && data.chat_messages) {
+                const chatMessages = JSON.parse(data.chat_messages);
+                if (chatMessages.length > 0) {
+                    const lastMessage = chatMessages[chatMessages.length - 1];
+                    const messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
+                    return messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
+                }
+            }
+        }
+        
+        // Fallback to localStorage
         const messages = JSON.parse(localStorage.getItem('messages') || '[]');
         const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
         const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
@@ -2345,4 +2379,83 @@ AdminPanel.prototype.saveAdminMessageToLocalStorage = function(message) {
     });
     localStorage.setItem('messages', JSON.stringify(messages));
     console.log('✅ Admin message saved to localStorage successfully');
+};
+
+AdminPanel.prototype.showAdminNotification = function(username, message) {
+    // Remove existing notifications
+    const existingNotifications = document.querySelectorAll('.admin-chat-notification');
+    existingNotifications.forEach(notification => notification.remove());
+    
+    // Show a professional notification
+    const notification = document.createElement('div');
+    notification.className = 'admin-chat-notification fixed top-4 right-4 bg-gradient-to-r from-green-500 to-blue-600 text-white px-6 py-4 rounded-xl shadow-2xl z-50 transform transition-all duration-300 ease-in-out';
+    notification.style.transform = 'translateX(100%)';
+    notification.innerHTML = `
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L3 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"></path>
+                </svg>
+            </div>
+            <div>
+                <h4 class="font-semibold text-sm">Yeni Mesaj!</h4>
+                <p class="text-xs opacity-90">${username}: ${message.length > 30 ? message.substring(0, 30) + '...' : message}</p>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => {
+        notification.style.transform = 'translateX(0)';
+    }, 100);
+    
+    // Add click to open chat tab
+    notification.addEventListener('click', (e) => {
+        if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SVG' && e.target.tagName !== 'PATH') {
+            this.switchTab('chat');
+            notification.remove();
+        }
+    });
+    
+    // Remove notification after 8 seconds
+    setTimeout(() => {
+        notification.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            notification.remove();
+        }, 300);
+    }, 8000);
+    
+    // Play notification sound
+    this.playAdminNotificationSound();
+};
+
+AdminPanel.prototype.playAdminNotificationSound = function() {
+    try {
+        // Create a different notification sound for admin
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.1);
+        oscillator.frequency.setValueAtTime(1200, audioContext.currentTime + 0.2);
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+    } catch (error) {
+        console.log('Admin notification sound not supported');
+    }
 };

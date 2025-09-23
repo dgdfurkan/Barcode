@@ -191,6 +191,13 @@ class ChatSystem {
         this.isOpen = false;
     }
 
+    scrollToBottom() {
+        const messagesContainer = document.getElementById('chatMessages');
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    }
+
     async sendMessage() {
         const messageInput = document.getElementById('messageInput');
         const message = messageInput?.value?.trim();
@@ -335,6 +342,9 @@ class ChatSystem {
                     this.saveToLocalStorage(message);
                 } else {
                     console.log('✅ User message saved to chat successfully');
+                    
+                    // Update local messages array
+                    this.messages = chatMessages;
                 }
             } else {
                 // Fallback to localStorage
@@ -391,6 +401,15 @@ class ChatSystem {
                     const chatMessages = JSON.parse(data.chat_messages);
                     console.log('✅ Loaded chat messages:', chatMessages);
                     
+                    // Clear existing messages
+                    const messagesContainer = document.getElementById('chatMessages');
+                    if (messagesContainer) {
+                        messagesContainer.innerHTML = '';
+                    }
+                    
+                    // Update messages array
+                    this.messages = chatMessages;
+                    
                     // Render all messages
                     chatMessages.forEach(msg => {
                         if (msg.sender === 'user') {
@@ -399,6 +418,9 @@ class ChatSystem {
                             this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
                         }
                     });
+                    
+                    // Scroll to bottom
+                    this.scrollToBottom();
                 }
             }
         } catch (error) {
@@ -445,19 +467,32 @@ class ChatSystem {
                 const chatMessages = JSON.parse(payload.new.chat_messages);
                 console.log('✅ New chat messages:', chatMessages);
                 
-                // Clear current messages and reload
-                const messagesContainer = document.getElementById('chatMessages');
-                if (messagesContainer) {
-                    messagesContainer.innerHTML = '';
+                // Check if there are new admin messages
+                const currentMessages = this.messages.length;
+                const newAdminMessages = chatMessages.filter(msg => 
+                    msg.sender === 'admin' && 
+                    !this.messages.some(existingMsg => 
+                        existingMsg.message === msg.message && 
+                        existingMsg.timestamp === msg.timestamp
+                    )
+                );
+                
+                if (newAdminMessages.length > 0) {
+                    console.log('🔔 New admin messages detected:', newAdminMessages);
+                    
+                    // Add new admin messages to UI
+                    newAdminMessages.forEach(msg => {
+                        this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
+                    });
+                    
+                    // Show notification if chat is closed
+                    if (!this.isOpen) {
+                        this.showChatNotification();
+                    }
                 }
                 
-                // Reload chat history
-                this.loadChatHistory();
-                
-                // Show notification if chat is closed
-                if (!this.isOpen) {
-                    this.showChatNotification();
-                }
+                // Update messages array
+                this.messages = chatMessages;
                 
             } catch (error) {
                 console.error('❌ Error parsing chat messages:', error);
@@ -466,24 +501,81 @@ class ChatSystem {
     }
 
     showChatNotification() {
-        // Show a notification that new message arrived
+        // Remove existing notifications
+        const existingNotifications = document.querySelectorAll('.chat-notification');
+        existingNotifications.forEach(notification => notification.remove());
+        
+        // Show a professional notification that new message arrived
         const notification = document.createElement('div');
-        notification.className = 'fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg z-50';
+        notification.className = 'chat-notification fixed top-4 right-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-4 rounded-xl shadow-2xl z-50 transform transition-all duration-300 ease-in-out';
+        notification.style.transform = 'translateX(100%)';
         notification.innerHTML = `
-            <div class="flex items-center space-x-2">
-                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L3 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"></path>
-                </svg>
-                <span>Yeni mesajınız var!</span>
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L3 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clip-rule="evenodd"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-sm">Yeni Mesaj!</h4>
+                    <p class="text-xs opacity-90">Destek ekibinden mesajınız var</p>
+                </div>
+                <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
             </div>
         `;
         
         document.body.appendChild(notification);
         
-        // Remove notification after 3 seconds
+        // Animate in
         setTimeout(() => {
-            notification.remove();
-        }, 3000);
+            notification.style.transform = 'translateX(0)';
+        }, 100);
+        
+        // Add click to open chat
+        notification.addEventListener('click', (e) => {
+            if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SVG' && e.target.tagName !== 'PATH') {
+                this.openChat();
+                notification.remove();
+            }
+        });
+        
+        // Remove notification after 8 seconds
+        setTimeout(() => {
+            notification.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }, 8000);
+        
+        // Play notification sound (if supported)
+        this.playNotificationSound();
+    }
+
+    playNotificationSound() {
+        try {
+            // Create a simple notification sound
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2);
+        } catch (error) {
+            console.log('Notification sound not supported');
+        }
     }
 
     async checkForNewMessages() {
