@@ -51,11 +51,12 @@ class ChatSystem {
         // Check if user is logged in
         this.checkUserStatus();
         
-        // Load chat history
-        this.loadChatHistory();
-        
         // Clean up any existing notifications from previous session
         this.cleanupExistingNotifications();
+        
+        // Load chat history AFTER user status is set
+        console.log('💬 Sayfa yüklendiğinde chat geçmişi yükleniyor...');
+        this.loadChatHistory();
         
         // Set up real-time updates
         this.setupRealTimeUpdates();
@@ -91,15 +92,15 @@ class ChatSystem {
             // Add hover effect
             openChatBtn.addEventListener('mouseenter', () => {
                 if (!this.hasUnreadMessages) {
-                    openChatBtn.style.transform = 'scale(1.1)';
-                    openChatBtn.style.backgroundColor = 'rgb(37 99 235)';
+                openChatBtn.style.transform = 'scale(1.1)';
+                openChatBtn.style.backgroundColor = 'rgb(37 99 235)';
                 }
             });
             
             openChatBtn.addEventListener('mouseleave', () => {
                 if (!this.hasUnreadMessages) {
-                    openChatBtn.style.transform = 'scale(1)';
-                    openChatBtn.style.backgroundColor = 'rgb(59 130 246)';
+                openChatBtn.style.transform = 'scale(1)';
+                openChatBtn.style.backgroundColor = 'rgb(59 130 246)';
                 }
             });
             
@@ -212,6 +213,10 @@ class ChatSystem {
         this.hasUnreadMessages = false;
         this.stopChatButtonAnimation();
         
+        // KULLANICI CHAT'İ AÇTIĞINDA TÜM ESKİ MESAJLARI YÜKLE!
+        console.log('💬 Chat açıldı - tüm eski mesajları yükleniyor...');
+        this.loadChatHistory();
+        
         // Focus on message input
         setTimeout(() => {
             const messageInput = document.getElementById('messageInput');
@@ -220,8 +225,10 @@ class ChatSystem {
             }
         }, 100);
         
-        // Scroll to bottom
+        // Scroll to bottom after loading
+        setTimeout(() => {
         this.scrollToBottom();
+        }, 200);
     }
 
     closeChat() {
@@ -418,6 +425,9 @@ class ChatSystem {
 
     async loadChatHistory() {
         try {
+            console.log('🔄 LOADING CHAT HISTORY - Current user:', this.currentUser);
+            console.log('🔄 Supabase available:', !!window.supabase);
+            
             if (window.supabase && this.currentUser) {
                 console.log('💬 Loading chat history from Supabase ONLY for user:', this.currentUser);
                 
@@ -429,6 +439,7 @@ class ChatSystem {
                     .single();
 
                 console.log('🔍 Supabase user lookup result:', { userData, userError });
+                console.log('🔍 Raw chat_messages:', userData?.chat_messages);
 
                 if (userError) {
                     console.error('❌ User not found in Supabase:', userError);
@@ -445,27 +456,27 @@ class ChatSystem {
                     try {
                         const chatMessages = JSON.parse(userData.chat_messages);
                         console.log('✅ Loaded chat messages from Supabase:', chatMessages);
-                        
-                        // Clear existing messages
-                        const messagesContainer = document.getElementById('chatMessages');
-                        if (messagesContainer) {
-                            messagesContainer.innerHTML = '';
-                        }
-                        
-                        // Update messages array
-                        this.messages = chatMessages;
-                        
+                    
+                    // Clear existing messages
+                    const messagesContainer = document.getElementById('chatMessages');
+                    if (messagesContainer) {
+                        messagesContainer.innerHTML = '';
+                    }
+                    
+                    // Update messages array
+                    this.messages = chatMessages;
+                    
                         // Render all messages with correct status
-                        chatMessages.forEach(msg => {
-                            if (msg.sender === 'user') {
+                    chatMessages.forEach(msg => {
+                        if (msg.sender === 'user') {
                                 this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status || 'sent');
-                            } else if (msg.sender === 'admin') {
+                        } else if (msg.sender === 'admin') {
                                 this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status || 'sent');
-                            }
-                        });
-                        
-                        // Scroll to bottom
-                        this.scrollToBottom();
+                        }
+                    });
+                    
+                    // Scroll to bottom
+                    this.scrollToBottom();
                         
                         console.log('✅ Rendered', chatMessages.length, 'messages from Supabase');
                         
