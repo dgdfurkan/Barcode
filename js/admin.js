@@ -2335,12 +2335,13 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
             // Parse existing chat messages or create new array
             let chatMessages = userData.chat_messages ? JSON.parse(userData.chat_messages) : [];
             
-            // Add admin message with read status (admin messages are immediately read by admin)
+            // Add admin message with new dual status system
             chatMessages.push({
                 message: message,
                 sender: 'admin',
                 timestamp: new Date().toISOString(),
-                status: 'read'
+                adminStatus: 'sent',    // Admin gönderdi
+                userStatus: 'unread'    // User henüz okumadı
             });
 
             // Update user's chat messages
@@ -2404,10 +2405,10 @@ AdminPanel.prototype.markUserMessagesAsReadByAdmin = async function(username) {
             let chatMessages = JSON.parse(userData.chat_messages);
             let hasChanges = false;
             
-            // Mark all user messages as read
+            // Mark all user messages as read by admin
             chatMessages.forEach(msg => {
-                if (msg.sender === 'user' && msg.status !== 'read') {
-                    msg.status = 'read';
+                if (msg.sender === 'user' && msg.adminStatus !== 'read') {
+                    msg.adminStatus = 'read'; // Admin okudu
                     hasChanges = true;
                 }
             });

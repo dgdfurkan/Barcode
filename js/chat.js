@@ -219,6 +219,11 @@ class ChatSystem {
         console.log('💬 Chat açıldı - tüm eski mesajları yükleniyor...');
         this.loadChatHistory();
         
+        // Kullanıcı chat'i açtı - admin mesajlarını okudu olarak işaretle
+        setTimeout(() => {
+            this.markAdminMessagesAsReadByUser();
+        }, 500);
+        
         // Focus on message input
         setTimeout(() => {
             const messageInput = document.getElementById('messageInput');
@@ -266,7 +271,7 @@ class ChatSystem {
         console.log('🔍 Sending message:', message);
 
         // Add message to UI immediately with pending status
-        this.addMessage(message, 'user', null, 'sent');
+        this.addMessage(message, 'user', null, { adminStatus: 'unread', userStatus: 'sent' });
         if (messageInput) {
             messageInput.value = '';
         }
@@ -275,7 +280,7 @@ class ChatSystem {
         await this.saveMessageToSupabase(message);
     }
 
-    addMessage(text, sender, timestamp = null, status = 'sent') {
+    addMessage(text, sender, timestamp = null, messageData = null) {
         const messagesContainer = document.getElementById('chatMessages');
         if (!messagesContainer) return;
         
@@ -286,19 +291,23 @@ class ChatSystem {
             minute: '2-digit' 
         });
         
-        // Get status icon (WhatsApp style)
-        const getStatusIcon = (status) => {
-            switch(status) {
-                case 'pending': return '☑️'; // Gray checkbox
-                case 'sent': return '☑️'; // Gray checkbox
-                case 'delivered': return '☑️'; // Gray checkbox
-                case 'read': return '✅'; // Green checkmark
-                default: return '☑️';
+        // Get status icon (WhatsApp style) with new dual status system
+        const getStatusIcon = () => {
+            if (sender === 'user') {
+                // Kullanıcı mesajı için admin'in okumuş mu kontrolü
+                const adminStatus = messageData?.adminStatus || 'unread';
+                return adminStatus === 'read' ? '✅' : '☑️';
+            } else if (sender === 'admin') {
+                // Admin mesajı için kullanıcının okumuş mu kontrolü
+                const userStatus = messageData?.userStatus || 'unread';
+                return userStatus === 'read' ? '✅' : '☑️';
             }
+            return '☑️';
         };
         
-        const statusIcon = getStatusIcon(status);
-        const isRead = status === 'read';
+        const statusIcon = getStatusIcon();
+        const isRead = (sender === 'user' && messageData?.adminStatus === 'read') || 
+                      (sender === 'admin' && messageData?.userStatus === 'read');
         
         if (sender === 'user') {
             messageDiv.innerHTML = `
@@ -378,7 +387,8 @@ class ChatSystem {
                     message: message,
                     sender: 'user',
                     timestamp: new Date().toISOString(),
-                    status: 'sent'
+                    adminStatus: 'unread', // Admin henüz okumadı
+                    userStatus: 'sent'     // User gönderdi
                 });
 
                 // Update user's chat messages
@@ -469,13 +479,19 @@ class ChatSystem {
                     this.messages = chatMessages;
                     
                         // Render all messages with correct status
-                    chatMessages.forEach(msg => {
-                        if (msg.sender === 'user') {
-                                this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status || 'sent');
-                        } else if (msg.sender === 'admin') {
-                                this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status || 'sent');
-                        }
-                    });
+                        chatMessages.forEach(msg => {
+                            if (msg.sender === 'user') {
+                                this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                                    adminStatus: msg.adminStatus || 'unread',
+                                    userStatus: msg.userStatus || 'sent'
+                                });
+                            } else if (msg.sender === 'admin') {
+                                this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                                    adminStatus: msg.adminStatus || 'sent',
+                                    userStatus: msg.userStatus || 'unread'
+                                });
+                            }
+                        });
                     
                     // Scroll to bottom
                     this.scrollToBottom();
@@ -632,10 +648,10 @@ class ChatSystem {
             if (!userError && userData && userData.chat_messages) {
                 let chatMessages = JSON.parse(userData.chat_messages);
                 
-                // Mark all user messages as read
+                // Mark all user messages as read by admin
                 chatMessages.forEach(msg => {
                     if (msg.sender === 'user') {
-                        msg.status = 'read';
+                        msg.adminStatus = 'read'; // Admin okudu
                     }
                 });
                 
@@ -896,36 +912,25 @@ class ChatSystem {
 
     playEnhancedNotificationSound() {
         try {
-            // Create a beautiful WhatsApp-like notification sound
+            // Admin paneldeki ile AYNI ses - 3 tonlu güzel bildirim
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
             
-            // First tone
-            const oscillator1 = audioContext.createOscillator();
-            const gainNode1 = audioContext.createGain();
-            oscillator1.connect(gainNode1);
-            gainNode1.connect(audioContext.destination);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
             
-            oscillator1.frequency.setValueAtTime(800, audioContext.currentTime);
-            gainNode1.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode1.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+            oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.1);
+            oscillator.frequency.setValueAtTime(1200, audioContext.currentTime + 0.2);
             
-            oscillator1.start(audioContext.currentTime);
-            oscillator1.stop(audioContext.currentTime + 0.3);
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
             
-            // Second tone (higher)
-            const oscillator2 = audioContext.createOscillator();
-            const gainNode2 = audioContext.createGain();
-            oscillator2.connect(gainNode2);
-            gainNode2.connect(audioContext.destination);
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
             
-            oscillator2.frequency.setValueAtTime(1000, audioContext.currentTime + 0.15);
-            gainNode2.gain.setValueAtTime(0.3, audioContext.currentTime + 0.15);
-            gainNode2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
-            
-            oscillator2.start(audioContext.currentTime + 0.15);
-            oscillator2.stop(audioContext.currentTime + 0.4);
-            
-            console.log('🔊 Enhanced notification sound played');
+            console.log('🔊 Enhanced notification sound played (same as admin)');
         } catch (error) {
             console.log('Enhanced notification sound not supported');
             // Fallback to simple sound
@@ -1109,6 +1114,55 @@ class ChatSystem {
         this.hideUnreadMessageBadge();
         
         console.log('🧹 Cleaned up existing notifications');
+    }
+
+    async markAdminMessagesAsReadByUser() {
+        // Kullanıcı chat'i açtı - admin mesajlarını okudu
+        if (!window.supabase || !this.currentUser) return;
+        
+        try {
+            console.log('✅ User viewing chat - marking admin messages as read');
+            
+            // Get current messages
+            const { data: userData, error: userError } = await window.supabase
+                .from('users')
+                .select('chat_messages')
+                .eq('username', this.currentUser)
+                .single();
+
+            if (!userError && userData && userData.chat_messages) {
+                let chatMessages = JSON.parse(userData.chat_messages);
+                let hasChanges = false;
+                
+                // Mark all admin messages as read by user
+                chatMessages.forEach(msg => {
+                    if (msg.sender === 'admin' && msg.userStatus !== 'read') {
+                        msg.userStatus = 'read'; // User okudu
+                        hasChanges = true;
+                    }
+                });
+                
+                if (hasChanges) {
+                    // Update in Supabase
+                    await window.supabase
+                        .from('users')
+                        .update({ 
+                            chat_messages: JSON.stringify(chatMessages),
+                            last_chat_update: new Date().toISOString()
+                        })
+                        .eq('username', this.currentUser);
+                    
+                    console.log('✅ Admin messages marked as read by user');
+                    
+                    // Refresh the chat display to show green ticks
+                    setTimeout(() => {
+                        this.loadChatHistory();
+                    }, 200);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error marking admin messages as read:', error);
+        }
     }
 
     ensureChatButtonPosition() {
