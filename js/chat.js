@@ -580,11 +580,15 @@ class ChatSystem {
     }
 
     checkForOfflineMessages(chatMessages) {
+        console.log('🔍 OFFLINE MESAJ KONTROLÜ başlatılıyor...');
+        
         // Kullanıcı offline'ken gelen admin mesajları kontrol et
         const adminMessages = chatMessages.filter(msg => msg.sender === 'admin');
         
+        console.log('🔍 Toplam admin mesajı:', adminMessages.length);
+        
         if (adminMessages.length > 0) {
-            console.log('🔔 OFFLINE mesajlar bulundu:', adminMessages.length);
+            console.log('🔔 OFFLINE admin mesajları bulundu:', adminMessages.length);
             
             // Son admin mesajı son 24 saat içinde mi?
             const latestAdminMessage = adminMessages[adminMessages.length - 1];
@@ -592,14 +596,22 @@ class ChatSystem {
             const now = new Date();
             const hoursDiff = (now - messageTime) / (1000 * 60 * 60);
             
+            console.log('🔍 Son admin mesajı zamanı:', latestAdminMessage.timestamp);
+            console.log('🔍 Şu anki zaman:', now.toISOString());
+            console.log('🔍 Saat farkı:', hoursDiff, 'saat');
+            
             if (hoursDiff < 24) {
-                console.log('🔔 Yeni offline mesaj bulundu - bildirim gösteriliyor');
+                console.log('🔔 YENİ OFFLINE MESAJ BULUNDU - bildirim gösteriliyor!');
                 this.hasUnreadMessages = true;
                 this.startChatButtonAnimation();
                 this.showUnreadMessageBadge();
                 this.showChatNotification();
                 this.playEnhancedNotificationSound();
+            } else {
+                console.log('⏰ Admin mesajı 24 saatten eski, bildirim gösterilmiyor');
             }
+        } else {
+            console.log('✅ Admin mesajı yok, offline bildirim yok');
         }
     }
 
@@ -856,8 +868,7 @@ class ChatSystem {
             }, 300);
         }, 8000);
         
-        // Play notification sound (if supported)
-        this.playNotificationSound();
+        // Sound will be played by caller, don't duplicate here
     }
 
     playNotificationSound() {
