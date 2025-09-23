@@ -2037,6 +2037,9 @@ AdminPanel.prototype.selectChatUser = function(username) {
     this.loadChatMessages(username);
     this.updateSelectedUserInfo(username);
     this.showChatInput();
+    
+    // Admin is viewing this user's chat - mark user messages as read
+    this.markUserMessagesAsReadByAdmin(username);
 };
 
 AdminPanel.prototype.updateSelectedUserInfo = function(username) {
@@ -2382,6 +2385,52 @@ AdminPanel.prototype.saveAdminMessageToLocalStorage = function(message) {
     });
     localStorage.setItem('messages', JSON.stringify(messages));
     console.log('✅ Admin message saved to localStorage successfully');
+};
+
+AdminPanel.prototype.markUserMessagesAsReadByAdmin = async function(username) {
+    if (!window.supabase) return;
+    
+    try {
+        console.log('✅ Admin viewing chat - marking user messages as read for:', username);
+        
+        // Get current messages
+        const { data: userData, error: userError } = await window.supabase
+            .from('users')
+            .select('chat_messages')
+            .eq('username', username)
+            .single();
+
+        if (!userError && userData && userData.chat_messages) {
+            let chatMessages = JSON.parse(userData.chat_messages);
+            let hasChanges = false;
+            
+            // Mark all user messages as read
+            chatMessages.forEach(msg => {
+                if (msg.sender === 'user' && msg.status !== 'read') {
+                    msg.status = 'read';
+                    hasChanges = true;
+                }
+            });
+            
+            if (hasChanges) {
+                // Update in Supabase
+                await window.supabase
+                    .from('users')
+                    .update({ 
+                        chat_messages: JSON.stringify(chatMessages),
+                        last_chat_update: new Date().toISOString()
+                    })
+                    .eq('username', username);
+                
+                console.log('✅ User messages marked as read by admin');
+                
+                // Refresh the chat display
+                this.renderChatMessages(chatMessages);
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error marking messages as read:', error);
+    }
 };
 
 AdminPanel.prototype.showAdminNotification = function(username, message) {

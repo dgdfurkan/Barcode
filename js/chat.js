@@ -256,11 +256,8 @@ class ChatSystem {
             messageInput.value = '';
         }
         
-        // Save to Supabase and localStorage
+        // Save ONLY to Supabase - it's the single source of truth
         await this.saveMessageToSupabase(message);
-        
-        // Also save to localStorage as backup
-        this.saveToLocalStorage(message);
     }
 
     addMessage(text, sender, timestamp = null, status = 'sent') {
@@ -416,9 +413,9 @@ class ChatSystem {
     async loadChatHistory() {
         try {
             if (window.supabase && this.currentUser) {
-                console.log('💬 Loading chat history from Supabase for user:', this.currentUser);
+                console.log('💬 Loading chat history from Supabase ONLY for user:', this.currentUser);
                 
-                // First check if user exists in Supabase
+                // Get user's chat messages from Supabase - ONLY SOURCE OF TRUTH
                 const { data: userData, error: userError } = await window.supabase
                     .from('users')
                     .select('username, chat_messages')
@@ -428,63 +425,143 @@ class ChatSystem {
                 console.log('🔍 Supabase user lookup result:', { userData, userError });
 
                 if (userError) {
-                    console.error('❌ Error loading user from Supabase:', userError);
-                    console.log('💬 User not found in Supabase, using localStorage');
-                    this.loadChatHistoryFromLocalStorage();
+                    console.error('❌ User not found in Supabase:', userError);
+                    // Clear messages - no fallback to localStorage
+                    const messagesContainer = document.getElementById('chatMessages');
+                    if (messagesContainer) {
+                        messagesContainer.innerHTML = '';
+                    }
+                    this.messages = [];
                     return;
                 }
 
-                if (userData) {
-                    console.log('✅ User found in Supabase:', userData.username);
-                    
-                    if (userData.chat_messages) {
-                        try {
-                            const chatMessages = JSON.parse(userData.chat_messages);
-                            console.log('✅ Loaded chat messages from Supabase:', chatMessages);
-                            
-                            // Clear existing messages
-                            const messagesContainer = document.getElementById('chatMessages');
-                            if (messagesContainer) {
-                                messagesContainer.innerHTML = '';
-                            }
-                            
-                            // Update messages array
-                            this.messages = chatMessages;
-                            
-                            // Render all messages
-                            chatMessages.forEach(msg => {
-                                if (msg.sender === 'user') {
-                                    this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
-                                } else if (msg.sender === 'admin') {
-                                    this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
-                                }
-                            });
-                            
-                            // Scroll to bottom
-                            this.scrollToBottom();
-                            
-                            console.log('✅ Rendered', chatMessages.length, 'messages from Supabase');
-                            return; // Success, don't load from localStorage
-                        } catch (parseError) {
-                            console.error('❌ Error parsing chat messages:', parseError);
-                            console.log('💬 Fallback to localStorage due to parse error');
+                if (userData && userData.chat_messages) {
+                    try {
+                        const chatMessages = JSON.parse(userData.chat_messages);
+                        console.log('✅ Loaded chat messages from Supabase:', chatMessages);
+                        
+                        // Clear existing messages
+                        const messagesContainer = document.getElementById('chatMessages');
+                        if (messagesContainer) {
+                            messagesContainer.innerHTML = '';
                         }
-                    } else {
-                        console.log('⚠️ User exists but no chat_messages, trying localStorage');
+                        
+                        // Update messages array
+                        this.messages = chatMessages;
+                        
+                        // Render all messages with correct status
+                        chatMessages.forEach(msg => {
+                            if (msg.sender === 'user') {
+                                this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status || 'sent');
+                            } else if (msg.sender === 'admin') {
+                                this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status || 'sent');
+                            }
+                        });
+                        
+                        // Scroll to bottom
+                        this.scrollToBottom();
+                        
+                        console.log('✅ Rendered', chatMessages.length, 'messages from Supabase');
+                        
+                        // Check for new admin messages to show notification
+                        this.checkForNewAdminMessages(chatMessages);
+                        
+                    } catch (parseError) {
+                        console.error('❌ Error parsing chat messages:', parseError);
+                        // Clear on error
+                        const messagesContainer = document.getElementById('chatMessages');
+                        if (messagesContainer) {
+                            messagesContainer.innerHTML = '';
+                        }
+                        this.messages = [];
                     }
                 } else {
-                    console.log('⚠️ No user data returned from Supabase');
+                    console.log('⚠️ User exists but no chat_messages');
+                    // Clear messages
+                    const messagesContainer = document.getElementById('chatMessages');
+                    if (messagesContainer) {
+                        messagesContainer.innerHTML = '';
+                    }
+                    this.messages = [];
                 }
             } else {
-                console.log('💬 Supabase not available, using localStorage for chat history');
+                console.log('💬 No Supabase or user, clearing chat');
+                const messagesContainer = document.getElementById('chatMessages');
+                if (messagesContainer) {
+                    messagesContainer.innerHTML = '';
+                }
+                this.messages = [];
             }
-            
-            // Fallback to localStorage
-            this.loadChatHistoryFromLocalStorage();
             
         } catch (error) {
             console.error('❌ Error loading chat history:', error);
-            this.loadChatHistoryFromLocalStorage();
+            // Clear on error
+            const messagesContainer = document.getElementById('chatMessages');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = '';
+            }
+            this.messages = [];
+        }
+    }
+
+    checkForNewAdminMessages(chatMessages) {
+        // Check if there are unread admin messages
+        const unreadAdminMessages = chatMessages.filter(msg => 
+            msg.sender === 'admin' && 
+            (!this.lastCheckedTime || new Date(msg.timestamp) > this.lastCheckedTime)
+        );
+        
+        if (unreadAdminMessages.length > 0 && !this.isOpen) {
+            console.log('🔔 Found new admin messages, showing notification');
+            this.hasUnreadMessages = true;
+            this.startChatButtonAnimation();
+            this.showUnreadMessageBadge();
+            this.showChatNotification();
+        }
+        
+        this.lastCheckedTime = new Date();
+    }
+
+    async markUserMessagesAsRead() {
+        // Admin opened chat - mark all user messages as read (green tick)
+        if (!window.supabase || !this.currentUser) return;
+        
+        try {
+            console.log('✅ Admin viewing chat - marking user messages as read');
+            
+            // Get current messages
+            const { data: userData, error: userError } = await window.supabase
+                .from('users')
+                .select('chat_messages')
+                .eq('username', this.currentUser)
+                .single();
+
+            if (!userError && userData && userData.chat_messages) {
+                let chatMessages = JSON.parse(userData.chat_messages);
+                
+                // Mark all user messages as read
+                chatMessages.forEach(msg => {
+                    if (msg.sender === 'user') {
+                        msg.status = 'read';
+                    }
+                });
+                
+                // Update in Supabase
+                await window.supabase
+                    .from('users')
+                    .update({ 
+                        chat_messages: JSON.stringify(chatMessages),
+                        last_chat_update: new Date().toISOString()
+                    })
+                    .eq('username', this.currentUser);
+                
+                console.log('✅ User messages marked as read');
+                
+                // Refresh chat to show green ticks
+                this.loadChatHistory();
+            }
+        } catch (error) {
+            console.error('❌ Error marking messages as read:', error);
         }
     }
 
@@ -571,12 +648,12 @@ class ChatSystem {
     }
 
     setupRealTimeUpdates() {
-        // More frequent real-time updates for better performance
+        // Aggressive real-time updates for instant messaging experience
         setInterval(() => {
             if (this.currentUser) {
                 this.checkForNewMessages();
             }
-        }, 10000); // Check every 10 seconds instead of 30
+        }, 3000); // Check every 3 seconds for near real-time
     }
 
     setupChatRealtime() {
@@ -727,10 +804,8 @@ class ChatSystem {
 
     async checkForNewMessages() {
         try {
-            if (window.supabase) {
-                console.log('💬 Checking for new messages');
-                
-                // Get user's chat messages from users table
+            if (window.supabase && this.currentUser) {
+                // Get user's current chat messages from Supabase
                 const { data, error } = await window.supabase
                     .from('users')
                     .select('chat_messages, last_chat_update')
@@ -743,19 +818,52 @@ class ChatSystem {
                 }
 
                 if (data && data.chat_messages) {
-                    const chatMessages = JSON.parse(data.chat_messages);
+                    const latestMessages = JSON.parse(data.chat_messages);
                     
-                    // Check if there are new admin messages
-                    const adminMessages = chatMessages.filter(msg => 
-                        msg.sender === 'admin' && 
-                        new Date(msg.timestamp) > new Date(Date.now() - 30000)
-                    );
+                    // Compare with current messages to find new ones
+                    const currentMessageCount = this.messages.length;
+                    const latestMessageCount = latestMessages.length;
                     
-                    if (adminMessages.length > 0) {
-                        console.log('✅ New admin messages found:', adminMessages);
-                        adminMessages.forEach(msg => {
-                            this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
-                        });
+                    if (latestMessageCount > currentMessageCount) {
+                        console.log('🔔 New messages detected, refreshing chat');
+                        
+                        // Get new messages
+                        const newMessages = latestMessages.slice(currentMessageCount);
+                        
+                        // Check if any new admin messages
+                        const newAdminMessages = newMessages.filter(msg => msg.sender === 'admin');
+                        
+                        if (newAdminMessages.length > 0) {
+                            console.log('🔔 New admin messages found:', newAdminMessages);
+                            
+                            // Show notification if chat is closed
+                            if (!this.isOpen) {
+                                this.hasUnreadMessages = true;
+                                this.startChatButtonAnimation();
+                                this.showUnreadMessageBadge();
+                                this.showChatNotification();
+                                this.playNotificationSound();
+                            }
+                        }
+                        
+                        // Refresh entire chat to maintain correct order and status
+                        this.loadChatHistory();
+                    }
+                    
+                    // Also check for status updates (green tick changes)
+                    if (this.messages.length === latestMessages.length) {
+                        let statusChanged = false;
+                        for (let i = 0; i < this.messages.length; i++) {
+                            if (this.messages[i].status !== latestMessages[i].status) {
+                                statusChanged = true;
+                                break;
+                            }
+                        }
+                        
+                        if (statusChanged) {
+                            console.log('🔄 Message status updated, refreshing chat');
+                            this.loadChatHistory();
+                        }
                     }
                 }
             }
