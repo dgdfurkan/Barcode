@@ -933,6 +933,9 @@ class ChatSystem {
     startChatButtonAnimation() {
         const openChatBtn = document.getElementById('openChat');
         if (openChatBtn) {
+            // ÖNCE POSİTİON'I SABİTLE!
+            this.ensureChatButtonPosition();
+            
             // Add pulsing animation
             openChatBtn.style.animation = 'pulse-notification 1.5s infinite';
             openChatBtn.style.backgroundColor = 'rgb(239 68 68)'; // Red color for notification
@@ -962,6 +965,9 @@ class ChatSystem {
     stopChatButtonAnimation() {
         const openChatBtn = document.getElementById('openChat');
         if (openChatBtn) {
+            // ÖNCE POSİTİON'I SABİTLE!
+            this.ensureChatButtonPosition();
+            
             openChatBtn.style.animation = '';
             openChatBtn.style.backgroundColor = 'rgb(59 130 246)'; // Original blue
             openChatBtn.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
@@ -974,10 +980,9 @@ class ChatSystem {
         if (openChatBtn && !document.getElementById('unread-badge')) {
             const badge = document.createElement('div');
             badge.id = 'unread-badge';
-            badge.className = 'absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold';
-            badge.style.position = 'absolute';
-            badge.style.top = '-8px';
-            badge.style.right = '-8px';
+            badge.style.position = 'fixed'; // FIXED kullan, relative değil!
+            badge.style.bottom = 'calc(1rem + 50px)'; // Butonun üstünde
+            badge.style.right = 'calc(1rem + 10px)'; // Butonun sağında
             badge.style.width = '24px';
             badge.style.height = '24px';
             badge.style.backgroundColor = 'rgb(239 68 68)';
@@ -989,12 +994,11 @@ class ChatSystem {
             badge.style.fontSize = '12px';
             badge.style.fontWeight = 'bold';
             badge.style.border = '2px solid white';
-            badge.style.zIndex = '10000';
+            badge.style.zIndex = '10001'; // Butondan daha yüksek
             badge.textContent = '!';
             
-            // Make button container relative
-            openChatBtn.style.position = 'relative';
-            openChatBtn.appendChild(badge);
+            // Badge'i body'e ekle, butona değil!
+            document.body.appendChild(badge);
         }
     }
 
@@ -1017,6 +1021,20 @@ class ChatSystem {
         this.hideUnreadMessageBadge();
         
         console.log('🧹 Cleaned up existing notifications');
+    }
+
+    ensureChatButtonPosition() {
+        // BUTONUN POSİTİONU HER ZAMAN SAĞ ALT KÖŞEDE OLMALI!
+        const openChatBtn = document.getElementById('openChat');
+        if (openChatBtn) {
+            openChatBtn.style.position = 'fixed';
+            openChatBtn.style.bottom = '1rem';
+            openChatBtn.style.right = '1rem';
+            openChatBtn.style.left = 'auto';
+            openChatBtn.style.top = 'auto';
+            openChatBtn.style.zIndex = '9999';
+            console.log('🔧 Chat button position fixed to bottom-right');
+        }
     }
 }
 
