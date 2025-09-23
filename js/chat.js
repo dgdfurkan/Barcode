@@ -251,13 +251,16 @@ class ChatSystem {
         console.log('🔍 Sending message:', message);
 
         // Add message to UI immediately with pending status
-        this.addMessage(message, 'user', null, 'pending');
+        this.addMessage(message, 'user', null, 'sent');
         if (messageInput) {
             messageInput.value = '';
         }
         
-        // Save to Supabase
+        // Save to Supabase and localStorage
         await this.saveMessageToSupabase(message);
+        
+        // Also save to localStorage as backup
+        this.saveToLocalStorage(message);
     }
 
     addMessage(text, sender, timestamp = null, status = 'sent') {
@@ -401,15 +404,18 @@ class ChatSystem {
         messages.push({
             username: this.currentUser,
             message: message,
-            status: 'pending',
+            sender: 'user',
+            status: 'sent',
+            timestamp: new Date().toISOString(),
             created_at: new Date().toISOString()
         });
         localStorage.setItem('chatMessages', JSON.stringify(messages));
+        console.log('✅ Message saved to localStorage:', message);
     }
 
     async loadChatHistory() {
         try {
-            if (window.supabase && this.currentUser && this.currentUser !== 'ProductSearchUser') {
+            if (window.supabase && this.currentUser) {
                 console.log('💬 Loading chat history from Supabase for user:', this.currentUser);
                 
                 // First check if user exists in Supabase
@@ -470,7 +476,7 @@ class ChatSystem {
                     console.log('⚠️ No user data returned from Supabase');
                 }
             } else {
-                console.log('💬 Using localStorage for chat history (no Supabase or ProductSearchUser)');
+                console.log('💬 Supabase not available, using localStorage for chat history');
             }
             
             // Fallback to localStorage

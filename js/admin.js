@@ -2401,8 +2401,8 @@ AdminPanel.prototype.showAdminNotification = function(username, message) {
                 </svg>
             </div>
             <div>
-                <h4 class="font-semibold text-sm">Yeni Mesaj!</h4>
-                <p class="text-xs opacity-90">${username}: ${message.length > 30 ? message.substring(0, 30) + '...' : message}</p>
+                <h4 class="font-semibold text-sm">Mesaj Gönderildi!</h4>
+                <p class="text-xs opacity-90">${username} kullanıcısına gönderildi</p>
             </div>
             <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200 transition-colors">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
