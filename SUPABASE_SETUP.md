@@ -6,7 +6,7 @@
 2. "Start your project" butonuna tıkla
 3. GitHub ile giriş yap
 4. "New Project" oluştur
-5. Proje adı: `product-barcode-search`
+5. Proje adı: `Barcode`
 6. Database password oluştur (güçlü bir şifre)
 7. Region: `Europe West (London)` seç
 

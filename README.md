@@ -1,8 +1,8 @@
-# 🔍 Product Barcode Search SaaS System
+# 🔍 Barcode SaaS System
 
 Profesyonel barkod arama sistemi - Kullanıcı kimlik doğrulama, IP kontrolü ve test süresi yönetimi ile.
 
-**GitHub:** [dgdfurkan/product_barcode_search](https://github.com/dgdfurkan/product_barcode_search)  
+**GitHub:** [dgdfurkan/Barcode](https://github.com/dgdfurkan/Barcode)  
 **Email:** furkangunduz.dev@gmail.com
 
 ## 🚀 Özellikler
@@ -29,7 +29,7 @@ Profesyonel barkod arama sistemi - Kullanıcı kimlik doğrulama, IP kontrolü v
 ## 📁 Dosya Yapısı
 
 ```
-product-search-saas/
+Barcode/
 ├── index.html              # Ana giriş sayfası
 ├── admin.html              # Admin paneli
 ├── pages/
@@ -49,7 +49,7 @@ product-search-saas/
 ```bash
 # Projeyi klonlayın
 git clone <repository-url>
-cd product-search-saas
+cd Barcode
 
 # Basit HTTP sunucusu başlatın
 python -m http.server 8000

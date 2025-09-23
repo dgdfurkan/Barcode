@@ -1,4 +1,4 @@
--- Supabase Database Schema for Product Barcode Search System
+-- Supabase Database Schema for Barcode System
 
 -- Users table
 CREATE TABLE users (

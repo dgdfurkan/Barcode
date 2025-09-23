@@ -1,6 +1,6 @@
 {
-  "short_name": "product-barcode-search",
-  "name": "product-barcode-search",
+  "short_name": "Barcode",
+  "name": "Barcode",
   "icons": [
     {
       "src": "favicon.ico",
