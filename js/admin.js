@@ -2332,12 +2332,12 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
             // Parse existing chat messages or create new array
             let chatMessages = userData.chat_messages ? JSON.parse(userData.chat_messages) : [];
             
-            // Add admin message
+            // Add admin message with read status (admin messages are immediately read by admin)
             chatMessages.push({
                 message: message,
                 sender: 'admin',
                 timestamp: new Date().toISOString(),
-                status: 'delivered'
+                status: 'read'
             });
 
             // Update user's chat messages
@@ -2355,6 +2355,9 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
                 this.saveAdminMessageToLocalStorage(message);
             } else {
                 console.log('✅ Admin message saved to user chat successfully');
+                
+                // Show success notification with faster delivery
+                this.showAdminNotification(this.selectedChatUser, message);
             }
         } else {
             console.log('💬 Supabase not available, saving to localStorage');

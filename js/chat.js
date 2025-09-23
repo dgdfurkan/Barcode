@@ -5,6 +5,7 @@ class ChatSystem {
         this.messages = [];
         this.currentUser = null;
         this.chatSubscription = null;
+        this.hasUnreadMessages = false;
         this.init();
     }
 
@@ -83,13 +84,17 @@ class ChatSystem {
             
             // Add hover effect
             openChatBtn.addEventListener('mouseenter', () => {
-                openChatBtn.style.transform = 'scale(1.1)';
-                openChatBtn.style.backgroundColor = 'rgb(37 99 235)';
+                if (!this.hasUnreadMessages) {
+                    openChatBtn.style.transform = 'scale(1.1)';
+                    openChatBtn.style.backgroundColor = 'rgb(37 99 235)';
+                }
             });
             
             openChatBtn.addEventListener('mouseleave', () => {
-                openChatBtn.style.transform = 'scale(1)';
-                openChatBtn.style.backgroundColor = 'rgb(59 130 246)';
+                if (!this.hasUnreadMessages) {
+                    openChatBtn.style.transform = 'scale(1)';
+                    openChatBtn.style.backgroundColor = 'rgb(59 130 246)';
+                }
             });
             
             console.log('✅ Chat button visibility ensured with inline styles');
@@ -162,6 +167,10 @@ class ChatSystem {
         
         this.isOpen = true;
         
+        // Mark messages as read
+        this.hasUnreadMessages = false;
+        this.stopChatButtonAnimation();
+        
         // Focus on message input
         setTimeout(() => {
             const messageInput = document.getElementById('messageInput');
@@ -214,11 +223,6 @@ class ChatSystem {
         
         // Save to Supabase
         await this.saveMessageToSupabase(message);
-        
-        // Show estimated response time message
-        setTimeout(() => {
-            this.showEstimatedResponseTime();
-        }, 1000);
     }
 
     addMessage(text, sender, timestamp = null, status = 'sent') {
@@ -235,11 +239,11 @@ class ChatSystem {
         // Get status icon (WhatsApp style)
         const getStatusIcon = (status) => {
             switch(status) {
-                case 'pending': return '⏳'; // Clock icon
-                case 'sent': return '✓'; // Single gray tick
-                case 'delivered': return '✓✓'; // Double gray tick
-                case 'read': return '✓✓'; // Double green tick (will be styled green)
-                default: return '✓';
+                case 'pending': return '☑️'; // Gray checkbox
+                case 'sent': return '☑️'; // Gray checkbox
+                case 'delivered': return '☑️'; // Gray checkbox
+                case 'read': return '✅'; // Green checkmark
+                default: return '☑️';
             }
         };
         
@@ -356,18 +360,6 @@ class ChatSystem {
         }
     }
 
-    showEstimatedResponseTime() {
-        const responses = [
-            "⏰ Tahmini dönüş süremiz: 15-30 dakika",
-            "📞 Destek ekibimiz mesajınızı gördüğünde dönecektir",
-            "🕐 Ortalama yanıt süremiz: 20 dakika",
-            "💬 Destek ekibimiz şu anda aktif, en kısa sürede dönüş yapacağız",
-            "⏱️ Mesajınız alındı, destek ekibimiz size dönecek"
-        ];
-        
-        const response = responses[Math.floor(Math.random() * responses.length)];
-        this.addMessage(response, 'system');
-    }
 
     saveToLocalStorage(message) {
         const messages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
@@ -429,12 +421,12 @@ class ChatSystem {
     }
 
     setupRealTimeUpdates() {
-        // Simulate real-time updates every 30 seconds
+        // More frequent real-time updates for better performance
         setInterval(() => {
-            if (this.isOpen && this.currentUser) {
+            if (this.currentUser) {
                 this.checkForNewMessages();
             }
-        }, 30000);
+        }, 10000); // Check every 10 seconds instead of 30
     }
 
     setupChatRealtime() {
@@ -485,9 +477,14 @@ class ChatSystem {
                         this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
                     });
                     
+                    // Mark as unread and show notification
+                    this.hasUnreadMessages = true;
+                    this.startChatButtonAnimation();
+                    
                     // Show notification if chat is closed
                     if (!this.isOpen) {
                         this.showChatNotification();
+                        this.showUnreadMessageBadge();
                     }
                 }
                 
@@ -621,6 +618,81 @@ class ChatSystem {
         const messagesContainer = document.getElementById('chatMessages');
         if (messagesContainer) {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    }
+
+    startChatButtonAnimation() {
+        const openChatBtn = document.getElementById('openChat');
+        if (openChatBtn) {
+            // Add pulsing animation
+            openChatBtn.style.animation = 'pulse-notification 1.5s infinite';
+            openChatBtn.style.backgroundColor = 'rgb(239 68 68)'; // Red color for notification
+            openChatBtn.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.5)';
+            
+            // Add CSS animation if not exists
+            if (!document.getElementById('chat-animation-styles')) {
+                const style = document.createElement('style');
+                style.id = 'chat-animation-styles';
+                style.textContent = `
+                    @keyframes pulse-notification {
+                        0% { transform: scale(1); }
+                        50% { transform: scale(1.1); }
+                        100% { transform: scale(1); }
+                    }
+                    @keyframes shake {
+                        0%, 100% { transform: translateX(0); }
+                        25% { transform: translateX(-5px); }
+                        75% { transform: translateX(5px); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+    }
+
+    stopChatButtonAnimation() {
+        const openChatBtn = document.getElementById('openChat');
+        if (openChatBtn) {
+            openChatBtn.style.animation = '';
+            openChatBtn.style.backgroundColor = 'rgb(59 130 246)'; // Original blue
+            openChatBtn.style.boxShadow = '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';
+        }
+        this.hideUnreadMessageBadge();
+    }
+
+    showUnreadMessageBadge() {
+        const openChatBtn = document.getElementById('openChat');
+        if (openChatBtn && !document.getElementById('unread-badge')) {
+            const badge = document.createElement('div');
+            badge.id = 'unread-badge';
+            badge.className = 'absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold';
+            badge.style.position = 'absolute';
+            badge.style.top = '-8px';
+            badge.style.right = '-8px';
+            badge.style.width = '24px';
+            badge.style.height = '24px';
+            badge.style.backgroundColor = 'rgb(239 68 68)';
+            badge.style.borderRadius = '50%';
+            badge.style.display = 'flex';
+            badge.style.alignItems = 'center';
+            badge.style.justifyContent = 'center';
+            badge.style.color = 'white';
+            badge.style.fontSize = '12px';
+            badge.style.fontWeight = 'bold';
+            badge.style.border = '2px solid white';
+            badge.style.zIndex = '10000';
+            badge.textContent = '!';
+            
+            // Make button container relative
+            openChatBtn.style.position = 'relative';
+            openChatBtn.appendChild(badge);
+        }
+    }
+
+    hideUnreadMessageBadge() {
+        const badge = document.getElementById('unread-badge');
+        if (badge) {
+            badge.remove();
         }
     }
 }
