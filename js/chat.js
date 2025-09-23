@@ -6,6 +6,8 @@ class ChatSystem {
         this.currentUser = null;
         this.chatSubscription = null;
         this.hasUnreadMessages = false;
+        this.lastMessageCount = 0; // Son bilinen mesaj sayısı
+        this.isFirstLoad = true; // İlk yükleme mi kontrol eder
         this.init();
     }
 
@@ -52,6 +54,9 @@ class ChatSystem {
         // Load chat history
         this.loadChatHistory();
         
+        // Clean up any existing notifications from previous session
+        this.cleanupExistingNotifications();
+        
         // Set up real-time updates
         this.setupRealTimeUpdates();
         this.setupChatRealtime();
@@ -65,11 +70,12 @@ class ChatSystem {
             // Remove any hidden classes
             openChatBtn.classList.remove('hidden');
             
-            // Force visibility with inline styles
+            // Force visibility with inline styles - SAĞ ALTTA SABİT!
             openChatBtn.style.position = 'fixed';
             openChatBtn.style.bottom = '1rem';
             openChatBtn.style.right = '1rem';
             openChatBtn.style.zIndex = '9999';
+            openChatBtn.style.left = 'auto'; // Sol taraf override etme
             openChatBtn.style.width = '3.5rem';
             openChatBtn.style.height = '3.5rem';
             openChatBtn.style.backgroundColor = 'rgb(59 130 246)';
@@ -463,8 +469,14 @@ class ChatSystem {
                         
                         console.log('✅ Rendered', chatMessages.length, 'messages from Supabase');
                         
-                        // Check for new admin messages to show notification
-                        this.checkForNewAdminMessages(chatMessages);
+                        // Check for new admin messages to show notification (sadece ilk yükleme değilse)
+                        if (!this.isFirstLoad) {
+                            this.checkForNewAdminMessages(chatMessages);
+                        } else {
+                            // İlk yükleme - sadece sayıyı kaydet
+                            this.lastMessageCount = chatMessages.length;
+                            this.isFirstLoad = false;
+                        }
                         
                     } catch (parseError) {
                         console.error('❌ Error parsing chat messages:', parseError);
@@ -505,21 +517,31 @@ class ChatSystem {
     }
 
     checkForNewAdminMessages(chatMessages) {
-        // Check if there are unread admin messages
-        const unreadAdminMessages = chatMessages.filter(msg => 
-            msg.sender === 'admin' && 
-            (!this.lastCheckedTime || new Date(msg.timestamp) > this.lastCheckedTime)
-        );
-        
-        if (unreadAdminMessages.length > 0 && !this.isOpen) {
-            console.log('🔔 Found new admin messages, showing notification');
-            this.hasUnreadMessages = true;
-            this.startChatButtonAnimation();
-            this.showUnreadMessageBadge();
-            this.showChatNotification();
+        // İLK YÜKLEME İSE BİLDİRİM GÖSTERME!
+        if (this.isFirstLoad) {
+            console.log('🔍 First load - no notifications for existing messages');
+            this.lastMessageCount = chatMessages.length;
+            this.isFirstLoad = false;
+            return;
         }
         
-        this.lastCheckedTime = new Date();
+        // Sadece yeni mesajlar varsa bildirim göster
+        if (chatMessages.length > this.lastMessageCount) {
+            const newMessages = chatMessages.slice(this.lastMessageCount);
+            const newAdminMessages = newMessages.filter(msg => msg.sender === 'admin');
+            
+            if (newAdminMessages.length > 0 && !this.isOpen) {
+                console.log('🔔 NEW admin messages detected:', newAdminMessages);
+                this.hasUnreadMessages = true;
+                this.startChatButtonAnimation();
+                this.showUnreadMessageBadge();
+                this.showChatNotification();
+                this.playNotificationSound();
+            }
+        }
+        
+        // Mesaj sayısını güncelle
+        this.lastMessageCount = chatMessages.length;
     }
 
     async markUserMessagesAsRead() {
@@ -825,7 +847,7 @@ class ChatSystem {
                     const latestMessageCount = latestMessages.length;
                     
                     if (latestMessageCount > currentMessageCount) {
-                        console.log('🔔 New messages detected, refreshing chat');
+                        console.log('🔔 New messages detected, count:', currentMessageCount, '->', latestMessageCount);
                         
                         // Get new messages
                         const newMessages = latestMessages.slice(currentMessageCount);
@@ -834,17 +856,23 @@ class ChatSystem {
                         const newAdminMessages = newMessages.filter(msg => msg.sender === 'admin');
                         
                         if (newAdminMessages.length > 0) {
-                            console.log('🔔 New admin messages found:', newAdminMessages);
+                            console.log('🔔 NEW ADMIN MESSAGES FOUND!', newAdminMessages);
                             
                             // Show notification if chat is closed
                             if (!this.isOpen) {
+                                console.log('🔔 Chat is closed, showing notification');
                                 this.hasUnreadMessages = true;
                                 this.startChatButtonAnimation();
                                 this.showUnreadMessageBadge();
                                 this.showChatNotification();
                                 this.playNotificationSound();
+                            } else {
+                                console.log('🔔 Chat is open, just refreshing');
                             }
                         }
+                        
+                        // Update message count BEFORE refreshing
+                        this.lastMessageCount = latestMessageCount;
                         
                         // Refresh entire chat to maintain correct order and status
                         this.loadChatHistory();
@@ -952,6 +980,20 @@ class ChatSystem {
         if (badge) {
             badge.remove();
         }
+    }
+
+    cleanupExistingNotifications() {
+        // Remove any existing chat notifications
+        const existingNotifications = document.querySelectorAll('.chat-notification');
+        existingNotifications.forEach(notification => {
+            console.log('🧹 Cleaning up existing notification');
+            notification.remove();
+        });
+        
+        // Remove any existing badges
+        this.hideUnreadMessageBadge();
+        
+        console.log('🧹 Cleaned up existing notifications');
     }
 }
 
