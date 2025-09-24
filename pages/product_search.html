@@ -125,13 +125,6 @@
                         </svg>
                         Ürün Ekle
                     </button>
-                    <button id="settingsBtn" class="btn-secondary text-sm">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        </svg>
-                        Ayarlar
-                    </button>
                     <div class="text-right">
                         <p class="text-lg font-semibold text-text-primary" id="userName">Yükleniyor...</p>
                         <p class="text-sm text-text-secondary" id="userCompany">Yükleniyor...</p>
@@ -139,6 +132,13 @@
                             <span id="trialBannerHeaderText" class="text-black">⏰ Test Süreniz</span>
                         </div>
                     </div>
+                    <button id="settingsBtn" class="btn-secondary text-sm mr-2">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        Ayarlar
+                    </button>
                     <button id="logoutBtn" class="btn-secondary text-sm">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
@@ -431,70 +431,6 @@
                     </svg>
                     Seçilenleri Ekle
                 </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Contact Modal REMOVED - Chat system kullanılıyor -->
-    
-    <!-- Product Management Modal -->
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-text-primary">📞 İletişim</h3>
-                <button id="closeContact" class="text-text-secondary hover:text-text-primary">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
-            
-            <div class="space-y-4">
-                <div class="bg-blue-50 rounded-lg p-4">
-                    <h4 class="font-medium text-blue-700 mb-2">💬 Mesaj Gönder</h4>
-                    <p class="text-sm text-blue-600 mb-3">Test süresi uzatma, hesap oluşturma veya destek taleplerinizi gönderebilirsiniz.</p>
-                    
-                    <form id="contactForm" class="space-y-3">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Mesaj Türü</label>
-                            <select id="messageType" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                                <option value="trial_extension">Test Süresi Uzatma</option>
-                                <option value="account_request">Hesap Oluşturma</option>
-                                <option value="support">Teknik Destek</option>
-                                <option value="feature_request">Özellik Talebi</option>
-                                <option value="other">Diğer</option>
-                            </select>
-                        </div>
-                        
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Mesajınız</label>
-                            <textarea id="messageContent" rows="4" 
-                                      placeholder="Mesajınızı buraya yazın..." 
-                                      class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"></textarea>
-                        </div>
-                        
-                        <div class="flex space-x-2">
-                            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-black py-3 px-4 rounded-lg text-sm font-medium border border-blue-700 shadow-sm">
-                                <svg class="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
-                                </svg>
-                                Gönder
-                            </button>
-                            <button type="button" id="cancelContact" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-3 px-4 rounded-lg text-sm font-medium border border-gray-400 shadow-sm">
-                                İptal
-                            </button>
-                        </div>
-                    </form>
-                </div>
-                
-                <div class="bg-green-50 rounded-lg p-4">
-                    <h4 class="font-medium text-green-700 mb-2">📧 Direkt İletişim</h4>
-                    <p class="text-sm text-green-600 mb-2">Acil durumlar için:</p>
-                    <div class="flex items-center space-x-2">
-                        <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                        </svg>
-                        <span class="text-sm text-green-700">support@example.com</span>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -3206,76 +3142,9 @@
             });
             
             // Add contact functionality
-            // Contact button removed - chat system kullanılıyor
+            // Contact system completely removed - chat system kullanılıyor
             
-            document.getElementById('closeContact').addEventListener('click', () => {
-                document.getElementById('contactModal').classList.add('hidden');
-            });
-            
-            document.getElementById('cancelContact').addEventListener('click', () => {
-                document.getElementById('contactModal').classList.add('hidden');
-            });
-            
-            // Contact form handler
-            document.getElementById('contactForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                const messageType = document.getElementById('messageType').value;
-                const messageContent = document.getElementById('messageContent').value.trim();
-                
-                if (!messageContent) {
-                    alert('Lütfen mesajınızı yazın!');
-                    return;
-                }
-                
-                try {
-                    // Try Supabase first
-                    if (window.supabase) {
-                        const { error } = await window.supabase
-                            .from('messages')
-                            .insert([{
-                                user_id: session.username,
-                                message_type: messageType,
-                                content: messageContent,
-                                status: 'pending'
-                            }]);
-                        
-                        if (error) throw error;
-                    }
-                    
-                    // Save to local storage
-                    const messages = JSON.parse(localStorage.getItem('userMessages') || '[]');
-                    const newMessage = {
-                        id: Date.now(),
-                        user_id: session.username,
-                        message_type: messageType,
-                        content: messageContent,
-                        status: 'pending',
-                        created_at: new Date().toISOString()
-                    };
-                    messages.push(newMessage);
-                    localStorage.setItem('userMessages', JSON.stringify(messages));
-                    
-                    // Also save to a global messages array for admin panel
-                    const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
-                    globalMessages.push(newMessage);
-                    localStorage.setItem('globalMessages', JSON.stringify(globalMessages));
-                    
-                    console.log('Message saved to local storage:', newMessage);
-                    console.log('All messages:', messages);
-                    console.log('Global messages:', globalMessages);
-                    
-                    alert('✅ Mesajınız başarıyla gönderildi!\n\nEn kısa sürede size dönüş yapacağız.');
-                    
-                    // Reset form and close modal
-                    document.getElementById('contactForm').reset();
-                    document.getElementById('contactModal').classList.add('hidden');
-                    
-                } catch (error) {
-                    console.error('Error sending message:', error);
-                    alert('❌ Mesaj gönderilirken hata oluştu. Lütfen tekrar deneyin.');
-                }
-            });
+            // Contact form handler removed - chat system kullanılıyor
             
             // Initialize user data manager
             try {
