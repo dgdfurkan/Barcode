@@ -606,9 +606,16 @@ class ChatSystem {
         
         if (adminMessages.length > 0) {
             // UNREAD olan admin mesajlarını bul!
-            const unreadAdminMessages = adminMessages.filter(msg => 
-                msg.userStatus === 'unread' || !msg.userStatus
-            );
+            console.log('🔍 Admin mesajları filtreleniyor...');
+            adminMessages.forEach((msg, index) => {
+                console.log(`  [${index}] userStatus: "${msg.userStatus}", sender: "${msg.sender}", message: "${msg.message}"`);
+            });
+            
+            const unreadAdminMessages = adminMessages.filter(msg => {
+                const isUnread = msg.userStatus === 'unread' || !msg.userStatus;
+                console.log(`🔍 Mesaj "${msg.message}": userStatus="${msg.userStatus}", isUnread=${isUnread}`);
+                return isUnread;
+            });
             
             console.log('🔔 UNREAD admin mesajları:', unreadAdminMessages.length);
             console.log('🔔 UNREAD mesaj detayları:', unreadAdminMessages);
@@ -616,9 +623,19 @@ class ChatSystem {
             if (unreadAdminMessages.length > 0) {
                 // En son unread mesaj son 48 saat içinde mi?
                 const latestUnreadMessage = unreadAdminMessages[unreadAdminMessages.length - 1];
+                console.log('🔍 Latest unread message:', latestUnreadMessage);
+                console.log('🔍 Message timestamp raw:', latestUnreadMessage.timestamp);
+                
                 const messageTime = new Date(latestUnreadMessage.timestamp);
                 const now = new Date();
+                
+                console.log('🔍 Message time parsed:', messageTime);
+                console.log('🔍 Current time:', now);
+                console.log('🔍 Message time valid?', !isNaN(messageTime.getTime()));
+                console.log('🔍 Current time valid?', !isNaN(now.getTime()));
+                
                 const hoursDiff = (now - messageTime) / (1000 * 60 * 60);
+                console.log('🔍 Time calculation:', `(${now.getTime()} - ${messageTime.getTime()}) / ${1000 * 60 * 60} = ${hoursDiff}`);
                 
                 console.log('🔍 Son UNREAD admin mesajı:', latestUnreadMessage.message);
                 console.log('🔍 Mesaj zamanı:', latestUnreadMessage.timestamp);
