@@ -602,62 +602,28 @@ class ChatSystem {
         const adminMessages = chatMessages.filter(msg => msg.sender === 'admin');
         
         console.log('🔍 Toplam admin mesajı:', adminMessages.length);
-        console.log('🔍 Admin mesajları detay:', adminMessages);
         
         if (adminMessages.length > 0) {
-            // UNREAD olan admin mesajlarını bul!
-            console.log('🔍 Admin mesajları filtreleniyor...');
-            adminMessages.forEach((msg, index) => {
-                console.log(`  [${index}] userStatus: "${msg.userStatus}", sender: "${msg.sender}", message: "${msg.message}"`);
-            });
-            
-            const unreadAdminMessages = adminMessages.filter(msg => {
-                const isUnread = msg.userStatus === 'unread' || !msg.userStatus;
-                console.log(`🔍 Mesaj "${msg.message}": userStatus="${msg.userStatus}", isUnread=${isUnread}`);
-                return isUnread;
-            });
+            // UNREAD olan admin mesajlarını bul - BASİT KONTROL!
+            const unreadAdminMessages = adminMessages.filter(msg => msg.userStatus === 'unread');
             
             console.log('🔔 UNREAD admin mesajları:', unreadAdminMessages.length);
-            console.log('🔔 UNREAD mesaj detayları:', unreadAdminMessages);
             
             if (unreadAdminMessages.length > 0) {
-                // En son unread mesaj son 48 saat içinde mi?
-                const latestUnreadMessage = unreadAdminMessages[unreadAdminMessages.length - 1];
-                console.log('🔍 Latest unread message:', latestUnreadMessage);
-                console.log('🔍 Message timestamp raw:', latestUnreadMessage.timestamp);
+                console.log('🔔 UNREAD MESAJ VAR - BİLDİRİM GÖSTERİLİYOR!');
+                console.log('🔔 Unread mesaj:', unreadAdminMessages[unreadAdminMessages.length - 1].message);
                 
-                const messageTime = new Date(latestUnreadMessage.timestamp);
-                const now = new Date();
-                
-                console.log('🔍 Message time parsed:', messageTime);
-                console.log('🔍 Current time:', now);
-                console.log('🔍 Message time valid?', !isNaN(messageTime.getTime()));
-                console.log('🔍 Current time valid?', !isNaN(now.getTime()));
-                
-                const hoursDiff = (now - messageTime) / (1000 * 60 * 60);
-                console.log('🔍 Time calculation:', `(${now.getTime()} - ${messageTime.getTime()}) / ${1000 * 60 * 60} = ${hoursDiff}`);
-                
-                console.log('🔍 Son UNREAD admin mesajı:', latestUnreadMessage.message);
-                console.log('🔍 Mesaj zamanı:', latestUnreadMessage.timestamp);
-                console.log('🔍 Şu anki zaman:', now.toISOString());
-                console.log('🔍 Saat farkı:', hoursDiff, 'saat');
-                console.log('🔍 userStatus:', latestUnreadMessage.userStatus);
-                
-                if (hoursDiff < 48) { // 48 saat içindeki unread mesajlar
-                    console.log('🔔 UNREAD ADMIN MESAJI BULUNDU - bildirim gösteriliyor!');
-                    this.hasUnreadMessages = true;
-                    this.startChatButtonAnimation();
-                    this.showUnreadMessageBadge();
-                    this.showChatNotification();
-                    this.playEnhancedNotificationSound();
-                } else {
-                    console.log('⏰ Unread admin mesajı 48 saatten eski, bildirim gösterilmiyor');
-                }
+                // UNREAD mesaj varsa KESINLIKLE bildirim göster!
+                this.hasUnreadMessages = true;
+                this.startChatButtonAnimation();
+                this.showUnreadMessageBadge();
+                this.showChatNotification();
+                this.playEnhancedNotificationSound();
             } else {
-                console.log('✅ Tüm admin mesajları okunmuş, bildirim yok');
+                console.log('✅ Tüm admin mesajları read, bildirim yok');
             }
         } else {
-            console.log('✅ Admin mesajı yok, offline bildirim yok');
+            console.log('✅ Admin mesajı yok');
         }
     }
 
