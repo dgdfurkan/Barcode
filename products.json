@@ -180061,6 +180061,82 @@
             "shelf": "-",
             "price": null,
             "stock": null
+        },
+        {
+            "id": "67e0f9b6a2cbd67f25865491",
+            "name": "Züber Peanutzilla Kakaolu Fıstık Kreması (315 g)",
+            "category": null,
+            "brand": null,
+            "description": "Züber Peanutzilla Kakaolu Fıstık Kreması (315 g)",
+            "image": "https://cdn-image.getir.com/market/product/c5efa647-9b29-47b6-a376-2423ffaee8e3.png",
+            "barcodes": [
+                {
+                    "code": "8681630410159",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "68025c3361bfd4e5b66b3ed0",
+            "name": "Dijital Termometre Testo 104-IR (TR Ekipman)",
+            "category": null,
+            "brand": null,
+            "description": "Dijital Termometre Testo 104-IR (TR Ekipman)",
+            "image": "https://cdn-image.getir.com/market/product/d0897c90-c6b3-4585-9e7e-c6e5957a0c5e.png",
+            "barcodes": [
+                {
+                    "code": "4029547011870",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "681c86b6d1ef9d17339254b1",
+            "name": "Wefood İnce Öğütülmüş Glutensiz Yulaf Ezmesi (300 g)",
+            "category": null,
+            "brand": null,
+            "description": "Wefood İnce Öğütülmüş Glutensiz Yulaf Ezmesi (300 g)",
+            "image": "https://cdn-image.getir.com/market/product/a5e46d9b-b5a0-4043-b619-51a4d91772f5.jpg",
+            "barcodes": [
+                {
+                    "code": "8683347034826",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "6835749ee4e2355cef28a8cd",
+            "name": "Perwoll Açık Renkliler Sıvı (1485 ml)",
+            "category": null,
+            "brand": null,
+            "description": "Perwoll Açık Renkliler Sıvı (1485 ml)",
+            "image": "https://cdn-image.getir.com/market/product/60cf70a7-41d6-456b-8762-7fa3b6f6933f.jpg",
+            "barcodes": [
+                {
+                    "code": "9000101834659",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
         }
     ]
 }
