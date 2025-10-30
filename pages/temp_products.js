@@ -178788,6 +178788,215 @@ const PRODUCTS_DATA = {
             "shelf": "-",
             "price": null,
             "stock": null
+        },
+        {
+            "id": "68b84fd3ce5c12b721d8e7f6",
+            "name": "Peros Renk Uzmanı Renkliler Sıvı Bakım Deterajanı (2 L)",
+            "category": null,
+            "brand": null,
+            "description": "Peros Renk Uzmanı Renkliler Sıvı Bakım Deterajanı (2 L)",
+            "image": "https://cdn-image.getir.com/market/product/5b83faca-f837-4b90-92e8-bee792dcd5a5.jpg",
+            "barcodes": [
+                {
+                    "code": "8697713839687",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "68b9a72235120f49a5ab0d83",
+            "name": "Sizzle-Pop Dancing Friends Ananas Mango Yaban Mersini (200 ml)",
+            "category": null,
+            "brand": null,
+            "description": "Sizzle-Pop Dancing Friends Ananas Mango Yaban Mersini (200 ml)",
+            "image": "https://cdn-image.getir.com/market/product/7e16d2f0-470e-492a-8418-9910ea1e13df.png",
+            "barcodes": [
+                {
+                    "code": "8684808280011",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "68b9a72f30bb6ebd7c7e6a41",
+            "name": "Sizzle-Pop Stay Funny Havuç Kırmızı Elma Çilek (200 ml)",
+            "category": null,
+            "brand": null,
+            "description": "Sizzle-Pop Stay Funny Havuç Kırmızı Elma Çilek (200 ml)",
+            "image": "https://cdn-image.getir.com/market/product/5c54bc6c-3df1-4751-9ae6-dec76194b59c.png",
+            "barcodes": [
+                {
+                    "code": "8684808280028",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "68b9a98956e641b8a3a23171",
+            "name": "Dimes Cool Sour Mix (310 ml)",
+            "category": null,
+            "brand": null,
+            "description": "Dimes Cool Sour Mix (310 ml)",
+            "image": "https://cdn-image.getir.com/market/product/41236a5c-12d3-4c12-bd1f-ee0b95f2127a.jpg",
+            "barcodes": [
+                {
+                    "code": "8690558041475",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "68baadd6ce5c12b721db8ce7",
+            "name": "Sek Yuzu & Çarkıfelekli İçilebilir Yoğurt (250 ml)",
+            "category": null,
+            "brand": null,
+            "description": "Sek Yuzu & Çarkıfelekli İçilebilir Yoğurt (250 ml)",
+            "image": "https://cdn-image.getir.com/market/product/001fe47a-acc2-46f6-9599-71696df62110.png",
+            "barcodes": [
+                {
+                    "code": "8692095346853",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "68baade62f5374d164d15301",
+            "name": "Sek Yaban Mersini & Vanilya İçilebilir Yoğurt (250 ml)",
+            "category": null,
+            "brand": null,
+            "description": "Sek Yaban Mersini & Vanilya İçilebilir Yoğurt (250 ml)",
+            "image": "https://cdn-image.getir.com/market/product/5a60a30b-b8ec-4d58-adf7-5928364ca6f1.png",
+            "barcodes": [
+                {
+                    "code": "8692095346860",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "68c00b1894728f1f88a048ff",
+            "name": "Yumoş Sıvı Bakım Deterjanı Canlandırıcı Terapi Renkliler (2500 ml)",
+            "category": null,
+            "brand": null,
+            "description": "Yumoş Sıvı Bakım Deterjanı Canlandırıcı Terapi Renkliler (2500 ml)",
+            "image": "https://cdn-image.getir.com/market/product/316d40ee-cf51-48cb-89b2-fe74cb6cf7ee.jpg",
+            "barcodes": [
+                {
+                    "code": "8683130123652",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "68c3db3b468d5c29f60f8550",
+            "name": "Knorr Ranch Mac & Cheese (212 g)",
+            "category": null,
+            "brand": null,
+            "description": "Knorr Ranch Mac & Cheese (212 g)",
+            "image": "https://cdn-image.getir.com/market/product/2ab7063d-84b9-416d-a98e-b58b98aca2d1.jpg",
+            "barcodes": [
+                {
+                    "code": "8683130126691",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "68c41f3314a2782bb69e8c01",
+            "name": "Eker Kaşar Peyniri (600 g)",
+            "category": null,
+            "brand": null,
+            "description": "Eker Kaşar Peyniri (600 g)",
+            "image": "https://cdn-image.getir.com/market/product/7276ab43-a02b-47be-879d-e0280543022c.jpg",
+            "barcodes": [
+                {
+                    "code": "8691316522601",
+                    "type": "EAN-13",
+                    "size": "",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "68ef9ae720844ca7c97f7339",
+            "name": "Pepsi Kola Kutu (4 x 330 ml)",
+            "category": "İçecekler",
+            "brand": "Pepsi",
+            "description": "Pepsi Kola Kutu (4 x 330 ml)",
+            "image": "https://cdn-image.getir.com/market/product/d8cabec2-97bb-4447-aef0-af79f85e14d4.jpg",
+            "barcodes": [
+                {
+                    "code": "8690574116980",
+                    "type": "EAN-13",
+                    "size": "4 x 330 ml",
+                    "variant": "Standart"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
+        },
+        {
+            "id": "68ef9af48a657b67727e3e0e",
+            "name": "Pepsi Zero Sugar Kutu Kola (4 x 330 ml)",
+            "category": "İçecekler",
+            "brand": "Pepsi",
+            "description": "Pepsi Zero Sugar Kutu Kola (4 x 330 ml)",
+            "image": "https://cdn-image.getir.com/market/product/e9629bf0-cb48-40e9-8e24-d350a52490c6.jpg",
+            "barcodes": [
+                {
+                    "code": "8690574117024",
+                    "type": "EAN-13",
+                    "size": "4 x 330 ml",
+                    "variant": "Zero Sugar"
+                }
+            ],
+            "shelf": "-",
+            "price": null,
+            "stock": null
         }
     ]
 };
