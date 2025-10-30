@@ -199,6 +199,11 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
                     </div>
+                    <button id="pasteFromClipboard" title="Panodan yapıştır" class="absolute right-12 top-1/2 transform -translate-y-1/2 text-secondary-400 hover:text-text-primary transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3h8v4m-9 4h10M7 15h10M7 19h10"/>
+                        </svg>
+                    </button>
                     <button id="clearSearch" class="absolute right-4 top-1/2 transform -translate-y-1/2 text-secondary-400 hover:text-text-primary transition-colors hidden">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -489,6 +494,10 @@
                         <input type="checkbox" id="showDuplicates" class="w-4 h-4 text-accent bg-gray-100 border-gray-300 rounded focus:ring-accent focus:ring-2">
                         <span class="text-sm text-text-secondary">Aynı isim ve barkoda sahip ürünleri göster</span>
                     </label>
+                    <label class="flex items-center space-x-3 cursor-pointer mt-2">
+                        <input type="checkbox" id="autoPasteEnabled" class="w-4 h-4 text-accent bg-gray-100 border-gray-300 rounded focus:ring-accent focus:ring-2">
+                        <span class="text-sm text-text-secondary">Otomatik yapıştırmayı aç (panodan arama kutusuna)</span>
+                    </label>
                 </div>
                 
                 <div class="bg-primary-50 rounded-lg p-4">
@@ -579,6 +588,8 @@
         // DOM elements
         const searchInput = document.getElementById('searchInput');
         const clearSearch = document.getElementById('clearSearch');
+        const pasteFromClipboardBtn = document.getElementById('pasteFromClipboard');
+        const autoPasteEnabledEl = document.getElementById('autoPasteEnabled');
         const loadingState = document.getElementById('loadingState');
         const resultsSection = document.getElementById('resultsSection');
         const noResultsState = document.getElementById('noResultsState');
@@ -587,6 +598,77 @@
         const mobileResults = document.getElementById('mobileResults');
         const resultCount = document.getElementById('resultCount');
         const exportResults = document.getElementById('exportResults');
+
+        // ----- Otomatik Yapıştırma Ayarı -----
+        const AUTO_PASTE_KEY = 'autoPasteEnabled';
+        function isAutoPasteEnabled() {
+            try {
+                return localStorage.getItem(AUTO_PASTE_KEY) === '1';
+            } catch (e) {
+                return false;
+            }
+        }
+        function setAutoPasteEnabled(value) {
+            try {
+                localStorage.setItem(AUTO_PASTE_KEY, value ? '1' : '0');
+            } catch (e) {}
+        }
+        // UI başlangıç durumunu ayarla
+        if (autoPasteEnabledEl) {
+            autoPasteEnabledEl.checked = isAutoPasteEnabled();
+            autoPasteEnabledEl.addEventListener('change', () => {
+                setAutoPasteEnabled(autoPasteEnabledEl.checked);
+            });
+        }
+
+        async function pasteFromClipboardAndSearch() {
+            try {
+                if (!navigator.clipboard || !navigator.clipboard.readText) return;
+                const text = await navigator.clipboard.readText();
+                if (!text) return;
+                // Varsa tablo verisini isimlere indirgeme
+                const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
+                searchInput.value = parsed;
+                // input event tetikle
+                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            } catch (err) {
+                console.warn('Panodan okuma başarısız:', err);
+            }
+        }
+
+        // Yapıştır butonu
+        if (pasteFromClipboardBtn) {
+            pasteFromClipboardBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                pasteFromClipboardAndSearch();
+            });
+        }
+
+        // Otomatik yapıştırma: sekmeden bu sekmeye geçişte (focus) veya sayfa gösterimde (pageshow) tek sefer dene
+        // Birçok tarayıcıda panodan okuma için kullanıcı etkileşimi gerekir; sekme odaklanması genelde yeterlidir.
+        let autoPasteDone = false;
+        let autoPasteTimer = null;
+
+        async function tryAutoPasteOnce() {
+            if (autoPasteDone || !isAutoPasteEnabled()) return;
+            try {
+                await pasteFromClipboardAndSearch();
+                autoPasteDone = true;
+            } catch (e) { /* ignore */ }
+        }
+
+        window.addEventListener('focus', () => {
+            if (autoPasteTimer) clearTimeout(autoPasteTimer);
+            autoPasteTimer = setTimeout(tryAutoPasteOnce, 50);
+        });
+
+        window.addEventListener('pageshow', (ev) => {
+            // BFCache geri dönüşlerinde de görünür olduğunda dene
+            if (document.visibilityState === 'visible') {
+                if (autoPasteTimer) clearTimeout(autoPasteTimer);
+                autoPasteTimer = setTimeout(tryAutoPasteOnce, 50);
+            }
+        });
 
         // Code128 Character Map
         const CODE128_CHARSET = {
