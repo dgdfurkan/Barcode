@@ -644,29 +644,42 @@
             });
         }
 
-        // Otomatik yapıştırma: sekmeden bu sekmeye geçişte (focus) veya sayfa gösterimde (pageshow) tek sefer dene
-        // Birçok tarayıcıda panodan okuma için kullanıcı etkileşimi gerekir; sekme odaklanması genelde yeterlidir.
-        let autoPasteDone = false;
+        // Otomatik yapıştırma: her odaklanmada panodan oku; aynı içerikse tekrarlama
         let autoPasteTimer = null;
+        let lastClipboardText = '';
 
-        async function tryAutoPasteOnce() {
-            if (autoPasteDone || !isAutoPasteEnabled()) return;
+        async function tryAutoPasteOnFocus() {
+            if (!isAutoPasteEnabled()) return;
             try {
-                await pasteFromClipboardAndSearch();
-                autoPasteDone = true;
+                if (!navigator.clipboard || !navigator.clipboard.readText) return;
+                const text = await navigator.clipboard.readText();
+                if (!text) return;
+                if (text === lastClipboardText && searchInput && searchInput.value === text) return;
+                lastClipboardText = text;
+                const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
+                if (parsed && parsed !== searchInput.value) {
+                    searchInput.value = parsed;
+                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                }
             } catch (e) { /* ignore */ }
         }
 
         window.addEventListener('focus', () => {
             if (autoPasteTimer) clearTimeout(autoPasteTimer);
-            autoPasteTimer = setTimeout(tryAutoPasteOnce, 50);
+            autoPasteTimer = setTimeout(tryAutoPasteOnFocus, 80);
         });
 
-        window.addEventListener('pageshow', (ev) => {
-            // BFCache geri dönüşlerinde de görünür olduğunda dene
+        window.addEventListener('pageshow', () => {
             if (document.visibilityState === 'visible') {
                 if (autoPasteTimer) clearTimeout(autoPasteTimer);
-                autoPasteTimer = setTimeout(tryAutoPasteOnce, 50);
+                autoPasteTimer = setTimeout(tryAutoPasteOnFocus, 80);
+            }
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                if (autoPasteTimer) clearTimeout(autoPasteTimer);
+                autoPasteTimer = setTimeout(tryAutoPasteOnFocus, 120);
             }
         });
 
@@ -914,8 +927,43 @@
                     return data.products || [];
                 }
                 
-                console.log('Loaded user products:', userProducts.length);
-                return userProducts;
+                // Always merge with embedded PRODUCTS_DATA to ensure latest catalog is available
+                let mergedProducts = Array.isArray(userProducts) ? [...userProducts] : [];
+                try {
+                    if (typeof PRODUCTS_DATA !== 'undefined' && Array.isArray(PRODUCTS_DATA.products)) {
+                        const haveBarcode = new Set();
+                        for (const p of mergedProducts) {
+                            if (Array.isArray(p.barcodes)) {
+                                for (const b of p.barcodes) {
+                                    if (b && b.code) haveBarcode.add(String(b.code));
+                                }
+                            }
+                        }
+                        for (const p of PRODUCTS_DATA.products) {
+                            let exists = false;
+                            if (Array.isArray(p.barcodes)) {
+                                for (const b of p.barcodes) {
+                                    if (b && b.code && haveBarcode.has(String(b.code))) {
+                                        exists = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!exists) {
+                                mergedProducts.push({ ...p, isDefault: true });
+                                if (Array.isArray(p.barcodes)) {
+                                    for (const b of p.barcodes) {
+                                        if (b && b.code) haveBarcode.add(String(b.code));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Merge with PRODUCTS_DATA failed:', e);
+                }
+                console.log('Loaded user products (merged):', mergedProducts.length);
+                return mergedProducts;
             } catch (error) {
                 console.error('Error loading products:', error);
                 // Fallback to mock data if all methods fail
