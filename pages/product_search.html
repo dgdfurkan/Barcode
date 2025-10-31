@@ -1743,14 +1743,21 @@
             return productNames.join(', ');
         }
         
+        // Global map to store product names -> image URLs (for premium image search)
+        let productImageMap = new Map();
+        
         // Parse HTML table and extract product names with image URLs (premium feature)
+        // Returns only product names for display, but stores image URLs in global map
         function parseHtmlTableWithImages(htmlContent) {
             try {
+                // Clear previous map
+                productImageMap.clear();
+                
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(htmlContent, 'text/html');
                 const rows = doc.querySelectorAll('tbody tr, tr');
                 
-                const searchTerms = [];
+                const productNames = [];
                 
                 rows.forEach((row) => {
                     try {
@@ -1795,23 +1802,25 @@
                             productName = productName.replace(/\s+/g, ' ').trim();
                         }
                         
-                        // If we have both image and product name, create combined search term
-                        if (imageUrl && productName) {
-                            // Format: "productName|imageUrl" - we'll parse this in search
-                            searchTerms.push(`${productName}|${imageUrl}`);
-                        } else if (productName) {
-                            // Just product name if no image
-                            searchTerms.push(productName);
+                        // Store mapping: product name -> image URL (for search, but hide from UI)
+                        if (productName) {
+                            productNames.push(productName);
+                            // If image URL exists, store it for search
+                            if (imageUrl) {
+                                productImageMap.set(productName, imageUrl);
+                            }
                         } else if (imageUrl) {
-                            // Just image URL if no product name
-                            searchTerms.push(imageUrl);
+                            // If only image URL exists, use it as product name fallback
+                            productNames.push(imageUrl);
+                            productImageMap.set(imageUrl, imageUrl);
                         }
                     } catch (error) {
                         console.error('Error parsing row:', error);
                     }
                 });
                 
-                return searchTerms.join(', ');
+                // Return only product names (no image URLs visible in search box)
+                return productNames.join(', ');
             } catch (error) {
                 console.error('Error parsing HTML table:', error);
                 // Fallback to text parsing
@@ -1851,6 +1860,10 @@
                     .map(term => term.trim())
                     .filter(term => term.length > 0);
             }
+            
+            // Store image URLs for premium search (if available)
+            // productImageMap is populated by parseHtmlTableWithImages
+            // We'll use it in performOptimizedSearch to search by image URLs too
 
             // Use requestAnimationFrame to prevent UI blocking
             requestAnimationFrame(() => {
@@ -1981,8 +1994,36 @@
                                 }
                             }
                         } else {
-                            // For regular table data, use exact product name matching
-                            if (product.name && isExactProductMatch(product.name, searchTerm.toLowerCase())) {
+                            // For regular table data, check both product name AND image URL (if available)
+                            let nameMatch = false;
+                            let imageMatch = false;
+                            
+                            // Check product name match
+                            if (product.name) {
+                                nameMatch = isExactProductMatch(product.name, searchTerm.toLowerCase());
+                            }
+                            
+                            // Check image URL match using productImageMap (premium feature, hidden from UI)
+                            if (hasImageSearch && productImageMap.has(searchTerm) && product.image) {
+                                const mappedImageUrl = productImageMap.get(searchTerm);
+                                const productImageUrl = product.image.toLowerCase().trim();
+                                const searchImageUrl = mappedImageUrl.toLowerCase().trim();
+                                
+                                // Exact match
+                                if (productImageUrl === searchImageUrl) {
+                                    imageMatch = true;
+                                } else {
+                                    // Try to match by filename (last part of URL)
+                                    const productFileName = productImageUrl.split('/').pop().split('?')[0];
+                                    const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
+                                    if (productFileName === searchFileName && productFileName.length > 0) {
+                                        imageMatch = true;
+                                    }
+                                }
+                            }
+                            
+                            // Match if either name or image matches (or both)
+                            if (nameMatch || imageMatch) {
                                 found = true;
                                 break;
                             }
@@ -2145,10 +2186,36 @@
                                 }
                             }
                         } else {
-                            // For regular table data, use exact product name matching
-                            if (product.name && isExactProductMatch(product.name, searchTerm.toLowerCase())) {
-                                found = true;
+                            // For regular table data, check both product name AND image URL (if available)
+                            let nameMatch = false;
+                            let imageMatch = false;
+                            
+                            // Check product name match
+                            if (product.name) {
+                                nameMatch = isExactProductMatch(product.name, searchTerm.toLowerCase());
                             }
+                            
+                            // Check image URL match using productImageMap (premium feature, hidden from UI)
+                            if (hasImageSearch && productImageMap.has(searchTerm) && product.image) {
+                                const mappedImageUrl = productImageMap.get(searchTerm);
+                                const productImageUrl = product.image.toLowerCase().trim();
+                                const searchImageUrl = mappedImageUrl.toLowerCase().trim();
+                                
+                                // Exact match
+                                if (productImageUrl === searchImageUrl) {
+                                    imageMatch = true;
+                                } else {
+                                    // Try to match by filename (last part of URL)
+                                    const productFileName = productImageUrl.split('/').pop().split('?')[0];
+                                    const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
+                                    if (productFileName === searchFileName && productFileName.length > 0) {
+                                        imageMatch = true;
+                                    }
+                                }
+                            }
+                            
+                            // Match if either name or image matches (or both)
+                            found = nameMatch || imageMatch;
                         }
                     } else {
                         // For normal search, check ALL fields for ALL tokens
