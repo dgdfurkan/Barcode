@@ -624,14 +624,22 @@
         }
         
         function isAutoPasteEnabled() {
-            // Quick check from cache (for immediate UI response)
-            if (window.premiumFeatures && window.premiumFeatures.checkPremiumFeature('autoPaste')) {
-                return true;
+            // Default is false - user must explicitly enable it
+            // First check if user has premium feature (if no premium, always return false)
+            if (!window.premiumFeatures || !window.premiumFeatures.checkPremiumFeature('autoPaste')) {
+                return false; // No premium = no access
             }
             
-            // Fallback to local storage
+            // If premium exists, check user's preference from localStorage
+            // Default to false if not set (user must enable it manually)
             try {
-                return localStorage.getItem(AUTO_PASTE_KEY) === '1';
+                const savedValue = localStorage.getItem(AUTO_PASTE_KEY);
+                // If nothing saved, default to false
+                if (savedValue === null) {
+                    return false;
+                }
+                // Return saved preference (true if '1', false otherwise)
+                return savedValue === '1';
             } catch (e) {
                 return false;
             }
@@ -654,11 +662,12 @@
                 // Check if user has premium feature
                 const hasPremium = await checkAutoPastePremium();
                 
-                // Update UI checkbox state
-                if (autoPasteEnabledEl) {
-                    // Load saved preference from localStorage (if premium user has enabled it before)
-                    const savedPreference = isAutoPasteEnabled();
-                    autoPasteEnabledEl.checked = hasPremium && savedPreference;
+                    // Update UI checkbox state
+                    if (autoPasteEnabledEl) {
+                        // Load saved preference from localStorage
+                        // Default is false (user must enable it manually)
+                        const savedPreference = isAutoPasteEnabled();
+                        autoPasteEnabledEl.checked = savedPreference; // Show user's actual preference
                     
                     // Enable/disable checkbox based on premium status
                     if (!hasPremium) {
@@ -743,6 +752,7 @@
         // Başka sayfadan kopyalayıp bu sayfaya geri gelindiğinde yapıştırır
         let autoPasteDebounceTimer = null;
         let lastPastTime = 0;
+        let lastClipboardText = ''; // Track last pasted clipboard text
         const AUTO_PASTE_DEBOUNCE_MS = 100; // Minimum 100ms between attempts
         const MIN_TIME_BETWEEN_PASTES_MS = 50; // Minimum 50ms between actual pastes
 
@@ -760,10 +770,10 @@
                 return;
             }
             
-            // Check if user has enabled auto-paste in settings
+            // Check if user has enabled auto-paste in settings (CRITICAL: user preference check)
             const isEnabled = isAutoPasteEnabled();
             if (!isEnabled) {
-                console.debug('Auto-paste: Feature disabled in settings');
+                console.debug('Auto-paste: Feature disabled in settings by user');
                 return;
             }
             
@@ -780,15 +790,26 @@
                     return;
                 }
                 
+                // Skip if same text was already pasted (avoid duplicate pastes)
+                if (text === lastClipboardText) {
+                    console.debug('Auto-paste: Same clipboard text already pasted, skipping');
+                    return;
+                }
+                
                 // Parse table data if needed
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
                 
                 if (parsed && parsed.trim() !== '') {
-                    // Always paste - user wants it every time they return to page
-                    searchInput.value = parsed;
-                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    lastPastTime = Date.now();
-                    console.log('✅ Auto-paste: Text pasted successfully:', parsed.substring(0, 50));
+                    // Only paste if it's different from what we last pasted
+                    if (parsed !== lastClipboardText) {
+                        searchInput.value = parsed;
+                        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        lastClipboardText = text; // Remember the raw clipboard text
+                        lastPastTime = Date.now();
+                        console.log('✅ Auto-paste: Text pasted successfully:', parsed.substring(0, 50));
+                    } else {
+                        console.debug('Auto-paste: Parsed text same as last, skipping');
+                    }
                 }
             } catch (e) { 
                 // Permission denied or other clipboard errors - ignore silently
@@ -807,8 +828,14 @@
         }
 
         // Track page visibility - trigger auto-paste when page becomes visible
+        // Reset clipboard tracking when page becomes hidden (so new content can be pasted when returning)
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
+            if (document.visibilityState === 'hidden') {
+                // When page becomes hidden, reset clipboard tracking
+                // This ensures next time they come back, new clipboard content will be pasted
+                console.debug('📄 Page hidden - will check for new clipboard content on return');
+                lastClipboardText = ''; // Reset so new content can be detected
+            } else if (document.visibilityState === 'visible') {
                 console.debug('📄 Page became visible - attempting auto-paste');
                 debouncedAutoPaste();
             }
@@ -816,6 +843,11 @@
 
         // Trigger on pageshow (when page is shown - includes initial load, back/forward, returning from another tab/page)
         window.addEventListener('pageshow', (event) => {
+            // Reset clipboard tracking if page was restored from cache
+            if (event.persisted) {
+                console.debug('📄 Page restored from cache - resetting clipboard tracking');
+                lastClipboardText = ''; // Reset so new content can be detected
+            }
             // Always try auto-paste when page is shown
             console.debug('📄 Page shown (pageshow) - attempting auto-paste');
             debouncedAutoPaste();
