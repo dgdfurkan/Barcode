@@ -539,10 +539,8 @@ class NotificationSystem {
         closeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             notification.remove();
-            // Reload page after closing notification
-            setTimeout(() => {
-                window.location.reload();
-            }, 500);
+            // Reload current page (F5 equivalent)
+            this.reloadCurrentPage();
         });
         notification.appendChild(closeBtn);
 
@@ -553,10 +551,17 @@ class NotificationSystem {
                 notification.style.transition = 'opacity 0.5s';
                 setTimeout(() => {
                     notification.remove();
-                    window.location.reload();
+                    this.reloadCurrentPage();
                 }, 500);
             }
         }, 3000);
+    }
+
+    // Reload current page (F5 equivalent)
+    reloadCurrentPage() {
+        console.log('🔄 Reloading current page:', window.location.href);
+        // Reload the current page - equivalent to F5
+        window.location.reload();
     }
 
     // No auto-reload needed - user controls through settings (except for disabled features)
