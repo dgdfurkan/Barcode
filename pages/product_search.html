@@ -479,98 +479,111 @@
         </div>
     </div>
     <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-surface rounded-xl border border-border shadow-lg p-6 max-w-md w-full mx-4">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-text-primary">Ayarlar</h3>
-                <button id="closeSettings" class="text-text-secondary hover:text-text-primary">
+        <div class="bg-surface rounded-xl border border-border shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between p-6 border-b border-border">
+                <h3 class="text-2xl font-bold text-text-primary">Ayarlar</h3>
+                <button id="closeSettings" class="text-text-secondary hover:text-text-primary transition-colors">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                 </button>
             </div>
             
-            <div class="space-y-4">
-                <!-- Premium Features Section -->
-                <div class="bg-gradient-to-br from-purple-50 via-purple-100 to-pink-50 rounded-xl p-5 border-2 border-purple-200 shadow-lg">
-                    <div class="flex items-center justify-between mb-4">
+            <div class="overflow-y-auto flex-1 p-6">
+                <!-- Premium Features Section - Compact Grid -->
+                <div class="bg-gradient-to-br from-purple-50 via-purple-100 to-pink-50 rounded-xl p-4 border-2 border-purple-200 shadow-lg mb-4">
+                    <div class="flex items-center justify-between mb-3">
                         <div class="flex items-center space-x-2">
-                            <span class="text-3xl">⭐</span>
-                            <h4 class="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Premium Özellikler</h4>
+                            <span class="text-2xl">⭐</span>
+                            <h4 class="text-lg font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Premium Özellikler</h4>
                         </div>
                         <span class="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full shadow-md">PREMIUM</span>
                     </div>
-                    <p class="text-sm text-gray-600 mb-4">İş verimliliğinizi artıracak özellikler</p>
-                    <div id="premiumFeaturesSettings" class="space-y-3">
+                    <p class="text-xs text-gray-600 mb-3">İş verimliliğinizi artıracak özellikler</p>
+                    <div id="premiumFeaturesSettings" class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <!-- Premium features will be loaded here -->
                     </div>
                 </div>
                 
-                <div class="bg-accent-50 rounded-lg p-4">
-                    <h4 class="font-medium text-accent mb-2">Arama Ayarları</h4>
-                    <label class="flex items-center space-x-3 cursor-pointer" id="autoPasteContainer">
-                        <input type="checkbox" id="autoPasteEnabled" class="w-4 h-4 text-accent bg-gray-100 border-gray-300 rounded focus:ring-accent focus:ring-2">
-                        <span class="text-sm text-text-secondary flex-1">Otomatik yapıştırmayı aç (panodan arama kutusuna)</span>
-                        <span id="autoPasteLockIcon" class="hidden text-gray-400">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                            </svg>
-                        </span>
-                    </label>
-                </div>
-                
-                <div class="bg-primary-50 rounded-lg p-4">
-                    <h4 class="font-medium text-primary mb-2">Veri Bilgileri</h4>
-                    <div class="text-sm text-text-secondary space-y-1">
-                        <p>Toplam ürün sayısı: <span id="totalProducts" class="font-medium">-</span></p>
-                        <p>Tekrar eden ürünler: <span id="duplicateProducts" class="font-medium">-</span></p>
-                        <p>Veri dosyası: <span class="font-mono text-xs">temp_products.js</span></p>
+                <!-- Other Settings - Compact -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-primary-50 rounded-lg p-3">
+                        <h4 class="font-medium text-primary text-sm mb-2">Veri Bilgileri</h4>
+                        <div class="text-xs text-text-secondary space-y-1">
+                            <p>Ürün: <span id="totalProducts" class="font-medium">-</span></p>
+                            <p>Tekrar: <span id="duplicateProducts" class="font-medium">-</span></p>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="bg-blue-50 rounded-lg p-4">
-                    <h4 class="font-medium text-blue-600 mb-3">Ürün Yönetimi</h4>
-                    <div class="space-y-3">
-                        <label class="flex items-center space-x-3 cursor-pointer">
-                            <input type="checkbox" id="showDefaultProducts" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2">
-                            <span class="text-sm text-text-secondary">Varsayılan ürünleri göster</span>
-                        </label>
-                        <div class="flex space-x-2">
-                            <button id="manageProductsBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded-lg text-sm">
-                                Ürünleri Yönet
+                    
+                    <div class="bg-blue-50 rounded-lg p-3">
+                        <h4 class="font-medium text-blue-600 text-sm mb-2">Ürün Yönetimi</h4>
+                        <div class="space-y-2">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="showDefaultProducts" class="w-3 h-3 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-1">
+                                <span class="text-xs text-text-secondary">Varsayılan ürünleri göster</span>
+                            </label>
+                            <div class="flex space-x-1">
+                                <button id="manageProductsBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-1.5 px-2 rounded text-xs">
+                                    Yönet
+                                </button>
+                                <button id="exportProductsBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 px-2 rounded text-xs">
+                                    Aktar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-50 rounded-lg p-3 md:col-span-2">
+                        <h4 class="font-medium text-green-700 text-sm mb-2">Veri Güncelleme</h4>
+                        <div class="flex flex-wrap gap-1">
+                            <button id="refreshData" class="btn-primary text-xs py-1.5 px-3">
+                                <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                                Yenile
                             </button>
-                            <button id="exportProductsBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-3 rounded-lg text-sm">
-                                Dışa Aktar
+                            <button id="analyzeDuplicates" class="btn-secondary text-xs py-1.5 px-3">
+                                <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                                </svg>
+                                Analiz
+                            </button>
+                            <button id="cleanDuplicates" class="btn-accent text-xs py-1.5 px-3">
+                                <svg class="w-3 h-3 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                                Temizle
                             </button>
                         </div>
-                        <button id="forceReloadDefaultsBtn" class="w-full bg-orange-600 hover:bg-orange-700 text-white py-2 px-3 rounded-lg text-sm">
-                            Varsayılan Ürünleri Yeniden Yükle
-                        </button>
                     </div>
                 </div>
-                
-                <div class="bg-green-50 rounded-lg p-4">
-                    <h4 class="font-medium text-green-700 mb-2">Veri Güncelleme</h4>
-                    <p class="text-sm text-green-600 mb-3">Ana products.json dosyasını güncellediyseniz:</p>
-                    <div class="flex space-x-2">
-                        <button id="refreshData" class="btn-primary text-sm">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                            </svg>
-                            Verileri Yenile
-                        </button>
-                        <button id="analyzeDuplicates" class="btn-secondary text-sm">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                            </svg>
-                            Analiz Et
-                        </button>
-                        <button id="cleanDuplicates" class="btn-accent text-sm">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                            Temizle
-                        </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Premium Feature Detail Modal -->
+    <div id="premiumFeatureDetailModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[60] hidden">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <span id="featureDetailEmoji" class="text-4xl">✨</span>
+                        <div>
+                            <h3 id="featureDetailName" class="text-2xl font-bold">Premium Özellik</h3>
+                            <p class="text-purple-100 text-sm mt-1">Detaylı bilgi</p>
+                        </div>
                     </div>
+                    <button id="closeFeatureDetailModal" class="text-white hover:text-purple-200 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-6 overflow-y-auto max-h-[60vh]">
+                <div id="featureDetailContent" class="space-y-4">
+                    <!-- Feature details will be loaded here -->
                 </div>
             </div>
         </div>
@@ -686,18 +699,10 @@
                         autoPasteEnabledEl.checked = savedPreference; // Show user's actual preference
                     
                     // Enable/disable checkbox based on premium status
-                    // Update lock icon visibility
-                    const lockIcon = document.getElementById('autoPasteLockIcon');
                     if (!hasPremium) {
                         autoPasteEnabledEl.disabled = true;
-                        if (lockIcon) {
-                            lockIcon.classList.remove('hidden');
-                        }
                     } else {
                         autoPasteEnabledEl.disabled = false;
-                        if (lockIcon) {
-                            lockIcon.classList.add('hidden');
-                        }
                     }
                     
                     // Add change listener - user can enable/disable if they have premium
@@ -3236,30 +3241,38 @@
                 }
 
                 const featureItem = document.createElement('div');
-                featureItem.className = `flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                featureItem.className = `flex items-center justify-between p-2 rounded-lg border transition-all cursor-pointer ${
                     hasPremium 
-                        ? 'bg-white border-purple-300 hover:border-purple-400 shadow-md' 
+                        ? 'bg-white border-purple-200 hover:border-purple-400 hover:shadow-md' 
                         : 'bg-gray-100 border-gray-300 opacity-75'
                 }`;
+                featureItem.setAttribute('data-feature-key', featureKey);
+                
+                // Lock icon SVG
+                const lockIcon = !hasPremium ? `
+                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                ` : '';
                 
                 featureItem.innerHTML = `
-                    <div class="flex items-center space-x-3 flex-1">
-                        <span class="text-2xl">${config.emoji}</span>
-                        <div class="flex-1">
-                            <div class="flex items-center space-x-2">
-                                <h5 class="font-semibold text-gray-900">${config.name}</h5>
-                                ${!hasPremium ? '<span class="px-2 py-0.5 bg-gray-300 text-gray-600 text-xs font-bold rounded">KİLİTLİ</span>' : ''}
+                    <div class="flex items-center space-x-2 flex-1 cursor-pointer" onclick="showPremiumFeatureDetail('${featureKey}')">
+                        <span class="text-lg">${config.emoji}</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center space-x-1">
+                                <h5 class="font-semibold text-gray-900 text-sm truncate">${config.name}</h5>
+                                ${lockIcon}
+                                ${!hasPremium ? '<span class="px-1.5 py-0.5 bg-gray-300 text-gray-600 text-[10px] font-bold rounded">KİLİTLİ</span>' : ''}
                             </div>
-                            <p class="text-xs text-gray-600 mt-1">${config.description}</p>
                         </div>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer ml-4 ${!hasPremium ? 'opacity-50 cursor-not-allowed' : ''}">
+                    <label class="relative inline-flex items-center cursor-pointer ml-2 flex-shrink-0 ${!hasPremium ? 'opacity-50 cursor-not-allowed' : ''}" onclick="event.stopPropagation();">
                         <input type="checkbox" 
                                data-feature="${featureKey}"
                                class="sr-only peer" 
                                ${isEnabled && hasPremium ? 'checked' : ''}
                                ${!hasPremium ? 'disabled' : ''}>
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${hasPremium ? 'peer-checked:bg-purple-600' : 'bg-gray-300'}"></div>
+                        <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${hasPremium ? 'peer-checked:bg-purple-600' : 'bg-gray-300'}"></div>
                     </label>
                 `;
 
@@ -3287,23 +3300,55 @@
             });
         }
 
-        // Update auto-paste lock icon
-        async function updateAutoPasteLockIcon() {
-            const lockIcon = document.getElementById('autoPasteLockIcon');
-            const checkbox = document.getElementById('autoPasteEnabled');
-            
-            if (!lockIcon || !checkbox) return;
+        // Show premium feature detail modal
+        function showPremiumFeatureDetail(featureKey) {
+            const config = PREMIUM_FEATURES_CONFIG[featureKey];
+            if (!config) return;
 
-            const hasPremium = await checkAutoPastePremium();
+            const hasPremium = window.premiumFeatures?.checkPremiumFeature(featureKey) || false;
             
-            if (hasPremium) {
-                lockIcon.classList.add('hidden');
-                checkbox.disabled = false;
-            } else {
-                lockIcon.classList.remove('hidden');
-                checkbox.disabled = true;
-                checkbox.checked = false;
-            }
+            // Update modal content
+            document.getElementById('featureDetailEmoji').textContent = config.emoji;
+            document.getElementById('featureDetailName').textContent = config.name;
+            
+            const detailContent = document.getElementById('featureDetailContent');
+            detailContent.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-2">
+                        ${hasPremium ? `
+                            <span class="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full">AKTİF</span>
+                        ` : `
+                            <span class="px-3 py-1 bg-gray-400 text-white text-xs font-bold rounded-full">KİLİTLİ</span>
+                        `}
+                        <span class="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full">PREMIUM</span>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Açıklama</h4>
+                        <p class="text-gray-600 text-sm">${config.description}</p>
+                    </div>
+                    
+                    ${hasPremium ? `
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <p class="text-green-800 text-sm font-medium">✓ Bu özelliğe erişiminiz var</p>
+                            <p class="text-green-600 text-xs mt-1">Ayarlarınızı yukarıdan yapabilirsiniz</p>
+                        </div>
+                    ` : `
+                        <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            <p class="text-gray-800 text-sm font-medium">🔒 Bu özellik premium üyeler için</p>
+                            <p class="text-gray-600 text-xs mt-1">Admin panelden bu özelliği aktifleştirmeniz gerekmektedir</p>
+                        </div>
+                    `}
+                </div>
+            `;
+            
+            // Show modal
+            document.getElementById('premiumFeatureDetailModal').classList.remove('hidden');
+        }
+
+        // Hide premium feature detail modal
+        function hidePremiumFeatureDetailModal() {
+            document.getElementById('premiumFeatureDetailModal').classList.add('hidden');
         }
 
         // Update settings modal info
@@ -3320,9 +3365,8 @@
                 document.getElementById('showDefaultProducts').checked = settings.showDefaultProducts;
             }
             
-            // Render premium features and update lock icons
+            // Render premium features
             renderPremiumFeatures();
-            updateAutoPasteLockIcon();
         }
 
         // Show product management modal
@@ -3780,6 +3824,14 @@
             // Settings button
             document.getElementById('settingsBtn').addEventListener('click', showSettings);
             document.getElementById('closeSettings').addEventListener('click', hideSettings);
+            
+            // Premium feature detail modal
+            document.getElementById('closeFeatureDetailModal').addEventListener('click', hidePremiumFeatureDetailModal);
+            document.getElementById('premiumFeatureDetailModal').addEventListener('click', (e) => {
+                if (e.target.id === 'premiumFeatureDetailModal') {
+                    hidePremiumFeatureDetailModal();
+                }
+            });
             document.getElementById('refreshData').addEventListener('click', refreshData);
             document.getElementById('analyzeDuplicates').addEventListener('click', () => {
                 const result = analyzeDuplicates();
