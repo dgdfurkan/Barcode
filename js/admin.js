@@ -2562,7 +2562,7 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
             }
         }
         
-        // Define available premium features
+        // Define available premium features (ORDERED - imageSearch is 4th)
         const availableFeatures = {
             'autoPaste': 'Otomatik Yapıştır',
             'keyboardShortcuts': 'Klavye Kısayolları',
@@ -2575,14 +2575,20 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
             'favorites': 'Favoriler'
         };
         
+        console.log('🖼️ Loading premium features, available:', Object.keys(availableFeatures));
+        console.log('🖼️ imageSearch in list:', 'imageSearch' in availableFeatures);
+        
         // Render premium features list
         const featuresList = document.getElementById('premiumFeaturesList');
         if (featuresList) {
             featuresList.innerHTML = '';
             
+            // Render each feature
             Object.keys(availableFeatures).forEach(featureKey => {
                 const featureEnabled = premiumFeatures[featureKey] === true;
                 const featureName = availableFeatures[featureKey];
+                
+                console.log(`🖼️ Rendering feature: ${featureKey} - ${featureName} (enabled: ${featureEnabled})`);
                 
                 const featureItem = document.createElement('div');
                 featureItem.className = 'flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200';
@@ -2602,6 +2608,10 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
                 
                 featuresList.appendChild(featureItem);
             });
+            
+            console.log('🖼️ Total features rendered:', featuresList.children.length);
+        } else {
+            console.error('🖼️ premiumFeaturesList element not found!');
         }
     } catch (error) {
         console.error('Error loading premium features:', error);
