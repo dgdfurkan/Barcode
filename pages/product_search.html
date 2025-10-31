@@ -490,15 +490,31 @@
             </div>
             
             <div class="space-y-4">
+                <!-- Premium Features Section -->
+                <div class="bg-gradient-to-br from-purple-50 via-purple-100 to-pink-50 rounded-xl p-5 border-2 border-purple-200 shadow-lg">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-3xl">⭐</span>
+                            <h4 class="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Premium Özellikler</h4>
+                        </div>
+                        <span class="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full shadow-md">PREMIUM</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-4">İş verimliliğinizi artıracak özellikler</p>
+                    <div id="premiumFeaturesSettings" class="space-y-3">
+                        <!-- Premium features will be loaded here -->
+                    </div>
+                </div>
+                
                 <div class="bg-accent-50 rounded-lg p-4">
                     <h4 class="font-medium text-accent mb-2">Arama Ayarları</h4>
-                    <label class="flex items-center space-x-3 cursor-pointer">
-                        <input type="checkbox" id="showDuplicates" class="w-4 h-4 text-accent bg-gray-100 border-gray-300 rounded focus:ring-accent focus:ring-2">
-                        <span class="text-sm text-text-secondary">Aynı isim ve barkoda sahip ürünleri göster</span>
-                    </label>
-                    <label class="flex items-center space-x-3 cursor-pointer mt-2">
+                    <label class="flex items-center space-x-3 cursor-pointer" id="autoPasteContainer">
                         <input type="checkbox" id="autoPasteEnabled" class="w-4 h-4 text-accent bg-gray-100 border-gray-300 rounded focus:ring-accent focus:ring-2">
-                        <span class="text-sm text-text-secondary">Otomatik yapıştırmayı aç (panodan arama kutusuna)</span>
+                        <span class="text-sm text-text-secondary flex-1">Otomatik yapıştırmayı aç (panodan arama kutusuna)</span>
+                        <span id="autoPasteLockIcon" class="hidden text-gray-400">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            </svg>
+                        </span>
                     </label>
                 </div>
                 
@@ -670,24 +686,17 @@
                         autoPasteEnabledEl.checked = savedPreference; // Show user's actual preference
                     
                     // Enable/disable checkbox based on premium status
+                    // Update lock icon visibility
+                    const lockIcon = document.getElementById('autoPasteLockIcon');
                     if (!hasPremium) {
                         autoPasteEnabledEl.disabled = true;
-                        // Add tooltip or visual indicator
-                        if (autoPasteEnabledEl.parentElement) {
-                            const label = autoPasteEnabledEl.parentElement.querySelector('label');
-                            if (label && !label.querySelector('.premium-badge')) {
-                                const badge = document.createElement('span');
-                                badge.className = 'premium-badge text-xs text-purple-600 ml-2';
-                                badge.textContent = '⭐ Premium';
-                                label.appendChild(badge);
-                            }
+                        if (lockIcon) {
+                            lockIcon.classList.remove('hidden');
                         }
                     } else {
                         autoPasteEnabledEl.disabled = false;
-                        // Remove premium badge if exists
-                        const badge = autoPasteEnabledEl.parentElement?.querySelector('.premium-badge');
-                        if (badge) {
-                            badge.remove();
+                        if (lockIcon) {
+                            lockIcon.classList.add('hidden');
                         }
                     }
                     
@@ -1917,20 +1926,17 @@
 
         // Advanced search algorithm with grouped results for comma-separated terms
         function performOptimizedSearch(products, searchTerms, isTableData = false) {
-            // Filter products based on duplicate setting
+            // Filter products - remove duplicates (keep first occurrence)
             let filteredProducts = products;
-            if (!showDuplicates) {
-                // Remove duplicates (keep first occurrence)
-                const seen = new Map();
-                filteredProducts = products.filter(product => {
-                    const key = `${product.name.toLowerCase()}_${product.barcodes[0]?.code || ''}`;
-                    if (seen.has(key)) {
-                        return false; // Skip duplicate
-                    }
-                    seen.set(key, product);
-                    return true;
-                });
-            }
+            const seen = new Map();
+            filteredProducts = products.filter(product => {
+                const key = `${product.name.toLowerCase()}_${product.barcodes[0]?.code || ''}`;
+                if (seen.has(key)) {
+                    return false; // Skip duplicate
+                }
+                seen.set(key, product);
+                return true;
+            });
             
             // If multiple search terms (comma-separated), group results by term
             if (searchTerms.length > 1) {
@@ -2994,8 +3000,7 @@
             return { duplicates, uniqueProducts };
         }
         
-        // Settings functionality
-        let showDuplicates = false;
+        // Settings functionality (removed showDuplicates - not useful)
         
         // Product addition functionality
         let parsedProducts = [];
@@ -3146,6 +3151,161 @@
             return duplicates;
         }
         
+        // Premium features configuration
+        const PREMIUM_FEATURES_CONFIG = {
+            'autoPaste': {
+                name: 'Otomatik Yapıştır',
+                description: 'Terminalden kopyalanan barkodları otomatik yapıştırır',
+                emoji: '📋',
+                storageKey: 'autoPasteEnabled'
+            },
+            'keyboardShortcuts': {
+                name: 'Klavye Kısayolları',
+                description: 'Klavye kısayolları ile hızlı erişim',
+                emoji: '⌨️',
+                storageKey: null
+            },
+            'bulkCopy': {
+                name: 'Toplu Kopyalama',
+                description: 'Birden fazla barkodu tek seferde kopyala',
+                emoji: '📦',
+                storageKey: null
+            },
+            'imageSearch': {
+                name: 'Görsel Link Arama',
+                description: 'HTML tablolardan görsel linklerini çıkarıp görsel linkine göre arama yap',
+                emoji: '🖼️',
+                storageKey: null
+            },
+            'darkMode': {
+                name: 'Karanlık Mod',
+                description: 'Göz yormayan karanlık tema',
+                emoji: '🌙',
+                storageKey: null
+            },
+            'offlineMode': {
+                name: 'Çevrimdışı Mod',
+                description: 'İnternet olmadan da çalışma',
+                emoji: '📡',
+                storageKey: null
+            },
+            'advancedFilters': {
+                name: 'Gelişmiş Filtreler',
+                description: 'Gelişmiş filtreleme seçenekleri',
+                emoji: '🔍',
+                storageKey: null
+            },
+            'unlimitedHistory': {
+                name: 'Sınırsız Geçmiş',
+                description: 'Sınırsız arama geçmişi',
+                emoji: '📜',
+                storageKey: null
+            },
+            'favorites': {
+                name: 'Favoriler',
+                description: 'Sık kullanılan ürünleri favorilere ekle',
+                emoji: '⭐',
+                storageKey: null
+            }
+        };
+
+        // Render premium features in settings
+        async function renderPremiumFeatures() {
+            const container = document.getElementById('premiumFeaturesSettings');
+            if (!container) return;
+
+            // Wait for premium features to be initialized
+            if (window.premiumFeatures && window.authUtils?.checkAuth()) {
+                await window.premiumFeatures.init();
+            }
+
+            container.innerHTML = '';
+
+            Object.keys(PREMIUM_FEATURES_CONFIG).forEach(featureKey => {
+                const config = PREMIUM_FEATURES_CONFIG[featureKey];
+                const hasPremium = window.premiumFeatures?.checkPremiumFeature(featureKey) || false;
+                
+                // Get user preference for this feature
+                let isEnabled = false;
+                if (config.storageKey) {
+                    try {
+                        isEnabled = localStorage.getItem(config.storageKey) === '1';
+                    } catch (e) {
+                        isEnabled = false;
+                    }
+                }
+
+                const featureItem = document.createElement('div');
+                featureItem.className = `flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                    hasPremium 
+                        ? 'bg-white border-purple-300 hover:border-purple-400 shadow-md' 
+                        : 'bg-gray-100 border-gray-300 opacity-75'
+                }`;
+                
+                featureItem.innerHTML = `
+                    <div class="flex items-center space-x-3 flex-1">
+                        <span class="text-2xl">${config.emoji}</span>
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2">
+                                <h5 class="font-semibold text-gray-900">${config.name}</h5>
+                                ${!hasPremium ? '<span class="px-2 py-0.5 bg-gray-300 text-gray-600 text-xs font-bold rounded">KİLİTLİ</span>' : ''}
+                            </div>
+                            <p class="text-xs text-gray-600 mt-1">${config.description}</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer ml-4 ${!hasPremium ? 'opacity-50 cursor-not-allowed' : ''}">
+                        <input type="checkbox" 
+                               data-feature="${featureKey}"
+                               class="sr-only peer" 
+                               ${isEnabled && hasPremium ? 'checked' : ''}
+                               ${!hasPremium ? 'disabled' : ''}>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all ${hasPremium ? 'peer-checked:bg-purple-600' : 'bg-gray-300'}"></div>
+                    </label>
+                `;
+
+                // Add change listener if premium
+                if (hasPremium && config.storageKey) {
+                    const checkbox = featureItem.querySelector('input[type="checkbox"]');
+                    checkbox.addEventListener('change', (e) => {
+                        const enabled = e.target.checked;
+                        try {
+                            localStorage.setItem(config.storageKey, enabled ? '1' : '0');
+                            if (featureKey === 'autoPaste') {
+                                // Update auto-paste checkbox in regular settings too
+                                const autoPasteCheckbox = document.getElementById('autoPasteEnabled');
+                                if (autoPasteCheckbox) {
+                                    autoPasteCheckbox.checked = enabled;
+                                }
+                            }
+                        } catch (err) {
+                            console.error('Error saving preference:', err);
+                        }
+                    });
+                }
+
+                container.appendChild(featureItem);
+            });
+        }
+
+        // Update auto-paste lock icon
+        async function updateAutoPasteLockIcon() {
+            const lockIcon = document.getElementById('autoPasteLockIcon');
+            const checkbox = document.getElementById('autoPasteEnabled');
+            
+            if (!lockIcon || !checkbox) return;
+
+            const hasPremium = await checkAutoPastePremium();
+            
+            if (hasPremium) {
+                lockIcon.classList.add('hidden');
+                checkbox.disabled = false;
+            } else {
+                lockIcon.classList.remove('hidden');
+                checkbox.disabled = true;
+                checkbox.checked = false;
+            }
+        }
+
         // Update settings modal info
         function updateSettingsInfo() {
             const totalProducts = products.length;
@@ -3159,6 +3319,10 @@
                 const settings = window.userDataManager.getSettings();
                 document.getElementById('showDefaultProducts').checked = settings.showDefaultProducts;
             }
+            
+            // Render premium features and update lock icons
+            renderPremiumFeatures();
+            updateAutoPasteLockIcon();
         }
 
         // Show product management modal
@@ -3624,12 +3788,7 @@
             document.getElementById('cleanDuplicates').addEventListener('click', cleanDuplicates);
             
             // Duplicate toggle
-            document.getElementById('showDuplicates').addEventListener('change', (e) => {
-                showDuplicates = e.target.checked;
-                if (searchInput.value.trim()) {
-                    performSearch(searchInput.value);
-                }
-            });
+            // Removed showDuplicates - feature not useful
             
             // Product management event listeners
             document.getElementById('manageProductsBtn').addEventListener('click', showProductManagement);
