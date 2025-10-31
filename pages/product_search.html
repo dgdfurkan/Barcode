@@ -1668,16 +1668,37 @@
             return matrix[str2.length][str1.length];
         }
 
-        // Parse table format data and extract product names
+        // Parse table format data and extract product names (and image URLs if premium)
         function parseTableData(input) {
             if (!input || typeof input !== 'string') return input;
             
             // Check if input contains table-like structure
             const hasTableHeaders = input.includes('#') && input.includes('Ürün Adı') && input.includes('Adet');
             const hasPreviewText = input.includes('Önizleme');
+            const hasHtmlTags = input.includes('<img') || input.includes('<table') || input.includes('<tr');
             
-            if (!hasTableHeaders && !hasPreviewText) {
+            // Check if input is a URL (image link)
+            const isImageUrl = /^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i.test(input.trim());
+            if (isImageUrl && typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch')) {
+                return input.trim(); // Return image URL as-is for premium users
+            }
+            
+            // If HTML table, parse it with image support (premium feature)
+            if (hasHtmlTags && typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch')) {
+                return parseHtmlTableWithImages(input);
+            }
+            
+            if (!hasTableHeaders && !hasPreviewText && !hasHtmlTags) {
                 return input; // Return original input if not table format
+            }
+            
+            // If HTML but no premium, fall back to text parsing
+            if (hasHtmlTags) {
+                // Try to extract text from HTML
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(input, 'text/html');
+                const textContent = doc.body.textContent || '';
+                input = textContent;
             }
             
             // Split by lines and process
@@ -1716,6 +1737,83 @@
             // Return comma-separated product names
             return productNames.join(', ');
         }
+        
+        // Parse HTML table and extract product names with image URLs (premium feature)
+        function parseHtmlTableWithImages(htmlContent) {
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlContent, 'text/html');
+                const rows = doc.querySelectorAll('tbody tr, tr');
+                
+                const searchTerms = [];
+                
+                rows.forEach((row) => {
+                    try {
+                        const cells = row.querySelectorAll('td');
+                        if (cells.length < 2) return;
+                        
+                        // Extract image URL from img tag (can be in any cell)
+                        let imageUrl = '';
+                        const imgTag = row.querySelector('img');
+                        if (imgTag && imgTag.src) {
+                            imageUrl = imgTag.src.trim();
+                        }
+                        
+                        // Extract product name from table cell
+                        // In the HTML structure, product name is usually in a cell with class "ant-table-cell"
+                        // and doesn't contain image, numbers, or special text
+                        let productName = '';
+                        const skipPatterns = ['Önizleme', 'eye', 'svg', '#', 'Ürün Adı', 'Adet'];
+                        
+                        for (let i = 0; i < cells.length; i++) {
+                            // Skip first cell if it contains image
+                            if (i === 0 && cells[i].querySelector('img')) {
+                                continue;
+                            }
+                            
+                            const cellText = cells[i].textContent.trim();
+                            
+                            // Check if this cell contains product name
+                            if (cellText && 
+                                cellText.length > 2 &&
+                                !cellText.match(/^\d+$/) && // Not just a number
+                                !skipPatterns.some(pattern => cellText.includes(pattern)) && // Not a header/special text
+                                !cellText.match(/^[#\s]*$/) && // Not just special characters
+                                cellText.length < 200) { // Reasonable length for product name
+                                productName = cellText;
+                                break;
+                            }
+                        }
+                        
+                        // Clean product name (remove extra whitespace)
+                        if (productName) {
+                            productName = productName.replace(/\s+/g, ' ').trim();
+                        }
+                        
+                        // If we have both image and product name, create combined search term
+                        if (imageUrl && productName) {
+                            // Format: "productName|imageUrl" - we'll parse this in search
+                            searchTerms.push(`${productName}|${imageUrl}`);
+                        } else if (productName) {
+                            // Just product name if no image
+                            searchTerms.push(productName);
+                        } else if (imageUrl) {
+                            // Just image URL if no product name
+                            searchTerms.push(imageUrl);
+                        }
+                    } catch (error) {
+                        console.error('Error parsing row:', error);
+                    }
+                });
+                
+                return searchTerms.join(', ');
+            } catch (error) {
+                console.error('Error parsing HTML table:', error);
+                // Fallback to text parsing
+                const textContent = htmlContent.replace(/<[^>]*>/g, '\n');
+                return parseTableData(textContent);
+            }
+        }
 
         // Optimized search functionality
         function performSearch(query) {
@@ -1736,14 +1834,14 @@
             let isTableData = false;
             if (parsedQuery !== query) {
                 // Table data was parsed, split by comma to get individual product names
-                searchTerms = parsedQuery.toLowerCase()
+                searchTerms = parsedQuery
                     .split(',')
                     .map(term => term.trim())
                     .filter(term => term.length > 0);
                 isTableData = true;
             } else {
                 // Normal comma-separated search
-                searchTerms = parsedQuery.toLowerCase()
+                searchTerms = parsedQuery
                     .split(',')
                     .map(term => term.trim())
                     .filter(term => term.length > 0);
@@ -1808,21 +1906,92 @@
                 
                 // Check each search term individually
                 for (const searchTerm of searchTerms) {
-                    if (isTableData) {
-                        // For table data, use exact product name matching
-                        if (product.name && isExactProductMatch(product.name, searchTerm)) {
-                            found = true;
-                            break;
+                    // Check if this is an image URL search (premium feature)
+                    const isImageUrl = /^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i.test(searchTerm);
+                    const hasImageSearch = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                    
+                    // Check if term contains both product name and image URL (format: "productName|imageUrl")
+                    const hasCombinedFormat = searchTerm.includes('|');
+                    let productNamePart = '';
+                    let imageUrlPart = '';
+                    
+                    if (hasCombinedFormat && hasImageSearch) {
+                        const parts = searchTerm.split('|');
+                        productNamePart = parts[0].trim().toLowerCase();
+                        imageUrlPart = parts[1]?.trim() || '';
+                    }
+                    
+                    if (isTableData || hasCombinedFormat) {
+                        // For table data, check both product name and image URL
+                        let nameMatch = false;
+                        let imageMatch = false;
+                        
+                        if (hasCombinedFormat && hasImageSearch) {
+                            // Check product name match
+                            if (product.name && productNamePart) {
+                                nameMatch = isExactProductMatch(product.name, productNamePart);
+                            }
+                            
+                            // Check image URL match (premium feature)
+                            if (hasImageSearch && product.image && imageUrlPart) {
+                                // Compare image URLs (exact match or domain+filename match)
+                                const productImageUrl = product.image.toLowerCase().trim();
+                                const searchImageUrl = imageUrlPart.toLowerCase().trim();
+                                
+                                // Exact match
+                                if (productImageUrl === searchImageUrl) {
+                                    imageMatch = true;
+                                } else {
+                                    // Try to match by filename (last part of URL)
+                                    const productFileName = productImageUrl.split('/').pop().split('?')[0];
+                                    const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
+                                    if (productFileName === searchFileName && productFileName.length > 0) {
+                                        imageMatch = true;
+                                    }
+                                }
+                            }
+                            
+                            // Match if either name or image matches (or both)
+                            if (nameMatch || imageMatch) {
+                                found = true;
+                                break;
+                            }
+                        } else if (isImageUrl && hasImageSearch) {
+                            // Direct image URL search
+                            if (product.image) {
+                                const productImageUrl = product.image.toLowerCase().trim();
+                                const searchImageUrl = searchTerm.toLowerCase().trim();
+                                
+                                if (productImageUrl === searchImageUrl) {
+                                    found = true;
+                                    break;
+                                }
+                                
+                                // Try filename match
+                                const productFileName = productImageUrl.split('/').pop().split('?')[0];
+                                const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
+                                if (productFileName === searchFileName && productFileName.length > 0) {
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        } else {
+                            // For regular table data, use exact product name matching
+                            if (product.name && isExactProductMatch(product.name, searchTerm.toLowerCase())) {
+                                found = true;
+                                break;
+                            }
                         }
                     } else {
                         // For normal search, use token-based matching
-                        const termTokens = tokenizeQuery(searchTerm);
+                        const termTokens = tokenizeQuery(searchTerm.toLowerCase());
                         if (termTokens.length === 0) continue;
                         
                         // Check ALL fields for ALL tokens
                         let nameMatch = false;
                         let brandMatch = false;
                         let categoryMatch = false;
+                        let imageMatch = false;
                         
                         // Check product name
                         if (product.name) {
@@ -1839,8 +2008,20 @@
                             categoryMatch = containsAllTokens(product.category, termTokens);
                         }
                         
+                        // Check image URL (premium feature)
+                        if (hasImageSearch && product.image && isImageUrl) {
+                            const productImageUrl = product.image.toLowerCase().trim();
+                            const searchImageUrl = searchTerm.toLowerCase().trim();
+                            
+                            if (productImageUrl === searchImageUrl || 
+                                productImageUrl.includes(searchImageUrl) ||
+                                searchImageUrl.includes(productImageUrl)) {
+                                imageMatch = true;
+                            }
+                        }
+                        
                         // Product must match in at least one field with ALL tokens
-                        if (nameMatch || brandMatch || categoryMatch) {
+                        if (nameMatch || brandMatch || categoryMatch || imageMatch) {
                             found = true;
                             break;
                         }
@@ -1898,20 +2079,78 @@
                 
                 // Optimize: Only search through products once per term
                 let foundCount = 0;
+                const hasImageSearch = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                const isImageUrl = /^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i.test(searchTerm);
+                const hasCombinedFormat = searchTerm.includes('|');
+                let productNamePart = '';
+                let imageUrlPart = '';
+                
+                if (hasCombinedFormat && hasImageSearch) {
+                    const parts = searchTerm.split('|');
+                    productNamePart = parts[0].trim().toLowerCase();
+                    imageUrlPart = parts[1]?.trim() || '';
+                }
+                
                 for (let i = 0; i < products.length && foundCount < maxResultsPerGroup; i++) {
                     const product = products[i];
                     let found = false;
                     
-                    if (isTableData) {
-                        // For table data, use exact product name matching
-                        if (product.name && isExactProductMatch(product.name, searchTerm)) {
-                            found = true;
+                    if (isTableData || hasCombinedFormat) {
+                        // For table data, check both product name and image URL
+                        let nameMatch = false;
+                        let imageMatch = false;
+                        
+                        if (hasCombinedFormat && hasImageSearch) {
+                            // Check product name match
+                            if (product.name && productNamePart) {
+                                nameMatch = isExactProductMatch(product.name, productNamePart);
+                            }
+                            
+                            // Check image URL match (premium feature)
+                            if (hasImageSearch && product.image && imageUrlPart) {
+                                const productImageUrl = product.image.toLowerCase().trim();
+                                const searchImageUrl = imageUrlPart.toLowerCase().trim();
+                                
+                                if (productImageUrl === searchImageUrl) {
+                                    imageMatch = true;
+                                } else {
+                                    const productFileName = productImageUrl.split('/').pop().split('?')[0];
+                                    const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
+                                    if (productFileName === searchFileName && productFileName.length > 0) {
+                                        imageMatch = true;
+                                    }
+                                }
+                            }
+                            
+                            found = nameMatch || imageMatch;
+                        } else if (isImageUrl && hasImageSearch) {
+                            // Direct image URL search
+                            if (product.image) {
+                                const productImageUrl = product.image.toLowerCase().trim();
+                                const searchImageUrl = searchTerm.toLowerCase().trim();
+                                
+                                if (productImageUrl === searchImageUrl) {
+                                    found = true;
+                                } else {
+                                    const productFileName = productImageUrl.split('/').pop().split('?')[0];
+                                    const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
+                                    if (productFileName === searchFileName && productFileName.length > 0) {
+                                        found = true;
+                                    }
+                                }
+                            }
+                        } else {
+                            // For regular table data, use exact product name matching
+                            if (product.name && isExactProductMatch(product.name, searchTerm.toLowerCase())) {
+                                found = true;
+                            }
                         }
                     } else {
                         // For normal search, check ALL fields for ALL tokens
                         let nameMatch = false;
                         let brandMatch = false;
                         let categoryMatch = false;
+                        let imageMatch = false;
                         
                         // Check product name
                         if (product.name) {
@@ -1928,8 +2167,20 @@
                             categoryMatch = containsAllTokens(product.category, termTokens);
                         }
                         
+                        // Check image URL (premium feature)
+                        if (hasImageSearch && product.image && isImageUrl) {
+                            const productImageUrl = product.image.toLowerCase().trim();
+                            const searchImageUrl = searchTerm.toLowerCase().trim();
+                            
+                            if (productImageUrl === searchImageUrl || 
+                                productImageUrl.includes(searchImageUrl) ||
+                                searchImageUrl.includes(productImageUrl)) {
+                                imageMatch = true;
+                            }
+                        }
+                        
                         // Product must match in at least one field with ALL tokens
-                        found = nameMatch || brandMatch || categoryMatch;
+                        found = nameMatch || brandMatch || categoryMatch || imageMatch;
                     }
                     
                     if (found) {
