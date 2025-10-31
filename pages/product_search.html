@@ -3258,7 +3258,7 @@
                 name: 'Klavye Kısayolları',
                 description: 'Klavye kısayolları ile hızlı erişim',
                 emoji: '⌨️',
-                storageKey: null
+                storageKey: 'keyboardShortcutsEnabled'
             },
             'bulkCopy': {
                 name: 'Toplu Kopyalama',
@@ -3345,7 +3345,7 @@
                     </svg>
                 ` : '';
                 
-                // Special handling for keyboardShortcuts - no checkbox, just a button
+                // Special handling for keyboardShortcuts - checkbox + manage button
                 const isKeyboardShortcuts = featureKey === 'keyboardShortcuts';
                 
                 if (isKeyboardShortcuts) {
@@ -3360,11 +3360,21 @@
                                 </div>
                             </div>
                         </div>
-                        ${hasPremium ? `
-                            <button class="ml-2 px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition-all shadow-sm hover:shadow-md" onclick="event.stopPropagation(); showKeyboardShortcutsModal();">
-                                ⚙️ Yönet
-                            </button>
-                        ` : ''}
+                        <div class="flex items-center space-x-2 ml-2">
+                            <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 ${!hasPremium ? 'opacity-50 cursor-not-allowed' : ''}" onclick="event.stopPropagation();">
+                                <input type="checkbox" 
+                                       data-feature="${featureKey}"
+                                       class="sr-only peer" 
+                                       ${isEnabled && hasPremium ? 'checked' : ''}
+                                       ${!hasPremium ? 'disabled' : ''}>
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all ${hasPremium ? 'peer-checked:bg-purple-600' : 'bg-gray-300'}"></div>
+                            </label>
+                            ${hasPremium ? `
+                                <button class="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition-all shadow-sm hover:shadow-md" onclick="event.stopPropagation(); showKeyboardShortcutsModal();">
+                                    ⚙️ Yönet
+                                </button>
+                            ` : ''}
+                        </div>
                     `;
                 } else {
                     featureItem.innerHTML = `
@@ -3392,21 +3402,23 @@
                 // Add change listener if premium
                 if (hasPremium && config.storageKey) {
                     const checkbox = featureItem.querySelector('input[type="checkbox"]');
-                    checkbox.addEventListener('change', (e) => {
-                        const enabled = e.target.checked;
-                        try {
-                            localStorage.setItem(config.storageKey, enabled ? '1' : '0');
-                            if (featureKey === 'autoPaste') {
-                                // Update auto-paste checkbox in regular settings too
-                                const autoPasteCheckbox = document.getElementById('autoPasteEnabled');
-                                if (autoPasteCheckbox) {
-                                    autoPasteCheckbox.checked = enabled;
+                    if (checkbox) {
+                        checkbox.addEventListener('change', (e) => {
+                            const enabled = e.target.checked;
+                            try {
+                                localStorage.setItem(config.storageKey, enabled ? '1' : '0');
+                                if (featureKey === 'autoPaste') {
+                                    // Update auto-paste checkbox in regular settings too
+                                    const autoPasteCheckbox = document.getElementById('autoPasteEnabled');
+                                    if (autoPasteCheckbox) {
+                                        autoPasteCheckbox.checked = enabled;
+                                    }
                                 }
+                            } catch (err) {
+                                console.error('Error saving preference:', err);
                             }
-                        } catch (err) {
-                            console.error('Error saving preference:', err);
-                        }
-                    });
+                        });
+                    }
                 }
 
                 container.appendChild(featureItem);
@@ -3733,6 +3745,21 @@
                 return;
             }
             
+            // Check if user has enabled the feature
+            if (!isKeyboardShortcutsEnabled()) {
+                const enable = confirm('Klavye kısayolları özelliği kapalı. Açmak ister misiniz?');
+                if (enable) {
+                    setKeyboardShortcutsEnabled(true);
+                    // Update checkbox in settings if visible
+                    const checkbox = document.querySelector('input[data-feature="keyboardShortcuts"]');
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                } else {
+                    return;
+                }
+            }
+            
             // Load and render shortcuts
             await renderKeyboardShortcutsUI();
             
@@ -3886,11 +3913,34 @@
             return parts.join('+');
         }
         
+        // Check if keyboard shortcuts are enabled by user
+        function isKeyboardShortcutsEnabled() {
+            try {
+                return localStorage.getItem('keyboardShortcutsEnabled') === '1';
+            } catch (e) {
+                return false;
+            }
+        }
+        
+        // Set keyboard shortcuts enabled state
+        function setKeyboardShortcutsEnabled(enabled) {
+            try {
+                localStorage.setItem('keyboardShortcutsEnabled', enabled ? '1' : '0');
+            } catch (e) {
+                console.error('Error saving keyboard shortcuts preference:', e);
+            }
+        }
+        
         // Handle keyboard press
         async function handleKeyPress(event) {
             // Premium control
             const hasPremium = window.premiumFeatures?.checkPremiumFeature('keyboardShortcuts');
             if (!hasPremium) {
+                return;
+            }
+            
+            // User preference control
+            if (!isKeyboardShortcutsEnabled()) {
                 return;
             }
             
