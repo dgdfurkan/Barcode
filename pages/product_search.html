@@ -739,11 +739,20 @@
             });
         }
 
-        // Otomatik yapıştırma: Sayfaya her gelişte (pageshow) çalışır
+        // Otomatik yapıştırma: Sayfaya her gelişte çalışır (hem pageshow hem visibilitychange)
         // Başka sayfadan kopyalayıp bu sayfaya geri gelindiğinde yapıştırır
-        let lastClipboardText = '';
+        let autoPasteDebounceTimer = null;
+        let lastPastTime = 0;
+        const AUTO_PASTE_DEBOUNCE_MS = 100; // Minimum 100ms between attempts
+        const MIN_TIME_BETWEEN_PASTES_MS = 50; // Minimum 50ms between actual pastes
 
         async function tryAutoPasteOnPageShow() {
+            // Debounce: prevent multiple rapid calls
+            const now = Date.now();
+            if (now - lastPastTime < MIN_TIME_BETWEEN_PASTES_MS) {
+                return;
+            }
+
             // Check premium feature with backend validation
             const hasPremium = await checkAutoPastePremium();
             if (!hasPremium) {
@@ -764,21 +773,10 @@
                     return;
                 }
                 
+                // Read clipboard - FAST, no delay
                 const text = await navigator.clipboard.readText();
                 if (!text || text.trim() === '') {
                     console.debug('Auto-paste: Clipboard is empty');
-                    return;
-                }
-                
-                // Skip if same text was already pasted (to avoid duplicate pastes on same session)
-                if (text === lastClipboardText) {
-                    console.debug('Auto-paste: Same text already pasted, skipping');
-                    return;
-                }
-                
-                // Skip if search input already has content (user might be typing)
-                if (searchInput && searchInput.value.trim() !== '') {
-                    console.debug('Auto-paste: Search input already has content, skipping');
                     return;
                 }
                 
@@ -786,10 +784,11 @@
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
                 
                 if (parsed && parsed.trim() !== '') {
-                    lastClipboardText = text; // Remember this text
+                    // Always paste - user wants it every time they return to page
                     searchInput.value = parsed;
                     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    console.log('✅ Auto-paste: Text pasted successfully');
+                    lastPastTime = Date.now();
+                    console.log('✅ Auto-paste: Text pasted successfully:', parsed.substring(0, 50));
                 }
             } catch (e) { 
                 // Permission denied or other clipboard errors - ignore silently
@@ -798,30 +797,36 @@
             }
         }
 
-        // Track page visibility to reset clipboard tracking when user leaves
+        // Debounced auto-paste function
+        function debouncedAutoPaste() {
+            if (autoPasteDebounceTimer) {
+                clearTimeout(autoPasteDebounceTimer);
+            }
+            // Very short delay for performance - only to avoid race conditions
+            autoPasteDebounceTimer = setTimeout(tryAutoPasteOnPageShow, 10);
+        }
+
+        // Track page visibility - trigger auto-paste when page becomes visible
         document.addEventListener('visibilitychange', () => {
-            // When page becomes hidden (user navigated away), reset clipboard tracking
-            // This ensures next time they come back, new clipboard content will be pasted
-            if (document.visibilityState === 'hidden') {
-                console.debug('📄 Page hidden - resetting clipboard tracking');
-                lastClipboardText = '';
+            if (document.visibilityState === 'visible') {
+                console.debug('📄 Page became visible - attempting auto-paste');
+                debouncedAutoPaste();
             }
         });
 
         // Trigger on pageshow (when page is shown - includes initial load, back/forward, returning from another tab/page)
         window.addEventListener('pageshow', (event) => {
-            // Reset clipboard tracking when page is restored from cache
-            if (event.persisted) {
-                console.debug('📄 Page restored from cache - resetting clipboard tracking');
-                lastClipboardText = '';
-            }
-            
-            // Always try auto-paste when page becomes visible
-            // This happens every time user returns to the page
+            // Always try auto-paste when page is shown
+            console.debug('📄 Page shown (pageshow) - attempting auto-paste');
+            debouncedAutoPaste();
+        });
+
+        // Also trigger on focus (when tab/window gets focus) - for extra reliability
+        window.addEventListener('focus', () => {
+            // Only if page is visible
             if (document.visibilityState === 'visible') {
-                console.debug('📄 Page shown - attempting auto-paste');
-                // Small delay to ensure clipboard API is ready and premium features loaded
-                setTimeout(tryAutoPasteOnPageShow, 300);
+                console.debug('📄 Window focused - attempting auto-paste');
+                debouncedAutoPaste();
             }
         });
 
