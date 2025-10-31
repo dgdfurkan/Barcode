@@ -77,10 +77,10 @@ class NotificationSystem {
         // Load initial state
         this.loadInitialPremiumFeatures();
         
-        // Poll every 5 seconds
+        // Poll every 2 seconds for faster response
         this.pollingInterval = setInterval(async () => {
             await this.checkPremiumFeaturesChanges();
-        }, 5000);
+        }, 2000);
     }
 
     // Load initial premium features state
@@ -129,7 +129,7 @@ class NotificationSystem {
             if (changedFeatures.length > 0) {
                 console.log('📢 Premium features changed (polling):', changedFeatures);
                 
-                // Update cache
+                // Update cache FIRST before showing notification
                 this.lastKnownFeatures = currentFeatures;
                 if (window.premiumFeatures) {
                     window.premiumFeatures.premiumFeatures = currentFeatures;
@@ -137,8 +137,10 @@ class NotificationSystem {
                 
                 // Handle changes
                 const enabledFeatures = changedFeatures.filter(f => f.enabled);
-                if (enabledFeatures.length > 0) {
-                    this.showPremiumFeaturesNotification(enabledFeatures);
+                const disabledFeatures = changedFeatures.filter(f => !f.enabled);
+                
+                if (enabledFeatures.length > 0 || disabledFeatures.length > 0) {
+                    this.showPremiumFeaturesNotification(changedFeatures);
                 }
             }
         } catch (error) {
@@ -159,17 +161,18 @@ class NotificationSystem {
         const changedFeatures = this.detectFeatureChanges(oldFeatures, newFeatures);
         
         if (changedFeatures.length > 0) {
-            console.log('📢 Premium features changed:', changedFeatures);
+            console.log('📢 Premium features changed (realtime):', changedFeatures);
             
             // Store changed features for later use
             this.lastChangedFeatures = changedFeatures;
             
-            // Refresh premium features cache
+            // Update cache FIRST before showing notification
+            this.lastKnownFeatures = newFeatures;
             if (window.premiumFeatures) {
                 window.premiumFeatures.premiumFeatures = newFeatures;
             }
 
-            // Show notification (don't auto-reload, let user click)
+            // Show notification (enabled features: modal, disabled features: reload page)
             this.showPremiumFeaturesNotification(changedFeatures);
         }
     }
@@ -204,8 +207,18 @@ class NotificationSystem {
         const enabledFeatures = changedFeatures.filter(f => f.enabled);
         const disabledFeatures = changedFeatures.filter(f => !f.enabled);
 
-        // Show notification for enabled features only (new premium features)
+        // Show notification for enabled features (new premium features)
         if (enabledFeatures.length > 0) {
+            // Check if we've already shown notification for these features
+            const shouldShow = this.shouldShowNotification(enabledFeatures);
+            if (!shouldShow) {
+                console.log('⏭️ Notification already shown for these features, skipping');
+                return;
+            }
+            
+            // Mark as shown
+            this.markNotificationAsShown(enabledFeatures);
+            
             const featureNames = enabledFeatures.map(f => this.getFeatureName(f.name)).join(', ');
             
             // Show browser notification if permission granted
@@ -220,6 +233,51 @@ class NotificationSystem {
             // Show in-page notification with click handler
             this.showInPageNotificationWithModal(enabledFeatures);
         }
+        
+        // Show notification for disabled features (premium features removed)
+        if (disabledFeatures.length > 0) {
+            const featureNames = disabledFeatures.map(f => this.getFeatureName(f.name)).join(', ');
+            
+            // Show browser notification if permission granted
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('⚠️ Premium Özellikler Güncellendi', {
+                    body: `${featureNames} özelliklerine artık erişemeyeceksiniz.`,
+                    icon: '../assets/logo.png',
+                    tag: 'premium-features-removed'
+                });
+            }
+
+            // Show in-page notification and reload page
+            this.showDisabledFeaturesNotification(disabledFeatures);
+        }
+    }
+
+    // Check if notification should be shown (only once per feature)
+    shouldShowNotification(enabledFeatures) {
+        if (!this.currentUser) return true;
+        
+        const notificationKey = `premium_notification_shown_${this.currentUser.username}`;
+        const shownFeatures = JSON.parse(localStorage.getItem(notificationKey) || '{}');
+        
+        // Check if any of the enabled features haven't been shown yet
+        return enabledFeatures.some(feature => {
+            const featureKey = feature.name;
+            return !shownFeatures[featureKey];
+        });
+    }
+
+    // Mark notification as shown
+    markNotificationAsShown(enabledFeatures) {
+        if (!this.currentUser) return;
+        
+        const notificationKey = `premium_notification_shown_${this.currentUser.username}`;
+        const shownFeatures = JSON.parse(localStorage.getItem(notificationKey) || '{}');
+        
+        enabledFeatures.forEach(feature => {
+            shownFeatures[feature.name] = true;
+        });
+        
+        localStorage.setItem(notificationKey, JSON.stringify(shownFeatures));
     }
 
     // Get user-friendly feature name
@@ -420,7 +478,69 @@ class NotificationSystem {
         });
     }
 
-    // No auto-reload needed - user controls through settings
+    // Show notification for disabled features (premium features removed)
+    showDisabledFeaturesNotification(disabledFeatures) {
+        const featureNames = disabledFeatures.map(f => this.getFeatureName(f.name)).join(', ');
+        
+        console.log('⚠️ Showing disabled features notification for:', disabledFeatures);
+        
+        // Remove existing notification if any
+        const existingNotification = document.getElementById('premium-features-disabled-notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.id = 'premium-features-disabled-notification';
+        notification.className = 'fixed top-4 right-4 bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-4 rounded-lg shadow-lg max-w-md z-[9998]';
+        notification.style.zIndex = '9998';
+        notification.innerHTML = `
+            <div class="flex items-center space-x-3">
+                <div class="text-2xl">⚠️</div>
+                <div class="flex-1">
+                    <p class="font-semibold text-lg">Bilgilendirme!</p>
+                    <p class="text-sm mt-1 opacity-95">Artık bu özelliklere erişemeyeceksiniz: ${featureNames}</p>
+                    <p class="text-xs mt-2 opacity-80">Sayfa yenilenecek...</p>
+                </div>
+                <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+        `;
+
+        document.body.appendChild(notification);
+
+        // Add close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'absolute top-2 right-2 text-white opacity-70 hover:opacity-100';
+        closeBtn.innerHTML = '×';
+        closeBtn.style.fontSize = '24px';
+        closeBtn.style.lineHeight = '1';
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notification.remove();
+            // Reload page after closing notification
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        });
+        notification.appendChild(closeBtn);
+
+        // Auto-reload after 3 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.5s';
+                setTimeout(() => {
+                    notification.remove();
+                    window.location.reload();
+                }, 500);
+            }
+        }, 3000);
+    }
+
+    // No auto-reload needed - user controls through settings (except for disabled features)
 
     // Cleanup subscription
     cleanup() {
