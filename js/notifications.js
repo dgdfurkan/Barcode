@@ -95,7 +95,9 @@ class NotificationSystem {
                 .single();
             
             if (!error && data) {
-                this.lastKnownFeatures = data.premium_features || {};
+                const currentFeatures = data.premium_features || {};
+                
+                this.lastKnownFeatures = currentFeatures;
                 
                 // Update premium features cache
                 if (window.premiumFeatures) {
@@ -123,7 +125,24 @@ class NotificationSystem {
             const currentFeatures = data.premium_features || {};
             const oldFeatures = this.lastKnownFeatures || {};
             
-            // Detect changes
+            // If lastKnownFeatures is null or empty on first check, set it and don't show notification
+            // This prevents showing notification on initial page load
+            if (!oldFeatures || Object.keys(oldFeatures).length === 0) {
+                console.log('📋 Initial premium features loaded, not showing notification');
+                this.lastKnownFeatures = currentFeatures;
+                if (window.premiumFeatures) {
+                    window.premiumFeatures.premiumFeatures = currentFeatures;
+                }
+                // Mark all currently enabled features as already shown to prevent future notifications
+                const enabledFeatureKeys = Object.keys(currentFeatures).filter(key => currentFeatures[key] === true);
+                if (enabledFeatureKeys.length > 0) {
+                    const enabledFeaturesArray = enabledFeatureKeys.map(key => ({ name: key, enabled: true }));
+                    this.markNotificationAsShown(enabledFeaturesArray);
+                }
+                return;
+            }
+            
+            // Detect changes only if we have previous state
             const changedFeatures = this.detectFeatureChanges(oldFeatures, currentFeatures);
             
             if (changedFeatures.length > 0) {
@@ -154,10 +173,10 @@ class NotificationSystem {
             return;
         }
 
-        const oldFeatures = payload.old?.premium_features || {};
+        const oldFeatures = payload.old?.premium_features || this.lastKnownFeatures || {};
         const newFeatures = payload.new.premium_features || {};
 
-        // Check if any features changed
+        // Check if any features changed (only show if there's a real change)
         const changedFeatures = this.detectFeatureChanges(oldFeatures, newFeatures);
         
         if (changedFeatures.length > 0) {
