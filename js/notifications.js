@@ -154,6 +154,12 @@ class NotificationSystem {
                     window.premiumFeatures.premiumFeatures = currentFeatures;
                 }
                 
+                // Clear keyboard shortcuts cache if keyboardShortcuts feature changed
+                const keyboardShortcutsChanged = changedFeatures.some(f => f.name === 'keyboardShortcuts');
+                if (keyboardShortcutsChanged) {
+                    this.clearKeyboardShortcutsCache();
+                }
+                
                 // Handle changes
                 const enabledFeatures = changedFeatures.filter(f => f.enabled);
                 const disabledFeatures = changedFeatures.filter(f => !f.enabled);
@@ -191,8 +197,29 @@ class NotificationSystem {
                 window.premiumFeatures.premiumFeatures = newFeatures;
             }
 
+            // Clear keyboard shortcuts cache if keyboardShortcuts feature changed
+            const keyboardShortcutsChanged = changedFeatures.some(f => f.name === 'keyboardShortcuts');
+            if (keyboardShortcutsChanged) {
+                this.clearKeyboardShortcutsCache();
+            }
+
             // Show notification (enabled features: modal, disabled features: reload page)
             this.showPremiumFeaturesNotification(changedFeatures);
+        }
+    }
+    
+    // Clear keyboard shortcuts cache
+    clearKeyboardShortcutsCache() {
+        if (!this.currentUser) return;
+        
+        const username = this.currentUser.username;
+        const cacheKey = `keyboardShortcuts_${username}`;
+        
+        try {
+            localStorage.removeItem(cacheKey);
+            console.log('🗑️ Keyboard shortcuts cache cleared for', username);
+        } catch (error) {
+            console.warn('Error clearing keyboard shortcuts cache:', error);
         }
     }
 

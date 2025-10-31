@@ -588,6 +588,89 @@
             </div>
         </div>
     </div>
+    
+    <!-- Keyboard Shortcuts Management Modal -->
+    <div id="keyboardShortcutsModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] hidden">
+        <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full mx-4 max-h-[85vh] overflow-hidden flex flex-col">
+            <div class="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-6 flex-shrink-0">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-4xl">⌨️</span>
+                        <div>
+                            <h3 class="text-2xl font-bold">Klavye Kısayolları</h3>
+                            <p class="text-purple-100 text-sm mt-1">Ürünlerinize hızlı erişim için tuş atayın</p>
+                        </div>
+                    </div>
+                    <button id="closeKeyboardShortcutsModal" class="text-white hover:text-purple-200 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6">
+                <!-- Mevcut Kısayollar Listesi -->
+                <div class="mb-6">
+                    <h4 class="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+                        <span>📋</span>
+                        <span>Mevcut Kısayollar</span>
+                    </h4>
+                    <div id="keyboardShortcutsList" class="space-y-2 mb-4">
+                        <!-- Kısayollar buraya yüklenecek -->
+                        <p class="text-sm text-gray-500 text-center py-4">Henüz kısayol eklenmemiş</p>
+                    </div>
+                </div>
+                
+                <div class="border-t border-gray-200 pt-6">
+                    <!-- Yeni Kısayol Ekleme Formu -->
+                    <h4 class="font-semibold text-gray-900 mb-4 flex items-center space-x-2">
+                        <span>➕</span>
+                        <span>Yeni Kısayol Ekle</span>
+                    </h4>
+                    <div class="bg-gray-50 rounded-lg p-4 space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Klavye Tuşu/Kombinasyonu
+                            </label>
+                            <input 
+                                type="text" 
+                                id="shortcutKeyInput" 
+                                placeholder="Örn: K, F1, Ctrl+K, Alt+S"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            />
+                            <p class="text-xs text-gray-500 mt-1">
+                                Tek tuş (K, F1) veya kombinasyon (Ctrl+K, Alt+S) girebilirsiniz
+                            </p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Aranacak Ürün(ler)
+                            </label>
+                            <textarea 
+                                id="shortcutProductsInput" 
+                                rows="3"
+                                placeholder="Ürün adları veya barkodları virgülle ayırarak yazın. Örn: Sek Quark, Mandalina File veya 8691234567890, 8699876543210"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                            ></textarea>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Birden fazla ürün için virgülle ayırın. Arama çubuğundan kopyalayıp yapıştırabilirsiniz.
+                            </p>
+                        </div>
+                        <div id="shortcutError" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded p-2">
+                            <!-- Hata mesajları buraya -->
+                        </div>
+                        <button 
+                            id="addShortcutBtn" 
+                            class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow-md hover:shadow-lg"
+                        >
+                            ➕ Kısayol Ekle
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer class="bg-surface border-t border-border mt-12">
@@ -3314,6 +3397,12 @@
 
             const hasPremium = window.premiumFeatures?.checkPremiumFeature(featureKey) || false;
             
+            // Keyboard shortcuts için özel modal aç
+            if (featureKey === 'keyboardShortcuts' && hasPremium) {
+                showKeyboardShortcutsModal();
+                return;
+            }
+            
             // Update modal content
             document.getElementById('featureDetailEmoji').textContent = config.emoji;
             document.getElementById('featureDetailName').textContent = config.name;
@@ -3356,6 +3445,473 @@
         // Hide premium feature detail modal
         function hidePremiumFeatureDetailModal() {
             document.getElementById('premiumFeatureDetailModal').classList.add('hidden');
+        }
+        
+        // ============================================
+        // KEYBOARD SHORTCUTS MANAGEMENT FUNCTIONS
+        // ============================================
+        
+        // Cache configuration
+        const KEYBOARD_SHORTCUTS_CACHE_KEY = 'keyboardShortcuts';
+        const CACHE_VERSION = '1.0';
+        const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+        
+        // Blocked keyboard shortcuts (browser shortcuts)
+        const BLOCKED_SHORTCUTS = [
+            'Ctrl+K', 'Ctrl+R', 'Ctrl+S', 'Ctrl+N', 'Ctrl+W', 
+            'Ctrl+T', 'Ctrl+L', 'Ctrl+P', 'Ctrl+Shift+P',
+            'F5', 'F12', 'Ctrl+F5', 'Ctrl+Shift+R',
+            'Ctrl+Tab', 'Ctrl+Shift+Tab', 'Alt+F4'
+        ];
+        
+        // Load keyboard shortcuts with cache
+        async function loadKeyboardShortcuts() {
+            const session = window.authUtils?.checkAuth();
+            if (!session || !session.username) {
+                return {};
+            }
+            
+            const username = session.username;
+            const cacheKey = `${KEYBOARD_SHORTCUTS_CACHE_KEY}_${username}`;
+            
+            // Try cache first
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    const cacheData = JSON.parse(cached);
+                    // Check cache validity (version and timestamp)
+                    if (cacheData.version === CACHE_VERSION) {
+                        const now = Date.now();
+                        if (cacheData.timestamp && (now - cacheData.timestamp < CACHE_DURATION)) {
+                            console.debug('📋 Loading keyboard shortcuts from cache');
+                            return cacheData.shortcuts || {};
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('Cache read error:', e);
+            }
+            
+            // Load from Supabase
+            try {
+                if (!window.supabase) {
+                    return {};
+                }
+                
+                const { data, error } = await window.supabase
+                    .from('users')
+                    .select('keyboard_shortcuts')
+                    .eq('username', username)
+                    .single();
+                
+                if (error) {
+                    console.error('Error loading keyboard shortcuts:', error);
+                    return {};
+                }
+                
+                const shortcuts = data?.keyboard_shortcuts || {};
+                
+                // Update cache
+                try {
+                    const cacheData = {
+                        shortcuts: shortcuts,
+                        timestamp: Date.now(),
+                        version: CACHE_VERSION
+                    };
+                    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+                } catch (e) {
+                    console.warn('Cache write error:', e);
+                }
+                
+                console.debug('📋 Loaded keyboard shortcuts from Supabase');
+                return shortcuts;
+            } catch (error) {
+                console.error('Error loading keyboard shortcuts:', error);
+                return {};
+            }
+        }
+        
+        // Save keyboard shortcuts to Supabase and cache
+        async function saveKeyboardShortcuts(shortcuts) {
+            const session = window.authUtils?.checkAuth();
+            if (!session || !session.username) {
+                throw new Error('User not authenticated');
+            }
+            
+            const username = session.username;
+            const cacheKey = `${KEYBOARD_SHORTCUTS_CACHE_KEY}_${username}`;
+            
+            try {
+                if (!window.supabase) {
+                    throw new Error('Supabase not available');
+                }
+                
+                // Save to Supabase
+                const { error } = await window.supabase
+                    .from('users')
+                    .update({ keyboard_shortcuts: shortcuts })
+                    .eq('username', username);
+                
+                if (error) {
+                    throw error;
+                }
+                
+                // Update cache
+                try {
+                    const cacheData = {
+                        shortcuts: shortcuts,
+                        timestamp: Date.now(),
+                        version: CACHE_VERSION
+                    };
+                    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+                } catch (e) {
+                    console.warn('Cache write error:', e);
+                }
+                
+                console.log('✅ Keyboard shortcuts saved successfully');
+                return true;
+            } catch (error) {
+                console.error('Error saving keyboard shortcuts:', error);
+                throw error;
+            }
+        }
+        
+        // Validate key combination
+        function validateKeyCombo(keyCombo, existingShortcuts = {}) {
+            const normalized = normalizeKeyCombo(keyCombo);
+            
+            // Check blocked shortcuts
+            if (BLOCKED_SHORTCUTS.includes(normalized)) {
+                return {
+                    valid: false,
+                    error: 'Bu tuş tarayıcı kısayolu olarak kullanılıyor. Lütfen farklı bir tuş seçin.'
+                };
+            }
+            
+            // Check if already exists
+            if (existingShortcuts[normalized]) {
+                return {
+                    valid: false,
+                    error: 'Bu tuş zaten kullanılıyor. Lütfen farklı bir tuş seçin veya önce mevcut kısayolu silin.'
+                };
+            }
+            
+            // Basic validation
+            if (!normalized || normalized.trim() === '') {
+                return {
+                    valid: false,
+                    error: 'Lütfen geçerli bir tuş girin.'
+                };
+            }
+            
+            return { valid: true };
+        }
+        
+        // Normalize key combination (standardize format)
+        function normalizeKeyCombo(keyCombo) {
+            if (!keyCombo) return '';
+            
+            // Remove extra spaces
+            let normalized = keyCombo.trim();
+            
+            // Standardize modifiers
+            normalized = normalized.replace(/\s+/g, ''); // Remove spaces
+            normalized = normalized.replace(/ctrl/gi, 'Ctrl');
+            normalized = normalized.replace(/alt/gi, 'Alt');
+            normalized = normalized.replace(/shift/gi, 'Shift');
+            normalized = normalized.replace(/meta/gi, 'Meta');
+            
+            // Handle case: Ctrl+Shift+K -> Ctrl+Shift+K (keep consistent)
+            return normalized;
+        }
+        
+        // Render keyboard shortcuts UI
+        async function renderKeyboardShortcutsUI() {
+            const listContainer = document.getElementById('keyboardShortcutsList');
+            if (!listContainer) return;
+            
+            const shortcuts = await loadKeyboardShortcuts();
+            const shortcutKeys = Object.keys(shortcuts);
+            
+            if (shortcutKeys.length === 0) {
+                listContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">Henüz kısayol eklenmemiş</p>';
+                return;
+            }
+            
+            listContainer.innerHTML = '';
+            
+            shortcutKeys.forEach(key => {
+                const products = shortcuts[key];
+                const shortcutItem = document.createElement('div');
+                shortcutItem.className = 'flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg hover:border-purple-300 hover:shadow-md transition-all';
+                shortcutItem.innerHTML = `
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded">${escapeHtml(key)}</span>
+                            <span class="text-sm text-gray-700">→</span>
+                            <span class="text-sm text-gray-600 flex-1 truncate">${escapeHtml(products)}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2 ml-4">
+                        <button 
+                            class="edit-shortcut-btn text-blue-600 hover:text-blue-800 text-sm px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                            data-key="${escapeHtml(key)}"
+                            data-products="${escapeHtml(products)}"
+                        >
+                            ✏️ Düzenle
+                        </button>
+                        <button 
+                            class="delete-shortcut-btn text-red-600 hover:text-red-800 text-sm px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                            data-key="${escapeHtml(key)}"
+                        >
+                            🗑️ Sil
+                        </button>
+                    </div>
+                `;
+                
+                listContainer.appendChild(shortcutItem);
+            });
+            
+            // Add event listeners for edit and delete
+            document.querySelectorAll('.edit-shortcut-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const key = btn.dataset.key;
+                    const products = btn.dataset.products;
+                    document.getElementById('shortcutKeyInput').value = key;
+                    document.getElementById('shortcutProductsInput').value = products;
+                    document.getElementById('shortcutKeyInput').focus();
+                });
+            });
+            
+            document.querySelectorAll('.delete-shortcut-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const key = btn.dataset.key;
+                    if (confirm(`"${key}" kısayolunu silmek istediğinizden emin misiniz?`)) {
+                        await deleteKeyboardShortcut(key);
+                        await renderKeyboardShortcutsUI();
+                    }
+                });
+            });
+        }
+        
+        // Delete keyboard shortcut
+        async function deleteKeyboardShortcut(key) {
+            const shortcuts = await loadKeyboardShortcuts();
+            delete shortcuts[normalizeKeyCombo(key)];
+            await saveKeyboardShortcuts(shortcuts);
+        }
+        
+        // Show keyboard shortcuts modal
+        async function showKeyboardShortcutsModal() {
+            // Check premium
+            const hasPremium = window.premiumFeatures?.checkPremiumFeature('keyboardShortcuts');
+            if (!hasPremium) {
+                alert('Bu özellik premium üyeler için mevcuttur.');
+                return;
+            }
+            
+            // Load and render shortcuts
+            await renderKeyboardShortcutsUI();
+            
+            // Clear form
+            document.getElementById('shortcutKeyInput').value = '';
+            document.getElementById('shortcutProductsInput').value = '';
+            document.getElementById('shortcutError').classList.add('hidden');
+            document.getElementById('shortcutError').textContent = '';
+            
+            // Show modal
+            document.getElementById('keyboardShortcutsModal').classList.remove('hidden');
+        }
+        
+        // Hide keyboard shortcuts modal
+        function hideKeyboardShortcutsModal() {
+            document.getElementById('keyboardShortcutsModal').classList.add('hidden');
+        }
+        
+        // Add keyboard shortcut
+        async function addKeyboardShortcut() {
+            const keyInput = document.getElementById('shortcutKeyInput');
+            const productsInput = document.getElementById('shortcutProductsInput');
+            const errorDiv = document.getElementById('shortcutError');
+            
+            const key = keyInput.value.trim();
+            const products = productsInput.value.trim();
+            
+            // Clear previous errors
+            errorDiv.classList.add('hidden');
+            errorDiv.textContent = '';
+            
+            // Remove any existing success messages
+            const existingSuccess = errorDiv.parentElement.querySelector('.bg-green-50');
+            if (existingSuccess) {
+                existingSuccess.remove();
+            }
+            
+            // Validation
+            if (!key) {
+                errorDiv.textContent = 'Lütfen bir tuş girin.';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+            
+            if (!products) {
+                errorDiv.textContent = 'Lütfen aranacak ürün(ler)i girin.';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+            
+            // Load existing shortcuts
+            const existingShortcuts = await loadKeyboardShortcuts();
+            
+            // Normalize key
+            const normalizedKey = normalizeKeyCombo(key);
+            
+            // Check if editing (key already exists)
+            const isEditing = existingShortcuts[normalizedKey] !== undefined;
+            
+            // If editing, temporarily remove from validation check
+            const shortcutsForValidation = { ...existingShortcuts };
+            if (isEditing) {
+                delete shortcutsForValidation[normalizedKey];
+            }
+            
+            // Validate key combo (if not editing or key changed)
+            const validation = validateKeyCombo(key, shortcutsForValidation);
+            if (!validation.valid) {
+                errorDiv.textContent = validation.error;
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+            
+            // Add/update shortcut
+            existingShortcuts[normalizedKey] = products;
+            
+            try {
+                await saveKeyboardShortcuts(existingShortcuts);
+                
+                // Clear form
+                keyInput.value = '';
+                productsInput.value = '';
+                
+                // Re-render list
+                await renderKeyboardShortcutsUI();
+                
+                // Show success message
+                const successMsg = document.createElement('div');
+                successMsg.className = 'text-sm text-green-600 bg-green-50 border border-green-200 rounded p-2 mb-4';
+                successMsg.textContent = isEditing 
+                    ? `✅ "${normalizedKey}" kısayolu başarıyla güncellendi!`
+                    : `✅ "${normalizedKey}" kısayolu başarıyla eklendi!`;
+                errorDiv.parentElement.insertBefore(successMsg, errorDiv);
+                setTimeout(() => successMsg.remove(), 3000);
+            } catch (error) {
+                errorDiv.textContent = 'Kısayol kaydedilirken bir hata oluştu. Lütfen tekrar deneyin.';
+                errorDiv.classList.remove('hidden');
+            }
+        }
+        
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Get keyboard shortcut key from event
+        function getKeyFromEvent(event) {
+            // Ignore if typing in input/textarea (including search input)
+            const target = event.target;
+            const tagName = target.tagName.toLowerCase();
+            if (tagName === 'input' || tagName === 'textarea') {
+                return null;
+            }
+            
+            // Build key combination
+            const parts = [];
+            if (event.ctrlKey) parts.push('Ctrl');
+            if (event.altKey) parts.push('Alt');
+            if (event.shiftKey) parts.push('Shift');
+            if (event.metaKey) parts.push('Meta');
+            
+            // Get the key (not modifier)
+            let key = event.key;
+            
+            // Handle special keys
+            if (key === ' ') key = 'Space';
+            if (key === 'Enter') key = 'Enter';
+            if (key.startsWith('F') && key.length > 1 && /^F\d+$/.test(key)) {
+                // F1, F2, etc.
+                key = key.toUpperCase();
+            } else if (key.length === 1 && /^[a-zA-Z]$/.test(key)) {
+                // Single letter
+                key = key.toUpperCase();
+            } else if (key.length > 1) {
+                // Other special keys (ArrowUp, ArrowDown, etc.) - keep as is
+                // But normalize common ones
+                if (key.startsWith('Arrow')) {
+                    key = key.replace('Arrow', '');
+                }
+            }
+            
+            // If no modifiers, return just the key
+            if (parts.length === 0) {
+                return key;
+            }
+            
+            // Combine modifiers + key
+            parts.push(key);
+            return parts.join('+');
+        }
+        
+        // Handle keyboard press
+        async function handleKeyPress(event) {
+            // Premium control
+            const hasPremium = window.premiumFeatures?.checkPremiumFeature('keyboardShortcuts');
+            if (!hasPremium) {
+                return;
+            }
+            
+            // Ignore if typing in any input/textarea (including search input)
+            const target = event.target;
+            const tagName = target.tagName.toLowerCase();
+            if (tagName === 'input' || tagName === 'textarea') {
+                return;
+            }
+            
+            // Ignore if typing in contenteditable elements
+            if (target.isContentEditable) {
+                return;
+            }
+            
+            // Get key combination
+            const keyCombo = getKeyFromEvent(event);
+            if (!keyCombo) {
+                return;
+            }
+            
+            // Load shortcuts
+            const shortcuts = await loadKeyboardShortcuts();
+            const normalizedKey = normalizeKeyCombo(keyCombo);
+            
+            // Check if shortcut exists
+            if (shortcuts[normalizedKey]) {
+                // Prevent default browser behavior
+                event.preventDefault();
+                event.stopPropagation();
+                
+                // Get products to search
+                const products = shortcuts[normalizedKey];
+                
+                // Set search input and trigger search
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) {
+                    searchInput.value = products;
+                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    searchInput.focus();
+                }
+                
+                console.log(`⌨️ Keyboard shortcut triggered: ${normalizedKey} → ${products}`);
+            }
         }
 
         // Update settings modal info
@@ -3839,6 +4395,18 @@
                     hidePremiumFeatureDetailModal();
                 }
             });
+            
+            // Keyboard shortcuts modal
+            document.getElementById('closeKeyboardShortcutsModal').addEventListener('click', hideKeyboardShortcutsModal);
+            document.getElementById('keyboardShortcutsModal').addEventListener('click', (e) => {
+                if (e.target.id === 'keyboardShortcutsModal') {
+                    hideKeyboardShortcutsModal();
+                }
+            });
+            document.getElementById('addShortcutBtn').addEventListener('click', addKeyboardShortcut);
+            
+            // Global keyboard event listener
+            document.addEventListener('keydown', handleKeyPress);
             document.getElementById('refreshData').addEventListener('click', refreshData);
             document.getElementById('analyzeDuplicates').addEventListener('click', () => {
                 const result = analyzeDuplicates();
