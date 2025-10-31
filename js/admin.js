@@ -185,6 +185,19 @@ class AdminPanel {
         document.getElementById('adminMessageInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.sendAdminMessage();
         });
+
+        // Premium Features Modal
+        document.getElementById('closePremiumFeaturesModal')?.addEventListener('click', () => {
+            document.getElementById('premiumFeaturesModal').classList.add('hidden');
+        });
+
+        document.getElementById('cancelPremiumFeatures')?.addEventListener('click', () => {
+            document.getElementById('premiumFeaturesModal').classList.add('hidden');
+        });
+
+        document.getElementById('savePremiumFeatures')?.addEventListener('click', () => {
+            this.savePremiumFeatures();
+        });
     }
 
     async switchTab(tabName) {
@@ -303,6 +316,7 @@ class AdminPanel {
                     <div class="flex space-x-2">
                         <button onclick="adminPanel.editUser('${user.username}')" class="text-green-600 hover:text-green-900">Düzenle</button>
                         <button onclick="adminPanel.extendTrial('${user.username}')" class="text-blue-600 hover:text-blue-900">Uzat</button>
+                        <button onclick="adminPanel.managePremiumFeatures('${user.username}')" class="text-purple-600 hover:text-purple-900">⭐ Premium</button>
                         <button onclick="adminPanel.toggleUser('${user.username}')" class="text-yellow-600 hover:text-yellow-900">
                             ${user.is_active ? 'Deaktif Et' : 'Aktif Et'}
                         </button>
@@ -2510,5 +2524,180 @@ AdminPanel.prototype.playAdminNotificationSound = function() {
         oscillator.stop(audioContext.currentTime + 0.3);
     } catch (error) {
         console.log('Admin notification sound not supported');
+    }
+};
+
+// Premium Features Management Functions
+AdminPanel.prototype.managePremiumFeatures = async function(username) {
+    console.log('⭐ Managing premium features for user:', username);
+    
+    // Set current user for premium features modal
+    this.currentPremiumUser = username;
+    
+    // Load user's premium features
+    await this.loadPremiumFeatures(username);
+    
+    // Show modal
+    const modal = document.getElementById('premiumFeaturesModal');
+    if (modal) {
+        document.getElementById('premiumFeaturesUsername').textContent = username;
+        modal.classList.remove('hidden');
+    }
+};
+
+AdminPanel.prototype.loadPremiumFeatures = async function(username) {
+    try {
+        let premiumFeatures = {};
+        
+        // Try Supabase first
+        if (window.supabase) {
+            const { data, error } = await window.supabase
+                .from('users')
+                .select('premium_features')
+                .eq('username', username)
+                .single();
+            
+            if (!error && data && data.premium_features) {
+                premiumFeatures = data.premium_features;
+            }
+        }
+        
+        // Define available premium features
+        const availableFeatures = {
+            'autoPaste': 'Otomatik Yapıştır',
+            'keyboardShortcuts': 'Klavye Kısayolları',
+            'bulkCopy': 'Toplu Kopyalama',
+            'darkMode': 'Karanlık Mod',
+            'offlineMode': 'Çevrimdışı Mod',
+            'advancedFilters': 'Gelişmiş Filtreler',
+            'unlimitedHistory': 'Sınırsız Geçmiş',
+            'favorites': 'Favoriler'
+        };
+        
+        // Render premium features list
+        const featuresList = document.getElementById('premiumFeaturesList');
+        if (featuresList) {
+            featuresList.innerHTML = '';
+            
+            Object.keys(availableFeatures).forEach(featureKey => {
+                const featureEnabled = premiumFeatures[featureKey] === true;
+                const featureName = availableFeatures[featureKey];
+                
+                const featureItem = document.createElement('div');
+                featureItem.className = 'flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200';
+                featureItem.innerHTML = `
+                    <div class="flex-1">
+                        <h4 class="text-sm font-medium text-gray-900">${featureName}</h4>
+                        <p class="text-xs text-gray-500 mt-1">${this.getFeatureDescription(featureKey)}</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer ml-4">
+                        <input type="checkbox" 
+                               data-feature="${featureKey}" 
+                               class="sr-only peer" 
+                               ${featureEnabled ? 'checked' : ''}>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                `;
+                
+                featuresList.appendChild(featureItem);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading premium features:', error);
+        alert('Premium özellikler yüklenirken hata oluştu.');
+    }
+};
+
+AdminPanel.prototype.getFeatureDescription = function(featureKey) {
+    const descriptions = {
+        'autoPaste': 'Terminalden kopyalanan barkodları otomatik yapıştırır',
+        'keyboardShortcuts': 'Klavye kısayolları ile hızlı erişim',
+        'bulkCopy': 'Birden fazla barkodu tek seferde kopyala',
+        'darkMode': 'Göz yormayan karanlık tema',
+        'offlineMode': 'İnternet olmadan da çalışma',
+        'advancedFilters': 'Gelişmiş filtreleme seçenekleri',
+        'unlimitedHistory': 'Sınırsız arama geçmişi',
+        'favorites': 'Sık kullanılan ürünleri favorilere ekle'
+    };
+    return descriptions[featureKey] || '';
+};
+
+AdminPanel.prototype.savePremiumFeatures = async function() {
+    if (!this.currentPremiumUser) {
+        alert('Kullanıcı seçilmedi!');
+        return;
+    }
+    
+    try {
+        // Collect feature states from checkboxes
+        const premiumFeatures = {};
+        const checkboxes = document.querySelectorAll('#premiumFeaturesList input[type="checkbox"]');
+        
+        checkboxes.forEach(checkbox => {
+            const featureKey = checkbox.dataset.feature;
+            if (featureKey) {
+                premiumFeatures[featureKey] = checkbox.checked;
+            }
+        });
+        
+        // Update in Supabase
+        if (window.supabase) {
+            const { data, error } = await window.supabase
+                .from('users')
+                .update({ 
+                    premium_features: premiumFeatures,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('username', this.currentPremiumUser);
+            
+            if (error) {
+                throw error;
+            }
+            
+            console.log('✅ Premium features updated for:', this.currentPremiumUser);
+            
+            // Show success message
+            alert(`Premium özellikler başarıyla güncellendi. Kullanıcıya bildirim gönderildi ve sayfa otomatik yenilenecek.`);
+            
+            // Close modal
+            document.getElementById('premiumFeaturesModal').classList.add('hidden');
+            
+            // Reload users to reflect changes
+            await this.loadUsers();
+            
+            // Trigger realtime update for user
+            await this.triggerPremiumFeaturesRealtimeUpdate(this.currentPremiumUser);
+        } else {
+            alert('Supabase bağlantısı yok!');
+        }
+    } catch (error) {
+        console.error('Error saving premium features:', error);
+        alert('Premium özellikler kaydedilirken hata oluştu: ' + error.message);
+    }
+};
+
+AdminPanel.prototype.triggerPremiumFeaturesRealtimeUpdate = async function(username) {
+    if (!window.supabase) return;
+    
+    console.log('🔔 Triggering premium features realtime update for:', username);
+    
+    // Update a timestamp field to trigger realtime subscription
+    // Since we're updating premium_features, the realtime subscription should catch it
+    // But we can also update updated_at to ensure the change is detected
+    try {
+        const { error } = await window.supabase
+            .from('users')
+            .update({ 
+                updated_at: new Date().toISOString()
+            })
+            .eq('username', username);
+        
+        if (error) {
+            console.error('❌ Error triggering realtime update:', error);
+        } else {
+            console.log('✅ Premium features realtime update triggered for:', username);
+        }
+    } catch (error) {
+        console.error('❌ Error triggering premium features realtime update:', error);
     }
 };

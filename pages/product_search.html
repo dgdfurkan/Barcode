@@ -17,6 +17,8 @@
     <script src="temp_products.js"></script>
     <script src="../js/auth.js"></script>
     <script src="../js/user-manager.js"></script>
+    <script src="../js/premium-features.js"></script>
+    <script src="../js/notifications.js"></script>
 <script type="module" src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Fproductba5734back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.8"></script>
     
     <!-- Animated Scan Effect CSS -->
@@ -599,26 +601,119 @@
         const resultCount = document.getElementById('resultCount');
         const exportResults = document.getElementById('exportResults');
 
-        // ----- Otomatik Yapıştırma Ayarı -----
+        // ----- Otomatik Yapıştırma Ayarı (Premium Özellik Kontrolü ile) -----
         const AUTO_PASTE_KEY = 'autoPasteEnabled';
-        function isAutoPasteEnabled() {
+        
+        // Premium feature check wrapper
+        async function checkAutoPastePremium() {
+            // Check premium feature from backend
+            if (window.premiumFeatures) {
+                // Validate with backend for security
+                const hasPremium = await window.premiumFeatures.validatePremiumFeature('autoPaste');
+                if (hasPremium) {
+                    return true;
+                }
+            }
+            
+            // Fallback to local storage (for backward compatibility during transition)
             try {
                 return localStorage.getItem(AUTO_PASTE_KEY) === '1';
             } catch (e) {
                 return false;
             }
         }
+        
+        function isAutoPasteEnabled() {
+            // Quick check from cache (for immediate UI response)
+            if (window.premiumFeatures && window.premiumFeatures.checkPremiumFeature('autoPaste')) {
+                return true;
+            }
+            
+            // Fallback to local storage
+            try {
+                return localStorage.getItem(AUTO_PASTE_KEY) === '1';
+            } catch (e) {
+                return false;
+            }
+        }
+        
         function setAutoPasteEnabled(value) {
+            // Premium feature is controlled by admin, so we can't set it here
+            // But we can save user preference in localStorage for future reference
             try {
                 localStorage.setItem(AUTO_PASTE_KEY, value ? '1' : '0');
             } catch (e) {}
         }
-        // UI başlangıç durumunu ayarla
-        if (autoPasteEnabledEl) {
-            autoPasteEnabledEl.checked = isAutoPasteEnabled();
-            autoPasteEnabledEl.addEventListener('change', () => {
-                setAutoPasteEnabled(autoPasteEnabledEl.checked);
+        
+        // Initialize premium features when ready
+        async function initAutoPasteFeature() {
+            // Wait for premium features to load
+            if (window.premiumFeatures && window.authUtils?.checkAuth()) {
+                await window.premiumFeatures.init();
+                
+                // Check if user has premium feature
+                const hasPremium = await checkAutoPastePremium();
+                
+                // Update UI checkbox state
+                if (autoPasteEnabledEl) {
+                    // Load saved preference from localStorage (if premium user has enabled it before)
+                    const savedPreference = isAutoPasteEnabled();
+                    autoPasteEnabledEl.checked = hasPremium && savedPreference;
+                    
+                    // Enable/disable checkbox based on premium status
+                    if (!hasPremium) {
+                        autoPasteEnabledEl.disabled = true;
+                        // Add tooltip or visual indicator
+                        if (autoPasteEnabledEl.parentElement) {
+                            const label = autoPasteEnabledEl.parentElement.querySelector('label');
+                            if (label && !label.querySelector('.premium-badge')) {
+                                const badge = document.createElement('span');
+                                badge.className = 'premium-badge text-xs text-purple-600 ml-2';
+                                badge.textContent = '⭐ Premium';
+                                label.appendChild(badge);
+                            }
+                        }
+                    } else {
+                        autoPasteEnabledEl.disabled = false;
+                        // Remove premium badge if exists
+                        const badge = autoPasteEnabledEl.parentElement?.querySelector('.premium-badge');
+                        if (badge) {
+                            badge.remove();
+                        }
+                    }
+                    
+                    // Add change listener - user can enable/disable if they have premium
+                    autoPasteEnabledEl.addEventListener('change', async () => {
+                        // Check premium again before allowing change
+                        const hasPremium = await checkAutoPastePremium();
+                        if (hasPremium) {
+                            // Save user preference
+                            setAutoPasteEnabled(autoPasteEnabledEl.checked);
+                        } else {
+                            // Reset to false and show message
+                            autoPasteEnabledEl.checked = false;
+                            alert('Bu özellik premium üyeler için mevcuttur. Lütfen admin ile iletişime geçin.');
+                        }
+                    });
+                }
+            } else {
+                // Fallback: use local storage if premium features not loaded
+                if (autoPasteEnabledEl) {
+                    autoPasteEnabledEl.checked = isAutoPasteEnabled();
+                    autoPasteEnabledEl.addEventListener('change', () => {
+                        setAutoPasteEnabled(autoPasteEnabledEl.checked);
+                    });
+                }
+            }
+        }
+        
+        // Initialize when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                setTimeout(initAutoPasteFeature, 1000); // Wait for auth to be ready
             });
+        } else {
+            setTimeout(initAutoPasteFeature, 1000);
         }
 
         async function pasteFromClipboardAndSearch() {
@@ -644,42 +739,62 @@
             });
         }
 
-        // Otomatik yapıştırma: her odaklanmada panodan oku; aynı içerikse tekrarlama
-        let autoPasteTimer = null;
+        // Otomatik yapıştırma: Sadece sayfa yüklendiğinde veya sayfaya geri dönüldüğünde çalışır
+        // Loop değil - sadece sayfa geçişlerinde çalışır
         let lastClipboardText = '';
+        let autoPasteAttempted = false; // Track if we've tried to paste in this session
 
-        async function tryAutoPasteOnFocus() {
-            if (!isAutoPasteEnabled()) return;
+        async function tryAutoPasteOnPageShow() {
+            // Check premium feature with backend validation
+            const hasPremium = await checkAutoPastePremium();
+            if (!hasPremium) return;
+            
+            // Check if user has enabled auto-paste in settings
+            const isEnabled = isAutoPasteEnabled();
+            if (!isEnabled) return;
+            
             try {
                 if (!navigator.clipboard || !navigator.clipboard.readText) return;
+                
                 const text = await navigator.clipboard.readText();
                 if (!text) return;
+                
+                // Skip if same text was already pasted
                 if (text === lastClipboardText && searchInput && searchInput.value === text) return;
+                
+                // Skip if search input already has content (user might be typing)
+                if (searchInput && searchInput.value.trim() !== '') return;
+                
                 lastClipboardText = text;
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
-                if (parsed && parsed !== searchInput.value) {
+                
+                if (parsed && parsed.trim() !== '') {
                     searchInput.value = parsed;
                     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    autoPasteAttempted = true;
                 }
-            } catch (e) { /* ignore */ }
+            } catch (e) { 
+                // Permission denied or other clipboard errors - ignore silently
+                // This is normal when clipboard API is not available or permission not granted
+                console.debug('Clipboard access:', e.message);
+            }
         }
 
-        window.addEventListener('focus', () => {
-            if (autoPasteTimer) clearTimeout(autoPasteTimer);
-            autoPasteTimer = setTimeout(tryAutoPasteOnFocus, 80);
-        });
-
-        window.addEventListener('pageshow', () => {
-            if (document.visibilityState === 'visible') {
-                if (autoPasteTimer) clearTimeout(autoPasteTimer);
-                autoPasteTimer = setTimeout(tryAutoPasteOnFocus, 80);
+        // Only trigger on pageshow (when page is shown, including initial load and back/forward navigation)
+        // This happens once per page load, not on every focus/visibility change
+        window.addEventListener('pageshow', (event) => {
+            // Reset flag when page is restored from back/forward cache
+            if (event.persisted) {
+                // Page was restored from back/forward cache - reset
+                autoPasteAttempted = false;
+                lastClipboardText = '';
             }
-        });
-
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-                if (autoPasteTimer) clearTimeout(autoPasteTimer);
-                autoPasteTimer = setTimeout(tryAutoPasteOnFocus, 120);
+            
+            // Try auto-paste on initial load (first pageshow event)
+            // or when page is restored from cache
+            if (!autoPasteAttempted && document.visibilityState === 'visible') {
+                // Small delay to ensure clipboard API is ready and premium features loaded
+                setTimeout(tryAutoPasteOnPageShow, 300);
             }
         });
 

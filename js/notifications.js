@@ -1,0 +1,460 @@
+// Notification System for Premium Features
+class NotificationSystem {
+    constructor() {
+        this.currentUser = null;
+        this.subscription = null;
+        this.reloadTimer = null;
+        this.pollingInterval = null;
+        this.lastKnownFeatures = null;
+    }
+
+    // Initialize notification system
+    async init() {
+        const session = window.authUtils?.checkAuth();
+        if (!session) {
+            console.warn('No user session found for notifications');
+            return;
+        }
+        
+        this.currentUser = session;
+        this.setupRealtimeSubscription();
+    }
+
+    // Setup Supabase Realtime subscription for premium features changes
+    setupRealtimeSubscription() {
+        if (!window.supabase || !this.currentUser) {
+            console.warn('⚠️ Supabase or user not available for realtime');
+            // Fallback to polling
+            this.setupPollingFallback();
+            return;
+        }
+
+        console.log('🔔 Setting up premium features realtime subscription for:', this.currentUser.username);
+
+        // Check if we're on file:// protocol (realtime won't work)
+        const isFileProtocol = window.location.protocol === 'file:';
+        if (isFileProtocol) {
+            console.warn('⚠️ File protocol detected - using polling fallback');
+            this.setupPollingFallback();
+            return;
+        }
+
+        // Load initial premium features to compare later
+        this.loadInitialPremiumFeatures();
+
+        try {
+            // Subscribe to users table changes for this specific user's premium_features
+            this.subscription = window.supabase
+                .channel('premium-features-updates')
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'users',
+                    filter: `username=eq.${this.currentUser.username}`
+                }, (payload) => {
+                    console.log('🔔 Premium features update received:', payload);
+                    this.handlePremiumFeaturesUpdate(payload);
+                })
+                .subscribe((status) => {
+                    console.log('🔔 Subscription status:', status);
+                    if (status === 'SUBSCRIBED') {
+                        console.log('✅ Premium features realtime subscription established');
+                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                        console.warn('⚠️ Realtime subscription failed, falling back to polling');
+                        this.setupPollingFallback();
+                    }
+                });
+        } catch (error) {
+            console.error('❌ Error setting up realtime subscription:', error);
+            this.setupPollingFallback();
+        }
+    }
+
+    // Fallback polling mechanism for file:// protocol or when realtime fails
+    setupPollingFallback() {
+        console.log('🔄 Setting up polling fallback for premium features');
+        
+        // Load initial state
+        this.loadInitialPremiumFeatures();
+        
+        // Poll every 5 seconds
+        this.pollingInterval = setInterval(async () => {
+            await this.checkPremiumFeaturesChanges();
+        }, 5000);
+    }
+
+    // Load initial premium features state
+    async loadInitialPremiumFeatures() {
+        try {
+            if (!window.supabase || !this.currentUser) return;
+            
+            const { data, error } = await window.supabase
+                .from('users')
+                .select('premium_features')
+                .eq('username', this.currentUser.username)
+                .single();
+            
+            if (!error && data) {
+                this.lastKnownFeatures = data.premium_features || {};
+                
+                // Update premium features cache
+                if (window.premiumFeatures) {
+                    window.premiumFeatures.premiumFeatures = this.lastKnownFeatures;
+                }
+            }
+        } catch (error) {
+            console.error('Error loading initial premium features:', error);
+        }
+    }
+
+    // Check for premium features changes (polling)
+    async checkPremiumFeaturesChanges() {
+        try {
+            if (!window.supabase || !this.currentUser) return;
+            
+            const { data, error } = await window.supabase
+                .from('users')
+                .select('premium_features')
+                .eq('username', this.currentUser.username)
+                .single();
+            
+            if (error || !data) return;
+            
+            const currentFeatures = data.premium_features || {};
+            const oldFeatures = this.lastKnownFeatures || {};
+            
+            // Detect changes
+            const changedFeatures = this.detectFeatureChanges(oldFeatures, currentFeatures);
+            
+            if (changedFeatures.length > 0) {
+                console.log('📢 Premium features changed (polling):', changedFeatures);
+                
+                // Update cache
+                this.lastKnownFeatures = currentFeatures;
+                if (window.premiumFeatures) {
+                    window.premiumFeatures.premiumFeatures = currentFeatures;
+                }
+                
+                // Handle changes
+                const enabledFeatures = changedFeatures.filter(f => f.enabled);
+                if (enabledFeatures.length > 0) {
+                    this.showPremiumFeaturesNotification(enabledFeatures);
+                }
+            }
+        } catch (error) {
+            console.error('Error checking premium features changes:', error);
+        }
+    }
+
+    // Handle premium features update from realtime
+    handlePremiumFeaturesUpdate(payload) {
+        if (!payload.new || !payload.new.premium_features) {
+            return;
+        }
+
+        const oldFeatures = payload.old?.premium_features || {};
+        const newFeatures = payload.new.premium_features || {};
+
+        // Check if any features changed
+        const changedFeatures = this.detectFeatureChanges(oldFeatures, newFeatures);
+        
+        if (changedFeatures.length > 0) {
+            console.log('📢 Premium features changed:', changedFeatures);
+            
+            // Store changed features for later use
+            this.lastChangedFeatures = changedFeatures;
+            
+            // Refresh premium features cache
+            if (window.premiumFeatures) {
+                window.premiumFeatures.premiumFeatures = newFeatures;
+            }
+
+            // Show notification (don't auto-reload, let user click)
+            this.showPremiumFeaturesNotification(changedFeatures);
+        }
+    }
+
+    // Detect which features changed
+    detectFeatureChanges(oldFeatures, newFeatures) {
+        const changed = [];
+        const allFeatureNames = new Set([
+            ...Object.keys(oldFeatures),
+            ...Object.keys(newFeatures)
+        ]);
+
+        allFeatureNames.forEach(featureName => {
+            const oldValue = oldFeatures[featureName] || false;
+            const newValue = newFeatures[featureName] || false;
+            
+            if (oldValue !== newValue) {
+                changed.push({
+                    name: featureName,
+                    oldValue: oldValue,
+                    newValue: newValue,
+                    enabled: newValue
+                });
+            }
+        });
+
+        return changed;
+    }
+
+    // Show notification about premium features change
+    showPremiumFeaturesNotification(changedFeatures) {
+        const enabledFeatures = changedFeatures.filter(f => f.enabled);
+        const disabledFeatures = changedFeatures.filter(f => !f.enabled);
+
+        // Show notification for enabled features only (new premium features)
+        if (enabledFeatures.length > 0) {
+            const featureNames = enabledFeatures.map(f => this.getFeatureName(f.name)).join(', ');
+            
+            // Show browser notification if permission granted
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('✨ Yeni Premium Özellikler', {
+                    body: `${featureNames} özelliklerine erişebilirsiniz!`,
+                    icon: '../assets/logo.png',
+                    tag: 'premium-features-update'
+                });
+            }
+
+            // Show in-page notification with click handler
+            this.showInPageNotificationWithModal(enabledFeatures);
+        }
+    }
+
+    // Get user-friendly feature name
+    getFeatureName(featureName) {
+        const featureNames = {
+            'autoPaste': 'Otomatik Yapıştır',
+            'keyboardShortcuts': 'Klavye Kısayolları',
+            'bulkCopy': 'Toplu Kopyalama',
+            'darkMode': 'Karanlık Mod',
+            'offlineMode': 'Çevrimdışı Mod',
+            'advancedFilters': 'Gelişmiş Filtreler',
+            'unlimitedHistory': 'Sınırsız Geçmiş',
+            'favorites': 'Favoriler'
+        };
+        return featureNames[featureName] || featureName;
+    }
+
+    // Get feature emoji
+    getFeatureEmoji(featureName) {
+        const emojis = {
+            'autoPaste': '📋',
+            'keyboardShortcuts': '⌨️',
+            'bulkCopy': '📦',
+            'darkMode': '🌙',
+            'offlineMode': '📡',
+            'advancedFilters': '🔍',
+            'unlimitedHistory': '📜',
+            'favorites': '⭐'
+        };
+        return emojis[featureName] || '✨';
+    }
+
+    // Get full feature description
+    getFeatureFullDescription(featureName) {
+        const descriptions = {
+            'autoPaste': 'Terminal cihazınızdan kopyaladığınız barkodları, sayfaya geri döndüğünüzde otomatik olarak arama kutusuna yapıştırır. Bu sayede tekrar tekrar kopyala-yapıştır yapmadan hızlıca arama yapabilirsiniz.',
+            'keyboardShortcuts': 'Klavye kısayolları ile sistemi daha hızlı kullanabilirsiniz. Örneğin Ctrl+K ile arama kutusuna odaklanabilir, Enter ile ilk sonuca geçebilirsiniz.',
+            'bulkCopy': 'Birden fazla ürünün barkodlarını seçip tek seferde kopyalayabilirsiniz. Terminalde hızlıca okutabilmek için tüm barkodları toplu olarak alabilirsiniz.',
+            'darkMode': 'Göz yormayan karanlık tema ile daha uzun süre rahatlıkla çalışabilirsiniz. Özellikle düşük ışıklı ortamlarda ideal.',
+            'offlineMode': 'İnternet bağlantınız olmasa bile sık kullandığınız ürünleri arayabilirsiniz. Çevrimdışı mod ile kesintisiz çalışma devam eder.',
+            'advancedFilters': 'Gelişmiş filtreleme seçenekleri ile ürünleri kategori, marka, stok durumu gibi kriterlere göre filtreleyebilirsiniz.',
+            'unlimitedHistory': 'Arama geçmişiniz sınırsız saklanır. Daha önce aradığınız ürünleri kolayca tekrar bulabilirsiniz.',
+            'favorites': 'Sık kullandığınız ürünleri favorilere ekleyip hızlı erişim sağlayabilirsiniz. Zaman kazandıran pratik bir özellik.'
+        };
+        return descriptions[featureName] || 'Bu özellik çalışma verimliliğinizi artırır.';
+    }
+
+    // Show in-page notification with modal option
+    showInPageNotificationWithModal(enabledFeatures) {
+        // Remove existing notification if any
+        const existingNotification = document.getElementById('premium-features-notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+
+        const featureNames = enabledFeatures.map(f => this.getFeatureName(f.name)).join(', ');
+
+        console.log('📢 Showing premium features notification for:', enabledFeatures);
+        
+        // Create notification element with click handler
+        const notification = document.createElement('div');
+        notification.id = 'premium-features-notification';
+        notification.className = 'fixed top-4 right-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white px-6 py-4 rounded-lg shadow-lg max-w-md cursor-pointer hover:from-purple-600 hover:to-purple-700 transition-all transform hover:scale-105';
+        notification.style.zIndex = '9998'; // High z-index, but lower than modal
+        notification.innerHTML = `
+            <div class="flex items-center space-x-3">
+                <div class="text-2xl">✨</div>
+                <div class="flex-1">
+                    <p class="font-semibold text-lg">Yeni Premium Özellikler!</p>
+                    <p class="text-sm mt-1 opacity-95">${featureNames}</p>
+                    <p class="text-xs mt-2 opacity-80">📋 Detaylar için tıklayın</p>
+                </div>
+                <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </div>
+        `;
+
+        // Add click handler to show modal
+        notification.addEventListener('click', () => {
+            this.showPremiumFeaturesModal(enabledFeatures);
+            notification.remove();
+        });
+
+        document.body.appendChild(notification);
+
+        // Don't auto-remove - let user click or close manually
+        // Add close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'absolute top-2 right-2 text-white opacity-70 hover:opacity-100';
+        closeBtn.innerHTML = '×';
+        closeBtn.style.fontSize = '24px';
+        closeBtn.style.lineHeight = '1';
+        closeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            notification.remove();
+        });
+        notification.appendChild(closeBtn);
+    }
+
+    // Show premium features information modal
+    showPremiumFeaturesModal(enabledFeatures) {
+        console.log('📋 Showing premium features modal for:', enabledFeatures);
+        
+        // Remove existing modal if any
+        const existingModal = document.getElementById('premium-features-info-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Create modal - using very high z-index to ensure it's on top
+        const modal = document.createElement('div');
+        modal.id = 'premium-features-info-modal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4';
+        modal.style.zIndex = '9999'; // Very high z-index to ensure visibility
+        modal.innerHTML = `
+            <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <div class="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-t-xl">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="text-4xl">✨</div>
+                            <div>
+                                <h3 class="text-2xl font-bold">Yeni Premium Özellikler!</h3>
+                                <p class="text-purple-100 text-sm mt-1">Artık bu özelliklere erişebilirsiniz</p>
+                            </div>
+                        </div>
+                        <button id="closePremiumModal" class="text-white hover:text-purple-200 transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="p-6">
+                    <div class="space-y-4">
+                        ${enabledFeatures.map(feature => `
+                            <div class="border border-purple-100 rounded-lg p-4 hover:bg-purple-50 transition-colors">
+                                <div class="flex items-start space-x-3">
+                                    <div class="text-2xl mt-1">${this.getFeatureEmoji(feature.name)}</div>
+                                    <div class="flex-1">
+                                        <h4 class="font-semibold text-lg text-gray-900">${this.getFeatureName(feature.name)}</h4>
+                                        <p class="text-gray-600 text-sm mt-1">${this.getFeatureFullDescription(feature.name)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div class="flex items-start space-x-3">
+                            <div class="text-xl">⚙️</div>
+                            <div>
+                                <p class="font-semibold text-gray-900">Nasıl Kullanılır?</p>
+                                <p class="text-gray-700 text-sm mt-1">
+                                    Bu premium özellikler şu anda aktif! Ancak isterseniz <strong>Ayarlar</strong> bölümünden 
+                                    her bir özelliği açıp kapatabilirsiniz. Bu sayede size en uygun deneyimi oluşturabilirsiniz.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-6 flex justify-end space-x-3">
+                        <button id="goToSettings" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">
+                            ⚙️ Ayarlara Git
+                        </button>
+                        <button id="closePremiumModalBtn" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium">
+                            Anladım
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Close handlers
+        const closeModal = () => {
+            modal.remove();
+        };
+
+        document.getElementById('closePremiumModal')?.addEventListener('click', closeModal);
+        document.getElementById('closePremiumModalBtn')?.addEventListener('click', closeModal);
+        document.getElementById('goToSettings')?.addEventListener('click', () => {
+            closeModal();
+            // Trigger settings modal
+            const settingsBtn = document.getElementById('settingsBtn');
+            if (settingsBtn) {
+                settingsBtn.click();
+            }
+        });
+
+        // Close on overlay click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+    }
+
+    // No auto-reload needed - user controls through settings
+
+    // Cleanup subscription
+    cleanup() {
+        if (this.subscription) {
+            window.supabase?.removeChannel(this.subscription);
+            this.subscription = null;
+        }
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
+        if (this.reloadTimer) {
+            clearTimeout(this.reloadTimer);
+            this.reloadTimer = null;
+        }
+    }
+}
+
+// Global notification system instance
+window.notificationSystem = new NotificationSystem();
+
+// Initialize when auth is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.authUtils?.checkAuth()) {
+            window.notificationSystem.init();
+        }
+    });
+} else {
+    // Already loaded, check if user is authenticated
+    setTimeout(() => {
+        if (window.authUtils?.checkAuth()) {
+            window.notificationSystem.init();
+        }
+    }, 500);
+}
+

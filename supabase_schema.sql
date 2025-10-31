@@ -11,6 +11,7 @@ CREATE TABLE users (
     allowed_ips TEXT[] DEFAULT ARRAY['*'],
     is_active BOOLEAN DEFAULT true,
     is_admin BOOLEAN DEFAULT false,
+    premium_features JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -65,6 +66,7 @@ CREATE INDEX idx_messages_status ON messages(status);
 CREATE INDEX idx_ip_logs_username ON ip_logs(username);
 CREATE INDEX idx_ip_logs_ip ON ip_logs(ip_address);
 CREATE INDEX idx_rate_limits_ip ON rate_limits(ip_address);
+CREATE INDEX idx_users_premium_features ON users USING GIN (premium_features);
 
 -- Row Level Security (RLS) policies
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
