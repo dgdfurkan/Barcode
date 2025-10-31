@@ -739,60 +739,87 @@
             });
         }
 
-        // Otomatik yapıştırma: Sadece sayfa yüklendiğinde veya sayfaya geri dönüldüğünde çalışır
-        // Loop değil - sadece sayfa geçişlerinde çalışır
+        // Otomatik yapıştırma: Sayfaya her gelişte (pageshow) çalışır
+        // Başka sayfadan kopyalayıp bu sayfaya geri gelindiğinde yapıştırır
         let lastClipboardText = '';
-        let autoPasteAttempted = false; // Track if we've tried to paste in this session
 
         async function tryAutoPasteOnPageShow() {
             // Check premium feature with backend validation
             const hasPremium = await checkAutoPastePremium();
-            if (!hasPremium) return;
+            if (!hasPremium) {
+                console.debug('Auto-paste: Premium feature not available');
+                return;
+            }
             
             // Check if user has enabled auto-paste in settings
             const isEnabled = isAutoPasteEnabled();
-            if (!isEnabled) return;
+            if (!isEnabled) {
+                console.debug('Auto-paste: Feature disabled in settings');
+                return;
+            }
             
             try {
-                if (!navigator.clipboard || !navigator.clipboard.readText) return;
+                if (!navigator.clipboard || !navigator.clipboard.readText) {
+                    console.debug('Auto-paste: Clipboard API not available');
+                    return;
+                }
                 
                 const text = await navigator.clipboard.readText();
-                if (!text) return;
+                if (!text || text.trim() === '') {
+                    console.debug('Auto-paste: Clipboard is empty');
+                    return;
+                }
                 
-                // Skip if same text was already pasted
-                if (text === lastClipboardText && searchInput && searchInput.value === text) return;
+                // Skip if same text was already pasted (to avoid duplicate pastes on same session)
+                if (text === lastClipboardText) {
+                    console.debug('Auto-paste: Same text already pasted, skipping');
+                    return;
+                }
                 
                 // Skip if search input already has content (user might be typing)
-                if (searchInput && searchInput.value.trim() !== '') return;
+                if (searchInput && searchInput.value.trim() !== '') {
+                    console.debug('Auto-paste: Search input already has content, skipping');
+                    return;
+                }
                 
-                lastClipboardText = text;
+                // Parse table data if needed
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
                 
                 if (parsed && parsed.trim() !== '') {
+                    lastClipboardText = text; // Remember this text
                     searchInput.value = parsed;
                     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    autoPasteAttempted = true;
+                    console.log('✅ Auto-paste: Text pasted successfully');
                 }
             } catch (e) { 
                 // Permission denied or other clipboard errors - ignore silently
                 // This is normal when clipboard API is not available or permission not granted
-                console.debug('Clipboard access:', e.message);
+                console.debug('Auto-paste error:', e.message);
             }
         }
 
-        // Only trigger on pageshow (when page is shown, including initial load and back/forward navigation)
-        // This happens once per page load, not on every focus/visibility change
+        // Track page visibility to reset clipboard tracking when user leaves
+        document.addEventListener('visibilitychange', () => {
+            // When page becomes hidden (user navigated away), reset clipboard tracking
+            // This ensures next time they come back, new clipboard content will be pasted
+            if (document.visibilityState === 'hidden') {
+                console.debug('📄 Page hidden - resetting clipboard tracking');
+                lastClipboardText = '';
+            }
+        });
+
+        // Trigger on pageshow (when page is shown - includes initial load, back/forward, returning from another tab/page)
         window.addEventListener('pageshow', (event) => {
-            // Reset flag when page is restored from back/forward cache
+            // Reset clipboard tracking when page is restored from cache
             if (event.persisted) {
-                // Page was restored from back/forward cache - reset
-                autoPasteAttempted = false;
+                console.debug('📄 Page restored from cache - resetting clipboard tracking');
                 lastClipboardText = '';
             }
             
-            // Try auto-paste on initial load (first pageshow event)
-            // or when page is restored from cache
-            if (!autoPasteAttempted && document.visibilityState === 'visible') {
+            // Always try auto-paste when page becomes visible
+            // This happens every time user returns to the page
+            if (document.visibilityState === 'visible') {
+                console.debug('📄 Page shown - attempting auto-paste');
                 // Small delay to ensure clipboard API is ready and premium features loaded
                 setTimeout(tryAutoPasteOnPageShow, 300);
             }
@@ -3492,4 +3519,5 @@
         });
     </script>
 </body>
+</html>
 </html>
