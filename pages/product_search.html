@@ -804,27 +804,34 @@
                     return;
                 }
                 
-                // Skip if same text was already pasted (avoid duplicate pastes)
-                if (text === lastClipboardText) {
-                    console.debug('Auto-paste: Same clipboard text already pasted, skipping');
-                    return;
-                }
-                
                 // Parse table data if needed
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
                 
-                if (parsed && parsed.trim() !== '') {
-                    // Only paste if it's different from what we last pasted
-                    if (parsed !== lastClipboardText) {
-                        searchInput.value = parsed;
-                        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                        lastClipboardText = text; // Remember the raw clipboard text
-                        lastPastTime = Date.now();
-                        console.log('✅ Auto-paste: Text pasted successfully:', parsed.substring(0, 50));
-                    } else {
-                        console.debug('Auto-paste: Parsed text same as last, skipping');
-                    }
+                if (!parsed || parsed.trim() === '') {
+                    console.debug('Auto-paste: Parsed text is empty');
+                    return;
                 }
+                
+                // CRITICAL: Skip if clipboard content matches what's already in search box
+                const currentSearchValue = searchInput.value.trim();
+                if (currentSearchValue === parsed.trim()) {
+                    console.debug('Auto-paste: Clipboard content same as search box, skipping');
+                    lastClipboardText = text; // Update to prevent re-checking
+                    return;
+                }
+                
+                // Skip if same text was already pasted in this session (avoid duplicate pastes)
+                if (text === lastClipboardText) {
+                    console.debug('Auto-paste: Same clipboard text already pasted in this session, skipping');
+                    return;
+                }
+                
+                // Paste the new content
+                searchInput.value = parsed;
+                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                lastClipboardText = text; // Remember the raw clipboard text
+                lastPastTime = Date.now();
+                console.log('✅ Auto-paste: Text pasted successfully:', parsed.substring(0, 50));
             } catch (e) { 
                 // Permission denied or other clipboard errors - ignore silently
                 // This is normal when clipboard API is not available or permission not granted
