@@ -249,12 +249,24 @@ class NotificationSystem {
                 });
             }
 
-            // Show in-page notification with click handler
+            // Show in-page notification with click handler (will reload page when clicked)
             this.showInPageNotificationWithModal(enabledFeatures);
         }
         
         // Show notification for disabled features (premium features removed)
         if (disabledFeatures.length > 0) {
+            // Check if we've already shown notification for these disabled features
+            const shouldShowDisabled = this.shouldShowDisabledNotification(disabledFeatures);
+            if (!shouldShowDisabled) {
+                console.log('⏭️ Disabled notification already shown for these features, skipping');
+                // Still reload page even if notification was shown before
+                this.reloadCurrentPage();
+                return;
+            }
+            
+            // Mark as shown
+            this.markDisabledNotificationAsShown(disabledFeatures);
+            
             const featureNames = disabledFeatures.map(f => this.getFeatureName(f.name)).join(', ');
             
             // Show browser notification if permission granted
@@ -266,7 +278,7 @@ class NotificationSystem {
                 });
             }
 
-            // Show in-page notification and reload page
+            // Show in-page notification (will reload page when clicked)
             this.showDisabledFeaturesNotification(disabledFeatures);
         }
     }
@@ -293,6 +305,34 @@ class NotificationSystem {
         const shownFeatures = JSON.parse(localStorage.getItem(notificationKey) || '{}');
         
         enabledFeatures.forEach(feature => {
+            shownFeatures[feature.name] = true;
+        });
+        
+        localStorage.setItem(notificationKey, JSON.stringify(shownFeatures));
+    }
+
+    // Check if disabled notification should be shown (only once per feature)
+    shouldShowDisabledNotification(disabledFeatures) {
+        if (!this.currentUser) return true;
+        
+        const notificationKey = `premium_notification_disabled_shown_${this.currentUser.username}`;
+        const shownFeatures = JSON.parse(localStorage.getItem(notificationKey) || '{}');
+        
+        // Check if any of the disabled features haven't been shown yet
+        return disabledFeatures.some(feature => {
+            const featureKey = feature.name;
+            return !shownFeatures[featureKey];
+        });
+    }
+
+    // Mark disabled notification as shown
+    markDisabledNotificationAsShown(disabledFeatures) {
+        if (!this.currentUser) return;
+        
+        const notificationKey = `premium_notification_disabled_shown_${this.currentUser.username}`;
+        const shownFeatures = JSON.parse(localStorage.getItem(notificationKey) || '{}');
+        
+        disabledFeatures.forEach(feature => {
             shownFeatures[feature.name] = true;
         });
         
@@ -384,7 +424,7 @@ class NotificationSystem {
         document.body.appendChild(notification);
 
         // Don't auto-remove - let user click or close manually
-        // Add close button
+        // Add close button (will reload page when clicked)
         const closeBtn = document.createElement('button');
         closeBtn.className = 'absolute top-2 right-2 text-white opacity-70 hover:opacity-100';
         closeBtn.innerHTML = '×';
@@ -393,6 +433,8 @@ class NotificationSystem {
         closeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             notification.remove();
+            // Reload page after closing
+            this.reloadCurrentPage();
         });
         notification.appendChild(closeBtn);
     }
@@ -478,21 +520,24 @@ class NotificationSystem {
             modal.remove();
         };
 
-        document.getElementById('closePremiumModal')?.addEventListener('click', closeModal);
-        document.getElementById('closePremiumModalBtn')?.addEventListener('click', closeModal);
+        const handleModalClose = () => {
+            closeModal();
+            // Reload page after closing modal
+            this.reloadCurrentPage();
+        };
+
+        document.getElementById('closePremiumModal')?.addEventListener('click', handleModalClose);
+        document.getElementById('closePremiumModalBtn')?.addEventListener('click', handleModalClose);
         document.getElementById('goToSettings')?.addEventListener('click', () => {
             closeModal();
-            // Trigger settings modal
-            const settingsBtn = document.getElementById('settingsBtn');
-            if (settingsBtn) {
-                settingsBtn.click();
-            }
+            // Reload page first, then settings will be available on reload
+            this.reloadCurrentPage();
         });
 
-        // Close on overlay click
+        // Close on overlay click (will reload page)
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
-                closeModal();
+                handleModalClose();
             }
         });
     }
@@ -520,13 +565,19 @@ class NotificationSystem {
                 <div class="flex-1">
                     <p class="font-semibold text-lg">Bilgilendirme!</p>
                     <p class="text-sm mt-1 opacity-95">Artık bu özelliklere erişemeyeceksiniz: ${featureNames}</p>
-                    <p class="text-xs mt-2 opacity-80">Sayfa yenilenecek...</p>
+                    <p class="text-xs mt-2 opacity-80">📋 Tıklayınca sayfa yenilenecek...</p>
                 </div>
                 <svg class="w-5 h-5 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
             </div>
         `;
+
+        // Add click handler to reload page
+        notification.addEventListener('click', () => {
+            notification.remove();
+            this.reloadCurrentPage();
+        });
 
         document.body.appendChild(notification);
 
@@ -544,17 +595,7 @@ class NotificationSystem {
         });
         notification.appendChild(closeBtn);
 
-        // Auto-reload after 3 seconds
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.style.opacity = '0';
-                notification.style.transition = 'opacity 0.5s';
-                setTimeout(() => {
-                    notification.remove();
-                    this.reloadCurrentPage();
-                }, 500);
-            }
-        }, 3000);
+        // Don't auto-reload - wait for user click
     }
 
     // Reload current page (F5 equivalent)
