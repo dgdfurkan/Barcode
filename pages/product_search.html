@@ -638,10 +638,16 @@
                 
                 <!-- Mevcut Kısayollar Listesi -->
                 <div class="mb-6">
-                    <h4 class="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
-                        <span>📋</span>
-                        <span>Mevcut Kısayollar</span>
-                    </h4>
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="font-semibold text-gray-900 flex items-center space-x-2">
+                            <span>📋</span>
+                            <span>Mevcut Kısayollar</span>
+                        </h4>
+                        <!-- Limit Badge -->
+                        <div id="keyboardShortcutsLimitBadge" class="flex items-center space-x-2">
+                            <!-- Buraya limit bilgisi render edilecek -->
+                        </div>
+                    </div>
                     <div id="keyboardShortcutsList" class="space-y-3 mb-4">
                         <!-- Kısayollar buraya yüklenecek -->
                         <p class="text-sm text-gray-500 text-center py-4">Henüz kısayol eklenmemiş</p>
@@ -3798,6 +3804,44 @@
             
             const shortcuts = await loadKeyboardShortcuts();
             const shortcutKeys = Object.keys(shortcuts);
+            const currentCount = shortcutKeys.length;
+            
+            // Update limit badge
+            const limitBadge = document.getElementById('keyboardShortcutsLimitBadge');
+            if (limitBadge) {
+                const limit = window.premiumFeatures?.getPremiumFeatureLimit('keyboardShortcuts');
+                
+                if (limit !== null && limit !== undefined) {
+                    // Has limit: show "3/4" format
+                    const remaining = Math.max(0, limit - currentCount);
+                    const isAtLimit = currentCount >= limit;
+                    
+                    limitBadge.innerHTML = `
+                        <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
+                            isAtLimit 
+                                ? 'bg-red-100 text-red-800 border border-red-200' 
+                                : remaining <= 1
+                                    ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                                    : 'bg-green-100 text-green-800 border border-green-200'
+                        }">
+                            <span class="font-bold">${currentCount}</span>
+                            <span class="mx-1">/</span>
+                            <span>${limit}</span>
+                            ${remaining > 0 ? `<span class="ml-2 text-xs opacity-75">(${remaining} kaldı)</span>` : ''}
+                        </span>
+                    `;
+                } else {
+                    // No limit: show "3" with infinity symbol
+                    limitBadge.innerHTML = `
+                        <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800 border border-purple-200">
+                            <span class="font-bold">${currentCount}</span>
+                            <span class="mx-1">/</span>
+                            <span>∞</span>
+                            <span class="ml-2 text-xs opacity-75">(Sınırsız)</span>
+                        </span>
+                    `;
+                }
+            }
             
             if (shortcutKeys.length === 0) {
                 listContainer.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">Henüz kısayol eklenmemiş</p>';
