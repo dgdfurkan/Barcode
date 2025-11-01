@@ -4,59 +4,59 @@ if(window.getirBookmarkletLoaded){
 console.log('Getir Bookmarklet already loaded');
 return;
 }
-window.getirBookmarkletLoaded=true;
-const BARCODE_SITE_URL='https://dgdfurkan.github.io/Barcode/pages/product_search.html';
-const STORAGE_KEY='getirAutoRedirect';
-const styles=`
- .getir-copy-btn {
- opacity: 0.4;
- transition: opacity 0.2s;
- font-size: 11px;
- padding: 2px 6px;
- border: 1px solid #ddd;
- background: #f5f5f5;
- border-radius: 3px;
- cursor: pointer;
- margin-left: 5px;
- color: #666;
- font-weight: normal;
- }
- .getir-copy-btn:hover {
- opacity: 1;
- background: #e8f4f8;
- border-color: #4a90e2;
- color: #4a90e2;
- }
- .getir-copy-all-btn {
- opacity: 0.6;
- padding: 4px 10px;
- font-size: 12px;
- border: 1px solid #4a90e2;
- background: #e8f4f8;
- color: #4a90e2;
- border-radius: 4px;
- cursor: pointer;
- margin: 5px;
- font-weight: 500;
- }
- .getir-copy-all-btn:hover {
- opacity: 1;
- background: #4a90e2;
- color: white;
- }
- .getir-copy-all-container {
- display: flex;
- justify-content: flex-end;
- padding: 5px;
- margin-bottom: 10px;
- }
- `;
-const styleSheet=document.createElement('style');
-styleSheet.textContent=styles;
+window.getirBookmarkletLoaded = true;
+const BARCODE_SITE_URL = 'https://dgdfurkan.github.io/Barcode/pages/product_search.html';
+const STORAGE_KEY = 'getirAutoRedirect';
+const styles = `
+        .getir-copy-btn {
+            opacity: 0.4;
+            transition: opacity 0.2s;
+            font-size: 11px;
+            padding: 2px 6px;
+            border: 1px solid #ddd;
+            background: #f5f5f5;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-left: 5px;
+            color: #666;
+            font-weight: normal;
+        }
+        .getir-copy-btn:hover {
+            opacity: 1;
+            background: #e8f4f8;
+            border-color: #4a90e2;
+            color: #4a90e2;
+        }
+        .getir-copy-all-btn {
+            opacity: 0.6;
+            padding: 4px 10px;
+            font-size: 12px;
+            border: 1px solid #4a90e2;
+            background: #e8f4f8;
+            color: #4a90e2;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+            font-weight: 500;
+        }
+        .getir-copy-all-btn:hover {
+            opacity: 1;
+            background: #4a90e2;
+            color: white;
+        }
+        .getir-copy-all-container {
+            display: flex;
+            justify-content: flex-end;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+    `;
+const styleSheet = document.createElement('style');
+styleSheet.textContent = styles;
 document.head.appendChild(styleSheet);
 function getAutoRedirect(){
 try{
-return localStorage.getItem(STORAGE_KEY)!=='0';
+return localStorage.getItem(STORAGE_KEY)!== '0';
 }catch(e){
 return true;
 }
@@ -66,10 +66,10 @@ try{
 await navigator.clipboard.writeText(text);
 return true;
 }catch(err){
-const textArea=document.createElement('textarea');
-textArea.value=text;
-textArea.style.position='fixed';
-textArea.style.left='-999999px';
+const textArea = document.createElement('textarea');
+textArea.value = text;
+textArea.style.position = 'fixed';
+textArea.style.left = '-999999px';
 document.body.appendChild(textArea);
 textArea.focus();
 textArea.select();
@@ -84,17 +84,17 @@ return false;
 }
 }
 async function copyRow(tr){
-const html=tr.outerHTML;
-const success=await copyToClipboard(html);
+const html = tr.outerHTML;
+const success = await copyToClipboard(html);
 if(success){
-const notification=document.createElement('div');
-notification.style.cssText='position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:10px 15px;border-radius:4px;z-index:10000;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
-notification.textContent='✓ HTML kopyalandı!';
+const notification = document.createElement('div');
+notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:10px 15px;border-radius:4px;z-index:10000;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
+notification.textContent = '✓ HTML kopyalandı!';
 document.body.appendChild(notification);
 setTimeout(()=> notification.remove(),2000);
 if(getAutoRedirect()){
 setTimeout(()=>{
-window.location.href=BARCODE_SITE_URL;
+window.location.href = BARCODE_SITE_URL;
 },500);
 }
 }else{
@@ -102,29 +102,29 @@ alert('Kopyalama başarısız. Lütfen tekrar deneyin.');
 }
 }
 async function copyAllRows(){
-const tables=document.querySelectorAll('table');
-let allRows=[];
-tables.forEach(table=>{
-const rows=table.querySelectorAll('tbody tr');
-rows.forEach(row=>{
+const tables = document.querySelectorAll('table');
+let allRows =[];
+tables.forEach(table =>{
+const rows = table.querySelectorAll('tbody tr');
+rows.forEach(row =>{
 allRows.push(row.outerHTML);
 });
 });
-if(allRows.length===0){
+if(allRows.length === 0){
 alert('Kopyalanacak ürün bulunamadı.');
 return;
 }
-const html=allRows.join('\n');
-const success=await copyToClipboard(html);
+const html = allRows.join('\n');
+const success = await copyToClipboard(html);
 if(success){
-const notification=document.createElement('div');
-notification.style.cssText='position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:10px 15px;border-radius:4px;z-index:10000;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
-notification.textContent=`✓ ${allRows.length} ürün kopyalandı!`;
+const notification = document.createElement('div');
+notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:10px 15px;border-radius:4px;z-index:10000;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
+notification.textContent = `✓ ${allRows.length} ürün kopyalandı!`;
 document.body.appendChild(notification);
 setTimeout(()=> notification.remove(),2000);
 if(getAutoRedirect()){
 setTimeout(()=>{
-window.location.href=BARCODE_SITE_URL;
+window.location.href = BARCODE_SITE_URL;
 },500);
 }
 }else{
@@ -135,63 +135,63 @@ function addButtonToRow(tr){
 if(tr.querySelector('.getir-copy-btn')){
 return;
 }
-const hasImage=tr.querySelector('img');
-const cells=tr.querySelectorAll('td');
-const hasProductName=Array.from(cells).some(cell=>{
-const text=cell.textContent.trim();
+const hasImage = tr.querySelector('img');
+const cells = tr.querySelectorAll('td');
+const hasProductName = Array.from(cells).some(cell =>{
+const text = cell.textContent.trim();
 return text && text.length > 2 && !text.match(/^\d+$/)&& !text.includes('#')&& !text.includes('Ürün Adı')&& !text.includes('Adet');
 });
 if(!hasImage && !hasProductName){
 return;
 }
-const btn=document.createElement('button');
-btn.className='getir-copy-btn';
-btn.textContent='📋';
-btn.title='Bu ürünün HTML\'ini kopyala';
-btn.onclick=(e)=>{
+const btn = document.createElement('button');
+btn.className = 'getir-copy-btn';
+btn.textContent = '📋';
+btn.title = 'Bu ürünün HTML\'ini kopyala';
+btn.onclick =(e)=>{
 e.preventDefault();
 e.stopPropagation();
 copyRow(tr);
 };
 if(cells.length > 0){
-const lastCell=cells[cells.length - 1];
+const lastCell = cells[cells.length - 1];
 if(!lastCell.querySelector('.getir-copy-btn')){
-lastCell.style.position='relative';
+lastCell.style.position = 'relative';
 lastCell.appendChild(btn);
 }
 }else{
-const newCell=document.createElement('td');
+const newCell = document.createElement('td');
 newCell.appendChild(btn);
 tr.appendChild(newCell);
 }
 }
 function addCopyAllButton(table){
-const parent=table.parentNode;
+const parent = table.parentNode;
 if(parent && parent.querySelector('.getir-copy-all-container')){
 return;
 }
-const productRows=table.querySelectorAll('tbody tr');
-let hasProductRows=false;
-productRows.forEach(row=>{
-const hasImage=row.querySelector('img');
-const cells=row.querySelectorAll('td');
-const hasProductName=Array.from(cells).some(cell=>{
-const text=cell.textContent.trim();
+const productRows = table.querySelectorAll('tbody tr');
+let hasProductRows = false;
+productRows.forEach(row =>{
+const hasImage = row.querySelector('img');
+const cells = row.querySelectorAll('td');
+const hasProductName = Array.from(cells).some(cell =>{
+const text = cell.textContent.trim();
 return text && text.length > 2 && !text.match(/^\d+$/)&& !text.includes('#')&& !text.includes('Ürün Adı')&& !text.includes('Adet');
 });
 if(hasImage || hasProductName){
-hasProductRows=true;
+hasProductRows = true;
 }
 });
 if(!hasProductRows){
 return;
 }
-const container=document.createElement('div');
-container.className='getir-copy-all-container';
-const btn=document.createElement('button');
-btn.className='getir-copy-all-btn';
-btn.textContent='📋 Tümünü Kopyala';
-btn.onclick=(e)=>{
+const container = document.createElement('div');
+container.className = 'getir-copy-all-container';
+const btn = document.createElement('button');
+btn.className = 'getir-copy-all-btn';
+btn.textContent = '📋 Tümünü Kopyala';
+btn.onclick =(e)=>{
 e.preventDefault();
 e.stopPropagation();
 copyAllRows();
