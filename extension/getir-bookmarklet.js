@@ -576,6 +576,52 @@
             childList: true,
             subtree: true
         });
+        
+        // Also watch for modal opens specifically (ant-modal-root)
+        const modalObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === 1 && node.classList && node.classList.contains('ant-modal')) {
+                        // Modal opened, wait a bit for content to load
+                        setTimeout(() => {
+                            // Re-add "Copy All" button
+                            addCopyAllButton();
+                            
+                            // Process all product tables in the modal
+                            const allRows = document.querySelectorAll('.ant-row');
+                            allRows.forEach(row => {
+                                // Skip if inside ant-descriptions
+                                if (row.closest('.ant-descriptions')) {
+                                    return;
+                                }
+                                
+                                const cols = row.querySelectorAll('.ant-col');
+                                cols.forEach(col => {
+                                    const tables = col.querySelectorAll('table');
+                                    tables.forEach(table => {
+                                        if (isProductTable(table)) {
+                                            const rows = table.querySelectorAll('tbody tr');
+                                            rows.forEach(tr => {
+                                                if (isProductRow(tr)) {
+                                                    addButtonToRow(tr);
+                                                }
+                                            });
+                                        }
+                                    });
+                                });
+                            });
+                        }, 300);
+                    }
+                });
+            });
+        });
+        
+        // Watch for modal container
+        const modalRoot = document.querySelector('.ant-modal-root') || document.body;
+        modalObserver.observe(modalRoot, {
+            childList: true,
+            subtree: true
+        });
     }
     
     // Start initialization
