@@ -97,7 +97,7 @@ setTimeout(()=>{
 window.location.href = BARCODE_SITE_URL;
 },500);
 }
-}else{
+}else {
 alert('Kopyalama başarısız. Lütfen tekrar deneyin.');
 }
 }
@@ -127,7 +127,7 @@ setTimeout(()=>{
 window.location.href = BARCODE_SITE_URL;
 },500);
 }
-}else{
+}else {
 alert('Kopyalama başarısız. Lütfen tekrar deneyin.');
 }
 }
@@ -159,7 +159,7 @@ if(!lastCell.querySelector('.getir-copy-btn')){
 lastCell.style.position = 'relative';
 lastCell.appendChild(btn);
 }
-}else{
+}else {
 const newCell = document.createElement('td');
 newCell.appendChild(btn);
 tr.appendChild(newCell);
@@ -197,7 +197,7 @@ e.stopPropagation();
 copyAllRows();
 };
 container.appendChild(btn);
-}else{
+}else {
 init();
 }
 })();})();
