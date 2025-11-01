@@ -3593,6 +3593,12 @@
                 return;
             }
             
+            // ImageSearch için özel içerik (bookmarklet kurulumu)
+            if (featureKey === 'imageSearch') {
+                showImageSearchModal(hasPremium);
+                return;
+            }
+            
             // Update modal content
             document.getElementById('featureDetailEmoji').textContent = config.emoji;
             document.getElementById('featureDetailName').textContent = config.name;
