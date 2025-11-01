@@ -102,6 +102,7 @@
     }
     
     // Navigate to barcode site (switch to existing tab if open, otherwise open new tab)
+    // IMPORTANT: Do not reload the page if it's already open
     function navigateToBarcodeSite() {
         // Try BroadcastChannel first to check if page is already open
         try {
@@ -116,23 +117,17 @@
                 const messageHandler = (e) => {
                     if (e.data && e.data.type === 'pong' && !responded) {
                         responded = true;
-                        // Page is open, try to focus it
-                        // Use window.open with target name to reuse existing tab
-                        const targetWindow = window.open(BARCODE_SITE_URL, 'barcode_site');
-                        if (targetWindow) {
-                            try {
-                                targetWindow.focus();
-                            } catch (err) {
-                                // Cross-origin restriction, ignore
-                            }
-                        }
+                        // Page is open and already at the correct URL
+                        // Use window.open with target name - this will focus existing tab without reloading
+                        // if the URL matches, otherwise opens new tab
+                        window.open(BARCODE_SITE_URL, 'barcode_site');
                         channel.close();
                     }
                 };
                 
                 channel.addEventListener('message', messageHandler);
                 
-                // If no response in 100ms, open new tab
+                // If no response in 100ms, page is not open, open new tab
                 setTimeout(() => {
                     if (!responded) {
                         channel.removeEventListener('message', messageHandler);
@@ -147,7 +142,7 @@
             // BroadcastChannel not supported, fall through
         }
         
-        // Fallback: Use window.open with target name (will reuse tab if exists)
+        // Fallback: Use window.open with target name (will reuse tab if exists, focus without reload)
         window.open(BARCODE_SITE_URL, 'barcode_site');
     }
     
