@@ -3741,36 +3741,48 @@
                         const dragElement = document.getElementById('dragBookmarklet');
                         if (dragElement) {
                             dragElement.addEventListener('dragstart', (e) => {
-                                // Create a temporary visible link element that will be dragged
-                                // The link's text content becomes the bookmark name
+                                // Create a temporary link element with proper bookmark name
                                 const link = document.createElement('a');
                                 link.href = bookmarkletCode;
                                 link.textContent = bookmarkletName;
                                 link.style.position = 'absolute';
-                                link.style.top = '0';
-                                link.style.left = '0';
+                                link.style.top = '-9999px';
+                                link.style.left = '-9999px';
                                 link.style.opacity = '0';
                                 link.style.pointerEvents = 'none';
-                                link.style.zIndex = '-1';
                                 document.body.appendChild(link);
                                 
-                                // Set drag data
-                                // Use the link element itself - browsers extract name from it
+                                // Create drag image with bookmark name
                                 const dragImage = document.createElement('div');
                                 dragImage.textContent = bookmarkletName;
                                 dragImage.style.position = 'absolute';
                                 dragImage.style.top = '-9999px';
+                                dragImage.style.fontSize = '14px';
+                                dragImage.style.fontWeight = 'normal';
                                 document.body.appendChild(dragImage);
                                 e.dataTransfer.setDragImage(dragImage, 0, 0);
                                 
-                                // Set data using the link element's outerHTML
-                                e.dataTransfer.setData('text/uri-list', bookmarkletCode);
-                                e.dataTransfer.setData('text/plain', bookmarkletCode);
-                                e.dataTransfer.setData('text/html', link.outerHTML);
+                                // Set bookmark data - multiple formats for browser compatibility
+                                // Primary method: text/html with link element
+                                const linkHTML = `<a href="${bookmarkletCode.replace(/"/g, '&quot;')}">${bookmarkletName}</a>`;
+                                e.dataTransfer.setData('text/html', linkHTML);
                                 
-                                // For Chrome - try to set DownloadURL format
+                                // Also set as uri-list
+                                e.dataTransfer.setData('text/uri-list', bookmarkletCode);
+                                
+                                // For Chrome/Edge: DownloadURL format (bookmark name:URL)
                                 try {
-                                    e.dataTransfer.setData('DownloadURL', 'application/x-bookmark:UTF8:' + bookmarkletName + ':' + bookmarkletCode);
+                                    // Chrome bookmark format: application/x-bookmark:UTF8:Name:URL
+                                    const chromeFormat = `application/x-bookmark:UTF8:${encodeURIComponent(bookmarkletName)}:${bookmarkletCode}`;
+                                    e.dataTransfer.setData('DownloadURL', chromeFormat);
+                                } catch (err) {
+                                    // Ignore if not supported
+                                }
+                                
+                                // Also try Firefox bookmark format
+                                try {
+                                    e.dataTransfer.setData('text/x-moz-url', `${bookmarkletCode}\n${bookmarkletName}`);
+                                    e.dataTransfer.setData('text/x-moz-url-priv', `${bookmarkletCode}\n${bookmarkletName}`);
                                 } catch (err) {
                                     // Ignore if not supported
                                 }
