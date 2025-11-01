@@ -171,22 +171,36 @@
             return;
         }
         
+        // Skip if this is not a product row (check for image or product name)
+        const hasImage = tr.querySelector('img');
+        const cells = tr.querySelectorAll('td');
+        const hasProductName = Array.from(cells).some(cell => {
+            const text = cell.textContent.trim();
+            return text && text.length > 2 && !text.match(/^\d+$/) && !text.includes('#') && !text.includes('Ürün Adı') && !text.includes('Adet');
+        });
+        
+        // Only add button if it looks like a product row
+        if (!hasImage && !hasProductName) {
+            return;
+        }
+        
         // Create button
         const btn = document.createElement('button');
         btn.className = 'getir-copy-btn';
         btn.textContent = '📋';
         btn.title = 'Bu ürünün HTML\'ini kopyala';
         btn.onclick = (e) => {
+            e.preventDefault();
             e.stopPropagation();
             copyRow(tr);
         };
         
-        // Add to last cell or create new cell
-        const cells = tr.querySelectorAll('td');
+        // Add to last cell
         if (cells.length > 0) {
             const lastCell = cells[cells.length - 1];
             // Check if last cell already has a button
             if (!lastCell.querySelector('.getir-copy-btn')) {
+                lastCell.style.position = 'relative';
                 lastCell.appendChild(btn);
             }
         } else {
@@ -199,8 +213,28 @@
     
     // Add "Copy All" button to table
     function addCopyAllButton(table) {
-        // Check if button already exists
-        if (table.querySelector('.getir-copy-all-container')) {
+        // Check if button already exists in parent
+        const parent = table.parentNode;
+        if (parent && parent.querySelector('.getir-copy-all-container')) {
+            return;
+        }
+        
+        // Check if table has product rows
+        const productRows = table.querySelectorAll('tbody tr');
+        let hasProductRows = false;
+        productRows.forEach(row => {
+            const hasImage = row.querySelector('img');
+            const cells = row.querySelectorAll('td');
+            const hasProductName = Array.from(cells).some(cell => {
+                const text = cell.textContent.trim();
+                return text && text.length > 2 && !text.match(/^\d+$/) && !text.includes('#') && !text.includes('Ürün Adı') && !text.includes('Adet');
+            });
+            if (hasImage || hasProductName) {
+                hasProductRows = true;
+            }
+        });
+        
+        if (!hasProductRows) {
             return;
         }
         
@@ -211,37 +245,58 @@
         const btn = document.createElement('button');
         btn.className = 'getir-copy-all-btn';
         btn.textContent = '📋 Tümünü Kopyala';
-        btn.onclick = () => copyAllRows();
+        btn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            copyAllRows();
+        };
         
         container.appendChild(btn);
         
-        // Insert before table
-        if (table.parentNode) {
-            table.parentNode.insertBefore(container, table);
+        // Insert before table or before table's parent wrapper
+        if (parent) {
+            // Try to insert before the table wrapper first
+            const tableWrapper = table.closest('.ant-table-wrapper, .ant-table-container');
+            if (tableWrapper && tableWrapper.parentNode) {
+                tableWrapper.parentNode.insertBefore(container, tableWrapper);
+            } else {
+                parent.insertBefore(container, table);
+            }
         }
     }
     
     // Initialize: Find all tables and add buttons
     function init() {
-        const tables = document.querySelectorAll('table');
+        console.log('🔧 Getir Bookmarklet: Initializing...');
         
-        tables.forEach(table => {
+        const tables = document.querySelectorAll('table');
+        console.log('🔧 Found tables:', tables.length);
+        
+        tables.forEach((table, index) => {
+            console.log(`🔧 Processing table ${index + 1}`);
+            
             // Add "Copy All" button
             addCopyAllButton(table);
             
             // Add buttons to each row
             const rows = table.querySelectorAll('tbody tr');
-            rows.forEach(row => {
+            console.log(`🔧 Found ${rows.length} rows in table ${index + 1}`);
+            
+            rows.forEach((row, rowIndex) => {
                 addButtonToRow(row);
             });
         });
+        
+        console.log('🔧 Getir Bookmarklet: Initialization complete');
+    }
         
         // Watch for dynamically added rows (if page uses AJAX)
         const observer = new MutationObserver((mutations) => {
             mutations.forEach((mutation) => {
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === 1) { // Element node
-                        if (node.tagName === 'TR' || node.querySelector('tr')) {
+                        // Check for new rows
+                        if (node.tagName === 'TR' || node.querySelector && node.querySelector('tr')) {
                             const rows = node.tagName === 'TR' ? [node] : node.querySelectorAll('tr');
                             rows.forEach(row => {
                                 if (row.closest('tbody')) {
@@ -249,13 +304,30 @@
                                 }
                             });
                         }
-                        if (node.tagName === 'TABLE' || node.querySelector('table')) {
+                        // Check for new tables
+                        if (node.tagName === 'TABLE' || (node.querySelector && node.querySelector('table'))) {
                             const tables = node.tagName === 'TABLE' ? [node] : node.querySelectorAll('table');
                             tables.forEach(table => {
                                 addCopyAllButton(table);
                                 const rows = table.querySelectorAll('tbody tr');
                                 rows.forEach(row => addButtonToRow(row));
                             });
+                        }
+                        // Check for table wrapper changes (modal opening, etc.)
+                        if (node.classList && (
+                            node.classList.contains('ant-modal-body') ||
+                            node.classList.contains('ant-table-wrapper') ||
+                            node.classList.contains('ant-table-container')
+                        )) {
+                            // Re-initialize all tables when modal opens
+                            setTimeout(() => {
+                                const tables = document.querySelectorAll('table');
+                                tables.forEach(table => {
+                                    addCopyAllButton(table);
+                                    const rows = table.querySelectorAll('tbody tr');
+                                    rows.forEach(row => addButtonToRow(row));
+                                });
+                            }, 100);
                         }
                     }
                 });
