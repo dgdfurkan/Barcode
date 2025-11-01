@@ -2077,6 +2077,22 @@
                 
                 // Check each search term individually
                 for (const searchTerm of searchTerms) {
+                    // Check if searchTerm is a barcode (all digits, typically 8+ digits)
+                    const trimmedSearchTerm = searchTerm.replace(/\s+/g, '');
+                    const isBarcodeSearch = /^\d{8,}$/.test(trimmedSearchTerm);
+                    
+                    // First check: If it's a barcode search, check barcodes directly with exact match
+                    if (isBarcodeSearch && product.barcodes && product.barcodes.length > 0) {
+                        for (const barcode of product.barcodes) {
+                            if (barcode.code === trimmedSearchTerm) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (found) break;
+                    
                     // Check if this is an image URL search (premium feature)
                     const isImageUrl = /^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i.test(searchTerm);
                     const hasImageSearch = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
@@ -2225,10 +2241,10 @@
                             break;
                         }
                         
-                        // Check barcodes if other fields didn't match
-                        if (!found && product.barcodes && product.barcodes.length > 0) {
+                        // Check barcodes if other fields didn't match (and not already checked as barcode search)
+                        if (!found && !isBarcodeSearch && product.barcodes && product.barcodes.length > 0) {
                             for (const barcode of product.barcodes) {
-                                if (barcode.code.includes(searchTerm.replace(/\s+/g, ''))) {
+                                if (barcode.code.includes(trimmedSearchTerm)) {
                                     found = true;
                                     break;
                                 }
@@ -2293,6 +2309,31 @@
                 for (let i = 0; i < products.length && foundCount < maxResultsPerGroup; i++) {
                     const product = products[i];
                     let found = false;
+                    
+                    // Check if searchTerm is a barcode (all digits, typically 8+ digits)
+                    const trimmedSearchTerm = searchTerm.replace(/\s+/g, '');
+                    const isBarcodeSearch = /^\d{8,}$/.test(trimmedSearchTerm);
+                    
+                    // First check: If it's a barcode search, check barcodes directly
+                    if (isBarcodeSearch && product.barcodes && product.barcodes.length > 0) {
+                        for (const barcode of product.barcodes) {
+                            if (barcode.code === trimmedSearchTerm) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (found) {
+                        // Add to results
+                        if (outOfStockProducts.has(product.id)) {
+                            termResults.outOfStock.push(product);
+                        } else {
+                            termResults.active.push(product);
+                        }
+                        foundCount++;
+                        continue;
+                    }
                     
                     if (isTableData || hasCombinedFormat) {
                         // For table data, check both product name and image URL
