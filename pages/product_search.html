@@ -3750,6 +3750,7 @@
                     `;
                     
                     // Setup drag and drop
+                    if (hasPremium) {
                         const dragElement = document.getElementById('dragBookmarklet');
                         if (dragElement) {
                             dragElement.addEventListener('dragstart', (e) => {
