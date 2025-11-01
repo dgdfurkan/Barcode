@@ -103,9 +103,52 @@
     
     // Navigate to barcode site (switch to existing tab if open, otherwise open new tab)
     function navigateToBarcodeSite() {
-        // window.open with _blank will focus existing tab if URL matches, otherwise open new tab
-        // This keeps current tab active and switches to barcode site if already open
-        window.open(BARCODE_SITE_URL, '_blank');
+        // Try BroadcastChannel first to check if page is already open
+        try {
+            if (typeof BroadcastChannel !== 'undefined') {
+                const channel = new BroadcastChannel('barcode_site_nav');
+                let responded = false;
+                
+                // Send ping message
+                channel.postMessage({ type: 'ping', url: BARCODE_SITE_URL });
+                
+                // Listen for response (page is open)
+                const messageHandler = (e) => {
+                    if (e.data && e.data.type === 'pong' && !responded) {
+                        responded = true;
+                        // Page is open, try to focus it
+                        // Use window.open with target name to reuse existing tab
+                        const targetWindow = window.open(BARCODE_SITE_URL, 'barcode_site');
+                        if (targetWindow) {
+                            try {
+                                targetWindow.focus();
+                            } catch (err) {
+                                // Cross-origin restriction, ignore
+                            }
+                        }
+                        channel.close();
+                    }
+                };
+                
+                channel.addEventListener('message', messageHandler);
+                
+                // If no response in 100ms, open new tab
+                setTimeout(() => {
+                    if (!responded) {
+                        channel.removeEventListener('message', messageHandler);
+                        window.open(BARCODE_SITE_URL, 'barcode_site');
+                        channel.close();
+                    }
+                }, 100);
+                
+                return;
+            }
+        } catch (e) {
+            // BroadcastChannel not supported, fall through
+        }
+        
+        // Fallback: Use window.open with target name (will reuse tab if exists)
+        window.open(BARCODE_SITE_URL, 'barcode_site');
     }
     
     // Copy single row HTML
@@ -133,50 +176,49 @@
         }
     }
     
-    // Copy all rows HTML (only the ant-row container with product tables)
+    // Copy all rows HTML (only the ant-row container with product tables, excluding customer info)
     async function copyAllRows() {
         // Find the ant-row container that contains all product tables
-        // This is the parent div that wraps all product tables (excluding customer info, etc.)
-        const rowContainer = document.querySelector('.ant-row.css-1b31m49');
+        // Look for ant-row that contains multiple ant-col with tables inside
+        let rowContainer = null;
         
-        if (!rowContainer) {
-            // Fallback: try to find any ant-row that contains tables
-            const rows = document.querySelectorAll('.ant-row');
-            let foundContainer = null;
+        // First try: Find ant-row with ant-col containers that have tables
+        const allRows = document.querySelectorAll('.ant-row');
+        for (const row of allRows) {
+            // Check if this row has columns with product tables
+            const cols = row.querySelectorAll('.ant-col');
+            let hasProductTables = false;
             
-            rows.forEach(row => {
-                const hasTables = row.querySelectorAll('table').length > 0;
-                const hasProductRows = row.querySelectorAll('tbody tr.ant-table-row').length > 0;
-                if (hasTables && hasProductRows && !foundContainer) {
-                    foundContainer = row;
-                }
-            });
-            
-            if (foundContainer) {
-                const html = foundContainer.outerHTML;
-                const success = await copyToClipboard(html);
-                
-                if (success) {
-                    const notification = document.createElement('div');
-                    notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:10px 15px;border-radius:4px;z-index:10000;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
-                    const productCount = foundContainer.querySelectorAll('tbody tr.ant-table-row').length;
-                    notification.textContent = `✓ ${productCount} ürün kopyalandı!`;
-                    document.body.appendChild(notification);
-                    setTimeout(() => notification.remove(), 2000);
-                    
-                    if (getAutoRedirect()) {
-                        setTimeout(() => {
-                            navigateToBarcodeSite();
-                        }, 500);
+            for (const col of cols) {
+                const tables = col.querySelectorAll('table');
+                if (tables.length > 0) {
+                    // Check if tables have product rows (tbody tr with images or product names)
+                    for (const table of tables) {
+                        const productRows = table.querySelectorAll('tbody tr');
+                        for (const tr of productRows) {
+                            const hasImage = tr.querySelector('img');
+                            const cells = tr.querySelectorAll('td');
+                            const hasProductName = Array.from(cells).some(cell => {
+                                const text = cell.textContent.trim();
+                                return text && text.length > 2 && !text.match(/^\d+$/) && !text.includes('#') && !text.includes('Ürün Adı') && !text.includes('Adet');
+                            });
+                            if (hasImage || hasProductName) {
+                                hasProductTables = true;
+                                break;
+                            }
+                        }
+                        if (hasProductTables) break;
                     }
-                } else {
-                    alert('Kopyalama başarısız. Lütfen tekrar deneyin.');
                 }
-                return;
+                if (hasProductTables) break;
+            }
+            
+            if (hasProductTables) {
+                rowContainer = row;
+                break;
             }
         }
         
-        // If container found, copy it
         if (rowContainer) {
             const html = rowContainer.outerHTML;
             const success = await copyToClipboard(html);
@@ -198,7 +240,7 @@
                 alert('Kopyalama başarısız. Lütfen tekrar deneyin.');
             }
         } else {
-            alert('Kopyalanacak ürün bulunamadı.');
+            alert('Kopyalanacak ürün tablosu bulunamadı.');
         }
     }
     
