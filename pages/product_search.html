@@ -2016,7 +2016,9 @@
                 }
                 
                 // Find matching products by image URL and collect their barcodes
-                const foundBarcodes = new Set(); // Use Set to avoid duplicates
+                // Use Map to track product IDs to avoid duplicates (same product = same barcode)
+                const foundProductIds = new Set(); // Track which products we've already added
+                const foundBarcodes = new Set(); // Use Set to avoid duplicate barcodes
                 
                 imageUrls.forEach(imageUrl => {
                     // Normalize image URL for matching
@@ -2024,33 +2026,35 @@
                     
                     // Try to find products matching this image URL
                     products.forEach(product => {
-                        if (!product.image) return;
+                        if (!product.image || !product.id) return;
+                        
+                        // Skip if we've already processed this product
+                        if (foundProductIds.has(product.id)) return;
                         
                         const productImageUrl = product.image.toLowerCase().trim();
+                        let isMatch = false;
                         
                         // Exact match
                         if (productImageUrl === normalizedImageUrl) {
-                            // Add all barcodes of this product
-                            if (product.barcodes && product.barcodes.length > 0) {
-                                product.barcodes.forEach(barcode => {
-                                    if (barcode.code) {
-                                        foundBarcodes.add(barcode.code);
-                                    }
-                                });
-                            }
+                            isMatch = true;
                         } else {
                             // Try filename match (last part of URL before query params)
                             const productFileName = productImageUrl.split('/').pop().split('?')[0];
                             const searchFileName = normalizedImageUrl.split('/').pop().split('?')[0];
                             if (productFileName === searchFileName && productFileName.length > 0) {
-                                // Add all barcodes of this product
-                                if (product.barcodes && product.barcodes.length > 0) {
-                                    product.barcodes.forEach(barcode => {
-                                        if (barcode.code) {
-                                            foundBarcodes.add(barcode.code);
-                                        }
-                                    });
-                                }
+                                isMatch = true;
+                            }
+                        }
+                        
+                        // If match found, add product's first barcode (one barcode per product)
+                        if (isMatch && product.barcodes && product.barcodes.length > 0) {
+                            // Find first valid barcode
+                            const firstBarcode = product.barcodes.find(b => b.code);
+                            if (firstBarcode && firstBarcode.code) {
+                                // Mark this product as processed
+                                foundProductIds.add(product.id);
+                                // Add only first barcode (one barcode per unique product)
+                                foundBarcodes.add(firstBarcode.code);
                             }
                         }
                     });
