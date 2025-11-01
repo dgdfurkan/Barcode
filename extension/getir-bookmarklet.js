@@ -102,7 +102,7 @@
     }
     
     // Navigate to barcode site (switch to existing tab if open, otherwise open new tab)
-    // IMPORTANT: Do not reload the page if it's already open - just switch tabs
+    // CRITICAL: Never reload existing page - only switch tabs
     function navigateToBarcodeSite() {
         // Try BroadcastChannel first to check if page is already open
         try {
@@ -118,21 +118,25 @@
                     if (e.data && e.data.type === 'pong' && !responded) {
                         responded = true;
                         // Page is already open - it will focus itself via window.focus() in the listener
-                        // Do NOT call window.open() to avoid reloading
+                        // ABSOLUTELY DO NOT call window.open() here - it would reload the page
                         channel.close();
+                        // Exit immediately - no further action needed
+                        return;
                     }
                 };
                 
                 channel.addEventListener('message', messageHandler);
                 
-                // If no response in 100ms, page is not open, open new tab
+                // Wait longer for response (500ms) to ensure we catch it
                 setTimeout(() => {
                     if (!responded) {
+                        // Page is NOT open - only now open a new tab
                         channel.removeEventListener('message', messageHandler);
-                        window.open(BARCODE_SITE_URL, 'barcode_site');
                         channel.close();
+                        // Use unique target name to avoid reloading if somehow tab exists
+                        window.open(BARCODE_SITE_URL, '_blank');
                     }
-                }, 100);
+                }, 500);
                 
                 return;
             }
@@ -140,8 +144,9 @@
             // BroadcastChannel not supported, fall through
         }
         
-        // Fallback: Use window.open with target name (will reuse tab if exists)
-        window.open(BARCODE_SITE_URL, 'barcode_site');
+        // Fallback: BroadcastChannel not available - open new tab
+        // Use _blank to avoid any potential tab reuse issues
+        window.open(BARCODE_SITE_URL, '_blank');
     }
     
     // Copy single row HTML
