@@ -103,18 +103,30 @@
     
     // Navigate to barcode site (switch to existing tab if open, otherwise open new tab)
     function navigateToBarcodeSite() {
-        // Try to open in existing tab or new tab
-        // Using window.open with same URL will focus existing tab if available
-        const newWindow = window.open(BARCODE_SITE_URL, '_blank');
-        // If popup was blocked or new tab opened, focus it after a short delay
-        if (newWindow) {
-            setTimeout(() => {
-                try {
-                    newWindow.focus();
-                } catch (e) {
-                    // Cross-origin restriction, ignore
+        // Try to find if the page is already open using BroadcastChannel
+        try {
+            const channel = new BroadcastChannel('barcode_site_nav');
+            // Send message to check if page is open
+            channel.postMessage({ type: 'ping', url: BARCODE_SITE_URL });
+            
+            // Listen for response
+            const timeout = setTimeout(() => {
+                // No response, open new tab
+                window.open(BARCODE_SITE_URL, '_blank');
+                channel.close();
+            }, 50);
+            
+            channel.addEventListener('message', (e) => {
+                if (e.data && e.data.type === 'pong') {
+                    clearTimeout(timeout);
+                    // Page is open, focus it by opening again (will focus existing tab)
+                    window.open(BARCODE_SITE_URL, '_blank');
+                    setTimeout(() => channel.close(), 100);
                 }
-            }, 100);
+            });
+        } catch (e) {
+            // BroadcastChannel not supported, just open new tab
+            window.open(BARCODE_SITE_URL, '_blank');
         }
     }
     
