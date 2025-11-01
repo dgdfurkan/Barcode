@@ -3762,100 +3762,34 @@
                         </div>
                     `;
                     
-                    // Setup install button
-                    if (hasPremium) {
-                        const installBtn = document.getElementById('installBookmarkletBtn');
-                        if (installBtn) {
-                            installBtn.addEventListener('click', async () => {
-                                try {
-                                    // Try to create bookmark programmatically (may not work in all browsers)
-                                    // For Chrome, we'll show instructions
-                                    if (navigator.userAgent.includes('Chrome') && !navigator.userAgent.includes('Edg')) {
-                                        // Chrome: Show copy instructions
-                                        const copySuccess = await navigator.clipboard.writeText(bookmarkletCode);
-                                        if (copySuccess !== undefined) {
-                                            // Show instructions modal
-                                            const instructionModal = document.createElement('div');
-                                            instructionModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100]';
-                                            instructionModal.innerHTML = `
-                                                <div class="bg-white rounded-lg p-6 max-w-md mx-4">
-                                                    <div class="text-center mb-4">
-                                                        <span class="text-4xl mb-2 block">🏷️</span>
-                                                        <h3 class="font-bold text-lg mb-2">Bookmarklet Kodu Kopyalandı!</h3>
-                                                        <p class="text-sm text-gray-600">Şimdi bookmark'a ekleyin</p>
-                                                    </div>
-                                                    <div class="bg-gray-100 p-3 rounded mb-4 text-xs font-mono break-all">
-                                                        ${bookmarkletCode.substring(0, 100)}...
-                                                    </div>
-                                                    <ol class="text-sm space-y-2 mb-4 list-decimal list-inside">
-                                                        <li>Chrome'da <strong>Ctrl+Shift+O</strong> (veya <strong>Cmd+Shift+O</strong> Mac'te) ile bookmark manager'ı açın</li>
-                                                        <li>Sağ tıklayın ve <strong>"Yeni bookmark ekle"</strong> seçin</li>
-                                                        <li>İsim: <strong>🏷️ Getir Barkod Kopyalama</strong></li>
-                                                        <li>URL: Yapıştırın (<strong>Ctrl+V</strong>)</li>
-                                                        <li>Kaydet'e tıklayın</li>
-                                                    </ol>
-                                                    <button class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700" onclick="this.closest('.fixed').remove()">
-                                                        Anladım
-                                                    </button>
-                                                </div>
-                                            `;
-                                            document.body.appendChild(instructionModal);
-                                        }
-                                    } else {
-                                        // Try to create bookmark directly
-                                        const link = document.createElement('a');
-                                        link.href = bookmarkletCode;
-                                        link.textContent = bookmarkletName;
-                                        link.style.display = 'none';
-                                        document.body.appendChild(link);
-                                        
-                                        // Try to trigger bookmark (works in some browsers)
-                                        if (window.sidebar && window.sidebar.addPanel) {
-                                            window.sidebar.addPanel(link.textContent, bookmarkletCode, '');
-                                        } else if (window.external && ('AddFavorite' in window.external)) {
-                                            window.external.AddFavorite(bookmarkletCode, link.textContent);
-                                        }
-                                        
-                                        document.body.removeChild(link);
-                                        
-                                        // Show success message
-                                        const successMsg = document.createElement('div');
-                                        successMsg.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg z-50';
-                                        successMsg.innerHTML = `
-                                            <div class="flex items-center space-x-2">
-                                                <span class="text-xl">✓</span>
-                                                <div>
-                                                    <p class="font-semibold">Bookmarklet eklendi!</p>
-                                                    <p class="text-xs opacity-90">Bookmark bar'ınızda görünecek</p>
-                                                </div>
-                                            </div>
-                                        `;
-                                        document.body.appendChild(successMsg);
-                                        setTimeout(() => successMsg.remove(), 3000);
-                                    }
-                                } catch (err) {
-                                    console.error('Error installing bookmarklet:', err);
-                                    // Fallback: Show copy instructions
-                                    alert('Bookmarklet kodunu manuel olarak eklemeniz gerekiyor. Lütfen sürükle-bırak yöntemini kullanın.');
-                                }
-                            });
-                        }
-                        
-                        // Setup drag and drop
+                    // Setup drag and drop
                         const dragElement = document.getElementById('dragBookmarklet');
                         if (dragElement) {
                             dragElement.addEventListener('dragstart', (e) => {
+                                // Set the bookmarklet URL and name
                                 e.dataTransfer.setData('text/uri-list', bookmarkletCode);
                                 e.dataTransfer.setData('text/plain', bookmarkletCode);
-                                e.dataTransfer.setData('text/html', '<a href="' + bookmarkletCode.replace(/"/g, '&quot;') + '">' + bookmarkletName + '</a>');
+                                e.dataTransfer.setData('text/html', '<a href="' + bookmarkletCode.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">' + bookmarkletName + '</a>');
                                 e.dataTransfer.effectAllowed = 'copy';
+                                
+                                // Visual feedback
                                 dragElement.style.opacity = '0.5';
                                 dragElement.style.cursor = 'grabbing';
+                                dragElement.style.transform = 'scale(0.95)';
                             });
                             
                             dragElement.addEventListener('dragend', () => {
                                 dragElement.style.opacity = '1';
                                 dragElement.style.cursor = 'grab';
+                                dragElement.style.transform = 'scale(1)';
+                            });
+                            
+                            dragElement.addEventListener('dragenter', (e) => {
+                                e.preventDefault();
+                            });
+                            
+                            dragElement.addEventListener('dragover', (e) => {
+                                e.preventDefault();
                             });
                         }
                     }
