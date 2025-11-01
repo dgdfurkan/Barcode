@@ -3911,20 +3911,18 @@
             
             const searchLower = searchTerm.toLowerCase().trim();
             
-            // Get barcodes from selected products (if search term matches selected product name)
+            // Get barcodes from ALL selected products (so we can search by their barcodes)
             const selectedProductBarcodes = new Set();
             for (const selectedProductName of selectedProductsForShortcut) {
-                if (selectedProductName.toLowerCase().includes(searchLower)) {
-                    const selectedProductObj = products.find(p => 
-                        (p.name || '').toLowerCase() === selectedProductName.toLowerCase()
-                    );
-                    if (selectedProductObj && selectedProductObj.barcodes) {
-                        selectedProductObj.barcodes.forEach(b => {
-                            if (b.code) {
-                                selectedProductBarcodes.add(b.code.toLowerCase());
-                            }
-                        });
-                    }
+                const selectedProductObj = products.find(p => 
+                    (p.name || '').toLowerCase() === selectedProductName.toLowerCase()
+                );
+                if (selectedProductObj && selectedProductObj.barcodes) {
+                    selectedProductObj.barcodes.forEach(b => {
+                        if (b.code) {
+                            selectedProductBarcodes.add(b.code.toLowerCase());
+                        }
+                    });
                 }
             }
             
@@ -3940,7 +3938,7 @@
                 // Search in barcodes
                 if (barcodeStrings.some(b => b.includes(searchLower))) return true;
                 
-                // Search by selected product barcodes (if any selected product matches search term)
+                // Search by selected product barcodes (show products with same barcodes as selected products)
                 if (selectedProductBarcodes.size > 0) {
                     if (barcodeStrings.some(b => selectedProductBarcodes.has(b))) {
                         return true;
