@@ -4396,6 +4396,27 @@
             }
         }
         
+        // Get keyboard shortcuts focus input setting (default: true)
+        function getKeyboardShortcutsFocusSetting() {
+            try {
+                const value = localStorage.getItem('keyboardShortcutsFocusInput');
+                // Default to true if not set
+                return value === null ? true : value === '1';
+            } catch (e) {
+                console.error('Error reading keyboard shortcuts focus setting:', e);
+                return true; // Default to true on error
+            }
+        }
+        
+        // Set keyboard shortcuts focus input setting
+        function setKeyboardShortcutsFocusSetting(enabled) {
+            try {
+                localStorage.setItem('keyboardShortcutsFocusInput', enabled ? '1' : '0');
+            } catch (e) {
+                console.error('Error saving keyboard shortcuts focus setting:', e);
+            }
+        }
+        
         // Handle keyboard press
         async function handleKeyPress(event) {
             // Premium control
