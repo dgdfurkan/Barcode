@@ -288,7 +288,6 @@
         });
         
         console.log('🔧 Getir Bookmarklet: Initialization complete');
-    }
         
         // Watch for dynamically added rows (if page uses AJAX)
         const observer = new MutationObserver((mutations) => {
