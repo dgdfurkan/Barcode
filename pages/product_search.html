@@ -1872,13 +1872,64 @@
             
             // Check if input is a URL (image link)
             const isImageUrl = /^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i.test(input.trim());
-            if (isImageUrl && typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch')) {
-                return input.trim(); // Return image URL as-is for premium users
+            if (isImageUrl) {
+                // Check both premium feature and user preference
+                const hasPremium = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                let isEnabled = true;
+                try {
+                    isEnabled = localStorage.getItem('imageSearchEnabled') !== '0'; // Default to enabled if not set
+                } catch (e) {
+                    isEnabled = true;
+                }
+                
+                if (hasPremium && isEnabled) {
+                    // Try to find product by image URL and return its barcode
+                    const imageUrl = input.trim().toLowerCase();
+                    let foundBarcode = null;
+                    
+                    for (const product of products) {
+                        if (!product.image) continue;
+                        
+                        const productImageUrl = product.image.toLowerCase().trim();
+                        
+                        // Exact match
+                        if (productImageUrl === imageUrl) {
+                            if (product.barcodes && product.barcodes.length > 0 && product.barcodes[0].code) {
+                                foundBarcode = product.barcodes[0].code;
+                                break;
+                            }
+                        } else {
+                            // Try filename match
+                            const productFileName = productImageUrl.split('/').pop().split('?')[0];
+                            const searchFileName = imageUrl.split('/').pop().split('?')[0];
+                            if (productFileName === searchFileName && productFileName.length > 0) {
+                                if (product.barcodes && product.barcodes.length > 0 && product.barcodes[0].code) {
+                                    foundBarcode = product.barcodes[0].code;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // If barcode found, return it; otherwise return image URL
+                    return foundBarcode || input.trim();
+                }
             }
             
             // If HTML table, parse it with image support (premium feature)
-            if (hasHtmlTags && typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch')) {
-                return parseHtmlTableWithImages(input);
+            if (hasHtmlTags) {
+                // Check both premium feature and user preference
+                const hasPremium = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                let isEnabled = true;
+                try {
+                    isEnabled = localStorage.getItem('imageSearchEnabled') !== '0'; // Default to enabled if not set
+                } catch (e) {
+                    isEnabled = true;
+                }
+                
+                if (hasPremium && isEnabled) {
+                    return parseHtmlTableWithImages(input);
+                }
             }
             
             if (!hasTableHeaders && !hasPreviewText && !hasHtmlTags) {
@@ -1934,8 +1985,8 @@
         // Global map to store product names -> image URLs (for premium image search)
         let productImageMap = new Map();
         
-        // Parse HTML table and extract product names with image URLs (premium feature)
-        // Returns only product names for display, but stores image URLs in global map
+        // Parse HTML table and extract image URLs, then find matching products and return their barcodes
+        // This ensures exact matching by barcode instead of fuzzy name matching
         function parseHtmlTableWithImages(htmlContent) {
             try {
                 // Clear previous map
@@ -1943,72 +1994,79 @@
                 
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(htmlContent, 'text/html');
-                const rows = doc.querySelectorAll('tbody tr, tr');
                 
-                const productNames = [];
+                // Find all img tags in the HTML (both in tables and standalone)
+                const imgTags = doc.querySelectorAll('img');
+                const imageUrls = [];
                 
-                rows.forEach((row) => {
-                    try {
-                        const cells = row.querySelectorAll('td');
-                        if (cells.length < 2) return;
-                        
-                        // Extract image URL from img tag (can be in any cell)
-                        let imageUrl = '';
-                        const imgTag = row.querySelector('img');
-                        if (imgTag && imgTag.src) {
-                            imageUrl = imgTag.src.trim();
+                imgTags.forEach(img => {
+                    if (img.src && img.src.trim()) {
+                        const imageUrl = img.src.trim();
+                        // Filter out data URIs and invalid URLs
+                        if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+                            imageUrls.push(imageUrl);
                         }
-                        
-                        // Extract product name from table cell
-                        // In the HTML structure, product name is usually in a cell with class "ant-table-cell"
-                        // and doesn't contain image, numbers, or special text
-                        let productName = '';
-                        const skipPatterns = ['Önizleme', 'eye', 'svg', '#', 'Ürün Adı', 'Adet'];
-                        
-                        for (let i = 0; i < cells.length; i++) {
-                            // Skip first cell if it contains image
-                            if (i === 0 && cells[i].querySelector('img')) {
-                                continue;
-                            }
-                            
-                            const cellText = cells[i].textContent.trim();
-                            
-                            // Check if this cell contains product name
-                            if (cellText && 
-                                cellText.length > 2 &&
-                                !cellText.match(/^\d+$/) && // Not just a number
-                                !skipPatterns.some(pattern => cellText.includes(pattern)) && // Not a header/special text
-                                !cellText.match(/^[#\s]*$/) && // Not just special characters
-                                cellText.length < 200) { // Reasonable length for product name
-                                productName = cellText;
-                                break;
-                            }
-                        }
-                        
-                        // Clean product name (remove extra whitespace)
-                        if (productName) {
-                            productName = productName.replace(/\s+/g, ' ').trim();
-                        }
-                        
-                        // Store mapping: product name -> image URL (for search, but hide from UI)
-                        if (productName) {
-                            productNames.push(productName);
-                            // If image URL exists, store it for search
-                            if (imageUrl) {
-                                productImageMap.set(productName, imageUrl);
-                            }
-                        } else if (imageUrl) {
-                            // If only image URL exists, use it as product name fallback
-                            productNames.push(imageUrl);
-                            productImageMap.set(imageUrl, imageUrl);
-                        }
-                    } catch (error) {
-                        console.error('Error parsing row:', error);
                     }
                 });
                 
-                // Return only product names (no image URLs visible in search box)
-                return productNames.join(', ');
+                // If no images found, fall back to text parsing
+                if (imageUrls.length === 0) {
+                    const textContent = htmlContent.replace(/<[^>]*>/g, '\n');
+                    return parseTableData(textContent);
+                }
+                
+                // Find matching products by image URL and collect their barcodes
+                const foundBarcodes = new Set(); // Use Set to avoid duplicates
+                
+                imageUrls.forEach(imageUrl => {
+                    // Normalize image URL for matching
+                    const normalizedImageUrl = imageUrl.toLowerCase().trim();
+                    
+                    // Try to find products matching this image URL
+                    products.forEach(product => {
+                        if (!product.image) return;
+                        
+                        const productImageUrl = product.image.toLowerCase().trim();
+                        
+                        // Exact match
+                        if (productImageUrl === normalizedImageUrl) {
+                            // Add all barcodes of this product
+                            if (product.barcodes && product.barcodes.length > 0) {
+                                product.barcodes.forEach(barcode => {
+                                    if (barcode.code) {
+                                        foundBarcodes.add(barcode.code);
+                                    }
+                                });
+                            }
+                        } else {
+                            // Try filename match (last part of URL before query params)
+                            const productFileName = productImageUrl.split('/').pop().split('?')[0];
+                            const searchFileName = normalizedImageUrl.split('/').pop().split('?')[0];
+                            if (productFileName === searchFileName && productFileName.length > 0) {
+                                // Add all barcodes of this product
+                                if (product.barcodes && product.barcodes.length > 0) {
+                                    product.barcodes.forEach(barcode => {
+                                        if (barcode.code) {
+                                            foundBarcodes.add(barcode.code);
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                    });
+                });
+                
+                // Convert Set to array and return as comma-separated barcodes
+                const barcodeArray = Array.from(foundBarcodes);
+                
+                if (barcodeArray.length === 0) {
+                    // No matches found, fall back to text parsing
+                    const textContent = htmlContent.replace(/<[^>]*>/g, '\n');
+                    return parseTableData(textContent);
+                }
+                
+                // Return barcodes as comma-separated string
+                return barcodeArray.join(', ');
             } catch (error) {
                 console.error('Error parsing HTML table:', error);
                 // Fallback to text parsing
@@ -3363,7 +3421,7 @@
                 name: 'Görsel Link Arama',
                 description: 'HTML tablolardan görsel linklerini çıkarıp görsel linkine göre arama yap',
                 emoji: '🖼️',
-                storageKey: null
+                storageKey: 'imageSearchEnabled'
             },
             'darkMode': {
                 name: 'Karanlık Mod',
