@@ -3727,38 +3727,46 @@
                         const dragElement = document.getElementById('dragBookmarklet');
                         if (dragElement) {
                             dragElement.addEventListener('dragstart', (e) => {
-                                // Create a temporary link element with the bookmarklet code and name
+                                // Create a temporary visible link element that will be dragged
+                                // The link's text content becomes the bookmark name
                                 const link = document.createElement('a');
                                 link.href = bookmarkletCode;
                                 link.textContent = bookmarkletName;
                                 link.style.position = 'absolute';
-                                link.style.left = '-9999px';
+                                link.style.top = '0';
+                                link.style.left = '0';
+                                link.style.opacity = '0';
+                                link.style.pointerEvents = 'none';
+                                link.style.zIndex = '-1';
                                 document.body.appendChild(link);
                                 
-                                // Set drag data - browsers use the link's textContent as bookmark name
+                                // Set drag data
+                                // Use the link element itself - browsers extract name from it
+                                const dragImage = document.createElement('div');
+                                dragImage.textContent = bookmarkletName;
+                                dragImage.style.position = 'absolute';
+                                dragImage.style.top = '-9999px';
+                                document.body.appendChild(dragImage);
+                                e.dataTransfer.setDragImage(dragImage, 0, 0);
+                                
+                                // Set data using the link element's outerHTML
                                 e.dataTransfer.setData('text/uri-list', bookmarkletCode);
                                 e.dataTransfer.setData('text/plain', bookmarkletCode);
                                 e.dataTransfer.setData('text/html', link.outerHTML);
                                 
-                                // Chrome/Edge bookmark name workaround
-                                if (e.dataTransfer.items) {
-                                    try {
-                                        e.dataTransfer.items.clear();
-                                        e.dataTransfer.items.add(bookmarkletCode, 'text/uri-list');
-                                        e.dataTransfer.items.add(link.outerHTML, 'text/html');
-                                    } catch (err) {
-                                        // Fallback
-                                        console.debug('items API not available');
-                                    }
+                                // For Chrome - try to set DownloadURL format
+                                try {
+                                    e.dataTransfer.setData('DownloadURL', 'application/x-bookmark:UTF8:' + bookmarkletName + ':' + bookmarkletCode);
+                                } catch (err) {
+                                    // Ignore if not supported
                                 }
                                 
                                 e.dataTransfer.effectAllowed = 'copy';
                                 
-                                // Clean up temporary link after a short delay
+                                // Clean up after drag
                                 setTimeout(() => {
-                                    if (document.body.contains(link)) {
-                                        document.body.removeChild(link);
-                                    }
+                                    if (document.body.contains(link)) document.body.removeChild(link);
+                                    if (document.body.contains(dragImage)) document.body.removeChild(dragImage);
                                 }, 100);
                                 
                                 // Visual feedback
