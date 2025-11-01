@@ -3703,6 +3703,22 @@
                                         Getir warehouse sitesinde çalışacak bir bookmarklet kurarak, ürün listelerindeki HTML'leri tek tıkla kopyalayabilirsiniz.
                                     </p>
                                     
+                                    <!-- Otomatik yönlendirme ayarı -->
+                                    <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex-1">
+                                                <label class="text-sm font-medium text-gray-900 flex items-center space-x-2 cursor-pointer">
+                                                    <span>🔄 Otomatik Yönlendirme</span>
+                                                </label>
+                                                <p class="text-xs text-gray-500 mt-1">Kopyalama sonrası otomatik olarak bu siteye yönlendir</p>
+                                            </div>
+                                            <label class="relative inline-flex items-center cursor-pointer">
+                                                <input type="checkbox" id="getirAutoRedirectSetting" class="sr-only peer">
+                                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
                                     <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
                                         <h5 class="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
                                             <span>📥 Kurulum</span>
@@ -3743,6 +3759,29 @@
                             `}
                         </div>
                     `;
+                    
+                    // Load and setup auto-redirect setting
+                    if (hasPremium) {
+                        const autoRedirectCheckbox = document.getElementById('getirAutoRedirectSetting');
+                        if (autoRedirectCheckbox) {
+                            // Load saved setting (default: false)
+                            try {
+                                const saved = localStorage.getItem('getirAutoRedirect');
+                                autoRedirectCheckbox.checked = saved === 'true';
+                            } catch (e) {
+                                autoRedirectCheckbox.checked = false;
+                            }
+                            
+                            // Save setting on change
+                            autoRedirectCheckbox.addEventListener('change', (e) => {
+                                try {
+                                    localStorage.setItem('getirAutoRedirect', e.target.checked ? 'true' : 'false');
+                                } catch (err) {
+                                    console.error('Error saving setting:', err);
+                                }
+                            });
+                        }
+                    }
                     
                     // Setup drag and drop
                     if (hasPremium) {
