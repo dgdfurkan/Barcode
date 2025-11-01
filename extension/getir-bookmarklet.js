@@ -345,6 +345,9 @@
             copyRow(tr);
         };
         
+        // Get cells for this row
+        const cells = tr.querySelectorAll('td');
+        
         // Add to last cell
         if (cells.length > 0) {
             const lastCell = cells[cells.length - 1];
@@ -491,6 +494,11 @@
                         if (node.tagName === 'TR' || node.querySelector && node.querySelector('tr')) {
                             const rows = node.tagName === 'TR' ? [node] : node.querySelectorAll('tr');
                             rows.forEach(row => {
+                                // Skip if inside ant-descriptions
+                                if (row.closest('.ant-descriptions')) {
+                                    return;
+                                }
+                                // Add button to product rows
                                 if (row.closest('tbody') && isProductRow(row)) {
                                     addButtonToRow(row);
                                 }
