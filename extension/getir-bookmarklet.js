@@ -514,10 +514,14 @@
                         }
                         // Check for new tables
                         if (node.tagName === 'TABLE' || (node.querySelector && node.querySelector('table'))) {
-                            // Re-add "Copy All" button (in case product container was just added)
-                            addCopyAllButton();
                             const tables = node.tagName === 'TABLE' ? [node] : node.querySelectorAll('table');
                             tables.forEach(table => {
+                                // Skip descriptions tables
+                                if (!isProductTable(table)) {
+                                    return;
+                                }
+                                // Re-add "Copy All" button (in case product container was just added)
+                                addCopyAllButton();
                                 const rows = table.querySelectorAll('tbody tr');
                                 rows.forEach(row => {
                                     if (isProductRow(row)) {
@@ -526,25 +530,42 @@
                                 });
                             });
                         }
-                        // Check for table wrapper changes (modal opening, etc.)
+                        // Check for table wrapper changes (modal opening, new order window, etc.)
                         if (node.classList && (
                             node.classList.contains('ant-modal-body') ||
                             node.classList.contains('ant-table-wrapper') ||
-                            node.classList.contains('ant-table-container')
+                            node.classList.contains('ant-table-container') ||
+                            node.classList.contains('ant-modal-content')
                         )) {
-                            // Re-initialize when modal opens
+                            // Re-initialize when modal opens or new content loads
                             setTimeout(() => {
+                                // Re-add "Copy All" button
                                 addCopyAllButton();
-                                const tables = document.querySelectorAll('table');
-                                tables.forEach(table => {
-                                    const rows = table.querySelectorAll('tbody tr');
-                                    rows.forEach(row => {
-                                        if (isProductRow(row)) {
-                                            addButtonToRow(row);
-                                        }
+                                
+                                // Process all product tables
+                                const allRows = document.querySelectorAll('.ant-row');
+                                allRows.forEach(row => {
+                                    // Skip if inside ant-descriptions
+                                    if (row.closest('.ant-descriptions')) {
+                                        return;
+                                    }
+                                    
+                                    const cols = row.querySelectorAll('.ant-col');
+                                    cols.forEach(col => {
+                                        const tables = col.querySelectorAll('table');
+                                        tables.forEach(table => {
+                                            if (isProductTable(table)) {
+                                                const rows = table.querySelectorAll('tbody tr');
+                                                rows.forEach(tr => {
+                                                    if (isProductRow(tr)) {
+                                                        addButtonToRow(tr);
+                                                    }
+                                                });
+                                            }
+                                        });
                                     });
                                 });
-                            }, 100);
+                            }, 200);
                         }
                     }
                 });
