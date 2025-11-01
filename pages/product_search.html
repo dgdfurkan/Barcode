@@ -3651,38 +3651,11 @@
             
             const detailContent = document.getElementById('featureDetailContent');
             
-            // Load bookmarklet code
-            fetch('../extension/getir-bookmarklet.js')
+            // Load bookmarklet code (already minified)
+            fetch('../extension/getir-bookmarklet-bookmarklet.js')
                 .then(response => response.text())
-                .then(code => {
-                    // Minify code for bookmarklet (preserve strings)
-                    let minified = code
-                        .replace(/\/\/[^\n]*/g, '') // Remove single-line comments
-                        .replace(/\/\*[\s\S]*?\*\//g, '') // Remove multi-line comments
-                        .replace(/\n\s*\n/g, '\n') // Remove blank lines
-                        .replace(/^\s+|\s+$/gm, '') // Trim lines
-                        .replace(/\s*([{}();,\[\]=+\-*\/%<>!&|?:])\s*/g, '$1') // Remove spaces around operators
-                        .replace(/\s+/g, ' ') // Collapse multiple spaces
-                        .trim();
-                    
-                    // Fix broken strings (ensure quotes are properly closed)
-                    minified = minified
-                        .replace(/const\s+([A-Z_]+)\s*=\s*'([^']*?)(?=\s*;)/g, (match, name, value) => {
-                            // If string appears incomplete, try to fix it
-                            if (!value.includes("'")) {
-                                return `const ${name}='${value}';`;
-                            }
-                            return match;
-                        })
-                        .replace(/const\s+([A-Z_]+)\s*=\s*"([^"]*?)(?=\s*;)/g, (match, name, value) => {
-                            // If string appears incomplete, try to fix it
-                            if (!value.includes('"')) {
-                                return `const ${name}="${value}";`;
-                            }
-                            return match;
-                        });
-                    
-                    const bookmarkletCode = 'javascript:(function(){' + minified + '})();';
+                .then(bookmarkletCode => {
+                    // Bookmarklet is already in correct format: javascript:(function(){...})();
                     const bookmarkletName = '🏷️ Getir Barkod Kopyalama';
                     
                     detailContent.innerHTML = `
@@ -3755,9 +3728,20 @@
                         if (dragElement) {
                             dragElement.addEventListener('dragstart', (e) => {
                                 // Set the bookmarklet URL and name
+                                // Use text/uri-list for bookmark URL
                                 e.dataTransfer.setData('text/uri-list', bookmarkletCode);
+                                // Use text/plain for fallback
                                 e.dataTransfer.setData('text/plain', bookmarkletCode);
-                                e.dataTransfer.setData('text/html', '<a href="' + bookmarkletCode.replace(/"/g, '&quot;').replace(/'/g, '&#39;') + '">' + bookmarkletName + '</a>');
+                                // Use text/html with proper title attribute for bookmark name
+                                const escapedCode = bookmarkletCode.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                                e.dataTransfer.setData('text/html', '<a href="' + escapedCode + '" title="' + bookmarkletName + '">' + bookmarkletName + '</a>');
+                                // Set bookmark name via DownloadURL format (works in Chrome/Edge)
+                                try {
+                                    e.dataTransfer.setData('DownloadURL', 'application/x-bookmark:UTF8:' + bookmarkletName + ':' + bookmarkletCode);
+                                } catch (err) {
+                                    // Fallback if DownloadURL not supported
+                                    console.debug('DownloadURL not supported, using text/html');
+                                }
                                 e.dataTransfer.effectAllowed = 'copy';
                                 
                                 // Visual feedback
