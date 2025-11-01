@@ -67,12 +67,17 @@
     styleSheet.textContent = styles;
     document.head.appendChild(styleSheet);
     
-    // Get setting from localStorage
+    // Get setting from localStorage (default: false - don't redirect)
     function getAutoRedirect() {
         try {
-            return localStorage.getItem(STORAGE_KEY) !== '0';
+            const value = localStorage.getItem(STORAGE_KEY);
+            // If not set, default to false (don't redirect)
+            if (value === null) {
+                return false;
+            }
+            return value === 'true';
         } catch (e) {
-            return true; // Default to enabled
+            return false; // Default to false on error
         }
     }
     
