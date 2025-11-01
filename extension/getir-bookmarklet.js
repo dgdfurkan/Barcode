@@ -101,8 +101,26 @@
         }
     }
     
+    // Navigate to barcode site (switch to existing tab if open, otherwise open new tab)
+    function navigateToBarcodeSite() {
+        // Try to open in existing tab or new tab
+        // Using window.open with same URL will focus existing tab if available
+        const newWindow = window.open(BARCODE_SITE_URL, '_blank');
+        // If popup was blocked or new tab opened, focus it after a short delay
+        if (newWindow) {
+            setTimeout(() => {
+                try {
+                    newWindow.focus();
+                } catch (e) {
+                    // Cross-origin restriction, ignore
+                }
+            }, 100);
+        }
+    }
+    
     // Copy single row HTML
     async function copyRow(tr) {
+        // Copy only the <tr> element (single product row)
         const html = tr.outerHTML;
         const success = await copyToClipboard(html);
         
@@ -117,7 +135,7 @@
             // Auto redirect if enabled
             if (getAutoRedirect()) {
                 setTimeout(() => {
-                    window.location.href = BARCODE_SITE_URL;
+                    navigateToBarcodeSite();
                 }, 500);
             }
         } else {
@@ -125,42 +143,72 @@
         }
     }
     
-    // Copy all rows HTML
+    // Copy all rows HTML (only the ant-row container with product tables)
     async function copyAllRows() {
-        const tables = document.querySelectorAll('table');
-        let allRows = [];
+        // Find the ant-row container that contains all product tables
+        // This is the parent div that wraps all product tables (excluding customer info, etc.)
+        const rowContainer = document.querySelector('.ant-row.css-1b31m49');
         
-        tables.forEach(table => {
-            const rows = table.querySelectorAll('tbody tr');
+        if (!rowContainer) {
+            // Fallback: try to find any ant-row that contains tables
+            const rows = document.querySelectorAll('.ant-row');
+            let foundContainer = null;
+            
             rows.forEach(row => {
-                allRows.push(row.outerHTML);
+                const hasTables = row.querySelectorAll('table').length > 0;
+                const hasProductRows = row.querySelectorAll('tbody tr.ant-table-row').length > 0;
+                if (hasTables && hasProductRows && !foundContainer) {
+                    foundContainer = row;
+                }
             });
-        });
-        
-        if (allRows.length === 0) {
-            alert('Kopyalanacak ürün bulunamadı.');
-            return;
+            
+            if (foundContainer) {
+                const html = foundContainer.outerHTML;
+                const success = await copyToClipboard(html);
+                
+                if (success) {
+                    const notification = document.createElement('div');
+                    notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:10px 15px;border-radius:4px;z-index:10000;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
+                    const productCount = foundContainer.querySelectorAll('tbody tr.ant-table-row').length;
+                    notification.textContent = `✓ ${productCount} ürün kopyalandı!`;
+                    document.body.appendChild(notification);
+                    setTimeout(() => notification.remove(), 2000);
+                    
+                    if (getAutoRedirect()) {
+                        setTimeout(() => {
+                            navigateToBarcodeSite();
+                        }, 500);
+                    }
+                } else {
+                    alert('Kopyalama başarısız. Lütfen tekrar deneyin.');
+                }
+                return;
+            }
         }
         
-        const html = allRows.join('\n');
-        const success = await copyToClipboard(html);
-        
-        if (success) {
-            // Show notification
-            const notification = document.createElement('div');
-            notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:10px 15px;border-radius:4px;z-index:10000;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
-            notification.textContent = `✓ ${allRows.length} ürün kopyalandı!`;
-            document.body.appendChild(notification);
-            setTimeout(() => notification.remove(), 2000);
+        // If container found, copy it
+        if (rowContainer) {
+            const html = rowContainer.outerHTML;
+            const success = await copyToClipboard(html);
             
-            // Auto redirect if enabled
-            if (getAutoRedirect()) {
-                setTimeout(() => {
-                    window.location.href = BARCODE_SITE_URL;
-                }, 500);
+            if (success) {
+                const notification = document.createElement('div');
+                notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:10px 15px;border-radius:4px;z-index:10000;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
+                const productCount = rowContainer.querySelectorAll('tbody tr.ant-table-row').length;
+                notification.textContent = `✓ ${productCount} ürün kopyalandı!`;
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 2000);
+                
+                if (getAutoRedirect()) {
+                    setTimeout(() => {
+                        navigateToBarcodeSite();
+                    }, 500);
+                }
+            } else {
+                alert('Kopyalama başarısız. Lütfen tekrar deneyin.');
             }
         } else {
-            alert('Kopyalama başarısız. Lütfen tekrar deneyin.');
+            alert('Kopyalanacak ürün bulunamadı.');
         }
     }
     
