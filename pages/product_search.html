@@ -3643,6 +3643,164 @@
             document.getElementById('premiumFeatureDetailModal').classList.add('hidden');
         }
         
+        // Show image search modal with bookmarklet installation
+        function showImageSearchModal(hasPremium) {
+            // Update modal header
+            document.getElementById('featureDetailEmoji').textContent = '🖼️';
+            document.getElementById('featureDetailName').textContent = 'Görsel Link Arama';
+            
+            const detailContent = document.getElementById('featureDetailContent');
+            
+            // Load bookmarklet code
+            fetch('../extension/getir-bookmarklet.js')
+                .then(response => response.text())
+                .then(code => {
+                    // Minify code for bookmarklet
+                    const minified = code
+                        .replace(/\/\/[^\n]*/g, '')
+                        .replace(/\/\*[\s\S]*?\*\//g, '')
+                        .replace(/\n\s*\n/g, '\n')
+                        .replace(/^\s+|\s+$/gm, '')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    
+                    const bookmarkletCode = 'javascript:(function(){' + minified + '})();';
+                    
+                    detailContent.innerHTML = `
+                        <div class="space-y-4">
+                            <div class="flex items-center space-x-2">
+                                ${hasPremium ? `
+                                    <span class="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full">AKTİF</span>
+                                ` : `
+                                    <span class="px-3 py-1 bg-gray-400 text-white text-xs font-bold rounded-full">KİLİTLİ</span>
+                                `}
+                                <span class="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full">PREMIUM</span>
+                            </div>
+                            
+                            <div>
+                                <h4 class="font-semibold text-gray-900 mb-2">Açıklama</h4>
+                                <p class="text-gray-600 text-sm">HTML tablolardan görsel linklerini çıkarıp görsel linkine göre arama yap</p>
+                            </div>
+                            
+                            ${hasPremium ? `
+                                <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-5">
+                                    <h4 class="font-semibold text-gray-900 mb-3 text-lg">🔗 Getir Entegrasyonu</h4>
+                                    <p class="text-gray-700 text-sm mb-4 leading-relaxed">
+                                        Getir warehouse sitesinde çalışacak bir bookmarklet kurarak, ürün listelerindeki HTML'leri tek tıkla kopyalayabilirsiniz.
+                                    </p>
+                                    
+                                    <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
+                                        <h5 class="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+                                            <span>📥 Kurulum</span>
+                                        </h5>
+                                        
+                                        <!-- Tek tıkla kurulum -->
+                                        <div class="mb-4">
+                                            <button 
+                                                id="installBookmarkletBtn" 
+                                                class="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-4 rounded-lg transition-all shadow-md hover:shadow-lg mb-2"
+                                            >
+                                                ✨ Tek Tıkla Bookmarklet'i Yükle
+                                            </button>
+                                            <p class="text-xs text-gray-500 text-center">Yukarıdaki butona tıklayın, bookmark bar'a eklenecek</p>
+                                        </div>
+                                        
+                                        <!-- Sürükle-bırak alternatifi -->
+                                        <div class="border-t border-gray-200 pt-4">
+                                            <p class="text-xs text-gray-600 mb-2 font-medium">Alternatif: Sürükle-Bırak</p>
+                                            <div class="bg-gray-50 border-2 border-dashed border-purple-300 rounded-lg p-4 text-center cursor-grab active:cursor-grabbing" 
+                                                 id="dragBookmarklet"
+                                                 draggable="true">
+                                                <p class="text-sm font-semibold text-purple-700 mb-1">📋 Getir Kopyalama</p>
+                                                <p class="text-xs text-gray-500">Bu butonu bookmark bar'a sürükleyin</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Kullanım talimatları -->
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                        <h5 class="font-semibold text-blue-900 mb-2">📖 Nasıl Kullanılır?</h5>
+                                        <ol class="text-sm text-blue-800 space-y-2 list-decimal list-inside">
+                                            <li>Bookmarklet'i yukarıdaki yöntemlerden biriyle kurun</li>
+                                            <li>Getir warehouse sitesine gidin (warehouse.getir.com)</li>
+                                            <li>Ürün listesini görüntüleyin</li>
+                                            <li>Bookmarklet'e tıklayın - Her ürünün yanında 📋 butonu görünecek</li>
+                                            <li>Tek ürün için: Ürünün yanındaki 📋 butonuna tıklayın</li>
+                                            <li>Tüm ürünler için: Tablonun üstündeki "📋 Tümünü Kopyala" butonuna tıklayın</li>
+                                            <li>HTML otomatik kopyalanacak ve bu siteye yönlendirileceksiniz</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            ` : `
+                                <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
+                                    <p class="text-gray-800 text-sm font-medium mb-2">🔒 Bu özellik premium üyeler için</p>
+                                    <p class="text-gray-700 text-xs leading-relaxed">Bu özellikten faydalanmak için premium üyelik gereklidir. Daha fazla bilgi ve aktivasyon için lütfen bizimle iletişime geçin.</p>
+                                </div>
+                            `}
+                        </div>
+                    `;
+                    
+                    // Setup install button
+                    if (hasPremium) {
+                        const installBtn = document.getElementById('installBookmarkletBtn');
+                        if (installBtn) {
+                            installBtn.addEventListener('click', () => {
+                                // Create bookmark link
+                                const link = document.createElement('a');
+                                link.href = bookmarkletCode;
+                                link.textContent = 'Getir Kopyalama';
+                                
+                                // Trigger bookmark creation
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                
+                                // Show success message
+                                const successMsg = document.createElement('div');
+                                successMsg.className = 'fixed top-20 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg z-50';
+                                successMsg.innerHTML = `
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xl">✓</span>
+                                        <div>
+                                            <p class="font-semibold">Bookmarklet eklendi!</p>
+                                            <p class="text-xs opacity-90">Bookmark bar'ınızda görünecek</p>
+                                        </div>
+                                    </div>
+                                `;
+                                document.body.appendChild(successMsg);
+                                setTimeout(() => successMsg.remove(), 3000);
+                            });
+                        }
+                        
+                        // Setup drag and drop
+                        const dragElement = document.getElementById('dragBookmarklet');
+                        if (dragElement) {
+                            dragElement.addEventListener('dragstart', (e) => {
+                                e.dataTransfer.setData('text/uri-list', bookmarkletCode);
+                                e.dataTransfer.setData('text/plain', bookmarkletCode);
+                                e.dataTransfer.effectAllowed = 'copy';
+                                dragElement.style.opacity = '0.5';
+                            });
+                            
+                            dragElement.addEventListener('dragend', () => {
+                                dragElement.style.opacity = '1';
+                            });
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading bookmarklet:', err);
+                    detailContent.innerHTML = `
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <p class="text-red-800 text-sm">Bookmarklet dosyası yüklenemedi. Lütfen daha sonra tekrar deneyin.</p>
+                        </div>
+                    `;
+                });
+            
+            // Show modal
+            document.getElementById('premiumFeatureDetailModal').classList.remove('hidden');
+        }
+        
         // ============================================
         // KEYBOARD SHORTCUTS MANAGEMENT FUNCTIONS
         // ============================================
