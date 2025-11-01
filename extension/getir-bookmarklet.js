@@ -244,6 +244,44 @@
         }
     }
     
+    // Check if a row is a product row (not customer info, address, etc.)
+    function isProductRow(tr) {
+        const cells = tr.querySelectorAll('td');
+        const cellTexts = Array.from(cells).map(cell => cell.textContent.trim()).join(' ').toLowerCase();
+        
+        // Skip rows with customer info, address, collector, courier, etc.
+        const skipPatterns = [
+            'müşteri adı', 'müşteri notu', 'teslimat adresi', 'adres açıklaması',
+            'toplayıcı adı', 'kurye adı', 'poşet kullanımı', 'durum', 'lokasyonlar',
+            'müşteri', 'kurye', 'toplayıcı', 'adres', 'teslimat', 'notu',
+            'Ürün Adı', '#', 'Adet' // Header row patterns
+        ];
+        
+        // Check if row contains any skip patterns
+        for (const pattern of skipPatterns) {
+            if (cellTexts.includes(pattern.toLowerCase())) {
+                return false;
+            }
+        }
+        
+        // Must have an image (product images) to be a product row
+        const hasImage = tr.querySelector('img[src*="product"], img[src*="getir"]');
+        if (!hasImage) {
+            return false;
+        }
+        
+        // Must have product name (not just numbers)
+        const hasProductName = Array.from(cells).some(cell => {
+            const text = cell.textContent.trim();
+            return text && 
+                   text.length > 2 && 
+                   !text.match(/^\d+$/) && 
+                   !text.match(/^[0-9]+$/);
+        });
+        
+        return hasProductName;
+    }
+    
     // Add button to row
     function addButtonToRow(tr) {
         // Check if button already exists
@@ -251,16 +289,8 @@
             return;
         }
         
-        // Skip if this is not a product row (check for image or product name)
-        const hasImage = tr.querySelector('img');
-        const cells = tr.querySelectorAll('td');
-        const hasProductName = Array.from(cells).some(cell => {
-            const text = cell.textContent.trim();
-            return text && text.length > 2 && !text.match(/^\d+$/) && !text.includes('#') && !text.includes('Ürün Adı') && !text.includes('Adet');
-        });
-        
-        // Only add button if it looks like a product row
-        if (!hasImage && !hasProductName) {
+        // Only add button if it's a product row
+        if (!isProductRow(tr)) {
             return;
         }
         
@@ -291,30 +321,46 @@
         }
     }
     
-    // Add "Copy All" button to table
-    function addCopyAllButton(table) {
-        // Check if button already exists in parent
-        const parent = table.parentNode;
-        if (parent && parent.querySelector('.getir-copy-all-container')) {
+    // Add "Copy All" button only to the product tables container (ant-row)
+    // This function is called once per product container, not per table
+    function addCopyAllButton() {
+        // Check if button already exists
+        if (document.querySelector('.getir-copy-all-container')) {
             return;
         }
         
-        // Check if table has product rows
-        const productRows = table.querySelectorAll('tbody tr');
-        let hasProductRows = false;
-        productRows.forEach(row => {
-            const hasImage = row.querySelector('img');
-            const cells = row.querySelectorAll('td');
-            const hasProductName = Array.from(cells).some(cell => {
-                const text = cell.textContent.trim();
-                return text && text.length > 2 && !text.match(/^\d+$/) && !text.includes('#') && !text.includes('Ürün Adı') && !text.includes('Adet');
-            });
-            if (hasImage || hasProductName) {
-                hasProductRows = true;
-            }
-        });
+        // Find the ant-row container with product tables
+        let rowContainer = null;
+        const allRows = document.querySelectorAll('.ant-row');
         
-        if (!hasProductRows) {
+        for (const row of allRows) {
+            const cols = row.querySelectorAll('.ant-col');
+            let hasProductTables = false;
+            
+            for (const col of cols) {
+                const tables = col.querySelectorAll('table');
+                if (tables.length > 0) {
+                    for (const table of tables) {
+                        const productRows = table.querySelectorAll('tbody tr');
+                        for (const tr of productRows) {
+                            if (isProductRow(tr)) {
+                                hasProductTables = true;
+                                break;
+                            }
+                        }
+                        if (hasProductTables) break;
+                    }
+                }
+                if (hasProductTables) break;
+            }
+            
+            if (hasProductTables) {
+                rowContainer = row;
+                break;
+            }
+        }
+        
+        if (!rowContainer) {
             return;
         }
         
@@ -333,39 +379,44 @@
         
         container.appendChild(btn);
         
-        // Insert before table or before table's parent wrapper
-        if (parent) {
-            // Try to insert before the table wrapper first
-            const tableWrapper = table.closest('.ant-table-wrapper, .ant-table-container');
-            if (tableWrapper && tableWrapper.parentNode) {
-                tableWrapper.parentNode.insertBefore(container, tableWrapper);
-            } else {
-                parent.insertBefore(container, table);
-            }
+        // Insert before the rowContainer
+        if (rowContainer.parentNode) {
+            rowContainer.parentNode.insertBefore(container, rowContainer);
         }
     }
     
-    // Initialize: Find all tables and add buttons
+    // Initialize: Find product tables and add buttons
     function init() {
         console.log('🔧 Getir Bookmarklet: Initializing...');
         
-        const tables = document.querySelectorAll('table');
-        console.log('🔧 Found tables:', tables.length);
+        // First, add "Copy All" button once to the product container
+        addCopyAllButton();
         
-        tables.forEach((table, index) => {
-            console.log(`🔧 Processing table ${index + 1}`);
-            
-            // Add "Copy All" button
-            addCopyAllButton(table);
-            
-            // Add buttons to each row
-            const rows = table.querySelectorAll('tbody tr');
-            console.log(`🔧 Found ${rows.length} rows in table ${index + 1}`);
-            
-            rows.forEach((row, rowIndex) => {
-                addButtonToRow(row);
-            });
-        });
+        // Find all tables within the product container (ant-row with ant-col)
+        const allRows = document.querySelectorAll('.ant-row');
+        let processedTables = new Set();
+        
+        for (const row of allRows) {
+            const cols = row.querySelectorAll('.ant-col');
+            for (const col of cols) {
+                const tables = col.querySelectorAll('table');
+                tables.forEach(table => {
+                    // Skip if already processed
+                    if (processedTables.has(table)) {
+                        return;
+                    }
+                    processedTables.add(table);
+                    
+                    // Add buttons only to product rows in product tables
+                    const rows = table.querySelectorAll('tbody tr');
+                    rows.forEach((tr) => {
+                        if (isProductRow(tr)) {
+                            addButtonToRow(tr);
+                        }
+                    });
+                });
+            }
+        }
         
         console.log('🔧 Getir Bookmarklet: Initialization complete');
         
@@ -398,13 +449,17 @@
                             node.classList.contains('ant-table-wrapper') ||
                             node.classList.contains('ant-table-container')
                         )) {
-                            // Re-initialize all tables when modal opens
+                            // Re-initialize when modal opens
                             setTimeout(() => {
+                                addCopyAllButton();
                                 const tables = document.querySelectorAll('table');
                                 tables.forEach(table => {
-                                    addCopyAllButton(table);
                                     const rows = table.querySelectorAll('tbody tr');
-                                    rows.forEach(row => addButtonToRow(row));
+                                    rows.forEach(row => {
+                                        if (isProductRow(row)) {
+                                            addButtonToRow(row);
+                                        }
+                                    });
                                 });
                             }, 100);
                         }
