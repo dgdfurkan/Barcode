@@ -244,8 +244,48 @@
         }
     }
     
+    // Check if a table is a product table (not descriptions table, customer info, etc.)
+    function isProductTable(table) {
+        // Skip ant-descriptions tables (customer info, address, etc.)
+        if (table.closest('.ant-descriptions')) {
+            return false;
+        }
+        
+        // Skip if table is inside ant-descriptions-view
+        if (table.closest('.ant-descriptions-view')) {
+            return false;
+        }
+        
+        // Must be inside ant-table-wrapper or have ant-table class
+        const wrapper = table.closest('.ant-table-wrapper, .ant-table-container');
+        if (!wrapper && !table.classList.contains('ant-table')) {
+            // Check if it's inside ant-row with ant-col (product tables structure)
+            const rowContainer = table.closest('.ant-row .ant-col');
+            if (!rowContainer) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
     // Check if a row is a product row (not customer info, address, etc.)
     function isProductRow(tr) {
+        // Skip if inside ant-descriptions (customer info table)
+        if (tr.closest('.ant-descriptions')) {
+            return false;
+        }
+        
+        // Skip ant-descriptions-row
+        if (tr.classList.contains('ant-descriptions-row')) {
+            return false;
+        }
+        
+        // Skip if row is inside ant-descriptions-view
+        if (tr.closest('.ant-descriptions-view')) {
+            return false;
+        }
+        
         const cells = tr.querySelectorAll('td');
         const cellTexts = Array.from(cells).map(cell => cell.textContent.trim()).join(' ').toLowerCase();
         
@@ -253,8 +293,7 @@
         const skipPatterns = [
             'müşteri adı', 'müşteri notu', 'teslimat adresi', 'adres açıklaması',
             'toplayıcı adı', 'kurye adı', 'poşet kullanımı', 'durum', 'lokasyonlar',
-            'müşteri', 'kurye', 'toplayıcı', 'adres', 'teslimat', 'notu',
-            'Ürün Adı', '#', 'Adet' // Header row patterns
+            'müşteri', 'kurye', 'toplayıcı', 'adres', 'teslimat', 'notu'
         ];
         
         // Check if row contains any skip patterns
@@ -265,7 +304,8 @@
         }
         
         // Must have an image (product images) to be a product row
-        const hasImage = tr.querySelector('img[src*="product"], img[src*="getir"]');
+        // Product images are in product URLs
+        const hasImage = tr.querySelector('img[src*="product"], img[src*="getir.com/product"]');
         if (!hasImage) {
             return false;
         }
@@ -329,11 +369,16 @@
             return;
         }
         
-        // Find the ant-row container with product tables
+        // Find the ant-row container with product tables (skip descriptions tables)
         let rowContainer = null;
         const allRows = document.querySelectorAll('.ant-row');
         
         for (const row of allRows) {
+            // Skip if inside ant-descriptions
+            if (row.closest('.ant-descriptions')) {
+                continue;
+            }
+            
             const cols = row.querySelectorAll('.ant-col');
             let hasProductTables = false;
             
@@ -341,6 +386,11 @@
                 const tables = col.querySelectorAll('table');
                 if (tables.length > 0) {
                     for (const table of tables) {
+                        // Skip descriptions tables
+                        if (!isProductTable(table)) {
+                            continue;
+                        }
+                        
                         const productRows = table.querySelectorAll('tbody tr');
                         for (const tr of productRows) {
                             if (isProductRow(tr)) {
@@ -393,10 +443,16 @@
         addCopyAllButton();
         
         // Find all tables within the product container (ant-row with ant-col)
+        // Skip ant-descriptions tables
         const allRows = document.querySelectorAll('.ant-row');
         let processedTables = new Set();
         
         for (const row of allRows) {
+            // Skip if inside ant-descriptions
+            if (row.closest('.ant-descriptions')) {
+                continue;
+            }
+            
             const cols = row.querySelectorAll('.ant-col');
             for (const col of cols) {
                 const tables = col.querySelectorAll('table');
@@ -405,6 +461,12 @@
                     if (processedTables.has(table)) {
                         return;
                     }
+                    
+                    // Skip descriptions tables
+                    if (!isProductTable(table)) {
+                        return;
+                    }
+                    
                     processedTables.add(table);
                     
                     // Add buttons only to product rows in product tables
