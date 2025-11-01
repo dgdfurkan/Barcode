@@ -592,16 +592,16 @@
     <!-- Keyboard Shortcuts Management Modal -->
     <div id="keyboardShortcutsModal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[70] hidden">
         <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
-            <div class="bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 text-white p-6 flex-shrink-0">
+            <div class="bg-gradient-to-r from-purple-400 via-purple-500 to-pink-400 text-white p-6 flex-shrink-0">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">
                         <span class="text-4xl">⌨️</span>
                         <div>
                             <h3 class="text-2xl font-bold">Klavye Kısayolları</h3>
-                            <p class="text-amber-100 text-sm mt-1">Ürünlerinize hızlı erişim için tuş atayın</p>
+                            <p class="text-purple-100 text-sm mt-1">Ürünlerinize hızlı erişim için tuş atayın</p>
                         </div>
                     </div>
-                    <button id="closeKeyboardShortcutsModal" class="text-white hover:text-amber-200 transition-colors">
+                    <button id="closeKeyboardShortcutsModal" class="text-white hover:text-purple-200 transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
@@ -639,7 +639,7 @@
                                     id="shortcutKeyInput" 
                                     placeholder="Tuş basın... (K, F1, Ctrl+K, Alt+S)"
                                     readonly
-                                    class="w-full px-3 py-2 border-2 border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white cursor-pointer"
+                                    class="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white cursor-pointer"
                                 />
                                 <div class="absolute right-3 top-1/2 -translate-y-1/2">
                                     <span class="text-xs text-gray-400">Tuşa basın</span>
@@ -661,11 +661,11 @@
                                     type="text" 
                                     id="productSearchInput" 
                                     placeholder="Ürün ara... (isim veya barkod)"
-                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                                 />
                             </div>
                             <!-- Arama Sonuçları -->
-                            <div id="productSearchResults" class="hidden max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-white mb-2">
+                            <div id="productSearchResults" class="hidden max-h-60 overflow-y-auto border border-gray-200 rounded-lg bg-white mb-2">
                                 <!-- Arama sonuçları buraya -->
                             </div>
                             <!-- Seçili Ürünler Listesi -->
@@ -682,7 +682,7 @@
                         </div>
                         <button 
                             id="addShortcutBtn" 
-                            class="w-full bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-700 hover:to-yellow-700 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow-md hover:shadow-lg"
+                            class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow-md hover:shadow-lg"
                         >
                             ➕ Kısayol Ekle
                         </button>
@@ -3746,14 +3746,14 @@
                 
                 const shortcutItem = document.createElement('div');
                 shortcutItem.className = `group relative bg-white border-2 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${
-                    enabled ? 'border-amber-200' : 'border-gray-200 opacity-60'
+                    enabled ? 'border-purple-200' : 'border-gray-200 opacity-60'
                 }`;
                 
                 shortcutItem.innerHTML = `
                     <div class="flex items-start justify-between gap-4">
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-3 mb-2">
-                                <span class="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-sm font-bold rounded-lg shadow-sm">${escapeHtml(key)}</span>
+                                <span class="px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-bold rounded-lg shadow-sm">${escapeHtml(key)}</span>
                                 ${enabled ? `
                                     <span class="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full flex items-center gap-1">
                                         <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
@@ -3779,7 +3779,7 @@
                                     data-key="${escapeHtml(key)}"
                                     ${enabled ? 'checked' : ''}
                                 />
-                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
                             </label>
                             <!-- Edit Button -->
                             <button 
@@ -3879,11 +3879,11 @@
             container.innerHTML = `
                 <div class="flex flex-wrap gap-2">
                     ${selectedProductsForShortcut.map((product, index) => `
-                        <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg">
+                        <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-800 text-sm rounded-lg">
                             <span>${escapeHtml(product)}</span>
                             <button 
                                 onclick="removeProductFromShortcut(${index})" 
-                                class="ml-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded p-0.5 transition-colors"
+                                class="ml-1 text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded p-0.5 transition-colors"
                             >
                                 ×
                             </button>
@@ -3910,11 +3910,45 @@
             }
             
             const searchLower = searchTerm.toLowerCase().trim();
+            
+            // Get barcodes from selected products (if search term matches selected product name)
+            const selectedProductBarcodes = new Set();
+            for (const selectedProductName of selectedProductsForShortcut) {
+                if (selectedProductName.toLowerCase().includes(searchLower)) {
+                    const selectedProductObj = products.find(p => 
+                        (p.name || '').toLowerCase() === selectedProductName.toLowerCase()
+                    );
+                    if (selectedProductObj && selectedProductObj.barcodes) {
+                        selectedProductObj.barcodes.forEach(b => {
+                            if (b.code) {
+                                selectedProductBarcodes.add(b.code.toLowerCase());
+                            }
+                        });
+                    }
+                }
+            }
+            
+            // Search in products: name, barcode (from barcodes array), and selected product barcodes
             const matchingProducts = products.filter(product => {
                 const name = (product.name || '').toLowerCase();
-                const barcode = (product.barcode || '').toLowerCase();
-                return name.includes(searchLower) || barcode.includes(searchLower);
-            }).slice(0, 10); // Limit to 10 results
+                const barcodes = product.barcodes || [];
+                const barcodeStrings = barcodes.map(b => (b.code || '').toLowerCase()).filter(b => b);
+                
+                // Search in name
+                if (name.includes(searchLower)) return true;
+                
+                // Search in barcodes
+                if (barcodeStrings.some(b => b.includes(searchLower))) return true;
+                
+                // Search by selected product barcodes (if any selected product matches search term)
+                if (selectedProductBarcodes.size > 0) {
+                    if (barcodeStrings.some(b => selectedProductBarcodes.has(b))) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            }).slice(0, 15); // Limit to 15 results (increased for better visibility)
             
             if (matchingProducts.length === 0) {
                 resultsContainer.innerHTML = '<p class="text-sm text-gray-500 p-3 text-center">Ürün bulunamadı</p>';
@@ -3923,16 +3957,34 @@
             }
             
             resultsContainer.innerHTML = matchingProducts.map(product => {
-                const productText = product.name || product.barcode || '';
-                const isSelected = selectedProductsForShortcut.includes(productText);
+                const productName = product.name || '';
+                const productImage = product.image || 'https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D';
+                const productBrand = product.brand || '';
+                const productCategory = product.category || '';
+                const isSelected = selectedProductsForShortcut.includes(productName);
                 
                 return `
-                    <div class="flex items-center justify-between p-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
-                        <span class="text-sm text-gray-700 flex-1">${escapeHtml(productText)}</span>
+                    <div class="flex items-center justify-between p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
+                        <div class="flex items-center space-x-3 flex-1 min-w-0">
+                            <img 
+                                src="${escapeHtml(productImage)}" 
+                                alt="${escapeHtml(productName)}" 
+                                class="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                                onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;"
+                            />
+                            <div class="flex-1 min-w-0">
+                                <h4 class="font-medium text-gray-900 text-sm truncate">${escapeHtml(productName)}</h4>
+                                ${productBrand || productCategory ? `
+                                    <p class="text-xs text-gray-500 truncate">
+                                        ${productBrand ? escapeHtml(productBrand) : ''}${productBrand && productCategory ? ' • ' : ''}${productCategory ? escapeHtml(productCategory) : ''}
+                                    </p>
+                                ` : ''}
+                            </div>
+                        </div>
                         <button 
-                            onclick="addProductToShortcut('${escapeHtml(productText)}')"
+                            onclick="addProductToShortcut('${escapeHtml(productName)}')"
                             ${isSelected ? 'disabled' : ''}
-                            class="${isSelected ? 'opacity-50 cursor-not-allowed bg-gray-200' : 'bg-amber-500 hover:bg-amber-600'} text-white px-3 py-1 rounded text-xs font-semibold transition-colors"
+                            class="${isSelected ? 'opacity-50 cursor-not-allowed bg-gray-200' : 'bg-purple-500 hover:bg-purple-600'} text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex-shrink-0 ml-2"
                         >
                             ${isSelected ? '✓ Eklendi' : '+ Ekle'}
                         </button>
