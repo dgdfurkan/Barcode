@@ -49,8 +49,33 @@ class PremiumFeatures {
             return false;
         }
         
-        // Return true if feature exists and is true
-        return this.premiumFeatures[featureName] === true;
+        const feature = this.premiumFeatures[featureName];
+        
+        // Support both old format (true/false) and new format ({enabled: true, limit: 3})
+        if (typeof feature === 'boolean') {
+            return feature === true;
+        } else if (typeof feature === 'object' && feature !== null) {
+            return feature.enabled === true;
+        }
+        
+        return false;
+    }
+    
+    // Get premium feature limit (if exists)
+    getPremiumFeatureLimit(featureName) {
+        if (!this.premiumFeatures || typeof this.premiumFeatures !== 'object') {
+            return null;
+        }
+        
+        const feature = this.premiumFeatures[featureName];
+        
+        // If feature is an object with limit property
+        if (typeof feature === 'object' && feature !== null && typeof feature.limit === 'number') {
+            return feature.limit;
+        }
+        
+        // No limit (null means unlimited)
+        return null;
     }
 
     // Get all premium features
@@ -104,8 +129,14 @@ class PremiumFeatures {
             // Update local cache
             this.premiumFeatures = features;
             
-            // Return validation result
-            return features[featureName] === true;
+            // Return validation result (support both formats)
+            const feature = features[featureName];
+            if (typeof feature === 'boolean') {
+                return feature === true;
+            } else if (typeof feature === 'object' && feature !== null) {
+                return feature.enabled === true;
+            }
+            return false;
         } catch (error) {
             console.error('Error validating premium feature:', error);
             return false;

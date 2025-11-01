@@ -2585,14 +2585,25 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
             
             // Render each feature
             Object.keys(availableFeatures).forEach(featureKey => {
-                const featureEnabled = premiumFeatures[featureKey] === true;
+                const feature = premiumFeatures[featureKey];
+                // Support both old format (true/false) and new format ({enabled: true, limit: 3})
+                const featureEnabled = typeof feature === 'boolean' 
+                    ? feature === true 
+                    : (typeof feature === 'object' && feature !== null ? feature.enabled === true : false);
+                const featureLimit = typeof feature === 'object' && feature !== null && typeof feature.limit === 'number'
+                    ? feature.limit
+                    : null;
                 const featureName = availableFeatures[featureKey];
                 
-                console.log(`🖼️ Rendering feature: ${featureKey} - ${featureName} (enabled: ${featureEnabled})`);
+                console.log(`🖼️ Rendering feature: ${featureKey} - ${featureName} (enabled: ${featureEnabled}, limit: ${featureLimit})`);
                 
                 const featureItem = document.createElement('div');
-                featureItem.className = 'flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200';
-                featureItem.innerHTML = `
+                featureItem.className = 'flex flex-col p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3';
+                
+                // Main row: feature name and toggle
+                const mainRow = document.createElement('div');
+                mainRow.className = 'flex items-center justify-between';
+                mainRow.innerHTML = `
                     <div class="flex-1">
                         <h4 class="text-sm font-medium text-gray-900">${featureName}</h4>
                         <p class="text-xs text-gray-500 mt-1">${this.getFeatureDescription(featureKey)}</p>
@@ -2600,11 +2611,44 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
                     <label class="relative inline-flex items-center cursor-pointer ml-4">
                         <input type="checkbox" 
                                data-feature="${featureKey}" 
-                               class="sr-only peer" 
+                               class="sr-only peer feature-toggle" 
                                ${featureEnabled ? 'checked' : ''}>
                         <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
                     </label>
                 `;
+                featureItem.appendChild(mainRow);
+                
+                // Limit input row (only for keyboardShortcuts)
+                if (featureKey === 'keyboardShortcuts') {
+                    const limitRow = document.createElement('div');
+                    limitRow.className = 'flex items-center space-x-3 mt-2 pt-2 border-t border-gray-200';
+                    limitRow.innerHTML = `
+                        <label class="text-xs font-medium text-gray-700 whitespace-nowrap">
+                            İzin Verilen Kısayol Sayısı:
+                        </label>
+                        <input type="number" 
+                               data-feature-limit="${featureKey}" 
+                               min="0" 
+                               placeholder="Sınırsız için boş bırakın"
+                               class="w-32 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                               value="${featureLimit !== null ? featureLimit : ''}"
+                               ${!featureEnabled ? 'disabled' : ''}>
+                        <span class="text-xs text-gray-500">
+                            (Boş bırakılırsa sınırsız olur)
+                        </span>
+                    `;
+                    featureItem.appendChild(limitRow);
+                    
+                    // Enable/disable limit input based on toggle
+                    const toggle = mainRow.querySelector('.feature-toggle');
+                    const limitInput = limitRow.querySelector(`[data-feature-limit="${featureKey}"]`);
+                    toggle.addEventListener('change', (e) => {
+                        limitInput.disabled = !e.target.checked;
+                        if (!e.target.checked) {
+                            limitInput.value = '';
+                        }
+                    });
+                }
                 
                 featuresList.appendChild(featureItem);
             });
@@ -2641,14 +2685,34 @@ AdminPanel.prototype.savePremiumFeatures = async function() {
     }
     
     try {
-        // Collect feature states from checkboxes
+        // Collect feature states from checkboxes and limit inputs
         const premiumFeatures = {};
-        const checkboxes = document.querySelectorAll('#premiumFeaturesList input[type="checkbox"]');
+        const checkboxes = document.querySelectorAll('#premiumFeaturesList input[type="checkbox"].feature-toggle');
         
         checkboxes.forEach(checkbox => {
             const featureKey = checkbox.dataset.feature;
             if (featureKey) {
-                premiumFeatures[featureKey] = checkbox.checked;
+                const isEnabled = checkbox.checked;
+                
+                // For keyboardShortcuts, check if there's a limit input
+                if (featureKey === 'keyboardShortcuts') {
+                    const limitInput = document.querySelector(`input[data-feature-limit="${featureKey}"]`);
+                    const limitValue = limitInput ? limitInput.value.trim() : '';
+                    
+                    if (limitValue !== '' && !isNaN(limitValue) && parseInt(limitValue) >= 0) {
+                        // New format: {enabled: true, limit: 3}
+                        premiumFeatures[featureKey] = {
+                            enabled: isEnabled,
+                            limit: parseInt(limitValue)
+                        };
+                    } else {
+                        // Enabled but no limit (unlimited) or disabled
+                        premiumFeatures[featureKey] = isEnabled ? { enabled: true } : false;
+                    }
+                } else {
+                    // Other features: simple boolean (for backward compatibility)
+                    premiumFeatures[featureKey] = isEnabled;
+                }
             }
         });
         

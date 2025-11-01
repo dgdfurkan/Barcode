@@ -4278,6 +4278,19 @@
             // Check if editing (key already exists)
             const isEditing = existingShortcuts[normalizedKey] !== undefined;
             
+            // Check limit if not editing (adding new shortcut)
+            if (!isEditing) {
+                const limit = window.premiumFeatures?.getPremiumFeatureLimit('keyboardShortcuts');
+                if (limit !== null && limit !== undefined) {
+                    const currentShortcutCount = Object.keys(existingShortcuts).length;
+                    if (currentShortcutCount >= limit) {
+                        errorDiv.textContent = `Kısayol limitine ulaştınız. Maksimum ${limit} kısayol ekleyebilirsiniz.`;
+                        errorDiv.classList.remove('hidden');
+                        return;
+                    }
+                }
+            }
+            
             // If editing, temporarily remove from validation check
             const shortcutsForValidation = { ...existingShortcuts };
             if (isEditing) {
