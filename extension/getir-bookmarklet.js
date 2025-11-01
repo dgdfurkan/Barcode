@@ -102,7 +102,7 @@
     }
     
     // Navigate to barcode site (switch to existing tab if open, otherwise open new tab)
-    // IMPORTANT: Do not reload the page if it's already open
+    // IMPORTANT: Do not reload the page if it's already open - just switch tabs
     function navigateToBarcodeSite() {
         // Try BroadcastChannel first to check if page is already open
         try {
@@ -117,10 +117,8 @@
                 const messageHandler = (e) => {
                     if (e.data && e.data.type === 'pong' && !responded) {
                         responded = true;
-                        // Page is open and already at the correct URL
-                        // Use window.open with target name - this will focus existing tab without reloading
-                        // if the URL matches, otherwise opens new tab
-                        window.open(BARCODE_SITE_URL, 'barcode_site');
+                        // Page is already open - it will focus itself via window.focus() in the listener
+                        // Do NOT call window.open() to avoid reloading
                         channel.close();
                     }
                 };
@@ -142,7 +140,7 @@
             // BroadcastChannel not supported, fall through
         }
         
-        // Fallback: Use window.open with target name (will reuse tab if exists, focus without reload)
+        // Fallback: Use window.open with target name (will reuse tab if exists)
         window.open(BARCODE_SITE_URL, 'barcode_site');
     }
     
