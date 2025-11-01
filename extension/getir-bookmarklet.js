@@ -304,10 +304,18 @@
         }
         
         // Must have an image (product images) to be a product row
-        // Product images are in product URLs
-        const hasImage = tr.querySelector('img[src*="product"], img[src*="getir.com/product"]');
+        // Product images are in product URLs - check for any img with product in src or getir domain
+        const hasImage = tr.querySelector('img[src*="product"], img[src*="getir.com/product"], img[src*="getir.com/market/product"], img[src*="market/product"]');
         if (!hasImage) {
-            return false;
+            // Also check for ant-image wrapper (common in Getir tables)
+            const antImage = tr.querySelector('.ant-image img');
+            if (!antImage) {
+                return false;
+            }
+            // If ant-image exists, check if it has a valid src
+            if (!antImage.src || (!antImage.src.includes('product') && !antImage.src.includes('getir'))) {
+                return false;
+            }
         }
         
         // Must have product name (not just numbers)
