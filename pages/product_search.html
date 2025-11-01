@@ -3727,22 +3727,39 @@
                         const dragElement = document.getElementById('dragBookmarklet');
                         if (dragElement) {
                             dragElement.addEventListener('dragstart', (e) => {
-                                // Set the bookmarklet URL and name
-                                // Use text/uri-list for bookmark URL
+                                // Create a temporary link element with the bookmarklet code and name
+                                const link = document.createElement('a');
+                                link.href = bookmarkletCode;
+                                link.textContent = bookmarkletName;
+                                link.style.position = 'absolute';
+                                link.style.left = '-9999px';
+                                document.body.appendChild(link);
+                                
+                                // Set drag data - browsers use the link's textContent as bookmark name
                                 e.dataTransfer.setData('text/uri-list', bookmarkletCode);
-                                // Use text/plain for fallback
                                 e.dataTransfer.setData('text/plain', bookmarkletCode);
-                                // Use text/html with proper title attribute for bookmark name
-                                const escapedCode = bookmarkletCode.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-                                e.dataTransfer.setData('text/html', '<a href="' + escapedCode + '" title="' + bookmarkletName + '">' + bookmarkletName + '</a>');
-                                // Set bookmark name via DownloadURL format (works in Chrome/Edge)
-                                try {
-                                    e.dataTransfer.setData('DownloadURL', 'application/x-bookmark:UTF8:' + bookmarkletName + ':' + bookmarkletCode);
-                                } catch (err) {
-                                    // Fallback if DownloadURL not supported
-                                    console.debug('DownloadURL not supported, using text/html');
+                                e.dataTransfer.setData('text/html', link.outerHTML);
+                                
+                                // Chrome/Edge bookmark name workaround
+                                if (e.dataTransfer.items) {
+                                    try {
+                                        e.dataTransfer.items.clear();
+                                        e.dataTransfer.items.add(bookmarkletCode, 'text/uri-list');
+                                        e.dataTransfer.items.add(link.outerHTML, 'text/html');
+                                    } catch (err) {
+                                        // Fallback
+                                        console.debug('items API not available');
+                                    }
                                 }
+                                
                                 e.dataTransfer.effectAllowed = 'copy';
+                                
+                                // Clean up temporary link after a short delay
+                                setTimeout(() => {
+                                    if (document.body.contains(link)) {
+                                        document.body.removeChild(link);
+                                    }
+                                }, 100);
                                 
                                 // Visual feedback
                                 dragElement.style.opacity = '0.5';
