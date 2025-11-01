@@ -3741,8 +3741,19 @@
             
             shortcutKeys.forEach(key => {
                 const shortcutData = shortcuts[key];
-                const products = shortcutData?.products || shortcutData || '';
+                const productsString = shortcutData?.products || shortcutData || '';
                 const enabled = shortcutData?.enabled !== undefined ? shortcutData.enabled : true;
+                
+                // Convert barcodes to product names for display
+                const productNames = productsString.split(',').map(barcode => {
+                    const trimmedBarcode = barcode.trim();
+                    if (!trimmedBarcode) return '';
+                    // Find product by barcode
+                    const product = products.find(p => 
+                        p.barcodes && p.barcodes.some(b => b.code === trimmedBarcode)
+                    );
+                    return product ? product.name : trimmedBarcode;
+                }).filter(p => p).join(', ');
                 
                 const shortcutItem = document.createElement('div');
                 shortcutItem.className = `group relative bg-white border-2 rounded-xl p-4 shadow-sm hover:shadow-md transition-all ${
@@ -3767,7 +3778,7 @@
                                 `}
                             </div>
                             <div class="mt-2">
-                                <p class="text-sm text-gray-600 break-words">${escapeHtml(products)}</p>
+                                <p class="text-sm text-gray-600 break-words">${escapeHtml(productNames)}</p>
                             </div>
                         </div>
                         <div class="flex items-center gap-2 flex-shrink-0">
@@ -3785,7 +3796,7 @@
                             <button 
                                 class="edit-shortcut-btn px-3 py-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1"
                                 data-key="${escapeHtml(key)}"
-                                data-products="${escapeHtml(products)}"
+                                data-products="${escapeHtml(productsString)}"
                             >
                                 ✏️ Düzenle
                             </button>
@@ -3818,11 +3829,24 @@
                     const key = btn.dataset.key;
                     const products = btn.dataset.products;
                     document.getElementById('shortcutKeyInput').value = key;
-                    // Clear selected products and populate from existing
+                    // Clear selected products and populate from existing (products can be barcodes or names)
                     selectedProductsForShortcut = [];
                     if (products) {
-                        const productNames = products.split(',').map(p => p.trim()).filter(p => p);
-                        selectedProductsForShortcut = productNames;
+                        const productList = products.split(',').map(p => p.trim()).filter(p => p);
+                        // Convert to barcodes: if it's a barcode (numeric), use it; if it's a name, find barcode
+                        for (const item of productList) {
+                            // Check if it's a barcode (all digits) or a name
+                            if (/^\d+$/.test(item)) {
+                                // It's a barcode
+                                selectedProductsForShortcut.push(item);
+                            } else {
+                                // It's a product name, find the product and get its barcode
+                                const productObj = products.find(p => (p.name || '').toLowerCase() === item.toLowerCase());
+                                if (productObj && productObj.barcodes && productObj.barcodes.length > 0) {
+                                    selectedProductsForShortcut.push(productObj.barcodes[0].code);
+                                }
+                            }
+                        }
                     }
                     renderSelectedProducts();
                     document.getElementById('shortcutKeyInput').focus();
@@ -3866,7 +3890,7 @@
             await saveKeyboardShortcuts(shortcuts);
         }
         
-        // Render selected products list
+        // Render selected products list (show names but store barcodes)
         function renderSelectedProducts() {
             const container = document.getElementById('selectedProductsList');
             if (!container) return;
@@ -3878,9 +3902,15 @@
             
             container.innerHTML = `
                 <div class="flex flex-wrap gap-2">
-                    ${selectedProductsForShortcut.map((product, index) => `
+                    ${selectedProductsForShortcut.map((barcode, index) => {
+                        // Find product by barcode to get name
+                        const product = products.find(p => 
+                            p.barcodes && p.barcodes.some(b => b.code === barcode)
+                        );
+                        const productName = product ? product.name : barcode;
+                        return `
                         <span class="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-800 text-sm rounded-lg">
-                            <span>${escapeHtml(product)}</span>
+                            <span>${escapeHtml(productName)}</span>
                             <button 
                                 onclick="removeProductFromShortcut(${index})" 
                                 class="ml-1 text-purple-600 hover:text-purple-800 hover:bg-purple-100 rounded p-0.5 transition-colors"
@@ -3888,7 +3918,8 @@
                                 ×
                             </button>
                         </span>
-                    `).join('')}
+                    `;
+                    }).join('')}
                 </div>
             `;
         }
@@ -3911,42 +3942,21 @@
             
             const searchLower = searchTerm.toLowerCase().trim();
             
-            // Get barcodes from ALL selected products (so we can search by their barcodes)
-            const selectedProductBarcodes = new Set();
-            for (const selectedProductName of selectedProductsForShortcut) {
-                const selectedProductObj = products.find(p => 
-                    (p.name || '').toLowerCase() === selectedProductName.toLowerCase()
-                );
-                if (selectedProductObj && selectedProductObj.barcodes) {
-                    selectedProductObj.barcodes.forEach(b => {
-                        if (b.code) {
-                            selectedProductBarcodes.add(b.code.toLowerCase());
-                        }
-                    });
-                }
-            }
-            
-            // Search in products: name, barcode (from barcodes array), and selected product barcodes
+            // Search in products: name and barcode (from barcodes array)
+            // User can search by name or barcode - normal search behavior
             const matchingProducts = products.filter(product => {
                 const name = (product.name || '').toLowerCase();
                 const barcodes = product.barcodes || [];
                 const barcodeStrings = barcodes.map(b => (b.code || '').toLowerCase()).filter(b => b);
                 
-                // Search in name
+                // Search in name (e.g., "A" will find all products with "A" in name)
                 if (name.includes(searchLower)) return true;
                 
                 // Search in barcodes
                 if (barcodeStrings.some(b => b.includes(searchLower))) return true;
                 
-                // Search by selected product barcodes (show products with same barcodes as selected products)
-                if (selectedProductBarcodes.size > 0) {
-                    if (barcodeStrings.some(b => selectedProductBarcodes.has(b))) {
-                        return true;
-                    }
-                }
-                
                 return false;
-            }).slice(0, 15); // Limit to 15 results (increased for better visibility)
+            }).slice(0, 30); // Limit to 30 results for better visibility
             
             if (matchingProducts.length === 0) {
                 resultsContainer.innerHTML = '<p class="text-sm text-gray-500 p-3 text-center">Ürün bulunamadı</p>';
@@ -3959,7 +3969,8 @@
                 const productImage = product.image || 'https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D';
                 const productBrand = product.brand || '';
                 const productCategory = product.category || '';
-                const isSelected = selectedProductsForShortcut.includes(productName);
+                const productBarcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : '';
+                const isSelected = productBarcode && selectedProductsForShortcut.includes(productBarcode);
                 
                 return `
                     <div class="flex items-center justify-between p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
@@ -3980,9 +3991,9 @@
                             </div>
                         </div>
                         <button 
-                            onclick="addProductToShortcut('${escapeHtml(productName)}')"
-                            ${isSelected ? 'disabled' : ''}
-                            class="${isSelected ? 'opacity-50 cursor-not-allowed bg-gray-200' : 'bg-purple-500 hover:bg-purple-600'} text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex-shrink-0 ml-2"
+                            onclick="addProductToShortcut('${escapeHtml(productBarcode)}', '${escapeHtml(productName)}')"
+                            ${isSelected || !productBarcode ? 'disabled' : ''}
+                            class="${isSelected || !productBarcode ? 'opacity-50 cursor-not-allowed bg-gray-200' : 'bg-purple-500 hover:bg-purple-600'} text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex-shrink-0 ml-2"
                         >
                             ${isSelected ? '✓ Eklendi' : '+ Ekle'}
                         </button>
@@ -3993,10 +4004,14 @@
             resultsContainer.classList.remove('hidden');
         }
         
-        // Add product to selected list (global for onclick)
-        window.addProductToShortcut = function(productText) {
-            if (!selectedProductsForShortcut.includes(productText)) {
-                selectedProductsForShortcut.push(productText);
+        // Add product to selected list (global for onclick) - stores barcode, not name
+        window.addProductToShortcut = function(barcode, productName) {
+            if (!barcode) {
+                console.warn('Product has no barcode, cannot add to shortcut');
+                return;
+            }
+            if (!selectedProductsForShortcut.includes(barcode)) {
+                selectedProductsForShortcut.push(barcode);
                 renderSelectedProducts();
                 renderProductSearchResults(document.getElementById('productSearchInput')?.value || '');
             }
@@ -4023,8 +4038,8 @@
                 isCapturingKey = false;
             });
             
-            // Prevent typing
-            keyInput.addEventListener('keydown', (e) => {
+            // Prevent typing and handle key capture
+            keyInput.addEventListener('keydown', async (e) => {
                 if (!isCapturingKey) return;
                 
                 e.preventDefault();
@@ -4059,11 +4074,31 @@
                 }
                 
                 // Combine modifiers + key
+                let finalKey = '';
                 if (parts.length > 0) {
                     parts.push(key);
-                    keyInput.value = parts.join('+');
+                    finalKey = parts.join('+');
                 } else {
-                    keyInput.value = key;
+                    finalKey = key;
+                }
+                
+                keyInput.value = finalKey;
+                
+                // Check if this key already exists - if yes, load existing data
+                const normalizedKey = normalizeKeyCombo(finalKey);
+                const existingShortcuts = await loadKeyboardShortcuts();
+                if (existingShortcuts[normalizedKey]) {
+                    const shortcutData = existingShortcuts[normalizedKey];
+                    const productsString = shortcutData?.products || shortcutData || '';
+                    
+                    // Load existing products (barcodes)
+                    selectedProductsForShortcut = [];
+                    if (productsString) {
+                        const productList = productsString.split(',').map(p => p.trim()).filter(p => p);
+                        // Products are stored as barcodes
+                        selectedProductsForShortcut = productList;
+                    }
+                    renderSelectedProducts();
                 }
                 
                 // Blur to stop capturing
