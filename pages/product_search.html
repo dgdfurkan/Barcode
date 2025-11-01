@@ -27,8 +27,16 @@
                 if (e.data && e.data.type === 'ping') {
                     // Respond that page is open
                     navChannel.postMessage({ type: 'pong' });
-                    // Focus this window
-                    window.focus();
+                    // Focus this window/tab - try multiple methods
+                    try {
+                        window.focus();
+                        // Also try to bring window to front
+                        if (window.parent !== window) {
+                            window.parent.focus();
+                        }
+                    } catch (err) {
+                        // Ignore focus errors
+                    }
                 }
             });
         }
