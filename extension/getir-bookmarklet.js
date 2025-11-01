@@ -429,18 +429,23 @@
                         if (node.tagName === 'TR' || node.querySelector && node.querySelector('tr')) {
                             const rows = node.tagName === 'TR' ? [node] : node.querySelectorAll('tr');
                             rows.forEach(row => {
-                                if (row.closest('tbody')) {
+                                if (row.closest('tbody') && isProductRow(row)) {
                                     addButtonToRow(row);
                                 }
                             });
                         }
                         // Check for new tables
                         if (node.tagName === 'TABLE' || (node.querySelector && node.querySelector('table'))) {
+                            // Re-add "Copy All" button (in case product container was just added)
+                            addCopyAllButton();
                             const tables = node.tagName === 'TABLE' ? [node] : node.querySelectorAll('table');
                             tables.forEach(table => {
-                                addCopyAllButton(table);
                                 const rows = table.querySelectorAll('tbody tr');
-                                rows.forEach(row => addButtonToRow(row));
+                                rows.forEach(row => {
+                                    if (isProductRow(row)) {
+                                        addButtonToRow(row);
+                                    }
+                                });
                             });
                         }
                         // Check for table wrapper changes (modal opening, etc.)
