@@ -133,16 +133,16 @@ class UserDataManager {
         };
     }
 
-    // Save user data (backward compatible: saves to both old 'data' column and new separate columns)
+    // Save user data (ONLY to custom_products and settings columns, NOT to data column)
     async saveUserData() {
         try {
             // Prepare data for saving
             const customProducts = (this.userData.products || []).filter(p => !p.isDefault);
             const settings = this.userData.settings || {};
             
-            // Save to Supabase
+            // Save to Supabase - ONLY to custom_products and settings columns
             if (window.supabase) {
-                // Try new structure first (custom_products + settings columns)
+                // Save to new structure (custom_products + settings columns)
                 const updateData = {
                     username: this.currentUser.username,
                     custom_products: customProducts,
@@ -150,32 +150,16 @@ class UserDataManager {
                     updated_at: new Date().toISOString()
                 };
                 
-                // Also save to old 'data' column for backward compatibility (during migration period)
-                // This ensures old clients can still read the data
-                // Note: statistics removed as per requirements
-                updateData.data = {
-                    products: customProducts,
-                    settings: settings
-                };
-                
+                // IMPORTANT: Do NOT write to 'data' column - it will not be used
                 const { error } = await window.supabase
                     .from('user_data')
                     .upsert(updateData);
                 
                 if (error) {
-                    // If new columns don't exist, fall back to old structure
+                    // If new columns don't exist, inform user but don't write to data column
                     if (error.message && error.message.includes('column') && error.message.includes('does not exist')) {
-                        console.log('⚠️ New columns not found, using old structure');
-                        await window.supabase
-                            .from('user_data')
-                            .upsert({
-                                username: this.currentUser.username,
-                                data: {
-                                    products: customProducts,
-                                    settings: settings
-                                },
-                                updated_at: new Date().toISOString()
-                            });
+                        console.error('⚠️ New columns (custom_products, settings) not found. Please run migration SQL first!');
+                        throw new Error('Yeni kolonlar bulunamadı. Lütfen migration SQL dosyasını çalıştırın!');
                     } else {
                         throw error;
                     }
