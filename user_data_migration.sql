@@ -1,37 +1,70 @@
 -- Migration: Separate user_data.data JSONB into custom_products and settings columns
--- This migration is backward compatible - old 'data' column remains, new columns added
+-- IMPORTANT: After migration, 'data' column will NOT be used anymore
+-- All writes will go to 'custom_products' and 'settings' columns only
 
 -- Step 1: Add new columns (nullable first, will be populated from existing data)
 ALTER TABLE user_data
 ADD COLUMN IF NOT EXISTS custom_products JSONB DEFAULT '[]'::jsonb,
 ADD COLUMN IF NOT EXISTS settings JSONB DEFAULT '{}'::jsonb;
 
--- Step 2: Create indexes for new columns
+-- Step 2: Create indexes for new columns (for better query performance)
 CREATE INDEX IF NOT EXISTS idx_user_data_custom_products ON user_data USING GIN (custom_products);
 CREATE INDEX IF NOT EXISTS idx_user_data_settings ON user_data USING GIN (settings);
 
 -- Step 3: Migrate existing data from 'data' column to new columns
--- Extract custom products (filter out isDefault=true products)
+-- Extract ONLY custom products (filter out isDefault=true products, those come from PRODUCTS_DATA)
 UPDATE user_data
 SET 
     custom_products = COALESCE(
         (
             SELECT jsonb_agg(product)
             FROM jsonb_array_elements(data->'products') AS product
-            WHERE product->>'isDefault' != 'true' OR product->>'isDefault' IS NULL
+            WHERE (product->>'isDefault' IS NULL OR product->>'isDefault' != 'true')
         ),
         '[]'::jsonb
     ),
-    settings = COALESCE(data->'settings', '{}'::jsonb)
+    settings = COALESCE(
+        jsonb_build_object(
+            'showDuplicates', COALESCE(data->'settings'->>'showDuplicates', 'false'),
+            'theme', COALESCE(data->'settings'->>'theme', 'light'),
+            'showDefaultProducts', COALESCE(data->'settings'->>'showDefaultProducts', 'true')
+        ),
+        '{}'::jsonb
+    )
 WHERE data IS NOT NULL
-  AND (custom_products IS NULL OR custom_products = '[]'::jsonb OR settings IS NULL OR settings = '{}'::jsonb);
+  AND (
+      custom_products IS NULL 
+      OR custom_products = '[]'::jsonb 
+      OR settings IS NULL 
+      OR settings = '{}'::jsonb
+  );
 
--- Step 4: Make columns NOT NULL after migration (optional, safer to keep nullable for now)
--- ALTER TABLE user_data
--- ALTER COLUMN custom_products SET NOT NULL,
--- ALTER COLUMN settings SET NOT NULL;
+-- Step 4: For rows without 'data' column, set defaults
+UPDATE user_data
+SET 
+    custom_products = COALESCE(custom_products, '[]'::jsonb),
+    settings = COALESCE(
+        settings,
+        '{"showDuplicates": false, "theme": "light", "showDefaultProducts": true}'::jsonb
+    )
+WHERE custom_products IS NULL OR settings IS NULL;
 
--- Note: The old 'data' column is kept for backward compatibility
--- It can be dropped later after confirming all clients are updated
--- DROP COLUMN data; -- DO NOT RUN THIS YET, keep for backward compatibility
+-- Step 5: Make columns NOT NULL (after migration is complete)
+ALTER TABLE user_data
+ALTER COLUMN custom_products SET NOT NULL,
+ALTER COLUMN custom_products SET DEFAULT '[]'::jsonb,
+ALTER COLUMN settings SET NOT NULL,
+ALTER COLUMN settings SET DEFAULT '{}'::jsonb;
+
+-- IMPORTANT NOTES:
+-- 1. The 'data' column is NOT dropped - it remains in the table but will NOT be used
+-- 2. All future writes go ONLY to 'custom_products' and 'settings' columns
+-- 3. Old 'data' column can be dropped later if needed (but not recommended immediately)
+-- 4. Statistics and searchHistory are removed - they will be added later if needed
+-- 5. Default products (isDefault=true) are NOT stored - they come from PRODUCTS_DATA
+
+-- Optional: If you want to clear the 'data' column after migration (NOT RECOMMENDED YET):
+-- UPDATE user_data SET data = NULL;
+-- Or drop the column later:
+-- ALTER TABLE user_data DROP COLUMN data;
 
