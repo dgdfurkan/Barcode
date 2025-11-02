@@ -1,0 +1,42 @@
+# Critical: Careful Reading and Verification Rules
+
+## Image and Screenshot Analysis
+- ALWAYS carefully read and verify ALL information in screenshots/images before making assumptions
+- When a user shows a table/screen, IDENTIFY which specific table/view they're referring to
+- Look for table names, column headers, file names, and ALL visible text
+- NEVER assume which table/file the user is referring to - VERIFY from the image description
+- If an image shows "1410 MB" for a table, CHECK which table name is shown in that image
+- Example: If image shows "user_data: 1410 MB" but user sends a different table screenshot, DO NOT confuse them
+
+## User Message Interpretation
+- Read the user's ENTIRE message carefully before responding
+- If user mentions a specific table/file name, PAY ATTENTION to that exact name
+- If user shows a problem in "user_data" table, do NOT assume they're talking about "users" table
+- Verify context: Check if user is asking about "user_data", "users", or another table
+- If user shows a screenshot of one table but mentions another, ASK for clarification rather than assuming
+
+## Error Prevention
+- Before saying "this table is fine", VERIFY you're looking at the correct table
+- If user says "user_data table has 1410 MB", do NOT look at "users" table and say it's fine
+- Always match the table/file name in user's question with the actual table/file you're analyzing
+- When in doubt, ASK which specific table/file the user is referring to
+
+## Response Quality
+- Take EXTRA care when analyzing screenshots/images
+- Read image descriptions completely and carefully
+- Verify table names, file paths, and all visible data before making conclusions
+- Admit when you're unsure and ask for clarification
+- Never make assumptions about which table/file user is referring to
+
+## Example Scenario (What NOT to Do)
+❌ User shows screenshot: "user_data: 1410 MB"
+❌ User sends another table screenshot later
+❌ AI assumes they're the same table without verifying
+❌ AI responds: "users table is fine" (WRONG!)
+
+✅ Correct approach:
+- Notice the FIRST image shows "user_data: 1410 MB"
+- Notice the SECOND image might be a different table
+- VERIFY which table user is asking about
+- If user mentions "user_data", focus on THAT table, not others
+- If screenshots show different tables, acknowledge the difference
