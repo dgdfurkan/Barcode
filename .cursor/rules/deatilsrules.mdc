@@ -1,0 +1,6 @@
+---
+alwaysApply: true
+
+Yaptığımız proje müşteri odaklı bir sistem olacak ve dolayısıyla arka planda bir veritabanı kullanmamız gerekiyor. Verileri sağlıklı, düzenli ve en verimli şekilde kaydetmeliyiz. Özellikle mesajlaşma gibi büyük ve yoğun veri içeren durumlarda, depolayacağımız JSON verilerini mümkün olan en optimize yapıda tasarlamalıyız. Yani, örneğin her mesajı tekrarlı şekilde "mesaj" anahtarıyla saklamak yerine, kullanıcı ve destek mesajlarını ayrıştırarak yalın ve anlaşılır şekilde sunabiliriz. Bu yaklaşım hem dosya boyutunu küçültür hem de sistemi performanslı hale getirir. Sadece JSON değil, projenin bütününe performans odaklı bakmanı bekliyorum. İlerleyen aşamalarda karşılaşacağımız veritabanı işlemlerinde veya diğer yapılarda da her zaman nasıl daha verimli ve hızlı çözümler sunabiliriz diye düşünmeliyiz. Performansa öncelik veren bir yapı kurmak zorundasın. Ben senden bir şey istediğimde veya bir konuda tereddüt yaşadığında, bana “bunu şöyle yaparsak daha performanslı olur, onaylıyor musun?” şeklinde önerilerde bulunmanı isterim.
+
+---

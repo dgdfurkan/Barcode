@@ -1237,7 +1237,8 @@
         }
 
         // Load products from embedded JavaScript data
-        // Load products from user data
+        // Load products from user data + default products from PRODUCTS_DATA
+        // Default products are NEVER stored in user_data, always loaded from PRODUCTS_DATA
         async function loadProducts() {
             try {
                 // Initialize user data manager if not already done
@@ -1245,82 +1246,32 @@
                     await window.userDataManager.init();
                 }
                 
-                // Get products from user data
-                const userProducts = window.userDataManager.getProducts();
+                // Get ALL products (custom + default) using getAllProducts()
+                // This merges user's custom products with default products from PRODUCTS_DATA
+                const allProducts = window.userDataManager.getAllProducts();
                 
-                // If user has no products, try to load from embedded data as default
-                if (userProducts.length === 0) {
-                    console.log('No user products found, loading defaults...');
-                    
-                    if (typeof PRODUCTS_DATA !== 'undefined' && PRODUCTS_DATA.products) {
-                        console.log('Loading from PRODUCTS_DATA:', PRODUCTS_DATA.products.length, 'products');
-                        // Import default products to user data
-                        PRODUCTS_DATA.products.forEach(product => {
-                            window.userDataManager.addProduct({
-                                ...product,
-                                isDefault: true
-                            });
-                        });
-                        return PRODUCTS_DATA.products;
-                    }
-                    
-                    // Fallback to fetch if embedded data is not available
-                    const response = await fetch('products.json');
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const data = await response.json();
-                    
-                    // Import fetched products to user data
-                    if (data.products) {
-                        data.products.forEach(product => {
-                            window.userDataManager.addProduct({
-                                ...product,
-                                isDefault: true
-                            });
-                        });
-                    }
-                    
-                    return data.products || [];
-                }
-                
-                // Always merge with embedded PRODUCTS_DATA to ensure latest catalog is available
-                let mergedProducts = Array.isArray(userProducts) ? [...userProducts] : [];
-                try {
-                    if (typeof PRODUCTS_DATA !== 'undefined' && Array.isArray(PRODUCTS_DATA.products)) {
-                        const haveBarcode = new Set();
-                        for (const p of mergedProducts) {
-                            if (Array.isArray(p.barcodes)) {
-                                for (const b of p.barcodes) {
-                                    if (b && b.code) haveBarcode.add(String(b.code));
-                                }
+                if (allProducts.length === 0) {
+                    // Fallback to fetch if PRODUCTS_DATA not available
+                    try {
+                        const response = await fetch('products.json');
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.products && Array.isArray(data.products)) {
+                                console.log('Loaded from products.json:', data.products.length, 'products');
+                                return data.products.map(p => ({ ...p, isDefault: true }));
                             }
                         }
-                        for (const p of PRODUCTS_DATA.products) {
-                            let exists = false;
-                            if (Array.isArray(p.barcodes)) {
-                                for (const b of p.barcodes) {
-                                    if (b && b.code && haveBarcode.has(String(b.code))) {
-                                        exists = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if (!exists) {
-                                mergedProducts.push({ ...p, isDefault: true });
-                                if (Array.isArray(p.barcodes)) {
-                                    for (const b of p.barcodes) {
-                                        if (b && b.code) haveBarcode.add(String(b.code));
-                                    }
-                                }
-                            }
-                        }
+                    } catch (e) {
+                        console.warn('Failed to fetch products.json:', e);
                     }
-                } catch (e) {
-                    console.warn('Merge with PRODUCTS_DATA failed:', e);
+                    
+                    // Last resort: mock data
+                    console.warn('Using fallback mock products');
+                    return getMockProducts();
                 }
-                console.log('Loaded user products (merged):', mergedProducts.length);
-                return mergedProducts;
+                
+                console.log('Loaded all products (custom + default):', allProducts.length);
+                return allProducts;
             } catch (error) {
                 console.error('Error loading products:', error);
                 // Fallback to mock data if all methods fail
@@ -4888,7 +4839,7 @@
                 return;
             }
             
-            const userProducts = window.userDataManager.getProducts(true); // Show all products including defaults
+            const userProducts = window.userDataManager.getAllProducts(); // Get all products (custom + default from PRODUCTS_DATA)
             totalCount.textContent = userProducts.length;
             selectedCount.textContent = '0';
             
@@ -4949,8 +4900,8 @@
             if (confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
                 window.userDataManager.removeProduct(productId);
                 loadProductsForManagement();
-                // Refresh main products array
-                products = window.userDataManager.getProducts();
+                // Refresh main products array (will merge custom + default from PRODUCTS_DATA)
+                products = window.userDataManager.getAllProducts();
                 updateSettingsInfo();
             }
         }
@@ -4983,8 +4934,8 @@
                 const productIds = Array.from(selectedCheckboxes).map(cb => cb.dataset.productId);
                 window.userDataManager.removeProducts(productIds);
                 loadProductsForManagement();
-                // Refresh main products array
-                products = window.userDataManager.getProducts();
+                // Refresh main products array (will merge custom + default from PRODUCTS_DATA)
+                products = window.userDataManager.getAllProducts();
                 updateSettingsInfo();
             }
         }
@@ -4994,24 +4945,17 @@
             if (confirm('Varsayılan ürünleri yeniden yüklemek istediğinizden emin misiniz?\n\nBu işlem mevcut ürünlerinizi etkilemez, sadece varsayılan ürünleri ekler.')) {
                 // Clear existing default products
                 if (window.userDataManager && window.userDataManager.currentUser) {
-                    const userProducts = window.userDataManager.getProducts(true);
-                    const nonDefaultProducts = userProducts.filter(p => !p.isDefault);
+                    // Clear default products from user_data (they should never be stored there)
+                    // User_data should only contain custom products
+                    const customProducts = window.userDataManager.getProducts(); // Only custom products
+                    window.userDataManager.userData.products = customProducts.filter(p => !p.isDefault);
+                    window.userDataManager.userData.statistics.totalProducts = window.userDataManager.userData.products.length;
                     
-                    // Keep only non-default products
-                    window.userDataManager.userData.products = nonDefaultProducts;
+                    // Save cleaned data
+                    window.userDataManager.saveUserData();
                     
-                    // Add default products again
-                    if (typeof PRODUCTS_DATA !== 'undefined' && PRODUCTS_DATA.products) {
-                        PRODUCTS_DATA.products.forEach(product => {
-                            window.userDataManager.addProduct({
-                                ...product,
-                                isDefault: true
-                            });
-                        });
-                    }
-                    
-                    // Refresh products and search
-                    products = window.userDataManager.getProducts();
+                    // Refresh products (will merge custom + default from PRODUCTS_DATA)
+                    products = window.userDataManager.getAllProducts();
                     updateSettingsInfo();
                     
                     if (searchInput.value.trim()) {
@@ -5364,8 +5308,8 @@
             document.getElementById('showDefaultProducts').addEventListener('change', (e) => {
                 if (window.userDataManager && window.userDataManager.currentUser) {
                     window.userDataManager.updateSettings({ showDefaultProducts: e.target.checked });
-                    // Refresh products
-                    products = window.userDataManager.getProducts();
+                    // Refresh products (will merge custom + default from PRODUCTS_DATA)
+                    products = window.userDataManager.getAllProducts();
                     if (searchInput.value.trim()) {
                         performSearch(searchInput.value);
                     }

@@ -29,6 +29,20 @@ class UserDataManager {
                 
                 if (!error && data) {
                     this.userData = data.data;
+                    // MIGRATION: Remove default products from user_data (they should come from PRODUCTS_DATA)
+                    if (this.userData.products && Array.isArray(this.userData.products)) {
+                        const beforeCount = this.userData.products.length;
+                        this.userData.products = this.userData.products.filter(p => !p.isDefault);
+                        const afterCount = this.userData.products.length;
+                        
+                        // If we removed default products, update statistics and save
+                        if (beforeCount !== afterCount) {
+                            console.log(`🧹 Cleaned ${beforeCount - afterCount} default products from user_data`);
+                            this.userData.statistics.totalProducts = afterCount;
+                            // Save cleaned data (only once, async without blocking)
+                            this.saveUserData().catch(err => console.warn('Failed to save cleaned data:', err));
+                        }
+                    }
                     return;
                 }
             }
@@ -37,6 +51,11 @@ class UserDataManager {
             const localData = localStorage.getItem(`userData_${this.currentUser.username}`);
             if (localData) {
                 this.userData = JSON.parse(localData);
+                // MIGRATION: Remove default products from local storage too
+                if (this.userData.products && Array.isArray(this.userData.products)) {
+                    this.userData.products = this.userData.products.filter(p => !p.isDefault);
+                    this.userData.statistics.totalProducts = this.userData.products.length;
+                }
             } else {
                 // Create default user data
                 this.userData = this.createDefaultUserData();
@@ -47,51 +66,21 @@ class UserDataManager {
         }
     }
 
-    // Create default user data structure with default products
+    // Create default user data structure WITHOUT default products
+    // Default products are always loaded from PRODUCTS_DATA, not stored in user_data
     createDefaultUserData() {
-        // Load default products from embedded data or fallback
-        let defaultProducts = [];
-        
-        // Try to get default products from embedded data
-        if (typeof PRODUCTS_DATA !== 'undefined' && PRODUCTS_DATA.products) {
-            defaultProducts = PRODUCTS_DATA.products.map(product => ({
-                ...product,
-                isDefault: true // Mark as default product
-            }));
-        } else {
-            // Fallback to mock data
-            defaultProducts = [
-                {
-                    id: 'default_1',
-                    name: 'Örnek Ürün 1',
-                    barcodes: [{ code: '1234567890123', type: 'EAN13' }],
-                    image: 'https://via.placeholder.com/150',
-                    shelf: 'A-1',
-                    isDefault: true
-                },
-                {
-                    id: 'default_2', 
-                    name: 'Örnek Ürün 2',
-                    barcodes: [{ code: '9876543210987', type: 'EAN13' }],
-                    image: 'https://via.placeholder.com/150',
-                    shelf: 'B-2',
-                    isDefault: true
-                }
-            ];
-        }
-        
         return {
-            products: defaultProducts,
+            products: [], // Only custom products added by user, NOT default products
             settings: {
                 showDuplicates: false,
                 theme: 'light',
                 searchHistory: [],
                 lastBackup: null,
-                showDefaultProducts: true // New setting to control default products visibility
+                showDefaultProducts: true
             },
             statistics: {
                 totalSearches: 0,
-                totalProducts: defaultProducts.length,
+                totalProducts: 0, // Only count custom products, default products are in PRODUCTS_DATA
                 lastLogin: new Date().toISOString()
             }
         };
@@ -125,25 +114,46 @@ class UserDataManager {
         }
     }
 
-    // Get user products with optional filtering
+    // Get user products (only custom products, default products come from PRODUCTS_DATA)
+    // This function now only returns custom products added by user
     getProducts(showDefaultProducts = null) {
-        let userProducts = this.userData.products || [];
+        // Only return custom products (user_data.products should NOT contain default products)
+        return this.userData.products || [];
+    }
+    
+    // Get ALL products (custom + default from PRODUCTS_DATA)
+    // Use this when you need both custom and default products merged
+    getAllProducts(showDefaultProducts = null) {
+        const customProducts = this.userData.products || [];
+        const defaultProducts = [];
+        
+        // Merge with default products from PRODUCTS_DATA if available
+        if (typeof PRODUCTS_DATA !== 'undefined' && PRODUCTS_DATA.products) {
+            defaultProducts.push(...PRODUCTS_DATA.products.map(p => ({ ...p, isDefault: true })));
+        }
         
         // Use setting if no parameter provided
         if (showDefaultProducts === null) {
             showDefaultProducts = this.userData.settings.showDefaultProducts;
         }
         
-        // Filter out default products if setting is false
-        if (!showDefaultProducts) {
-            userProducts = userProducts.filter(product => !product.isDefault);
+        if (showDefaultProducts) {
+            // Merge custom + default products
+            return [...customProducts, ...defaultProducts];
+        } else {
+            // Only custom products
+            return customProducts;
         }
-        
-        return userProducts;
     }
 
-    // Add product to user data
+    // Add product to user data (only custom products, NOT default products)
     addProduct(product) {
+        // Prevent adding default products to user_data
+        if (product.isDefault) {
+            console.warn('⚠️ Cannot add default product to user_data. Default products come from PRODUCTS_DATA.');
+            return;
+        }
+        
         if (!this.userData.products) {
             this.userData.products = [];
         }
@@ -164,6 +174,7 @@ class UserDataManager {
             this.userData.products.push(product);
         }
         
+        // Only count custom products in statistics
         this.userData.statistics.totalProducts = this.userData.products.length;
         this.saveUserData();
     }
@@ -204,7 +215,7 @@ class UserDataManager {
         return this.userData.settings || {};
     }
 
-    // Add search to history
+    // Add search to history (optimized: save only settings, not products)
     addSearchHistory(query) {
         if (!this.userData.settings.searchHistory) {
             this.userData.settings.searchHistory = [];
@@ -218,6 +229,8 @@ class UserDataManager {
         
         this.userData.settings.searchHistory = this.userData.settings.searchHistory.slice(0, 50);
         this.userData.statistics.totalSearches++;
+        
+        // Save user data (now only contains small settings, not 8000+ products)
         this.saveUserData();
     }
 

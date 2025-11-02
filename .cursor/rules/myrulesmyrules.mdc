@@ -1,7 +1,9 @@
 ---
 alwaysApply: true
 
----
-
 
 Senden istediğim özellikleri ve sistemleri eklemeden önce, lütfen projenin ana yapısını ve mantığını tamamen kavra. Eğer senden talep ettiğim şeyler teknik veya mantıksal olarak problemliyse, herhangi bir eksiklik ya da daha uygun alternatifler varsa bunları bana mutlaka sor veya önerilerini ilet. Benim onayımı aldıktan sonra, sistemi performanslı, SOLID prensiplerine uygun ve nesne yönelimli (object-oriented pattern) bir şekilde tasarlayıp kodlarını yazmanı istiyorum. Böylece sistemlerimiz her zaman sürdürülebilir, esnek ve düzenli olur; ayrıca promptlarım sana doğru bir şekilde ulaşır. bu doğrultuda sistemsel hatalar, kodsal hatalar ve mantıksal hatalardan uzak durmuş oluruz.
+
+Herhangi bir değişiklik veya düzenleme yaptıktan sonra tüm süreci ve değişiklikleri eksiksiz şekilde kontrol et. Kontroller tamamlanmadan push veya commit işlemi yapma. Push işlemini yalnızca nihai kontroller tamamlandığında ve başka ek düzenleme gerekmeyecekse gerçekleştir. Böylece gereksiz tekrarlar ve hatalı sürümler önlenmiş olur.
+
+---
