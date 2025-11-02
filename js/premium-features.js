@@ -146,6 +146,80 @@ class PremiumFeatures {
     // Refresh premium features from backend
     async refresh() {
         await this.loadPremiumFeatures();
+        // Clear cache when refreshed (admin might have changed settings)
+        this.clearCache();
+    }
+    
+    // Cache for feature preferences (user toggles)
+    featurePreferencesCache = null;
+    cacheTimestamp = null;
+    CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+    
+    // Load feature preferences from user_data (cached)
+    async loadFeaturePreferences() {
+        try {
+            // Check cache first
+            const now = Date.now();
+            if (this.featurePreferencesCache && this.cacheTimestamp && (now - this.cacheTimestamp) < this.CACHE_DURATION) {
+                return this.featurePreferencesCache;
+            }
+            
+            // Load from database
+            if (!window.supabase || !this.currentUser) {
+                return {};
+            }
+            
+            const { data, error } = await window.supabase
+                .from('user_data')
+                .select('settings')
+                .eq('username', this.currentUser.username)
+                .single();
+            
+            if (!error && data && data.settings && data.settings.featurePreferences) {
+                this.featurePreferencesCache = data.settings.featurePreferences;
+                this.cacheTimestamp = now;
+                return this.featurePreferencesCache;
+            }
+            
+            // Default to empty
+            this.featurePreferencesCache = {};
+            this.cacheTimestamp = now;
+            return {};
+        } catch (error) {
+            console.error('Error loading feature preferences:', error);
+            return {};
+        }
+    }
+    
+    // Save feature preferences to database
+    async saveFeaturePreferences(featureKey, enabled) {
+        try {
+            // Update cache
+            if (!this.featurePreferencesCache) {
+                this.featurePreferencesCache = {};
+            }
+            this.featurePreferencesCache[featureKey] = enabled;
+            this.cacheTimestamp = Date.now();
+            
+            // Save via user-manager
+            if (window.userDataManager) {
+                await window.userDataManager.saveFeaturePreferences(featureKey, enabled);
+            }
+        } catch (error) {
+            console.error('Error saving feature preferences:', error);
+        }
+    }
+    
+    // Clear cache (when admin changes settings)
+    clearCache() {
+        this.featurePreferencesCache = null;
+        this.cacheTimestamp = null;
+    }
+    
+    // Get feature preference (from cache or database)
+    async getFeaturePreference(featureKey) {
+        const preferences = await this.loadFeaturePreferences();
+        return preferences[featureKey] || false;
     }
 }
 

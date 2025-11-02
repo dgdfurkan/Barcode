@@ -2568,6 +2568,7 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
             'keyboardShortcuts': 'Klavye Kısayolları',
             'bulkCopy': 'Toplu Kopyalama',
             'imageSearch': 'Görsel Link Arama',
+            'stokSayimi': 'Stok Sayımı',
             'darkMode': 'Karanlık Mod',
             'offlineMode': 'Çevrimdışı Mod',
             'advancedFilters': 'Gelişmiş Filtreler',

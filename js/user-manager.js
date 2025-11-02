@@ -252,6 +252,38 @@ class UserDataManager {
     getSettings() {
         return this.userData.settings || {};
     }
+    
+    // Get feature preferences (premium feature toggles)
+    getFeaturePreferences() {
+        return this.userData.settings?.featurePreferences || {};
+    }
+    
+    // Save feature preferences to database
+    async saveFeaturePreferences(featureKey, enabled) {
+        if (!this.userData.settings) {
+            this.userData.settings = {};
+        }
+        if (!this.userData.settings.featurePreferences) {
+            this.userData.settings.featurePreferences = {};
+        }
+        
+        // Update local data
+        this.userData.settings.featurePreferences[featureKey] = enabled;
+        
+        // Save to database
+        await this.saveUserData();
+    }
+    
+    // Save all feature preferences at once
+    async saveAllFeaturePreferences(preferences) {
+        if (!this.userData.settings) {
+            this.userData.settings = {};
+        }
+        this.userData.settings.featurePreferences = preferences;
+        
+        // Save to database
+        await this.saveUserData();
+    }
 
     // Search history and statistics removed as per requirements (will be added later if needed)
 

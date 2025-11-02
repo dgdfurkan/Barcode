@@ -3396,6 +3396,12 @@
                 emoji: '🖼️',
                 storageKey: 'imageSearchEnabled'
             },
+            'stokSayimi': {
+                name: 'Stok Sayımı',
+                description: 'Mevcut Stok sayfası için gelişmiş araçlar ve kullanıcı scriptleri',
+                emoji: '📊',
+                storageKey: null // Bu özellik sadece dosya kopyalama için, toggle yok
+            },
             'darkMode': {
                 name: 'Karanlık Mod',
                 description: 'Göz yormayan karanlık tema',
@@ -3440,17 +3446,32 @@
 
             container.innerHTML = '';
 
-            Object.keys(PREMIUM_FEATURES_CONFIG).forEach(featureKey => {
+            // Load feature preferences from database (with cache) - do this once before loop
+            let featurePreferences = {};
+            if (window.premiumFeatures) {
+                featurePreferences = await window.premiumFeatures.loadFeaturePreferences();
+            }
+
+            // Render each feature
+            for (const featureKey of Object.keys(PREMIUM_FEATURES_CONFIG)) {
                 const config = PREMIUM_FEATURES_CONFIG[featureKey];
                 const hasPremium = window.premiumFeatures?.checkPremiumFeature(featureKey) || false;
                 
-                // Get user preference for this feature
+                // Get user preference for this feature (from cache loaded above)
                 let isEnabled = false;
                 if (config.storageKey) {
-                    try {
-                        isEnabled = localStorage.getItem(config.storageKey) === '1';
-                    } catch (e) {
-                        isEnabled = false;
+                    // Try database first (from cache)
+                    if (featurePreferences && featurePreferences.hasOwnProperty(featureKey)) {
+                        isEnabled = featurePreferences[featureKey];
+                        // Sync with localStorage for backward compatibility
+                        localStorage.setItem(config.storageKey, isEnabled ? '1' : '0');
+                    } else {
+                        // Fallback to localStorage
+                        try {
+                            isEnabled = localStorage.getItem(config.storageKey) === '1';
+                        } catch (e) {
+                            isEnabled = false;
+                        }
                     }
                 }
 
@@ -3527,10 +3548,17 @@
                 if (hasPremium && config.storageKey) {
                     const checkbox = featureItem.querySelector('input[type="checkbox"]');
                     if (checkbox) {
-                        checkbox.addEventListener('change', (e) => {
+                        checkbox.addEventListener('change', async (e) => {
                             const enabled = e.target.checked;
                             try {
+                                // Save to localStorage (for backward compatibility)
                                 localStorage.setItem(config.storageKey, enabled ? '1' : '0');
+                                
+                                // Save to database (with cache update)
+                                if (window.premiumFeatures) {
+                                    await window.premiumFeatures.saveFeaturePreferences(featureKey, enabled);
+                                }
+                                
                                 if (featureKey === 'autoPaste') {
                                     // Update auto-paste checkbox in regular settings too
                                     const autoPasteCheckbox = document.getElementById('autoPasteEnabled');
@@ -3546,7 +3574,7 @@
                 }
 
                 container.appendChild(featureItem);
-            });
+            }
         }
 
         // Show premium feature detail modal
@@ -3565,6 +3593,12 @@
             // ImageSearch için özel içerik (bookmarklet kurulumu)
             if (featureKey === 'imageSearch') {
                 showImageSearchModal(hasPremium);
+                return;
+            }
+            
+            // StokSayimi için özel içerik (dosya kopyalama butonları)
+            if (featureKey === 'stokSayimi') {
+                showStokSayimiModal(hasPremium);
                 return;
             }
             
@@ -3610,6 +3644,175 @@
         // Hide premium feature detail modal
         function hidePremiumFeatureDetailModal() {
             document.getElementById('premiumFeatureDetailModal').classList.add('hidden');
+        }
+        
+        // Show Stok Sayımı modal with file copy buttons
+        function showStokSayimiModal(hasPremium) {
+            // Update modal header
+            document.getElementById('featureDetailEmoji').textContent = '📊';
+            document.getElementById('featureDetailName').textContent = 'Stok Sayımı';
+            
+            const detailContent = document.getElementById('featureDetailContent');
+            
+            // First render UI, then load files
+            detailContent.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-2">
+                        ${hasPremium ? `
+                            <span class="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full">AKTİF</span>
+                        ` : `
+                            <span class="px-3 py-1 bg-gray-400 text-white text-xs font-bold rounded-full">KİLİTLİ</span>
+                        `}
+                        <span class="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full">PREMIUM</span>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Açıklama</h4>
+                        <p class="text-gray-600 text-sm">Mevcut Stok sayfası için gelişmiş araçlar ve kullanıcı scriptleri</p>
+                    </div>
+                    
+                    ${hasPremium ? `
+                        <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-5">
+                            <h4 class="font-semibold text-gray-900 mb-3 text-lg">🔧 Stok Sayımı Araçları</h4>
+                            <p class="text-gray-700 text-sm mb-4 leading-relaxed">
+                                Mevcut Stok sayfasında kullanabileceğiniz gelişmiş araçlar. Aşağıdaki dosyaları kopyalayıp Tampermonkey veya Greasemonkey'e yükleyebilirsiniz.
+                            </p>
+                            
+                            <!-- Limit Override Dosyası -->
+                            <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-2xl">🔧</span>
+                                        <div>
+                                            <h5 class="font-semibold text-gray-900">Limit Override Script</h5>
+                                            <p class="text-xs text-gray-600">limit-override.user.js</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        id="copyLimitOverrideBtn"
+                                        class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-lg transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
+                                        data-file="limit-override.user.js"
+                                    >
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                        </svg>
+                                        <span>Kopyala</span>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-600 leading-relaxed">
+                                    Mevcut Stok sayfasında limit input field'ını değiştirir ve API çağrılarını intercept eder. Tüm ürünleri tek seferde görmenizi sağlar.
+                                </p>
+                            </div>
+                            
+                            <!-- Excel Export Dosyası -->
+                            <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-2xl">📊</span>
+                                        <div>
+                                            <h5 class="font-semibold text-gray-900">Excel Export Script</h5>
+                                            <p class="text-xs text-gray-600">excel-export.user.js</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        id="copyExcelExportBtn"
+                                        class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-lg transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
+                                        data-file="excel-export.user.js"
+                                    >
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                        </svg>
+                                        <span>Kopyala</span>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-600 leading-relaxed">
+                                    Mevcut Stok verilerini Excel'e görsellerle birlikte aktarır. Görseller direkt gömülü olarak Excel dosyasına eklenir.
+                                </p>
+                            </div>
+                            
+                            <!-- Kullanım talimatları -->
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <h5 class="font-semibold text-blue-900 mb-2">📖 Nasıl Kurulur?</h5>
+                                <ol class="text-sm text-blue-800 space-y-2 list-decimal list-inside">
+                                    <li>Tampermonkey veya Greasemonkey eklentisini tarayıcınıza kurun</li>
+                                    <li>Eklentiyi açın ve "Yeni script oluştur" seçeneğini seçin</li>
+                                    <li>Yukarıdaki butonlardan birine tıklayarak kodu kopyalayın</li>
+                                    <li>Kopyalanan kodu script editörüne yapıştırın ve kaydedin</li>
+                                    <li>Mevcut Stok sayfasına gidin, script otomatik olarak çalışacaktır</li>
+                                </ol>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
+                            <p class="text-gray-800 text-sm font-medium mb-2">🔒 Bu özellik premium üyeler için</p>
+                            <p class="text-gray-700 text-xs leading-relaxed">Bu özellikten faydalanmak için premium üyelik gereklidir. Daha fazla bilgi ve aktivasyon için lütfen bizimle iletişime geçin.</p>
+                        </div>
+                    `}
+                </div>
+            `;
+            
+            // Add event listeners after rendering
+            if (hasPremium) {
+                const limitBtn = document.getElementById('copyLimitOverrideBtn');
+                const excelBtn = document.getElementById('copyExcelExportBtn');
+                
+                if (limitBtn) {
+                    limitBtn.addEventListener('click', async () => {
+                        try {
+                            const response = await fetch('../extension/limit-override.user.js');
+                            const content = await response.text();
+                            await copyToClipboard('limit-override', content);
+                        } catch (error) {
+                            console.error('Error loading file:', error);
+                            alert('Dosya yüklenemedi. Lütfen tekrar deneyin.');
+                        }
+                    });
+                }
+                
+                if (excelBtn) {
+                    excelBtn.addEventListener('click', async () => {
+                        try {
+                            const response = await fetch('../extension/excel-export.user.js');
+                            const content = await response.text();
+                            await copyToClipboard('excel-export', content);
+                        } catch (error) {
+                            console.error('Error loading file:', error);
+                            alert('Dosya yüklenemedi. Lütfen tekrar deneyin.');
+                        }
+                    });
+                }
+            }
+            
+            // Show modal
+            document.getElementById('premiumFeatureDetailModal').classList.remove('hidden');
+        }
+        
+        // Copy to clipboard helper function (updated to be async)
+        async function copyToClipboard(fileName, content) {
+            try {
+                await navigator.clipboard.writeText(content);
+                
+                // Show success feedback
+                const btn = document.getElementById(fileName === 'limit-override' ? 'copyLimitOverrideBtn' : 'copyExcelExportBtn');
+                if (btn) {
+                    const span = btn.querySelector('span');
+                    if (span) {
+                        const originalText = span.textContent;
+                        span.textContent = '✓ Kopyalandı!';
+                        btn.classList.add('bg-green-500');
+                        btn.classList.remove('from-purple-500', 'to-pink-500', 'hover:from-purple-600', 'hover:to-pink-600');
+                        
+                        setTimeout(() => {
+                            span.textContent = originalText;
+                            btn.classList.remove('bg-green-500');
+                            btn.classList.add('from-purple-500', 'to-pink-500', 'hover:from-purple-600', 'hover:to-pink-600');
+                        }, 2000);
+                    }
+                }
+            } catch (err) {
+                console.error('Kopyalama hatası:', err);
+                alert('Kopyalama başarısız oldu. Lütfen manuel olarak kopyalayın.');
+            }
         }
         
         // Show image search modal with bookmarklet installation

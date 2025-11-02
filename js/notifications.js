@@ -202,6 +202,13 @@ class NotificationSystem {
             if (keyboardShortcutsChanged) {
                 this.clearKeyboardShortcutsCache();
             }
+            
+            // Clear feature preferences cache if any feature was disabled
+            const anyDisabled = changedFeatures.some(f => f.newStatus === false);
+            if (anyDisabled && window.premiumFeatures) {
+                window.premiumFeatures.clearCache();
+                console.log('🧹 Feature preferences cache cleared (admin disabled features)');
+            }
 
             // Show notification (enabled features: modal, disabled features: reload page)
             this.showPremiumFeaturesNotification(changedFeatures);
