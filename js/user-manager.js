@@ -16,27 +16,28 @@ class UserDataManager {
         await this.loadUserData();
     }
 
-    // Load user-specific data (backward compatible: supports both old 'data' column and new separate columns)
+    // Load user-specific data (ONLY from custom_products and settings columns)
+    // Note: 'data' column has been removed - only new columns are used
     async loadUserData() {
         try {
             // Try to load from Supabase first
             if (window.supabase) {
-                // Try new structure first (custom_products + settings columns)
-                const { data: newData, error: newError } = await window.supabase
+                // Load from new structure (custom_products + settings columns)
+                const { data, error } = await window.supabase
                     .from('user_data')
                     .select('custom_products, settings')
                     .eq('username', this.currentUser.username)
                     .single();
                 
-                if (!newError && newData && (newData.custom_products !== null || newData.settings !== null)) {
+                if (!error && data && (data.custom_products !== null || data.settings !== null)) {
                     // New structure: separate columns
                     console.log('📦 Loading from new structure (custom_products + settings columns)');
                     this.userData = {
-                        products: newData.custom_products || [],
-                        settings: newData.settings || {}
+                        products: data.custom_products || [],
+                        settings: data.settings || {}
                     };
                     
-                    // Clean default products if any exist
+                    // Clean default products if any exist (they should come from PRODUCTS_DATA)
                     if (this.userData.products && Array.isArray(this.userData.products)) {
                         const beforeCount = this.userData.products.length;
                         this.userData.products = this.userData.products.filter(p => !p.isDefault);
@@ -48,47 +49,17 @@ class UserDataManager {
                         }
                     }
                     
-                    // Migrate to new columns if needed
-                    this.saveUserData();
                     return;
-                }
-                
-                // Fallback to old structure (data JSONB column)
-                const { data: oldData, error: oldError } = await window.supabase
-                    .from('user_data')
-                    .select('data')
-                    .eq('username', this.currentUser.username)
-                    .single();
-                
-                if (!oldError && oldData && oldData.data) {
-                    // Old structure: data JSONB column
-                    console.log('📦 Loading from old structure (data JSONB column)');
-                    this.userData = oldData.data;
-                    
-                    // MIGRATION: Remove default products from user_data (they should come from PRODUCTS_DATA)
-                    if (this.userData.products && Array.isArray(this.userData.products)) {
-                        const beforeCount = this.userData.products.length;
-                        this.userData.products = this.userData.products.filter(p => !p.isDefault);
-                        const afterCount = this.userData.products.length;
-                        
-                        if (beforeCount !== afterCount) {
-                            console.log(`🧹 Cleaned ${beforeCount - afterCount} default products from user_data`);
-                            // Save cleaned data and migrate to new columns
-                            this.saveUserData().catch(err => console.warn('Failed to save cleaned data:', err));
-                        }
-                    }
-                    
-                    // Remove statistics and searchHistory from old data structure
-                    if (this.userData.statistics) {
-                        delete this.userData.statistics;
-                    }
-                    if (this.userData.settings && this.userData.settings.searchHistory) {
-                        delete this.userData.settings.searchHistory;
-                    }
-                    
-                    // Migrate old structure to new columns
-                    this.saveUserData();
+                } else if (error && error.code === 'PGRST116') {
+                    // No row found - create default data
+                    console.log('📦 No user data found, creating default');
+                    this.userData = this.createDefaultUserData();
+                    await this.saveUserData();
                     return;
+                } else if (error) {
+                    // Other error
+                    console.error('Error loading user data:', error);
+                    throw error;
                 }
             }
             
