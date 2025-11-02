@@ -2331,11 +2331,7 @@
                 }
             }
             
-            // Save search to user history
-            if (window.userDataManager && window.userDataManager.currentUser) {
-                const query = searchTerms.join(' ');
-                window.userDataManager.addSearchHistory(query);
-            }
+            // Search history removed as per requirements (will be added later if needed)
             
             return { active: activeResults, outOfStock: outOfStockResults };
         }

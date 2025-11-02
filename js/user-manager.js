@@ -16,33 +16,78 @@ class UserDataManager {
         await this.loadUserData();
     }
 
-    // Load user-specific data
+    // Load user-specific data (backward compatible: supports both old 'data' column and new separate columns)
     async loadUserData() {
         try {
             // Try to load from Supabase first
             if (window.supabase) {
-                const { data, error } = await window.supabase
+                // Try new structure first (custom_products + settings columns)
+                const { data: newData, error: newError } = await window.supabase
+                    .from('user_data')
+                    .select('custom_products, settings')
+                    .eq('username', this.currentUser.username)
+                    .single();
+                
+                if (!newError && newData && (newData.custom_products !== null || newData.settings !== null)) {
+                    // New structure: separate columns
+                    console.log('📦 Loading from new structure (custom_products + settings columns)');
+                    this.userData = {
+                        products: newData.custom_products || [],
+                        settings: newData.settings || {}
+                    };
+                    
+                    // Clean default products if any exist
+                    if (this.userData.products && Array.isArray(this.userData.products)) {
+                        const beforeCount = this.userData.products.length;
+                        this.userData.products = this.userData.products.filter(p => !p.isDefault);
+                        const afterCount = this.userData.products.length;
+                        
+                        if (beforeCount !== afterCount) {
+                            console.log(`🧹 Cleaned ${beforeCount - afterCount} default products from user_data`);
+                            this.saveUserData().catch(err => console.warn('Failed to save cleaned data:', err));
+                        }
+                    }
+                    
+                    // Migrate to new columns if needed
+                    this.saveUserData();
+                    return;
+                }
+                
+                // Fallback to old structure (data JSONB column)
+                const { data: oldData, error: oldError } = await window.supabase
                     .from('user_data')
                     .select('data')
                     .eq('username', this.currentUser.username)
                     .single();
                 
-                if (!error && data) {
-                    this.userData = data.data;
+                if (!oldError && oldData && oldData.data) {
+                    // Old structure: data JSONB column
+                    console.log('📦 Loading from old structure (data JSONB column)');
+                    this.userData = oldData.data;
+                    
                     // MIGRATION: Remove default products from user_data (they should come from PRODUCTS_DATA)
                     if (this.userData.products && Array.isArray(this.userData.products)) {
                         const beforeCount = this.userData.products.length;
                         this.userData.products = this.userData.products.filter(p => !p.isDefault);
                         const afterCount = this.userData.products.length;
                         
-                        // If we removed default products, update statistics and save
                         if (beforeCount !== afterCount) {
                             console.log(`🧹 Cleaned ${beforeCount - afterCount} default products from user_data`);
-                            this.userData.statistics.totalProducts = afterCount;
-                            // Save cleaned data (only once, async without blocking)
+                            // Save cleaned data and migrate to new columns
                             this.saveUserData().catch(err => console.warn('Failed to save cleaned data:', err));
                         }
                     }
+                    
+                    // Remove statistics and searchHistory from old data structure
+                    if (this.userData.statistics) {
+                        delete this.userData.statistics;
+                    }
+                    if (this.userData.settings && this.userData.settings.searchHistory) {
+                        delete this.userData.settings.searchHistory;
+                    }
+                    
+                    // Migrate old structure to new columns
+                    this.saveUserData();
                     return;
                 }
             }
@@ -54,7 +99,14 @@ class UserDataManager {
                 // MIGRATION: Remove default products from local storage too
                 if (this.userData.products && Array.isArray(this.userData.products)) {
                     this.userData.products = this.userData.products.filter(p => !p.isDefault);
-                    this.userData.statistics.totalProducts = this.userData.products.length;
+                }
+                
+                // Remove statistics and searchHistory from local storage
+                if (this.userData.statistics) {
+                    delete this.userData.statistics;
+                }
+                if (this.userData.settings && this.userData.settings.searchHistory) {
+                    delete this.userData.settings.searchHistory;
                 }
             } else {
                 // Create default user data
@@ -68,49 +120,84 @@ class UserDataManager {
 
     // Create default user data structure WITHOUT default products
     // Default products are always loaded from PRODUCTS_DATA, not stored in user_data
+    // Statistics and searchHistory are removed as per requirements
     createDefaultUserData() {
         return {
             products: [], // Only custom products added by user, NOT default products
             settings: {
                 showDuplicates: false,
                 theme: 'light',
-                searchHistory: [],
-                lastBackup: null,
                 showDefaultProducts: true
-            },
-            statistics: {
-                totalSearches: 0,
-                totalProducts: 0, // Only count custom products, default products are in PRODUCTS_DATA
-                lastLogin: new Date().toISOString()
+                // searchHistory and statistics removed - will be added later if needed
             }
         };
     }
 
-    // Save user data
+    // Save user data (backward compatible: saves to both old 'data' column and new separate columns)
     async saveUserData() {
         try {
-            // Update statistics
-            this.userData.statistics.lastLogin = new Date().toISOString();
+            // Prepare data for saving
+            const customProducts = (this.userData.products || []).filter(p => !p.isDefault);
+            const settings = this.userData.settings || {};
             
             // Save to Supabase
             if (window.supabase) {
-                await window.supabase
+                // Try new structure first (custom_products + settings columns)
+                const updateData = {
+                    username: this.currentUser.username,
+                    custom_products: customProducts,
+                    settings: settings,
+                    updated_at: new Date().toISOString()
+                };
+                
+                // Also save to old 'data' column for backward compatibility (during migration period)
+                // This ensures old clients can still read the data
+                // Note: statistics removed as per requirements
+                updateData.data = {
+                    products: customProducts,
+                    settings: settings
+                };
+                
+                const { error } = await window.supabase
                     .from('user_data')
-                    .upsert({
-                        username: this.currentUser.username,
-                        data: this.userData,
-                        updated_at: new Date().toISOString()
-                    });
+                    .upsert(updateData);
+                
+                if (error) {
+                    // If new columns don't exist, fall back to old structure
+                    if (error.message && error.message.includes('column') && error.message.includes('does not exist')) {
+                        console.log('⚠️ New columns not found, using old structure');
+                        await window.supabase
+                            .from('user_data')
+                            .upsert({
+                                username: this.currentUser.username,
+                                data: {
+                                    products: customProducts,
+                                    settings: settings
+                                },
+                                updated_at: new Date().toISOString()
+                            });
+                    } else {
+                        throw error;
+                    }
+                }
             }
             
             // Save to local storage as backup
-            localStorage.setItem(`userData_${this.currentUser.username}`, JSON.stringify(this.userData));
+            const localData = {
+                products: customProducts,
+                settings: settings
+            };
+            localStorage.setItem(`userData_${this.currentUser.username}`, JSON.stringify(localData));
             
-            console.log('User data saved successfully');
+            console.log('✅ User data saved successfully');
         } catch (error) {
             console.error('Error saving user data:', error);
             // Fallback to local storage only
-            localStorage.setItem(`userData_${this.currentUser.username}`, JSON.stringify(this.userData));
+            const localData = {
+                products: (this.userData.products || []).filter(p => !p.isDefault),
+                settings: this.userData.settings || {}
+            };
+            localStorage.setItem(`userData_${this.currentUser.username}`, JSON.stringify(localData));
         }
     }
 
@@ -174,8 +261,6 @@ class UserDataManager {
             this.userData.products.push(product);
         }
         
-        // Only count custom products in statistics
-        this.userData.statistics.totalProducts = this.userData.products.length;
         this.saveUserData();
     }
 
@@ -184,7 +269,6 @@ class UserDataManager {
         if (!this.userData.products) return;
         
         this.userData.products = this.userData.products.filter(p => p.id !== productId);
-        this.userData.statistics.totalProducts = this.userData.products.length;
         this.saveUserData();
     }
 
@@ -193,7 +277,6 @@ class UserDataManager {
         if (!this.userData.products) return;
         
         this.userData.products = this.userData.products.filter(p => !productIds.includes(p.id));
-        this.userData.statistics.totalProducts = this.userData.products.length;
         this.saveUserData();
     }
 
@@ -215,29 +298,7 @@ class UserDataManager {
         return this.userData.settings || {};
     }
 
-    // Add search to history (optimized: save only settings, not products)
-    addSearchHistory(query) {
-        if (!this.userData.settings.searchHistory) {
-            this.userData.settings.searchHistory = [];
-        }
-        
-        // Add to beginning and limit to 50 items
-        this.userData.settings.searchHistory.unshift({
-            query: query,
-            timestamp: new Date().toISOString()
-        });
-        
-        this.userData.settings.searchHistory = this.userData.settings.searchHistory.slice(0, 50);
-        this.userData.statistics.totalSearches++;
-        
-        // Save user data (now only contains small settings, not 8000+ products)
-        this.saveUserData();
-    }
-
-    // Get search history
-    getSearchHistory() {
-        return this.userData.settings.searchHistory || [];
-    }
+    // Search history and statistics removed as per requirements (will be added later if needed)
 
     // Export user data
     exportUserData() {
@@ -274,7 +335,6 @@ class UserDataManager {
                     
                     // Merge with existing data
                     this.userData.products = [...this.userData.products, ...importData.data.products];
-                    this.userData.statistics.totalProducts = this.userData.products.length;
                     
                     this.saveUserData();
                     resolve('Veriler başarıyla içe aktarıldı');
@@ -286,15 +346,8 @@ class UserDataManager {
         });
     }
 
-    // Get user statistics
-    getStatistics() {
-        return {
-            ...this.userData.statistics,
-            trialDaysLeft: this.getTrialDaysLeft(),
-            productsCount: this.userData.products.length,
-            searchHistoryCount: this.userData.settings.searchHistory.length
-        };
-    }
+    // Statistics removed as per requirements (will be added later if needed)
+    // getStatistics() removed - will be added later if needed
 
     // Calculate trial days left
     getTrialDaysLeft() {
