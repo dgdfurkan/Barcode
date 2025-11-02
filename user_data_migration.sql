@@ -56,15 +56,14 @@ ALTER COLUMN custom_products SET DEFAULT '[]'::jsonb,
 ALTER COLUMN settings SET NOT NULL,
 ALTER COLUMN settings SET DEFAULT '{}'::jsonb;
 
--- IMPORTANT NOTES:
--- 1. The 'data' column is NOT dropped - it remains in the table but will NOT be used
--- 2. All future writes go ONLY to 'custom_products' and 'settings' columns
--- 3. Old 'data' column can be dropped later if needed (but not recommended immediately)
--- 4. Statistics and searchHistory are removed - they will be added later if needed
--- 5. Default products (isDefault=true) are NOT stored - they come from PRODUCTS_DATA
+-- Step 6: Drop the old 'data' column (no longer needed)
+-- IMPORTANT: Make sure all data is migrated before dropping!
+ALTER TABLE user_data DROP COLUMN IF EXISTS data;
 
--- Optional: If you want to clear the 'data' column after migration (NOT RECOMMENDED YET):
--- UPDATE user_data SET data = NULL;
--- Or drop the column later:
--- ALTER TABLE user_data DROP COLUMN data;
+-- IMPORTANT NOTES:
+-- 1. The 'data' column has been DROPPED - it is no longer in the table
+-- 2. All future writes go ONLY to 'custom_products' and 'settings' columns
+-- 3. Statistics and searchHistory are removed - they will be added later if needed
+-- 4. Default products (isDefault=true) are NOT stored - they come from PRODUCTS_DATA
+-- 5. Migration is complete - old 'data' column structure is removed
 
