@@ -16,6 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="temp_products.js"></script>
     <script src="../js/auth.js"></script>
+    <script src="../js/trial-notifications.js"></script>
     <script src="../js/user-manager.js"></script>
     <script src="../js/premium-features.js"></script>
     <script src="../js/notifications.js"></script>
@@ -1126,6 +1127,76 @@
             }
         }
 
+        // Copy to clipboard function for product/barcode copying
+        async function copyProductText(text, showNotification = true) {
+            if (!text || text === 'undefined') {
+                console.warn('Cannot copy undefined or empty text');
+                return false;
+            }
+            
+            try {
+                await navigator.clipboard.writeText(String(text));
+                if (showNotification) {
+                    showCopyNotification(String(text));
+                }
+                return true;
+            } catch (err) {
+                console.error('Copy failed:', err);
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = String(text);
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999999px';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    if (showNotification) {
+                        showCopyNotification(String(text));
+                    }
+                    return true;
+                } catch (err) {
+                    console.error('Fallback copy failed:', err);
+                    return false;
+                } finally {
+                    document.body.removeChild(textArea);
+                }
+            }
+        }
+
+        // Global function for onclick handlers
+        window.copyProductText = copyProductText;
+
+        // Show copy notification
+        function showCopyNotification(text) {
+            // Remove existing notification
+            const existing = document.getElementById('copyNotification');
+            if (existing) {
+                existing.remove();
+            }
+
+            const notification = document.createElement('div');
+            notification.id = 'copyNotification';
+            notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 flex items-center space-x-2 animate-fade-in';
+            notification.innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                <span>Kopyalandı: ${text.length > 20 ? text.substring(0, 20) + '...' : text}</span>
+            `;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transition = 'opacity 0.3s';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.remove();
+                    }
+                }, 300);
+            }, 2000);
+        }
+
         // Create barcode navigation component
         function createBarcodeNavigation(product) {
             const barcodes = product.barcodes;
@@ -1133,12 +1204,17 @@
             // If only one barcode, show it without navigation
             if (barcodes.length === 1) {
                 return `
-                    <div class="barcode-item bg-gray-50 rounded-lg p-3 border">
+                    <div class="barcode-item bg-gray-50 rounded-lg p-3 border cursor-pointer hover:bg-gray-100 transition-colors" onclick="copyProductText('${String(barcodes[0].code || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Barkodu kopyalamak için tıklayın">
                         <div class="barcode-visual mb-2">
                             ${generateCode128SVG(barcodes[0].code, 200, 60)}
                         </div>
                         <div class="text-xs space-y-1">
-                            <div class="font-mono font-medium">${barcodes[0].code}</div>
+                            <div class="font-mono font-medium flex items-center justify-between">
+                                <span>${barcodes[0].code}</span>
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
                             <div class="text-gray-600">${barcodes[0].size} - ${barcodes[0].variant}</div>
                         </div>
                     </div>
@@ -1167,12 +1243,17 @@
                     </div>
                     <div class="barcode-container">
                         ${barcodes.map((barcode, index) => `
-                            <div class="barcode-item bg-gray-50 rounded-lg p-3 border ${index > 0 ? 'hidden' : ''}" data-index="${index}">
+                            <div class="barcode-item bg-gray-50 rounded-lg p-3 border cursor-pointer hover:bg-gray-100 transition-colors ${index > 0 ? 'hidden' : ''}" data-index="${index}" onclick="copyProductText('${String(barcode.code || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Barkodu kopyalamak için tıklayın">
                                 <div class="barcode-visual mb-2">
                                     ${generateCode128SVG(barcode.code, 200, 60)}
                                 </div>
                                 <div class="text-xs space-y-1">
-                                    <div class="font-mono font-medium">${barcode.code}</div>
+                                    <div class="font-mono font-medium flex items-center justify-between">
+                                        <span>${barcode.code}</span>
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                        </svg>
+                                    </div>
                                     <div class="text-gray-600">${barcode.size} - ${barcode.variant}</div>
                                 </div>
                             </div>
@@ -2569,7 +2650,12 @@
                                  onclick="showImageModal('${product.image}', '${product.name}')"
                                  onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
                             <div>
-                                <h4 class="font-medium text-text-primary">${product.name}</h4>
+                                <h4 class="font-medium text-text-primary cursor-pointer hover:text-blue-600 transition-colors flex items-center space-x-1" onclick="copyProductText('${String(product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '')}')" title="Ürün adını kopyalamak için tıklayın">
+                                    <span>${product.name}</span>
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                    </svg>
+                                </h4>
                                 <p class="text-sm text-text-secondary">${product.brand || 'Marka Belirtilmemiş'} • ${product.category || 'Kategori Yok'}</p>
                             </div>
                         </div>
@@ -2649,7 +2735,12 @@
                              onclick="showImageModal('${product.image}', '${product.name}')"
                              onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
                         <div class="flex-1 min-w-0">
-                            <h4 class="font-medium text-text-primary mb-1">${product.name}</h4>
+                            <h4 class="font-medium text-text-primary mb-1 cursor-pointer hover:text-blue-600 transition-colors flex items-center space-x-1" onclick="copyProductText('${String(product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '')}')" title="Ürün adını kopyalamak için tıklayın">
+                                <span>${product.name}</span>
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </h4>
                             <p class="text-sm text-text-secondary mb-2">${product.brand || 'Marka Belirtilmemiş'} • Raf: ${product.shelf}</p>
                         </div>
                         <div class="flex-shrink-0">
@@ -2774,7 +2865,12 @@
                                      onclick="showImageModal('${product.image}', '${product.name}')"
                                      onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
                                 <div>
-                                    <h4 class="font-medium text-text-primary">${product.name}</h4>
+                                    <h4 class="font-medium text-text-primary cursor-pointer hover:text-blue-600 transition-colors flex items-center space-x-1" onclick="copyProductText('${String(product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '')}')" title="Ürün adını kopyalamak için tıklayın">
+                                        <span>${product.name}</span>
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                        </svg>
+                                    </h4>
                                     <p class="text-sm text-text-secondary">${product.brand || 'Marka Belirtilmemiş'} • ${product.category || 'Kategori Yok'}</p>
                                 </div>
                             </div>
@@ -2812,7 +2908,12 @@
                                      onclick="showImageModal('${product.image}', '${product.name}')"
                                      onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
                                 <div>
-                                    <h4 class="font-medium text-text-primary">${product.name}</h4>
+                                    <h4 class="font-medium text-text-primary cursor-pointer hover:text-blue-600 transition-colors flex items-center space-x-1" onclick="copyProductText('${String(product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '')}')" title="Ürün adını kopyalamak için tıklayın">
+                                        <span>${product.name}</span>
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                        </svg>
+                                    </h4>
                                     <p class="text-sm text-text-secondary">${product.brand || 'Marka Belirtilmemiş'} • ${product.category || 'Kategori Yok'}</p>
                                 </div>
                             </div>
@@ -4545,7 +4646,12 @@
                                 onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;"
                             />
                             <div class="flex-1 min-w-0">
-                                <h4 class="font-medium text-gray-900 text-sm truncate">${escapeHtml(productName)}</h4>
+                                <h4 class="font-medium text-gray-900 text-sm truncate cursor-pointer hover:text-blue-600 transition-colors flex items-center space-x-1" onclick="copyProductText('${String(escapeHtml(productName) || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Ürün adını kopyalamak için tıklayın">
+                                    <span class="truncate">${escapeHtml(productName)}</span>
+                                    <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                    </svg>
+                                </h4>
                                 ${productBrand || productCategory ? `
                                     <p class="text-xs text-gray-500 truncate">
                                         ${productBrand ? escapeHtml(productBrand) : ''}${productBrand && productCategory ? ' • ' : ''}${productCategory ? escapeHtml(productCategory) : ''}

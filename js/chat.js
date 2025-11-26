@@ -4,6 +4,7 @@ class ChatSystem {
         this.isOpen = false;
         this.messages = [];
         this.currentUser = null;
+        this.isGuest = false; // Guest user flag
         this.chatSubscription = null;
         this.hasUnreadMessages = false;
         this.initialLoadComplete = false; // İlk yükleme tamamlandı mı
@@ -41,15 +42,21 @@ class ChatSystem {
         
         if (messageInput) {
             messageInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') this.sendMessage();
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent form submission
+                    e.stopPropagation(); // Stop event bubbling
+                    this.sendMessage();
+                }
             });
         }
 
         // Ensure chat button is always visible
         this.ensureChatButtonVisible();
 
-        // Check if user is logged in
-        this.checkUserStatus();
+        // Check if user is logged in (async for guest users)
+        this.checkUserStatus().then(() => {
+            console.log('✅ User status checked:', this.currentUser, 'isGuest:', this.isGuest);
+        });
         
         // Clean up any existing notifications from previous session
         this.cleanupExistingNotifications();
@@ -112,7 +119,7 @@ class ChatSystem {
         }
     }
 
-    checkUserStatus() {
+    async checkUserStatus() {
         const session = window.authUtils?.checkAuth();
         if (session && session.username) {
             this.currentUser = session.username;
@@ -121,39 +128,56 @@ class ChatSystem {
         } else {
             // Try to get username from localStorage or URL
             const storedUsername = localStorage.getItem('currentUser') || localStorage.getItem('username');
+            const tempChatUser = localStorage.getItem('tempChatUser'); // For trial expired users
             const sessionData = JSON.parse(localStorage.getItem('session') || '{}');
             
             if (sessionData.username) {
                 this.currentUser = sessionData.username;
                 console.log('🔍 Using session username:', this.currentUser);
+            } else if (tempChatUser) {
+                this.currentUser = tempChatUser;
+                console.log('🔍 Using temp chat user (trial expired):', this.currentUser);
             } else if (storedUsername) {
                 this.currentUser = storedUsername;
                 console.log('🔍 Using stored username:', this.currentUser);
             } else {
-                // Last resort: try to get from any auth-related localStorage
-                const authKeys = ['user', 'authUser', 'loggedInUser'];
-                let foundUser = null;
-                
-                for (const key of authKeys) {
-                    const userData = localStorage.getItem(key);
-                    if (userData) {
-                        try {
-                            const parsed = JSON.parse(userData);
-                            if (parsed.username) {
-                                foundUser = parsed.username;
-                                break;
-                            }
-                        } catch (e) {
-                            if (typeof userData === 'string' && userData.length > 0) {
-                                foundUser = userData;
-                                break;
+                // Check for guest user (IP-based)
+                if (window.guestUserManager) {
+                    try {
+                        const guestUser = await window.guestUserManager.getOrCreateGuestUser();
+                        this.currentUser = guestUser;
+                        this.isGuest = true;
+                        console.log('🔍 Using guest user:', this.currentUser);
+                    } catch (error) {
+                        console.error('Error getting guest user:', error);
+                        this.currentUser = 'ProductSearchUser';
+                    }
+                } else {
+                    // Last resort: try to get from any auth-related localStorage
+                    const authKeys = ['user', 'authUser', 'loggedInUser'];
+                    let foundUser = null;
+                    
+                    for (const key of authKeys) {
+                        const userData = localStorage.getItem(key);
+                        if (userData) {
+                            try {
+                                const parsed = JSON.parse(userData);
+                                if (parsed.username) {
+                                    foundUser = parsed.username;
+                                    break;
+                                }
+                            } catch (e) {
+                                if (typeof userData === 'string' && userData.length > 0) {
+                                    foundUser = userData;
+                                    break;
+                                }
                             }
                         }
                     }
+                    
+                    this.currentUser = foundUser || 'ProductSearchUser';
+                    console.log('🔍 Final username resolution:', this.currentUser);
                 }
-                
-                this.currentUser = foundUser || 'ProductSearchUser';
-                console.log('🔍 Final username resolution:', this.currentUser);
             }
             this.updateChatHeader();
         }
@@ -191,8 +215,27 @@ class ChatSystem {
         }
     }
 
-    openChat() {
+    async openChat() {
         console.log('🔍 Opening chat...');
+        
+        // Check for temp chat user (for trial expired users)
+        const tempChatUser = localStorage.getItem('tempChatUser');
+        if (tempChatUser && !this.currentUser) {
+            this.currentUser = tempChatUser;
+            console.log('🔍 Using temp chat user:', this.currentUser);
+        }
+        
+        // If no user, get or create guest user
+        if (!this.currentUser && window.guestUserManager) {
+            try {
+                this.currentUser = await window.guestUserManager.getOrCreateGuestUser();
+                this.isGuest = true;
+                console.log('🔍 Using guest user:', this.currentUser);
+            } catch (error) {
+                console.error('Error getting guest user:', error);
+            }
+        }
+        
         const chatInterface = document.getElementById('chatInterface');
         const openButton = document.getElementById('openChat');
         
@@ -210,6 +253,9 @@ class ChatSystem {
         }
         
         this.isOpen = true;
+        
+        // Update chat header with current user
+        this.updateChatHeader();
         
         // Mark messages as read
         this.hasUnreadMessages = false;
@@ -365,6 +411,13 @@ class ChatSystem {
             if (window.supabase) {
                 console.log('💬 Saving user message to Supabase:', message);
                 
+                // Check if guest user
+                if (this.isGuest || (window.guestUserManager && window.guestUserManager.isGuestUser(this.currentUser))) {
+                    // Save guest user message
+                    await this.saveGuestMessageToSupabase(message);
+                    return;
+                }
+                
                 // Get current user's chat messages
                 const { data: userData, error: userError } = await window.supabase
                     .from('users')
@@ -420,6 +473,236 @@ class ChatSystem {
         }
     }
 
+    async saveGuestMessageToSupabase(message) {
+        try {
+            if (!window.supabase) {
+                this.saveGuestMessageToLocalStorage(message);
+                return;
+            }
+
+            console.log('💬 Saving guest user message to Supabase:', message);
+            
+            // Get client IP
+            const clientIP = await window.guestUserManager.getClientIP();
+            
+            // Try to get guest chat from guest_chats table
+            const { data: guestChatData, error: getError } = await window.supabase
+                .from('guest_chats')
+                .select('*')
+                .eq('username', this.currentUser)
+                .single();
+
+            let chatMessages = [];
+            
+            if (getError && getError.code === 'PGRST116') {
+                // Guest chat doesn't exist, create new one
+                const newGuestChat = {
+                    username: this.currentUser,
+                    ip_address: clientIP,
+                    chat_messages: JSON.stringify([{
+                        message: message,
+                        sender: 'user',
+                        timestamp: new Date().toISOString(),
+                        adminStatus: 'unread',
+                        userStatus: 'sent'
+                    }]),
+                    last_chat_update: new Date().toISOString(),
+                    created_at: new Date().toISOString()
+                };
+
+                const { error: insertError } = await window.supabase
+                    .from('guest_chats')
+                    .insert([newGuestChat]);
+
+                if (insertError) {
+                    console.error('❌ Error creating guest chat:', insertError);
+                    this.saveGuestMessageToLocalStorage(message);
+                    return;
+                }
+
+                chatMessages = [newGuestChat.chat_messages];
+            } else if (getError) {
+                console.error('❌ Error getting guest chat:', getError);
+                this.saveGuestMessageToLocalStorage(message);
+                return;
+            } else {
+                // Guest chat exists, update it
+                chatMessages = guestChatData.chat_messages ? JSON.parse(guestChatData.chat_messages) : [];
+                
+                chatMessages.push({
+                    message: message,
+                    sender: 'user',
+                    timestamp: new Date().toISOString(),
+                    adminStatus: 'unread',
+                    userStatus: 'sent'
+                });
+
+                const { error: updateError } = await window.supabase
+                    .from('guest_chats')
+                    .update({
+                        chat_messages: JSON.stringify(chatMessages),
+                        last_chat_update: new Date().toISOString()
+                    })
+                    .eq('username', this.currentUser);
+
+                if (updateError) {
+                    console.error('❌ Error updating guest chat:', updateError);
+                    this.saveGuestMessageToLocalStorage(message);
+                    return;
+                }
+            }
+
+            console.log('✅ Guest message saved successfully');
+            this.messages = chatMessages;
+            
+            // Update last seen
+            if (window.guestUserManager) {
+                await window.guestUserManager.updateGuestUserLastSeen(this.currentUser);
+            }
+        } catch (error) {
+            console.error('❌ Error saving guest message:', error);
+            this.saveGuestMessageToLocalStorage(message);
+        }
+    }
+
+    saveGuestMessageToLocalStorage(message) {
+        const guestChats = JSON.parse(localStorage.getItem('guestChats') || '{}');
+        
+        if (!guestChats[this.currentUser]) {
+            guestChats[this.currentUser] = {
+                username: this.currentUser,
+                chat_messages: [],
+                created_at: new Date().toISOString()
+            };
+        }
+
+        guestChats[this.currentUser].chat_messages.push({
+            message: message,
+            sender: 'user',
+            timestamp: new Date().toISOString(),
+            adminStatus: 'unread',
+            userStatus: 'sent'
+        });
+
+        guestChats[this.currentUser].last_chat_update = new Date().toISOString();
+        
+        localStorage.setItem('guestChats', JSON.stringify(guestChats));
+        console.log('✅ Guest message saved to localStorage');
+    }
+
+    async loadGuestChatHistory() {
+        try {
+            console.log('💬 Loading guest chat history for:', this.currentUser);
+            
+            if (window.supabase && this.currentUser) {
+                // Try to load from Supabase guest_chats table
+                const { data: guestChatData, error } = await window.supabase
+                    .from('guest_chats')
+                    .select('*')
+                    .eq('username', this.currentUser)
+                    .single();
+
+                if (!error && guestChatData && guestChatData.chat_messages) {
+                    const chatMessages = JSON.parse(guestChatData.chat_messages);
+                    console.log('✅ Loaded guest chat messages from Supabase:', chatMessages);
+                    
+                    // Clear existing messages
+                    const messagesContainer = document.getElementById('chatMessages');
+                    if (messagesContainer) {
+                        messagesContainer.innerHTML = '';
+                    }
+                    
+                    // Update messages array
+                    this.messages = chatMessages;
+                    
+                    // Render all messages
+                    chatMessages.forEach(msg => {
+                        if (msg.sender === 'user') {
+                            this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                                adminStatus: msg.adminStatus || 'unread',
+                                userStatus: msg.userStatus || 'sent'
+                            });
+                        } else if (msg.sender === 'admin') {
+                            this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                                adminStatus: msg.adminStatus || 'sent',
+                                userStatus: msg.userStatus || 'unread'
+                            });
+                        }
+                    });
+                    
+                    // Scroll to bottom
+                    this.scrollToBottom();
+                    
+                    // Record existing messages
+                    if (!this.initialLoadComplete) {
+                        this.recordExistingMessages(chatMessages);
+                        this.checkForOfflineMessages(chatMessages);
+                        this.initialLoadComplete = true;
+                    } else {
+                        this.checkForNewAdminMessages(chatMessages);
+                    }
+                    return;
+                }
+            }
+            
+            // Fallback to localStorage
+            const guestChats = JSON.parse(localStorage.getItem('guestChats') || '{}');
+            if (guestChats[this.currentUser] && guestChats[this.currentUser].chat_messages) {
+                const chatMessages = guestChats[this.currentUser].chat_messages;
+                console.log('✅ Loaded guest chat messages from localStorage:', chatMessages);
+                
+                // Clear existing messages
+                const messagesContainer = document.getElementById('chatMessages');
+                if (messagesContainer) {
+                    messagesContainer.innerHTML = '';
+                }
+                
+                // Update messages array
+                this.messages = chatMessages;
+                
+                // Render all messages
+                chatMessages.forEach(msg => {
+                    if (msg.sender === 'user') {
+                        this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                            adminStatus: msg.adminStatus || 'unread',
+                            userStatus: msg.userStatus || 'sent'
+                        });
+                    } else if (msg.sender === 'admin') {
+                        this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                            adminStatus: msg.adminStatus || 'sent',
+                            userStatus: msg.userStatus || 'unread'
+                        });
+                    }
+                });
+                
+                // Scroll to bottom
+                this.scrollToBottom();
+                
+                // Record existing messages
+                if (!this.initialLoadComplete) {
+                    this.recordExistingMessages(chatMessages);
+                    this.checkForOfflineMessages(chatMessages);
+                    this.initialLoadComplete = true;
+                } else {
+                    this.checkForNewAdminMessages(chatMessages);
+                }
+            } else {
+                // No chat history
+                const messagesContainer = document.getElementById('chatMessages');
+                if (messagesContainer) {
+                    messagesContainer.innerHTML = '';
+                }
+                this.messages = [];
+            }
+        } catch (error) {
+            console.error('❌ Error loading guest chat history:', error);
+            const messagesContainer = document.getElementById('chatMessages');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = '';
+            }
+            this.messages = [];
+        }
+    }
 
     saveToLocalStorage(message) {
         const messages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
@@ -437,8 +720,14 @@ class ChatSystem {
 
     async loadChatHistory() {
         try {
-            console.log('🔄 LOADING CHAT HISTORY - Current user:', this.currentUser);
+            console.log('🔄 LOADING CHAT HISTORY - Current user:', this.currentUser, 'isGuest:', this.isGuest);
             console.log('🔄 Supabase available:', !!window.supabase);
+            
+            // Check if guest user
+            if (this.isGuest || (window.guestUserManager && window.guestUserManager.isGuestUser(this.currentUser))) {
+                await this.loadGuestChatHistory();
+                return;
+            }
             
             if (window.supabase && this.currentUser) {
                 console.log('💬 Loading chat history from Supabase ONLY for user:', this.currentUser);
@@ -1114,10 +1403,83 @@ class ChatSystem {
 
     async markAdminMessagesAsReadByUser() {
         // Kullanıcı chat'i açtı - admin mesajlarını okudu
-        if (!window.supabase || !this.currentUser) return;
+        if (!this.currentUser) return;
+        
+        // Check if guest user
+        const isGuest = this.isGuest || (window.guestUserManager && window.guestUserManager.isGuestUser(this.currentUser));
         
         try {
-            console.log('✅ User viewing chat - marking admin messages as read');
+            console.log('✅ User viewing chat - marking admin messages as read', isGuest ? '(guest)' : '');
+            
+            if (isGuest) {
+                // Handle guest user
+                if (window.supabase) {
+                    const { data: guestChatData, error: guestError } = await window.supabase
+                        .from('guest_chats')
+                        .select('chat_messages')
+                        .eq('username', this.currentUser)
+                        .single();
+
+                    if (!guestError && guestChatData && guestChatData.chat_messages) {
+                        let chatMessages = JSON.parse(guestChatData.chat_messages);
+                        let hasChanges = false;
+                        
+                        // Mark all admin messages as read by user
+                        chatMessages.forEach(msg => {
+                            if (msg.sender === 'admin' && msg.userStatus !== 'read') {
+                                msg.userStatus = 'read'; // User okudu
+                                hasChanges = true;
+                            }
+                        });
+                        
+                        if (hasChanges) {
+                            // Update in Supabase
+                            await window.supabase
+                                .from('guest_chats')
+                                .update({ 
+                                    chat_messages: JSON.stringify(chatMessages),
+                                    last_chat_update: new Date().toISOString()
+                                })
+                                .eq('username', this.currentUser);
+                            
+                            console.log('✅ Admin messages marked as read by guest user');
+                            
+                            // Refresh the chat display to show green ticks
+                            setTimeout(() => {
+                                this.loadChatHistory();
+                            }, 200);
+                        }
+                    }
+                } else {
+                    // Fallback to localStorage
+                    const guestChats = JSON.parse(localStorage.getItem('guestChats') || '{}');
+                    if (guestChats[this.currentUser] && guestChats[this.currentUser].chat_messages) {
+                        let chatMessages = guestChats[this.currentUser].chat_messages;
+                        let hasChanges = false;
+                        
+                        chatMessages.forEach(msg => {
+                            if (msg.sender === 'admin' && msg.userStatus !== 'read') {
+                                msg.userStatus = 'read';
+                                hasChanges = true;
+                            }
+                        });
+                        
+                        if (hasChanges) {
+                            guestChats[this.currentUser].chat_messages = chatMessages;
+                            guestChats[this.currentUser].last_chat_update = new Date().toISOString();
+                            localStorage.setItem('guestChats', JSON.stringify(guestChats));
+                            
+                            setTimeout(() => {
+                                this.loadChatHistory();
+                            }, 200);
+                        }
+                    }
+                }
+                return;
+            }
+            
+            // Regular user
+            if (!window.supabase) return;
             
             // Get current messages
             const { data: userData, error: userError } = await window.supabase

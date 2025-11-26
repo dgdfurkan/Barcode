@@ -183,6 +183,14 @@ async function login(username, password) {
         // Check trial expiry (handle both camelCase and snake_case)
         const trialEnd = user.trialEnd || user.trial_end;
         if (!checkTrialExpiry(trialEnd)) {
+            // Show trial expired notification on login page
+            if (window.showTrialExpiredLoginNotification) {
+                window.showTrialExpiredLoginNotification();
+            }
+            // Open chat with username after showing error
+            setTimeout(() => {
+                openChatWithUsernameForTrialExpired(username);
+            }, 1500);
             throw new Error('Test süreniz dolmuş! Lütfen destek ile iletişime geçin.');
         }
 
@@ -282,6 +290,20 @@ function checkAuth() {
         if (now - loginTime > 24 * 60 * 60 * 1000) {
             logout();
             return false;
+        }
+        
+        // Check trial expiry
+        if (sessionData.trialEnd) {
+            const trialEnd = new Date(sessionData.trialEnd);
+            if (now > trialEnd) {
+                // Trial expired - show notification and logout immediately
+                if (window.showTrialExpiredNotification) {
+                    window.showTrialExpiredNotification();
+                }
+                // Logout immediately
+                logout();
+                return false;
+            }
         }
         
         return sessionData;
@@ -441,9 +463,19 @@ document.addEventListener('DOMContentLoaded', () => {
         await login(username, password);
     });
     
-    // Enter key handler
+    // Enter key handler - only for login form, not for chat
     document.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
+        // Don't trigger login if chat input is focused
+        const chatInput = document.getElementById('messageInput');
+        const chatInterface = document.getElementById('chatInterface');
+        if (chatInput && chatInterface && !chatInterface.classList.contains('hidden') && document.activeElement === chatInput) {
+            return; // Let chat handle Enter key
+        }
+        
+        // Only trigger login if login form input is focused
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        if (e.key === 'Enter' && (document.activeElement === usernameInput || document.activeElement === passwordInput)) {
             document.getElementById('loginForm').dispatchEvent(new Event('submit'));
         }
     });
@@ -535,6 +567,105 @@ async function checkIPTracking(userId, clientIP, maxIPCount) {
             is_new: false
         };
     }
+}
+
+// Function to check if trial expired message exists in chat history
+async function checkTrialExpiredMessageInHistory(username) {
+    try {
+        if (window.supabase && username) {
+            // Get user's chat messages from Supabase
+            const { data: userData, error } = await window.supabase
+                .from('users')
+                .select('chat_messages')
+                .eq('username', username)
+                .single();
+
+            if (error || !userData || !userData.chat_messages) {
+                return false; // No messages found, can add
+            }
+
+            const chatMessages = JSON.parse(userData.chat_messages);
+            const oneDayAgo = new Date();
+            oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+            
+            const expectedMessage = `Merhaba, ben ${username}. Hesap sürem doldu, ödeme yapmak istiyorum.`;
+            
+            // Check if message exists in last 1 day
+            const hasMessage = chatMessages.some(msg => {
+                if (msg.sender === 'user' && msg.message === expectedMessage) {
+                    const msgDate = new Date(msg.timestamp);
+                    return msgDate >= oneDayAgo;
+                }
+                return false;
+            });
+            
+            return hasMessage;
+        }
+        
+        // Fallback: check localStorage
+        const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+        const oneDayAgo = new Date();
+        oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+        
+        const expectedMessage = `Merhaba, ben ${username}. Hesap sürem doldu, ödeme yapmak istiyorum.`;
+        
+        const hasMessage = chatMessages.some(msg => {
+            if (msg.username === username && msg.message === expectedMessage) {
+                const msgDate = new Date(msg.timestamp || msg.created_at);
+                return msgDate >= oneDayAgo;
+            }
+            return false;
+        });
+        
+        return hasMessage;
+    } catch (error) {
+        console.error('Error checking trial expired message:', error);
+        return false; // On error, allow adding message
+    }
+}
+
+// Function to open chat with username pre-filled when trial expired
+async function openChatWithUsernameForTrialExpired(username) {
+    // Store username temporarily for chat system
+    localStorage.setItem('tempChatUser', username);
+    
+    // Set current user for chat system if it exists
+    if (window.chatSystem) {
+        window.chatSystem.currentUser = username;
+        // Update chat header immediately
+        window.chatSystem.updateChatHeader();
+    }
+    
+    // Open chat
+    if (window.chatSystem && typeof window.chatSystem.openChat === 'function') {
+        window.chatSystem.openChat();
+    } else if (document.getElementById('openChat')) {
+        document.getElementById('openChat').click();
+    }
+    
+    // Wait a bit for chat to open, then check history and fill message input
+    setTimeout(async () => {
+        // Update chat system user if chat system exists
+        if (window.chatSystem) {
+            window.chatSystem.currentUser = username;
+            window.chatSystem.updateChatHeader();
+        }
+        
+        // Check if message already exists in chat history (last 1 day)
+        const messageExists = await checkTrialExpiredMessageInHistory(username);
+        
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput && !messageExists) {
+            const message = `Merhaba, ben ${username}. Hesap sürem doldu, ödeme yapmak istiyorum.`;
+            messageInput.value = message;
+            messageInput.focus();
+            // Scroll message input into view
+            messageInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else if (messageInput && messageExists) {
+            // Just focus if message already exists
+            messageInput.focus();
+        }
+    }, 1000); // Increased timeout to ensure chat is fully loaded and history checked
 }
 
 // Export functions for use in other pages

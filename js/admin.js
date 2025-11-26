@@ -1815,33 +1815,18 @@ AdminPanel.prototype.triggerRealtimeUpdate = function(username) {
 AdminPanel.prototype.loadChatUsers = async function() {
     console.log('💬 Loading chat users...');
     try {
+        const allUsers = [];
+        
         if (window.supabase) {
             console.log('💬 Using Supabase for chat users');
             
-            // First try to get users with chat_messages column
+            // Load regular users with chat messages
             const { data: usersData, error: usersError } = await window.supabase
                 .from('users')
                 .select('username, chat_messages, last_chat_update')
                 .not('chat_messages', 'is', null);
 
-            if (usersError && usersError.code === '42703') {
-                console.log('⚠️ chat_messages column does not exist, using messages table');
-                // Fallback to messages table
-                const { data, error } = await window.supabase
-                    .from('messages')
-                    .select('username, status, created_at, message')
-                    .order('created_at', { ascending: false });
-
-                if (error) {
-                    console.error('❌ Supabase error loading chat users:', error);
-                    this.loadChatUsersFromLocalStorage();
-                    return;
-                }
-
-                const uniqueUsers = [...new Set(data.map(msg => msg.username))];
-                console.log('✅ Unique users from messages table:', uniqueUsers);
-                this.renderChatUsers(uniqueUsers);
-            } else if (usersData) {
+            if (!usersError && usersData) {
                 // Filter users who have chat messages
                 const usersWithChat = usersData.filter(user => {
                     try {
@@ -1852,17 +1837,61 @@ AdminPanel.prototype.loadChatUsers = async function() {
                     }
                 });
                 
-                const uniqueUsers = usersWithChat.map(user => user.username);
+                usersWithChat.forEach(user => {
+                    allUsers.push({
+                        username: user.username,
+                        isGuest: false,
+                        lastUpdate: user.last_chat_update
+                    });
+                });
+            }
+            
+            // Load guest users with chat messages
+            try {
+                const { data: guestChatsData, error: guestError } = await window.supabase
+                    .from('guest_chats')
+                    .select('username, chat_messages, last_chat_update')
+                    .not('chat_messages', 'is', null)
+                    .order('last_chat_update', { ascending: false });
+
+                if (!guestError && guestChatsData) {
+                    guestChatsData.forEach(guest => {
+                        try {
+                            const chatMessages = JSON.parse(guest.chat_messages || '[]');
+                            if (chatMessages.length > 0) {
+                                allUsers.push({
+                                    username: guest.username,
+                                    isGuest: true,
+                                    lastUpdate: guest.last_chat_update
+                                });
+                            }
+                        } catch (e) {
+                            console.warn('Error parsing guest chat messages:', e);
+                        }
+                    });
+                }
+            } catch (guestTableError) {
+                console.log('⚠️ guest_chats table might not exist yet:', guestTableError);
+            }
+            
+            // Sort by last update (most recent first)
+            allUsers.sort((a, b) => {
+                const dateA = new Date(a.lastUpdate || 0);
+                const dateB = new Date(b.lastUpdate || 0);
+                return dateB - dateA;
+            });
+            
+            if (allUsers.length > 0) {
+                const uniqueUsers = allUsers.map(u => u.username);
                 console.log('✅ Unique users with chat messages:', uniqueUsers);
                 this.renderChatUsers(uniqueUsers);
-            } else {
-                console.log('⚠️ No users found, checking localStorage...');
-                this.loadChatUsersFromLocalStorage();
+                return;
             }
-        } else {
-            console.log('💬 Supabase not available, using localStorage');
-            this.loadChatUsersFromLocalStorage();
         }
+        
+        // Fallback to localStorage
+        console.log('💬 Loading from localStorage...');
+        this.loadChatUsersFromLocalStorage();
     } catch (error) {
         console.error('❌ Error loading chat users:', error);
         this.loadChatUsersFromLocalStorage();
@@ -2077,44 +2106,71 @@ AdminPanel.prototype.showChatInput = function() {
 AdminPanel.prototype.loadChatMessages = async function(username) {
     console.log('💬 Loading chat messages for:', username);
     try {
+        // Check if guest user
+        const isGuest = username && username.startsWith('Kullanıcı') && /^\d+$/.test(username.replace('Kullanıcı', ''));
+        
         if (window.supabase) {
             console.log('💬 Using Supabase for chat messages');
             
-            // First try to get user's chat messages from users table
-            const { data, error } = await window.supabase
-                .from('users')
-                .select('chat_messages')
-                .eq('username', username)
-                .single();
-
-            if (error && error.code === '42703') {
-                console.log('⚠️ chat_messages column does not exist, using messages table');
-                // Fallback to messages table
-                const { data: messagesData, error: messagesError } = await window.supabase
-                    .from('messages')
-                    .select('*')
+            if (isGuest) {
+                // Load guest chat messages
+                const { data: guestChatData, error: guestError } = await window.supabase
+                    .from('guest_chats')
+                    .select('chat_messages')
                     .eq('username', username)
-                    .order('created_at', { ascending: true });
+                    .single();
 
-                if (messagesError) {
-                    console.error('❌ Supabase error loading chat messages:', messagesError);
+                if (!guestError && guestChatData && guestChatData.chat_messages) {
+                    const chatMessages = JSON.parse(guestChatData.chat_messages);
+                    console.log('✅ Parsed guest chat messages:', chatMessages);
+                    this.renderChatMessages(chatMessages);
+                    return;
+                } else if (guestError && guestError.code === 'PGRST116') {
+                    // Guest chat doesn't exist, check localStorage
+                    console.log('⚠️ Guest chat not found in Supabase, checking localStorage');
                     this.loadChatMessagesFromLocalStorage(username);
                     return;
                 }
-
-                console.log('✅ Messages for', username, 'from messages table:', messagesData);
-                this.renderChatMessages(messagesData);
-            } else if (error) {
-                console.error('❌ Supabase error loading chat messages:', error);
-                this.loadChatMessagesFromLocalStorage(username);
-            } else if (data && data.chat_messages) {
-                const chatMessages = JSON.parse(data.chat_messages);
-                console.log('✅ Parsed chat messages:', chatMessages);
-                this.renderChatMessages(chatMessages);
             } else {
-                console.log('⚠️ No chat messages in Supabase for', username, ', checking localStorage');
-                this.loadChatMessagesFromLocalStorage(username);
+                // Load regular user chat messages
+                const { data, error } = await window.supabase
+                    .from('users')
+                    .select('chat_messages')
+                    .eq('username', username)
+                    .single();
+
+                if (error && error.code === '42703') {
+                    console.log('⚠️ chat_messages column does not exist, using messages table');
+                    // Fallback to messages table
+                    const { data: messagesData, error: messagesError } = await window.supabase
+                        .from('messages')
+                        .select('*')
+                        .eq('username', username)
+                        .order('created_at', { ascending: true });
+
+                    if (messagesError) {
+                        console.error('❌ Supabase error loading chat messages:', messagesError);
+                        this.loadChatMessagesFromLocalStorage(username);
+                        return;
+                    }
+
+                    console.log('✅ Messages for', username, 'from messages table:', messagesData);
+                    this.renderChatMessages(messagesData);
+                    return;
+                } else if (error) {
+                    console.error('❌ Supabase error loading chat messages:', error);
+                    this.loadChatMessagesFromLocalStorage(username);
+                    return;
+                } else if (data && data.chat_messages) {
+                    const chatMessages = JSON.parse(data.chat_messages);
+                    console.log('✅ Parsed chat messages:', chatMessages);
+                    this.renderChatMessages(chatMessages);
+                    return;
+                }
             }
+            
+            console.log('⚠️ No chat messages in Supabase for', username, ', checking localStorage');
+            this.loadChatMessagesFromLocalStorage(username);
         } else {
             console.log('💬 Supabase not available, using localStorage');
             this.loadChatMessagesFromLocalStorage(username);
@@ -2127,6 +2183,20 @@ AdminPanel.prototype.loadChatMessages = async function(username) {
 
 AdminPanel.prototype.loadChatMessagesFromLocalStorage = function(username) {
     console.log('💬 Loading chat messages from localStorage for:', username);
+    
+    // Check if guest user
+    const isGuest = username && username.startsWith('Kullanıcı') && /^\d+$/.test(username.replace('Kullanıcı', ''));
+    
+    if (isGuest) {
+        // Load guest chat from localStorage
+        const guestChats = JSON.parse(localStorage.getItem('guestChats') || '{}');
+        if (guestChats[username] && guestChats[username].chat_messages) {
+            const chatMessages = guestChats[username].chat_messages;
+            console.log('✅ Loaded guest chat messages from localStorage:', chatMessages);
+            this.renderChatMessages(chatMessages);
+            return;
+        }
+    }
     
     const messages = JSON.parse(localStorage.getItem('messages') || '[]');
     const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
@@ -2334,6 +2404,80 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
         if (window.supabase) {
             console.log('💬 Saving admin message to Supabase:', message);
             
+            // Check if guest user
+            const isGuest = this.selectedChatUser && this.selectedChatUser.startsWith('Kullanıcı') && /^\d+$/.test(this.selectedChatUser.replace('Kullanıcı', ''));
+            
+            if (isGuest) {
+                // Save to guest_chats table
+                const { data: guestChatData, error: guestError } = await window.supabase
+                    .from('guest_chats')
+                    .select('chat_messages')
+                    .eq('username', this.selectedChatUser)
+                    .single();
+
+                let chatMessages = [];
+                
+                if (guestError && guestError.code === 'PGRST116') {
+                    // Guest chat doesn't exist, create new one
+                    chatMessages = [{
+                        message: message,
+                        sender: 'admin',
+                        timestamp: new Date().toISOString(),
+                        adminStatus: 'sent',
+                        userStatus: 'unread'
+                    }];
+                    
+                    const { error: insertError } = await window.supabase
+                        .from('guest_chats')
+                        .insert([{
+                            username: this.selectedChatUser,
+                            ip_address: '0.0.0.0', // Will be updated if needed
+                            chat_messages: JSON.stringify(chatMessages),
+                            last_chat_update: new Date().toISOString()
+                        }]);
+
+                    if (insertError) {
+                        console.error('❌ Error creating guest chat:', insertError);
+                        this.saveAdminMessageToLocalStorage(message);
+                        return;
+                    }
+                } else if (guestError) {
+                    console.error('❌ Error getting guest chat:', guestError);
+                    this.saveAdminMessageToLocalStorage(message);
+                    return;
+                } else {
+                    // Guest chat exists, update it
+                    chatMessages = guestChatData.chat_messages ? JSON.parse(guestChatData.chat_messages) : [];
+                    
+                    chatMessages.push({
+                        message: message,
+                        sender: 'admin',
+                        timestamp: new Date().toISOString(),
+                        adminStatus: 'sent',
+                        userStatus: 'unread'
+                    });
+
+                    const { error: updateError } = await window.supabase
+                        .from('guest_chats')
+                        .update({
+                            chat_messages: JSON.stringify(chatMessages),
+                            last_chat_update: new Date().toISOString()
+                        })
+                        .eq('username', this.selectedChatUser);
+
+                    if (updateError) {
+                        console.error('❌ Error updating guest chat:', updateError);
+                        this.saveAdminMessageToLocalStorage(message);
+                        return;
+                    }
+                }
+                
+                console.log('✅ Admin message saved to guest chat successfully');
+                this.showAdminNotification(this.selectedChatUser, message);
+                return;
+            }
+            
+            // Regular user
             // Get current user's chat messages
             const { data: userData, error: userError } = await window.supabase
                 .from('users')
@@ -2390,6 +2534,38 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
 
 AdminPanel.prototype.saveAdminMessageToLocalStorage = function(message) {
     console.log('💬 Saving admin message to localStorage:', message);
+    
+    // Check if guest user
+    const isGuest = this.selectedChatUser && this.selectedChatUser.startsWith('Kullanıcı') && /^\d+$/.test(this.selectedChatUser.replace('Kullanıcı', ''));
+    
+    if (isGuest) {
+        // Save to guestChats
+        const guestChats = JSON.parse(localStorage.getItem('guestChats') || '{}');
+        
+        if (!guestChats[this.selectedChatUser]) {
+            guestChats[this.selectedChatUser] = {
+                username: this.selectedChatUser,
+                chat_messages: [],
+                created_at: new Date().toISOString()
+            };
+        }
+
+        guestChats[this.selectedChatUser].chat_messages.push({
+            message: message,
+            sender: 'admin',
+            timestamp: new Date().toISOString(),
+            adminStatus: 'sent',
+            userStatus: 'unread'
+        });
+
+        guestChats[this.selectedChatUser].last_chat_update = new Date().toISOString();
+        
+        localStorage.setItem('guestChats', JSON.stringify(guestChats));
+        console.log('✅ Admin message saved to guest chat localStorage');
+        this.showAdminNotification(this.selectedChatUser, message);
+        return;
+    }
+    
     const messages = JSON.parse(localStorage.getItem('messages') || '[]');
     messages.push({
         username: this.selectedChatUser,
@@ -2403,10 +2579,79 @@ AdminPanel.prototype.saveAdminMessageToLocalStorage = function(message) {
 };
 
 AdminPanel.prototype.markUserMessagesAsReadByAdmin = async function(username) {
-    if (!window.supabase) return;
+    if (!username) return;
+    
+    // Check if guest user
+    const isGuest = username && username.startsWith('Kullanıcı') && /^\d+$/.test(username.replace('Kullanıcı', ''));
     
     try {
-        console.log('✅ Admin viewing chat - marking user messages as read for:', username);
+        console.log('✅ Admin viewing chat - marking user messages as read for:', username, isGuest ? '(guest)' : '');
+        
+        if (isGuest) {
+            // Handle guest user
+            if (window.supabase) {
+                const { data: guestChatData, error: guestError } = await window.supabase
+                    .from('guest_chats')
+                    .select('chat_messages')
+                    .eq('username', username)
+                    .single();
+
+                if (!guestError && guestChatData && guestChatData.chat_messages) {
+                    let chatMessages = JSON.parse(guestChatData.chat_messages);
+                    let hasChanges = false;
+                    
+                    // Mark all user messages as read by admin
+                    chatMessages.forEach(msg => {
+                        if (msg.sender === 'user' && msg.adminStatus !== 'read') {
+                            msg.adminStatus = 'read'; // Admin okudu
+                            hasChanges = true;
+                        }
+                    });
+                    
+                    if (hasChanges) {
+                        // Update in Supabase
+                        await window.supabase
+                            .from('guest_chats')
+                            .update({ 
+                                chat_messages: JSON.stringify(chatMessages),
+                                last_chat_update: new Date().toISOString()
+                            })
+                            .eq('username', username);
+                        
+                        console.log('✅ Guest user messages marked as read by admin');
+                        
+                        // Refresh the chat display
+                        this.renderChatMessages(chatMessages);
+                    }
+                }
+            } else {
+                // Fallback to localStorage
+                const guestChats = JSON.parse(localStorage.getItem('guestChats') || '{}');
+                if (guestChats[username] && guestChats[username].chat_messages) {
+                    let chatMessages = guestChats[username].chat_messages;
+                    let hasChanges = false;
+                    
+                    chatMessages.forEach(msg => {
+                        if (msg.sender === 'user' && msg.adminStatus !== 'read') {
+                            msg.adminStatus = 'read';
+                            hasChanges = true;
+                        }
+                    });
+                    
+                    if (hasChanges) {
+                        guestChats[username].chat_messages = chatMessages;
+                        guestChats[username].last_chat_update = new Date().toISOString();
+                        localStorage.setItem('guestChats', JSON.stringify(guestChats));
+                        
+                        this.renderChatMessages(chatMessages);
+                    }
+                }
+            }
+            return;
+        }
+        
+        // Regular user
+        if (!window.supabase) return;
         
         // Get current messages
         const { data: userData, error: userError } = await window.supabase
