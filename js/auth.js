@@ -194,6 +194,32 @@ async function login(username, password) {
             throw new Error('Test süreniz dolmuş! Lütfen destek ile iletişime geçin.');
         }
 
+        // IP Ban Check - Check if IP is blocked before allowing login
+        if (window.ipBanChecker) {
+            const ipBanStatus = await window.ipBanChecker.checkIPBanStatus(clientIP);
+            if (ipBanStatus.isBlocked) {
+                console.log('🚫 IP is blocked, preventing login:', clientIP);
+                
+                // Show inline message
+                const ipBanMessage = document.getElementById('ipBanMessage');
+                if (ipBanMessage) {
+                    ipBanMessage.classList.remove('hidden');
+                    const ipBanText = ipBanMessage.querySelector('span');
+                    if (ipBanText) {
+                        ipBanText.textContent = 'Bu IP adresi sistem tarafından engellenmiştir. Kullanım şartlarımıza göre, bir hesabın birden fazla farklı cihazda kullanımı yasaktır. Lütfen destek ekibimizle iletişime geçerek ödeminizi tamamlayınız.';
+                    }
+                }
+                
+                // Open anonymous chat with username
+                setTimeout(async () => {
+                    await openChatForBlockedIP(clientIP, username);
+                }, 1000);
+                
+                // Sadece inline mesaj göster, throw error yapma (tekrar mesaj göstermemek için)
+                return;
+            }
+        }
+
         // IP Tracking Check
         if (user.ip_tracking_enabled !== false) {
             console.log('IP Tracking Check:', {
@@ -276,7 +302,7 @@ async function login(username, password) {
     }
 }
 
-// Check if user is logged in
+// Check if user is logged in (sync version - for backward compatibility)
 function checkAuth() {
     const token = localStorage.getItem('authToken');
     if (!token) return false;
@@ -290,6 +316,79 @@ function checkAuth() {
         if (now - loginTime > 24 * 60 * 60 * 1000) {
             logout();
             return false;
+        }
+        
+        // Check trial expiry (sync check)
+        if (sessionData.trialEnd) {
+            const trialEnd = new Date(sessionData.trialEnd);
+            if (now > trialEnd) {
+                // Trial expired - show notification and logout immediately
+                if (window.showTrialExpiredNotification) {
+                    window.showTrialExpiredNotification();
+                }
+                // Logout immediately
+                logout();
+                return false;
+            }
+        }
+        
+        return sessionData;
+    } catch (error) {
+        console.error('Token decode error:', error);
+        logout();
+        return false;
+    }
+}
+
+// Check if user is logged in (async version for IP ban check)
+async function checkAuthAsync() {
+    const token = localStorage.getItem('authToken');
+    if (!token) return false;
+    
+    try {
+        const sessionData = JSON.parse(decodeURIComponent(escape(atob(token))));
+        const now = new Date();
+        const loginTime = new Date(sessionData.loginTime);
+        
+        // Check if session is older than 24 hours
+        if (now - loginTime > 24 * 60 * 60 * 1000) {
+            logout();
+            return false;
+        }
+        
+        // Check IP ban status (async check)
+        if (sessionData.clientIP && window.ipBanChecker) {
+            const ipBanStatus = await window.ipBanChecker.checkIPBanStatus(sessionData.clientIP);
+            if (ipBanStatus.isBlocked) {
+                console.log('🚫 IP is blocked, checking if user should be logged out:', sessionData.clientIP);
+                
+                // Kullanıcının birden fazla IP ile giriş yapıp yapmadığını kontrol et
+                const hasMultipleIPs = await window.ipBanChecker.checkUserHasMultipleIPs(sessionData.username);
+                
+                if (hasMultipleIPs) {
+                    console.log(`ℹ️ User ${sessionData.username} has multiple IPs, not logging out`);
+                    // Birden fazla IP varsa logout yapma, ama yine de false dön (güvenlik için)
+                    // return false; // Bu satırı kaldırdık, çünkü kullanıcı giriş yapmaya devam edebilir
+                } else {
+                    // Sadece bu IP ile giriş yapılmış, logout yap
+                    console.log('🚫 IP is blocked and user has only this IP, logging out user:', sessionData.clientIP);
+                    
+                    // Logout immediately
+                    logout();
+                    
+                    // Show notification (if on product_search page)
+                    if (window.showIPBannedNotification) {
+                        window.showIPBannedNotification();
+                    }
+                    
+                    // Open anonymous chat with username
+                    setTimeout(async () => {
+                        await openChatForBlockedIP(sessionData.clientIP, sessionData.username);
+                    }, 1000);
+                    
+                    return false;
+                }
+            }
         }
         
         // Check trial expiry
@@ -408,7 +507,10 @@ function showUserInfo(session) {
 // Make logout function available globally
 window.authUtils = {
     checkAuth: checkAuth,
-    logout: logout
+    checkAuthAsync: checkAuthAsync,
+    logout: logout,
+    getClientIP: getClientIP,
+    openChatForBlockedIP: openChatForBlockedIP
 };
 
 // Initialize on page load
@@ -449,34 +551,33 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // Login form handler
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const username = document.getElementById('username').value.trim();
-        const password = document.getElementById('password').value;
-        
-        if (!username || !password) {
-            showError('Lütfen tüm alanları doldurun!');
-            return;
-        }
-        
-        await login(username, password);
-    });
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                showError('Lütfen tüm alanları doldurun!');
+                return;
+            }
+            
+            await login(username, password);
+        });
+    }
     
-    // Enter key handler - only for login form, not for chat
+    // Enter key handler - only for login form
     document.addEventListener('keypress', (e) => {
-        // Don't trigger login if chat input is focused
-        const chatInput = document.getElementById('messageInput');
-        const chatInterface = document.getElementById('chatInterface');
-        if (chatInput && chatInterface && !chatInterface.classList.contains('hidden') && document.activeElement === chatInput) {
-            return; // Let chat handle Enter key
-        }
-        
-        // Only trigger login if login form input is focused
         const usernameInput = document.getElementById('username');
         const passwordInput = document.getElementById('password');
+        
+        // Only if login form inputs are focused
         if (e.key === 'Enter' && (document.activeElement === usernameInput || document.activeElement === passwordInput)) {
-            document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+            if (loginForm) {
+                loginForm.dispatchEvent(new Event('submit'));
+            }
         }
     });
 });
@@ -625,6 +726,42 @@ async function checkTrialExpiredMessageInHistory(username) {
 }
 
 // Function to open chat with username pre-filled when trial expired
+// Open chat for blocked IP (anonymous)
+async function openChatForBlockedIP(clientIP, username = null) {
+    try {
+        // Get or create guest user
+        if (window.guestUserManager) {
+            const guestUsername = await window.guestUserManager.getOrCreateGuestUser();
+            
+            // Open chat system
+            if (window.chatSystem) {
+                // Set current user to guest username
+                window.chatSystem.currentUser = guestUsername;
+                window.chatSystem.isGuest = true;
+                
+                // Open chat
+                window.chatSystem.openChat();
+                
+                // Pre-fill message about IP ban with username and IP if available
+                setTimeout(() => {
+                    const messageInput = document.getElementById('messageInput');
+                    if (messageInput) {
+                        let message = 'Merhaba, IP adresim banlandı. Ödeme yapmak istiyorum.';
+                        if (username) {
+                            message += `\nKullanıcı adı olarak "${username}" kullanıyordum.`;
+                        }
+                        message += `\nIP adresim de budur: ${clientIP}`;
+                        messageInput.value = message;
+                        messageInput.focus();
+                    }
+                }, 500);
+            }
+        }
+    } catch (error) {
+        console.error('Error opening chat for blocked IP:', error);
+    }
+}
+
 async function openChatWithUsernameForTrialExpired(username) {
     // Store username temporarily for chat system
     localStorage.setItem('tempChatUser', username);
@@ -669,8 +806,4 @@ async function openChatWithUsernameForTrialExpired(username) {
 }
 
 // Export functions for use in other pages
-window.authUtils = {
-    checkAuth,
-    logout,
-    getClientIP
-};
+// window.authUtils already defined above

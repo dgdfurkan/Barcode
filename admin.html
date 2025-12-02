@@ -12,6 +12,19 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
+        
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top-color: #9333ea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -116,6 +129,15 @@
                     </button>
                     <button class="tab-button py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="ipAnalysis">
                         IP Analizi
+                    </button>
+                    <button class="tab-button py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="updates">
+                        📢 Güncellemeler
+                    </button>
+                    <button class="tab-button py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="config">
+                        ⚙️ Config
+                    </button>
+                    <button class="tab-button py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="product-import">
+                        📦 Ürün İçe Aktarma
                     </button>
                     <button class="tab-button py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="settings">
                         Ayarlar
@@ -515,6 +537,41 @@
                                 </div>
                             </div>
 
+                            <!-- 🔒 Engellenen IP'ler Bölümü -->
+                            <div class="mb-8">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h5 class="text-lg font-semibold text-gray-900">🔒 Engellenen IP'ler</h5>
+                                    <div class="flex items-center space-x-2">
+                                        <button id="refreshBlockedIPsBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm flex items-center space-x-1">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                            </svg>
+                                            <span>Yenile</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                                    <div class="overflow-x-auto">
+                                        <table class="min-w-full divide-y divide-gray-200">
+                                            <thead class="bg-red-50">
+                                                <tr>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">IP Adresi</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">İlgili Kullanıcı(lar)</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Banlanma Tarihi</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Son Görülme</th>
+                                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">İşlemler</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="blockedIPsTableBody" class="bg-white divide-y divide-gray-200">
+                                                <tr>
+                                                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">Yükleniyor...</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- IP Tracking Table -->
                             <div class="overflow-x-auto">
                                 <table class="min-w-full divide-y divide-gray-200">
@@ -605,7 +662,359 @@
                     </div>
                 </div>
 
+                <!-- Updates Tab -->
+                <div id="updates-tab" class="tab-content hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-medium text-gray-900">Güncelleme Yönetimi</h3>
+                        <button id="createUpdateBtn" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-md">
+                            ✨ Yeni Güncelleme
+                        </button>
+                    </div>
+                    
+                    <!-- Updates List -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+                        <div class="p-4 border-b border-gray-200">
+                            <div class="flex items-center justify-between">
+                                <h4 class="text-md font-semibold text-gray-900">Geçmiş Güncellemeler</h4>
+                                <div class="flex items-center space-x-2">
+                                    <select id="updateFilter" class="border border-gray-300 rounded-md px-3 py-1 text-sm">
+                                        <option value="all">Tümü</option>
+                                        <option value="active">Aktif</option>
+                                        <option value="inactive">Pasif</option>
+                                    </select>
+                                    <button id="refreshUpdatesBtn" class="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
+                                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                        </svg>
+                                        Yenile
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Güncelleme No</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Başlık</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Zamanlama</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Görüntülenme</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="updatesTable" class="bg-white divide-y divide-gray-200">
+                                    <tr>
+                                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">Güncellemeler yükleniyor...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Settings Tab -->
+                <div id="config-tab" class="tab-content hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="text-lg font-medium text-gray-900">Sistem Özellikleri (Config)</h3>
+                            <p class="text-sm text-gray-600 mt-1">Canlı sistem özelliklerini görüntüleyin ve düzenleyin</p>
+                        </div>
+                        <button id="refreshConfigBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                            🔄 Yenile
+                        </button>
+                    </div>
+                    
+                    <!-- Arama ve Filtreleme -->
+                    <div class="mb-4">
+                        <input type="text" id="configSearchInput" placeholder="Özellik adı veya key ile ara..." 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    
+                    <!-- Config Tablosu -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Feature Key</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ad</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tip</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Default Değer</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Güncel Değer</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Son Değişiklik</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gelecek Güncelleme</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="configTableBody" class="bg-white divide-y divide-gray-200">
+                                    <!-- Config data will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Product Import Tab -->
+                <div id="product-import-tab" class="tab-content hidden">
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-2">Ürün İçe Aktarma</h3>
+                        <p class="text-sm text-gray-600">HTML tablo formatındaki ürün verilerini analiz edin ve products.json'a ekleyin</p>
+                    </div>
+
+                    <!-- Getir API Product Export -->
+                    <div class="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6 mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="text-md font-semibold text-gray-900 mb-1">🚀 Getir API'den Tüm Ürünleri Çek</h4>
+                                <p class="text-sm text-gray-600">Getir API'den tüm ürünleri çekip products.json formatına dönüştürün</p>
+                            </div>
+                            <button id="fetchAllProductsBtn" class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 py-3 rounded-lg text-sm font-medium shadow-md flex items-center space-x-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                </svg>
+                                <span>Ürünleri Çek</span>
+                            </button>
+                        </div>
+                        <div id="fetchProgress" class="hidden mt-4">
+                            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-sm font-medium text-gray-700">İlerleme</span>
+                                    <span id="fetchProgressText" class="text-sm text-gray-600">Başlatılıyor...</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div id="fetchProgressBar" class="bg-purple-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="fetchResults" class="hidden mt-4">
+                            <div class="bg-white rounded-lg p-4 border border-gray-200">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="text-sm font-semibold text-gray-900">Çekilen Ürünler</span>
+                                    <div class="flex space-x-2">
+                                        <button id="downloadProductsJSONBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                                            💾 JSON İndir
+                                        </button>
+                                        <button id="analyzeFetchedProductsBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                                            🔍 Eksik Ürünleri Bul
+                                        </button>
+                                    </div>
+                                </div>
+                                <p id="fetchResultsText" class="text-sm text-gray-600"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Warehouse Shelf Label Export -->
+                    <div class="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6 mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="text-md font-semibold text-gray-900 mb-1">🏷️ Warehouse Raf Etiketlerini Çek</h4>
+                                <p class="text-sm text-gray-600">Warehouse.getir.com sitesinden raf etiketlerini çekip JSON formatında indirin</p>
+                            </div>
+                            <button id="fetchShelfLabelsBtn" class="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-lg text-sm font-medium shadow-md flex items-center space-x-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                </svg>
+                                <span>Raf Etiketlerini Çek</span>
+                            </button>
+                        </div>
+                        <div id="shelfLabelProgress" class="hidden mt-4">
+                            <div class="bg-white rounded-lg p-4 border border-green-200">
+                                <div class="flex items-center space-x-3 mb-2">
+                                    <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
+                                    <span class="text-sm font-medium text-gray-700">Çekiliyor...</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+                                    <div id="shelfLabelProgressBar" class="bg-green-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                                </div>
+                                <div id="shelfLabelProgressText" class="text-xs text-gray-600"></div>
+                            </div>
+                        </div>
+                        <div id="shelfLabelResults" class="hidden mt-4">
+                            <div class="bg-white rounded-lg p-4 border border-green-200">
+                                <div id="shelfLabelResultsText" class="text-sm text-gray-700 mb-3"></div>
+                                <div class="flex space-x-2">
+                                    <button id="downloadShelfLabelsBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                        📥 JSON Olarak İndir
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Manuel Dosya Yükleme -->
+                        <div class="mt-4 bg-white rounded-lg p-4 border border-green-200">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">📁 Manuel Raf Etiketi Dosyası Yükle</label>
+                            <div class="flex items-center space-x-3">
+                                <input type="file" id="manualShelfLabelFileInput" accept=".json" class="hidden">
+                                <button id="selectManualShelfLabelBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm">
+                                    📁 Dosya Seç
+                                </button>
+                                <span id="manualShelfLabelFileName" class="text-sm text-gray-600">JSON dosyası seçin</span>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2">Manuel olarak yüklediğiniz dosyayı products.json ile karşılaştırabilirsiniz.</p>
+                            
+                            <!-- Karşılaştır Butonu (Her zaman görünür) -->
+                            <div class="mt-4 pt-4 border-t border-gray-200">
+                                <button id="compareShelfLabelsBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                    🔍 Products.json ile Karşılaştır
+                                </button>
+                                <p class="text-xs text-gray-500 mt-2 text-center">
+                                    Yüklediğiniz raf etiketi dosyasını veya çekilen verileri products.json ile karşılaştırmak için tıklayın.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Karşılaştırma Sonuçları (Sayfanın Altında) -->
+                    <div id="shelfLabelComparisonResults" class="hidden mt-6 bg-white rounded-lg p-6 border border-blue-300 shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-semibold text-gray-900">🔍 Karşılaştırma Sonuçları</h3>
+                            <button id="closeComparisonResultsBtn" class="text-gray-500 hover:text-gray-700">
+                                ✕
+                            </button>
+                        </div>
+                        <div id="comparisonStats" class="mb-4 p-3 bg-blue-50 rounded-lg">
+                            <div class="grid grid-cols-3 gap-4 text-sm">
+                                <div>
+                                    <span class="font-medium">✅ Mevcut Ürünler:</span>
+                                    <span id="comparisonExistingCount" class="ml-2 text-blue-600">0</span>
+                                </div>
+                                <div>
+                                    <span class="font-medium">📋 Çekilen Ürünler:</span>
+                                    <span id="comparisonTotalCount" class="ml-2 text-blue-600">0</span>
+                                </div>
+                                <div>
+                                    <span class="font-medium">🔍 Eksik Ürünler:</span>
+                                    <span id="comparisonMissingCount" class="ml-2 text-red-600 font-bold">0</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-4 flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <button id="selectAllMissingBtn" class="text-sm text-blue-600 hover:text-blue-800">Tümünü Seç</button>
+                                <span class="text-gray-400">|</span>
+                                <button id="deselectAllMissingBtn" class="text-sm text-blue-600 hover:text-blue-800">Tümünü Kaldır</button>
+                            </div>
+                            <button id="addSelectedProductsBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg text-sm font-medium">
+                                📥 Seçili Ürünleri JSON İndir
+                            </button>
+                        </div>
+                        <div id="missingProductsList" class="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
+                            <!-- Eksik ürünler buraya eklenecek -->
+                        </div>
+                    </div>
+
+                    <!-- Products.json File Loader -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Products.json Dosyası</label>
+                        <div class="flex items-center space-x-3">
+                            <input type="file" id="productsJsonFileInput" accept=".json" class="hidden">
+                            <button id="selectProductsJsonBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+                                📁 Dosya Seç
+                            </button>
+                            <span id="productsJsonFileName" class="text-sm text-gray-600">products.json dosyasını seçin (ilk kullanım için gerekli)</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">Not: Dosya seçildikten sonra otomatik yüklenecektir.</p>
+                    </div>
+
+                    <!-- HTML Table Paste Area -->
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">HTML Tablo Verisi</label>
+                        <textarea id="htmlTableInput" rows="10" class="w-full border border-gray-300 rounded-md p-3 font-mono text-sm" placeholder="HTML tablo verisini buraya yapıştırın..."></textarea>
+                        <div class="mt-3 flex space-x-3">
+                            <button id="analyzeProductsBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium">
+                                🔍 Analiz Et
+                            </button>
+                            <button id="clearInputBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-lg text-sm">
+                                Temizle
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Analysis Results -->
+                    <div id="analysisResults" class="hidden mb-6">
+                        <div class="bg-white rounded-lg shadow p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="text-md font-medium text-gray-900">Analiz Sonuçları</h4>
+                                <div class="flex space-x-2">
+                                    <button id="selectAllNewBtn" class="text-sm text-blue-600 hover:text-blue-800">Tümünü Seç</button>
+                                    <button id="deselectAllBtn" class="text-sm text-gray-600 hover:text-gray-800">Seçimi Kaldır</button>
+                                </div>
+                            </div>
+                            <div class="mb-4 flex space-x-4 text-sm">
+                                <span class="text-green-600 font-medium" id="newProductsCount">0 yeni ürün</span>
+                                <span class="text-yellow-600 font-medium" id="existingProductsCount">0 zaten var</span>
+                                <span class="text-red-600 font-medium" id="errorProductsCount">0 hata</span>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                <input type="checkbox" id="selectAllCheckbox" class="rounded">
+                                            </th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ürün Adı</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Barkod</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marka</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="analysisResultsBody" class="bg-white divide-y divide-gray-200">
+                                        <!-- Results will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-4 flex justify-between items-center">
+                                <div class="flex space-x-2">
+                                    <button id="exportAllProductsBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg text-sm font-medium">
+                                        💾 Tümünü Dışa Aktar (JSON)
+                                    </button>
+                                    <button id="clearAllResultsBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                                        🗑️ Tümünü Temizle
+                                    </button>
+                                </div>
+                                <button id="addSelectedProductsBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg text-sm font-medium">
+                                    ✅ Seçili Ürünleri Hafızaya Ekle
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Barcode Search -->
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h4 class="text-md font-medium text-gray-900 mb-4">Barkod Arama</h4>
+                        <div class="mb-4">
+                            <input type="text" id="barcodeSearchInput" placeholder="Barkod numarasını girin..." class="w-full border border-gray-300 rounded-md px-4 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div id="barcodeSearchResults" class="hidden">
+                            <div class="text-sm text-gray-600 mb-2">
+                                <span id="searchResultsCount">0</span> sonuç bulundu
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ürün Adı</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Barkod</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Varyant</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Kategori</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marka</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="barcodeSearchResultsBody" class="bg-white divide-y divide-gray-200">
+                                        <!-- Search results will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="barcodeSearchNoResults" class="hidden text-center py-8 text-gray-500">
+                            Sonuç bulunamadı
+                        </div>
+                    </div>
+                </div>
+
                 <div id="settings-tab" class="tab-content hidden">
                     <h3 class="text-lg font-medium text-gray-900 mb-4">Sistem Ayarları</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -632,6 +1041,36 @@
                                 <div class="flex items-center">
                                     <input type="checkbox" id="enableTrialExpiry" checked class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                                     <label class="ml-2 block text-sm text-gray-900">Test Süresi Kontrolü</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-medium text-gray-900 mb-2">AI Ayarları</h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Gemini API Key</label>
+                                    <input type="password" id="geminiApiKey" placeholder="AI-za..." class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <p class="text-xs text-gray-500 mt-1">Gemini AI ile otomatik güncelleme oluşturmak için gerekli</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h4 class="font-medium text-gray-900 mb-2">Cloudinary Ayarları</h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Cloud Name</label>
+                                    <input type="text" id="cloudinaryCloudName" placeholder="dxyz1234" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <p class="text-xs text-gray-500 mt-1">Cloudinary dashboard'dan alınan cloud name</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">API Key <span class="text-gray-400 text-xs">(Opsiyonel)</span></label>
+                                    <input type="text" id="cloudinaryApiKey" placeholder="123456789012345" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <p class="text-xs text-gray-500 mt-1">Unsigned upload preset kullanıyorsan gerekli değil</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Upload Preset</label>
+                                    <input type="text" id="cloudinaryUploadPreset" placeholder="updates_media" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                                    <p class="text-xs text-gray-500 mt-1">Unsigned upload preset ismi (Settings > Upload > Upload presets)</p>
                                 </div>
                             </div>
                         </div>
@@ -885,7 +1324,232 @@
         </div>
     </div>
 
+    <!-- Create/Edit Update Modal -->
+    <div id="updateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden overflow-y-auto">
+        <div class="bg-white rounded-xl p-6 max-w-4xl w-full mx-4 my-8 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-3">
+                    <h3 class="text-xl font-semibold text-gray-900" id="updateModalTitle">Yeni Güncelleme</h3>
+                    <button type="button" id="openGeminiModalBtn" class="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg text-sm font-medium transition-all shadow-md hover:shadow-lg">
+                        <span>✨</span>
+                        <span>Gemini ile Oluştur</span>
+                    </button>
+                </div>
+                <button id="closeUpdateModal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="updateForm" class="space-y-6">
+                <!-- Basic Info -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Güncelleme Numarası *</label>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-gray-700 font-semibold text-lg">v</span>
+                            <input type="number" id="updateNumberMajor" min="0" required class="w-20 border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-center" placeholder="1">
+                            <span class="text-gray-700 font-semibold text-lg">.</span>
+                            <input type="number" id="updateNumberMinor" min="0" required class="w-20 border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-center" placeholder="0">
+                            <span class="text-gray-700 font-semibold text-lg">.</span>
+                            <input type="number" id="updateNumberPatch" min="0" required class="w-20 border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500 text-center" placeholder="0">
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Bir sonraki versiyon otomatik önerilir</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Zamanlama</label>
+                        <input type="datetime-local" id="updateScheduledAt" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                        <p class="text-xs text-gray-500 mt-1">Boş bırakılırsa hemen aktif olur</p>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Başlık *</label>
+                    <input type="text" id="updateTitle" required class="w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500" placeholder="Yeni özellikler eklendi!">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Kısa Açıklama</label>
+                    <textarea id="updateDescription" rows="2" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500" placeholder="Bu güncellemede neler var?"></textarea>
+                </div>
+                
+                <!-- Feature Changes Section -->
+                <div class="border-t border-gray-200 pt-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="block text-sm font-medium text-gray-700">Özellik Değişiklikleri</label>
+                        <button type="button" id="addFeatureChangeBtn" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm">
+                            + Özellik Ekle
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-3">Bu güncelleme ile aktif edilecek/pasif edilecek özellikler</p>
+                    <div id="featureChangesContainer" class="space-y-3">
+                        <!-- Feature changes will be added here -->
+                    </div>
+                </div>
+                
+                <!-- Steps Management -->
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="block text-sm font-medium text-gray-700">Adımlar *</label>
+                        <button type="button" id="addStepBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm">
+                            + Adım Ekle
+                        </button>
+                    </div>
+                    <div id="stepsContainer" class="space-y-4">
+                        <!-- Steps will be added here -->
+                    </div>
+                </div>
+                
+                <!-- Actions -->
+                <div class="flex justify-end space-x-3 pt-4 border-t">
+                    <button type="button" id="previewUpdateBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                        👁️ Önizleme
+                    </button>
+                    <button type="button" id="cancelUpdateBtn" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+                        İptal
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700">
+                        💾 Kaydet
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div id="previewContent">
+            <!-- Preview content will be rendered here -->
+        </div>
+    </div>
+
+    <!-- Gemini Input Modal -->
+    <div id="geminiInputModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] hidden">
+        <div class="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-semibold text-gray-900 flex items-center space-x-2">
+                    <span>✨</span>
+                    <span>Gemini AI ile Güncelleme Oluştur</span>
+                </h3>
+                <button id="closeGeminiModal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Güncelleme İçeriği</label>
+                    <textarea 
+                        id="geminiInputText" 
+                        rows="8" 
+                        class="w-full border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500" 
+                        placeholder="Örnek: Yeni barkod arama özelliği eklendi. Kullanıcılar artık ürün adına göre arama yapabilir. Ayrıca QR kod görüntüleme modu eklendi ve performans iyileştirmeleri yapıldı."></textarea>
+                    <p class="text-xs text-gray-500 mt-1">Yaptığınız değişiklikleri, eklediğiniz özellikleri veya düzelttiğiniz hataları kısaca açıklayın.</p>
+                </div>
+                
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 class="text-sm font-medium text-blue-900 mb-2">💡 Örnek Metin:</h4>
+                    <p class="text-xs text-blue-800 italic">
+                        "Yeni barkod arama özelliği eklendi. Kullanıcılar artık ürün adına göre arama yapabilir. 
+                        Ayrıca QR kod görüntüleme modu eklendi ve performans iyileştirmeleri yapıldı. 
+                        Hata düzeltmeleri: Login sayfasındaki hata mesajları düzeltildi."
+                    </p>
+                </div>
+                
+                <div id="geminiLoadingState" class="hidden">
+                    <div class="flex items-center justify-center space-x-3 py-4">
+                        <div class="spinner border-4 border-purple-200 border-t-purple-600 rounded-full w-8 h-8 animate-spin"></div>
+                        <span class="text-sm text-gray-600">AI güncellemeyi oluşturuyor...</span>
+                    </div>
+                </div>
+                
+                <div id="geminiErrorState" class="hidden bg-red-50 border border-red-200 rounded-lg p-4">
+                    <p class="text-sm text-red-800" id="geminiErrorText"></p>
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-4 border-t">
+                    <button type="button" id="cancelGeminiBtn" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+                        İptal
+                    </button>
+                    <button type="button" id="generateGeminiBtn" class="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700">
+                        ✨ Oluştur
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Feature Modal -->
+    <div id="editFeatureModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900" id="editFeatureModalTitle">Özellik Düzenle</h3>
+                    <button id="closeEditFeatureModal" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <form id="editFeatureForm">
+                    <input type="hidden" id="editFeatureKey" />
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Feature Key</label>
+                        <input type="text" id="editFeatureKeyDisplay" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly />
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Özellik Adı</label>
+                        <input type="text" id="editFeatureName" class="w-full px-3 py-2 border border-gray-300 rounded-md" readonly />
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Değer Tipi</label>
+                        <input type="text" id="editFeatureType" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" readonly />
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Açıklama</label>
+                        <textarea id="editFeatureDescription" class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50" rows="2" readonly></textarea>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Default Değer</label>
+                        <div id="editDefaultValueContainer">
+                            <!-- Dynamic input based on value type -->
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Güncel Değer</label>
+                        <div id="editCurrentValueContainer">
+                            <!-- Dynamic input based on value type -->
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button type="button" id="cancelEditFeature" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors">
+                            İptal
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                            Kaydet
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script src="js/auth.js"></script>
     <script src="js/admin.js"></script>
+    <script src="js/feature-definitions.js"></script>
+    <script src="js/feature-manager.js"></script>
+    <script src="js/admin-updates.js"></script>
+    <script src="js/admin-product-importer.js"></script>
 </body>
 </html>

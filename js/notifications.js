@@ -52,15 +52,22 @@ class NotificationSystem {
                     table: 'users',
                     filter: `username=eq.${this.currentUser.username}`
                 }, (payload) => {
-                    console.log('🔔 Premium features update received:', payload);
+                    console.log('🔔 Premium features update received via Realtime:', payload);
                     this.handlePremiumFeaturesUpdate(payload);
                 })
                 .subscribe((status) => {
                     console.log('🔔 Subscription status:', status);
                     if (status === 'SUBSCRIBED') {
                         console.log('✅ Premium features realtime subscription established');
-                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                        console.warn('⚠️ Realtime subscription failed, falling back to polling');
+                        // Realtime çalışıyor, ama yine de polling'i backup olarak başlat
+                        // (Realtime bazen gecikebilir veya kaçırabilir)
+                        this.setupPollingFallback();
+                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                        console.warn('⚠️ Realtime subscription failed, falling back to polling only');
+                        this.setupPollingFallback();
+                    } else {
+                        console.log('⏳ Realtime subscription pending:', status);
+                        // Pending durumunda da polling'i başlat (güvenlik için)
                         this.setupPollingFallback();
                     }
                 });
@@ -77,10 +84,14 @@ class NotificationSystem {
         // Load initial state
         this.loadInitialPremiumFeatures();
         
-        // Poll every 2 seconds for faster response
+        // Polling aktif - Realtime çalışmazsa veya gecikirse polling ile kontrol et
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+        }
+        
         this.pollingInterval = setInterval(async () => {
             await this.checkPremiumFeaturesChanges();
-        }, 2000);
+        }, 3000); // Her 3 saniyede bir kontrol et
     }
 
     // Load initial premium features state
@@ -125,47 +136,25 @@ class NotificationSystem {
             const currentFeatures = data.premium_features || {};
             const oldFeatures = this.lastKnownFeatures || {};
             
-            // If lastKnownFeatures is null or empty on first check, set it and don't show notification
-            // This prevents showing notification on initial page load
-            if (!oldFeatures || Object.keys(oldFeatures).length === 0) {
-                console.log('📋 Initial premium features loaded, not showing notification');
-                this.lastKnownFeatures = currentFeatures;
-                if (window.premiumFeatures) {
-                    window.premiumFeatures.premiumFeatures = currentFeatures;
-                }
-                // Mark all currently enabled features as already shown to prevent future notifications
-                const enabledFeatureKeys = Object.keys(currentFeatures).filter(key => currentFeatures[key] === true);
-                if (enabledFeatureKeys.length > 0) {
-                    const enabledFeaturesArray = enabledFeatureKeys.map(key => ({ name: key, enabled: true }));
-                    this.markNotificationAsShown(enabledFeaturesArray);
-                }
-                return;
-            }
-            
-            // Detect changes only if we have previous state
+            // Değişiklik var mı kontrol et
             const changedFeatures = this.detectFeatureChanges(oldFeatures, currentFeatures);
             
             if (changedFeatures.length > 0) {
-                console.log('📢 Premium features changed (polling):', changedFeatures);
+                console.log('🔔 Premium features changed (via polling):', changedFeatures);
                 
-                // Update cache FIRST before showing notification
+                // Cache'i güncelle
                 this.lastKnownFeatures = currentFeatures;
                 if (window.premiumFeatures) {
                     window.premiumFeatures.premiumFeatures = currentFeatures;
                 }
                 
-                // Clear keyboard shortcuts cache if keyboardShortcuts feature changed
-                const keyboardShortcutsChanged = changedFeatures.some(f => f.name === 'keyboardShortcuts');
-                if (keyboardShortcutsChanged) {
-                    this.clearKeyboardShortcutsCache();
-                }
-                
-                // Handle changes
-                const enabledFeatures = changedFeatures.filter(f => f.enabled);
-                const disabledFeatures = changedFeatures.filter(f => !f.enabled);
-                
-                if (enabledFeatures.length > 0 || disabledFeatures.length > 0) {
-                    this.showPremiumFeaturesNotification(changedFeatures);
+                // Bildirim göster
+                this.showPremiumFeaturesNotification(changedFeatures);
+            } else {
+                // Değişiklik yok, sadece cache'i güncelle
+                this.lastKnownFeatures = currentFeatures;
+                if (window.premiumFeatures) {
+                    window.premiumFeatures.premiumFeatures = currentFeatures;
                 }
             }
         } catch (error) {
@@ -179,40 +168,45 @@ class NotificationSystem {
             return;
         }
 
-        const oldFeatures = payload.old?.premium_features || this.lastKnownFeatures || {};
         const newFeatures = payload.new.premium_features || {};
+        const oldFeatures = payload.old?.premium_features || this.lastKnownFeatures || {};
 
-        // Check if any features changed (only show if there's a real change)
+        // Detect which features changed
         const changedFeatures = this.detectFeatureChanges(oldFeatures, newFeatures);
         
-        if (changedFeatures.length > 0) {
-            console.log('📢 Premium features changed (realtime):', changedFeatures);
-            
-            // Store changed features for later use
-            this.lastChangedFeatures = changedFeatures;
-            
-            // Update cache FIRST before showing notification
+        if (changedFeatures.length === 0) {
+            console.log('📋 No feature changes detected');
+            // Still update cache
             this.lastKnownFeatures = newFeatures;
             if (window.premiumFeatures) {
                 window.premiumFeatures.premiumFeatures = newFeatures;
             }
-
-            // Clear keyboard shortcuts cache if keyboardShortcuts feature changed
-            const keyboardShortcutsChanged = changedFeatures.some(f => f.name === 'keyboardShortcuts');
-            if (keyboardShortcutsChanged) {
-                this.clearKeyboardShortcutsCache();
-            }
-            
-            // Clear feature preferences cache if any feature was disabled
-            const anyDisabled = changedFeatures.some(f => f.newStatus === false);
-            if (anyDisabled && window.premiumFeatures) {
-                window.premiumFeatures.clearCache();
-                console.log('🧹 Feature preferences cache cleared (admin disabled features)');
-            }
-
-            // Show notification (enabled features: modal, disabled features: reload page)
-            this.showPremiumFeaturesNotification(changedFeatures);
+            return;
         }
+
+        console.log('🔔 Premium features changed:', changedFeatures);
+
+        // Update cache
+        this.lastKnownFeatures = newFeatures;
+        if (window.premiumFeatures) {
+            window.premiumFeatures.premiumFeatures = newFeatures;
+        }
+
+        // Clear keyboard shortcuts cache if keyboardShortcuts feature changed
+        const keyboardShortcutsChanged = changedFeatures.some(f => f.name === 'keyboardShortcuts');
+        if (keyboardShortcutsChanged) {
+            this.clearKeyboardShortcutsCache();
+        }
+        
+        // Clear feature preferences cache if any feature was disabled
+        const anyDisabled = changedFeatures.some(f => f.newValue === false);
+        if (anyDisabled && window.premiumFeatures) {
+            window.premiumFeatures.clearCache();
+            console.log('🧹 Feature preferences cache cleared (admin disabled features)');
+        }
+
+        // Show notification for feature changes
+        this.showPremiumFeaturesNotification(changedFeatures);
     }
     
     // Clear keyboard shortcuts cache
@@ -234,8 +228,8 @@ class NotificationSystem {
     detectFeatureChanges(oldFeatures, newFeatures) {
         const changed = [];
         const allFeatureNames = new Set([
-            ...Object.keys(oldFeatures),
-            ...Object.keys(newFeatures)
+            ...Object.keys(oldFeatures || {}),
+            ...Object.keys(newFeatures || {})
         ]);
 
         allFeatureNames.forEach(featureName => {
@@ -664,19 +658,33 @@ class NotificationSystem {
 // Global notification system instance
 window.notificationSystem = new NotificationSystem();
 
-// Initialize when auth is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
+// Initialize when auth is ready (aggressive initialization like update-notifications.js)
+async function initializeNotificationSystem() {
+    // Wait for auth to be ready (max 10 seconds)
+    let attempts = 0;
+    const maxAttempts = 20; // 20 * 500ms = 10 seconds
+    
+    const checkAuth = setInterval(() => {
+        attempts++;
+        
         if (window.authUtils?.checkAuth()) {
+            clearInterval(checkAuth);
+            console.log('✅ Auth ready, initializing NotificationSystem...');
             window.notificationSystem.init();
-        }
-    });
-} else {
-    // Already loaded, check if user is authenticated
-    setTimeout(() => {
-        if (window.authUtils?.checkAuth()) {
+        } else if (attempts >= maxAttempts) {
+            clearInterval(checkAuth);
+            console.warn('⚠️ Auth not ready after 10 seconds, initializing anyway...');
+            // Try to init anyway - maybe auth will be ready later
             window.notificationSystem.init();
         }
     }, 500);
+}
+
+// Start initialization immediately
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeNotificationSystem);
+} else {
+    // DOM already loaded, start immediately
+    initializeNotificationSystem();
 }
 

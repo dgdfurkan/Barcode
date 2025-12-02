@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "Getir Stock Bot Token Provider",
+  "version": "1.0.0",
+  "description": "Getir franchise token'ını Python bot'a sağlar",
+  "permissions": [
+    "storage",
+    "tabs",
+    "webRequest",
+    "scripting",
+    "management",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://franchise.getir.com/*",
+    "https://franchise-api-gateway.getirapi.com/*",
+    "https://warehouse.getir.com/*",
+    "https://warehouse-panel-api-gateway.getirapi.com/*",
+    "https://stockid.getirapi.com/*",
+    "wss://warehouse-panel-api-gateway.getirapi.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://franchise.getir.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://warehouse.getir.com/*"],
+      "js": ["warehouse_content.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"],
+      "js": ["admin_panel_inject.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "warehouse_injected.js"
+      ],
+      "matches": [
+        "https://warehouse.getir.com/*"
+      ]
+    },
+    {
+      "resources": [
+        "franchise_injected.js"
+      ],
+      "matches": [
+        "https://franchise.getir.com/*"
+      ]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Getir Stock Bot"
+  },
+  "externally_connectable": {
+    "matches": [
+      "http://localhost/*",
+      "http://127.0.0.1/*",
+      "https://*/*"
+    ]
+  }
+}
+

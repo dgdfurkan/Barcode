@@ -12,6 +12,8 @@
     <link rel="stylesheet" href="../css/main.css" />
     <link rel="stylesheet" href="../css/tailwind.css" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- QR Code Library - Using QRCode.js (more reliable) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onload="console.log('✅ QRCode.js library loaded')" onerror="console.error('❌ QRCode.js failed to load')"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="temp_products.js"></script>
@@ -20,7 +22,321 @@
     <script src="../js/user-manager.js"></script>
     <script src="../js/premium-features.js"></script>
     <script src="../js/notifications.js"></script>
+    <script src="../js/feature-definitions.js"></script>
+    <script src="../js/feature-manager.js"></script>
+    <script src="../js/feature-checker.js"></script>
+    <script src="../js/update-notifications.js"></script>
+    <script src="../js/ip-ban-checker.js"></script>
+    <script src="../js/changelog.js"></script>
     <script>
+        // ===== SCAN EFFECT VISIBILITY FUNCTION - MUST BE DEFINED BEFORE feature-manager.js LOADS =====
+        // Load and update scan effect visibility (DEFINED AT TOP LEVEL SO IT'S ALWAYS AVAILABLE)
+        // Cache mekanizması: localStorage'da cache tut, Supabase'den güncelle
+        async function loadScanEffectVisibility() {
+            try {
+                const scanEffectContainer = document.getElementById('scanEffectContainer');
+                if (!scanEffectContainer) {
+                    console.warn('⚠️ [SCAN] scanEffectContainer not found');
+                    return;
+                }
+                
+                console.log('🔄 [SCAN] Loading scan effect visibility...');
+                
+                // ÖNCE: localStorage'dan cache'den oku (flash of incorrect content önlemek için)
+                const CACHE_KEY = 'scan_effect_visible_cache';
+                const CACHE_TIMESTAMP_KEY = 'scan_effect_visible_cache_timestamp';
+                const CACHE_DURATION = 5 * 60 * 1000; // 5 dakika
+                
+                let isVisible = true; // Default to visible
+                let useCache = false;
+                let cachedValue = null; // Cache değerini fonksiyon başında tanımla
+                
+                // Cache kontrolü
+                try {
+                    cachedValue = localStorage.getItem(CACHE_KEY);
+                    const cacheTimestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+                    
+                    if (cachedValue !== null && cacheTimestamp !== null) {
+                        const cacheAge = Date.now() - parseInt(cacheTimestamp);
+                        if (cacheAge < CACHE_DURATION) {
+                            // Cache geçerli, kullan
+                            isVisible = cachedValue === 'true';
+                            useCache = true;
+                            console.log('📦 [SCAN] Using cached value:', isVisible, '(age:', Math.round(cacheAge / 1000), 'seconds)');
+                            
+                            // Hemen UI'ı güncelle (cache'den)
+                            if (isVisible) {
+                                scanEffectContainer.classList.remove('hidden');
+                                scanEffectContainer.style.display = 'flex';
+                            } else {
+                                scanEffectContainer.classList.add('hidden');
+                                scanEffectContainer.style.display = 'none';
+                            }
+                        } else {
+                            console.log('⏰ [SCAN] Cache expired, fetching from Supabase...');
+                        }
+                    }
+                } catch (error) {
+                    console.warn('⚠️ [SCAN] Error reading cache:', error);
+                }
+                
+                // SONRA: Supabase'den güncel değeri al (cache kullanılsa bile güncelle)
+                try {
+                    // Clear feature manager cache first
+                    if (window.featureManager) {
+                        window.featureManager.featuresCache = null;
+                        window.featureManager.cacheTimestamp = null;
+                    }
+                    
+                    // Fetch DIRECTLY from Supabase
+                    if (window.supabase) {
+                        const { data, error } = await window.supabase
+                            .from('system_features')
+                            .select('current_value')
+                            .eq('feature_key', 'scan_effect_visible')
+                            .eq('is_active', true)
+                            .single();
+                        
+                        console.log('📡 [SCAN] Supabase query result:', { data, error, feature_key: 'scan_effect_visible' });
+                        
+                        if (error || !data) {
+                            console.warn('⚠️ [SCAN] scan_effect_visible not found in DB, using default value from feature-definitions');
+                            // Supabase'de veri yoksa, feature-definitions.js'den default değeri al
+                            const definition = window.getFeatureDefinition?.('scan_effect_visible');
+                            if (definition && definition.defaultValue !== undefined) {
+                                isVisible = definition.defaultValue === true;
+                                console.log('📋 [SCAN] Using default value from feature-definitions:', isVisible);
+                            } else {
+                                // Fallback: true (eğer definition da yoksa)
+                                isVisible = true;
+                                console.log('⚠️ [SCAN] No definition found, using fallback: true');
+                            }
+                            
+                            // ÖNEMLİ: Supabase'de veri yoksa, cache'deki eski değeri temizle ve default değeri kullan
+                            // Çünkü cache'deki değer eski bir güncellemeden kalma olabilir
+                            if (useCache && cachedValue !== null) {
+                                console.log('🧹 [SCAN] Clearing old cache value because Supabase has no data. Old cache:', cachedValue, 'New default:', isVisible);
+                                try {
+                                    localStorage.removeItem(CACHE_KEY);
+                                    localStorage.removeItem(CACHE_TIMESTAMP_KEY);
+                                } catch (e) {
+                                    console.warn('⚠️ [SCAN] Error clearing cache:', e);
+                                }
+                            }
+                            
+                            // UI'ı güncelle
+                            if (isVisible) {
+                                scanEffectContainer.classList.remove('hidden');
+                                scanEffectContainer.style.display = 'flex';
+                                console.log('✅ [SCAN] Scan effect shown (default value)');
+                            } else {
+                                scanEffectContainer.classList.add('hidden');
+                                scanEffectContainer.style.display = 'none';
+                                console.log('❌ [SCAN] Scan effect hidden (default value)');
+                            }
+                            
+                            // Cache'i default değere göre güncelle
+                            try {
+                                localStorage.setItem(CACHE_KEY, isVisible ? 'true' : 'false');
+                                localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+                                console.log('💾 [SCAN] Cache updated with default value');
+                            } catch (error) {
+                                console.warn('⚠️ [SCAN] Error updating cache:', error);
+                            }
+                        } else {
+                            // Supabase'den veri geldi, her zaman Supabase'deki değeri kullan
+                            const supabaseValue = data.current_value === true || data.current_value === 'true' || data.current_value === 1;
+                            
+                            // ÖNEMLİ: Cache'deki eski değer ne olursa olsun, Supabase'deki değeri kullan
+                            isVisible = supabaseValue;
+                            
+                            console.log('🔄 [SCAN] Using Supabase value (ignoring cache). Supabase value:', supabaseValue, 'Raw value:', data.current_value, 'Type:', typeof data.current_value, 'Previous cache:', cachedValue);
+                            
+                            // UI'ı her zaman güncelle (Supabase'deki değere göre)
+                            if (isVisible) {
+                                scanEffectContainer.classList.remove('hidden');
+                                scanEffectContainer.style.display = 'flex';
+                                console.log('✅ [SCAN] Scan effect shown (from Supabase)');
+                            } else {
+                                scanEffectContainer.classList.add('hidden');
+                                scanEffectContainer.style.display = 'none';
+                                console.log('❌ [SCAN] Scan effect hidden (from Supabase)');
+                            }
+                            
+                            // Cache'i her zaman Supabase'deki değere göre güncelle
+                            try {
+                                localStorage.setItem(CACHE_KEY, isVisible ? 'true' : 'false');
+                                localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+                                console.log('💾 [SCAN] Cache updated with Supabase value:', isVisible);
+                            } catch (error) {
+                                console.warn('⚠️ [SCAN] Error updating cache:', error);
+                            }
+                        }
+                    } else {
+                        console.warn('⚠️ [SCAN] Supabase not available, using cached or default value');
+                        if (!useCache) {
+                            // Supabase yoksa, feature-definitions.js'den default değeri al
+                            const definition = window.getFeatureDefinition?.('scan_effect_visible');
+                            if (definition && definition.defaultValue !== undefined) {
+                                isVisible = definition.defaultValue === true;
+                                console.log('📋 [SCAN] Using default value from feature-definitions (Supabase unavailable):', isVisible);
+                            } else {
+                                isVisible = true; // Fallback
+                            }
+                            
+                            // UI'ı güncelle
+                            if (isVisible) {
+                                scanEffectContainer.classList.remove('hidden');
+                                scanEffectContainer.style.display = 'flex';
+                            } else {
+                                scanEffectContainer.classList.add('hidden');
+                                scanEffectContainer.style.display = 'none';
+                            }
+                            
+                            // Cache'i default değere göre güncelle
+                            try {
+                                localStorage.setItem(CACHE_KEY, isVisible ? 'true' : 'false');
+                                localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+                                console.log('💾 [SCAN] Cache updated with default value (Supabase unavailable)');
+                            } catch (error) {
+                                console.warn('⚠️ [SCAN] Error updating cache:', error);
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ [SCAN] Error fetching scan effect visibility:', error);
+                    // On error, use cache or default from feature-definitions
+                    if (!useCache) {
+                        const definition = window.getFeatureDefinition?.('scan_effect_visible');
+                        if (definition && definition.defaultValue !== undefined) {
+                            isVisible = definition.defaultValue === true;
+                            console.log('📋 [SCAN] Using default value from feature-definitions (error occurred):', isVisible);
+                        } else {
+                            isVisible = true; // Fallback
+                        }
+                        
+                        // UI'ı güncelle
+                        if (isVisible) {
+                            scanEffectContainer.classList.remove('hidden');
+                            scanEffectContainer.style.display = 'flex';
+                        } else {
+                            scanEffectContainer.classList.add('hidden');
+                            scanEffectContainer.style.display = 'none';
+                        }
+                        
+                        // Cache'i default değere göre güncelle
+                        try {
+                            localStorage.setItem(CACHE_KEY, isVisible ? 'true' : 'false');
+                            localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+                            console.log('💾 [SCAN] Cache updated with default value (error occurred)');
+                        } catch (cacheError) {
+                            console.warn('⚠️ [SCAN] Error updating cache:', cacheError);
+                        }
+                    }
+                }
+                
+                console.log('🔍 [SCAN] Final scan effect visibility:', isVisible);
+            } catch (error) {
+                console.error('❌ [SCAN] Error loading scan effect visibility:', error);
+            }
+        }
+        
+        // Make function globally available IMMEDIATELY (before feature-manager.js loads)
+        window.loadScanEffectVisibility = loadScanEffectVisibility;
+        console.log('✅ [SCAN] loadScanEffectVisibility function defined and exposed to window');
+        
+        // Sayfa yüklendiğinde HEMEN cache'den oku ve UI'ı güncelle (setTimeout olmadan)
+        // Bu sayede kullanıcı adı gibi localStorage'dan hemen okunan veriler gibi, feature değeri de anında gösterilir
+        (function() {
+            // DOM hazır olana kadar bekle (ama çok kısa süre)
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    applyImmediateCache();
+                });
+            } else {
+                // DOM zaten hazır
+                applyImmediateCache();
+            }
+            
+            function applyImmediateCache() {
+                const scanEffectContainer = document.getElementById('scanEffectContainer');
+                if (scanEffectContainer) {
+                    // ÖNEMLİ: Cache'den okurken, Supabase'den veri gelene kadar beklemek yerine
+                    // önce default değeri kullan, sonra Supabase'den gelen değere göre güncelle
+                    // Bu sayede eski cache değerleri sorun yaratmaz
+                    const CACHE_KEY = 'scan_effect_visible_cache';
+                    const cachedValue = localStorage.getItem(CACHE_KEY);
+                    
+                    const definition = window.getFeatureDefinition?.('scan_effect_visible');
+                    let defaultVisible = true; // Fallback
+                    if (definition && definition.defaultValue !== undefined) {
+                        defaultVisible = definition.defaultValue === true;
+                    }
+                    
+                    // ÖNEMLİ: Cache'deki değeri kullanma, her zaman default değeri kullan
+                    // Eğer cache'deki değer default değerden farklıysa cache'i temizle
+                    // Supabase'den veri gelince doğru değer kullanılacak
+                    let isVisible = defaultVisible;
+                    if (cachedValue !== null) {
+                        const cachedVisible = cachedValue === 'true';
+                        if (cachedVisible !== defaultVisible) {
+                            // Cache'deki değer default değerden farklı, cache'i temizle
+                            console.log('🧹 [SCAN] Cache value (', cachedVisible, ') differs from default (', defaultVisible, '), clearing cache');
+                            try {
+                                localStorage.removeItem(CACHE_KEY);
+                                localStorage.removeItem('scan_effect_visible_cache_timestamp');
+                            } catch (e) {
+                                console.warn('⚠️ [SCAN] Error clearing cache:', e);
+                            }
+                        } else {
+                            console.log('⚡ [SCAN] Cache value matches default, keeping cache');
+                        }
+                        console.log('⚡ [SCAN] Using default value until Supabase confirms:', defaultVisible);
+                    } else {
+                        console.log('⚡ [SCAN] No cache found, using default from feature-definitions:', defaultVisible);
+                    }
+                    
+                    // Hemen UI'ı güncelle (default değerle)
+                    if (isVisible) {
+                        scanEffectContainer.classList.remove('hidden');
+                        scanEffectContainer.style.display = 'flex';
+                    } else {
+                        scanEffectContainer.classList.add('hidden');
+                        scanEffectContainer.style.display = 'none';
+                    }
+                    console.log('⚡ [SCAN] Immediate UI update (using default value, ignoring cache):', isVisible);
+                }
+            }
+        })();
+        
+        // ===== IP BAN CHECK FUNCTION =====
+        // IP Ban Check Function - Global scope'da hemen tanımlanmalı
+        window.checkIPBanStatus = async function() {
+            try {
+                const session = window.authUtils?.checkAuth();
+                if (!session || !session.clientIP || !window.ipBanChecker) {
+                    return;
+                }
+                
+                // Cache'i bypass et, her zaman güncel veriyi al (forceRefresh = true)
+                const ipBanStatus = await window.ipBanChecker.checkIPBanStatus(session.clientIP, true);
+                
+                if (ipBanStatus.isBlocked) {
+                    // Kullanıcının birden fazla IP ile giriş yapıp yapmadığını kontrol et
+                    const hasMultipleIPs = await window.ipBanChecker.checkUserHasMultipleIPs(session.username);
+                    
+                    if (hasMultipleIPs) {
+                        return; // Birden fazla IP varsa logout yapma
+                    }
+                    
+                    // Sadece bu IP ile giriş yapılmış, logout yap
+                    await window.ipBanChecker.checkAndLogoutBannedIP(session.clientIP);
+                }
+            } catch (error) {
+                console.error('❌ Error checking IP ban status:', error);
+            }
+        };
+        
         // Listen for navigation requests from bookmarklet
         if (typeof BroadcastChannel !== 'undefined') {
             const navChannel = new BroadcastChannel('barcode_site_nav');
@@ -119,6 +435,471 @@
                 clip-path: inset(0 0 0 0);
             }
         }
+
+        /* Anti-glare mode styles - Mat effect and glare prevention */
+        .anti-glare-mode .barcode-item {
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(8px) saturate(180%);
+            -webkit-backdrop-filter: blur(8px) saturate(180%);
+            filter: brightness(0.98) contrast(1.05);
+            -webkit-filter: brightness(0.98) contrast(1.05);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        }
+
+        .anti-glare-mode .barcode-visual,
+        .anti-glare-mode .barcode-visual img,
+        .anti-glare-mode .barcode-visual canvas,
+        .anti-glare-mode .barcode-visual svg {
+            filter: brightness(0.95) contrast(1.15) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+            -webkit-filter: brightness(0.95) contrast(1.15) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            image-rendering: pixelated;
+        }
+
+        .anti-glare-mode .barcode-visual img {
+            background: white;
+            padding: 8px;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Reduce glare on entire page when anti-glare mode is active */
+        body.anti-glare-mode {
+            filter: brightness(0.98);
+            -webkit-filter: brightness(0.98);
+        }
+
+        body.anti-glare-mode .barcode-item,
+        body.anti-glare-mode .barcode-navigation {
+            filter: brightness(0.98) contrast(1.05);
+            -webkit-filter: brightness(0.98) contrast(1.05);
+        }
+
+        /* Changelog Styles - Minimalist Design */
+        .changelog-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            backdrop-filter: blur(2px);
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .changelog-modal {
+            background: #f5f5f5;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            max-width: 850px;
+            width: 100%;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Inter', sans-serif;
+            animation: slideUp 0.2s ease-out;
+            position: relative;
+        }
+
+        /* Progress Bar */
+        .changelog-progress-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #3b82f6, #2563eb);
+            width: 0%;
+            transition: width 0.1s ease-out;
+            z-index: 10;
+            border-radius: 0.5rem 0.5rem 0 0;
+        }
+
+        .changelog-modal-header {
+            background: #f5f5f5;
+            color: #333;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #e5e5e5;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .changelog-modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+            color: #333;
+        }
+
+        .changelog-close-btn {
+            background: transparent;
+            border: none;
+            color: #666;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .changelog-close-btn:hover {
+            background: #e5e5e5;
+            color: #333;
+        }
+
+        .changelog-modal-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem 1.5rem;
+            background: #f5f5f5;
+        }
+
+        .changelog-content-wrapper {
+            min-height: 100%;
+        }
+
+        .changelog-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        .changelog-loading .spinner {
+            width: 2.5rem;
+            height: 2.5rem;
+            border: 2px solid #e5e5e5;
+            border-top-color: #666;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 1rem;
+        }
+
+        .changelog-container {
+            max-width: 750px;
+            margin: 0 auto;
+        }
+
+        .changelog-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .changelog-main-title {
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .changelog-subtitle-text {
+            font-size: 0.9375rem;
+            color: #666;
+        }
+
+        .changelog-timeline {
+            position: relative;
+            padding-left: 1.75rem;
+        }
+
+        .changelog-block {
+            position: relative;
+            margin-bottom: 2rem;
+            opacity: 0;
+            transform: translateY(15px);
+            transition: all 0.4s ease-out;
+        }
+
+        .changelog-block.animate-in,
+        .changelog-block.fade-in-up {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .changelog-timeline-line {
+            position: absolute;
+            left: -1.75rem;
+            top: 0;
+            bottom: -2rem;
+            width: 2px;
+            background: #e0e0e0;
+            overflow: hidden;
+        }
+
+        .changelog-timeline-line-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            background: #3b82f6;
+            height: 0%;
+            transition: height 0.15s ease-out;
+            border-radius: 1px;
+        }
+
+        .changelog-content {
+            display: flex;
+            gap: 1.25rem;
+            position: relative;
+        }
+
+        .changelog-icon {
+            flex-shrink: 0;
+            width: 2.5rem;
+            height: 2.5rem;
+            background: #e5e5e5;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+            border: 2px solid #f5f5f5;
+        }
+
+        .changelog-icon-svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            fill: #666;
+        }
+
+        .changelog-block-content {
+            flex: 1;
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1.25rem;
+            border: 1px solid #e5e5e5;
+            transition: all 0.2s;
+        }
+
+        .changelog-block-content:hover {
+            border-color: #d0d0d0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .changelog-date {
+            display: inline-block;
+            font-size: 0.8125rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .changelog-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #2563eb;
+            margin-bottom: 0.5rem;
+        }
+
+        .changelog-subtitle {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .changelog-description {
+            font-size: 0.9375rem;
+            color: #555;
+            margin-bottom: 1rem;
+            line-height: 1.6;
+        }
+
+        .changelog-steps {
+            margin-top: 0.75rem;
+        }
+
+        .changelog-step {
+            opacity: 0;
+            transform: translateX(-8px);
+            transition: all 0.3s ease-out;
+            margin-bottom: 1rem;
+        }
+
+        .changelog-step:last-child {
+            margin-bottom: 0;
+        }
+
+        .changelog-step.animate-in {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .changelog-step-icon {
+            flex-shrink: 0;
+        }
+
+        .changelog-step h4 {
+            font-size: 0.9375rem;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 0.375rem;
+        }
+
+        .changelog-step p {
+            font-size: 0.875rem;
+            color: #555;
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        .changelog-media-container {
+            margin-top: 0.75rem;
+        }
+
+        .changelog-image,
+        .changelog-video {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.375rem;
+            border: 1px solid #e5e5e5;
+        }
+        
+        /* Video GIF gibi davranması için - kontroller yok, tıklanamaz */
+        .changelog-video {
+            pointer-events: none !important; /* Tıklanamaz, GIF gibi */
+            user-select: none !important; /* Seçilemez */
+            -webkit-user-select: none !important;
+            -moz-user-select: none !important;
+            -ms-user-select: none !important;
+            cursor: default !important;
+        }
+        
+        /* Tüm video kontrollerini gizle */
+        .changelog-video::-webkit-media-controls {
+            display: none !important;
+        }
+        
+        .changelog-video::-webkit-media-controls-enclosure {
+            display: none !important;
+        }
+        
+        .changelog-video::-webkit-media-controls-panel {
+            display: none !important;
+        }
+        
+        .changelog-video::-webkit-media-controls-play-button {
+            display: none !important;
+        }
+        
+        .changelog-video::-webkit-media-controls-start-playback-button {
+            display: none !important;
+        }
+        
+        /* Video kalitesi ve performans için */
+        .changelog-video {
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            will-change: auto;
+        }
+        
+        /* Preview video için de aynı kurallar */
+        .preview-video {
+            pointer-events: none !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            -moz-user-select: none !important;
+            -ms-user-select: none !important;
+            cursor: default !important;
+        }
+        
+        .preview-video::-webkit-media-controls {
+            display: none !important;
+        }
+        
+        .preview-video::-webkit-media-controls-enclosure {
+            display: none !important;
+        }
+
+        .changelog-empty {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+
+        #versionDisplay {
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+
+        #versionDisplay:hover {
+            color: #2563eb;
+            background-color: rgba(37, 99, 235, 0.1);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .changelog-modal {
+                max-height: 95vh;
+                margin: 0.5rem;
+            }
+
+            .changelog-modal-content {
+                padding: 1.25rem 1rem;
+            }
+
+            .changelog-timeline {
+                padding-left: 1.5rem;
+            }
+
+            .changelog-icon {
+                width: 2rem;
+                height: 2rem;
+            }
+
+            .changelog-icon-svg {
+                width: 1rem;
+                height: 1rem;
+            }
+
+            .changelog-main-title {
+                font-size: 1.5rem;
+            }
+
+            .changelog-block-content {
+                padding: 1rem;
+            }
+
+            .changelog-title {
+                font-size: 1.125rem;
+            }
+        }
     </style>
 </head>
 <body class="bg-background min-h-screen">
@@ -138,7 +919,7 @@
                 </div>
                 
                 <!-- Animated Scan Effect -->
-                <div class="flex items-center">
+                <div id="scanEffectContainer" class="flex items-center">
                     <p class="loader"><span>Scan</span></p>
                 </div>
                 
@@ -150,12 +931,25 @@
                         </svg>
                         Ürün Ekle
                     </button>
+                    
+                    <!-- Trial Countdown (Süre) - Solda -->
+                    <div id="trialCountdownContainer" class="flex items-center space-x-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200">
+                        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <div class="flex items-center space-x-1">
+                            <span id="trialCountdownValue1" class="text-sm font-semibold text-gray-800">--</span>
+                            <span id="trialCountdownLabel1" class="text-xs text-gray-600">gün</span>
+                            <span id="trialCountdownSeparator" class="text-xs text-gray-400 mx-1">•</span>
+                            <span id="trialCountdownValue2" class="text-sm font-semibold text-gray-800">--</span>
+                            <span id="trialCountdownLabel2" class="text-xs text-gray-600">saat</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Kullanıcı Adı ve Depo Adı - Sağda, Altlı Üstlü -->
                     <div class="text-right">
                         <p class="text-lg font-semibold text-text-primary" id="userName">Yükleniyor...</p>
                         <p class="text-sm text-text-secondary" id="userCompany">Yükleniyor...</p>
-                        <div id="trialBannerHeader" class="bg-gradient-to-r from-red-500 to-red-600 text-black px-3 py-1 rounded-full text-xs font-medium">
-                            <span id="trialBannerHeaderText" class="text-black">⏰ Test Süreniz</span>
-                        </div>
                     </div>
                     <button id="settingsBtn" class="btn-secondary text-sm mr-2">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -556,6 +1350,19 @@
                         </div>
                     </div>
                     
+                    <div id="antiGlareSettingsSection" class="bg-yellow-50 rounded-lg p-3">
+                        <h4 class="font-medium text-yellow-700 text-sm mb-2 flex items-center space-x-2">
+                            <span>Görüntüleme Ayarları</span>
+                        </h4>
+                        <div class="space-y-2">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="antiGlareModeUserToggle" class="w-3 h-3 text-yellow-600 bg-gray-100 border-gray-300 rounded focus:ring-yellow-500 focus:ring-1">
+                                <span class="text-xs text-text-secondary">Parlama Önleme Modu</span>
+                            </label>
+                            <p class="text-xs text-gray-500">Barkodları QR Code olarak gösterir ve ekran parlamasını azaltır</p>
+                        </div>
+                    </div>
+                    
                     <div class="bg-green-50 rounded-lg p-3 md:col-span-2">
                         <h4 class="font-medium text-green-700 text-sm mb-2">Veri Güncelleme</h4>
                         <div class="flex flex-wrap gap-1">
@@ -579,6 +1386,16 @@
                             </button>
                         </div>
                     </div>
+                </div>
+                
+                <!-- Changelog Button -->
+                <div class="mt-6 pt-6 border-t border-gray-200">
+                    <button id="openChangelogFromSettings" class="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-semibold py-2.5 px-4 rounded-lg transition-all shadow-md hover:shadow-lg flex items-center justify-center space-x-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>Güncelleme Geçmişi</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -755,7 +1572,7 @@
                     © 2025 GunduzDev. Tüm hakları saklıdır.
                 </div>
                 <div class="flex items-center space-x-6 text-sm text-text-secondary">
-                    <span>Versiyon 1.0.0</span>
+                    <span id="versionDisplay" class="cursor-pointer hover:text-primary transition-colors">Versiyon 1.0.0</span>
                 </div>
             </div>
         </div>
@@ -1197,13 +2014,190 @@
             }, 2000);
         }
 
-        // Create barcode navigation component
+        // Generate QR Code for barcode using QRCode.js
+        function generateQRCode(text, size = 120) {
+            return new Promise((resolve, reject) => {
+                console.log('🔷 generateQRCode called for:', text);
+                
+                // Check if QRCode.js is loaded
+                if (typeof QRCode === 'undefined') {
+                    console.error('❌ QRCode.js library not loaded');
+                    reject(new Error('QRCode.js library not loaded'));
+                    return;
+                }
+                
+                console.log('✅ QRCode.js library found');
+                
+                // Create a temporary container
+                const tempDiv = document.createElement('div');
+                tempDiv.style.position = 'absolute';
+                tempDiv.style.left = '-9999px';
+                tempDiv.style.width = size + 'px';
+                tempDiv.style.height = size + 'px';
+                document.body.appendChild(tempDiv);
+                
+                try {
+                    // Generate QR Code using QRCode.js
+                    const qrcode = new QRCode(tempDiv, {
+                        text: text,
+                        width: size,
+                        height: size,
+                        colorDark: '#000000',
+                        colorLight: '#FFFFFF',
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                    
+                    // Wait a bit for QR Code to render
+                    setTimeout(() => {
+                        try {
+                            const canvas = tempDiv.querySelector('canvas');
+                            if (canvas) {
+                                const dataUrl = canvas.toDataURL();
+                                console.log('✅ QR Code generated successfully');
+                                document.body.removeChild(tempDiv);
+                                resolve(dataUrl);
+                            } else {
+                                console.error('❌ Canvas not found in QR Code');
+                                document.body.removeChild(tempDiv);
+                                reject(new Error('Canvas not found'));
+                            }
+                        } catch (error) {
+                            console.error('❌ Error getting canvas data:', error);
+                            document.body.removeChild(tempDiv);
+                            reject(error);
+                        }
+                    }, 100);
+                } catch (error) {
+                    console.error('❌ QR Code generation exception:', error);
+                    document.body.removeChild(tempDiv);
+                    reject(error);
+                }
+            });
+        }
+
+        // Get anti-glare setting from feature system (sync version for immediate use)
+        function getAntiGlareSetting() {
+            try {
+                if (window.getFeatureValueSync) {
+                    const value = window.getFeatureValueSync('anti_glare_mode');
+                    return value === true;
+                }
+                // Fallback to false if feature system not available
+                return false;
+            } catch (error) {
+                console.error('❌ Error getting anti-glare setting:', error);
+                return false;
+            }
+        }
+        
+        // Async version for when feature system is ready
+        async function getAntiGlareSettingAsync() {
+            try {
+                // Try feature-checker first
+                if (window.isFeatureEnabled) {
+                    return await window.isFeatureEnabled('anti_glare_mode');
+                }
+                // Fallback to feature-manager directly
+                if (window.featureManager) {
+                    const value = await window.featureManager.getFeatureValue('anti_glare_mode');
+                    return value === true;
+                }
+                return false;
+            } catch (error) {
+                console.error('❌ Error getting anti-glare setting async:', error);
+                return false;
+            }
+        }
+
+        // Create barcode navigation component (sync version for template literals)
         function createBarcodeNavigation(product) {
             const barcodes = product.barcodes;
+            // Check both feature flag and user preference
+            const featureEnabled = getAntiGlareSetting();
+            const userPreference = typeof getUserAntiGlarePreference === 'function' ? getUserAntiGlarePreference() : false;
+            const useAntiGlare = featureEnabled && userPreference;
+            
+            console.log('📦 Creating barcode navigation for product:', product.name, 'Anti-glare:', useAntiGlare);
             
             // If only one barcode, show it without navigation
             if (barcodes.length === 1) {
+                // For anti-glare mode, show QR Code instead of barcode
+                if (useAntiGlare) {
+                    const placeholderId = `qr-placeholder-${product.id}-${barcodes[0].code}`;
+                    console.log('🔷 Anti-glare mode ON - Generating QR Code for:', barcodes[0].code);
+                    
+                    // Generate QR code after DOM is ready
+                    const generateQR = () => {
+                        const QRCodeLib = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
+                        
+                        if (!QRCodeLib) {
+                            console.warn('⚠️ QRCode library not loaded yet');
+                            return false;
+                        }
+                        
+                        console.log('✅ QRCode library found, generating QR Code...');
+                        generateQRCode(barcodes[0].code, 120).then(qrDataUrl => {
+                            console.log('✅ QR Code generated successfully');
+                            const placeholder = document.getElementById(placeholderId);
+                            if (placeholder) {
+                                placeholder.innerHTML = `<img src="${qrDataUrl}" alt="QR Code: ${barcodes[0].code}" class="mx-auto" style="max-width: 120px; height: auto; display: block;">`;
+                            } else {
+                                console.error('❌ Placeholder not found:', placeholderId);
+                            }
+                        }).catch(error => {
+                            console.error('❌ QR Code generation failed:', error);
+                            const placeholder = document.getElementById(placeholderId);
+                            if (placeholder) {
+                                placeholder.innerHTML = generateCode128SVG(barcodes[0].code, 200, 60);
+                            }
+                        });
+                        return true;
+                    };
+                    
+                    // Try immediately, then retry if needed
+                    const QRCodeLib = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
+                    if (QRCodeLib) {
+                        setTimeout(generateQR, 100);
+                    } else {
+                        // Wait for library to load - check multiple times
+                        let retries = 0;
+                        const maxRetries = 100; // 10 seconds
+                        const checkQRCode = setInterval(() => {
+                            retries++;
+                            const QRCodeLib = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
+                            if (QRCodeLib) {
+                                clearInterval(checkQRCode);
+                                generateQR();
+                            } else if (retries >= maxRetries) {
+                                clearInterval(checkQRCode);
+                                console.error('❌ QRCode library failed to load after 10 seconds');
+                                const placeholder = document.getElementById(placeholderId);
+                                if (placeholder) {
+                                    placeholder.innerHTML = generateCode128SVG(barcodes[0].code, 200, 60);
+                                }
+                            }
+                        }, 100);
+                    }
+                    
                 return `
+                    <div class="barcode-item bg-gray-50 rounded-lg p-3 border cursor-pointer hover:bg-gray-100 transition-colors anti-glare-mode" onclick="copyProductText('${String(barcodes[0].code || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="QR Code - Barkodu kopyalamak için tıklayın">
+                        <div class="barcode-visual mb-2 flex justify-center items-center" id="${placeholderId}" style="min-height: 120px;">
+                            <div class="animate-pulse text-gray-400 text-sm">QR Code oluşturuluyor...</div>
+                        </div>
+                        <div class="text-xs space-y-1">
+                            <div class="font-mono font-medium flex items-center justify-between">
+                                <span>${barcodes[0].code}</span>
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <div class="text-gray-600">${barcodes[0].size} - ${barcodes[0].variant}</div>
+                        </div>
+                    </div>
+                `;
+                } else {
+                    console.log('📊 Normal mode - Showing barcode');
+                    return `
                     <div class="barcode-item bg-gray-50 rounded-lg p-3 border cursor-pointer hover:bg-gray-100 transition-colors" onclick="copyProductText('${String(barcodes[0].code || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Barkodu kopyalamak için tıklayın">
                         <div class="barcode-visual mb-2">
                             ${generateCode128SVG(barcodes[0].code, 200, 60)}
@@ -1219,6 +2213,7 @@
                         </div>
                     </div>
                 `;
+                }
             }
             
             // Multiple barcodes - show navigation
@@ -1242,7 +2237,80 @@
                         </div>
                     </div>
                     <div class="barcode-container">
-                        ${barcodes.map((barcode, index) => `
+                        ${barcodes.map((barcode, index) => {
+                            const placeholderId = `qr-placeholder-${product.id}-${index}-${barcode.code}`;
+                            
+                            if (useAntiGlare) {
+                                console.log('🔷 Anti-glare mode ON - Generating QR Code for:', barcode.code);
+                                
+                                // Generate QR code after DOM is ready
+                                const generateQR = () => {
+                                    const QRCodeLib = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
+                                    
+                                    if (!QRCodeLib) {
+                                        console.warn('⚠️ QRCode library not loaded yet');
+                                        return false;
+                                    }
+                                    
+                                    generateQRCode(barcode.code, 120).then(qrDataUrl => {
+                                        console.log('✅ QR Code generated successfully for:', barcode.code);
+                                        const placeholder = document.getElementById(placeholderId);
+                                        if (placeholder) {
+                                            placeholder.innerHTML = `<img src="${qrDataUrl}" alt="QR Code: ${barcode.code}" class="mx-auto" style="max-width: 120px; height: auto; display: block;">`;
+                                        }
+                                    }).catch(error => {
+                                        console.error('❌ QR Code generation failed:', error);
+                                        const placeholder = document.getElementById(placeholderId);
+                                        if (placeholder) {
+                                            placeholder.innerHTML = generateCode128SVG(barcode.code, 200, 60);
+                                        }
+                                    });
+                                    return true;
+                                };
+                                
+                                // Try immediately, then retry if needed
+                                const QRCodeLib = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
+                                if (QRCodeLib) {
+                                    setTimeout(generateQR, 50);
+                                } else {
+                                    // Wait for library to load - check multiple times
+                                    let retries = 0;
+                                    const maxRetries = 50; // 5 seconds
+                                    const checkQRCode = setInterval(() => {
+                                        retries++;
+                                        const QRCodeLib = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
+                                        if (QRCodeLib) {
+                                            clearInterval(checkQRCode);
+                                            generateQR();
+                                        } else if (retries >= maxRetries) {
+                                            clearInterval(checkQRCode);
+                                            console.error('❌ QRCode library failed to load after 5 seconds');
+                                            const placeholder = document.getElementById(placeholderId);
+                                            if (placeholder) {
+                                                placeholder.innerHTML = generateCode128SVG(barcode.code, 200, 60);
+                                            }
+                                        }
+                                    }, 100);
+                                }
+                                
+                                return `
+                            <div class="barcode-item bg-gray-50 rounded-lg p-3 border cursor-pointer hover:bg-gray-100 transition-colors ${index > 0 ? 'hidden' : ''} anti-glare-mode" data-index="${index}" onclick="copyProductText('${String(barcode.code || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="QR Code - Barkodu kopyalamak için tıklayın">
+                                <div class="barcode-visual mb-2 flex justify-center items-center" id="${placeholderId}" style="min-height: 200px;">
+                                    <div class="animate-pulse text-gray-400 text-sm">QR Code oluşturuluyor...</div>
+                                </div>
+                                <div class="text-xs space-y-1">
+                                    <div class="font-mono font-medium flex items-center justify-between">
+                                        <span>${barcode.code}</span>
+                                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                        </svg>
+                                    </div>
+                                    <div class="text-gray-600">${barcode.size} - ${barcode.variant}</div>
+                                </div>
+                            </div>
+                        `;
+                            } else {
+                                return `
                             <div class="barcode-item bg-gray-50 rounded-lg p-3 border cursor-pointer hover:bg-gray-100 transition-colors ${index > 0 ? 'hidden' : ''}" data-index="${index}" onclick="copyProductText('${String(barcode.code || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Barkodu kopyalamak için tıklayın">
                                 <div class="barcode-visual mb-2">
                                     ${generateCode128SVG(barcode.code, 200, 60)}
@@ -1257,7 +2325,9 @@
                                     <div class="text-gray-600">${barcode.size} - ${barcode.variant}</div>
                                 </div>
                             </div>
-                        `).join('')}
+                        `;
+                            }
+                        }).join('')}
                     </div>
                 </div>
             `;
@@ -1786,6 +2856,188 @@
                 
                 // Make updateTrialBannerHeader globally available
                 window.updateTrialBannerHeader = updateTrialBannerHeader;
+                
+                // Header trial countdown update function (Her saniye güncellenecek)
+                function updateTrialCountdownHeader(trialEnd) {
+                    const value1El = document.getElementById('trialCountdownValue1');
+                    const value2El = document.getElementById('trialCountdownValue2');
+                    const label1El = document.getElementById('trialCountdownLabel1');
+                    const label2El = document.getElementById('trialCountdownLabel2');
+                    const separatorEl = document.getElementById('trialCountdownSeparator');
+                    const container = document.getElementById('trialCountdownContainer');
+                    
+                    if (!value1El || !value2El || !label1El || !label2El || !separatorEl || !container) {
+                        return;
+                    }
+                    
+                    if (!trialEnd) {
+                        container.style.display = 'none';
+                        return;
+                    }
+                    
+                    container.style.display = 'flex';
+                    
+                    let trialEndDate;
+                    try {
+                        if (typeof trialEnd === 'string') {
+                            if (trialEnd.includes('T')) {
+                                trialEndDate = new Date(trialEnd);
+                            } else if (trialEnd.includes('-')) {
+                                trialEndDate = new Date(trialEnd + 'T23:59:59');
+                            } else {
+                                trialEndDate = new Date(trialEnd);
+                            }
+                        } else if (trialEnd instanceof Date) {
+                            trialEndDate = trialEnd;
+                        } else {
+                            trialEndDate = new Date(trialEnd);
+                        }
+                        
+                        if (isNaN(trialEndDate.getTime())) {
+                            container.style.display = 'none';
+                            return;
+                        }
+                    } catch (error) {
+                        container.style.display = 'none';
+                        return;
+                    }
+                    
+                    const now = new Date();
+                    const timeLeft = trialEndDate - now;
+                    
+                    if (timeLeft <= 0) {
+                        value1El.textContent = '0';
+                        value2El.textContent = '0';
+                        label1El.textContent = 'gün';
+                        label2El.textContent = 'saat';
+                        container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-red-50 border border-red-200';
+                        value1El.className = 'text-sm font-semibold text-red-600';
+                        value2El.className = 'text-sm font-semibold text-red-600';
+                        label1El.className = 'text-xs text-red-500';
+                        label2El.className = 'text-xs text-red-500';
+                        separatorEl.className = 'text-xs text-red-400 mx-1';
+                        return;
+                    }
+                    
+                    const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                    const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+                    
+                    // Gösterim mantığı:
+                    // - 365 günden fazla ise: Yıl ve ay göster
+                    // - 30 günden fazla ise: Ay ve gün göster
+                    // - 30 günden az ise: Gün ve saat göster
+                    // - Gün yoksa: Saat ve dakika göster
+                    // - Saat yoksa: Dakika ve saniye göster
+                    
+                    if (days >= 365) {
+                        // Yıl ve ay göster
+                        const years = Math.floor(days / 365);
+                        const remainingDays = days % 365;
+                        const months = Math.floor(remainingDays / 30);
+                        
+                        value1El.textContent = years;
+                        label1El.textContent = years === 1 ? 'yıl' : 'yıl';
+                        separatorEl.style.display = 'inline';
+                        value2El.textContent = months;
+                        label2El.textContent = months === 1 ? 'ay' : 'ay';
+                        
+                        // Normal renk (uzun süre)
+                        container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200';
+                        value1El.className = 'text-sm font-semibold text-gray-800';
+                        value2El.className = 'text-sm font-semibold text-gray-800';
+                        label1El.className = 'text-xs text-gray-600';
+                        label2El.className = 'text-xs text-gray-600';
+                        separatorEl.className = 'text-xs text-gray-400 mx-1';
+                    } else if (days >= 30) {
+                        // Ay ve gün göster
+                        const months = Math.floor(days / 30);
+                        const remainingDays = days % 30;
+                        
+                        value1El.textContent = months;
+                        label1El.textContent = months === 1 ? 'ay' : 'ay';
+                        separatorEl.style.display = 'inline';
+                        value2El.textContent = remainingDays;
+                        label2El.textContent = remainingDays === 1 ? 'gün' : 'gün';
+                        
+                        // Normal renk
+                        container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200';
+                        value1El.className = 'text-sm font-semibold text-gray-800';
+                        value2El.className = 'text-sm font-semibold text-gray-800';
+                        label1El.className = 'text-xs text-gray-600';
+                        label2El.className = 'text-xs text-gray-600';
+                        separatorEl.className = 'text-xs text-gray-400 mx-1';
+                    } else if (days > 0) {
+                        // Gün ve saat göster
+                        value1El.textContent = days;
+                        label1El.textContent = days === 1 ? 'gün' : 'gün';
+                        separatorEl.style.display = 'inline';
+                        value2El.textContent = hours;
+                        label2El.textContent = hours === 1 ? 'saat' : 'saat';
+                        
+                        // Renk değişimi
+                        if (days <= 3) {
+                            container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-red-50 border border-red-200';
+                            value1El.className = 'text-sm font-semibold text-red-600';
+                            value2El.className = 'text-sm font-semibold text-red-600';
+                            label1El.className = 'text-xs text-red-500';
+                            label2El.className = 'text-xs text-red-500';
+                            separatorEl.className = 'text-xs text-red-400 mx-1';
+                        } else if (days <= 7) {
+                            container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-yellow-50 border border-yellow-200';
+                            value1El.className = 'text-sm font-semibold text-yellow-600';
+                            value2El.className = 'text-sm font-semibold text-yellow-600';
+                            label1El.className = 'text-xs text-yellow-500';
+                            label2El.className = 'text-xs text-yellow-500';
+                            separatorEl.className = 'text-xs text-yellow-400 mx-1';
+                        } else {
+                            container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200';
+                            value1El.className = 'text-sm font-semibold text-gray-800';
+                            value2El.className = 'text-sm font-semibold text-gray-800';
+                            label1El.className = 'text-xs text-gray-600';
+                            label2El.className = 'text-xs text-gray-600';
+                            separatorEl.className = 'text-xs text-gray-400 mx-1';
+                        }
+                    } else if (hours > 0) {
+                        // Saat ve dakika göster
+                        value1El.textContent = hours;
+                        label1El.textContent = 'saat';
+                        separatorEl.style.display = 'inline';
+                        value2El.textContent = minutes;
+                        label2El.textContent = 'dakika';
+                        
+                        // Kırmızı renk (acil)
+                        container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-red-50 border border-red-200';
+                        value1El.className = 'text-sm font-semibold text-red-600';
+                        value2El.className = 'text-sm font-semibold text-red-600';
+                        label1El.className = 'text-xs text-red-500';
+                        label2El.className = 'text-xs text-red-500';
+                        separatorEl.className = 'text-xs text-red-400 mx-1';
+                    } else {
+                        // Dakika ve saniye göster
+                        value1El.textContent = minutes;
+                        label1El.textContent = 'dakika';
+                        separatorEl.style.display = 'inline';
+                        value2El.textContent = seconds;
+                        label2El.textContent = 'saniye';
+                        
+                        // Kırmızı renk (çok acil)
+                        container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-red-50 border border-red-200';
+                        value1El.className = 'text-sm font-semibold text-red-600';
+                        value2El.className = 'text-sm font-semibold text-red-600';
+                        label1El.className = 'text-xs text-red-500';
+                        label2El.className = 'text-xs text-red-500';
+                        separatorEl.className = 'text-xs text-red-400 mx-1';
+                    }
+                    
+                    // Her saniye güncelle
+                    setTimeout(() => updateTrialCountdownHeader(trialEnd), 1000);
+                }
+                
+                // Make updateTrialCountdownHeader globally available
+                window.updateTrialCountdownHeader = updateTrialCountdownHeader;
+                console.log('✅ updateTrialCountdownHeader function registered to window');
                 
                 // Initialize barcode navigation
                 initializeBarcodeNavigation();
@@ -5273,9 +6525,16 @@
         }
         
         // Show/hide settings modal
-        function showSettings() {
+        async function showSettings() {
             updateSettingsInfo();
             document.getElementById('settingsModal').classList.remove('hidden');
+            // Update anti-glare settings UI when modal opens (with cache clear)
+            if (typeof updateAntiGlareSettingsUI === 'function') {
+                // Small delay to ensure modal is visible, then update with fresh data
+                setTimeout(async () => {
+                    await updateAntiGlareSettingsUI();
+                }, 100);
+            }
         }
         
         function hideSettings() {
@@ -5569,6 +6828,25 @@
             
             // Settings button
             document.getElementById('settingsBtn').addEventListener('click', showSettings);
+            
+            // Changelog event listeners
+            const versionDisplay = document.getElementById('versionDisplay');
+            if (versionDisplay) {
+                versionDisplay.addEventListener('click', () => {
+                    if (window.changelogSystem) {
+                        window.changelogSystem.showModal();
+                    }
+                });
+            }
+            
+            const openChangelogFromSettings = document.getElementById('openChangelogFromSettings');
+            if (openChangelogFromSettings) {
+                openChangelogFromSettings.addEventListener('click', () => {
+                    if (window.changelogSystem) {
+                        window.changelogSystem.showModal();
+                    }
+                });
+            }
             document.getElementById('closeSettings').addEventListener('click', hideSettings);
             
             // Premium feature detail modal
@@ -5610,6 +6888,317 @@
             document.getElementById('deleteSelectedProducts').addEventListener('click', deleteSelectedProducts);
             
             // Default products toggle
+            // Get user preference for anti-glare mode (stored in localStorage)
+            function getUserAntiGlarePreference() {
+                try {
+                    const session = window.authUtils?.checkAuth();
+                    if (session && session.username) {
+                        const stored = localStorage.getItem(`antiGlareMode_${session.username}`);
+                        if (stored !== null) {
+                            return stored === 'true';
+                        }
+                    }
+                    return false; // Default: disabled
+                } catch (error) {
+                    console.error('Error getting user anti-glare preference:', error);
+                    return false;
+                }
+            }
+
+            // Save user preference for anti-glare mode
+            function saveUserAntiGlarePreference(enabled) {
+                try {
+                    const session = window.authUtils?.checkAuth();
+                    if (session && session.username) {
+                        localStorage.setItem(`antiGlareMode_${session.username}`, enabled ? 'true' : 'false');
+                        console.log('💾 User anti-glare preference saved:', enabled);
+                    }
+                } catch (error) {
+                    console.error('Error saving user anti-glare preference:', error);
+                }
+            }
+
+            // Update settings UI visibility and checkbox state
+            async function updateAntiGlareSettingsUI() {
+                const section = document.getElementById('antiGlareSettingsSection');
+                const checkbox = document.getElementById('antiGlareModeUserToggle');
+                
+                if (!section) {
+                    console.warn('⚠️ antiGlareSettingsSection not found');
+                    return;
+                }
+                
+                if (!checkbox) {
+                    console.warn('⚠️ antiGlareModeUserToggle not found');
+                    return;
+                }
+
+                console.log('🔄 Updating anti-glare settings UI...');
+
+                // Clear cache and fetch fresh value DIRECTLY from Supabase (bypass all cache)
+                let featureEnabled = false;
+                try {
+                    // Clear feature manager cache first
+                    if (window.featureManager) {
+                        window.featureManager.featuresCache = null;
+                        window.featureManager.cacheTimestamp = null;
+                    }
+                    
+                    // Fetch DIRECTLY from Supabase, bypassing all cache and helper functions
+                    if (window.supabase) {
+                        const { data, error } = await window.supabase
+                            .from('system_features')
+                            .select('current_value')
+                            .eq('feature_key', 'anti_glare_mode')
+                            .eq('is_active', true)
+                            .single();
+                        
+                        if (error || !data) {
+                            console.warn('⚠️ anti_glare_mode not found in DB, assuming false');
+                            featureEnabled = false;
+                        } else {
+                            featureEnabled = data.current_value === true;
+                            console.log('🔍 Anti-glare mode enabled (admin, DIRECT from DB):', featureEnabled, 'Raw value:', data.current_value);
+                        }
+                    } else {
+                        console.warn('⚠️ Supabase not available, assuming false');
+                        featureEnabled = false;
+                    }
+                } catch (error) {
+                    console.error('❌ Error fetching anti-glare setting:', error);
+                    // On error, assume false (hide it)
+                    featureEnabled = false;
+                }
+                
+                if (!featureEnabled) {
+                    // Feature is disabled by admin, hide the section and deactivate
+                    section.classList.add('hidden');
+                    document.body.classList.remove('anti-glare-mode');
+                    
+                    // Also reset user preference to false (since feature is disabled)
+                    const session = window.authUtils?.checkAuth();
+                    if (session && session.username) {
+                        localStorage.setItem(`antiGlareMode_${session.username}`, 'false');
+                        console.log('🔄 User preference reset to false (feature disabled)');
+                    }
+                    
+                    console.log('❌ Anti-glare mode disabled by admin, hiding settings and deactivating');
+                    // Also reload products to remove QR codes and show normal barcodes
+                    if (window.renderProducts) {
+                        await window.renderProducts();
+                    }
+                    return;
+                }
+                
+                // Feature is enabled, show it
+                section.classList.remove('hidden');
+                console.log('✅ Showing anti-glare settings section');
+                
+                // Update checkbox state based on user preference
+                const userPreference = getUserAntiGlarePreference();
+                checkbox.checked = userPreference;
+                console.log('✅ Checkbox state updated:', userPreference);
+            }
+            
+            // Make functions globally available for update-notifications.js
+            window.loadAntiGlareSetting = loadAntiGlareSetting;
+            window.updateAntiGlareSettingsUI = updateAntiGlareSettingsUI;
+
+            // Load and apply anti-glare setting (combines feature flag + user preference)
+            async function loadAntiGlareSetting() {
+                try {
+                    console.log('🔄 Loading anti-glare setting...');
+                    
+                    // Check if feature is enabled by admin
+                    const featureEnabled = await getAntiGlareSettingAsync();
+                    console.log('🔍 Feature enabled (admin):', featureEnabled);
+                    
+                    // If feature is disabled by admin, deactivate immediately
+                    if (!featureEnabled) {
+                        document.body.classList.remove('anti-glare-mode');
+                        console.log('❌ Anti-glare mode deactivated (admin disabled)');
+                        // Also reload products to remove QR codes and show normal barcodes
+                        if (window.renderProducts) {
+                            await window.renderProducts();
+                        }
+                        // Update UI
+                        await updateAntiGlareSettingsUI();
+                        return;
+                    }
+                    
+                    // Get user preference (only if feature is enabled)
+                    const userPreference = getUserAntiGlarePreference();
+                    console.log('👤 User preference:', userPreference);
+                    
+                    // Anti-glare is active only if BOTH are true
+                    const isEnabled = featureEnabled && userPreference;
+                    console.log('✅ Final anti-glare status:', isEnabled);
+                    
+                    // Update settings UI
+                    await updateAntiGlareSettingsUI();
+                    
+                    // Apply anti-glare mode to body if enabled
+                    if (isEnabled) {
+                        document.body.classList.add('anti-glare-mode');
+                        console.log('✅ Anti-glare mode activated');
+                    } else {
+                        document.body.classList.remove('anti-glare-mode');
+                        console.log('❌ Anti-glare mode deactivated');
+                    }
+                    
+                    // Also reload products to update barcode display
+                    if (window.renderProducts) {
+                        await window.renderProducts();
+                    }
+                } catch (error) {
+                    console.error('❌ Error loading anti-glare setting:', error);
+                }
+            }
+
+            // Handle user toggle change
+            document.addEventListener('DOMContentLoaded', () => {
+                const checkbox = document.getElementById('antiGlareModeUserToggle');
+                if (checkbox) {
+                    checkbox.addEventListener('change', async (e) => {
+                        const enabled = e.target.checked;
+                        saveUserAntiGlarePreference(enabled);
+                        await loadAntiGlareSetting();
+                    });
+                }
+            });
+
+            // loadScanEffectVisibility function is already defined at the top of the page (before feature-manager.js loads)
+            // ÖNEMLİ: İlk yüklemede HEMEN Supabase'den veriyi çek, cache'e güvenme
+            // Bu sayede yanlış değer gösterilmez (birkaç saniye görünüp sonra kaybolma sorunu çözülür)
+            (async function() {
+                const scanEffectContainer = document.getElementById('scanEffectContainer');
+                if (!scanEffectContainer) return;
+                
+                // ÖNCE: Supabase hazır olana kadar bekle (maksimum 2 saniye)
+                let supabaseReady = false;
+                for (let i = 0; i < 20; i++) {
+                    if (window.supabase) {
+                        supabaseReady = true;
+                        break;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                
+                if (!supabaseReady) {
+                    console.warn('⚠️ [SCAN] Supabase not ready after 2s, using default value');
+                    // Supabase hazır değilse default değeri kullan
+                    const definition = window.getFeatureDefinition?.('scan_effect_visible');
+                    const defaultVisible = (definition && definition.defaultValue !== undefined) ? definition.defaultValue === true : true;
+                    if (defaultVisible) {
+                        scanEffectContainer.classList.remove('hidden');
+                        scanEffectContainer.style.display = 'flex';
+                    } else {
+                        scanEffectContainer.classList.add('hidden');
+                        scanEffectContainer.style.display = 'none';
+                    }
+                    return;
+                }
+                
+                // HEMEN Supabase'den veriyi çek (cache'i atla)
+                console.log('⚡ [SCAN] Immediately fetching from Supabase (ignoring cache)...');
+                try {
+                    const { data, error } = await window.supabase
+                        .from('system_features')
+                        .select('current_value')
+                        .eq('feature_key', 'scan_effect_visible')
+                        .eq('is_active', true)
+                        .single();
+                    
+                    let isVisible = true; // Default fallback
+                    
+                    if (error || !data) {
+                        // Supabase'de veri yoksa default değeri kullan
+                        const definition = window.getFeatureDefinition?.('scan_effect_visible');
+                        if (definition && definition.defaultValue !== undefined) {
+                            isVisible = definition.defaultValue === true;
+                        }
+                        console.log('📋 [SCAN] No data in Supabase, using default:', isVisible);
+                    } else {
+                        // Supabase'den veri geldi, direkt kullan
+                        isVisible = data.current_value === true || data.current_value === 'true' || data.current_value === 1;
+                        console.log('✅ [SCAN] Got value from Supabase immediately:', isVisible, 'Raw:', data.current_value);
+                    }
+                    
+                    // UI'ı anında güncelle
+                    if (isVisible) {
+                        scanEffectContainer.classList.remove('hidden');
+                        scanEffectContainer.style.display = 'flex';
+                    } else {
+                        scanEffectContainer.classList.add('hidden');
+                        scanEffectContainer.style.display = 'none';
+                    }
+                    
+                    // Cache'i güncelle
+                    try {
+                        localStorage.setItem('scan_effect_visible_cache', isVisible ? 'true' : 'false');
+                        localStorage.setItem('scan_effect_visible_cache_timestamp', Date.now().toString());
+                    } catch (e) {
+                        console.warn('⚠️ [SCAN] Error updating cache:', e);
+                    }
+                } catch (error) {
+                    console.error('❌ [SCAN] Error fetching immediately:', error);
+                    // Hata durumunda gizle (güvenli taraf)
+                    scanEffectContainer.classList.add('hidden');
+                    scanEffectContainer.style.display = 'none';
+                }
+            })();
+            
+            // Ayrıca feature manager yüklendikten sonra da kontrol et
+            setTimeout(async () => {
+                console.log('🔄 [SCAN] Loading scan effect visibility (after feature manager - 2s)...');
+                await loadScanEffectVisibility();
+                
+                // Feature manager'a scan_effect_visible değişikliği için callback ekle
+                if (window.featureManager) {
+                    window.featureManager.onFeatureChange(async (featureKey, oldValue, newValue) => {
+                        if (featureKey === 'scan_effect_visible') {
+                            console.log('🔄 [SCAN] scan_effect_visible changed via realtime:', { oldValue, newValue });
+                            // Hemen UI'ı güncelle
+                            await loadScanEffectVisibility();
+                        }
+                    });
+                    console.log('✅ [SCAN] Registered feature change callback for scan_effect_visible');
+                }
+            }, 2000);
+
+            // IP Ban Check fonksiyonu script bloğunun başında tanımlandı (yukarıda)
+            
+            // IP ban change callback - Real-time subscription zaten checkAndLogoutBannedIP çağırıyor
+            // Bu callback sadece ek kontrol için
+            if (window.ipBanChecker) {
+                window.ipBanChecker.onBanChange(async (ip, isBlocked) => {
+                    console.log(`🔄 IP ban callback triggered: ${ip}, isBlocked: ${isBlocked}`);
+                    const session = window.authUtils?.checkAuth();
+                    if (session && session.clientIP === ip && isBlocked) {
+                        console.log('🚫 IP ban detected via callback, checking status...');
+                        if (typeof window.checkIPBanStatus === 'function') {
+                            await window.checkIPBanStatus();
+                        }
+                    }
+                });
+            }
+
+            // Load anti-glare setting on page load (wait for feature manager to be ready)
+            setTimeout(async () => {
+                console.log('🚀 Initializing anti-glare settings...');
+                await loadAntiGlareSetting();
+                // Also update UI when page loads
+                console.log('🎨 Updating anti-glare UI...');
+                await updateAntiGlareSettingsUI();
+            }, 2000); // Wait 2 seconds for feature manager to load features
+            
+            // Listen for feature changes periodically
+            if (window.featureManager) {
+                setInterval(async () => {
+                    await loadAntiGlareSetting();
+                }, 5 * 60 * 1000); // Every 5 minutes
+            }
+
             document.getElementById('showDefaultProducts').addEventListener('change', (e) => {
                 if (window.userDataManager && window.userDataManager.currentUser) {
                     window.userDataManager.updateSettings({ showDefaultProducts: e.target.checked });
@@ -5644,19 +7233,225 @@
                 return;
             }
             
+            // ÖNCE Supabase'den güncel trial_end değerini çek (CACHE YOK, DİREKT SUPABASE!)
+            let trialEndDate = session.trialEnd;
+            
+            // Supabase hazır olana kadar bekle
+            for (let i = 0; i < 50; i++) {
+                if (window.supabase) break;
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            if (window.supabase && session.username) {
+                try {
+                    const { data, error } = await window.supabase
+                        .from('users')
+                        .select('trial_end, trialEnd')
+                        .eq('username', session.username)
+                        .single();
+                    
+                    if (!error && data) {
+                        trialEndDate = data.trial_end || data.trialEnd;
+                        
+                        const sessionData = {
+                            username: session.username,
+                            company: session.company || '',
+                            trialEnd: trialEndDate,
+                            isAdmin: session.isAdmin || false,
+                            loginTime: session.loginTime || new Date().toISOString(),
+                            clientIP: session.clientIP || ''
+                        };
+                        
+                        Object.assign(session, sessionData);
+                        localStorage.setItem('userSession', JSON.stringify(sessionData));
+                        
+                        const authToken = btoa(unescape(encodeURIComponent(JSON.stringify(sessionData))));
+                        localStorage.setItem('authToken', authToken);
+                    }
+                } catch (error) {
+                    // Sessizce devam et, session değerini kullan
+                }
+            }
+            
             // Update user info in header
             document.getElementById('userName').textContent = session.username;
             document.getElementById('userCompany').textContent = session.company;
             
             // Update trial countdown
             if (window.updateTrialCountdown) {
-                window.updateTrialCountdown(session.trialEnd);
+                window.updateTrialCountdown(trialEndDate);
             }
             
             // Update trial banner
             if (window.updateTrialBanner) {
-                window.updateTrialBanner(session.trialEnd);
+                window.updateTrialBanner(trialEndDate);
             }
+            
+            // Fonksiyonun yüklenmesini bekle ve countdown'ı başlat
+            const tryUpdateCountdown = () => {
+                if (window.updateTrialCountdownHeader) {
+                    window.updateTrialCountdownHeader(trialEndDate);
+                } else {
+                    setTimeout(tryUpdateCountdown, 100);
+                }
+            };
+            tryUpdateCountdown();
+            
+            // Supabase realtime subscription - trial_end değişikliklerini dinle
+            if (window.supabase && session.username) {
+                window.trialEndSubscription = window.supabase
+                    .channel(`user_trial_end_${session.username}`)
+                    .on('postgres_changes', {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'users',
+                        filter: `username=eq.${session.username}`
+                    }, async (payload) => {
+                        const newTrialEnd = payload.new?.trial_end || payload.new?.trialEnd;
+                        const oldTrialEnd = payload.old?.trial_end || payload.old?.trialEnd;
+                        
+                        // Sadece gerçekten değiştiyse güncelle
+                        if (newTrialEnd && newTrialEnd !== oldTrialEnd && newTrialEnd !== session.trialEnd) {
+                            const sessionData = {
+                                username: session.username,
+                                company: session.company || '',
+                                trialEnd: newTrialEnd,
+                                isAdmin: session.isAdmin || false,
+                                loginTime: session.loginTime || new Date().toISOString(),
+                                clientIP: session.clientIP || ''
+                            };
+                            
+                            Object.assign(session, sessionData);
+                            localStorage.setItem('userSession', JSON.stringify(sessionData));
+                            
+                            const authToken = btoa(unescape(encodeURIComponent(JSON.stringify(sessionData))));
+                            localStorage.setItem('authToken', authToken);
+                            
+                            if (window.updateTrialCountdownHeader) {
+                                window.updateTrialCountdownHeader(newTrialEnd);
+                            }
+                        }
+                    })
+                    .subscribe();
+                
+                // Cleanup function (sayfa kapatılırken)
+                window.addEventListener('beforeunload', () => {
+                    if (window.trialEndSubscription && window.supabase) {
+                        window.supabase.removeChannel(window.trialEndSubscription);
+                    }
+                });
+                
+                // Periyodik kontrol (realtime çalışmazsa yedek) - Her 30 saniyede bir
+                const periodicCheckInterval = setInterval(async () => {
+                    if (window.supabase && session.username) {
+                        try {
+                            const { data, error } = await window.supabase
+                                .from('users')
+                                .select('trial_end, trialEnd')
+                                .eq('username', session.username)
+                                .single();
+                            
+                            if (!error && data) {
+                                const supabaseTrialEnd = data.trial_end || data.trialEnd;
+                                if (supabaseTrialEnd !== session.trialEnd) {
+                                    const sessionData = {
+                                        username: session.username,
+                                        company: session.company || '',
+                                        trialEnd: supabaseTrialEnd,
+                                        isAdmin: session.isAdmin || false,
+                                        loginTime: session.loginTime || new Date().toISOString(),
+                                        clientIP: session.clientIP || ''
+                                    };
+                                    
+                                    Object.assign(session, sessionData);
+                                    localStorage.setItem('userSession', JSON.stringify(sessionData));
+                                    
+                                    const authToken = btoa(unescape(encodeURIComponent(JSON.stringify(sessionData))));
+                                    localStorage.setItem('authToken', authToken);
+                                    
+                                    if (window.updateTrialCountdownHeader) {
+                                        window.updateTrialCountdownHeader(supabaseTrialEnd);
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            // Sessizce devam et
+                        }
+                    }
+                }, 30000);
+                
+                // Cleanup interval on page unload
+                window.addEventListener('beforeunload', () => {
+                    if (periodicCheckInterval) {
+                        clearInterval(periodicCheckInterval);
+                    }
+                });
+                
+                // Sayfa görünür olduğunda kontrol et
+                document.addEventListener('visibilitychange', async () => {
+                    if (!document.hidden && window.supabase && session.username) {
+                        try {
+                            const { data, error } = await window.supabase
+                                .from('users')
+                                .select('trial_end, trialEnd')
+                                .eq('username', session.username)
+                                .single();
+                            
+                            if (!error && data) {
+                                const supabaseTrialEnd = data.trial_end || data.trialEnd;
+                                if (supabaseTrialEnd !== session.trialEnd) {
+                                    const sessionData = {
+                                        username: session.username,
+                                        company: session.company || '',
+                                        trialEnd: supabaseTrialEnd,
+                                        isAdmin: session.isAdmin || false,
+                                        loginTime: session.loginTime || new Date().toISOString(),
+                                        clientIP: session.clientIP || ''
+                                    };
+                                    
+                                    Object.assign(session, sessionData);
+                                    localStorage.setItem('userSession', JSON.stringify(sessionData));
+                                    
+                                    const authToken = btoa(unescape(encodeURIComponent(JSON.stringify(sessionData))));
+                                    localStorage.setItem('authToken', authToken);
+                                    
+                                    if (window.updateTrialCountdownHeader) {
+                                        window.updateTrialCountdownHeader(supabaseTrialEnd);
+                                    }
+                                }
+                            }
+                        } catch (error) {
+                            // Sessizce devam et
+                        }
+                    }
+                });
+            }
+            
+            // IP Ban Check - HEMEN kontrol et (sayfa yüklendiğinde)
+            console.log('🔍 [PAGE LOAD] Starting immediate IP ban check...');
+            if (typeof window.checkIPBanStatus === 'function') {
+                window.checkIPBanStatus(); // Hemen çağır
+            } else {
+                console.error('❌ [PAGE LOAD] checkIPBanStatus function not found!');
+                console.error('❌ [PAGE LOAD] window.checkIPBanStatus:', typeof window.checkIPBanStatus);
+            }
+            
+            // Ayrıca 2 saniye sonra da kontrol et (güvenlik için)
+            setTimeout(async () => {
+                console.log('🔍 [PAGE LOAD] Delayed IP ban check (2s)...');
+                if (typeof window.checkIPBanStatus === 'function') {
+                    await window.checkIPBanStatus();
+                } else {
+                    console.error('❌ [PAGE LOAD] checkIPBanStatus function still not found after 2s!');
+                }
+            }, 2000);
+            
+            // Check IP ban periodically (every 5 seconds for faster response)
+            setInterval(async () => {
+                if (typeof window.checkIPBanStatus === 'function') {
+                    await window.checkIPBanStatus();
+                }
+            }, 5 * 1000);
             
             // FORCE UPDATE TRIAL BANNER HEADER - IMMEDIATE CALL
             console.log('🚀 FORCE CALLING updateTrialBannerHeader with:', session.trialEnd);

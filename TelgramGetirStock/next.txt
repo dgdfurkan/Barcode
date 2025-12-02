@@ -1,0 +1,36 @@
+💡 Sistem geliştirme önerileri
+🏷️ Raf etiketi ile arama
+🔍 Raf etiketi ile ürün arama (örn: 8690504017301)
+⭐ Favori ürünler
+➕ Sık kullanılan ürünleri favorilere ekleme
+⚡ Hızlı erişim komutları (/fav, /favoriler)
+🔔 Stok uyarıları
+⬇️ Belirli bir eşiğin altına düştüğünde bildirim
+📝 Örnek: /alert Ülker Çubuk Kraker 50 → stok 50'nin altına düştüğünde bildirim
+
+📦 Toplu arama
+✏️ Birden fazla ürünü tek mesajda arama
+📝 Örnek: Ülker Çubuk Kraker\nCoca Cola\nSütaş Süt
+
+📂 Kategori bazlı arama
+🗂️ Kategoriye göre ürün listeleme
+📝 Örnek: /kategori Çikolata
+
+📊 Stok geçmişi/trend
+📈 Stok değişimlerini takip etme (veritabanı gerekir)
+
+📤 Excel export
+📄 Arama sonuçlarını Excel'e aktarma
+
+⚙️ Hızlı komutlar
+🥉 /dusuk → Düşük stoklu ürünler
+🥇 /yuksek → Yüksek stoklu ürünler
+⭕ /sifir → Stoku sıfır olan ürünler
+
+🏬 Çoklu depo desteği
+🏪 Birden fazla depo varsa, depo seçimi
+
+📈 İstatistikler
+🔢 Toplam ürün sayısı, ortalama stok vb.
+
+❓ Hangi özellikleri ekleyelim? Öncelik sırasına göre ekleyebilirim.

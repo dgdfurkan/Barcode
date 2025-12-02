@@ -7,6 +7,7 @@ class AdminPanel {
         this.logs = [];
         this.currentMessageFilter = 'all';
         this.ipTrackingData = [];
+        this.blockedIPsData = [];
         this.ipAnalysis = null;
         this.currentIPDetailsSortDirection = 'asc';
         this.currentIPDetailsSortColumn = null;
@@ -15,6 +16,9 @@ class AdminPanel {
         this.selectedChatUser = null;
         this.chatMessages = [];
         this.chatSubscription = null;
+        this.updates = [];
+        this.currentUpdateSteps = [];
+        this.editingUpdateId = null;
     }
 
     async init() {
@@ -80,6 +84,9 @@ class AdminPanel {
             e.preventDefault();
             this.addUser();
         });
+
+        // Product Import Tab Event Listeners
+        this.initProductImportTab();
 
         // Extend Trial Modal
         document.getElementById('closeExtendTrialModal').addEventListener('click', () => {
@@ -178,6 +185,11 @@ class AdminPanel {
             this.loadIPTracking();
         });
 
+        // Refresh blocked IPs button
+        document.getElementById('refreshBlockedIPsBtn')?.addEventListener('click', async () => {
+            await this.loadBlockedIPs();
+        });
+
         // Chat event listeners
         document.getElementById('refreshChat').addEventListener('click', () => this.loadChatUsers());
         document.getElementById('clearChatBtn').addEventListener('click', () => this.clearChat());
@@ -197,6 +209,76 @@ class AdminPanel {
 
         document.getElementById('savePremiumFeatures')?.addEventListener('click', () => {
             this.savePremiumFeatures();
+        });
+
+        // Updates Management
+        document.getElementById('createUpdateBtn')?.addEventListener('click', () => {
+            this.openUpdateModal();
+        });
+
+        document.getElementById('closeUpdateModal')?.addEventListener('click', () => {
+            document.getElementById('updateModal').classList.add('hidden');
+        });
+
+        document.getElementById('cancelUpdateBtn')?.addEventListener('click', () => {
+            document.getElementById('updateModal').classList.add('hidden');
+        });
+
+        document.getElementById('addStepBtn')?.addEventListener('click', () => {
+            this.addStep();
+        });
+
+        document.getElementById('addFeatureChangeBtn')?.addEventListener('click', () => {
+            this.addFeatureChange();
+        });
+
+        document.getElementById('updateForm')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveUpdate();
+        });
+
+        document.getElementById('previewUpdateBtn')?.addEventListener('click', () => {
+            this.previewUpdate();
+        });
+
+        document.getElementById('closePreviewModal')?.addEventListener('click', () => {
+            document.getElementById('previewModal').classList.add('hidden');
+        });
+
+        document.getElementById('refreshUpdatesBtn')?.addEventListener('click', () => {
+            this.loadUpdates();
+        });
+
+        document.getElementById('updateFilter')?.addEventListener('change', (e) => {
+            this.filterUpdates(e.target.value);
+        });
+
+        // Gemini AI Modal
+        document.getElementById('openGeminiModalBtn')?.addEventListener('click', () => {
+            this.openGeminiModal();
+        });
+
+        document.getElementById('closeGeminiModal')?.addEventListener('click', () => {
+            this.closeGeminiModal();
+        });
+
+        document.getElementById('cancelGeminiBtn')?.addEventListener('click', () => {
+            this.closeGeminiModal();
+        });
+
+        document.getElementById('generateGeminiBtn')?.addEventListener('click', () => {
+            this.generateWithGemini();
+        });
+
+        // Settings save/load
+        this.loadAdminSettings();
+        
+        // Save settings when switching away from settings tab
+        const settingsInputs = document.querySelectorAll('#settings-tab input, #settings-tab select');
+        settingsInputs.forEach(input => {
+            input.addEventListener('change', () => {
+                this.saveAdminSettings();
+            });
         });
     }
 
@@ -223,8 +305,17 @@ class AdminPanel {
         if (tabName === 'ipAnalysis') {
             await this.loadIPAnalysis();
             await this.loadIPTracking();
+            await this.loadBlockedIPs();
         } else if (tabName === 'chat') {
             await this.loadChatUsers();
+        } else if (tabName === 'updates') {
+            await this.loadUpdates();
+        } else if (tabName === 'config') {
+            await this.loadConfigTab();
+        } else if (tabName === 'product-import') {
+            await this.loadProductImportTab();
+        } else if (tabName === 'settings') {
+            this.loadAdminSettings();
         }
     }
 
@@ -1655,6 +1746,7 @@ class AdminPanel {
                 }
 
                 await this.loadIPTracking();
+                await this.loadBlockedIPs(); // Reload blocked IPs list
                 alert('IP adresi engellendi!');
             } catch (error) {
                 console.error('Error blocking IP:', error);
@@ -1682,11 +1774,117 @@ class AdminPanel {
             }
 
             await this.loadIPTracking();
+            await this.loadBlockedIPs(); // Reload blocked IPs list
             alert('IP engeli kaldırıldı!');
         } catch (error) {
             console.error('Error unblocking IP:', error);
             alert('IP engeli kaldırılırken hata oluştu!');
         }
+    }
+
+    // Load blocked IPs
+    async loadBlockedIPs() {
+        try {
+            if (!window.supabase) {
+                console.warn('Supabase not available for loading blocked IPs');
+                return;
+            }
+
+            const { data, error } = await window.supabase
+                .from('user_ip_tracking')
+                .select('id, ip_address, is_blocked, first_seen, last_seen, updated_at, user_id')
+                .eq('is_blocked', true)
+                .order('updated_at', { ascending: false });
+
+            if (error) throw error;
+
+            this.blockedIPsData = data || [];
+            this.renderBlockedIPs();
+        } catch (error) {
+            console.error('Error loading blocked IPs:', error);
+        }
+    }
+
+    // Render blocked IPs table
+    renderBlockedIPs() {
+        const tbody = document.getElementById('blockedIPsTableBody');
+        if (!tbody) return;
+
+        if (!this.blockedIPsData || this.blockedIPsData.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="px-6 py-4 text-center text-gray-500">Engellenen IP bulunmuyor</td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = '';
+
+        // Group IPs by IP address to show related users
+        const ipGroups = {};
+        this.blockedIPsData.forEach(ip => {
+            if (!ipGroups[ip.ip_address]) {
+                ipGroups[ip.ip_address] = [];
+            }
+            ipGroups[ip.ip_address].push(ip);
+        });
+
+        // Render each IP group
+        Object.entries(ipGroups).forEach(([ipAddress, ips]) => {
+            const firstIP = ips[0];
+            const latestUpdate = ips.reduce((latest, ip) => {
+                const ipDate = new Date(ip.updated_at || ip.last_seen);
+                const latestDate = new Date(latest.updated_at || latest.last_seen);
+                return ipDate > latestDate ? ip : latest;
+            }, firstIP);
+
+            // Get usernames for this IP
+            const userIds = [...new Set(ips.map(ip => ip.user_id).filter(Boolean))];
+            let usernames = [];
+            
+            if (userIds.length > 0 && this.users) {
+                usernames = userIds.map(userId => {
+                    const user = this.users.find(u => u.id === userId);
+                    return user ? user.username : null;
+                }).filter(Boolean);
+            }
+
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-50';
+            
+            const banDate = new Date(latestUpdate.updated_at || latestUpdate.last_seen);
+            const lastSeenDate = new Date(latestUpdate.last_seen);
+            
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="flex items-center">
+                        <span class="text-sm font-medium text-gray-900">${ipAddress}</span>
+                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                            Engelli
+                        </span>
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm text-gray-900">
+                        ${usernames.length > 0 ? usernames.map(u => `<span class="inline-block bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs mr-1 mb-1">${u}</span>`).join('') : '<span class="text-gray-400">Kullanıcı bilgisi yok</span>'}
+                    </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${banDate.toLocaleDateString('tr-TR')} ${banDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${lastSeenDate.toLocaleDateString('tr-TR')} ${lastSeenDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button onclick="adminPanel.unblockIP('${firstIP.id}')" class="text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100 px-3 py-1 rounded text-xs">
+                        Engeli Kaldır
+                    </button>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        });
     }
 
     async deleteIPTracking(ipId) {
@@ -1730,6 +1928,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('refreshMessagesBtn').addEventListener('click', async () => {
         await adminPanel.loadMessages();
     });
+
+    // Config Tab Event Listeners
+    const refreshConfigBtn = document.getElementById('refreshConfigBtn');
+    if (refreshConfigBtn) {
+        refreshConfigBtn.addEventListener('click', async () => {
+            await adminPanel.loadConfigTab();
+        });
+    }
+
+    // Config Search
+    const configSearchInput = document.getElementById('configSearchInput');
+    if (configSearchInput) {
+        configSearchInput.addEventListener('input', (e) => {
+            adminPanel.filterConfigTable(e.target.value);
+        });
+    }
+
+    // Edit Feature Modal
+    const closeEditFeatureModal = document.getElementById('closeEditFeatureModal');
+    if (closeEditFeatureModal) {
+        closeEditFeatureModal.addEventListener('click', () => {
+            document.getElementById('editFeatureModal').classList.add('hidden');
+        });
+    }
+
+    const cancelEditFeature = document.getElementById('cancelEditFeature');
+    if (cancelEditFeature) {
+        cancelEditFeature.addEventListener('click', () => {
+            document.getElementById('editFeatureModal').classList.add('hidden');
+        });
+    }
+
+    const editFeatureForm = document.getElementById('editFeatureForm');
+    if (editFeatureForm) {
+        editFeatureForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            adminPanel.updateFeatureValue();
+        });
+    }
     
     // IP Analysis refresh button
     const refreshIPAnalysisBtn = document.getElementById('refreshIPAnalysisBtn');
@@ -3021,5 +3258,1036 @@ AdminPanel.prototype.triggerPremiumFeaturesRealtimeUpdate = async function(usern
         }
     } catch (error) {
         console.error('❌ Error triggering premium features realtime update:', error);
+    }
+};
+
+// ==================== CONFIG TAB METHODS ====================
+
+AdminPanel.prototype.loadConfigTab = async function() {
+    try {
+        console.log('🔄 Loading config tab...');
+        
+        // ÖNCE: feature-definitions.js'deki tüm özellikleri Supabase'e ekle (eksik olanlar)
+        await this.syncFeatureDefinitionsToSupabase();
+        
+        // Load system features
+        const { data: features, error: featuresError } = await window.supabase
+            .from('system_features')
+            .select('*')
+            .eq('is_active', true)
+            .order('feature_key', { ascending: true });
+
+        if (featuresError) {
+            console.error('❌ Error loading system features:', featuresError);
+            alert('Özellikler yüklenirken hata oluştu: ' + featuresError.message);
+            return;
+        }
+
+        // Load scheduled feature changes
+        const scheduledChanges = await this.getScheduledFeatureChanges();
+
+        // Store for filtering
+        this.configFeatures = features || [];
+        this.configScheduledChanges = scheduledChanges;
+
+        // Render table
+        this.renderConfigTable();
+    } catch (error) {
+        console.error('❌ Error loading config tab:', error);
+        alert('Config sekmesi yüklenirken hata oluştu: ' + error.message);
+    }
+};
+
+AdminPanel.prototype.syncFeatureDefinitionsToSupabase = async function() {
+    try {
+        if (!window.supabase) {
+            console.warn('⚠️ Supabase not available, cannot sync feature definitions');
+            return;
+        }
+
+        if (!window.getAllFeatureDefinitions) {
+            console.warn('⚠️ getAllFeatureDefinitions not available');
+            return;
+        }
+
+        const definitions = window.getAllFeatureDefinitions();
+        console.log('🔄 Syncing feature definitions to Supabase...', Object.keys(definitions).length, 'features');
+
+        // Mevcut özellikleri getir
+        const { data: existingFeatures, error: fetchError } = await window.supabase
+            .from('system_features')
+            .select('feature_key');
+
+        if (fetchError) {
+            console.error('❌ Error fetching existing features:', fetchError);
+            return;
+        }
+
+        const existingKeys = new Set((existingFeatures || []).map(f => f.feature_key));
+        const featuresToInsert = [];
+
+        // Her definition için kontrol et
+        for (const [featureKey, definition] of Object.entries(definitions)) {
+            if (!existingKeys.has(featureKey)) {
+                // Supabase'de yok, ekle
+                featuresToInsert.push({
+                    feature_key: featureKey,
+                    feature_name: definition.name,
+                    current_value: definition.defaultValue,
+                    default_value: definition.defaultValue,
+                    value_type: definition.valueType,
+                    description: definition.description || null,
+                    is_active: true
+                });
+                console.log(`➕ Will insert feature: ${featureKey} (${definition.name})`);
+            }
+        }
+
+        // Eksik özellikleri ekle
+        if (featuresToInsert.length > 0) {
+            const { error: insertError } = await window.supabase
+                .from('system_features')
+                .insert(featuresToInsert);
+
+            if (insertError) {
+                console.error('❌ Error inserting features:', insertError);
+                alert(`⚠️ ${featuresToInsert.length} özellik eklenirken hata oluştu: ${insertError.message}`);
+            } else {
+                console.log(`✅ Successfully inserted ${featuresToInsert.length} features to Supabase`);
+            }
+        } else {
+            console.log('✅ All features already exist in Supabase');
+        }
+    } catch (error) {
+        console.error('❌ Error syncing feature definitions:', error);
+    }
+};
+
+AdminPanel.prototype.getScheduledFeatureChanges = async function() {
+    try {
+        const now = new Date().toISOString();
+        
+        // Get scheduled updates (is_active = false, scheduled_at > now)
+        const { data: scheduledUpdates, error } = await window.supabase
+            .from('updates')
+            .select('update_number, scheduled_at, feature_changes')
+            .eq('is_active', false)
+            .gt('scheduled_at', now)
+            .order('scheduled_at', { ascending: true });
+
+        if (error) {
+            console.error('❌ Error loading scheduled updates:', error);
+            return {};
+        }
+
+        // Create a map: feature_key -> { update_number, scheduled_at, new_value }
+        const changesMap = {};
+        
+        if (scheduledUpdates) {
+            for (const update of scheduledUpdates) {
+                if (update.feature_changes && Array.isArray(update.feature_changes)) {
+                    for (const change of update.feature_changes) {
+                        if (change.feature_key) {
+                            changesMap[change.feature_key] = {
+                                update_number: update.update_number,
+                                scheduled_at: update.scheduled_at,
+                                new_value: change.new_value
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        return changesMap;
+    } catch (error) {
+        console.error('❌ Error getting scheduled feature changes:', error);
+        return {};
+    }
+};
+
+AdminPanel.prototype.renderConfigTable = function() {
+    const tbody = document.getElementById('configTableBody');
+    if (!tbody) return;
+
+    // Hem Supabase'deki hem de feature-definitions.js'deki özellikleri birleştir
+    const allFeatures = this.mergeFeaturesWithDefinitions();
+
+    if (!allFeatures || allFeatures.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Özellik bulunamadı</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = allFeatures.map(feature => {
+        const scheduledChange = this.configScheduledChanges[feature.feature_key];
+        const scheduledInfo = scheduledChange 
+            ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800" title="v ${scheduledChange.update_number} - ${new Date(scheduledChange.scheduled_at).toLocaleString('tr-TR')}">
+                📅 v ${scheduledChange.update_number}
+              </span>`
+            : '<span class="text-gray-400">-</span>';
+
+        // Eğer Supabase'de yoksa, uyarı göster
+        const notInSupabase = feature._from_definition ? '<div class="text-xs text-orange-600 font-medium mt-1">⚠️ Supabase\'de yok</div>' : '';
+
+        // Format value based on type
+        const formatValue = (value, type) => {
+            if (value === null || value === undefined) return '-';
+            if (type === 'boolean') {
+                return value ? '<span class="text-green-600 font-medium">✓ True</span>' : '<span class="text-red-600 font-medium">✗ False</span>';
+            }
+            if (type === 'object') {
+                return '<code class="text-xs bg-gray-100 px-2 py-1 rounded">' + JSON.stringify(value).substring(0, 50) + (JSON.stringify(value).length > 50 ? '...' : '') + '</code>';
+            }
+            return String(value);
+        };
+
+        const lastUpdated = feature.updated_at 
+            ? new Date(feature.updated_at).toLocaleString('tr-TR')
+            : '-';
+
+        return `
+            <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <code class="text-sm font-mono text-gray-900">${feature.feature_key}</code>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <div class="text-sm font-medium text-gray-900">${feature.feature_name}</div>
+                    ${feature.description ? `<div class="text-xs text-gray-500">${feature.description}</div>` : ''}
+                    ${notInSupabase}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full ${
+                        feature.value_type === 'boolean' ? 'bg-purple-100 text-purple-800' :
+                        feature.value_type === 'number' ? 'bg-blue-100 text-blue-800' :
+                        feature.value_type === 'string' ? 'bg-green-100 text-green-800' :
+                        'bg-gray-100 text-gray-800'
+                    }">${feature.value_type}</span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${formatValue(feature.default_value, feature.value_type)}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ${formatValue(feature.current_value, feature.value_type)}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    ${lastUpdated}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    ${scheduledInfo}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button onclick="adminPanel.openEditFeatureModal('${feature.feature_key}')" 
+                            class="text-blue-600 hover:text-blue-900">
+                        Düzenle
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+};
+
+AdminPanel.prototype.mergeFeaturesWithDefinitions = function() {
+    // Supabase'deki özellikler
+    const supabaseFeatures = this.configFeatures || [];
+    const supabaseKeys = new Set(supabaseFeatures.map(f => f.feature_key));
+
+    // feature-definitions.js'deki tüm özellikler
+    const definitions = window.getAllFeatureDefinitions?.() || {};
+    const allFeatures = [...supabaseFeatures];
+
+    // feature-definitions.js'de olup Supabase'de olmayanları ekle
+    for (const [featureKey, definition] of Object.entries(definitions)) {
+        if (!supabaseKeys.has(featureKey)) {
+            // Supabase'de yok, definition'dan oluştur
+            allFeatures.push({
+                feature_key: featureKey,
+                feature_name: definition.name,
+                current_value: definition.defaultValue,
+                default_value: definition.defaultValue,
+                value_type: definition.valueType,
+                description: definition.description || null,
+                is_active: true,
+                created_at: null,
+                updated_at: null,
+                _from_definition: true // Flag: Supabase'de henüz yok
+            });
+        }
+    }
+
+    return allFeatures.sort((a, b) => a.feature_key.localeCompare(b.feature_key));
+};
+
+AdminPanel.prototype.filterConfigTable = function(searchTerm) {
+    if (!this.configFeatures) return;
+    
+    const tbody = document.getElementById('configTableBody');
+    if (!tbody) return;
+
+    if (!searchTerm || searchTerm.trim() === '') {
+        // No filter, show all
+        this.renderConfigTable();
+        return;
+    }
+
+    // Merge features with definitions first
+    const allFeatures = this.mergeFeaturesWithDefinitions();
+    const filtered = allFeatures.filter(feature => {
+        const term = searchTerm.toLowerCase();
+        return feature.feature_key.toLowerCase().includes(term) ||
+               feature.feature_name.toLowerCase().includes(term) ||
+               (feature.description && feature.description.toLowerCase().includes(term));
+    });
+
+    // Render filtered results
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Arama sonucu bulunamadı</td></tr>';
+        return;
+    }
+
+    // Temporarily store filtered features for rendering
+    const originalFeatures = this.configFeatures;
+    this.configFeatures = filtered;
+    this.renderConfigTable();
+    this.configFeatures = originalFeatures;
+};
+
+AdminPanel.prototype.openEditFeatureModal = async function(featureKey) {
+    try {
+        // Find feature (hem Supabase'deki hem de definition'daki)
+        const allFeatures = this.mergeFeaturesWithDefinitions();
+        const feature = allFeatures.find(f => f.feature_key === featureKey);
+        
+        if (!feature) {
+            alert('Özellik bulunamadı!');
+            return;
+        }
+
+        // Eğer Supabase'de yoksa, önce ekle
+        if (feature._from_definition) {
+            console.log(`➕ Feature ${featureKey} not in Supabase, inserting...`);
+            await this.syncFeatureDefinitionsToSupabase();
+            // Reload to get the newly inserted feature
+            await this.loadConfigTab();
+            // Find again after reload
+            const reloadedFeatures = this.mergeFeaturesWithDefinitions();
+            const reloadedFeature = reloadedFeatures.find(f => f.feature_key === featureKey);
+            if (reloadedFeature) {
+                // Use reloaded feature
+                Object.assign(feature, reloadedFeature);
+            }
+        }
+
+        // Populate modal
+        document.getElementById('editFeatureKey').value = feature.feature_key;
+        document.getElementById('editFeatureKeyDisplay').value = feature.feature_key;
+        document.getElementById('editFeatureName').value = feature.feature_name;
+        document.getElementById('editFeatureType').value = feature.value_type;
+        document.getElementById('editFeatureDescription').value = feature.description || '';
+
+        // Create dynamic inputs based on value type
+        const defaultContainer = document.getElementById('editDefaultValueContainer');
+        const currentContainer = document.getElementById('editCurrentValueContainer');
+
+        defaultContainer.innerHTML = this.createValueInput('editDefaultValue', feature.value_type, feature.default_value);
+        currentContainer.innerHTML = this.createValueInput('editCurrentValue', feature.value_type, feature.current_value);
+
+        // Show modal
+        document.getElementById('editFeatureModal').classList.remove('hidden');
+    } catch (error) {
+        console.error('❌ Error opening edit feature modal:', error);
+        alert('Modal açılırken hata oluştu: ' + error.message);
+    }
+};
+
+AdminPanel.prototype.createValueInput = function(inputId, valueType, currentValue) {
+    switch (valueType) {
+        case 'boolean':
+            return `
+                <label class="flex items-center space-x-3">
+                    <input type="checkbox" id="${inputId}" 
+                           ${currentValue === true ? 'checked' : ''}
+                           class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <span class="text-sm text-gray-700">${currentValue === true ? 'True (Aktif)' : 'False (Pasif)'}</span>
+                </label>
+            `;
+        case 'number':
+            return `
+                <input type="number" id="${inputId}" 
+                       value="${currentValue}" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+            `;
+        case 'string':
+            return `
+                <input type="text" id="${inputId}" 
+                       value="${String(currentValue)}" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+            `;
+        case 'object':
+            return `
+                <textarea id="${inputId}" 
+                          rows="6" 
+                          class="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:ring-blue-500 focus:border-blue-500">${JSON.stringify(currentValue, null, 2)}</textarea>
+                <p class="text-xs text-gray-500 mt-1">JSON formatında girin</p>
+            `;
+        default:
+            return `<input type="text" id="${inputId}" value="${String(currentValue)}" class="w-full px-3 py-2 border border-gray-300 rounded-md">`;
+    }
+};
+
+AdminPanel.prototype.updateFeatureValue = async function() {
+    try {
+        const featureKey = document.getElementById('editFeatureKey').value;
+        const valueType = document.getElementById('editFeatureType').value;
+
+        // Get values from inputs
+        let newDefaultValue, newCurrentValue;
+
+        if (valueType === 'boolean') {
+            newDefaultValue = document.getElementById('editDefaultValue').checked;
+            newCurrentValue = document.getElementById('editCurrentValue').checked;
+        } else if (valueType === 'number') {
+            newDefaultValue = parseFloat(document.getElementById('editDefaultValue').value);
+            newCurrentValue = parseFloat(document.getElementById('editCurrentValue').value);
+            if (isNaN(newDefaultValue) || isNaN(newCurrentValue)) {
+                alert('Geçerli bir sayı girin!');
+                return;
+            }
+        } else if (valueType === 'string') {
+            newDefaultValue = document.getElementById('editDefaultValue').value;
+            newCurrentValue = document.getElementById('editCurrentValue').value;
+        } else if (valueType === 'object') {
+            try {
+                newDefaultValue = JSON.parse(document.getElementById('editDefaultValue').value);
+                newCurrentValue = JSON.parse(document.getElementById('editCurrentValue').value);
+            } catch (e) {
+                alert('Geçerli bir JSON formatı girin!');
+                return;
+            }
+        } else {
+            alert('Bilinmeyen değer tipi!');
+            return;
+        }
+
+        // Get current feature to compare
+        const feature = this.configFeatures.find(f => f.feature_key === featureKey);
+        if (!feature) {
+            alert('Özellik bulunamadı!');
+            return;
+        }
+
+        // Update system_features
+        const { error: updateError } = await window.supabase
+            .from('system_features')
+            .update({
+                default_value: newDefaultValue,
+                current_value: newCurrentValue,
+                updated_at: new Date().toISOString()
+            })
+            .eq('feature_key', featureKey);
+
+        if (updateError) {
+            console.error('❌ Error updating feature:', updateError);
+            alert('Özellik güncellenirken hata oluştu: ' + updateError.message);
+            return;
+        }
+
+        // Save to feature_history if current_value changed
+        if (window.featureManager && !window.featureManager.valuesEqual(feature.current_value, newCurrentValue)) {
+            const adminUser = document.getElementById('adminUser')?.textContent || 'admin';
+            await window.featureManager.saveFeatureHistory(
+                featureKey,
+                feature.current_value,
+                newCurrentValue,
+                null, // update_number = null for manual changes
+                adminUser
+            );
+        }
+
+        // Close modal
+        document.getElementById('editFeatureModal').classList.add('hidden');
+
+        // Reload config tab
+        await this.loadConfigTab();
+
+        alert('✅ Özellik başarıyla güncellendi!');
+    } catch (error) {
+        console.error('❌ Error updating feature value:', error);
+        alert('Özellik güncellenirken hata oluştu: ' + error.message);
+    }
+};
+
+AdminPanel.prototype.initProductImportTab = function() {
+    // Analyze button
+    const analyzeBtn = document.getElementById('analyzeProductsBtn');
+    if (analyzeBtn) {
+        analyzeBtn.addEventListener('click', async () => {
+            await this.analyzeProducts();
+        });
+    }
+
+    // Clear input button
+    const clearBtn = document.getElementById('clearInputBtn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            document.getElementById('htmlTableInput').value = '';
+            document.getElementById('analysisResults').classList.add('hidden');
+        });
+    }
+
+    // Select all checkbox
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', (e) => {
+            const checkboxes = document.querySelectorAll('#analysisResultsBody input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = e.target.checked);
+        });
+    }
+
+    // Select all new products button
+    const selectAllNewBtn = document.getElementById('selectAllNewBtn');
+    if (selectAllNewBtn) {
+        selectAllNewBtn.addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('#analysisResultsBody tr[data-status="new"] input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = true);
+        });
+    }
+
+    // Deselect all button
+    const deselectAllBtn = document.getElementById('deselectAllBtn');
+    if (deselectAllBtn) {
+        deselectAllBtn.addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('#analysisResultsBody input[type="checkbox"]');
+            checkboxes.forEach(cb => cb.checked = false);
+            if (selectAllCheckbox) selectAllCheckbox.checked = false;
+        });
+    }
+
+    // Add selected products button
+    const addSelectedBtn = document.getElementById('addSelectedProductsBtn');
+    if (addSelectedBtn) {
+        addSelectedBtn.addEventListener('click', async () => {
+            await this.addSelectedProducts();
+        });
+    }
+
+    // Export all products button
+    const exportAllBtn = document.getElementById('exportAllProductsBtn');
+    if (exportAllBtn) {
+        exportAllBtn.addEventListener('click', () => {
+            this.exportAllProducts();
+        });
+    }
+
+    // Clear all results button
+    const clearAllBtn = document.getElementById('clearAllResultsBtn');
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', () => {
+            if (confirm('Tüm analiz sonuçlarını temizlemek istediğinizden emin misiniz?')) {
+                window.productImporter.clearAllAnalysisResults();
+                document.getElementById('analysisResults').classList.add('hidden');
+                document.getElementById('htmlTableInput').value = '';
+                alert('✅ Tüm analiz sonuçları temizlendi!');
+            }
+        });
+    }
+
+    // Barcode search input (debounce)
+    const barcodeSearchInput = document.getElementById('barcodeSearchInput');
+    if (barcodeSearchInput) {
+        barcodeSearchInput.addEventListener('input', (e) => {
+            clearTimeout(window.productImporter.searchDebounceTimer);
+            window.productImporter.searchDebounceTimer = setTimeout(() => {
+                this.searchBarcode(e.target.value);
+            }, 300);
+        });
+    }
+
+    // Products.json file input
+    const selectProductsJsonBtn = document.getElementById('selectProductsJsonBtn');
+    const productsJsonFileInput = document.getElementById('productsJsonFileInput');
+    if (selectProductsJsonBtn && productsJsonFileInput) {
+        selectProductsJsonBtn.addEventListener('click', () => {
+            productsJsonFileInput.click();
+        });
+
+        productsJsonFileInput.addEventListener('change', async (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                const fileName = e.target.files[0].name;
+                const fileNameSpan = document.getElementById('productsJsonFileName');
+                if (fileNameSpan) {
+                    fileNameSpan.textContent = `⏳ ${fileName} yükleniyor...`;
+                }
+                
+                try {
+                    await window.productImporter.loadProductsJSON(e.target);
+                    if (fileNameSpan) {
+                        fileNameSpan.textContent = `✅ ${fileName} yüklendi`;
+                    }
+                    // Cache'i zorla yenile (bir sonraki karşılaştırmada güncel veri kullanılsın)
+                    window.productImporter.productsCacheTimestamp = null;
+                    alert('✅ Products.json başarıyla yüklendi! Artık "Products.json ile Karşılaştır" butonunu kullanarak karşılaştırma yapabilirsiniz.');
+                } catch (error) {
+                    console.error('Error loading file:', error);
+                    if (fileNameSpan) {
+                        fileNameSpan.textContent = `❌ Hata: ${error.message}`;
+                    }
+                    alert('❌ Dosya yüklenirken hata oluştu: ' + error.message);
+                }
+            }
+        });
+    }
+
+    // Getir API'den ürün çekme butonu
+    const fetchAllProductsBtn = document.getElementById('fetchAllProductsBtn');
+    if (fetchAllProductsBtn) {
+        fetchAllProductsBtn.addEventListener('click', async () => {
+            await this.fetchAllProductsFromGetir();
+        });
+    }
+
+    // Warehouse raf etiketlerini çekme butonu
+    const fetchShelfLabelsBtn = document.getElementById('fetchShelfLabelsBtn');
+    if (fetchShelfLabelsBtn) {
+        fetchShelfLabelsBtn.addEventListener('click', async () => {
+            try {
+                await window.productImporter.fetchShelfLabelsFromWarehouse();
+            } catch (error) {
+                console.error('Error fetching shelf labels from Warehouse:', error);
+                alert('Raf etiketleri çekilemedi: ' + error.message);
+            }
+        });
+    }
+
+    // Warehouse raf etiketlerini indirme butonu
+    const downloadShelfLabelsBtn = document.getElementById('downloadShelfLabelsBtn');
+    if (downloadShelfLabelsBtn) {
+        downloadShelfLabelsBtn.addEventListener('click', () => {
+            try {
+                window.productImporter.downloadShelfLabelsJSON();
+                alert('✅ Raf etiketleri JSON olarak indirildi!');
+            } catch (error) {
+                console.error('Error downloading shelf labels:', error);
+                alert('❌ İndirme hatası: ' + error.message);
+            }
+        });
+    }
+
+    // Warehouse raf etiketlerini karşılaştırma butonu
+    const compareShelfLabelsBtn = document.getElementById('compareShelfLabelsBtn');
+    if (compareShelfLabelsBtn) {
+        compareShelfLabelsBtn.addEventListener('click', async () => {
+            try {
+                const result = await window.productImporter.compareShelfLabelsWithProducts();
+                // Alert artık gerekli değil, sonuçlar sayfanın altında gösteriliyor
+            } catch (error) {
+                console.error('Error comparing shelf labels:', error);
+                alert('❌ Karşılaştırma hatası: ' + error.message);
+            }
+        });
+    }
+
+    // Manuel raf etiketi dosyası seçme
+    const selectManualShelfLabelBtn = document.getElementById('selectManualShelfLabelBtn');
+    const manualShelfLabelFileInput = document.getElementById('manualShelfLabelFileInput');
+    const manualShelfLabelFileName = document.getElementById('manualShelfLabelFileName');
+    
+    if (selectManualShelfLabelBtn && manualShelfLabelFileInput) {
+        selectManualShelfLabelBtn.addEventListener('click', () => {
+            manualShelfLabelFileInput.click();
+        });
+        
+        manualShelfLabelFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            try {
+                manualShelfLabelFileName.textContent = file.name;
+                const text = await file.text();
+                const data = JSON.parse(text);
+                
+                // Products.json formatında mı kontrol et
+                let products = [];
+                if (data.products && Array.isArray(data.products)) {
+                    products = data.products;
+                } else if (Array.isArray(data)) {
+                    products = data;
+                } else {
+                    throw new Error('Geçersiz JSON formatı. Products.json formatında olmalı.');
+                }
+                
+                // Manuel dosyayı hafızada tut
+                window.productImporter.manualShelfLabels = products;
+                
+                // Otomatik karşılaştırma yapma, sadece dosyayı yükle
+                // Kullanıcı "Karşılaştır" butonuna tıklayarak karşılaştırma yapabilir
+                alert(`✅ ${products.length} ürün yüklendi! Şimdi "Products.json ile Karşılaştır" butonuna tıklayarak karşılaştırma yapabilirsiniz.`);
+            } catch (error) {
+                console.error('Error loading manual shelf label file:', error);
+                alert('❌ Dosya yükleme hatası: ' + error.message);
+                manualShelfLabelFileName.textContent = 'JSON dosyası seçin';
+                window.productImporter.manualShelfLabels = null;
+            }
+        });
+    }
+
+    // Karşılaştırma sonuçları - Tümünü seç/Kaldır
+    const selectAllMissingBtn = document.getElementById('selectAllMissingBtn');
+    const deselectAllMissingBtn = document.getElementById('deselectAllMissingBtn');
+    
+    if (selectAllMissingBtn) {
+        selectAllMissingBtn.addEventListener('click', () => {
+            document.querySelectorAll('.missing-product-checkbox').forEach(cb => cb.checked = true);
+        });
+    }
+    
+    if (deselectAllMissingBtn) {
+        deselectAllMissingBtn.addEventListener('click', () => {
+            document.querySelectorAll('.missing-product-checkbox').forEach(cb => cb.checked = false);
+        });
+    }
+
+    // Seçili ürünleri ekle butonu
+    const addSelectedProductsBtn = document.getElementById('addSelectedProductsBtn');
+    if (addSelectedProductsBtn) {
+        addSelectedProductsBtn.addEventListener('click', async () => {
+            try {
+                await window.productImporter.addSelectedProductsToJSON();
+            } catch (error) {
+                console.error('Error adding selected products:', error);
+                alert('❌ Ürün ekleme hatası: ' + error.message);
+            }
+        });
+    }
+
+    // Karşılaştırma sonuçlarını kapat
+    const closeComparisonResultsBtn = document.getElementById('closeComparisonResultsBtn');
+    if (closeComparisonResultsBtn) {
+        closeComparisonResultsBtn.addEventListener('click', () => {
+            const resultsDiv = document.getElementById('shelfLabelComparisonResults');
+            if (resultsDiv) {
+                resultsDiv.classList.add('hidden');
+            }
+        });
+    }
+
+    // JSON indirme butonu
+    const downloadProductsJSONBtn = document.getElementById('downloadProductsJSONBtn');
+    if (downloadProductsJSONBtn) {
+        downloadProductsJSONBtn.addEventListener('click', () => {
+            try {
+                window.productImporter.downloadProductsAsJSON();
+                alert('✅ Ürünler JSON olarak indirildi!');
+            } catch (error) {
+                alert('❌ İndirme hatası: ' + error.message);
+            }
+        });
+    }
+
+    // Eksik ürünleri bul butonu
+    const analyzeFetchedProductsBtn = document.getElementById('analyzeFetchedProductsBtn');
+    if (analyzeFetchedProductsBtn) {
+        analyzeFetchedProductsBtn.addEventListener('click', async () => {
+            await this.findMissingProductsFromGetir();
+        });
+    }
+};
+
+AdminPanel.prototype.analyzeProducts = async function() {
+    try {
+        const htmlContent = document.getElementById('htmlTableInput').value.trim();
+        if (!htmlContent) {
+            alert('Lütfen HTML tablo verisini girin!');
+            return;
+        }
+
+        const analyzeBtn = document.getElementById('analyzeProductsBtn');
+        analyzeBtn.disabled = true;
+        analyzeBtn.textContent = '⏳ Analiz ediliyor...';
+
+        const results = await window.productImporter.analyzeProducts(htmlContent);
+
+        // Sonuçları göster
+        this.renderAnalysisResults(results);
+
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = '🔍 Analiz Et';
+    } catch (error) {
+        console.error('❌ Error analyzing products:', error);
+        alert('Analiz sırasında hata oluştu: ' + error.message);
+        const analyzeBtn = document.getElementById('analyzeProductsBtn');
+        if (analyzeBtn) {
+            analyzeBtn.disabled = false;
+            analyzeBtn.textContent = '🔍 Analiz Et';
+        }
+    }
+};
+
+AdminPanel.prototype.renderAnalysisResults = function(results) {
+    const tbody = document.getElementById('analysisResultsBody');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+
+    // Counts
+    const newCountEl = document.getElementById('newProductsCount');
+    const existingCountEl = document.getElementById('existingProductsCount');
+    const errorCountEl = document.getElementById('errorProductsCount');
+    
+    if (newCountEl) newCountEl.textContent = `${results.new.length} yeni ürün`;
+    if (existingCountEl) existingCountEl.textContent = `${results.existing.length} zaten var (gösterilmiyor)`;
+    if (errorCountEl) errorCountEl.textContent = `${results.errors.length} hata`;
+
+    // New products (sadece yeni ürünleri göster)
+    results.new.forEach((product, index) => {
+        const row = document.createElement('tr');
+        row.setAttribute('data-status', 'new');
+        row.className = 'bg-green-50';
+        row.innerHTML = `
+            <td class="px-4 py-3">
+                <input type="checkbox" class="product-checkbox rounded" data-index="${index}" data-type="new">
+            </td>
+            <td class="px-4 py-3">
+                <span class="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Yeni</span>
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-900">${product.name || '-'}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${product.barcodes[0]?.code || '-'}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${product.category || '-'}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">${product.brand || '-'}</td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    // Existing products - GÖSTERME (kullanıcı istemedi)
+    // Sadece sayı olarak gösteriliyor
+
+    // Errors
+    results.errors.forEach((item) => {
+        const row = document.createElement('tr');
+        row.setAttribute('data-status', 'error');
+        row.className = 'bg-red-50';
+        row.innerHTML = `
+            <td class="px-4 py-3"></td>
+            <td class="px-4 py-3">
+                <span class="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">Hata</span>
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-900">${item.product.name || '-'}</td>
+            <td class="px-4 py-3 text-sm text-gray-900">-</td>
+            <td class="px-4 py-3 text-sm text-gray-900">-</td>
+            <td class="px-4 py-3 text-sm text-red-600">${item.error}</td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    // Show results
+    const resultsDiv = document.getElementById('analysisResults');
+    if (resultsDiv) {
+        resultsDiv.classList.remove('hidden');
+    }
+};
+
+AdminPanel.prototype.addSelectedProducts = async function() {
+    try {
+        const checkboxes = document.querySelectorAll('#analysisResultsBody tr[data-status="new"] input.product-checkbox:checked');
+        if (checkboxes.length === 0) {
+            alert('Lütfen eklemek istediğiniz ürünleri seçin!');
+            return;
+        }
+
+        const addBtn = document.getElementById('addSelectedProductsBtn');
+        if (addBtn) {
+            addBtn.disabled = true;
+            addBtn.textContent = '⏳ Ekleniyor...';
+        }
+
+        const selectedProducts = [];
+        checkboxes.forEach(cb => {
+            const index = parseInt(cb.dataset.index);
+            if (window.productImporter.analysisResults && window.productImporter.analysisResults.new) {
+                selectedProducts.push(window.productImporter.analysisResults.new[index]);
+            }
+        });
+
+        // Hafızaya ekle (dosya indirme yok)
+        const result = window.productImporter.addProductsToMemory(selectedProducts);
+
+        alert(`✅ ${selectedProducts.length} ürün hafızaya eklendi!\n\nToplam hafızadaki ürün sayısı: ${result.totalInMemory}\n\nTüm ürünleri dışa aktarmak için "Tümünü Dışa Aktar" butonunu kullanın.`);
+
+        if (addBtn) {
+            addBtn.disabled = false;
+            addBtn.textContent = '✅ Seçili Ürünleri Hafızaya Ekle';
+        }
+    } catch (error) {
+        console.error('❌ Error adding products:', error);
+        alert('Ürünler eklenirken hata oluştu: ' + error.message);
+        const addBtn = document.getElementById('addSelectedProductsBtn');
+        if (addBtn) {
+            addBtn.disabled = false;
+            addBtn.textContent = '✅ Seçili Ürünleri Hafızaya Ekle';
+        }
+    }
+};
+
+AdminPanel.prototype.exportAllProducts = function() {
+    try {
+        const allData = window.productImporter.getAllProductsFromMemory();
+
+        // Yedekleme oluştur
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupData = JSON.stringify({ products: window.productImporter.productsCache }, null, 2);
+        const backupBlob = new Blob([backupData], { type: 'application/json' });
+        const backupUrl = URL.createObjectURL(backupBlob);
+        const backupLink = document.createElement('a');
+        backupLink.href = backupUrl;
+        backupLink.download = `products_backup_${timestamp}.json`;
+        backupLink.click();
+        URL.revokeObjectURL(backupUrl);
+
+        // Yeni JSON'u indir
+        const jsonBlob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+        const jsonUrl = URL.createObjectURL(jsonBlob);
+        const jsonLink = document.createElement('a');
+        jsonLink.href = jsonUrl;
+        jsonLink.download = 'products.json';
+        jsonLink.click();
+        URL.revokeObjectURL(jsonUrl);
+
+        alert(`✅ Tüm ürünler dışa aktarıldı!\n\nYeni ürün sayısı: ${allData.newProducts.length}\nMevcut ürün sayısı: ${allData.existingProducts}\nToplam ürün sayısı: ${allData.totalProducts}\n\nYedek ve yeni products.json dosyaları indirildi.`);
+    } catch (error) {
+        console.error('❌ Error exporting products:', error);
+        alert('Ürünler dışa aktarılırken hata oluştu: ' + error.message);
+    }
+};
+
+AdminPanel.prototype.searchBarcode = async function(barcode) {
+    try {
+        if (!barcode || !barcode.trim()) {
+            const resultsDiv = document.getElementById('barcodeSearchResults');
+            const noResultsDiv = document.getElementById('barcodeSearchNoResults');
+            if (resultsDiv) resultsDiv.classList.add('hidden');
+            if (noResultsDiv) noResultsDiv.classList.add('hidden');
+            return;
+        }
+
+        // Products.json'u yükle
+        const fileInput = document.getElementById('productsJsonFileInput');
+        const products = await window.productImporter.loadProductsJSON(fileInput);
+
+        // Arama yap
+        const results = window.productImporter.searchByBarcode(barcode.trim(), products);
+
+        // Sonuçları göster
+        const tbody = document.getElementById('barcodeSearchResultsBody');
+        const resultsDiv = document.getElementById('barcodeSearchResults');
+        const noResultsDiv = document.getElementById('barcodeSearchNoResults');
+        
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+
+        if (results.length === 0) {
+            if (resultsDiv) resultsDiv.classList.add('hidden');
+            if (noResultsDiv) noResultsDiv.classList.remove('hidden');
+            return;
+        }
+
+        if (noResultsDiv) noResultsDiv.classList.add('hidden');
+        const countEl = document.getElementById('searchResultsCount');
+        if (countEl) countEl.textContent = results.length;
+        if (resultsDiv) resultsDiv.classList.remove('hidden');
+
+        results.forEach(result => {
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-50';
+            row.innerHTML = `
+                <td class="px-4 py-3 text-sm text-gray-900">${result.product.name || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-900 font-mono">${result.barcode.code || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${result.barcode.variant || '-'} ${result.barcode.size || ''}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${result.product.category || '-'}</td>
+                <td class="px-4 py-3 text-sm text-gray-900">${result.product.brand || '-'}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('❌ Error searching barcode:', error);
+        const resultsDiv = document.getElementById('barcodeSearchResults');
+        const noResultsDiv = document.getElementById('barcodeSearchNoResults');
+        if (resultsDiv) resultsDiv.classList.add('hidden');
+        if (noResultsDiv) noResultsDiv.classList.remove('hidden');
+    }
+};
+
+AdminPanel.prototype.loadProductImportTab = async function() {
+    try {
+        console.log('🔄 Loading product import tab...');
+        
+        // Products.json'u yükle ve cache'le (hata olursa kullanıcı dosya seçecek)
+        if (window.productImporter) {
+            try {
+                const fileInput = document.getElementById('productsJsonFileInput');
+                await window.productImporter.loadProductsJSON(fileInput);
+                console.log('✅ Products loaded and cached');
+            } catch (error) {
+                console.warn('⚠️ Products not loaded yet, user will select file:', error.message);
+                // Hata olursa kullanıcıya dosya seçtirilecek, alert gösterme
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error loading product import tab:', error);
+    }
+};
+
+AdminPanel.prototype.fetchAllProductsFromGetir = async function() {
+    try {
+        const fetchBtn = document.getElementById('fetchAllProductsBtn');
+        if (fetchBtn) {
+            fetchBtn.disabled = true;
+            fetchBtn.innerHTML = '<svg class="w-5 h-5 animate-spin inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Çekiliyor...';
+        }
+
+        const products = await window.productImporter.fetchAllProductsFromGetirAPI();
+        
+        if (fetchBtn) {
+            fetchBtn.disabled = false;
+            fetchBtn.innerHTML = '<svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Ürünleri Çek';
+        }
+
+        alert(`✅ ${products.length} ürün başarıyla çekildi!\n\nArtık JSON olarak indirebilir veya eksik ürünleri bulabilirsiniz.`);
+    } catch (error) {
+        console.error('❌ Error fetching products from Getir API:', error);
+        alert('❌ Ürünler çekilirken hata oluştu: ' + error.message + '\n\n💡 Lütfen:\n1. Python bot\'un çalıştığından emin olun (localhost:8765)\n2. Getir sitesine giriş yapıp extension\'ın token gönderdiğinden emin olun');
+        
+        const fetchBtn = document.getElementById('fetchAllProductsBtn');
+        if (fetchBtn) {
+            fetchBtn.disabled = false;
+            fetchBtn.innerHTML = '<svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Ürünleri Çek';
+        }
+    }
+};
+
+AdminPanel.prototype.findMissingProductsFromGetir = async function() {
+    try {
+        const analyzeBtn = document.getElementById('analyzeFetchedProductsBtn');
+        if (analyzeBtn) {
+            analyzeBtn.disabled = true;
+            analyzeBtn.textContent = '⏳ Aranıyor...';
+        }
+
+        const result = await window.productImporter.findMissingProducts();
+        
+        if (analyzeBtn) {
+            analyzeBtn.disabled = false;
+            analyzeBtn.textContent = '🔍 Eksik Ürünleri Bul';
+        }
+
+        alert(`✅ Analiz tamamlandı!\n\nEksik ürün sayısı: ${result.missing.length}\nMevcut ürün sayısı: ${result.existing}\nToplam ürün sayısı: ${result.total}\n\nEksik ürünler tabloda gösterildi.`);
+    } catch (error) {
+        console.error('❌ Error finding missing products:', error);
+        alert('❌ Eksik ürünler aranırken hata oluştu: ' + error.message);
+        
+        const analyzeBtn = document.getElementById('analyzeFetchedProductsBtn');
+        if (analyzeBtn) {
+            analyzeBtn.disabled = false;
+            analyzeBtn.textContent = '🔍 Eksik Ürünleri Bul';
+        }
     }
 };

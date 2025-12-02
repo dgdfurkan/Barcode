@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 500px;
+      max-height: 700px;
+      padding: 0;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+    }
+    .header {
+      background-color: #5D3EBC;
+      color: white;
+      padding: 15px;
+      text-align: center;
+    }
+    .header h3 {
+      margin: 0;
+      font-size: 18px;
+    }
+    .tabs {
+      display: flex;
+      background-color: #f0f0f0;
+      border-bottom: 2px solid #5D3EBC;
+    }
+    .tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      cursor: pointer;
+      background-color: #f0f0f0;
+      border: none;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background-color 0.2s;
+    }
+    .tab:hover {
+      background-color: #e0e0e0;
+    }
+    .tab.active {
+      background-color: white;
+      color: #5D3EBC;
+      border-bottom: 2px solid #5D3EBC;
+    }
+    .tab-content {
+      display: none;
+      padding: 15px;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    h4 {
+      margin: 15px 0 8px 0;
+      font-size: 14px;
+      color: #333;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 5px;
+      margin: 10px 0;
+      font-size: 12px;
+    }
+    .status.success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .status.error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .status.info {
+      background-color: #d1ecf1;
+      color: #0c5460;
+    }
+    .status.warning {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background-color: #5D3EBC;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    button:hover {
+      background-color: #4a2fa3;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    button.secondary {
+      background-color: #6c757d;
+    }
+    button.secondary:hover {
+      background-color: #5a6268;
+    }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 11px;
+      box-sizing: border-box;
+      margin-top: 5px;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    .instructions {
+      font-size: 11px;
+      color: #666;
+      margin-top: 5px;
+      line-height: 1.5;
+    }
+    .section {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+    }
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      background-color: #f8f9fa;
+      border-radius: 5px;
+      margin-top: 10px;
+    }
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 24px;
+      background-color: #ccc;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    .toggle-switch.active {
+      background-color: #5D3EBC;
+    }
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: white;
+      top: 2px;
+      left: 2px;
+      transition: left 0.3s;
+    }
+    .toggle-switch.active::after {
+      left: 28px;
+    }
+    .bot-info {
+      background-color: #f8f9fa;
+      padding: 10px;
+      border-radius: 5px;
+      margin-top: 10px;
+      font-size: 11px;
+    }
+    .bot-info-item {
+      margin: 5px 0;
+    }
+    .bot-info-label {
+      font-weight: bold;
+      color: #666;
+    }
+    .step {
+      margin: 15px 0;
+      padding: 12px;
+      background-color: #f8f9fa;
+      border-radius: 5px;
+      border-left: 4px solid #5D3EBC;
+    }
+    .step-number {
+      font-weight: bold;
+      color: #5D3EBC;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+    .step-content {
+      font-size: 12px;
+      line-height: 1.6;
+      color: #333;
+    }
+    .step-content code {
+      background-color: #e9ecef;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+    }
+    .step-content strong {
+      color: #5D3EBC;
+    }
+    .note {
+      background-color: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 3px;
+      font-size: 11px;
+    }
+    .note strong {
+      color: #856404;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h3>⚙️ Getir Stock Bot</h3>
+  </div>
+  
+  <div class="tabs">
+    <button class="tab active" data-tab="management">📊 Yönetim</button>
+    <button class="tab" data-tab="setup">🔧 Kurulum</button>
+  </div>
+  
+  <!-- YÖNETİM SEKMESİ -->
+  <div id="management" class="tab-content active">
+    <!-- Bot Durumu -->
+    <div class="section" style="margin-top: 0;">
+      <h4>📊 Bot Durumu</h4>
+      <div id="status" class="status info">Durum kontrol ediliyor...</div>
+      <button id="checkBtn">🔄 Durumu Yenile</button>
+      <div id="botInfo" class="bot-info" style="display: none;">
+        <div class="bot-info-item">
+          <span class="bot-info-label">Bot Token:</span> <span id="botTokenDisplay">-</span>
+        </div>
+        <div class="bot-info-item">
+          <span class="bot-info-label">Franchise Token:</span> <span id="franchiseTokenStatus">-</span>
+        </div>
+        <div class="bot-info-item">
+          <span class="bot-info-label">SKT Durumu:</span> <span id="sktStatus">-</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Bot Token Ayarları -->
+    <div class="section">
+      <h4>🤖 Bot Token</h4>
+      <div class="instructions">
+        BotFather'dan aldığınız bot token'ını buraya girin. Her depo için farklı bot token kullanın.
+      </div>
+      <input type="text" id="botTokenInput" placeholder="8374649024:AAF..." />
+      <button id="saveBotTokenBtn" class="secondary">💾 Bot Token'ı Kaydet</button>
+      <div id="botTokenStatus" style="margin-top: 10px;"></div>
+    </div>
+    
+    <!-- SKT Ayarları -->
+    <div class="section">
+      <h4>📅 SKT (Son Kullanma Tarihi) Ayarları</h4>
+      <div class="toggle-container">
+        <span>SKT Bilgisini Göster</span>
+        <div id="sktToggle" class="toggle-switch"></div>
+      </div>
+      <div id="sktStatusMsg" style="margin-top: 10px; font-size: 11px; color: #666;"></div>
+    </div>
+    
+    <!-- Keycloak Token (Manuel) -->
+    <div class="section">
+      <h4>🔑 Keycloak Token (Manuel Giriş)</h4>
+      <div class="instructions">
+        Otomatik yakalanmazsa warehouse token'ı manuel olarak girebilirsiniz.
+      </div>
+      <textarea id="tokenInput" placeholder="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."></textarea>
+      <button id="sendTokenBtn">📤 Token'ı Bot'a Gönder</button>
+      <div id="tokenStatus" style="margin-top: 10px;"></div>
+    </div>
+  </div>
+  
+  <!-- KURULUM SEKMESİ -->
+  <div id="setup" class="tab-content">
+    <h4 style="margin-top: 0;">🚀 Hızlı Kurulum</h4>
+    
+    <!-- KURULUM SİHİRBZI -->
+    <div id="setupWizard" class="section" style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+      <div class="note" style="margin-bottom: 15px; background-color: #fff3cd; border-left-color: #ffc107;">
+        <strong>📝 ÖNEMLİ:</strong> Önce bot'u başlatın (token olmadan bile çalışır), sonra buradan token'ı girin.
+      </div>
+      
+      <h5 style="margin-top: 0; color: #5D3EBC;">🤖 Bot Token'ınızı Girin</h5>
+      <div class="instructions" style="margin-bottom: 10px;">
+        BotFather'dan aldığınız bot token'ını girin. Bot çalışıyorsa token otomatik kaydedilecek.
+      </div>
+      <input type="text" id="setupBotToken" placeholder="8374649024:AAF..." style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;" />
+      <button id="startSetupBtn" class="primary" style="width: 100%; margin-bottom: 10px;">
+        🚀 Kurulumu Başlat
+      </button>
+      
+      <div id="setupProgress" style="display: none; margin-top: 15px;">
+        <div style="background-color: #fff; padding: 10px; border-radius: 5px; border-left: 4px solid #28a745;">
+          <div id="setupProgressText" style="font-size: 11px; color: #666;"></div>
+        </div>
+      </div>
+      
+      <div id="setupInstructions" style="display: none; background-color: #e7f3ff; padding: 15px; border-radius: 5px; margin-top: 15px;">
+        <h6 style="margin-top: 0;">📋 Sonraki Adımlar:</h6>
+        <div id="setupInstructionsContent"></div>
+      </div>
+    </div>
+    
+    <div class="section" style="margin-top: 20px;">
+      <h4>📖 Kurulum Script'leri</h4>
+      <div class="instructions" style="margin-bottom: 15px;">
+        Bot token'ını kaydettikten sonra, proje klasöründe oluşturulan script'i çalıştırın:
+      </div>
+      
+      <div class="step" style="background-color: #e7f3ff; border-left-color: #2196F3;">
+        <div class="step-number">⚡ Script'i Çalıştırın</div>
+        <div class="step-content" id="setupScriptsContent">
+          <div style="text-align: center; color: #666; padding: 20px;">
+            Bot klasör yolu yükleniyor...
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

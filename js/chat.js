@@ -1051,12 +1051,27 @@ class ChatSystem {
     }
 
     setupChatRealtime() {
-        if (!window.supabase) return;
+        if (!window.supabase) {
+            console.warn('⚠️ Supabase not available for realtime');
+            return;
+        }
+
+        // Check if supabase is a client instance (has channel method)
+        let supabaseClient = window.supabase;
+        if (typeof supabaseClient.channel !== 'function') {
+            console.warn('⚠️ Supabase client channel method not available');
+            return;
+        }
         
         console.log('🔔 Setting up chat realtime subscription for user:', this.currentUser);
         
+        // Remove existing subscription if any
+        if (this.chatSubscription && typeof supabaseClient.removeChannel === 'function') {
+            supabaseClient.removeChannel(this.chatSubscription);
+        }
+        
         // Subscribe to users table changes for this specific user
-        this.chatSubscription = window.supabase
+        this.chatSubscription = supabaseClient
             .channel('user-chat-updates')
             .on('postgres_changes', {
                 event: 'UPDATE',
