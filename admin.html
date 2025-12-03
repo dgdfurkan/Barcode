@@ -819,6 +819,19 @@
                                 <span>Raf Etiketlerini Çek</span>
                             </button>
                         </div>
+                        <!-- Yavaş Çek Modu Checkbox -->
+                        <div class="mb-4">
+                            <label class="flex items-center space-x-2 cursor-pointer mb-2">
+                                <input type="checkbox" id="slowModeCheckbox" class="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500">
+                                <span class="text-sm text-gray-700">Yavaş Çek Modu (Her sayfada 100 ürün garantisi)</span>
+                            </label>
+                            <div id="slowModeSettings" class="hidden ml-6 mt-2">
+                                <label class="block text-sm text-gray-700 mb-1">Sayfalar Arası Bekleme Süresi (ms):</label>
+                                <input type="number" id="slowModeDelay" value="2000" min="500" max="10000" step="500" class="w-32 px-2 py-1 border border-gray-300 rounded text-sm">
+                                <p class="text-xs text-gray-500 mt-1">Varsayılan: 2000ms (2 saniye). Minimum: 500ms, Maximum: 10000ms</p>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1 ml-6">Aktif edildiğinde sayfalar arası belirlediğiniz süre kadar bekler ve her sayfada tam 100 ürün çekmeyi garanti eder.</p>
+                        </div>
                         <div id="shelfLabelProgress" class="hidden mt-4">
                             <div class="bg-white rounded-lg p-4 border border-green-200">
                                 <div class="flex items-center space-x-3 mb-2">
@@ -838,6 +851,24 @@
                                     <button id="downloadShelfLabelsBtn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
                                         📥 JSON Olarak İndir
                                     </button>
+                                    <button id="importWarehouseToProductsBtn" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                        📥 Warehouse Verisini Products.json'a Aktar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Eksik Sayfalar Gösterimi -->
+                        <div id="shelfLabelMissingPages" class="hidden mt-4">
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h5 class="text-sm font-semibold text-yellow-900">⚠️ Eksik Veri Çekilen Sayfalar</h5>
+                                    <button id="openManualHtmlModalBtn" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                        📝 Manuel HTML Gir
+                                    </button>
+                                </div>
+                                <p class="text-xs text-yellow-700 mb-3">Aşağıdaki sayfalarda 100 ürün çekilemedi. Manuel HTML girerek eksikleri tamamlayabilirsiniz.</p>
+                                <div id="missingPagesList" class="flex flex-wrap gap-2">
+                                    <!-- Eksik sayfa numaraları buraya eklenecek -->
                                 </div>
                             </div>
                         </div>
@@ -866,6 +897,25 @@
                         </div>
                     </div>
                     
+                    <!-- Temp Products Güncelleme -->
+                    <div class="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="text-md font-semibold text-gray-900 mb-1">🔄 Temp Products Güncelle</h4>
+                                <p class="text-xs text-gray-600">products.json dosyasından temp_products.js dosyasını oluşturur</p>
+                            </div>
+                            <button id="updateTempProductsBtn" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-6 py-3 rounded-lg text-sm font-medium shadow-md flex items-center space-x-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                                <span>Temp Products Güncelle</span>
+                            </button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">
+                            products.json dosyasını okuyup pages/temp_products.js dosyasını oluşturur. İndirilen dosyayı pages klasörüne kopyalayın.
+                        </p>
+                    </div>
+                    
                     <!-- Karşılaştırma Sonuçları (Sayfanın Altında) -->
                     <div id="shelfLabelComparisonResults" class="hidden mt-6 bg-white rounded-lg p-6 border border-blue-300 shadow-lg">
                         <div class="flex items-center justify-between mb-4">
@@ -889,6 +939,10 @@
                                     <span id="comparisonMissingCount" class="ml-2 text-red-600 font-bold">0</span>
                                 </div>
                             </div>
+                        </div>
+                        <!-- Eksik Sayfalar Bilgisi (Karşılaştırma Sonuçlarında) -->
+                        <div id="missingPagesInfo" class="hidden mb-4">
+                            <!-- Buraya eksik sayfalar bilgisi eklenecek -->
                         </div>
                         <div class="mb-4 flex items-center justify-between">
                             <div class="flex items-center space-x-2">
@@ -1551,5 +1605,50 @@
     <script src="js/feature-manager.js"></script>
     <script src="js/admin-updates.js"></script>
     <script src="js/admin-product-importer.js"></script>
+    <!-- Manuel HTML Girme Modalı -->
+    <div id="manualHtmlModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-4xl max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between p-6 border-b">
+                <h3 class="text-lg font-semibold text-gray-900">📝 Manuel HTML Gir - Eksik Sayfa Analizi</h3>
+                <button id="closeManualHtmlModal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Sayfa Numarası
+                    </label>
+                    <input type="number" id="manualHtmlPageNumber" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Örn: 5" min="1">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        HTML İçeriği (ant-table-container)
+                    </label>
+                    <textarea id="manualHtmlContent" class="w-full h-64 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-xs" placeholder="<div class='ant-table-container'>...</div> içeriğini buraya yapıştırın"></textarea>
+                    <p class="text-xs text-gray-500 mt-2">Warehouse sayfasındaki tablo HTML'ini (ant-table-container içeriği) buraya yapıştırın.</p>
+                </div>
+                <div id="manualHtmlProgress" class="hidden mb-4">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div class="flex items-center space-x-2">
+                            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                            <span id="manualHtmlProgressText" class="text-sm text-blue-700">Analiz ediliyor...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center justify-end space-x-3 p-6 border-t">
+                <button id="cancelManualHtml" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors">
+                    İptal
+                </button>
+                <button id="analyzeManualHtml" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                    🔍 Analiz Et ve Ekle
+                </button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

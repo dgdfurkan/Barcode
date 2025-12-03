@@ -3291,6 +3291,57 @@
         // Global map to store product names -> image URLs (for premium image search)
         let productImageMap = new Map();
         
+        // Normalize image URL for better matching
+        function normalizeImageUrl(url) {
+            if (!url) return '';
+            // Lowercase
+            let normalized = url.toLowerCase().trim();
+            // Remove query parameters
+            normalized = normalized.split('?')[0];
+            // Remove hash
+            normalized = normalized.split('#')[0];
+            // Normalize domain (cdn-image.getir.com, cdn.getir.com, getir.com/product, etc.)
+            normalized = normalized.replace(/^(https?:\/\/)([^\/]+)/, (match, protocol, domain) => {
+                // Normalize all getir domains to getir.com
+                if (domain.includes('getir.com')) {
+                    return protocol + 'getir.com';
+                }
+                return match;
+            });
+            // Remove trailing slash
+            normalized = normalized.replace(/\/$/, '');
+            return normalized;
+        }
+        
+        // Extract unique identifier from image URL (for better matching)
+        function extractImageId(url) {
+            if (!url) return null;
+            // Try to extract UUID or product ID from URL
+            // Pattern 1: UUID format (e.g., 4691c9da-a6ba-47c1-8917-4c3530155f08)
+            const uuidMatch = url.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+            if (uuidMatch) {
+                return uuidMatch[1].toLowerCase();
+            }
+            // Pattern 2: Hex ID format (e.g., 5f44be014952487ce5e44ac7)
+            const hexIdMatch = url.match(/([0-9a-f]{24,})/i);
+            if (hexIdMatch) {
+                return hexIdMatch[1].toLowerCase();
+            }
+            // Pattern 3: Extract filename without extension and query params
+            const filenameMatch = url.match(/\/([^\/]+?)(?:\?|$)/);
+            if (filenameMatch) {
+                const filename = filenameMatch[1];
+                // Remove extension
+                const nameWithoutExt = filename.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                // Remove common suffixes like _tr_1648104901043
+                const cleanName = nameWithoutExt.replace(/_[a-z]{2}_\d+$/i, '');
+                if (cleanName.length > 10) { // Only return if it's a meaningful ID
+                    return cleanName.toLowerCase();
+                }
+            }
+            return null;
+        }
+        
         // Parse HTML table and extract image URLs, then find matching products and return their barcodes
         // This ensures exact matching by barcode instead of fuzzy name matching
         function parseHtmlTableWithImages(htmlContent) {
@@ -3305,6 +3356,30 @@
                 const imgTags = doc.querySelectorAll('img');
                 const imageUrls = [];
                 
+                // Also extract product names and their corresponding image URLs for productImageMap
+                const rows = doc.querySelectorAll('tbody tr, tr');
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 2) {
+                        const img = cells[0].querySelector('img');
+                        const nameCell = cells[1];
+                        if (img && img.src && nameCell) {
+                            const productName = nameCell.textContent.trim();
+                            const imageUrl = img.src.trim();
+                            if (productName && imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+                                // Map product name to image URL for later use in grouped search
+                                productImageMap.set(productName.toLowerCase().trim(), imageUrl);
+                                // Also add to imageUrls if not already added
+                                if (!imageUrls.includes(imageUrl)) {
+                                    imageUrls.push(imageUrl);
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // If no images found in table rows, try to get all img tags
+                if (imageUrls.length === 0) {
                 imgTags.forEach(img => {
                     if (img.src && img.src.trim()) {
                         const imageUrl = img.src.trim();
@@ -3314,6 +3389,7 @@
                         }
                     }
                 });
+                }
                 
                 // If no images found, fall back to text parsing
                 if (imageUrls.length === 0) {
@@ -3325,10 +3401,30 @@
                 // Use Map to track product IDs to avoid duplicates (same product = same barcode)
                 const foundProductIds = new Set(); // Track which products we've already added
                 const foundBarcodes = new Set(); // Use Set to avoid duplicate barcodes
+                const unmatchedImages = new Map(); // Track image URLs that didn't match, with their product names
+                
+                // Create reverse map: imageUrl -> productName
+                const imageToNameMap = new Map();
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 2) {
+                        const img = cells[0].querySelector('img');
+                        const nameCell = cells[1];
+                        if (img && img.src && nameCell) {
+                            const productName = nameCell.textContent.trim();
+                            const imageUrl = img.src.trim();
+                            if (productName && imageUrl) {
+                                imageToNameMap.set(imageUrl, productName);
+                            }
+                        }
+                    }
+                });
                 
                 imageUrls.forEach(imageUrl => {
                     // Normalize image URL for matching
-                    const normalizedImageUrl = imageUrl.toLowerCase().trim();
+                    const normalizedSearchUrl = normalizeImageUrl(imageUrl);
+                    const searchImageId = extractImageId(imageUrl);
+                    let imageMatched = false;
                     
                     // Try to find products matching this image URL
                     products.forEach(product => {
@@ -3337,18 +3433,57 @@
                         // Skip if we've already processed this product
                         if (foundProductIds.has(product.id)) return;
                         
-                        const productImageUrl = product.image.toLowerCase().trim();
+                        const normalizedProductUrl = normalizeImageUrl(product.image);
+                        const productImageId = extractImageId(product.image);
                         let isMatch = false;
                         
-                        // Exact match
-                        if (productImageUrl === normalizedImageUrl) {
+                        // 1. Image ID match (most reliable - UUID or hex ID)
+                        if (searchImageId && productImageId && searchImageId === productImageId) {
                             isMatch = true;
-                        } else {
-                            // Try filename match (last part of URL before query params)
-                            const productFileName = productImageUrl.split('/').pop().split('?')[0];
-                            const searchFileName = normalizedImageUrl.split('/').pop().split('?')[0];
-                            if (productFileName === searchFileName && productFileName.length > 0) {
+                        }
+                        
+                        // 2. Exact match (normalized)
+                        if (!isMatch && normalizedProductUrl === normalizedSearchUrl) {
                                 isMatch = true;
+                        }
+                        
+                        // 3. Filename match (extension ignore)
+                        if (!isMatch && normalizedProductUrl && normalizedSearchUrl) {
+                            const productFileName = normalizedProductUrl.split('/').pop();
+                            const searchFileName = normalizedSearchUrl.split('/').pop();
+                            if (productFileName && searchFileName) {
+                                // Remove extensions for comparison
+                                const productNameNoExt = productFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                const searchNameNoExt = searchFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                // Also remove common suffixes like _tr_1648104901043
+                                const productClean = productNameNoExt.replace(/_[a-z]{2}_\d+$/i, '');
+                                const searchClean = searchNameNoExt.replace(/_[a-z]{2}_\d+$/i, '');
+                                if (productClean === searchClean && productClean.length > 5) { // At least 6 chars
+                                    isMatch = true;
+                                }
+                            }
+                        }
+                        
+                        // 4. Partial path match (if other matches failed)
+                        if (!isMatch && normalizedProductUrl && normalizedSearchUrl) {
+                            // Extract path segments (remove domain)
+                            const productPath = normalizedProductUrl.replace(/^https?:\/\/[^\/]+/, '');
+                            const searchPath = normalizedSearchUrl.replace(/^https?:\/\/[^\/]+/, '');
+                            
+                            if (productPath && searchPath) {
+                                // Get last significant segment (usually product ID or filename)
+                                const productLastSegment = productPath.split('/').filter(s => s.length > 0).pop();
+                                const searchLastSegment = searchPath.split('/').filter(s => s.length > 0).pop();
+                                
+                                if (productLastSegment && searchLastSegment) {
+                                    // Remove extensions and suffixes
+                                    const productClean = productLastSegment.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                    const searchClean = searchLastSegment.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                    
+                                    if (productClean === searchClean && productClean.length > 5) { // At least 6 chars
+                                        isMatch = true;
+                                    }
+                                }
                             }
                         }
                         
@@ -3361,27 +3496,359 @@
                                 foundProductIds.add(product.id);
                                 // Add only first barcode (one barcode per unique product)
                                 foundBarcodes.add(firstBarcode.code);
+                                imageMatched = true;
                             }
                         }
                     });
+                    
+                    // If image didn't match, store it with its product name for fallback
+                    if (!imageMatched) {
+                        const productName = imageToNameMap.get(imageUrl);
+                        if (productName) {
+                            unmatchedImages.set(imageUrl, productName);
+                        }
+                    }
+                });
+                
+                // For unmatched images, try to find products by name (with parentheses handling)
+                unmatchedImages.forEach((productName, imageUrl) => {
+                    const normalizedName = productName.toLowerCase().trim();
+                    const normalizedNameClean = normalizedName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                    
+                    // Try to find product by name (with and without parentheses)
+                    const matchedProduct = products.find(p => {
+                        if (!p.name || foundProductIds.has(p.id)) return false;
+                        const pName = p.name.toLowerCase().trim();
+                        const pNameClean = pName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                        return pName === normalizedName || 
+                               pNameClean === normalizedName || 
+                               pName === normalizedNameClean || 
+                               pNameClean === normalizedNameClean;
+                    });
+                    
+                    if (matchedProduct && matchedProduct.barcodes && matchedProduct.barcodes.length > 0) {
+                        const firstBarcode = matchedProduct.barcodes.find(b => b.code);
+                        if (firstBarcode && firstBarcode.code) {
+                            foundProductIds.add(matchedProduct.id);
+                            foundBarcodes.add(firstBarcode.code);
+                        }
+                    }
                 });
                 
                 // Convert Set to array and return as comma-separated barcodes
                 const barcodeArray = Array.from(foundBarcodes);
                 
                 if (barcodeArray.length === 0) {
-                    // No matches found, fall back to text parsing
+                    // No matches found, fall back to text parsing with image URL assistance
                     const textContent = htmlContent.replace(/<[^>]*>/g, '\n');
-                    return parseTableData(textContent);
+                    const productNamesResult = parseTableData(textContent);
+                    
+                    // Try to convert product names to barcodes using both name and image URL
+                    if (productNamesResult && productNamesResult !== textContent) {
+                        const productNames = productNamesResult.split(',').map(name => name.trim()).filter(name => name.length > 0);
+                        const foundBarcodesFromNames = new Set();
+                        
+                        // Create a map of product names to their image URLs from HTML
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(htmlContent, 'text/html');
+                        const rows = doc.querySelectorAll('tbody tr, tr');
+                        const nameToImageMap = new Map();
+                        
+                        rows.forEach(row => {
+                            const cells = row.querySelectorAll('td');
+                            if (cells.length >= 2) {
+                                const img = cells[0].querySelector('img');
+                                const nameCell = cells[1];
+                                if (img && img.src && nameCell) {
+                                    const productName = nameCell.textContent.trim();
+                                    if (productName) {
+                                        nameToImageMap.set(productName.toLowerCase(), img.src);
+                                    }
+                                }
+                            }
+                        });
+                        
+                        // For each product name, try to find matching product using both name and image
+                        productNames.forEach(productName => {
+                            const normalizedName = productName.toLowerCase().trim();
+                            // Remove parentheses and content inside (e.g., "(38 g)" or "(134 g)")
+                            const normalizedNameClean = normalizedName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                            const htmlImageUrl = nameToImageMap.get(normalizedName);
+                            
+                            // Try to find product by name AND image URL if available
+                            let matchedProduct = null;
+                            
+                            if (htmlImageUrl) {
+                                const normalizedHtmlImage = normalizeImageUrl(htmlImageUrl);
+                                const htmlImageId = extractImageId(htmlImageUrl);
+                                
+                                // First try: exact name match (with and without parentheses) with image URL match
+                                matchedProduct = products.find(p => {
+                                    if (!p.name || !p.image) return false;
+                                    
+                                    const pName = p.name.toLowerCase().trim();
+                                    const pNameClean = pName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                                    
+                                    // Check if names match (with or without parentheses)
+                                    const nameMatches = pName === normalizedName || 
+                                                       pNameClean === normalizedName || 
+                                                       pName === normalizedNameClean || 
+                                                       pNameClean === normalizedNameClean;
+                                    
+                                    if (!nameMatches) return false;
+                                    
+                                    const normalizedProductImage = normalizeImageUrl(p.image);
+                                    const productImageId = extractImageId(p.image);
+                                    
+                                    // Check image ID match (most reliable)
+                                    if (htmlImageId && productImageId && htmlImageId === productImageId) {
+                                        return true;
+                                    }
+                                    
+                                    // Check normalized URL match
+                                    if (normalizedProductImage === normalizedHtmlImage) {
+                                        return true;
+                                    }
+                                    
+                                    // Check filename match
+                                    const productFileName = normalizedProductImage.split('/').pop();
+                                    const htmlFileName = normalizedHtmlImage.split('/').pop();
+                                    if (productFileName && htmlFileName) {
+                                        const productClean = productFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                        const htmlClean = htmlFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                        if (productClean === htmlClean && productClean.length > 5) {
+                                            return true;
+                                        }
+                                    }
+                                    
+                                    // Check partial path match
+                                    const productPath = normalizedProductImage.replace(/^https?:\/\/[^\/]+/, '');
+                                    const htmlPath = normalizedHtmlImage.replace(/^https?:\/\/[^\/]+/, '');
+                                    if (productPath && htmlPath) {
+                                        const productLastSegment = productPath.split('/').filter(s => s.length > 0).pop();
+                                        const htmlLastSegment = htmlPath.split('/').filter(s => s.length > 0).pop();
+                                        if (productLastSegment && htmlLastSegment) {
+                                            const productClean = productLastSegment.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                            const htmlClean = htmlLastSegment.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                            if (productClean === htmlClean && productClean.length > 5) {
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                    
+                                    return false;
+                                });
+                            }
+                            
+                            // If no match with image, try exact name match (with and without parentheses)
+                            if (!matchedProduct) {
+                                matchedProduct = products.find(p => {
+                                    if (!p.name) return false;
+                                    const pName = p.name.toLowerCase().trim();
+                                    const pNameClean = pName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                                    return pName === normalizedName || 
+                                           pNameClean === normalizedName || 
+                                           pName === normalizedNameClean || 
+                                           pNameClean === normalizedNameClean;
+                                });
+                            }
+                            
+                            // If still no match, try partial name match (but be more careful)
+                            if (!matchedProduct && normalizedNameClean.length > 3) {
+                                // Only try partial match if name is not too generic
+                                const genericNames = ['ekmek', 'süt', 'su', 'peynir', 'yumurta'];
+                                const isGeneric = genericNames.includes(normalizedNameClean);
+                                
+                                if (!isGeneric) {
+                                    matchedProduct = products.find(p => {
+                                        if (!p.name) return false;
+                                        const pName = p.name.toLowerCase();
+                                        const pNameClean = pName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                                        // Check if either normalized name or clean name matches
+                                        return pName.includes(normalizedNameClean) || 
+                                               normalizedNameClean.includes(pNameClean) ||
+                                               pNameClean.includes(normalizedNameClean) ||
+                                               normalizedNameClean.includes(pName);
+                                    });
+                                }
+                            }
+                            
+                            if (matchedProduct && matchedProduct.barcodes && matchedProduct.barcodes.length > 0) {
+                                const firstBarcode = matchedProduct.barcodes.find(b => b.code);
+                                if (firstBarcode && firstBarcode.code) {
+                                    foundBarcodesFromNames.add(firstBarcode.code);
+                                }
+                            }
+                        });
+                        
+                        // If we found barcodes from names, return them
+                        if (foundBarcodesFromNames.size > 0) {
+                            return Array.from(foundBarcodesFromNames).join(', ');
+                        }
+                    }
+                    
+                    // If no barcodes found from names, return product names (original behavior)
+                    return productNamesResult;
                 }
                 
                 // Return barcodes as comma-separated string
                 return barcodeArray.join(', ');
             } catch (error) {
                 console.error('Error parsing HTML table:', error);
-                // Fallback to text parsing
+                // Fallback to text parsing with image URL assistance
                 const textContent = htmlContent.replace(/<[^>]*>/g, '\n');
-                return parseTableData(textContent);
+                const productNamesResult = parseTableData(textContent);
+                
+                // Try to convert product names to barcodes using both name and image URL
+                if (productNamesResult && productNamesResult !== textContent) {
+                    const productNames = productNamesResult.split(',').map(name => name.trim()).filter(name => name.length > 0);
+                    const foundBarcodesFromNames = new Set();
+                    
+                    // Create a map of product names to their image URLs from HTML
+                    try {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(htmlContent, 'text/html');
+                        const rows = doc.querySelectorAll('tbody tr, tr');
+                        const nameToImageMap = new Map();
+                        
+                        rows.forEach(row => {
+                            const cells = row.querySelectorAll('td');
+                            if (cells.length >= 2) {
+                                const img = cells[0].querySelector('img');
+                                const nameCell = cells[1];
+                                if (img && img.src && nameCell) {
+                                    const productName = nameCell.textContent.trim();
+                                    if (productName) {
+                                        nameToImageMap.set(productName.toLowerCase(), img.src);
+                                    }
+                                }
+                            }
+                        });
+                        
+                        // For each product name, try to find matching product using both name and image
+                        productNames.forEach(productName => {
+                            const normalizedName = productName.toLowerCase().trim();
+                            // Remove parentheses and content inside (e.g., "(38 g)" or "(134 g)")
+                            const normalizedNameClean = normalizedName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                            const htmlImageUrl = nameToImageMap.get(normalizedName);
+                            
+                            // Try to find product by name AND image URL if available
+                            let matchedProduct = null;
+                            
+                            if (htmlImageUrl) {
+                                const normalizedHtmlImage = normalizeImageUrl(htmlImageUrl);
+                                const htmlImageId = extractImageId(htmlImageUrl);
+                                
+                                // First try: exact name match (with and without parentheses) with image URL match
+                                matchedProduct = products.find(p => {
+                                    if (!p.name || !p.image) return false;
+                                    
+                                    const pName = p.name.toLowerCase().trim();
+                                    const pNameClean = pName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                                    
+                                    // Check if names match (with or without parentheses)
+                                    const nameMatches = pName === normalizedName || 
+                                                       pNameClean === normalizedName || 
+                                                       pName === normalizedNameClean || 
+                                                       pNameClean === normalizedNameClean;
+                                    
+                                    if (!nameMatches) return false;
+                                    
+                                    const normalizedProductImage = normalizeImageUrl(p.image);
+                                    const productImageId = extractImageId(p.image);
+                                    
+                                    // Check image ID match (most reliable)
+                                    if (htmlImageId && productImageId && htmlImageId === productImageId) {
+                                        return true;
+                                    }
+                                    
+                                    // Check normalized URL match
+                                    if (normalizedProductImage === normalizedHtmlImage) {
+                                        return true;
+                                    }
+                                    
+                                    // Check filename match
+                                    const productFileName = normalizedProductImage.split('/').pop();
+                                    const htmlFileName = normalizedHtmlImage.split('/').pop();
+                                    if (productFileName && htmlFileName) {
+                                        const productClean = productFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                        const htmlClean = htmlFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                        if (productClean === htmlClean && productClean.length > 5) {
+                                            return true;
+                                        }
+                                    }
+                                    
+                                    // Check partial path match
+                                    const productPath = normalizedProductImage.replace(/^https?:\/\/[^\/]+/, '');
+                                    const htmlPath = normalizedHtmlImage.replace(/^https?:\/\/[^\/]+/, '');
+                                    if (productPath && htmlPath) {
+                                        const productLastSegment = productPath.split('/').filter(s => s.length > 0).pop();
+                                        const htmlLastSegment = htmlPath.split('/').filter(s => s.length > 0).pop();
+                                        if (productLastSegment && htmlLastSegment) {
+                                            const productClean = productLastSegment.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                            const htmlClean = htmlLastSegment.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                            if (productClean === htmlClean && productClean.length > 5) {
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                    
+                                    return false;
+                                });
+                            }
+                            
+                            // If no match with image, try exact name match (with and without parentheses)
+                            if (!matchedProduct) {
+                                matchedProduct = products.find(p => {
+                                    if (!p.name) return false;
+                                    const pName = p.name.toLowerCase().trim();
+                                    const pNameClean = pName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                                    return pName === normalizedName || 
+                                           pNameClean === normalizedName || 
+                                           pName === normalizedNameClean || 
+                                           pNameClean === normalizedNameClean;
+                                });
+                            }
+                            
+                            // If still no match, try partial name match (but be more careful)
+                            if (!matchedProduct && normalizedNameClean.length > 3) {
+                                // Only try partial match if name is not too generic
+                                const genericNames = ['ekmek', 'süt', 'su', 'peynir', 'yumurta'];
+                                const isGeneric = genericNames.includes(normalizedNameClean);
+                                
+                                if (!isGeneric) {
+                                    matchedProduct = products.find(p => {
+                                        if (!p.name) return false;
+                                        const pName = p.name.toLowerCase();
+                                        const pNameClean = pName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+                                        // Check if either normalized name or clean name matches
+                                        return pName.includes(normalizedNameClean) || 
+                                               normalizedNameClean.includes(pNameClean) ||
+                                               pNameClean.includes(normalizedNameClean) ||
+                                               normalizedNameClean.includes(pName);
+                                    });
+                                }
+                            }
+                            
+                            if (matchedProduct && matchedProduct.barcodes && matchedProduct.barcodes.length > 0) {
+                                const firstBarcode = matchedProduct.barcodes.find(b => b.code);
+                                if (firstBarcode && firstBarcode.code) {
+                                    foundBarcodesFromNames.add(firstBarcode.code);
+                                }
+                            }
+                        });
+                    } catch (e) {
+                        console.error('Error in fallback image matching:', e);
+                    }
+                    
+                    // If we found barcodes from names, return them
+                    if (foundBarcodesFromNames.size > 0) {
+                        return Array.from(foundBarcodesFromNames).join(', ');
+                    }
+                }
+                
+                // If no barcodes found from names, return product names (original behavior)
+                return productNamesResult;
             }
         }
 
@@ -3395,15 +3862,38 @@
             // Show loading state for better UX
             showSearchLoading();
 
-            // Parse table data if present
-            const parsedQuery = parseTableData(query);
+            // Check if input contains HTML tags
+            const hasHtmlTags = /<[^>]+>/.test(query);
+            const hasImageSearch = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+            
+            // If HTML content and premium feature is active, try to parse HTML with images first
+            let parsedQuery = query;
+            if (hasHtmlTags && hasImageSearch) {
+                const htmlParsedResult = parseHtmlTableWithImages(query);
+                // If parseHtmlTableWithImages found barcodes, use them
+                // Otherwise, it will fallback to parseTableData which returns product names
+                if (htmlParsedResult && htmlParsedResult !== query) {
+                    // Check if result looks like barcodes (comma-separated numbers)
+                    const barcodePattern = /^[\d\s,]+$/;
+                    if (barcodePattern.test(htmlParsedResult.replace(/\s/g, ''))) {
+                        // It's barcodes, use them directly
+                        parsedQuery = htmlParsedResult;
+                    } else {
+                        // It's product names, continue with normal parsing
+                        parsedQuery = htmlParsedResult;
+                    }
+                }
+            } else {
+                // Parse table data if present (for non-HTML or non-premium users)
+                parsedQuery = parseTableData(query);
+            }
             
             // If parsed query is different from original, split by comma for individual products
             // Otherwise, split by comma for multiple terms
             let searchTerms;
             let isTableData = false;
             if (parsedQuery !== query) {
-                // Table data was parsed, split by comma to get individual product names
+                // Table data was parsed, split by comma to get individual product names or barcodes
                 searchTerms = parsedQuery
                     .split(',')
                     .map(term => term.trim())
@@ -3519,21 +4009,39 @@
                                 nameMatch = isExactProductMatch(product.name, productNamePart);
                             }
                             
-                            // Check image URL match (premium feature)
+                            // Check image URL match (premium feature) - using normalized matching
                             if (hasImageSearch && product.image && imageUrlPart) {
-                                // Compare image URLs (exact match or domain+filename match)
-                                const productImageUrl = product.image.toLowerCase().trim();
-                                const searchImageUrl = imageUrlPart.toLowerCase().trim();
+                                const normalizedProductUrl = normalizeImageUrl(product.image);
+                                const normalizedSearchUrl = normalizeImageUrl(imageUrlPart);
                                 
-                                // Exact match
-                                if (productImageUrl === searchImageUrl) {
+                                // Exact match (normalized)
+                                if (normalizedProductUrl === normalizedSearchUrl) {
                                     imageMatch = true;
-                                } else {
-                                    // Try to match by filename (last part of URL)
-                                    const productFileName = productImageUrl.split('/').pop().split('?')[0];
-                                    const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
-                                    if (productFileName === searchFileName && productFileName.length > 0) {
+                                } else if (normalizedProductUrl && normalizedSearchUrl) {
+                                    // Filename match (extension ignore)
+                                    const productFileName = normalizedProductUrl.split('/').pop();
+                                    const searchFileName = normalizedSearchUrl.split('/').pop();
+                                    if (productFileName && searchFileName) {
+                                        const productNameNoExt = productFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                        const searchNameNoExt = searchFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                        if (productNameNoExt === searchNameNoExt && productNameNoExt.length > 0) {
                                         imageMatch = true;
+                                        }
+                                    }
+                                    
+                                    // Partial path match
+                                    if (!imageMatch) {
+                                        const productPath = normalizedProductUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        const searchPath = normalizedSearchUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        if (productPath && searchPath) {
+                                            const productLastSegment = productPath.split('/').filter(s => s.length > 0).pop();
+                                            const searchLastSegment = searchPath.split('/').filter(s => s.length > 0).pop();
+                                            if (productLastSegment && searchLastSegment && 
+                                                productLastSegment === searchLastSegment && 
+                                                productLastSegment.length > 3) {
+                                                imageMatch = true;
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -3544,22 +4052,43 @@
                                 break;
                             }
                         } else if (isImageUrl && hasImageSearch) {
-                            // Direct image URL search
+                            // Direct image URL search - using normalized matching
                             if (product.image) {
-                                const productImageUrl = product.image.toLowerCase().trim();
-                                const searchImageUrl = searchTerm.toLowerCase().trim();
+                                const normalizedProductUrl = normalizeImageUrl(product.image);
+                                const normalizedSearchUrl = normalizeImageUrl(searchTerm);
                                 
-                                if (productImageUrl === searchImageUrl) {
+                                // Exact match (normalized)
+                                if (normalizedProductUrl === normalizedSearchUrl) {
                                     found = true;
                                     break;
-                                }
-                                
-                                // Try filename match
-                                const productFileName = productImageUrl.split('/').pop().split('?')[0];
-                                const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
-                                if (productFileName === searchFileName && productFileName.length > 0) {
+                                } else if (normalizedProductUrl && normalizedSearchUrl) {
+                                    // Filename match (extension ignore)
+                                    const productFileName = normalizedProductUrl.split('/').pop();
+                                    const searchFileName = normalizedSearchUrl.split('/').pop();
+                                    if (productFileName && searchFileName) {
+                                        const productNameNoExt = productFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                        const searchNameNoExt = searchFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                        if (productNameNoExt === searchNameNoExt && productNameNoExt.length > 0) {
                                     found = true;
                                     break;
+                                        }
+                                    }
+                                    
+                                    // Partial path match
+                                    if (!found) {
+                                        const productPath = normalizedProductUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        const searchPath = normalizedSearchUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        if (productPath && searchPath) {
+                                            const productLastSegment = productPath.split('/').filter(s => s.length > 0).pop();
+                                            const searchLastSegment = searchPath.split('/').filter(s => s.length > 0).pop();
+                                            if (productLastSegment && searchLastSegment && 
+                                                productLastSegment === searchLastSegment && 
+                                                productLastSegment.length > 3) {
+                                    found = true;
+                                    break;
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         } else {
@@ -3572,21 +4101,40 @@
                                 nameMatch = isExactProductMatch(product.name, searchTerm.toLowerCase());
                             }
                             
-                            // Check image URL match using productImageMap (premium feature, hidden from UI)
+                            // Check image URL match using productImageMap (premium feature, hidden from UI) - using normalized matching
                             if (hasImageSearch && productImageMap.has(searchTerm) && product.image) {
                                 const mappedImageUrl = productImageMap.get(searchTerm);
-                                const productImageUrl = product.image.toLowerCase().trim();
-                                const searchImageUrl = mappedImageUrl.toLowerCase().trim();
+                                const normalizedProductUrl = normalizeImageUrl(product.image);
+                                const normalizedSearchUrl = normalizeImageUrl(mappedImageUrl);
                                 
-                                // Exact match
-                                if (productImageUrl === searchImageUrl) {
+                                // Exact match (normalized)
+                                if (normalizedProductUrl === normalizedSearchUrl) {
                                     imageMatch = true;
-                                } else {
-                                    // Try to match by filename (last part of URL)
-                                    const productFileName = productImageUrl.split('/').pop().split('?')[0];
-                                    const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
-                                    if (productFileName === searchFileName && productFileName.length > 0) {
+                                } else if (normalizedProductUrl && normalizedSearchUrl) {
+                                    // Filename match (extension ignore)
+                                    const productFileName = normalizedProductUrl.split('/').pop();
+                                    const searchFileName = normalizedSearchUrl.split('/').pop();
+                                    if (productFileName && searchFileName) {
+                                        const productNameNoExt = productFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                        const searchNameNoExt = searchFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                        if (productNameNoExt === searchNameNoExt && productNameNoExt.length > 0) {
                                         imageMatch = true;
+                                        }
+                                    }
+                                    
+                                    // Partial path match
+                                    if (!imageMatch) {
+                                        const productPath = normalizedProductUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        const searchPath = normalizedSearchUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        if (productPath && searchPath) {
+                                            const productLastSegment = productPath.split('/').filter(s => s.length > 0).pop();
+                                            const searchLastSegment = searchPath.split('/').filter(s => s.length > 0).pop();
+                                            if (productLastSegment && searchLastSegment && 
+                                                productLastSegment === searchLastSegment && 
+                                                productLastSegment.length > 3) {
+                                                imageMatch = true;
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -3742,36 +4290,78 @@
                                 nameMatch = isExactProductMatch(product.name, productNamePart);
                             }
                             
-                            // Check image URL match (premium feature)
+                            // Check image URL match (premium feature) - using normalized matching
                             if (hasImageSearch && product.image && imageUrlPart) {
-                                const productImageUrl = product.image.toLowerCase().trim();
-                                const searchImageUrl = imageUrlPart.toLowerCase().trim();
+                                const normalizedProductUrl = normalizeImageUrl(product.image);
+                                const normalizedSearchUrl = normalizeImageUrl(imageUrlPart);
                                 
-                                if (productImageUrl === searchImageUrl) {
+                                // Exact match (normalized)
+                                if (normalizedProductUrl === normalizedSearchUrl) {
                                     imageMatch = true;
-                                } else {
-                                    const productFileName = productImageUrl.split('/').pop().split('?')[0];
-                                    const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
-                                    if (productFileName === searchFileName && productFileName.length > 0) {
+                                } else if (normalizedProductUrl && normalizedSearchUrl) {
+                                    // Filename match (extension ignore)
+                                    const productFileName = normalizedProductUrl.split('/').pop();
+                                    const searchFileName = normalizedSearchUrl.split('/').pop();
+                                    if (productFileName && searchFileName) {
+                                        const productNameNoExt = productFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                        const searchNameNoExt = searchFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                        if (productNameNoExt === searchNameNoExt && productNameNoExt.length > 0) {
                                         imageMatch = true;
+                                        }
+                                    }
+                                    
+                                    // Partial path match
+                                    if (!imageMatch) {
+                                        const productPath = normalizedProductUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        const searchPath = normalizedSearchUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        if (productPath && searchPath) {
+                                            const productLastSegment = productPath.split('/').filter(s => s.length > 0).pop();
+                                            const searchLastSegment = searchPath.split('/').filter(s => s.length > 0).pop();
+                                            if (productLastSegment && searchLastSegment && 
+                                                productLastSegment === searchLastSegment && 
+                                                productLastSegment.length > 3) {
+                                                imageMatch = true;
+                                            }
+                                        }
                                     }
                                 }
                             }
                             
                             found = nameMatch || imageMatch;
                         } else if (isImageUrl && hasImageSearch) {
-                            // Direct image URL search
+                            // Direct image URL search - using normalized matching
                             if (product.image) {
-                                const productImageUrl = product.image.toLowerCase().trim();
-                                const searchImageUrl = searchTerm.toLowerCase().trim();
+                                const normalizedProductUrl = normalizeImageUrl(product.image);
+                                const normalizedSearchUrl = normalizeImageUrl(searchTerm);
                                 
-                                if (productImageUrl === searchImageUrl) {
+                                // Exact match (normalized)
+                                if (normalizedProductUrl === normalizedSearchUrl) {
                                     found = true;
-                                } else {
-                                    const productFileName = productImageUrl.split('/').pop().split('?')[0];
-                                    const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
-                                    if (productFileName === searchFileName && productFileName.length > 0) {
+                                } else if (normalizedProductUrl && normalizedSearchUrl) {
+                                    // Filename match (extension ignore)
+                                    const productFileName = normalizedProductUrl.split('/').pop();
+                                    const searchFileName = normalizedSearchUrl.split('/').pop();
+                                    if (productFileName && searchFileName) {
+                                        const productNameNoExt = productFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                        const searchNameNoExt = searchFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                        if (productNameNoExt === searchNameNoExt && productNameNoExt.length > 0) {
                                         found = true;
+                                        }
+                                    }
+                                    
+                                    // Partial path match
+                                    if (!found) {
+                                        const productPath = normalizedProductUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        const searchPath = normalizedSearchUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        if (productPath && searchPath) {
+                                            const productLastSegment = productPath.split('/').filter(s => s.length > 0).pop();
+                                            const searchLastSegment = searchPath.split('/').filter(s => s.length > 0).pop();
+                                            if (productLastSegment && searchLastSegment && 
+                                                productLastSegment === searchLastSegment && 
+                                                productLastSegment.length > 3) {
+                                                found = true;
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -3785,21 +4375,70 @@
                                 nameMatch = isExactProductMatch(product.name, searchTerm.toLowerCase());
                             }
                             
-                            // Check image URL match using productImageMap (premium feature, hidden from UI)
-                            if (hasImageSearch && productImageMap.has(searchTerm) && product.image) {
-                                const mappedImageUrl = productImageMap.get(searchTerm);
-                                const productImageUrl = product.image.toLowerCase().trim();
-                                const searchImageUrl = mappedImageUrl.toLowerCase().trim();
+                            // Check image URL match using productImageMap (premium feature, hidden from UI) - using normalized matching
+                            // First, try to find image URL from productImageMap using searchTerm (could be product name or barcode)
+                            let mappedImageUrl = null;
+                            
+                            // Try direct lookup (if searchTerm is a product name)
+                            if (hasImageSearch && productImageMap.has(searchTerm)) {
+                                mappedImageUrl = productImageMap.get(searchTerm);
+                            } else if (hasImageSearch && isBarcodeSearch) {
+                                // If searchTerm is a barcode, find the product first, then get its name and lookup in map
+                                const productByBarcode = products.find(p => 
+                                    p.barcodes && p.barcodes.some(b => b.code === trimmedSearchTerm)
+                                );
+                                if (productByBarcode && productByBarcode.name) {
+                                    const productName = productByBarcode.name.toLowerCase().trim();
+                                    if (productImageMap.has(productName)) {
+                                        mappedImageUrl = productImageMap.get(productName);
+                                    }
+                                }
+                            }
+                            
+                            // If we have a mapped image URL, compare it with product's image
+                            if (hasImageSearch && mappedImageUrl && product.image) {
+                                const normalizedProductUrl = normalizeImageUrl(product.image);
+                                const normalizedSearchUrl = normalizeImageUrl(mappedImageUrl);
                                 
-                                // Exact match
-                                if (productImageUrl === searchImageUrl) {
+                                // Exact match (normalized)
+                                if (normalizedProductUrl === normalizedSearchUrl) {
                                     imageMatch = true;
-                                } else {
-                                    // Try to match by filename (last part of URL)
-                                    const productFileName = productImageUrl.split('/').pop().split('?')[0];
-                                    const searchFileName = searchImageUrl.split('/').pop().split('?')[0];
-                                    if (productFileName === searchFileName && productFileName.length > 0) {
+                                } else if (normalizedProductUrl && normalizedSearchUrl) {
+                                    // Image ID match (most reliable)
+                                    const productImageId = extractImageId(product.image);
+                                    const searchImageId = extractImageId(mappedImageUrl);
+                                    if (productImageId && searchImageId && productImageId === searchImageId) {
                                         imageMatch = true;
+                                    }
+                                    
+                                    // Filename match (extension ignore)
+                                    if (!imageMatch) {
+                                        const productFileName = normalizedProductUrl.split('/').pop();
+                                        const searchFileName = normalizedSearchUrl.split('/').pop();
+                                        if (productFileName && searchFileName) {
+                                            const productNameNoExt = productFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                            const searchNameNoExt = searchFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                            if (productNameNoExt === searchNameNoExt && productNameNoExt.length > 5) {
+                                                imageMatch = true;
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Partial path match
+                                    if (!imageMatch) {
+                                        const productPath = normalizedProductUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        const searchPath = normalizedSearchUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                        if (productPath && searchPath) {
+                                            const productLastSegment = productPath.split('/').filter(s => s.length > 0).pop();
+                                            const searchLastSegment = searchPath.split('/').filter(s => s.length > 0).pop();
+                                            if (productLastSegment && searchLastSegment) {
+                                                const productClean = productLastSegment.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                                const searchClean = searchLastSegment.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '').replace(/_[a-z]{2}_\d+$/i, '');
+                                                if (productClean === searchClean && productClean.length > 5) {
+                                                    imageMatch = true;
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -3829,15 +4468,46 @@
                             categoryMatch = containsAllTokens(product.category, termTokens);
                         }
                         
-                        // Check image URL (premium feature)
+                        // Check image URL (premium feature) - using normalized matching
                         if (hasImageSearch && product.image && isImageUrl) {
-                            const productImageUrl = product.image.toLowerCase().trim();
-                            const searchImageUrl = searchTerm.toLowerCase().trim();
+                            const normalizedProductUrl = normalizeImageUrl(product.image);
+                            const normalizedSearchUrl = normalizeImageUrl(searchTerm);
                             
-                            if (productImageUrl === searchImageUrl || 
-                                productImageUrl.includes(searchImageUrl) ||
-                                searchImageUrl.includes(productImageUrl)) {
+                            // Exact match (normalized)
+                            if (normalizedProductUrl === normalizedSearchUrl) {
                                 imageMatch = true;
+                            } else if (normalizedProductUrl && normalizedSearchUrl) {
+                                // Filename match (extension ignore)
+                                const productFileName = normalizedProductUrl.split('/').pop();
+                                const searchFileName = normalizedSearchUrl.split('/').pop();
+                                if (productFileName && searchFileName) {
+                                    const productNameNoExt = productFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                    const searchNameNoExt = searchFileName.replace(/\.(jpg|jpeg|png|gif|webp|svg)$/i, '');
+                                    if (productNameNoExt === searchNameNoExt && productNameNoExt.length > 0) {
+                                imageMatch = true;
+                                    }
+                                }
+                                
+                                // Partial path match or contains check
+                                if (!imageMatch) {
+                                    const productPath = normalizedProductUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                    const searchPath = normalizedSearchUrl.replace(/^https?:\/\/[^\/]+/, '');
+                                    if (productPath && searchPath) {
+                                        // Check if one contains the other
+                                        if (productPath.includes(searchPath) || searchPath.includes(productPath)) {
+                                            imageMatch = true;
+                                        } else {
+                                            // Check last segment match
+                                            const productLastSegment = productPath.split('/').filter(s => s.length > 0).pop();
+                                            const searchLastSegment = searchPath.split('/').filter(s => s.length > 0).pop();
+                                            if (productLastSegment && searchLastSegment && 
+                                                productLastSegment === searchLastSegment && 
+                                                productLastSegment.length > 3) {
+                                                imageMatch = true;
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                         

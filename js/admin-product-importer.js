@@ -16,6 +16,7 @@
         this.fetchedProducts = null; // Getir API'den çekilen ürünler
         this.fetchedShelfLabels = null; // Warehouse'dan çekilen raf etiketleri
         this.manualShelfLabels = null; // Manuel olarak yüklenen raf etiketi dosyası
+        this.missingPages = []; // Eksik sayfalar (100 ürün alınamayan sayfalar)
     }
 
         // Products.json dosyasını yükle ve cache'le
@@ -158,7 +159,7 @@
                             }
                         }
                     });
-
+                    
                     // En az name veya barcode olmalı
                     if (product.name || product.barcode) {
                         products.push(product);
@@ -172,7 +173,184 @@
                 throw error;
             }
         }
-
+        
+        // Eksik sayfaları göster
+        displayMissingPages(missingPages) {
+            console.log(`📋 displayMissingPages çağrıldı, ${missingPages.length} eksik sayfa:`, missingPages);
+            const missingPagesDiv = document.getElementById('shelfLabelMissingPages');
+            const missingPagesList = document.getElementById('missingPagesList');
+            
+            if (!missingPagesDiv) {
+                console.error('❌ shelfLabelMissingPages div bulunamadı!');
+                return;
+            }
+            
+            if (!missingPagesList) {
+                console.error('❌ missingPagesList div bulunamadı!');
+                return;
+            }
+            
+            // Eksik sayfalar div'ini göster
+            missingPagesDiv.classList.remove('hidden');
+            console.log(`✅ Eksik sayfalar div'i gösterildi`);
+            
+            // Liste temizle
+            missingPagesList.innerHTML = '';
+            
+            // Her eksik sayfa için badge oluştur
+            missingPages.forEach(pageNumber => {
+                const badge = document.createElement('button');
+                badge.className = 'px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded-md text-sm font-medium transition-colors';
+                badge.textContent = `Sayfa ${pageNumber}`;
+                badge.title = `Sayfa ${pageNumber} - Eksik veri çekildi, manuel HTML ile ekleyebilirsiniz`;
+                badge.onclick = () => {
+                    console.log(`📝 Sayfa ${pageNumber} için manuel HTML modal açılıyor`);
+                    this.openManualHtmlModal(pageNumber);
+                };
+                missingPagesList.appendChild(badge);
+            });
+            
+            console.log(`✅ ${missingPages.length} eksik sayfa badge'i oluşturuldu`);
+            
+            // Manuel HTML gir butonunu da bağla
+            const openManualHtmlModalBtn = document.getElementById('openManualHtmlModalBtn');
+            if (openManualHtmlModalBtn) {
+                openManualHtmlModalBtn.onclick = () => {
+                    this.openManualHtmlModal(null);
+                };
+            }
+        }
+        
+        // Manuel HTML modalını aç
+        openManualHtmlModal(pageNumber) {
+            const modal = document.getElementById('manualHtmlModal');
+            const pageNumberInput = document.getElementById('manualHtmlPageNumber');
+            
+            if (modal) {
+                modal.classList.remove('hidden');
+                if (pageNumberInput && pageNumber) {
+                    pageNumberInput.value = pageNumber;
+                }
+            }
+        }
+        
+        // Manuel HTML analiz et ve ekle
+        async analyzeManualHtml(htmlContent, pageNumber) {
+            try {
+                const progressDiv = document.getElementById('manualHtmlProgress');
+                const progressText = document.getElementById('manualHtmlProgressText');
+                
+                if (progressDiv) {
+                    progressDiv.classList.remove('hidden');
+                }
+                if (progressText) {
+                    progressText.textContent = 'HTML analiz ediliyor...';
+                }
+                
+                return new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        window.removeEventListener('message', listener);
+                        reject(new Error('Extension yanıt vermedi (timeout).'));
+                    }, 30000); // 30 saniye
+                    
+                    const listener = (event) => {
+                        if (event.data && event.data.type === 'WAREHOUSE_MANUAL_HTML_RESPONSE') {
+                            clearTimeout(timeout);
+                            window.removeEventListener('message', listener);
+                            
+                            const response = event.data;
+                            
+                            if (!response.success) {
+                                if (progressText) {
+                                    progressText.textContent = `❌ Hata: ${response.error}`;
+                                }
+                                reject(new Error(response.error));
+                                return;
+                            }
+                            
+                            if (progressText) {
+                                progressText.textContent = `✅ ${response.total} ürün başarıyla parse edildi!`;
+                            }
+                            
+                            // Parse edilen verileri mevcut array'e ekle
+                            if (response.data && response.data.length > 0) {
+                                if (!this.fetchedShelfLabels) {
+                                    this.fetchedShelfLabels = [];
+                                }
+                                this.fetchedShelfLabels = this.fetchedShelfLabels.concat(response.data);
+                                
+                                // Eksik sayfalar listesinden bu sayfayı kaldır
+                                if (this.missingPages && this.missingPages.includes(pageNumber)) {
+                                    this.missingPages = this.missingPages.filter(p => p !== pageNumber);
+                                    console.log(`✅ Sayfa ${pageNumber} eksik sayfalar listesinden kaldırıldı. Kalan: ${this.missingPages.length}`);
+                                }
+                                
+                                const missingPagesList = document.getElementById('missingPagesList');
+                                if (missingPagesList) {
+                                    const badges = missingPagesList.querySelectorAll('button');
+                                    badges.forEach(badge => {
+                                        if (badge.textContent.includes(`Sayfa ${pageNumber}`)) {
+                                            badge.remove();
+                                        }
+                                    });
+                                    
+                                    // Eğer hiç eksik sayfa kalmadıysa div'i gizle
+                                    if (missingPagesList.children.length === 0) {
+                                        const missingPagesDiv = document.getElementById('shelfLabelMissingPages');
+                                        if (missingPagesDiv) {
+                                            missingPagesDiv.classList.add('hidden');
+                                        }
+                                    }
+                                }
+                                
+                                // Karşılaştırma sonuçlarındaki eksik sayfalar listesini de güncelle
+                                const missingPagesListInComparison = document.getElementById('missingPagesListInComparison');
+                                if (missingPagesListInComparison) {
+                                    const comparisonBadges = missingPagesListInComparison.querySelectorAll('button');
+                                    comparisonBadges.forEach(badge => {
+                                        const onclickAttr = badge.getAttribute('onclick');
+                                        if (onclickAttr && onclickAttr.includes(`openManualHtmlModal(${pageNumber})`)) {
+                                            badge.remove();
+                                        }
+                                    });
+                                    
+                                    // Eğer hiç eksik sayfa kalmadıysa info div'ini gizle
+                                    if (missingPagesListInComparison.children.length === 0) {
+                                        const missingPagesInfo = document.getElementById('missingPagesInfo');
+                                        if (missingPagesInfo) {
+                                            missingPagesInfo.classList.add('hidden');
+                                        }
+                                    }
+                                }
+                                
+                                // Sonuçları güncelle
+                                const resultsText = document.getElementById('shelfLabelResultsText');
+                                if (resultsText) {
+                                    resultsText.textContent = `Toplam ${this.fetchedShelfLabels.length} raf etiketi çekildi. JSON olarak indirebilir veya mevcut products.json ile karşılaştırabilirsiniz.`;
+                                }
+                                
+                                console.log(`✅ Sayfa ${pageNumber} için ${response.total} ürün eklendi. Toplam: ${this.fetchedShelfLabels.length}`);
+                            }
+                            
+                            resolve(response.data);
+                        }
+                    };
+                    
+                    window.addEventListener('message', listener);
+                    
+                    // Extension'a mesaj gönder
+                    window.postMessage({
+                        type: 'WAREHOUSE_PARSE_MANUAL_HTML',
+                        htmlContent: htmlContent,
+                        pageNumber: pageNumber
+                    }, '*');
+                });
+            } catch (error) {
+                console.error('❌ Manuel HTML analiz hatası:', error);
+                throw error;
+            }
+        }
+        
         // MongoDB ObjectId formatında benzersiz ID üretme
         generateObjectId() {
             // 24 karakter hex string (MongoDB ObjectId formatı)
@@ -982,6 +1160,12 @@
                     progressText.textContent = 'Extension\'a bağlanılıyor...';
                 }
                 
+                // Yavaş çek modu checkbox'ını kontrol et
+                const slowModeCheckbox = document.getElementById('slowModeCheckbox');
+                const slowMode = slowModeCheckbox ? slowModeCheckbox.checked : false;
+                const slowModeDelayInput = document.getElementById('slowModeDelay');
+                const slowModeDelay = slowMode && slowModeDelayInput ? parseInt(slowModeDelayInput.value) || 2000 : 2000;
+                
                 // Content script üzerinden mesaj gönder (window.postMessage)
                 return new Promise((resolve, reject) => {
                     // Timeout ekle (600 saniye = 10 dakika - 86 sayfa için yeterli)
@@ -1046,9 +1230,15 @@
                             
                             const data = response.data || [];
                             const total = response.total || data.length;
+                            const missingPages = response.missingPages || [];
+                            
+                            console.log(`✅ ${total} raf etiketi başarıyla çekildi`);
+                            if (missingPages.length > 0) {
+                                console.log(`⚠️ Eksik sayfalar: ${missingPages.join(', ')}`);
+                            }
                             
                             if (progressText) {
-                                progressText.textContent = `✅ ${total} raf etiketi başarıyla çekildi`;
+                                progressText.textContent = `✅ ${total} raf etiketi başarıyla çekildi${missingPages.length > 0 ? ` (${missingPages.length} sayfa eksik)` : ''}`;
                             }
                             
                             // Progress div'i gizle
@@ -1062,10 +1252,22 @@
                                 resultsText.textContent = `Toplam ${total} raf etiketi çekildi. JSON olarak indirebilir veya mevcut products.json ile karşılaştırabilirsiniz.`;
                             }
                             
+                            // Eksik sayfaları göster (MUTLAKA!)
+                            if (missingPages.length > 0) {
+                                console.log(`📋 Eksik sayfaları gösteriliyor: ${missingPages.length} sayfa`);
+                                this.displayMissingPages(missingPages);
+                            } else {
+                                // Eksik sayfa yoksa div'i gizle
+                                const missingPagesDiv = document.getElementById('shelfLabelMissingPages');
+                                if (missingPagesDiv) {
+                                    missingPagesDiv.classList.add('hidden');
+                                }
+                            }
+                            
                             // Verileri hafızada tut
                             this.fetchedShelfLabels = data;
+                            this.missingPages = missingPages; // Eksik sayfaları da sakla
                             
-                            console.log(`✅ ${total} raf etiketi başarıyla çekildi`);
                             resolve(data);
                         }
                     };
@@ -1092,7 +1294,9 @@
                         }
                         
                         window.postMessage({
-                            type: 'WAREHOUSE_EXPORT_SHELF_LABELS'
+                            type: 'WAREHOUSE_EXPORT_SHELF_LABELS',
+                            slowMode: slowMode,
+                            slowModeDelay: slowModeDelay
                         }, '*');
                         
                         console.log('📤 Admin panelden warehouse extension\'a mesaj gönderildi');
@@ -1157,9 +1361,23 @@
                     throw new Error('İndirilecek raf etiketi verisi yok. Lütfen önce raf etiketlerini çekin.');
                 }
                 
-                // Products.json formatına dönüştür
+                // Products.json formatına dönüştür (DOĞRU SIRALAMA: id, name, category, brand, description, image, barcodes, shelf, price, stock)
                 const productsData = {
-                    products: this.fetchedShelfLabels
+                    products: this.fetchedShelfLabels.map(product => {
+                        // Sıralamayı düzelt: id, name, category, brand, description, image, barcodes, shelf, price, stock
+                        return {
+                            id: product.id,
+                            name: product.name,
+                            category: product.category,
+                            brand: product.brand,
+                            description: product.description,
+                            image: product.image,
+                            barcodes: product.barcodes,
+                            shelf: product.shelf,
+                            price: product.price,
+                            stock: product.stock
+                        };
+                    })
                 };
                 
                 const jsonString = JSON.stringify(productsData, null, 2);
@@ -1178,6 +1396,148 @@
                 console.log(`✅ ${this.fetchedShelfLabels.length} raf etiketi JSON olarak indirildi (products.json formatında)`);
             } catch (error) {
                 console.error('❌ JSON indirme hatası:', error);
+                throw error;
+            }
+        }
+        
+        // Warehouse verisini direkt products.json'a aktar (karşılaştırma yapmadan)
+        async importWarehouseToProducts() {
+            try {
+                if (!this.fetchedShelfLabels || this.fetchedShelfLabels.length === 0) {
+                    throw new Error('Aktarılacak raf etiketi verisi yok. Lütfen önce raf etiketlerini çekin.');
+                }
+                
+                // Onay al
+                const confirmed = confirm(
+                    `⚠️ DİKKAT!\n\n` +
+                    `${this.fetchedShelfLabels.length} ürün direkt products.json'a aktarılacak.\n\n` +
+                    `Bu işlem:\n` +
+                    `- Mevcut products.json dosyasını YEDEKLEYECEK\n` +
+                    `- Warehouse verisini products.json'a YAZACAK\n` +
+                    `- Karşılaştırma YAPMAYACAK (tüm ürünler direkt eklenecek)\n\n` +
+                    `Devam etmek istiyor musunuz?`
+                );
+                
+                if (!confirmed) {
+                    return;
+                }
+                
+                console.log(`📥 Warehouse verisi products.json'a aktarılıyor: ${this.fetchedShelfLabels.length} ürün...`);
+                
+                // Mevcut products.json'ı yükle (yedek için)
+                const existingProducts = await this.loadProductsJSON(null, true);
+                
+                // Warehouse verisini products.json formatına dönüştür (DOĞRU SIRALAMA)
+                const warehouseProducts = this.fetchedShelfLabels.map(product => {
+                    // Sıralamayı düzelt: id, name, category, brand, description, image, barcodes, shelf, price, stock
+                    return {
+                        id: product.id,
+                        name: product.name,
+                        category: product.category || 'Genel',
+                        brand: product.brand || '',
+                        description: product.description || product.name,
+                        image: product.image || '',
+                        barcodes: product.barcodes || [],
+                        shelf: product.shelf || '-', // MUTLAKA VAR
+                        price: product.price || null,
+                        stock: product.stock || null
+                    };
+                });
+                
+                // Yeni products.json oluştur
+                const newProductsData = {
+                    products: warehouseProducts
+                };
+                
+                // JSON string'e çevir
+                const jsonString = JSON.stringify(newProductsData, null, 2);
+                
+                // Yedek oluştur (mevcut products.json'ı kaydet)
+                const backupData = {
+                    products: existingProducts,
+                    backupDate: new Date().toISOString(),
+                    originalCount: existingProducts.length,
+                    warehouseCount: warehouseProducts.length
+                };
+                const backupJsonString = JSON.stringify(backupData, null, 2);
+                const backupBlob = new Blob([backupJsonString], { type: 'application/json' });
+                const backupUrl = URL.createObjectURL(backupBlob);
+                const backupA = document.createElement('a');
+                backupA.href = backupUrl;
+                backupA.download = `products_backup_${new Date().toISOString().split('T')[0]}_${Date.now()}.json`;
+                document.body.appendChild(backupA);
+                backupA.click();
+                document.body.removeChild(backupA);
+                URL.revokeObjectURL(backupUrl);
+                
+                console.log(`💾 Yedek oluşturuldu: ${existingProducts.length} ürün`);
+                
+                // Yeni products.json'ı indir
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'products.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                console.log(`✅ ${warehouseProducts.length} ürün products.json'a aktarıldı!`);
+                alert(`✅ Başarılı!\n\n` +
+                      `- Yedek oluşturuldu: ${existingProducts.length} ürün\n` +
+                      `- Warehouse verisi aktarıldı: ${warehouseProducts.length} ürün\n\n` +
+                      `Şimdi indirilen products.json dosyasını projenin kök dizinine kopyalayın ve temp products işlemini çalıştırın.`);
+            } catch (error) {
+                console.error('❌ Warehouse verisi aktarma hatası:', error);
+                alert(`❌ Hata: ${error.message}`);
+                throw error;
+            }
+        }
+
+        // Temp Products Güncelle (products.json'dan temp_products.js oluştur)
+        async updateTempProducts() {
+            try {
+                console.log('📖 products.json dosyası okunuyor...');
+                
+                // products.json'ı yükle
+                const productsData = await this.loadProductsJSON(null, true);
+                
+                if (!productsData || !Array.isArray(productsData)) {
+                    throw new Error('products.json geçersiz format!');
+                }
+                
+                console.log(`✅ ${productsData.length} ürün bulundu`);
+                
+                // temp_products.js formatına dönüştür
+                const productsDataObj = {
+                    products: productsData
+                };
+                
+                // temp_products.js içeriğini oluştur
+                const jsContent = `const PRODUCTS_DATA = ${JSON.stringify(productsDataObj, null, 2)};`;
+                
+                // Dosyayı indir
+                const blob = new Blob([jsContent], { type: 'application/javascript' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'temp_products.js';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                console.log(`✅ temp_products.js dosyası oluşturuldu!`);
+                console.log(`📊 Toplam ürün sayısı: ${productsData.length}`);
+                
+                alert(`✅ Başarılı!\n\n` +
+                      `- ${productsData.length} ürün bulundu\n` +
+                      `- temp_products.js dosyası indirildi\n\n` +
+                      `İndirilen dosyayı pages klasörüne kopyalayın.`);
+            } catch (error) {
+                console.error('❌ Temp products güncelleme hatası:', error);
+                alert(`❌ Hata: ${error.message}`);
                 throw error;
             }
         }
@@ -1205,47 +1565,123 @@
                 // Eğer manuel dosya yüklendiyse, o dosyayı kullan
                 const existingProducts = await this.loadProductsJSON(null, true);
                 
-                // Karşılaştır (barkod ve ID ile)
+                // Karşılaştır (SADECE BARKOD İLE - BASIT VE KESIN)
                 const missingProducts = [];
-                const existingProductsMap = new Map();
+                const existingProductsMap = new Map(); // Key: "barcode:CODE" (tüm varyasyonlar)
                 
-                // Mevcut ürünleri map'e ekle (barkod ve ID ile)
+                // Tüm barkod varyasyonlarını oluştur (nokta, tire vs. temizle)
+                const getBarcodeVariations = (code) => {
+                    if (!code) return [];
+                    const variations = new Set();
+                    const str = String(code).trim();
+                    
+                    // Orijinal
+                    variations.add(str);
+                    
+                    // Nokta/tire/boşluk temizlenmiş
+                    const cleaned = str.replace(/[.\-\s]/g, '');
+                    if (cleaned && cleaned !== str && cleaned.length >= 6) {
+                        variations.add(cleaned);
+                    }
+                    
+                    // Sadece sayılar (eğer farklıysa)
+                    const numbersOnly = str.replace(/\D/g, '');
+                    if (numbersOnly && numbersOnly.length >= 6 && numbersOnly !== str && numbersOnly !== cleaned) {
+                        variations.add(numbersOnly);
+                    }
+                    
+                    return Array.from(variations);
+                };
+                
+                console.log('📦 Mevcut ürünler indexleniyor (BARKOD VARYASYONLARIYLA)...');
+                let indexedCount = 0;
+                
+                // Mevcut ürünleri map'e ekle (SADECE BARKOD VARYASYONLARIYLA)
                 for (const product of existingProducts) {
+                    // Barkod ile index'le (TÜM VARYASYONLARLA)
                     if (product.barcodes && Array.isArray(product.barcodes)) {
                         for (const barcode of product.barcodes) {
                             if (barcode.code) {
-                                existingProductsMap.set(`barcode:${barcode.code}`, product);
+                                const variations = getBarcodeVariations(barcode.code);
+                                for (const variation of variations) {
+                                    existingProductsMap.set(`barcode:${variation}`, product);
+                                }
                             }
                         }
                     }
-                    if (product.id) {
-                        existingProductsMap.set(`id:${product.id}`, product);
+                    
+                    indexedCount++;
+                    if (indexedCount % 1000 === 0) {
+                        console.log(`📦 ${indexedCount}/${existingProducts.length} ürün indexlendi...`);
                     }
                 }
                 
-                // Çekilen raf etiketlerini kontrol et
+                console.log(`✅ ${indexedCount} ürün indexlendi. ${existingProductsMap.size} barkod varyasyonu oluşturuldu.`);
+                
+                // Çekilen raf etiketlerini kontrol et (SADECE BARKOD İLE - BASIT VE KESIN)
+                console.log('🔍 Raf etiketleri kontrol ediliyor (BARKOD İLE)...');
+                let checkedCount = 0;
+                let foundByBarcode = 0;
+                let notFound = 0;
+                const notFoundDetails = []; // Debug için
+                
                 for (const shelfLabel of labelsToCompare) {
                     let found = false;
                     
-                    // Önce barkod ile kontrol et
+                    // SADECE BARKOD İLE KONTROL ET
                     if (shelfLabel.barcodes && Array.isArray(shelfLabel.barcodes) && shelfLabel.barcodes.length > 0) {
                         for (const barcode of shelfLabel.barcodes) {
-                            if (barcode.code && existingProductsMap.has(`barcode:${barcode.code}`)) {
-                                found = true;
-                                break;
+                            if (barcode.code) {
+                                const variations = getBarcodeVariations(barcode.code);
+                                for (const variation of variations) {
+                                    if (existingProductsMap.has(`barcode:${variation}`)) {
+                                        found = true;
+                                        foundByBarcode++;
+                                        break;
+                                    }
+                                }
+                                if (found) break;
                             }
                         }
                     }
                     
-                    // Barkod ile bulunamazsa ID ile kontrol et
-                    if (!found && shelfLabel.id && existingProductsMap.has(`id:${shelfLabel.id}`)) {
-                        found = true;
-                    }
-                    
+                    // Eğer barkod yoksa veya bulunamadıysa, eksik ürünler listesine ekle
                     if (!found) {
                         missingProducts.push(shelfLabel);
+                        notFound++;
+                        
+                        // İlk 20 bulunamayan ürünü logla (debug için)
+                        if (notFound <= 20) {
+                            const barcodeList = shelfLabel.barcodes && shelfLabel.barcodes.length > 0 
+                                ? shelfLabel.barcodes.map(b => b.code).join(', ') 
+                                : 'BARKOD YOK';
+                            notFoundDetails.push({
+                                name: shelfLabel.name,
+                                id: shelfLabel.id,
+                                barcodes: barcodeList
+                            });
+                        }
+                    }
+                    
+                    checkedCount++;
+                    // Her 100 üründe bir ilerleme göster
+                    if (checkedCount % 100 === 0) {
+                        console.log(`🔍 ${checkedCount}/${labelsToCompare.length} ürün kontrol edildi... (✅ Bulunan: ${foundByBarcode}, ❌ Bulunamayan: ${notFound})`);
                     }
                 }
+                
+                // Bulunamayan ürünlerin detaylarını göster
+                if (notFoundDetails.length > 0) {
+                    console.log('❌ İlk 20 bulunamayan ürün (BARKOD KONTROLÜ):');
+                    notFoundDetails.forEach((detail, idx) => {
+                        console.log(`   ${idx + 1}. ${detail.name} (Barkod: ${detail.barcodes})`);
+                    });
+                }
+                
+                console.log(`📊 Karşılaştırma tamamlandı:`);
+                console.log(`   ✅ Barkod ile bulunan: ${foundByBarcode}`);
+                console.log(`   ❌ Bulunamayan (barkod yok veya eşleşme yok): ${notFound}`);
+                console.log(`   📈 Toplam kontrol edilen: ${checkedCount}`);
                 
                 console.log(`📊 Karşılaştırma sonucu: ${missingProducts.length} eksik ürün bulundu`);
                 
@@ -1260,6 +1696,7 @@
                             <div>✅ Mevcut ürünler: ${existingProducts.length}</div>
                             <div>📋 Çekilen raf etiketleri: ${labelsToCompare.length}</div>
                             <div class="text-blue-600 font-medium">🔍 Eksik ürünler: ${missingProducts.length}</div>
+                            ${this.missingPages && this.missingPages.length > 0 ? `<div class="text-yellow-600 font-medium">⚠️ Eksik sayfalar (100 ürün alınamayan): ${this.missingPages.length} sayfa (${this.missingPages.join(', ')})</div>` : ''}
                         </div>
                     `;
                 }
@@ -1296,6 +1733,47 @@
             if (existingCountEl) existingCountEl.textContent = existingCount;
             if (totalCountEl) totalCountEl.textContent = totalCount;
             if (missingCountEl) missingCountEl.textContent = missingProducts.length;
+            
+            // Eksik sayfaları göster (eğer varsa)
+            if (this.missingPages && this.missingPages.length > 0) {
+                // Eksik sayfalar bölümünü göster
+                this.displayMissingPages(this.missingPages);
+                
+                // Karşılaştırma sonuçlarına eksik sayfalar bilgisini ekle
+                const missingPagesInfo = document.getElementById('missingPagesInfo');
+                if (missingPagesInfo) {
+                    missingPagesInfo.innerHTML = `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-yellow-600 font-semibold">⚠️ Eksik Sayfalar (100 ürün alınamayan)</span>
+                                    <span class="px-2 py-1 bg-yellow-200 text-yellow-800 rounded text-sm font-medium">${this.missingPages.length} sayfa</span>
+                                </div>
+                                <button onclick="window.productImporter.openManualHtmlModal(null)" class="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-md text-sm font-medium transition-colors">
+                                    📝 Manuel HTML Ekle
+                                </button>
+                            </div>
+                            <div class="text-sm text-gray-700 mb-2">
+                                Aşağıdaki sayfalardan 100 ürün çekilemedi. Manuel olarak HTML girerek eksik ürünleri ekleyebilirsiniz:
+                            </div>
+                            <div id="missingPagesListInComparison" class="flex flex-wrap gap-2">
+                                ${this.missingPages.map(pageNum => `
+                                    <button onclick="window.productImporter.openManualHtmlModal(${pageNum})" 
+                                            class="px-3 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded-md text-sm font-medium transition-colors">
+                                        Sayfa ${pageNum}
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                    missingPagesInfo.classList.remove('hidden');
+                }
+            } else {
+                const missingPagesInfo = document.getElementById('missingPagesInfo');
+                if (missingPagesInfo) {
+                    missingPagesInfo.classList.add('hidden');
+                }
+            }
             
             // Eksik ürünleri listele
             if (missingListEl) {
@@ -1412,9 +1890,11 @@
         }
     }
 
-    // Global instance
-    window.productImporter = new ProductImporter();
-
-    console.log('✅ ProductImporter initialized');
+    // Initialize ProductImporter
+    if (typeof window !== 'undefined') {
+        window.productImporter = new ProductImporter();
+        console.log('✅ ProductImporter initialized');
+    }
 })();
+
 

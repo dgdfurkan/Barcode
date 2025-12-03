@@ -3845,6 +3845,19 @@ AdminPanel.prototype.initProductImportTab = function() {
         });
     }
 
+    // Yavaş mod checkbox'ı için ayarlar bölümünü göster/gizle
+    const slowModeCheckbox = document.getElementById('slowModeCheckbox');
+    const slowModeSettings = document.getElementById('slowModeSettings');
+    if (slowModeCheckbox && slowModeSettings) {
+        slowModeCheckbox.addEventListener('change', () => {
+            if (slowModeCheckbox.checked) {
+                slowModeSettings.classList.remove('hidden');
+            } else {
+                slowModeSettings.classList.add('hidden');
+            }
+        });
+    }
+    
     // Warehouse raf etiketlerini çekme butonu
     const fetchShelfLabelsBtn = document.getElementById('fetchShelfLabelsBtn');
     if (fetchShelfLabelsBtn) {
@@ -3854,6 +3867,72 @@ AdminPanel.prototype.initProductImportTab = function() {
             } catch (error) {
                 console.error('Error fetching shelf labels from Warehouse:', error);
                 alert('Raf etiketleri çekilemedi: ' + error.message);
+            }
+        });
+    }
+    
+    // Manuel HTML modal butonları
+    const openManualHtmlModalBtn = document.getElementById('openManualHtmlModalBtn');
+    const closeManualHtmlModal = document.getElementById('closeManualHtmlModal');
+    const cancelManualHtml = document.getElementById('cancelManualHtml');
+    const analyzeManualHtmlBtn = document.getElementById('analyzeManualHtml');
+    
+    if (openManualHtmlModalBtn) {
+        openManualHtmlModalBtn.addEventListener('click', () => {
+            window.productImporter.openManualHtmlModal(null);
+        });
+    }
+    
+    if (closeManualHtmlModal) {
+        closeManualHtmlModal.addEventListener('click', () => {
+            const modal = document.getElementById('manualHtmlModal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    }
+    
+    if (cancelManualHtml) {
+        cancelManualHtml.addEventListener('click', () => {
+            const modal = document.getElementById('manualHtmlModal');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    }
+    
+    if (analyzeManualHtmlBtn) {
+        analyzeManualHtmlBtn.addEventListener('click', async () => {
+            const htmlContent = document.getElementById('manualHtmlContent').value.trim();
+            const pageNumber = parseInt(document.getElementById('manualHtmlPageNumber').value);
+            
+            if (!htmlContent) {
+                alert('Lütfen HTML içeriğini girin.');
+                return;
+            }
+            
+            if (!pageNumber || isNaN(pageNumber) || pageNumber < 1) {
+                alert('Lütfen geçerli bir sayfa numarası girin.');
+                return;
+            }
+            
+            try {
+                await window.productImporter.analyzeManualHtml(htmlContent, pageNumber);
+                
+                // Modal'ı kapat
+                const modal = document.getElementById('manualHtmlModal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                }
+                
+                // Formu temizle
+                document.getElementById('manualHtmlContent').value = '';
+                document.getElementById('manualHtmlPageNumber').value = '';
+                
+                alert(`✅ Sayfa ${pageNumber} başarıyla analiz edildi ve eklendi!`);
+            } catch (error) {
+                console.error('Error analyzing manual HTML:', error);
+                alert('HTML analiz edilemedi: ' + error.message);
             }
         });
     }
@@ -3868,6 +3947,32 @@ AdminPanel.prototype.initProductImportTab = function() {
             } catch (error) {
                 console.error('Error downloading shelf labels:', error);
                 alert('❌ İndirme hatası: ' + error.message);
+            }
+        });
+    }
+    
+    // Warehouse verisini direkt products.json'a aktar butonu
+    const importWarehouseToProductsBtn = document.getElementById('importWarehouseToProductsBtn');
+    if (importWarehouseToProductsBtn) {
+        importWarehouseToProductsBtn.addEventListener('click', async () => {
+            try {
+                await window.productImporter.importWarehouseToProducts();
+            } catch (error) {
+                console.error('Error importing warehouse to products:', error);
+                alert('❌ Aktarım hatası: ' + error.message);
+            }
+        });
+    }
+    
+    // Temp Products güncelle butonu
+    const updateTempProductsBtn = document.getElementById('updateTempProductsBtn');
+    if (updateTempProductsBtn) {
+        updateTempProductsBtn.addEventListener('click', async () => {
+            try {
+                await window.productImporter.updateTempProducts();
+            } catch (error) {
+                console.error('Error updating temp products:', error);
+                alert('❌ Temp products güncelleme hatası: ' + error.message);
             }
         });
     }
