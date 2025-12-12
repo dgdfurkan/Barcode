@@ -1248,6 +1248,169 @@ AdminPanel.prototype.previewUpdate = function() {
     previewModal.classList.remove('hidden');
 };
 
+// Product Update JSON Parse Fonksiyonu
+AdminPanel.prototype.parseProductUpdateJSON = function(description) {
+    if (!description || !description.trim()) return null;
+    
+    try {
+        // Description'dan JSON'u bul (tüm satırları kontrol et)
+        const lines = description.split('\n');
+        let jsonStart = -1;
+        let jsonEnd = -1;
+        let braceCount = 0;
+        
+        // JSON'un başlangıç ve bitişini bul
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line.includes('"type"') && line.includes('"product_update"')) {
+                jsonStart = i;
+                braceCount = (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
+                if (braceCount === 0 && line.endsWith('}')) {
+                    // Tek satırda JSON
+                    try {
+                        const parsed = JSON.parse(line);
+                        if (parsed.type === 'product_update' && Array.isArray(parsed.products)) {
+                            return parsed.products;
+                        }
+                    } catch (e) {
+                        // Devam et
+                    }
+                }
+            } else if (jsonStart !== -1) {
+                braceCount += (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
+                if (braceCount === 0 && line.includes('}')) {
+                    jsonEnd = i;
+                    break;
+                }
+            }
+        }
+        
+        // JSON'u parse et
+        if (jsonStart !== -1) {
+            const jsonLines = jsonEnd !== -1 
+                ? lines.slice(jsonStart, jsonEnd + 1)
+                : lines.slice(jsonStart);
+            const jsonString = jsonLines.join('\n');
+            
+            try {
+                const parsed = JSON.parse(jsonString);
+                if (parsed.type === 'product_update' && Array.isArray(parsed.products)) {
+                    return parsed.products;
+                }
+            } catch (e) {
+                // JSON parse hatası, description'ın tamamını kontrol et
+                try {
+                    const fullParsed = JSON.parse(description.trim());
+                    if (fullParsed.type === 'product_update' && Array.isArray(fullParsed.products)) {
+                        return fullParsed.products;
+                    }
+                } catch (e2) {
+                    // JSON değil, null döndür
+                }
+            }
+        }
+    } catch (error) {
+        console.warn('Product update JSON parse hatası:', error);
+    }
+    
+    return null;
+};
+
+// Product Update Grid Render Fonksiyonu
+AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
+    if (!products || !Array.isArray(products) || products.length === 0) {
+        return '';
+    }
+    
+    const initialDisplayCount = 20;
+    const shouldShowAll = showAll || products.length <= initialDisplayCount;
+    const displayProducts = shouldShowAll ? products : products.slice(0, initialDisplayCount);
+    const remainingCount = products.length - initialDisplayCount;
+    const uniqueId = 'product-update-' + Math.random().toString(36).substr(2, 9);
+    
+    // Products'ı string olarak sakla (onclick için)
+    const productsJson = JSON.stringify(products).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+    
+    return `
+        <div class="product-update-grid mt-4 mb-4" id="${uniqueId}" data-products='${productsJson}'>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                ${displayProducts.map(product => {
+                    const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;');
+                    const barcode = product.barcode || 'Barkod yok';
+                    const image = product.image || '';
+                    
+                    return `
+                        <div class="product-card bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+                            <div class="product-card-image-container bg-gray-100 flex items-center justify-center" style="height: 150px; overflow: hidden;">
+                                ${image ? `
+                                    <img src="${image}" 
+                                         alt="${productName}" 
+                                         class="product-card-image w-full h-full object-cover"
+                                         onerror="this.onerror=null;this.src='';this.parentElement.innerHTML='<div class=\\'text-gray-400 text-sm\\'>Görsel Yok</div>';"
+                                         loading="lazy">
+                                ` : `
+                                    <div class="text-gray-400 text-sm">Görsel Yok</div>
+                                `}
+                            </div>
+                            <div class="p-3">
+                                <div class="product-card-name font-medium text-sm text-gray-900 mb-1 line-clamp-2" style="min-height: 2.5rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                    ${productName}
+                                </div>
+                                <div class="product-card-barcode text-xs text-gray-600 font-mono">
+                                    ${barcode}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            ${remainingCount > 0 && !shouldShowAll ? `
+                <div class="mt-4 text-center">
+                    <button onclick="
+                        (function() {
+                            const container = document.getElementById('${uniqueId}');
+                            if (!container) return;
+                            const productsJson = container.getAttribute('data-products');
+                            if (!productsJson) return;
+                            try {
+                                const products = JSON.parse(productsJson.replace(/&#39;/g, '\\'').replace(/&quot;/g, '\\"'));
+                                if (window.adminPanel) {
+                                    container.innerHTML = window.adminPanel.renderProductUpdate(products, true);
+                                }
+                            } catch(e) {
+                                console.error('Product update render error:', e);
+                            }
+                        })();
+                    " class="text-blue-600 hover:text-blue-800 font-medium text-sm underline cursor-pointer transition-colors">
+                        ve ${remainingCount} ürün daha eklendi (Tıklayarak göster)
+                    </button>
+                </div>
+            ` : remainingCount > 0 && shouldShowAll ? `
+                <div class="mt-4 text-center">
+                    <button onclick="
+                        (function() {
+                            const container = document.getElementById('${uniqueId}');
+                            if (!container) return;
+                            const productsJson = container.getAttribute('data-products');
+                            if (!productsJson) return;
+                            try {
+                                const products = JSON.parse(productsJson.replace(/&#39;/g, '\\'').replace(/&quot;/g, '\\"'));
+                                if (window.adminPanel) {
+                                    container.innerHTML = window.adminPanel.renderProductUpdate(products, false);
+                                }
+                            } catch(e) {
+                                console.error('Product update render error:', e);
+                            }
+                        })();
+                    " class="text-gray-600 hover:text-gray-800 font-medium text-sm underline cursor-pointer transition-colors">
+                        Daha az göster
+                    </button>
+                </div>
+            ` : ''}
+        </div>
+    `;
+};
+
 AdminPanel.prototype.renderPreviewContent = function() {
     if (!this.previewState || !this.previewState.steps || this.previewState.steps.length === 0) {
         return '<div class="p-6">Güncelleme yükleniyor...</div>';
@@ -1260,6 +1423,24 @@ AdminPanel.prototype.renderPreviewContent = function() {
 
     // Use green gradient for update notifications (same as user side)
     const stepColor = 'from-green-500 to-emerald-600';
+    
+    // Product update JSON'unu kontrol et
+    const productUpdateProducts = this.parseProductUpdateJSON(currentStep.description);
+    const hasProductUpdate = productUpdateProducts !== null;
+    
+    // Description'dan JSON'u çıkar (eğer varsa)
+    let displayDescription = currentStep.description || '';
+    if (hasProductUpdate) {
+        // JSON'u description'dan çıkar, sadece diğer text'i göster
+        try {
+            const jsonMatch = displayDescription.match(/\{[\s\S]*"type"\s*:\s*"product_update"[\s\S]*\}/);
+            if (jsonMatch) {
+                displayDescription = displayDescription.replace(jsonMatch[0], '').trim();
+            }
+        } catch (e) {
+            // Hata durumunda tüm description'ı göster
+        }
+    }
 
     return `
         <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -1292,7 +1473,8 @@ AdminPanel.prototype.renderPreviewContent = function() {
                         <div class="text-5xl">${currentStep.icon || '🚀'}</div>
                         <div class="flex-1">
                             <h3 class="text-2xl font-bold text-gray-900 mb-3">${currentStep.title || 'Adım ' + (this.previewState.currentStepIndex + 1)}</h3>
-                            <p class="text-gray-700 text-lg leading-relaxed whitespace-pre-line">${currentStep.description || 'Açıklama'}</p>
+                            ${displayDescription ? `<p class="text-gray-700 text-lg leading-relaxed whitespace-pre-line mb-4">${displayDescription}</p>` : ''}
+                            ${hasProductUpdate ? this.renderProductUpdate(productUpdateProducts) : ''}
                         </div>
                     </div>
                     

@@ -767,6 +767,81 @@
         /* Video GIF gibi davranması için - kontroller yok, tıklanamaz */
         .changelog-video {
             pointer-events: none !important; /* Tıklanamaz, GIF gibi */
+        }
+        
+        /* Product Update Grid Styles */
+        .product-update-grid {
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .product-card {
+            background: white;
+            border: 1px solid #e5e5e5;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+        
+        .product-card:hover {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transform: scale(1.02);
+        }
+        
+        .product-card-image-container {
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 150px;
+            overflow: hidden;
+        }
+        
+        .product-card-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .product-card-name {
+            font-weight: 500;
+            font-size: 0.875rem;
+            color: #1a1a1a;
+            margin-bottom: 0.25rem;
+            min-height: 2.5rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.25rem;
+        }
+        
+        .product-card-barcode {
+            font-size: 0.75rem;
+            color: #666;
+            font-family: 'Courier New', monospace;
+        }
+        
+        /* Responsive Grid */
+        @media (max-width: 640px) {
+            .product-update-grid .grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.75rem;
+            }
+        }
+        
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .product-update-grid .grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        @media (min-width: 1025px) {
+            .product-update-grid .grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
             user-select: none !important; /* Seçilemez */
             -webkit-user-select: none !important;
             -moz-user-select: none !important;

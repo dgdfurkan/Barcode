@@ -1719,6 +1719,53 @@
             }
         }
 
+        // Seçili ürünleri güncelleme için JSON formatına çevir
+        exportSelectedProductsAsJSON() {
+            try {
+                const checkboxes = document.querySelectorAll('.missing-product-checkbox:checked');
+                if (checkboxes.length === 0) {
+                    throw new Error('Lütfen en az bir ürün seçin!');
+                }
+                
+                const selectedProducts = [];
+                checkboxes.forEach(cb => {
+                    const index = parseInt(cb.dataset.index);
+                    // missingProducts'ı saklamak için state'i kontrol et
+                    if (this.lastComparisonMissingProducts && this.lastComparisonMissingProducts[index]) {
+                        const product = this.lastComparisonMissingProducts[index];
+                        
+                        // İlk barkodu al
+                        const firstBarcode = product.barcodes && product.barcodes.length > 0 
+                            ? product.barcodes[0].code 
+                            : '';
+                        
+                        // Ürün verisini oluştur
+                        selectedProducts.push({
+                            name: product.name || 'İsimsiz Ürün',
+                            barcode: firstBarcode,
+                            image: product.image || ''
+                        });
+                    }
+                });
+                
+                if (selectedProducts.length === 0) {
+                    throw new Error('Seçili ürün bulunamadı!');
+                }
+                
+                // JSON formatını oluştur
+                const jsonData = {
+                    type: 'product_update',
+                    display_type: 'grid', // Gelecek için: grid, list, carousel
+                    products: selectedProducts
+                };
+                
+                return JSON.stringify(jsonData, null, 2);
+            } catch (error) {
+                console.error('❌ JSON export hatası:', error);
+                throw error;
+            }
+        }
+
         // Karşılaştırma sonuçlarını sayfanın altında göster
         displayComparisonResults(existingCount, totalCount, missingProducts) {
             const resultsDiv = document.getElementById('shelfLabelComparisonResults');
@@ -1728,6 +1775,9 @@
             const missingListEl = document.getElementById('missingProductsList');
             
             if (!resultsDiv) return;
+            
+            // missingProducts'ı state'e kaydet (export için)
+            this.lastComparisonMissingProducts = missingProducts;
             
             // İstatistikleri güncelle
             if (existingCountEl) existingCountEl.textContent = existingCount;

@@ -4063,6 +4063,36 @@ AdminPanel.prototype.initProductImportTab = function() {
             }
         });
     }
+    
+    // Güncelleme için JSON kopyala butonu
+    const copyProductsForUpdateBtn = document.getElementById('copyProductsForUpdateBtn');
+    if (copyProductsForUpdateBtn) {
+        copyProductsForUpdateBtn.addEventListener('click', async () => {
+            try {
+                const jsonString = window.productImporter.exportSelectedProductsAsJSON();
+                
+                // Clipboard'a kopyala
+                await navigator.clipboard.writeText(jsonString);
+                
+                // Başarı mesajı göster
+                const originalText = copyProductsForUpdateBtn.textContent;
+                copyProductsForUpdateBtn.textContent = '✅ Kopyalandı!';
+                copyProductsForUpdateBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                copyProductsForUpdateBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                
+                setTimeout(() => {
+                    copyProductsForUpdateBtn.textContent = originalText;
+                    copyProductsForUpdateBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                    copyProductsForUpdateBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                }, 2000);
+                
+                alert(`✅ Başarılı!\n\n${JSON.parse(jsonString).products.length} ürün JSON formatında kopyalandı.\n\nGüncelleme adımının açıklama alanına yapıştırabilirsiniz.`);
+            } catch (error) {
+                console.error('Error copying products JSON:', error);
+                alert('❌ Kopyalama hatası: ' + error.message);
+            }
+        });
+    }
 
     // Karşılaştırma sonuçlarını kapat
     const closeComparisonResultsBtn = document.getElementById('closeComparisonResultsBtn');

@@ -950,9 +950,14 @@
                                 <span class="text-gray-400">|</span>
                                 <button id="deselectAllMissingBtn" class="text-sm text-blue-600 hover:text-blue-800">Tümünü Kaldır</button>
                             </div>
-                            <button id="addSelectedProductsBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg text-sm font-medium">
-                                📥 Seçili Ürünleri JSON İndir
-                            </button>
+                            <div class="flex space-x-2">
+                                <button id="addSelectedProductsBtn" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg text-sm font-medium">
+                                    📥 Seçili Ürünleri JSON İndir
+                                </button>
+                                <button id="copyProductsForUpdateBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium">
+                                    📋 Güncelleme İçin JSON Kopyala
+                                </button>
+                            </div>
                         </div>
                         <div id="missingProductsList" class="max-h-96 overflow-y-auto border border-gray-200 rounded-lg">
                             <!-- Eksik ürünler buraya eklenecek -->
