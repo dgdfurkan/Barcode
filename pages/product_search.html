@@ -4042,12 +4042,11 @@
                 
                 // Check each search term individually
                 for (const searchTerm of searchTerms) {
-                    // Check if searchTerm is a barcode (all digits, typically 8+ digits)
                     const trimmedSearchTerm = searchTerm.replace(/\s+/g, '');
-                    const isBarcodeSearch = /^\d{8,}$/.test(trimmedSearchTerm);
                     
-                    // First check: If it's a barcode search, check barcodes directly with exact match
-                    if (isBarcodeSearch && product.barcodes && product.barcodes.length > 0) {
+                    // First check: Always check barcodes first with exact match (for any alphanumeric code)
+                    // This handles both numeric barcodes (8696368011332) and alphanumeric codes (F001250)
+                    if (product.barcodes && product.barcodes.length > 0) {
                         for (const barcode of product.barcodes) {
                             if (barcode.code === trimmedSearchTerm) {
                                 found = true;
@@ -4057,6 +4056,9 @@
                     }
                     
                     if (found) break;
+                    
+                    // Check if searchTerm is a numeric barcode (all digits, typically 8+ digits)
+                    const isBarcodeSearch = /^\d{8,}$/.test(trimmedSearchTerm);
                     
                     // Check if this is an image URL search (premium feature)
                     const isImageUrl = /^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i.test(searchTerm);
@@ -4264,10 +4266,11 @@
                             break;
                         }
                         
-                        // Check barcodes if other fields didn't match (and not already checked as barcode search)
-                        if (!found && !isBarcodeSearch && product.barcodes && product.barcodes.length > 0) {
+                        // Check barcodes if other fields didn't match (partial match for non-exact searches)
+                        if (!found && product.barcodes && product.barcodes.length > 0) {
                             for (const barcode of product.barcodes) {
-                                if (barcode.code.includes(trimmedSearchTerm)) {
+                                // Only do partial match if it's not already an exact match (we already checked exact above)
+                                if (barcode.code.includes(trimmedSearchTerm) && barcode.code !== trimmedSearchTerm) {
                                     found = true;
                                     break;
                                 }
@@ -4329,12 +4332,11 @@
                     const product = products[i];
                     let found = false;
                     
-                    // Check if searchTerm is a barcode (all digits, typically 8+ digits)
                     const trimmedSearchTerm = searchTerm.replace(/\s+/g, '');
-                    const isBarcodeSearch = /^\d{8,}$/.test(trimmedSearchTerm);
                     
-                    // First check: If it's a barcode search, check barcodes directly
-                    if (isBarcodeSearch && product.barcodes && product.barcodes.length > 0) {
+                    // First check: Always check barcodes first with exact match (for any alphanumeric code)
+                    // This handles both numeric barcodes (8696368011332) and alphanumeric codes (F001250)
+                    if (product.barcodes && product.barcodes.length > 0) {
                         for (const barcode of product.barcodes) {
                             if (barcode.code === trimmedSearchTerm) {
                                 found = true;
@@ -4353,6 +4355,9 @@
                         foundCount++;
                         continue;
                     }
+                    
+                    // Check if searchTerm is a numeric barcode (all digits, typically 8+ digits)
+                    const isBarcodeSearch = /^\d{8,}$/.test(trimmedSearchTerm);
                     
                     if (isTableData || hasCombinedFormat) {
                         // For table data, check both product name and image URL
