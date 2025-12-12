@@ -331,12 +331,12 @@
             const remainingCount = products.length - initialDisplayCount;
             const uniqueId = 'product-update-' + Math.random().toString(36).substr(2, 9);
             
-            // Products'ı string olarak sakla (onclick için)
-            const productsJson = JSON.stringify(products).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+            // Products'ı string olarak sakla (onclick için) - Base64 encode kullanarak güvenli hale getir
+            const productsJson = btoa(JSON.stringify(products));
             
             return `
-                <div class="product-update-grid mt-4 mb-4" id="${uniqueId}" data-products='${productsJson}'>
-                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div class="product-update-grid mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3" style="transform: scale(0.75); transform-origin: top left; width: 133.33%;">
                         ${displayProducts.map(product => {
                             const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                             const barcode = product.barcode || 'Barkod yok';
@@ -344,7 +344,7 @@
                             
                             return `
                                 <div class="product-card bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-                                    <div class="product-card-image-container bg-gray-100 flex items-center justify-center" style="height: 150px; overflow: hidden;">
+                                    <div class="product-card-image-container bg-gray-100 flex items-center justify-center" style="height: 112px; overflow: hidden;">
                                         ${image ? `
                                             <img src="${image}" 
                                                  alt="${productName}" 
@@ -368,15 +368,15 @@
                         }).join('')}
                     </div>
                     ${remainingCount > 0 && !shouldShowAll ? `
-                        <div class="mt-4 text-center">
+                        <div class="mt-4 text-center" style="transform: scale(0.75); transform-origin: center;">
                             <button onclick="
                                 (function() {
                                     const container = document.getElementById('${uniqueId}');
                                     if (!container) return;
-                                    const productsJson = container.getAttribute('data-products');
-                                    if (!productsJson) return;
+                                    const productsBase64 = container.getAttribute('data-products');
+                                    if (!productsBase64) return;
                                     try {
-                                        const products = JSON.parse(productsJson.replace(/&#39;/g, '\\'').replace(/&quot;/g, '\\"'));
+                                        const products = JSON.parse(atob(productsBase64));
                                         if (window.changelogSystem) {
                                             container.innerHTML = window.changelogSystem.renderProductUpdate(products, true);
                                         }
@@ -384,20 +384,20 @@
                                         console.error('Product update render error:', e);
                                     }
                                 })();
-                            " class="text-blue-600 hover:text-blue-800 font-medium text-sm underline cursor-pointer transition-colors">
-                                ve ${remainingCount} ürün daha eklendi (Tıklayarak göster)
+                            " class="text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer transition-colors px-4 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200">
+                                <span class="font-semibold">+${remainingCount} ürün daha</span> görmek için tıklayın
                             </button>
                         </div>
                     ` : remainingCount > 0 && shouldShowAll ? `
-                        <div class="mt-4 text-center">
+                        <div class="mt-4 text-center" style="transform: scale(0.75); transform-origin: center;">
                             <button onclick="
                                 (function() {
                                     const container = document.getElementById('${uniqueId}');
                                     if (!container) return;
-                                    const productsJson = container.getAttribute('data-products');
-                                    if (!productsJson) return;
+                                    const productsBase64 = container.getAttribute('data-products');
+                                    if (!productsBase64) return;
                                     try {
-                                        const products = JSON.parse(productsJson.replace(/&#39;/g, '\\'').replace(/&quot;/g, '\\"'));
+                                        const products = JSON.parse(atob(productsBase64));
                                         if (window.changelogSystem) {
                                             container.innerHTML = window.changelogSystem.renderProductUpdate(products, false);
                                         }
@@ -405,7 +405,7 @@
                                         console.error('Product update render error:', e);
                                     }
                                 })();
-                            " class="text-gray-600 hover:text-gray-800 font-medium text-sm underline cursor-pointer transition-colors">
+                            " class="text-gray-600 hover:text-gray-800 font-medium text-sm cursor-pointer transition-colors px-4 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200">
                                 Daha az göster
                             </button>
                         </div>
