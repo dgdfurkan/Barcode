@@ -636,7 +636,7 @@
             const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
             
             return `
-                <div class="product-update-grid mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}">
+                <div class="product-update-grid mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="grid">
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                         ${displayProducts.map(product => {
                             const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -678,8 +678,9 @@
                                     if (!productsBase64) return;
                                     try {
                                         const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
+                                        const displayType = container.getAttribute('data-display-type') || 'grid';
                                         if (window.updateNotificationSystem) {
-                                            container.innerHTML = window.updateNotificationSystem.renderProductUpdate(products, true);
+                                            container.innerHTML = window.updateNotificationSystem.renderProductUpdate(products, true, displayType);
                                         }
                                     } catch(e) {
                                         console.error('Product update render error:', e);

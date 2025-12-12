@@ -419,8 +419,9 @@
                                     if (!productsBase64) return;
                                     try {
                                         const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
+                                        const displayType = container.getAttribute('data-display-type') || 'grid';
                                         if (window.changelogSystem) {
-                                            container.innerHTML = window.changelogSystem.renderProductUpdate(products, true);
+                                            container.innerHTML = window.changelogSystem.renderProductUpdate(products, true, displayType);
                                         }
                                     } catch(e) {
                                         console.error('Product update render error:', e);
