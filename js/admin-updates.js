@@ -1368,7 +1368,7 @@ AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
                                 `}
                             </div>
                             <div class="p-2 flex-1 flex flex-col">
-                                <div class="product-card-name font-medium text-xs text-gray-900 mb-1 line-clamp-2 flex-1" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5rem;">
+                                <div class="product-card-name font-medium text-xs text-gray-900 mb-1 flex-1" style="word-wrap: break-word; overflow-wrap: break-word; hyphens: auto;">
                                     ${productName}
                                 </div>
                                 <div class="product-card-barcode text-xs text-gray-600 font-mono mt-auto">
