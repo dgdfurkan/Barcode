@@ -1758,7 +1758,7 @@
                 // JSON formatını oluştur
                 const jsonData = {
                     type: 'product_update',
-                    display_type: 'grid', // Gelecek için: grid, list, carousel
+                    display_type: 'grid', // Seçenekler: grid, list, carousel, orbit
                     products: selectedProducts
                 };
                 

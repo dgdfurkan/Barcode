@@ -1270,7 +1270,10 @@ AdminPanel.prototype.parseProductUpdateJSON = function(description) {
                     try {
                         const parsed = JSON.parse(line);
                         if (parsed.type === 'product_update' && Array.isArray(parsed.products)) {
-                            return parsed.products;
+                            return {
+                                products: parsed.products,
+                                display_type: parsed.display_type || 'grid'
+                            };
                         }
                     } catch (e) {
                         // Devam et
@@ -1295,14 +1298,20 @@ AdminPanel.prototype.parseProductUpdateJSON = function(description) {
             try {
                 const parsed = JSON.parse(jsonString);
                 if (parsed.type === 'product_update' && Array.isArray(parsed.products)) {
-                    return parsed.products;
+                    return {
+                        products: parsed.products,
+                        display_type: parsed.display_type || 'grid'
+                    };
                 }
             } catch (e) {
                 // JSON parse hatası, description'ın tamamını kontrol et
                 try {
                     const fullParsed = JSON.parse(description.trim());
                     if (fullParsed.type === 'product_update' && Array.isArray(fullParsed.products)) {
-                        return fullParsed.products;
+                        return {
+                            products: fullParsed.products,
+                            display_type: fullParsed.display_type || 'grid'
+                        };
                     }
                 } catch (e2) {
                     // JSON değil, null döndür
@@ -1316,8 +1325,28 @@ AdminPanel.prototype.parseProductUpdateJSON = function(description) {
     return null;
 };
 
-// Product Update Grid Render Fonksiyonu
-AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
+// Product Update Render Fonksiyonu (Grid, List, Carousel, Orbit)
+AdminPanel.prototype.renderProductUpdate = function(products, showAll = false, displayType = 'grid') {
+    if (!products || !Array.isArray(products) || products.length === 0) {
+        return '';
+    }
+    
+    // Display type'a göre farklı render fonksiyonlarını çağır
+    switch(displayType) {
+        case 'list':
+            return this.renderProductUpdateList(products, showAll);
+        case 'carousel':
+            return this.renderProductUpdateCarousel(products, showAll);
+        case 'orbit':
+            return this.renderProductUpdateOrbit(products, showAll);
+        case 'grid':
+        default:
+            return this.renderProductUpdateGrid(products, showAll);
+    }
+};
+
+// Grid Görünümü
+AdminPanel.prototype.renderProductUpdateGrid = function(products, showAll = false) {
     if (!products || !Array.isArray(products) || products.length === 0) {
         return '';
     }
@@ -1347,7 +1376,7 @@ AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
     const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
     
     return `
-        <div class="product-update-grid mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}">
+        <div class="product-update-grid mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="grid">
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 ${displayProducts.map(product => {
                     const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;');
@@ -1389,8 +1418,9 @@ AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
                             if (!productsBase64) return;
                             try {
                                 const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
+                                const displayType = container.getAttribute('data-display-type') || 'grid';
                                 if (window.adminPanel) {
-                                    container.innerHTML = window.adminPanel.renderProductUpdate(products, true);
+                                    container.innerHTML = window.adminPanel.renderProductUpdate(products, true, displayType);
                                 }
                             } catch(e) {
                                 console.error('Product update render error:', e);
@@ -1401,6 +1431,292 @@ AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
                     </button>
                 </div>
             ` : ''}
+        </div>
+    `;
+};
+
+// List Görünümü
+AdminPanel.prototype.renderProductUpdateList = function(products, showAll = false) {
+    if (!products || !Array.isArray(products) || products.length === 0) {
+        return '';
+    }
+    
+    let initialDisplayCount = 10;
+    if (typeof window !== 'undefined' && window.innerWidth) {
+        if (window.innerWidth < 768) {
+            initialDisplayCount = 5;
+        } else if (window.innerWidth < 1024) {
+            initialDisplayCount = 8;
+        } else {
+            initialDisplayCount = 10;
+        }
+    }
+    
+    const shouldShowAll = showAll || products.length <= initialDisplayCount;
+    const displayProducts = shouldShowAll ? products : products.slice(0, initialDisplayCount);
+    const remainingCount = products.length - initialDisplayCount;
+    const uniqueId = 'product-update-list-' + Math.random().toString(36).substr(2, 9);
+    const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
+    
+    return `
+        <div class="product-update-list mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="list">
+            <div class="space-y-3">
+                ${displayProducts.map(product => {
+                    const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;');
+                    const barcode = product.barcode || 'Barkod yok';
+                    const image = product.image || '';
+                    
+                    return `
+                        <div class="product-list-item bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 flex items-center gap-4 p-3">
+                            <div class="product-list-image flex-shrink-0" style="width: 80px; height: 80px; overflow: hidden; border-radius: 8px; background: #f3f4f6;">
+                                ${image ? `
+                                    <img src="${image}" 
+                                         alt="${productName}" 
+                                         class="w-full h-full object-cover"
+                                         onerror="this.onerror=null;this.src='';this.parentElement.innerHTML='<div class=\\'text-gray-400 text-xs flex items-center justify-center h-full\\'>Görsel Yok</div>';"
+                                         loading="lazy">
+                                ` : `
+                                    <div class="text-gray-400 text-xs flex items-center justify-center h-full">Görsel Yok</div>
+                                `}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="product-list-name font-medium text-sm text-gray-900 mb-1" style="word-wrap: break-word; overflow-wrap: break-word;">
+                                    ${productName}
+                                </div>
+                                <div class="product-list-barcode text-xs text-gray-600 font-mono">
+                                    ${barcode}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            ${remainingCount > 0 && !shouldShowAll ? `
+                <div class="mt-4 text-center">
+                    <button onclick="
+                        (function() {
+                            const container = document.getElementById('${uniqueId}');
+                            if (!container) return;
+                            const productsBase64 = container.getAttribute('data-products');
+                            if (!productsBase64) return;
+                            try {
+                                const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
+                                const displayType = container.getAttribute('data-display-type') || 'list';
+                                if (window.adminPanel) {
+                                    container.innerHTML = window.adminPanel.renderProductUpdate(products, true, displayType);
+                                }
+                            } catch(e) {
+                                console.error('Product update render error:', e);
+                            }
+                        })();
+                    " class="text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer transition-colors px-4 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 inline-block">
+                        <span class="font-semibold">+${remainingCount} ürün daha</span> görmek için tıklayın
+                    </button>
+                </div>
+            ` : ''}
+        </div>
+    `;
+};
+
+// Carousel Görünümü
+AdminPanel.prototype.renderProductUpdateCarousel = function(products, showAll = false) {
+    if (!products || !Array.isArray(products) || products.length === 0) {
+        return '';
+    }
+    
+    const uniqueId = 'product-update-carousel-' + Math.random().toString(36).substr(2, 9);
+    const carouselId = 'carousel-' + uniqueId;
+    const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
+    const displayProducts = products;
+    
+    return `
+        <div class="product-update-carousel mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="carousel">
+            <div class="relative">
+                <div id="${carouselId}" class="overflow-hidden rounded-lg">
+                    <div class="flex transition-transform duration-500 ease-in-out" style="transform: translateX(0px);">
+                        ${displayProducts.map((product, index) => {
+                            const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;');
+                            const barcode = product.barcode || 'Barkod yok';
+                            const image = product.image || '';
+                            
+                            return `
+                                <div class="carousel-slide flex-shrink-0 w-full px-2">
+                                    <div class="product-card bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col mx-auto" style="max-width: 300px;">
+                                        <div class="product-card-image-container bg-gray-100 flex items-center justify-center flex-shrink-0" style="height: 200px; overflow: hidden;">
+                                            ${image ? `
+                                                <img src="${image}" 
+                                                     alt="${productName}" 
+                                                     class="product-card-image w-full h-full object-cover"
+                                                     onerror="this.onerror=null;this.src='';this.parentElement.innerHTML='<div class=\\'text-gray-400 text-sm\\'>Görsel Yok</div>';"
+                                                     loading="lazy">
+                                            ` : `
+                                                <div class="text-gray-400 text-sm">Görsel Yok</div>
+                                            `}
+                                        </div>
+                                        <div class="p-4 flex-1 flex flex-col">
+                                            <div class="product-card-name font-medium text-base text-gray-900 mb-2 flex-1" style="word-wrap: break-word; overflow-wrap: break-word;">
+                                                ${productName}
+                                            </div>
+                                            <div class="product-card-barcode text-sm text-gray-600 font-mono mt-auto">
+                                                ${barcode}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+                ${displayProducts.length > 1 ? `
+                    <button onclick="
+                        (function() {
+                            const carousel = document.getElementById('${carouselId}');
+                            const slides = carousel.querySelector('.flex');
+                            const currentTransform = slides.style.transform.match(/translateX\\((-?\\d+)px\\)/);
+                            const currentX = currentTransform ? parseInt(currentTransform[1]) : 0;
+                            const slideWidth = carousel.offsetWidth;
+                            const newX = Math.max(currentX - slideWidth, -(slideWidth * (${displayProducts.length} - 1)));
+                            slides.style.transform = 'translateX(' + newX + 'px)';
+                        })();
+                    " class="absolute left-0 top-1/2 -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-lg transition-all z-10">
+                        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                    <button onclick="
+                        (function() {
+                            const carousel = document.getElementById('${carouselId}');
+                            const slides = carousel.querySelector('.flex');
+                            const currentTransform = slides.style.transform.match(/translateX\\((-?\\d+)px\\)/);
+                            const currentX = currentTransform ? parseInt(currentTransform[1]) : 0;
+                            const slideWidth = carousel.offsetWidth;
+                            const newX = Math.min(currentX + slideWidth, 0);
+                            slides.style.transform = 'translateX(' + newX + 'px)';
+                        })();
+                    " class="absolute right-0 top-1/2 -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-lg transition-all z-10">
+                        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                    <div class="flex justify-center mt-4 gap-2">
+                        ${displayProducts.map((_, index) => `
+                            <button onclick="
+                                (function() {
+                                    const carousel = document.getElementById('${carouselId}');
+                                    const slides = carousel.querySelector('.flex');
+                                    const slideWidth = carousel.offsetWidth;
+                                    slides.style.transform = 'translateX(' + (-slideWidth * ${index}) + 'px)';
+                                })();
+                            " class="carousel-dot w-2 h-2 rounded-full bg-gray-300 hover:bg-gray-400 transition-all ${index === 0 ? 'bg-blue-500' : ''}"></button>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+};
+
+// Orbit Görünümü (Apple Watch tarzı circular)
+AdminPanel.prototype.renderProductUpdateOrbit = function(products, showAll = false) {
+    if (!products || !Array.isArray(products) || products.length === 0) {
+        return '';
+    }
+    
+    let initialDisplayCount = 12;
+    if (typeof window !== 'undefined' && window.innerWidth) {
+        if (window.innerWidth < 768) {
+            initialDisplayCount = 6;
+        } else if (window.innerWidth < 1024) {
+            initialDisplayCount = 9;
+        } else {
+            initialDisplayCount = 12;
+        }
+    }
+    
+    const shouldShowAll = showAll || products.length <= initialDisplayCount;
+    const displayProducts = shouldShowAll ? products : products.slice(0, initialDisplayCount);
+    const remainingCount = products.length - initialDisplayCount;
+    const uniqueId = 'product-update-orbit-' + Math.random().toString(36).substr(2, 9);
+    const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
+    
+    const centerX = 50;
+    const centerY = 50;
+    const radius = 35;
+    const totalItems = displayProducts.length;
+    const angleStep = totalItems > 0 ? (2 * Math.PI) / totalItems : 0;
+    
+    return `
+        <div class="product-update-orbit mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="orbit">
+            <div class="relative" style="min-height: 400px; padding: 20px;">
+                <div class="orbit-container relative w-full h-full" style="position: relative;">
+                    ${displayProducts.map((product, index) => {
+                        const angle = index * angleStep - Math.PI / 2;
+                        const x = centerX + radius * Math.cos(angle);
+                        const y = centerY + radius * Math.sin(angle);
+                        const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;');
+                        const barcode = product.barcode || 'Barkod yok';
+                        const image = product.image || '';
+                        
+                        return `
+                            <div class="orbit-item absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 hover:scale-110 hover:z-20" 
+                                 style="left: ${x}%; top: ${y}%; animation: float 3s ease-in-out infinite; animation-delay: ${index * 0.1}s;">
+                                <div class="product-orbit-card bg-white border-2 border-gray-200 rounded-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer" 
+                                     style="width: 100px; height: 100px; position: relative;">
+                                    ${image ? `
+                                        <img src="${image}" 
+                                             alt="${productName}" 
+                                             class="w-full h-full object-cover rounded-full"
+                                             onerror="this.onerror=null;this.src='';this.parentElement.innerHTML='<div class=\\'text-gray-400 text-xs flex items-center justify-center h-full\\'>?</div>';"
+                                             loading="lazy">
+                                    ` : `
+                                        <div class="text-gray-400 text-xs flex items-center justify-center h-full rounded-full bg-gray-100">?</div>
+                                    `}
+                                    <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all duration-300 rounded-full flex items-center justify-center">
+                                        <div class="opacity-0 hover:opacity-100 transition-opacity duration-300 text-white text-xs font-medium text-center px-2" style="text-shadow: 0 1px 3px rgba(0,0,0,0.5);">
+                                            ${productName.length > 20 ? productName.substring(0, 20) + '...' : productName}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                        <div class="bg-white rounded-full p-4 shadow-lg border-2 border-gray-200">
+                            <div class="text-2xl font-bold text-gray-800">${displayProducts.length}</div>
+                            <div class="text-xs text-gray-600">Ürün</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            ${remainingCount > 0 && !shouldShowAll ? `
+                <div class="mt-4 text-center">
+                    <button onclick="
+                        (function() {
+                            const container = document.getElementById('${uniqueId}');
+                            if (!container) return;
+                            const productsBase64 = container.getAttribute('data-products');
+                            if (!productsBase64) return;
+                            try {
+                                const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
+                                const displayType = container.getAttribute('data-display-type') || 'orbit';
+                                if (window.adminPanel) {
+                                    container.innerHTML = window.adminPanel.renderProductUpdate(products, true, displayType);
+                                }
+                            } catch(e) {
+                                console.error('Product update render error:', e);
+                            }
+                        })();
+                    " class="text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer transition-colors px-4 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 inline-block">
+                        <span class="font-semibold">+${remainingCount} ürün daha</span> görmek için tıklayın
+                    </button>
+                </div>
+            ` : ''}
+            <style>
+                @keyframes float {
+                    0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
+                    50% { transform: translate(-50%, -50%) translateY(-10px); }
+                }
+            </style>
         </div>
     `;
 };
@@ -1419,8 +1735,10 @@ AdminPanel.prototype.renderPreviewContent = function() {
     const stepColor = 'from-green-500 to-emerald-600';
     
     // Product update JSON'unu kontrol et
-    const productUpdateProducts = this.parseProductUpdateJSON(currentStep.description);
-    const hasProductUpdate = productUpdateProducts !== null;
+    const productUpdateData = this.parseProductUpdateJSON(currentStep.description);
+    const hasProductUpdate = productUpdateData !== null;
+    const productUpdateProducts = hasProductUpdate ? productUpdateData.products : null;
+    const displayType = hasProductUpdate ? (productUpdateData.display_type || 'grid') : 'grid';
     
     // Description'dan JSON'u çıkar (eğer varsa)
     let displayDescription = currentStep.description || '';
@@ -1468,7 +1786,7 @@ AdminPanel.prototype.renderPreviewContent = function() {
                         <div class="flex-1">
                             <h3 class="text-2xl font-bold text-gray-900 mb-3">${currentStep.title || 'Adım ' + (this.previewState.currentStepIndex + 1)}</h3>
                             ${displayDescription ? `<p class="text-gray-700 text-lg leading-relaxed whitespace-pre-line mb-4">${displayDescription}</p>` : ''}
-                            ${hasProductUpdate ? this.renderProductUpdate(productUpdateProducts) : ''}
+                            ${hasProductUpdate ? this.renderProductUpdate(productUpdateProducts, false, displayType) : ''}
                         </div>
                     </div>
                     
