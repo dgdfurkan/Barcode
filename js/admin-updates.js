@@ -1322,7 +1322,22 @@ AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
         return '';
     }
     
-    const initialDisplayCount = 20;
+    // Responsive grid: Ekran boyutuna göre kaç ürün gösterileceğini hesapla
+    // Varsayılan: 2 sütun (mobil), 3 sütun (tablet), 4-6 sütun (desktop)
+    // İlk görünümde ekranın izin verdiği kadar göster (yaklaşık 2-3 satır)
+    let initialDisplayCount = 12; // Varsayılan: 3 sütun x 4 satır = 12
+    if (typeof window !== 'undefined' && window.innerWidth) {
+        if (window.innerWidth < 768) {
+            initialDisplayCount = 6; // Mobil: 2 sütun x 3 satır
+        } else if (window.innerWidth < 1024) {
+            initialDisplayCount = 12; // Tablet: 3 sütun x 4 satır
+        } else if (window.innerWidth < 1280) {
+            initialDisplayCount = 16; // Desktop: 4 sütun x 4 satır
+        } else {
+            initialDisplayCount = 18; // Büyük ekran: 6 sütun x 3 satır
+        }
+    }
+    
     const shouldShowAll = showAll || products.length <= initialDisplayCount;
     const displayProducts = shouldShowAll ? products : products.slice(0, initialDisplayCount);
     const remainingCount = products.length - initialDisplayCount;
@@ -1333,30 +1348,30 @@ AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
     
     return `
         <div class="product-update-grid mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}">
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3" style="transform: scale(0.75); transform-origin: top left; width: 133.33%;">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 ${displayProducts.map(product => {
                     const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;');
                     const barcode = product.barcode || 'Barkod yok';
                     const image = product.image || '';
                     
                     return `
-                        <div class="product-card bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-                            <div class="product-card-image-container bg-gray-100 flex items-center justify-center" style="height: 112px; overflow: hidden;">
+                        <div class="product-card bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 transform hover:scale-105 flex flex-col">
+                            <div class="product-card-image-container bg-gray-100 flex items-center justify-center flex-shrink-0" style="height: 120px; overflow: hidden;">
                                 ${image ? `
                                     <img src="${image}" 
                                          alt="${productName}" 
                                          class="product-card-image w-full h-full object-cover"
-                                         onerror="this.onerror=null;this.src='';this.parentElement.innerHTML='<div class=\\'text-gray-400 text-sm\\'>Görsel Yok</div>';"
+                                         onerror="this.onerror=null;this.src='';this.parentElement.innerHTML='<div class=\\'text-gray-400 text-xs\\'>Görsel Yok</div>';"
                                          loading="lazy">
                                 ` : `
-                                    <div class="text-gray-400 text-sm">Görsel Yok</div>
+                                    <div class="text-gray-400 text-xs">Görsel Yok</div>
                                 `}
                             </div>
-                            <div class="p-3">
-                                <div class="product-card-name font-medium text-sm text-gray-900 mb-1 line-clamp-2" style="min-height: 2.5rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                            <div class="p-2 flex-1 flex flex-col">
+                                <div class="product-card-name font-medium text-xs text-gray-900 mb-1 line-clamp-2 flex-1" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.5rem;">
                                     ${productName}
                                 </div>
-                                <div class="product-card-barcode text-xs text-gray-600 font-mono">
+                                <div class="product-card-barcode text-xs text-gray-600 font-mono mt-auto">
                                     ${barcode}
                                 </div>
                             </div>
@@ -1365,45 +1380,24 @@ AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
                 }).join('')}
             </div>
             ${remainingCount > 0 && !shouldShowAll ? `
-                <div class="mt-4 text-center" style="transform: scale(0.75); transform-origin: center;">
+                <div class="mt-4 text-center">
                     <button onclick="
                         (function() {
                             const container = document.getElementById('${uniqueId}');
                             if (!container) return;
-                                    const productsBase64 = container.getAttribute('data-products');
-                                    if (!productsBase64) return;
-                                    try {
-                                        const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
-                                        if (window.adminPanel) {
-                                            container.innerHTML = window.adminPanel.renderProductUpdate(products, true);
-                                        }
+                            const productsBase64 = container.getAttribute('data-products');
+                            if (!productsBase64) return;
+                            try {
+                                const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
+                                if (window.adminPanel) {
+                                    container.innerHTML = window.adminPanel.renderProductUpdate(products, true);
+                                }
                             } catch(e) {
                                 console.error('Product update render error:', e);
                             }
                         })();
-                    " class="text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer transition-colors px-4 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200">
+                    " class="text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer transition-colors px-4 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 inline-block">
                         <span class="font-semibold">+${remainingCount} ürün daha</span> görmek için tıklayın
-                    </button>
-                </div>
-            ` : remainingCount > 0 && shouldShowAll ? `
-                <div class="mt-4 text-center" style="transform: scale(0.75); transform-origin: center;">
-                    <button onclick="
-                        (function() {
-                            const container = document.getElementById('${uniqueId}');
-                            if (!container) return;
-                                    const productsBase64 = container.getAttribute('data-products');
-                                    if (!productsBase64) return;
-                                    try {
-                                        const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
-                                        if (window.adminPanel) {
-                                            container.innerHTML = window.adminPanel.renderProductUpdate(products, false);
-                                        }
-                            } catch(e) {
-                                console.error('Product update render error:', e);
-                            }
-                        })();
-                    " class="text-gray-600 hover:text-gray-800 font-medium text-sm cursor-pointer transition-colors px-4 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200">
-                        Daha az göster
                     </button>
                 </div>
             ` : ''}

@@ -64,8 +64,8 @@
                             console.log('📁 Dosya konumu: Ana dizin (root/products.json)');
                             console.log(`📊 Toplam ürün sayısı: ${data.products ? data.products.length : 0}`);
                         } catch (fetchError) {
-                            // CORS hatası veya fetch başarısız, kullanıcıya dosya seçtir
-                            console.warn('⚠️ Fetch failed, requesting file input:', fetchError);
+                            // CORS hatası veya fetch başarısız, kullanıcıya dosya seçtir (sessizce handle et)
+                            // console.warn('⚠️ Fetch failed, requesting file input:', fetchError);
                             throw new Error('products.json dosyasını yükleyemiyorum. Lütfen dosyayı seçin.');
                         }
                     }
@@ -83,7 +83,10 @@
                 console.log(`📊 Cache updated at ${new Date().toLocaleTimeString()}`);
                 return this.productsCache;
             } catch (error) {
-                console.error('❌ Error loading products.json:', error);
+                // Sadece kritik hataları logla, CORS hatalarını sessizce handle et
+                if (!error.message.includes('products.json dosyasını yükleyemiyorum')) {
+                    console.error('❌ Error loading products.json:', error);
+                }
                 throw error;
             }
         }
