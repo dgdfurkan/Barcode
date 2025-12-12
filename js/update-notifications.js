@@ -694,6 +694,349 @@
             `;
         }
 
+        // List Görünümü
+        renderProductUpdateList(products, showAll = false) {
+            if (!products || !Array.isArray(products) || products.length === 0) {
+                return '';
+            }
+            
+            let initialDisplayCount = 10;
+            if (typeof window !== 'undefined' && window.innerWidth) {
+                if (window.innerWidth < 768) {
+                    initialDisplayCount = 5;
+                } else if (window.innerWidth < 1024) {
+                    initialDisplayCount = 8;
+                } else {
+                    initialDisplayCount = 10;
+                }
+            }
+            
+            const shouldShowAll = showAll || products.length <= initialDisplayCount;
+            const displayProducts = shouldShowAll ? products : products.slice(0, initialDisplayCount);
+            const remainingCount = products.length - initialDisplayCount;
+            const uniqueId = 'product-update-list-' + Math.random().toString(36).substr(2, 9);
+            const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
+            
+            return `
+                <div class="product-update-list mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="list">
+                    <div class="space-y-3">
+                        ${displayProducts.map(product => {
+                            const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                            const barcode = product.barcode || 'Barkod yok';
+                            const image = product.image || '';
+                            
+                            return `
+                                <div class="product-list-item bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-all duration-300 flex items-center gap-4 p-3">
+                                    <div class="product-list-image flex-shrink-0" style="width: 80px; height: 80px; overflow: hidden; border-radius: 8px; background: #f3f4f6;">
+                                        ${image ? `
+                                            <img src="${image}" 
+                                                 alt="${productName}" 
+                                                 class="w-full h-full object-cover"
+                                                 onerror="this.onerror=null;this.src='';this.parentElement.innerHTML='<div class=\\'text-gray-400 text-xs flex items-center justify-center h-full\\'>Görsel Yok</div>';"
+                                                 loading="lazy">
+                                        ` : `
+                                            <div class="text-gray-400 text-xs flex items-center justify-center h-full">Görsel Yok</div>
+                                        `}
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="product-list-name font-medium text-sm text-gray-900 mb-1" style="word-wrap: break-word; overflow-wrap: break-word;">
+                                            ${productName}
+                                        </div>
+                                        <div class="product-list-barcode text-xs text-gray-600 font-mono">
+                                            ${barcode}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    ${remainingCount > 0 && !shouldShowAll ? `
+                        <div class="mt-4 text-center">
+                            <button onclick="
+                                (function() {
+                                    const container = document.getElementById('${uniqueId}');
+                                    if (!container) return;
+                                    const productsBase64 = container.getAttribute('data-products');
+                                    if (!productsBase64) return;
+                                    try {
+                                        const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
+                                        const displayType = container.getAttribute('data-display-type') || 'list';
+                                        if (window.updateNotificationSystem) {
+                                            container.innerHTML = window.updateNotificationSystem.renderProductUpdate(products, true, displayType);
+                                        }
+                                    } catch(e) {
+                                        console.error('Product update render error:', e);
+                                    }
+                                })();
+                            " class="text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer transition-colors px-4 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 inline-block">
+                                <span class="font-semibold">+${remainingCount} ürün daha</span> görmek için tıklayın
+                            </button>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // Carousel Görünümü
+        renderProductUpdateCarousel(products, showAll = false) {
+            if (!products || !Array.isArray(products) || products.length === 0) {
+                return '';
+            }
+            
+            const uniqueId = 'product-update-carousel-' + Math.random().toString(36).substr(2, 9);
+            const carouselId = 'carousel-' + uniqueId;
+            const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
+            const displayProducts = products;
+            
+            return `
+                <div class="product-update-carousel mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="carousel">
+                    <div class="relative">
+                        <div id="${carouselId}" class="overflow-hidden rounded-lg">
+                            <div class="flex transition-transform duration-500 ease-in-out" style="transform: translateX(0px);">
+                                ${displayProducts.map((product, index) => {
+                                    const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                                    const barcode = product.barcode || 'Barkod yok';
+                                    const image = product.image || '';
+                                    
+                                    return `
+                                        <div class="carousel-slide flex-shrink-0 w-full px-2">
+                                            <div class="product-card bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col mx-auto" style="max-width: 300px;">
+                                                <div class="product-card-image-container bg-gray-100 flex items-center justify-center flex-shrink-0" style="height: 200px; overflow: hidden;">
+                                                    ${image ? `
+                                                        <img src="${image}" 
+                                                             alt="${productName}" 
+                                                             class="product-card-image w-full h-full object-cover"
+                                                             onerror="this.onerror=null;this.src='';this.parentElement.innerHTML='<div class=\\'text-gray-400 text-sm\\'>Görsel Yok</div>';"
+                                                             loading="lazy">
+                                                    ` : `
+                                                        <div class="text-gray-400 text-sm">Görsel Yok</div>
+                                                    `}
+                                                </div>
+                                                <div class="p-4 flex-1 flex flex-col">
+                                                    <div class="product-card-name font-medium text-base text-gray-900 mb-2 flex-1" style="word-wrap: break-word; overflow-wrap: break-word;">
+                                                        ${productName}
+                                                    </div>
+                                                    <div class="product-card-barcode text-sm text-gray-600 font-mono mt-auto">
+                                                        ${barcode}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                        ${displayProducts.length > 1 ? `
+                            <button onclick="
+                                (function() {
+                                    const carousel = document.getElementById('${carouselId}');
+                                    const slides = carousel.querySelector('.flex');
+                                    const currentTransform = slides.style.transform.match(/translateX\\((-?\\d+)px\\)/);
+                                    const currentX = currentTransform ? parseInt(currentTransform[1]) : 0;
+                                    const slideWidth = carousel.offsetWidth;
+                                    const newX = Math.max(currentX - slideWidth, -(slideWidth * (${displayProducts.length} - 1)));
+                                    slides.style.transform = 'translateX(' + newX + 'px)';
+                                })();
+                            " class="absolute left-0 top-1/2 -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-lg transition-all z-10">
+                                <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                </svg>
+                            </button>
+                            <button onclick="
+                                (function() {
+                                    const carousel = document.getElementById('${carouselId}');
+                                    const slides = carousel.querySelector('.flex');
+                                    const currentTransform = slides.style.transform.match(/translateX\\((-?\\d+)px\\)/);
+                                    const currentX = currentTransform ? parseInt(currentTransform[1]) : 0;
+                                    const slideWidth = carousel.offsetWidth;
+                                    const newX = Math.min(currentX + slideWidth, 0);
+                                    slides.style.transform = 'translateX(' + newX + 'px)';
+                                })();
+                            " class="absolute right-0 top-1/2 -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 shadow-lg transition-all z-10">
+                                <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                </svg>
+                            </button>
+                            <div class="flex justify-center mt-4 gap-2">
+                                ${displayProducts.map((_, index) => `
+                                    <button onclick="
+                                        (function() {
+                                            const carousel = document.getElementById('${carouselId}');
+                                            const slides = carousel.querySelector('.flex');
+                                            const slideWidth = carousel.offsetWidth;
+                                            slides.style.transform = 'translateX(' + (-slideWidth * ${index}) + 'px)';
+                                        })();
+                                    " class="carousel-dot w-2 h-2 rounded-full bg-gray-300 hover:bg-gray-400 transition-all ${index === 0 ? 'bg-blue-500' : ''}"></button>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Orbit Görünümü (Apple Watch tarzı circular - interaktif mouse kontrolü)
+        renderProductUpdateOrbit(products, showAll = false) {
+            if (!products || !Array.isArray(products) || products.length === 0) {
+                return '';
+            }
+            
+            // Orbit modunda her zaman tüm ürünleri göster
+            const displayProducts = products;
+            const uniqueId = 'product-update-orbit-' + Math.random().toString(36).substr(2, 9);
+            const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
+            
+            const centerX = 50;
+            const centerY = 50;
+            const radius = 35;
+            const totalItems = displayProducts.length;
+            const angleStep = totalItems > 0 ? (2 * Math.PI) / totalItems : 0;
+            
+            return `
+                <div class="product-update-orbit mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="orbit" data-total-items="${totalItems}" data-angle-step="${angleStep}" data-radius="${radius}">
+                    <div class="relative orbit-wrapper" style="min-height: 500px; padding: 40px; cursor: grab;" onmouseleave="
+                        (function() {
+                            const orbit = document.getElementById('${uniqueId}');
+                            if (!orbit) return;
+                            const items = orbit.querySelectorAll('.orbit-item');
+                            const totalItems = parseInt(orbit.getAttribute('data-total-items'));
+                            const angleStep = parseFloat(orbit.getAttribute('data-angle-step'));
+                            const radius = parseFloat(orbit.getAttribute('data-radius'));
+                            items.forEach((item, index) => {
+                                const angle = index * angleStep - Math.PI / 2;
+                                const x = 50 + radius * Math.cos(angle);
+                                const y = 50 + radius * Math.sin(angle);
+                                item.style.left = x + '%';
+                                item.style.top = y + '%';
+                                item.style.transform = 'translate(-50%, -50%)';
+                            });
+                        })();
+                    ">
+                        <div class="orbit-container relative w-full h-full" style="position: relative;">
+                            ${displayProducts.map((product, index) => {
+                                const angle = index * angleStep - Math.PI / 2;
+                                const x = centerX + radius * Math.cos(angle);
+                                const y = centerY + radius * Math.sin(angle);
+                                const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                                const barcode = product.barcode || 'Barkod yok';
+                                const image = product.image || '';
+                                
+                                return `
+                                    <div class="orbit-item absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 hover:scale-125 hover:z-30" 
+                                         style="left: ${x}%; top: ${y}%; will-change: transform;">
+                                        <div class="product-orbit-card bg-white border-2 border-gray-200 rounded-full overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer" 
+                                             style="width: 100px; height: 100px; position: relative;">
+                                            ${image ? `
+                                                <img src="${image}" 
+                                                     alt="${productName}" 
+                                                     class="w-full h-full object-cover rounded-full"
+                                                     onerror="this.onerror=null;this.src='';this.parentElement.innerHTML='<div class=\\'text-gray-400 text-xs flex items-center justify-center h-full\\'>?</div>';"
+                                                     loading="lazy">
+                                            ` : `
+                                                <div class="text-gray-400 text-xs flex items-center justify-center h-full rounded-full bg-gray-100">?</div>
+                                            `}
+                                            <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all duration-300 rounded-full flex items-center justify-center">
+                                                <div class="opacity-0 hover:opacity-100 transition-opacity duration-300 text-white text-xs font-medium text-center px-2" style="text-shadow: 0 2px 4px rgba(0,0,0,0.7);">
+                                                    ${productName.length > 25 ? productName.substring(0, 25) + '...' : productName}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-10">
+                                <div class="bg-white rounded-full p-4 shadow-lg border-2 border-gray-200">
+                                    <div class="text-2xl font-bold text-gray-800">${displayProducts.length}</div>
+                                    <div class="text-xs text-gray-600">Ürün</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                        (function() {
+                            const orbit = document.getElementById('${uniqueId}');
+                            if (!orbit) return;
+                            const wrapper = orbit.querySelector('.orbit-wrapper');
+                            const items = orbit.querySelectorAll('.orbit-item');
+                            const totalItems = parseInt(orbit.getAttribute('data-total-items'));
+                            const angleStep = parseFloat(orbit.getAttribute('data-angle-step'));
+                            const radius = parseFloat(orbit.getAttribute('data-radius'));
+                            const centerX = 50;
+                            const centerY = 50;
+                            
+                            let isMouseDown = false;
+                            let lastMouseX = 0;
+                            let lastMouseY = 0;
+                            let currentRotation = 0;
+                            
+                            wrapper.addEventListener('mousedown', function(e) {
+                                isMouseDown = true;
+                                wrapper.style.cursor = 'grabbing';
+                                lastMouseX = e.clientX;
+                                lastMouseY = e.clientY;
+                            });
+                            
+                            document.addEventListener('mouseup', function() {
+                                isMouseDown = false;
+                                wrapper.style.cursor = 'grab';
+                            });
+                            
+                            wrapper.addEventListener('mousemove', function(e) {
+                                if (!isMouseDown) return;
+                                
+                                const deltaX = e.clientX - lastMouseX;
+                                const deltaY = e.clientY - lastMouseY;
+                                
+                                const sensitivity = 0.02;
+                                currentRotation += (deltaX - deltaY) * sensitivity;
+                                
+                                items.forEach((item, index) => {
+                                    const baseAngle = index * angleStep - Math.PI / 2;
+                                    const newAngle = baseAngle + currentRotation;
+                                    const x = centerX + radius * Math.cos(newAngle);
+                                    const y = centerY + radius * Math.sin(newAngle);
+                                    item.style.left = x + '%';
+                                    item.style.top = y + '%';
+                                });
+                                
+                                lastMouseX = e.clientX;
+                                lastMouseY = e.clientY;
+                            });
+                            
+                            let touchStartX = 0;
+                            let touchStartY = 0;
+                            
+                            wrapper.addEventListener('touchstart', function(e) {
+                                touchStartX = e.touches[0].clientX;
+                                touchStartY = e.touches[0].clientY;
+                            });
+                            
+                            wrapper.addEventListener('touchmove', function(e) {
+                                e.preventDefault();
+                                const deltaX = e.touches[0].clientX - touchStartX;
+                                const deltaY = e.touches[0].clientY - touchStartY;
+                                
+                                const sensitivity = 0.02;
+                                currentRotation += (deltaX - deltaY) * sensitivity;
+                                
+                                items.forEach((item, index) => {
+                                    const baseAngle = index * angleStep - Math.PI / 2;
+                                    const newAngle = baseAngle + currentRotation;
+                                    const x = centerX + radius * Math.cos(newAngle);
+                                    const y = centerY + radius * Math.sin(newAngle);
+                                    item.style.left = x + '%';
+                                    item.style.top = y + '%';
+                                });
+                                
+                                touchStartX = e.touches[0].clientX;
+                                touchStartY = e.touches[0].clientY;
+                            });
+                        })();
+                    </script>
+                </div>
+            `;
+        }
+
         // Step Description Render (Product Update desteği ile)
         renderStepDescription(step) {
             // Product update JSON'unu kontrol et
