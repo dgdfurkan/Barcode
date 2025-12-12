@@ -1616,26 +1616,14 @@ AdminPanel.prototype.renderProductUpdateCarousel = function(products, showAll = 
     `;
 };
 
-// Orbit Görünümü (Apple Watch tarzı circular)
+// Orbit Görünümü (Apple Watch tarzı circular - interaktif mouse kontrolü)
 AdminPanel.prototype.renderProductUpdateOrbit = function(products, showAll = false) {
     if (!products || !Array.isArray(products) || products.length === 0) {
         return '';
     }
     
-    let initialDisplayCount = 12;
-    if (typeof window !== 'undefined' && window.innerWidth) {
-        if (window.innerWidth < 768) {
-            initialDisplayCount = 6;
-        } else if (window.innerWidth < 1024) {
-            initialDisplayCount = 9;
-        } else {
-            initialDisplayCount = 12;
-        }
-    }
-    
-    const shouldShowAll = showAll || products.length <= initialDisplayCount;
-    const displayProducts = shouldShowAll ? products : products.slice(0, initialDisplayCount);
-    const remainingCount = products.length - initialDisplayCount;
+    // Orbit modunda her zaman tüm ürünleri göster
+    const displayProducts = products;
     const uniqueId = 'product-update-orbit-' + Math.random().toString(36).substr(2, 9);
     const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
     
@@ -1646,8 +1634,25 @@ AdminPanel.prototype.renderProductUpdateOrbit = function(products, showAll = fal
     const angleStep = totalItems > 0 ? (2 * Math.PI) / totalItems : 0;
     
     return `
-        <div class="product-update-orbit mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="orbit">
-            <div class="relative" style="min-height: 400px; padding: 20px;">
+        <div class="product-update-orbit mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="orbit" data-total-items="${totalItems}" data-angle-step="${angleStep}" data-radius="${radius}">
+            <div class="relative orbit-wrapper" style="min-height: 500px; padding: 40px; cursor: grab;" onmouseleave="
+                (function() {
+                    const orbit = document.getElementById('${uniqueId}');
+                    if (!orbit) return;
+                    const items = orbit.querySelectorAll('.orbit-item');
+                    const totalItems = parseInt(orbit.getAttribute('data-total-items'));
+                    const angleStep = parseFloat(orbit.getAttribute('data-angle-step'));
+                    const radius = parseFloat(orbit.getAttribute('data-radius'));
+                    items.forEach((item, index) => {
+                        const angle = index * angleStep - Math.PI / 2;
+                        const x = 50 + radius * Math.cos(angle);
+                        const y = 50 + radius * Math.sin(angle);
+                        item.style.left = x + '%';
+                        item.style.top = y + '%';
+                        item.style.transform = 'translate(-50%, -50%)';
+                    });
+                })();
+            ">
                 <div class="orbit-container relative w-full h-full" style="position: relative;">
                     ${displayProducts.map((product, index) => {
                         const angle = index * angleStep - Math.PI / 2;
@@ -1658,9 +1663,9 @@ AdminPanel.prototype.renderProductUpdateOrbit = function(products, showAll = fal
                         const image = product.image || '';
                         
                         return `
-                            <div class="orbit-item absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 hover:scale-110 hover:z-20" 
-                                 style="left: ${x}%; top: ${y}%; animation: float 3s ease-in-out infinite; animation-delay: ${index * 0.1}s;">
-                                <div class="product-orbit-card bg-white border-2 border-gray-200 rounded-full overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer" 
+                            <div class="orbit-item absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 hover:scale-125 hover:z-30" 
+                                 style="left: ${x}%; top: ${y}%; will-change: transform;">
+                                <div class="product-orbit-card bg-white border-2 border-gray-200 rounded-full overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer" 
                                      style="width: 100px; height: 100px; position: relative;">
                                     ${image ? `
                                         <img src="${image}" 
@@ -1671,16 +1676,16 @@ AdminPanel.prototype.renderProductUpdateOrbit = function(products, showAll = fal
                                     ` : `
                                         <div class="text-gray-400 text-xs flex items-center justify-center h-full rounded-full bg-gray-100">?</div>
                                     `}
-                                    <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all duration-300 rounded-full flex items-center justify-center">
-                                        <div class="opacity-0 hover:opacity-100 transition-opacity duration-300 text-white text-xs font-medium text-center px-2" style="text-shadow: 0 1px 3px rgba(0,0,0,0.5);">
-                                            ${productName.length > 20 ? productName.substring(0, 20) + '...' : productName}
+                                    <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all duration-300 rounded-full flex items-center justify-center">
+                                        <div class="opacity-0 hover:opacity-100 transition-opacity duration-300 text-white text-xs font-medium text-center px-2" style="text-shadow: 0 2px 4px rgba(0,0,0,0.7);">
+                                            ${productName.length > 25 ? productName.substring(0, 25) + '...' : productName}
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         `;
                     }).join('')}
-                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-10">
                         <div class="bg-white rounded-full p-4 shadow-lg border-2 border-gray-200">
                             <div class="text-2xl font-bold text-gray-800">${displayProducts.length}</div>
                             <div class="text-xs text-gray-600">Ürün</div>
@@ -1688,35 +1693,90 @@ AdminPanel.prototype.renderProductUpdateOrbit = function(products, showAll = fal
                     </div>
                 </div>
             </div>
-            ${remainingCount > 0 && !shouldShowAll ? `
-                <div class="mt-4 text-center">
-                    <button onclick="
-                        (function() {
-                            const container = document.getElementById('${uniqueId}');
-                            if (!container) return;
-                            const productsBase64 = container.getAttribute('data-products');
-                            if (!productsBase64) return;
-                            try {
-                                const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
-                                const displayType = container.getAttribute('data-display-type') || 'orbit';
-                                if (window.adminPanel) {
-                                    container.innerHTML = window.adminPanel.renderProductUpdate(products, true, displayType);
-                                }
-                            } catch(e) {
-                                console.error('Product update render error:', e);
-                            }
-                        })();
-                    " class="text-blue-600 hover:text-blue-800 font-medium text-sm cursor-pointer transition-colors px-4 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 inline-block">
-                        <span class="font-semibold">+${remainingCount} ürün daha</span> görmek için tıklayın
-                    </button>
-                </div>
-            ` : ''}
-            <style>
-                @keyframes float {
-                    0%, 100% { transform: translate(-50%, -50%) translateY(0px); }
-                    50% { transform: translate(-50%, -50%) translateY(-10px); }
-                }
-            </style>
+            <script>
+                (function() {
+                    const orbit = document.getElementById('${uniqueId}');
+                    if (!orbit) return;
+                    const wrapper = orbit.querySelector('.orbit-wrapper');
+                    const items = orbit.querySelectorAll('.orbit-item');
+                    const totalItems = parseInt(orbit.getAttribute('data-total-items'));
+                    const angleStep = parseFloat(orbit.getAttribute('data-angle-step'));
+                    const radius = parseFloat(orbit.getAttribute('data-radius'));
+                    const centerX = 50;
+                    const centerY = 50;
+                    
+                    let isMouseDown = false;
+                    let lastMouseX = 0;
+                    let lastMouseY = 0;
+                    let currentRotation = 0;
+                    
+                    wrapper.addEventListener('mousedown', function(e) {
+                        isMouseDown = true;
+                        wrapper.style.cursor = 'grabbing';
+                        lastMouseX = e.clientX;
+                        lastMouseY = e.clientY;
+                    });
+                    
+                    document.addEventListener('mouseup', function() {
+                        isMouseDown = false;
+                        wrapper.style.cursor = 'grab';
+                    });
+                    
+                    wrapper.addEventListener('mousemove', function(e) {
+                        if (!isMouseDown) return;
+                        
+                        const deltaX = e.clientX - lastMouseX;
+                        const deltaY = e.clientY - lastMouseY;
+                        
+                        // Mouse hareketine göre rotation hesapla
+                        const sensitivity = 0.02;
+                        currentRotation += (deltaX - deltaY) * sensitivity;
+                        
+                        // Her ürünü yeni açıya göre konumlandır
+                        items.forEach((item, index) => {
+                            const baseAngle = index * angleStep - Math.PI / 2;
+                            const newAngle = baseAngle + currentRotation;
+                            const x = centerX + radius * Math.cos(newAngle);
+                            const y = centerY + radius * Math.sin(newAngle);
+                            item.style.left = x + '%';
+                            item.style.top = y + '%';
+                        });
+                        
+                        lastMouseX = e.clientX;
+                        lastMouseY = e.clientY;
+                    });
+                    
+                    // Touch desteği (mobil için)
+                    let touchStartX = 0;
+                    let touchStartY = 0;
+                    
+                    wrapper.addEventListener('touchstart', function(e) {
+                        touchStartX = e.touches[0].clientX;
+                        touchStartY = e.touches[0].clientY;
+                    });
+                    
+                    wrapper.addEventListener('touchmove', function(e) {
+                        e.preventDefault();
+                        const deltaX = e.touches[0].clientX - touchStartX;
+                        const deltaY = e.touches[0].clientY - touchStartY;
+                        
+                        const sensitivity = 0.02;
+                        currentRotation += (deltaX - deltaY) * sensitivity;
+                        
+                        items.forEach((item, index) => {
+                            const baseAngle = index * angleStep - Math.PI / 2;
+                            const newAngle = baseAngle + currentRotation;
+                            const x = centerX + radius * Math.cos(newAngle);
+                            const y = centerY + radius * Math.sin(newAngle);
+                            item.style.left = x + '%';
+                            item.style.top = y + '%';
+                        });
+                        
+                        touchStartX = e.touches[0].clientX;
+                        touchStartY = e.touches[0].clientY;
+                    });
+                })();
+            </script>
         </div>
     `;
 };

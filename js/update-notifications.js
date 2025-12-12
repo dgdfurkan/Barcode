@@ -532,7 +532,10 @@
                             try {
                                 const parsed = JSON.parse(line);
                                 if (parsed.type === 'product_update' && Array.isArray(parsed.products)) {
-                                    return parsed.products;
+                                    return {
+                                        products: parsed.products,
+                                        display_type: parsed.display_type || 'grid'
+                                    };
                                 }
                             } catch (e) {
                                 // Devam et
@@ -557,14 +560,20 @@
                     try {
                         const parsed = JSON.parse(jsonString);
                         if (parsed.type === 'product_update' && Array.isArray(parsed.products)) {
-                            return parsed.products;
+                            return {
+                                products: parsed.products,
+                                display_type: parsed.display_type || 'grid'
+                            };
                         }
                     } catch (e) {
                         // JSON parse hatası, description'ın tamamını kontrol et
                         try {
                             const fullParsed = JSON.parse(description.trim());
                             if (fullParsed.type === 'product_update' && Array.isArray(fullParsed.products)) {
-                                return fullParsed.products;
+                                return {
+                                    products: fullParsed.products,
+                                    display_type: fullParsed.display_type || 'grid'
+                                };
                             }
                         } catch (e2) {
                             // JSON değil, null döndür
@@ -578,8 +587,28 @@
             return null;
         }
 
-        // Product Update Grid Render Fonksiyonu
-        renderProductUpdate(products, showAll = false) {
+        // Product Update Render Fonksiyonu (Grid, List, Carousel, Orbit)
+        renderProductUpdate(products, showAll = false, displayType = 'grid') {
+            if (!products || !Array.isArray(products) || products.length === 0) {
+                return '';
+            }
+            
+            // Display type'a göre farklı render fonksiyonlarını çağır
+            switch(displayType) {
+                case 'list':
+                    return this.renderProductUpdateList(products, showAll);
+                case 'carousel':
+                    return this.renderProductUpdateCarousel(products, showAll);
+                case 'orbit':
+                    return this.renderProductUpdateOrbit(products, showAll);
+                case 'grid':
+                default:
+                    return this.renderProductUpdateGrid(products, showAll);
+            }
+        }
+
+        // Grid Görünümü
+        renderProductUpdateGrid(products, showAll = false) {
             if (!products || !Array.isArray(products) || products.length === 0) {
                 return '';
             }
@@ -668,8 +697,10 @@
         // Step Description Render (Product Update desteği ile)
         renderStepDescription(step) {
             // Product update JSON'unu kontrol et
-            const productUpdateProducts = this.parseProductUpdateJSON(step.description);
-            const hasProductUpdate = productUpdateProducts !== null;
+            const productUpdateData = this.parseProductUpdateJSON(step.description);
+            const hasProductUpdate = productUpdateData !== null;
+            const productUpdateProducts = hasProductUpdate ? productUpdateData.products : null;
+            const displayType = hasProductUpdate ? (productUpdateData.display_type || 'grid') : 'grid';
             
             // Description'dan JSON'u çıkar (eğer varsa)
             let displayDescription = step.description || '';
@@ -687,7 +718,7 @@
             
             return `
                 ${displayDescription ? `<p class="text-gray-700 text-lg leading-relaxed whitespace-pre-line mb-4">${displayDescription}</p>` : ''}
-                ${hasProductUpdate ? this.renderProductUpdate(productUpdateProducts) : ''}
+                ${hasProductUpdate ? this.renderProductUpdate(productUpdateProducts, false, displayType) : ''}
             `;
         }
 
