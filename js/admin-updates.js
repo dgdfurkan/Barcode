@@ -1328,8 +1328,8 @@ AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
     const remainingCount = products.length - initialDisplayCount;
     const uniqueId = 'product-update-' + Math.random().toString(36).substr(2, 9);
     
-    // Products'ı string olarak sakla (onclick için) - Base64 encode kullanarak güvenli hale getir
-    const productsJson = btoa(JSON.stringify(products));
+    // Products'ı string olarak sakla (onclick için) - UTF-8 uyumlu Base64 encode
+    const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
     
     return `
         <div class="product-update-grid mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}">
@@ -1370,13 +1370,13 @@ AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
                         (function() {
                             const container = document.getElementById('${uniqueId}');
                             if (!container) return;
-                            const productsBase64 = container.getAttribute('data-products');
-                            if (!productsBase64) return;
-                            try {
-                                const products = JSON.parse(atob(productsBase64));
-                                if (window.adminPanel) {
-                                    container.innerHTML = window.adminPanel.renderProductUpdate(products, true);
-                                }
+                                    const productsBase64 = container.getAttribute('data-products');
+                                    if (!productsBase64) return;
+                                    try {
+                                        const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
+                                        if (window.adminPanel) {
+                                            container.innerHTML = window.adminPanel.renderProductUpdate(products, true);
+                                        }
                             } catch(e) {
                                 console.error('Product update render error:', e);
                             }
@@ -1391,13 +1391,13 @@ AdminPanel.prototype.renderProductUpdate = function(products, showAll = false) {
                         (function() {
                             const container = document.getElementById('${uniqueId}');
                             if (!container) return;
-                            const productsBase64 = container.getAttribute('data-products');
-                            if (!productsBase64) return;
-                            try {
-                                const products = JSON.parse(atob(productsBase64));
-                                if (window.adminPanel) {
-                                    container.innerHTML = window.adminPanel.renderProductUpdate(products, false);
-                                }
+                                    const productsBase64 = container.getAttribute('data-products');
+                                    if (!productsBase64) return;
+                                    try {
+                                        const products = JSON.parse(decodeURIComponent(atob(productsBase64)));
+                                        if (window.adminPanel) {
+                                            container.innerHTML = window.adminPanel.renderProductUpdate(products, false);
+                                        }
                             } catch(e) {
                                 console.error('Product update render error:', e);
                             }
