@@ -617,7 +617,7 @@
             `;
         }
 
-        // Orbit Görünümü (Apple Watch tarzı circular - interaktif mouse kontrolü)
+        // Orbit Görünümü (Apple Watch tarzı - spiral düzenleme, zoom efekti)
         renderProductUpdateOrbit(products, showAll = false) {
             if (!products || !Array.isArray(products) || products.length === 0) {
                 return '';
@@ -628,29 +628,51 @@
             const uniqueId = 'product-update-orbit-' + Math.random().toString(36).substr(2, 9);
             const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
             
+            // Apple Watch tarzı spiral düzenleme
             const centerX = 50;
             const centerY = 50;
-            const radius = 35;
+            const baseRadius = 18;
+            const radiusStep = 7;
+            const angleStep = Math.PI / 6;
             const totalItems = displayProducts.length;
-            const angleStep = totalItems > 0 ? (2 * Math.PI) / totalItems : 0;
+            
+            // Spiral pozisyonları hesapla
+            const positions = [];
+            let currentRadius = baseRadius;
+            let currentAngle = 0;
+            
+            for (let i = 0; i < totalItems; i++) {
+                const x = centerX + currentRadius * Math.cos(currentAngle);
+                const y = centerY + currentRadius * Math.sin(currentAngle);
+                positions.push({ x, y, radius: currentRadius, angle: currentAngle });
+                
+                currentAngle += angleStep;
+                if ((i + 1) % 12 === 0) {
+                    currentRadius += radiusStep;
+                }
+            }
             
             return `
-                <div class="product-update-orbit mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="orbit" data-total-items="${totalItems}" data-angle-step="${angleStep}" data-radius="${radius}">
-                    <div class="relative orbit-wrapper" style="min-height: 500px; padding: 40px; cursor: grab;">
-                        <div class="orbit-container relative w-full h-full" style="position: relative;">
+                <div class="product-update-orbit mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="orbit" data-total-items="${totalItems}">
+                    <div class="relative orbit-wrapper" style="min-height: 600px; padding: 50px; cursor: grab; overflow: hidden;">
+                        <div class="orbit-container relative w-full h-full" style="position: relative; transform-origin: center center;">
                             ${displayProducts.map((product, index) => {
-                                const angle = index * angleStep - Math.PI / 2;
-                                const x = centerX + radius * Math.cos(angle);
-                                const y = centerY + radius * Math.sin(angle);
+                                const pos = positions[index];
                                 const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
                                 const barcode = product.barcode || 'Barkod yok';
                                 const image = product.image || '';
                                 
+                                const distanceFromCenter = pos.radius;
+                                const maxDistance = Math.max(...positions.map(p => p.radius));
+                                const scale = 0.5 + (1 - distanceFromCenter / maxDistance) * 0.5;
+                                const opacity = 0.6 + (1 - distanceFromCenter / maxDistance) * 0.4;
+                                const zIndex = Math.floor(100 - (distanceFromCenter / maxDistance) * 50);
+                                
                                 return `
-                                    <div class="orbit-item absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 hover:scale-125 hover:z-30" 
-                                         style="left: ${x}%; top: ${y}%; will-change: transform;">
+                                    <div class="orbit-item absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 hover:scale-150 hover:z-50" 
+                                         style="left: ${pos.x}%; top: ${pos.y}%; will-change: transform; transform: translate(-50%, -50%) scale(${scale}); opacity: ${opacity}; z-index: ${zIndex};">
                                         <div class="product-orbit-card bg-white border-2 border-gray-200 rounded-full overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer" 
-                                             style="width: 100px; height: 100px; position: relative;">
+                                             style="width: 85px; height: 85px; position: relative;">
                                             ${image ? `
                                                 <img src="${image}" 
                                                      alt="${productName}" 
@@ -662,14 +684,14 @@
                                             `}
                                             <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all duration-300 rounded-full flex items-center justify-center">
                                                 <div class="opacity-0 hover:opacity-100 transition-opacity duration-300 text-white text-xs font-medium text-center px-2" style="text-shadow: 0 2px 4px rgba(0,0,0,0.7);">
-                                                    ${productName.length > 25 ? productName.substring(0, 25) + '...' : productName}
+                                                    ${productName.length > 20 ? productName.substring(0, 20) + '...' : productName}
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 `;
                             }).join('')}
-                            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-10">
+                            <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-50 pointer-events-none">
                                 <div class="bg-white rounded-full p-4 shadow-lg border-2 border-gray-200">
                                     <div class="text-2xl font-bold text-gray-800">${displayProducts.length}</div>
                                     <div class="text-xs text-gray-600">Ürün</div>

@@ -1616,7 +1616,7 @@ AdminPanel.prototype.renderProductUpdateCarousel = function(products, showAll = 
     `;
 };
 
-// Orbit Görünümü (Apple Watch tarzı circular - interaktif mouse kontrolü)
+// Orbit Görünümü (Apple Watch tarzı - spiral düzenleme, zoom efekti)
 AdminPanel.prototype.renderProductUpdateOrbit = function(products, showAll = false) {
     if (!products || !Array.isArray(products) || products.length === 0) {
         return '';
@@ -1627,29 +1627,54 @@ AdminPanel.prototype.renderProductUpdateOrbit = function(products, showAll = fal
     const uniqueId = 'product-update-orbit-' + Math.random().toString(36).substr(2, 9);
     const productsJson = btoa(encodeURIComponent(JSON.stringify(products)));
     
+    // Apple Watch tarzı spiral düzenleme
+    // Ürünler merkezden dışarı doğru spiral şeklinde yerleştirilir
     const centerX = 50;
     const centerY = 50;
-    const radius = 35;
+    const baseRadius = 20; // Minimum radius
+    const radiusStep = 8; // Her spiral turunda radius artışı
+    const angleStep = Math.PI / 6; // Her ürün arası açı (30 derece)
     const totalItems = displayProducts.length;
-    const angleStep = totalItems > 0 ? (2 * Math.PI) / totalItems : 0;
+    
+    // Spiral pozisyonları hesapla
+    const positions = [];
+    let currentRadius = baseRadius;
+    let currentAngle = 0;
+    
+    for (let i = 0; i < totalItems; i++) {
+        const x = centerX + currentRadius * Math.cos(currentAngle);
+        const y = centerY + currentRadius * Math.sin(currentAngle);
+        positions.push({ x, y, radius: currentRadius, angle: currentAngle });
+        
+        currentAngle += angleStep;
+        // Her 12 üründe bir (360 derece) radius'u artır
+        if ((i + 1) % 12 === 0) {
+            currentRadius += radiusStep;
+        }
+    }
     
     return `
-        <div class="product-update-orbit mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="orbit" data-total-items="${totalItems}" data-angle-step="${angleStep}" data-radius="${radius}">
-                    <div class="relative orbit-wrapper" style="min-height: 500px; padding: 40px; cursor: grab;">
-                <div class="orbit-container relative w-full h-full" style="position: relative;">
+        <div class="product-update-orbit mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="orbit" data-total-items="${totalItems}">
+            <div class="relative orbit-wrapper" style="min-height: 600px; padding: 50px; cursor: grab; overflow: hidden;">
+                <div class="orbit-container relative w-full h-full" style="position: relative; transform-origin: center center;">
                     ${displayProducts.map((product, index) => {
-                        const angle = index * angleStep - Math.PI / 2;
-                        const x = centerX + radius * Math.cos(angle);
-                        const y = centerY + radius * Math.sin(angle);
+                        const pos = positions[index];
                         const productName = (product.name || 'İsimsiz Ürün').replace(/"/g, '&quot;');
                         const barcode = product.barcode || 'Barkod yok';
                         const image = product.image || '';
                         
+                        // Merkeze uzaklığa göre boyut hesapla (3D perspektif)
+                        const distanceFromCenter = pos.radius;
+                        const maxDistance = Math.max(...positions.map(p => p.radius));
+                        const scale = 0.6 + (1 - distanceFromCenter / maxDistance) * 0.4; // 0.6x - 1.0x arası
+                        const opacity = 0.7 + (1 - distanceFromCenter / maxDistance) * 0.3; // 0.7 - 1.0 arası
+                        const zIndex = Math.floor(100 - (distanceFromCenter / maxDistance) * 50);
+                        
                         return `
-                            <div class="orbit-item absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 hover:scale-125 hover:z-30" 
-                                 style="left: ${x}%; top: ${y}%; will-change: transform;">
+                            <div class="orbit-item absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 hover:scale-150 hover:z-50" 
+                                 style="left: ${pos.x}%; top: ${pos.y}%; will-change: transform; transform: translate(-50%, -50%) scale(${scale}); opacity: ${opacity}; z-index: ${zIndex};">
                                 <div class="product-orbit-card bg-white border-2 border-gray-200 rounded-full overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer" 
-                                     style="width: 100px; height: 100px; position: relative;">
+                                     style="width: 90px; height: 90px; position: relative;">
                                     ${image ? `
                                         <img src="${image}" 
                                              alt="${productName}" 
@@ -1661,14 +1686,14 @@ AdminPanel.prototype.renderProductUpdateOrbit = function(products, showAll = fal
                                     `}
                                     <div class="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-30 transition-all duration-300 rounded-full flex items-center justify-center">
                                         <div class="opacity-0 hover:opacity-100 transition-opacity duration-300 text-white text-xs font-medium text-center px-2" style="text-shadow: 0 2px 4px rgba(0,0,0,0.7);">
-                                            ${productName.length > 25 ? productName.substring(0, 25) + '...' : productName}
+                                            ${productName.length > 20 ? productName.substring(0, 20) + '...' : productName}
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         `;
                     }).join('')}
-                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-10">
+                    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center z-50 pointer-events-none">
                         <div class="bg-white rounded-full p-4 shadow-lg border-2 border-gray-200">
                             <div class="text-2xl font-bold text-gray-800">${displayProducts.length}</div>
                             <div class="text-xs text-gray-600">Ürün</div>
@@ -1681,82 +1706,211 @@ AdminPanel.prototype.renderProductUpdateOrbit = function(products, showAll = fal
                     const orbit = document.getElementById('${uniqueId}');
                     if (!orbit) return;
                     const wrapper = orbit.querySelector('.orbit-wrapper');
+                    const container = orbit.querySelector('.orbit-container');
                     const items = orbit.querySelectorAll('.orbit-item');
                     const totalItems = parseInt(orbit.getAttribute('data-total-items'));
-                    const angleStep = parseFloat(orbit.getAttribute('data-angle-step'));
-                    const radius = parseFloat(orbit.getAttribute('data-radius'));
-                    const centerX = 50;
-                    const centerY = 50;
                     
-                    let isMouseDown = false;
-                    let lastMouseX = 0;
-                    let lastMouseY = 0;
+                    // Spiral pozisyonları (render sırasında hesaplanan)
+                    const positions = ${JSON.stringify(positions)};
+                    
                     let currentRotation = 0;
+                    let currentZoom = 1;
+                    let baseRotation = 0;
+                    let baseZoom = 1;
                     
-                    wrapper.addEventListener('mousedown', function(e) {
-                        isMouseDown = true;
-                        wrapper.style.cursor = 'grabbing';
-                        lastMouseX = e.clientX;
-                        lastMouseY = e.clientY;
-                    });
-                    
-                    document.addEventListener('mouseup', function() {
-                        isMouseDown = false;
-                        wrapper.style.cursor = 'grab';
-                    });
-                    
+                    // Mouse pozisyonuna göre rotation ve zoom
                     wrapper.addEventListener('mousemove', function(e) {
-                        if (!isMouseDown) return;
+                        const rect = wrapper.getBoundingClientRect();
+                        const centerX_px = rect.left + rect.width / 2;
+                        const centerY_px = rect.top + rect.height / 2;
                         
-                        const deltaX = e.clientX - lastMouseX;
-                        const deltaY = e.clientY - lastMouseY;
+                        const mouseX = e.clientX - centerX_px;
+                        const mouseY = e.clientY - centerY_px;
                         
-                        // Mouse hareketine göre rotation hesapla
-                        const sensitivity = 0.02;
-                        currentRotation += (deltaX - deltaY) * sensitivity;
+                        // Mouse pozisyonuna göre açı hesapla (rotation)
+                        const angle = Math.atan2(mouseY, mouseX);
+                        const targetRotation = angle + Math.PI / 2;
+                        const rotationSensitivity = 0.3;
+                        currentRotation += (targetRotation - currentRotation) * rotationSensitivity;
                         
-                        // Her ürünü yeni açıya göre konumlandır
+                        // Mouse merkeze uzaklığına göre zoom hesapla
+                        const distance = Math.sqrt(mouseX * mouseX + mouseY * mouseY);
+                        const maxDistance = Math.sqrt(rect.width * rect.width + rect.height * rect.height) / 2;
+                        const normalizedDistance = Math.min(distance / maxDistance, 1);
+                        
+                        // Uzaklığa göre zoom: merkeze yakın = zoom in, uzak = zoom out
+                        const targetZoom = 0.7 + (1 - normalizedDistance) * 0.6; // 0.7x - 1.3x arası
+                        const zoomSensitivity = 0.2;
+                        currentZoom += (targetZoom - currentZoom) * zoomSensitivity;
+                        
+                        // Container'a rotation ve zoom uygula
+                        container.style.transform = 'rotate(' + currentRotation + 'rad) scale(' + currentZoom + ')';
+                        
+                        // Her ürünü spiral pozisyonuna göre güncelle (rotation ile birlikte)
                         items.forEach((item, index) => {
-                            const baseAngle = index * angleStep - Math.PI / 2;
-                            const newAngle = baseAngle + currentRotation;
-                            const x = centerX + radius * Math.cos(newAngle);
-                            const y = centerY + radius * Math.sin(newAngle);
+                            const pos = positions[index];
+                            const rotatedAngle = pos.angle + currentRotation;
+                            const rotatedRadius = pos.radius * currentZoom;
+                            const x = 50 + rotatedRadius * Math.cos(rotatedAngle);
+                            const y = 50 + rotatedRadius * Math.sin(rotatedAngle);
+                            
+                            // Merkeze uzaklığa göre scale ve opacity
+                            const maxRadius = Math.max(...positions.map(p => p.radius));
+                            const itemScale = 0.5 + (1 - pos.radius / maxRadius) * 0.5;
+                            const itemOpacity = 0.6 + (1 - pos.radius / maxRadius) * 0.4;
+                            
                             item.style.left = x + '%';
                             item.style.top = y + '%';
+                            item.style.transform = 'translate(-50%, -50%) scale(' + itemScale + ')';
+                            item.style.opacity = itemOpacity;
                         });
-                        
-                        lastMouseX = e.clientX;
-                        lastMouseY = e.clientY;
                     });
                     
-                    // Touch desteği (mobil için)
-                    let touchStartX = 0;
-                    let touchStartY = 0;
+                    // Mouse çıkınca başlangıç pozisyonuna dön
+                    wrapper.addEventListener('mouseleave', function() {
+                        const resetSpeed = 0.15;
+                        const resetInterval = setInterval(() => {
+                            const rotationDiff = Math.abs(currentRotation);
+                            const zoomDiff = Math.abs(currentZoom - 1);
+                            
+                            if (rotationDiff < 0.01 && zoomDiff < 0.01) {
+                                currentRotation = 0;
+                                currentZoom = 1;
+                                container.style.transform = 'rotate(0rad) scale(1)';
+                                clearInterval(resetInterval);
+                                
+                                // Pozisyonları sıfırla
+                                items.forEach((item, index) => {
+                                    const pos = positions[index];
+                                    const maxRadius = Math.max(...positions.map(p => p.radius));
+                                    const itemScale = 0.5 + (1 - pos.radius / maxRadius) * 0.5;
+                                    const itemOpacity = 0.6 + (1 - pos.radius / maxRadius) * 0.4;
+                                    
+                                    item.style.left = pos.x + '%';
+                                    item.style.top = pos.y + '%';
+                                    item.style.transform = 'translate(-50%, -50%) scale(' + itemScale + ')';
+                                    item.style.opacity = itemOpacity;
+                                });
+                            } else {
+                                currentRotation *= (1 - resetSpeed);
+                                currentZoom += (1 - currentZoom) * resetSpeed;
+                                container.style.transform = 'rotate(' + currentRotation + 'rad) scale(' + currentZoom + ')';
+                                
+                                items.forEach((item, index) => {
+                                    const pos = positions[index];
+                                    const rotatedAngle = pos.angle + currentRotation;
+                                    const rotatedRadius = pos.radius * currentZoom;
+                                    const x = 50 + rotatedRadius * Math.cos(rotatedAngle);
+                                    const y = 50 + rotatedRadius * Math.sin(rotatedAngle);
+                                    const maxRadius = Math.max(...positions.map(p => p.radius));
+                                    const itemScale = 0.5 + (1 - pos.radius / maxRadius) * 0.5;
+                                    const itemOpacity = 0.6 + (1 - pos.radius / maxRadius) * 0.4;
+                                    
+                                    item.style.left = x + '%';
+                                    item.style.top = y + '%';
+                                    item.style.transform = 'translate(-50%, -50%) scale(' + itemScale + ')';
+                                    item.style.opacity = itemOpacity;
+                                });
+                            }
+                        }, 16);
+                    });
+                    
+                    // Wheel ile zoom (Apple Watch Digital Crown benzeri)
+                    wrapper.addEventListener('wheel', function(e) {
+                        e.preventDefault();
+                        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                        baseZoom = Math.max(0.5, Math.min(2.0, baseZoom + delta));
+                        currentZoom = baseZoom;
+                        
+                        container.style.transform = 'rotate(' + currentRotation + 'rad) scale(' + currentZoom + ')';
+                        
+                        items.forEach((item, index) => {
+                            const pos = positions[index];
+                            const rotatedAngle = pos.angle + currentRotation;
+                            const rotatedRadius = pos.radius * currentZoom;
+                            const x = 50 + rotatedRadius * Math.cos(rotatedAngle);
+                            const y = 50 + rotatedRadius * Math.sin(rotatedAngle);
+                            const maxRadius = Math.max(...positions.map(p => p.radius));
+                            const itemScale = 0.5 + (1 - pos.radius / maxRadius) * 0.5;
+                            const itemOpacity = 0.6 + (1 - pos.radius / maxRadius) * 0.4;
+                            
+                            item.style.left = x + '%';
+                            item.style.top = y + '%';
+                            item.style.transform = 'translate(-50%, -50%) scale(' + itemScale + ')';
+                            item.style.opacity = itemOpacity;
+                        });
+                    });
+                    
+                    // Touch desteği (pinch to zoom)
+                    let touchStartDistance = 0;
+                    let touchStartZoom = 1;
                     
                     wrapper.addEventListener('touchstart', function(e) {
-                        touchStartX = e.touches[0].clientX;
-                        touchStartY = e.touches[0].clientY;
+                        if (e.touches.length === 2) {
+                            const touch1 = e.touches[0];
+                            const touch2 = e.touches[1];
+                            touchStartDistance = Math.sqrt(
+                                Math.pow(touch2.clientX - touch1.clientX, 2) +
+                                Math.pow(touch2.clientY - touch1.clientY, 2)
+                            );
+                            touchStartZoom = currentZoom;
+                        } else if (e.touches.length === 1) {
+                            const rect = wrapper.getBoundingClientRect();
+                            const centerX_px = rect.left + rect.width / 2;
+                            const centerY_px = rect.top + rect.height / 2;
+                            
+                            const touchX = e.touches[0].clientX - centerX_px;
+                            const touchY = e.touches[0].clientY - centerY_px;
+                            const touchAngle = Math.atan2(touchY, touchX);
+                            baseRotation = touchAngle + Math.PI / 2 - currentRotation;
+                        }
                     });
                     
                     wrapper.addEventListener('touchmove', function(e) {
                         e.preventDefault();
-                        const deltaX = e.touches[0].clientX - touchStartX;
-                        const deltaY = e.touches[0].clientY - touchStartY;
                         
-                        const sensitivity = 0.02;
-                        currentRotation += (deltaX - deltaY) * sensitivity;
+                        if (e.touches.length === 2) {
+                            // Pinch to zoom
+                            const touch1 = e.touches[0];
+                            const touch2 = e.touches[1];
+                            const currentDistance = Math.sqrt(
+                                Math.pow(touch2.clientX - touch1.clientX, 2) +
+                                Math.pow(touch2.clientY - touch1.clientY, 2)
+                            );
+                            const zoomFactor = currentDistance / touchStartDistance;
+                            currentZoom = Math.max(0.5, Math.min(2.0, touchStartZoom * zoomFactor));
+                            
+                            container.style.transform = 'rotate(' + currentRotation + 'rad) scale(' + currentZoom + ')';
+                        } else if (e.touches.length === 1) {
+                            // Rotation
+                            const rect = wrapper.getBoundingClientRect();
+                            const centerX_px = rect.left + rect.width / 2;
+                            const centerY_px = rect.top + rect.height / 2;
+                            
+                            const touchX = e.touches[0].clientX - centerX_px;
+                            const touchY = e.touches[0].clientY - centerY_px;
+                            const currentAngle = Math.atan2(touchY, touchX);
+                            currentRotation = currentAngle + Math.PI / 2 - baseRotation;
+                            
+                            container.style.transform = 'rotate(' + currentRotation + 'rad) scale(' + currentZoom + ')';
+                        }
                         
+                        // Pozisyonları güncelle
                         items.forEach((item, index) => {
-                            const baseAngle = index * angleStep - Math.PI / 2;
-                            const newAngle = baseAngle + currentRotation;
-                            const x = centerX + radius * Math.cos(newAngle);
-                            const y = centerY + radius * Math.sin(newAngle);
+                            const pos = positions[index];
+                            const rotatedAngle = pos.angle + currentRotation;
+                            const rotatedRadius = pos.radius * currentZoom;
+                            const x = 50 + rotatedRadius * Math.cos(rotatedAngle);
+                            const y = 50 + rotatedRadius * Math.sin(rotatedAngle);
+                            const maxRadius = Math.max(...positions.map(p => p.radius));
+                            const itemScale = 0.5 + (1 - pos.radius / maxRadius) * 0.5;
+                            const itemOpacity = 0.6 + (1 - pos.radius / maxRadius) * 0.4;
+                            
                             item.style.left = x + '%';
                             item.style.top = y + '%';
+                            item.style.transform = 'translate(-50%, -50%) scale(' + itemScale + ')';
+                            item.style.opacity = itemOpacity;
                         });
-                        
-                        touchStartX = e.touches[0].clientX;
-                        touchStartY = e.touches[0].clientY;
                     });
                 })();
             </script>
