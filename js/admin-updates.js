@@ -1635,24 +1635,7 @@ AdminPanel.prototype.renderProductUpdateOrbit = function(products, showAll = fal
     
     return `
         <div class="product-update-orbit mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="orbit" data-total-items="${totalItems}" data-angle-step="${angleStep}" data-radius="${radius}">
-            <div class="relative orbit-wrapper" style="min-height: 500px; padding: 40px; cursor: grab;" onmouseleave="
-                (function() {
-                    const orbit = document.getElementById('${uniqueId}');
-                    if (!orbit) return;
-                    const items = orbit.querySelectorAll('.orbit-item');
-                    const totalItems = parseInt(orbit.getAttribute('data-total-items'));
-                    const angleStep = parseFloat(orbit.getAttribute('data-angle-step'));
-                    const radius = parseFloat(orbit.getAttribute('data-radius'));
-                    items.forEach((item, index) => {
-                        const angle = index * angleStep - Math.PI / 2;
-                        const x = 50 + radius * Math.cos(angle);
-                        const y = 50 + radius * Math.sin(angle);
-                        item.style.left = x + '%';
-                        item.style.top = y + '%';
-                        item.style.transform = 'translate(-50%, -50%)';
-                    });
-                })();
-            ">
+                    <div class="relative orbit-wrapper" style="min-height: 500px; padding: 40px; cursor: grab;">
                 <div class="orbit-container relative w-full h-full" style="position: relative;">
                     ${displayProducts.map((product, index) => {
                         const angle = index * angleStep - Math.PI / 2;

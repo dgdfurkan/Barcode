@@ -636,24 +636,7 @@
             
             return `
                 <div class="product-update-orbit mt-4 mb-4" id="${uniqueId}" data-products="${productsJson}" data-display-type="orbit" data-total-items="${totalItems}" data-angle-step="${angleStep}" data-radius="${radius}">
-                    <div class="relative orbit-wrapper" style="min-height: 500px; padding: 40px; cursor: grab;" onmouseleave="
-                        (function() {
-                            const orbit = document.getElementById('${uniqueId}');
-                            if (!orbit) return;
-                            const items = orbit.querySelectorAll('.orbit-item');
-                            const totalItems = parseInt(orbit.getAttribute('data-total-items'));
-                            const angleStep = parseFloat(orbit.getAttribute('data-angle-step'));
-                            const radius = parseFloat(orbit.getAttribute('data-radius'));
-                            items.forEach((item, index) => {
-                                const angle = index * angleStep - Math.PI / 2;
-                                const x = 50 + radius * Math.cos(angle);
-                                const y = 50 + radius * Math.sin(angle);
-                                item.style.left = x + '%';
-                                item.style.top = y + '%';
-                                item.style.transform = 'translate(-50%, -50%)';
-                            });
-                        })();
-                    ">
+                    <div class="relative orbit-wrapper" style="min-height: 500px; padding: 40px; cursor: grab;">
                         <div class="orbit-container relative w-full h-full" style="position: relative;">
                             ${displayProducts.map((product, index) => {
                                 const angle = index * angleStep - Math.PI / 2;
@@ -706,31 +689,24 @@
                             const centerX = 50;
                             const centerY = 50;
                             
-                            let isMouseDown = false;
-                            let lastMouseX = 0;
-                            let lastMouseY = 0;
                             let currentRotation = 0;
                             
-                            wrapper.addEventListener('mousedown', function(e) {
-                                isMouseDown = true;
-                                wrapper.style.cursor = 'grabbing';
-                                lastMouseX = e.clientX;
-                                lastMouseY = e.clientY;
-                            });
-                            
-                            document.addEventListener('mouseup', function() {
-                                isMouseDown = false;
-                                wrapper.style.cursor = 'grab';
-                            });
-                            
+                            // Mouse pozisyonuna göre otomatik dönme
                             wrapper.addEventListener('mousemove', function(e) {
-                                if (!isMouseDown) return;
+                                const rect = wrapper.getBoundingClientRect();
+                                const centerX_px = rect.left + rect.width / 2;
+                                const centerY_px = rect.top + rect.height / 2;
                                 
-                                const deltaX = e.clientX - lastMouseX;
-                                const deltaY = e.clientY - lastMouseY;
+                                const mouseX = e.clientX - centerX_px;
+                                const mouseY = e.clientY - centerY_px;
                                 
-                                const sensitivity = 0.02;
-                                currentRotation += (deltaX - deltaY) * sensitivity;
+                                // Mouse pozisyonuna göre açı hesapla
+                                const angle = Math.atan2(mouseY, mouseX);
+                                
+                                // Orbit'i mouse pozisyonuna göre döndür (smooth)
+                                const targetRotation = angle + Math.PI / 2;
+                                const sensitivity = 0.3;
+                                currentRotation += (targetRotation - currentRotation) * sensitivity;
                                 
                                 items.forEach((item, index) => {
                                     const baseAngle = index * angleStep - Math.PI / 2;
@@ -740,26 +716,56 @@
                                     item.style.left = x + '%';
                                     item.style.top = y + '%';
                                 });
-                                
-                                lastMouseX = e.clientX;
-                                lastMouseY = e.clientY;
                             });
                             
-                            let touchStartX = 0;
-                            let touchStartY = 0;
+                            // Mouse çıkınca başlangıç pozisyonuna dön
+                            wrapper.addEventListener('mouseleave', function() {
+                                const resetSpeed = 0.1;
+                                const resetInterval = setInterval(() => {
+                                    if (Math.abs(currentRotation) < 0.01) {
+                                        currentRotation = 0;
+                                        clearInterval(resetInterval);
+                                    } else {
+                                        currentRotation *= (1 - resetSpeed);
+                                        items.forEach((item, index) => {
+                                            const baseAngle = index * angleStep - Math.PI / 2;
+                                            const newAngle = baseAngle + currentRotation;
+                                            const x = centerX + radius * Math.cos(newAngle);
+                                            const y = centerY + radius * Math.sin(newAngle);
+                                            item.style.left = x + '%';
+                                            item.style.top = y + '%';
+                                        });
+                                    }
+                                }, 16);
+                            });
+                            
+                            // Touch desteği (mobil için)
+                            let touchStartAngle = 0;
+                            let touchStartRotation = 0;
                             
                             wrapper.addEventListener('touchstart', function(e) {
-                                touchStartX = e.touches[0].clientX;
-                                touchStartY = e.touches[0].clientY;
+                                const rect = wrapper.getBoundingClientRect();
+                                const centerX_px = rect.left + rect.width / 2;
+                                const centerY_px = rect.top + rect.height / 2;
+                                
+                                const touchX = e.touches[0].clientX - centerX_px;
+                                const touchY = e.touches[0].clientY - centerY_px;
+                                touchStartAngle = Math.atan2(touchY, touchX);
+                                touchStartRotation = currentRotation;
                             });
                             
                             wrapper.addEventListener('touchmove', function(e) {
                                 e.preventDefault();
-                                const deltaX = e.touches[0].clientX - touchStartX;
-                                const deltaY = e.touches[0].clientY - touchStartY;
+                                const rect = wrapper.getBoundingClientRect();
+                                const centerX_px = rect.left + rect.width / 2;
+                                const centerY_px = rect.top + rect.height / 2;
                                 
-                                const sensitivity = 0.02;
-                                currentRotation += (deltaX - deltaY) * sensitivity;
+                                const touchX = e.touches[0].clientX - centerX_px;
+                                const touchY = e.touches[0].clientY - centerY_px;
+                                const currentAngle = Math.atan2(touchY, touchX);
+                                
+                                const deltaAngle = currentAngle - touchStartAngle;
+                                currentRotation = touchStartRotation + deltaAngle;
                                 
                                 items.forEach((item, index) => {
                                     const baseAngle = index * angleStep - Math.PI / 2;
@@ -769,9 +775,6 @@
                                     item.style.left = x + '%';
                                     item.style.top = y + '%';
                                 });
-                                
-                                touchStartX = e.touches[0].clientX;
-                                touchStartY = e.touches[0].clientY;
                             });
                         })();
                     </script>
