@@ -704,16 +704,17 @@
                             const orbit = document.getElementById('${uniqueId}');
                             if (!orbit) return;
                             const wrapper = orbit.querySelector('.orbit-wrapper');
+                            const container = orbit.querySelector('.orbit-container');
                             const items = orbit.querySelectorAll('.orbit-item');
                             const totalItems = parseInt(orbit.getAttribute('data-total-items'));
-                            const angleStep = parseFloat(orbit.getAttribute('data-angle-step'));
-                            const radius = parseFloat(orbit.getAttribute('data-radius'));
-                            const centerX = 50;
-                            const centerY = 50;
+                            
+                            const positions = ${JSON.stringify(positions)};
                             
                             let currentRotation = 0;
+                            let currentZoom = 1;
+                            let baseRotation = 0;
+                            let baseZoom = 1;
                             
-                            // Mouse pozisyonuna göre otomatik dönme
                             wrapper.addEventListener('mousemove', function(e) {
                                 const rect = wrapper.getBoundingClientRect();
                                 const centerX_px = rect.left + rect.width / 2;
@@ -722,80 +723,176 @@
                                 const mouseX = e.clientX - centerX_px;
                                 const mouseY = e.clientY - centerY_px;
                                 
-                                // Mouse pozisyonuna göre açı hesapla
                                 const angle = Math.atan2(mouseY, mouseX);
-                                
-                                // Orbit'i mouse pozisyonuna göre döndür (smooth)
                                 const targetRotation = angle + Math.PI / 2;
-                                const sensitivity = 0.3;
-                                currentRotation += (targetRotation - currentRotation) * sensitivity;
+                                const rotationSensitivity = 0.3;
+                                currentRotation += (targetRotation - currentRotation) * rotationSensitivity;
+                                
+                                const distance = Math.sqrt(mouseX * mouseX + mouseY * mouseY);
+                                const maxDistance = Math.sqrt(rect.width * rect.width + rect.height * rect.height) / 2;
+                                const normalizedDistance = Math.min(distance / maxDistance, 1);
+                                
+                                const targetZoom = 0.7 + (1 - normalizedDistance) * 0.6;
+                                const zoomSensitivity = 0.2;
+                                currentZoom += (targetZoom - currentZoom) * zoomSensitivity;
+                                
+                                container.style.transform = 'rotate(' + currentRotation + 'rad) scale(' + currentZoom + ')';
                                 
                                 items.forEach((item, index) => {
-                                    const baseAngle = index * angleStep - Math.PI / 2;
-                                    const newAngle = baseAngle + currentRotation;
-                                    const x = centerX + radius * Math.cos(newAngle);
-                                    const y = centerY + radius * Math.sin(newAngle);
+                                    const pos = positions[index];
+                                    const rotatedAngle = pos.angle + currentRotation;
+                                    const rotatedRadius = pos.radius * currentZoom;
+                                    const x = 50 + rotatedRadius * Math.cos(rotatedAngle);
+                                    const y = 50 + rotatedRadius * Math.sin(rotatedAngle);
+                                    
+                                    const maxRadius = Math.max(...positions.map(p => p.radius));
+                                    const itemScale = 0.5 + (1 - pos.radius / maxRadius) * 0.5;
+                                    const itemOpacity = 0.6 + (1 - pos.radius / maxRadius) * 0.4;
+                                    
                                     item.style.left = x + '%';
                                     item.style.top = y + '%';
+                                    item.style.transform = 'translate(-50%, -50%) scale(' + itemScale + ')';
+                                    item.style.opacity = itemOpacity;
                                 });
                             });
                             
-                            // Mouse çıkınca başlangıç pozisyonuna dön
                             wrapper.addEventListener('mouseleave', function() {
-                                const resetSpeed = 0.1;
+                                const resetSpeed = 0.15;
                                 const resetInterval = setInterval(() => {
-                                    if (Math.abs(currentRotation) < 0.01) {
+                                    const rotationDiff = Math.abs(currentRotation);
+                                    const zoomDiff = Math.abs(currentZoom - 1);
+                                    
+                                    if (rotationDiff < 0.01 && zoomDiff < 0.01) {
                                         currentRotation = 0;
+                                        currentZoom = 1;
+                                        container.style.transform = 'rotate(0rad) scale(1)';
                                         clearInterval(resetInterval);
+                                        
+                                        items.forEach((item, index) => {
+                                            const pos = positions[index];
+                                            const maxRadius = Math.max(...positions.map(p => p.radius));
+                                            const itemScale = 0.5 + (1 - pos.radius / maxRadius) * 0.5;
+                                            const itemOpacity = 0.6 + (1 - pos.radius / maxRadius) * 0.4;
+                                            
+                                            item.style.left = pos.x + '%';
+                                            item.style.top = pos.y + '%';
+                                            item.style.transform = 'translate(-50%, -50%) scale(' + itemScale + ')';
+                                            item.style.opacity = itemOpacity;
+                                        });
                                     } else {
                                         currentRotation *= (1 - resetSpeed);
+                                        currentZoom += (1 - currentZoom) * resetSpeed;
+                                        container.style.transform = 'rotate(' + currentRotation + 'rad) scale(' + currentZoom + ')';
+                                        
                                         items.forEach((item, index) => {
-                                            const baseAngle = index * angleStep - Math.PI / 2;
-                                            const newAngle = baseAngle + currentRotation;
-                                            const x = centerX + radius * Math.cos(newAngle);
-                                            const y = centerY + radius * Math.sin(newAngle);
+                                            const pos = positions[index];
+                                            const rotatedAngle = pos.angle + currentRotation;
+                                            const rotatedRadius = pos.radius * currentZoom;
+                                            const x = 50 + rotatedRadius * Math.cos(rotatedAngle);
+                                            const y = 50 + rotatedRadius * Math.sin(rotatedAngle);
+                                            const maxRadius = Math.max(...positions.map(p => p.radius));
+                                            const itemScale = 0.5 + (1 - pos.radius / maxRadius) * 0.5;
+                                            const itemOpacity = 0.6 + (1 - pos.radius / maxRadius) * 0.4;
+                                            
                                             item.style.left = x + '%';
                                             item.style.top = y + '%';
+                                            item.style.transform = 'translate(-50%, -50%) scale(' + itemScale + ')';
+                                            item.style.opacity = itemOpacity;
                                         });
                                     }
                                 }, 16);
                             });
                             
-                            // Touch desteği (mobil için)
-                            let touchStartAngle = 0;
-                            let touchStartRotation = 0;
+                            wrapper.addEventListener('wheel', function(e) {
+                                e.preventDefault();
+                                const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                                baseZoom = Math.max(0.5, Math.min(2.0, baseZoom + delta));
+                                currentZoom = baseZoom;
+                                
+                                container.style.transform = 'rotate(' + currentRotation + 'rad) scale(' + currentZoom + ')';
+                                
+                                items.forEach((item, index) => {
+                                    const pos = positions[index];
+                                    const rotatedAngle = pos.angle + currentRotation;
+                                    const rotatedRadius = pos.radius * currentZoom;
+                                    const x = 50 + rotatedRadius * Math.cos(rotatedAngle);
+                                    const y = 50 + rotatedRadius * Math.sin(rotatedAngle);
+                                    const maxRadius = Math.max(...positions.map(p => p.radius));
+                                    const itemScale = 0.5 + (1 - pos.radius / maxRadius) * 0.5;
+                                    const itemOpacity = 0.6 + (1 - pos.radius / maxRadius) * 0.4;
+                                    
+                                    item.style.left = x + '%';
+                                    item.style.top = y + '%';
+                                    item.style.transform = 'translate(-50%, -50%) scale(' + itemScale + ')';
+                                    item.style.opacity = itemOpacity;
+                                });
+                            });
+                            
+                            let touchStartDistance = 0;
+                            let touchStartZoom = 1;
                             
                             wrapper.addEventListener('touchstart', function(e) {
-                                const rect = wrapper.getBoundingClientRect();
-                                const centerX_px = rect.left + rect.width / 2;
-                                const centerY_px = rect.top + rect.height / 2;
-                                
-                                const touchX = e.touches[0].clientX - centerX_px;
-                                const touchY = e.touches[0].clientY - centerY_px;
-                                touchStartAngle = Math.atan2(touchY, touchX);
-                                touchStartRotation = currentRotation;
+                                if (e.touches.length === 2) {
+                                    const touch1 = e.touches[0];
+                                    const touch2 = e.touches[1];
+                                    touchStartDistance = Math.sqrt(
+                                        Math.pow(touch2.clientX - touch1.clientX, 2) +
+                                        Math.pow(touch2.clientY - touch1.clientY, 2)
+                                    );
+                                    touchStartZoom = currentZoom;
+                                } else if (e.touches.length === 1) {
+                                    const rect = wrapper.getBoundingClientRect();
+                                    const centerX_px = rect.left + rect.width / 2;
+                                    const centerY_px = rect.top + rect.height / 2;
+                                    
+                                    const touchX = e.touches[0].clientX - centerX_px;
+                                    const touchY = e.touches[0].clientY - centerY_px;
+                                    const touchAngle = Math.atan2(touchY, touchX);
+                                    baseRotation = touchAngle + Math.PI / 2 - currentRotation;
+                                }
                             });
                             
                             wrapper.addEventListener('touchmove', function(e) {
                                 e.preventDefault();
-                                const rect = wrapper.getBoundingClientRect();
-                                const centerX_px = rect.left + rect.width / 2;
-                                const centerY_px = rect.top + rect.height / 2;
                                 
-                                const touchX = e.touches[0].clientX - centerX_px;
-                                const touchY = e.touches[0].clientY - centerY_px;
-                                const currentAngle = Math.atan2(touchY, touchX);
-                                
-                                const deltaAngle = currentAngle - touchStartAngle;
-                                currentRotation = touchStartRotation + deltaAngle;
+                                if (e.touches.length === 2) {
+                                    const touch1 = e.touches[0];
+                                    const touch2 = e.touches[1];
+                                    const currentDistance = Math.sqrt(
+                                        Math.pow(touch2.clientX - touch1.clientX, 2) +
+                                        Math.pow(touch2.clientY - touch1.clientY, 2)
+                                    );
+                                    const zoomFactor = currentDistance / touchStartDistance;
+                                    currentZoom = Math.max(0.5, Math.min(2.0, touchStartZoom * zoomFactor));
+                                    
+                                    container.style.transform = 'rotate(' + currentRotation + 'rad) scale(' + currentZoom + ')';
+                                } else if (e.touches.length === 1) {
+                                    const rect = wrapper.getBoundingClientRect();
+                                    const centerX_px = rect.left + rect.width / 2;
+                                    const centerY_px = rect.top + rect.height / 2;
+                                    
+                                    const touchX = e.touches[0].clientX - centerX_px;
+                                    const touchY = e.touches[0].clientY - centerY_px;
+                                    const currentAngle = Math.atan2(touchY, touchX);
+                                    currentRotation = currentAngle + Math.PI / 2 - baseRotation;
+                                    
+                                    container.style.transform = 'rotate(' + currentRotation + 'rad) scale(' + currentZoom + ')';
+                                }
                                 
                                 items.forEach((item, index) => {
-                                    const baseAngle = index * angleStep - Math.PI / 2;
-                                    const newAngle = baseAngle + currentRotation;
-                                    const x = centerX + radius * Math.cos(newAngle);
-                                    const y = centerY + radius * Math.sin(newAngle);
+                                    const pos = positions[index];
+                                    const rotatedAngle = pos.angle + currentRotation;
+                                    const rotatedRadius = pos.radius * currentZoom;
+                                    const x = 50 + rotatedRadius * Math.cos(rotatedAngle);
+                                    const y = 50 + rotatedRadius * Math.sin(rotatedAngle);
+                                    const maxRadius = Math.max(...positions.map(p => p.radius));
+                                    const itemScale = 0.5 + (1 - pos.radius / maxRadius) * 0.5;
+                                    const itemOpacity = 0.6 + (1 - pos.radius / maxRadius) * 0.4;
+                                    
                                     item.style.left = x + '%';
                                     item.style.top = y + '%';
+                                    item.style.transform = 'translate(-50%, -50%) scale(' + itemScale + ')';
+                                    item.style.opacity = itemOpacity;
                                 });
                             });
                         })();
