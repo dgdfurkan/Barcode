@@ -61,7 +61,7 @@ exception when others then
     -- Fail silently to avoid blocking chat updates
     return new;
 end;
-$$;
+$$ LANGUAGE plpgsql;
 
 -- Trigger on guest_chats.chat_messages updates
 drop trigger if exists trg_notify_telegram_on_guest_chat on public.guest_chats;
