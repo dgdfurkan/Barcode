@@ -201,6 +201,12 @@ class AdminPanel {
         document.getElementById('adminMessageInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.sendAdminMessage();
         });
+        
+        // New Chat Modal event listeners
+        document.getElementById('newChatBtn').addEventListener('click', () => this.openNewChatModal());
+        document.getElementById('closeNewChatModal').addEventListener('click', () => this.closeNewChatModal());
+        document.getElementById('cancelNewChatBtn').addEventListener('click', () => this.closeNewChatModal());
+        document.getElementById('newChatSearchInput').addEventListener('input', (e) => this.filterNewChatUsers(e.target.value));
 
         // Premium Features Modal
         document.getElementById('closePremiumFeaturesModal')?.addEventListener('click', () => {
@@ -2145,6 +2151,112 @@ AdminPanel.prototype.loadChatUsers = async function() {
     }
 };
 
+// Get all users (registered + guests) who haven't started a chat yet
+AdminPanel.prototype.getAllUsersForChat = async function() {
+    console.log('💬 Getting all users for new chat...');
+    try {
+        const allUsers = [];
+        const usersWithChat = new Set();
+        
+        // Get usernames of users who already have chat messages
+        if (window.supabase) {
+            // Get registered users with chat messages
+            const { data: usersWithChatData } = await window.supabase
+                .from('users')
+                .select('username, chat_messages')
+                .not('chat_messages', 'is', null);
+            
+            if (usersWithChatData) {
+                usersWithChatData.forEach(user => {
+                    try {
+                        const chatMessages = JSON.parse(user.chat_messages || '[]');
+                        if (chatMessages.length > 0) {
+                            usersWithChat.add(user.username);
+                        }
+                    } catch (e) {
+                        // Ignore parse errors
+                    }
+                });
+            }
+            
+            // Get guest users with chat messages
+            try {
+                const { data: guestChatsData } = await window.supabase
+                    .from('guest_chats')
+                    .select('username, chat_messages')
+                    .not('chat_messages', 'is', null);
+                
+                if (guestChatsData) {
+                    guestChatsData.forEach(guest => {
+                        try {
+                            const chatMessages = JSON.parse(guest.chat_messages || '[]');
+                            if (chatMessages.length > 0) {
+                                usersWithChat.add(guest.username);
+                            }
+                        } catch (e) {
+                            // Ignore parse errors
+                        }
+                    });
+                }
+            } catch (guestError) {
+                console.log('⚠️ guest_chats table might not exist:', guestError);
+            }
+            
+            // Get all registered users (excluding those with chat)
+            const { data: allRegisteredUsers, error: regError } = await window.supabase
+                .from('users')
+                .select('username, company, is_active')
+                .eq('is_active', true)
+                .order('username', { ascending: true });
+            
+            if (!regError && allRegisteredUsers) {
+                allRegisteredUsers.forEach(user => {
+                    if (!usersWithChat.has(user.username)) {
+                        allUsers.push({
+                            username: user.username,
+                            company: user.company || '',
+                            isGuest: false,
+                            isActive: user.is_active
+                        });
+                    }
+                });
+            }
+            
+            // Get all guest users (excluding those with chat)
+            try {
+                const { data: allGuestUsers, error: guestError } = await window.supabase
+                    .from('guest_chats')
+                    .select('username, ip_address, created_at')
+                    .order('username', { ascending: true });
+                
+                if (!guestError && allGuestUsers) {
+                    allGuestUsers.forEach(guest => {
+                        if (!usersWithChat.has(guest.username)) {
+                            allUsers.push({
+                                username: guest.username,
+                                company: 'Misafir Kullanıcı',
+                                isGuest: true,
+                                isActive: true
+                            });
+                        }
+                    });
+                }
+            } catch (guestTableError) {
+                console.log('⚠️ guest_chats table might not exist:', guestTableError);
+            }
+        }
+        
+        // Sort alphabetically by username
+        allUsers.sort((a, b) => a.username.localeCompare(b.username));
+        
+        console.log(`✅ Found ${allUsers.length} users without chat history`);
+        return allUsers;
+    } catch (error) {
+        console.error('❌ Error getting all users for chat:', error);
+        return [];
+    }
+};
+
 AdminPanel.prototype.loadChatUsersFromLocalStorage = function() {
     console.log('💬 Loading chat users from localStorage');
     const messages = JSON.parse(localStorage.getItem('messages') || '[]');
@@ -2219,6 +2331,155 @@ AdminPanel.prototype.renderChatUsers = async function(users) {
     
     chatUsersList.innerHTML = userElements.join('');
     console.log('💬 Chat users rendered successfully');
+};
+
+// Open new chat modal and load users without chat history
+AdminPanel.prototype.openNewChatModal = async function() {
+    console.log('💬 Opening new chat modal...');
+    const modal = document.getElementById('newChatModal');
+    const userList = document.getElementById('newChatUserList');
+    const searchInput = document.getElementById('newChatSearchInput');
+    
+    if (!modal || !userList) {
+        console.error('❌ New chat modal elements not found');
+        return;
+    }
+    
+    // Show modal
+    modal.classList.remove('hidden');
+    searchInput.value = '';
+    
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            this.closeNewChatModal();
+        }
+    });
+    
+    // Close modal on ESC key
+    const escHandler = (e) => {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+            this.closeNewChatModal();
+            document.removeEventListener('keydown', escHandler);
+        }
+    };
+    document.addEventListener('keydown', escHandler);
+    
+    // Show loading state
+    userList.innerHTML = `
+        <div class="text-center text-gray-500 py-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-3"></div>
+            <p>Kullanıcılar yükleniyor...</p>
+        </div>
+    `;
+    
+    // Load users
+    try {
+        const users = await this.getAllUsersForChat();
+        this.newChatUsers = users; // Store for filtering
+        this.renderNewChatUsers(users);
+    } catch (error) {
+        console.error('❌ Error loading users for new chat:', error);
+        userList.innerHTML = `
+            <div class="text-center text-gray-500 py-8">
+                <p class="text-red-500">Kullanıcılar yüklenirken hata oluştu</p>
+            </div>
+        `;
+    }
+};
+
+// Close new chat modal
+AdminPanel.prototype.closeNewChatModal = function() {
+    const modal = document.getElementById('newChatModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        this.newChatUsers = null;
+    }
+};
+
+// Render users in new chat modal
+AdminPanel.prototype.renderNewChatUsers = function(users) {
+    const userList = document.getElementById('newChatUserList');
+    if (!userList) return;
+    
+    if (users.length === 0) {
+        userList.innerHTML = `
+            <div class="text-center text-gray-500 py-8">
+                <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                </svg>
+                <p class="text-sm">Henüz sohbet etmediğiniz kullanıcı bulunmuyor</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const userElements = users.map(user => {
+        const initial = user.username.charAt(0).toUpperCase();
+        const guestBadge = user.isGuest ? `
+            <span class="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">Misafir</span>
+        ` : '';
+        
+        return `
+            <div class="p-3 border-b border-gray-200 hover:bg-blue-50 cursor-pointer transition-colors rounded-lg mb-2" onclick="adminPanel.startNewChat('${user.username}')">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium shadow-md">
+                        ${initial}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center space-x-2">
+                            <h4 class="font-medium text-gray-900 truncate">${user.username}</h4>
+                            ${guestBadge}
+                        </div>
+                        <p class="text-xs text-gray-500 truncate">${user.company || 'Kullanıcı'}</p>
+                    </div>
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </div>
+            </div>
+        `;
+    });
+    
+    userList.innerHTML = userElements.join('');
+};
+
+// Filter users in new chat modal
+AdminPanel.prototype.filterNewChatUsers = function(searchTerm) {
+    if (!this.newChatUsers) return;
+    
+    const term = searchTerm.toLowerCase().trim();
+    
+    if (term === '') {
+        this.renderNewChatUsers(this.newChatUsers);
+        return;
+    }
+    
+    const filtered = this.newChatUsers.filter(user => 
+        user.username.toLowerCase().includes(term) ||
+        (user.company && user.company.toLowerCase().includes(term))
+    );
+    
+    this.renderNewChatUsers(filtered);
+};
+
+// Start new chat with selected user
+AdminPanel.prototype.startNewChat = function(username) {
+    console.log('💬 Starting new chat with:', username);
+    
+    // Close modal
+    this.closeNewChatModal();
+    
+    // Select user (this will open chat area and show input)
+    this.selectChatUser(username);
+    
+    // Focus on message input
+    setTimeout(() => {
+        const messageInput = document.getElementById('adminMessageInput');
+        if (messageInput) {
+            messageInput.focus();
+        }
+    }, 300);
 };
 
 AdminPanel.prototype.getLastMessagePreview = async function(username) {
