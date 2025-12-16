@@ -394,6 +394,32 @@
     </button>
 
     <!-- Scripts -->
+    <!-- Initialize Supabase immediately after CDN load -->
+    <script>
+        // Initialize Supabase client after CDN loads
+        (function() {
+            const SUPABASE_URL = 'https://ytekbbxvfdheiexsojpx.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
+            
+            // Wait for Supabase to be loaded from CDN
+            const initSupabaseClient = () => {
+                if (typeof window.supabase !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+                    window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    console.log('✅ Supabase client initialized in index.html');
+                } else {
+                    // Retry after a short delay
+                    setTimeout(initSupabaseClient, 100);
+                }
+            };
+            
+            // Start initialization
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initSupabaseClient);
+            } else {
+                initSupabaseClient();
+            }
+        })();
+    </script>
     <script src="js/auth.js"></script>
     <script src="js/ip-ban-checker.js"></script>
     <script src="js/guest-user-manager.js"></script>
