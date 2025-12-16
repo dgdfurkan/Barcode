@@ -7996,12 +7996,12 @@
                 try {
                     const { data, error } = await window.supabase
                         .from('users')
-                        .select('trial_end, trialEnd')
+                        .select('trial_end')
                         .eq('username', session.username)
                         .single();
                     
                     if (!error && data) {
-                        trialEndDate = data.trial_end || data.trialEnd;
+                        trialEndDate = data.trial_end;
                         
                         const sessionData = {
                             username: session.username,
@@ -8097,12 +8097,12 @@
                         try {
                             const { data, error } = await window.supabase
                                 .from('users')
-                                .select('trial_end, trialEnd')
+                                .select('trial_end')
                                 .eq('username', session.username)
                                 .single();
                             
                             if (!error && data) {
-                                const supabaseTrialEnd = data.trial_end || data.trialEnd;
+                                const supabaseTrialEnd = data.trial_end;
                                 if (supabaseTrialEnd !== session.trialEnd) {
                                     const sessionData = {
                                         username: session.username,
@@ -8143,12 +8143,12 @@
                         try {
                             const { data, error } = await window.supabase
                                 .from('users')
-                                .select('trial_end, trialEnd')
+                                .select('trial_end')
                                 .eq('username', session.username)
                                 .single();
                             
                             if (!error && data) {
-                                const supabaseTrialEnd = data.trial_end || data.trialEnd;
+                                const supabaseTrialEnd = data.trial_end;
                                 if (supabaseTrialEnd !== session.trialEnd) {
                                     const sessionData = {
                                         username: session.username,
