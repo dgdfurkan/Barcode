@@ -396,13 +396,21 @@ class ChatSystem {
         emptyState.id = 'chatEmptyState';
         emptyState.className = 'flex flex-col items-center justify-center h-full text-center px-4 py-8';
         emptyState.innerHTML = `
-            <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
-                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-                </svg>
+            <div class="relative mb-6">
+                <div class="w-20 h-20 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                </div>
+                <div class="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center animate-bounce">
+                    <svg class="w-4 h-4 text-yellow-800" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/>
+                    </svg>
+                </div>
             </div>
-            <p class="text-gray-500 text-sm font-medium mb-1">Henüz mesaj yok</p>
-            <p class="text-gray-400 text-xs">Destek ekibimizle iletişime geçmek için mesajınızı yazın</p>
+            <h3 class="text-gray-700 text-lg font-bold mb-2">Merhaba! 👋</h3>
+            <p class="text-gray-600 text-sm mb-1 font-medium">Sohbet başlatmak için ilk mesajınızı yazın</p>
+            <p class="text-gray-500 text-xs">Destek ekibimiz size yardımcı olmak için burada</p>
         `;
         messagesContainer.appendChild(emptyState);
     }
