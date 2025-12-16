@@ -128,36 +128,45 @@ async function login(username, password) {
         // Try Supabase first
         if (window.supabase && typeof window.supabase.from === 'function') {
             try {
-                // Set current user context for RLS
-                await window.supabase.rpc('set_current_user', { user_name: username });
-                
-                // Get user without password first (password might be protected by RLS)
+                // Try to get user with password first
                 const { data, error } = await window.supabase
                     .from('users')
-                    .select('id, username, company, contact_email, trial_end, allowed_ips, is_active, is_admin, premium_features, created_at, updated_at')
+                    .select('id, username, password, company, contact_email, trial_end, allowed_ips, is_active, is_admin, premium_features, created_at, updated_at')
                     .eq('username', username)
                     .single();
                 
                 if (!error && data) {
-                    // Try to get password separately
-                    try {
-                        const { data: pwdData, error: pwdError } = await window.supabase
-                            .from('users')
-                            .select('password')
-                            .eq('username', username)
-                            .single();
-                        
-                        if (!pwdError && pwdData && pwdData.password) {
-                            user = { ...data, password: pwdData.password };
-                        } else {
-                            // Password is protected, we'll verify it via a different method
-                            user = { ...data, password: null };
+                    user = data;
+                    console.log('User found in Supabase:', user);
+                } else if (error) {
+                    // If query fails (possibly due to RLS or password protection), try without password
+                    console.warn('First query failed, trying without password:', error);
+                    
+                    const { data: userData, error: userError } = await window.supabase
+                        .from('users')
+                        .select('id, username, company, contact_email, trial_end, allowed_ips, is_active, is_admin, premium_features, created_at, updated_at')
+                        .eq('username', username)
+                        .single();
+                    
+                    if (!userError && userData) {
+                        // Password is protected by RLS, try to get it separately
+                        try {
+                            const { data: pwdData, error: pwdError } = await window.supabase
+                                .from('users')
+                                .select('password')
+                                .eq('username', username)
+                                .single();
+                            
+                            if (!pwdError && pwdData && pwdData.password) {
+                                user = { ...userData, password: pwdData.password };
+                            } else {
+                                user = { ...userData, password: null };
+                            }
+                            console.log('User found in Supabase (password query separate):', user);
+                        } catch (pwdErr) {
+                            user = { ...userData, password: null };
+                            console.log('User found in Supabase (password protected):', user);
                         }
-                        console.log('User found in Supabase:', user);
-                    } catch (pwdErr) {
-                        // Password query failed, use user without password
-                        user = { ...data, password: null };
-                        console.log('User found in Supabase (password protected):', user);
                     }
                 }
             } catch (error) {
