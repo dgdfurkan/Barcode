@@ -23030,6 +23030,12 @@ const PRODUCTS_DATA = {
           "variant": ""
         },
         {
+          "code": "8684278082405",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8697785102078",
           "size": "",
           "type": "CUSTOM",
@@ -27847,10 +27853,10 @@ const PRODUCTS_DATA = {
     },
     {
       "id": "5c936b4429acb10001e530bc",
-      "name": "Garnier Micellar Kusursuz Makyaj Temizleme Suyu (400 ml)",
+      "name": "Garnier Micellar Makyaj Temizleme Suyu (400 ml)",
       "category": "İçecek",
       "brand": "Garnier",
-      "description": "Garnier Micellar Kusursuz Makyaj Temizleme Suyu (400 ml)",
+      "description": "Garnier Micellar Makyaj Temizleme Suyu (400 ml)",
       "image": "https://cdn-image.getir.com/market/product/79d495fd-157f-4d43-ace0-81ce6517cb57.jpeg",
       "barcodes": [
         {
@@ -31141,6 +31147,12 @@ const PRODUCTS_DATA = {
         },
         {
           "code": "8683955678092",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8684278082085",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -55342,10 +55354,10 @@ const PRODUCTS_DATA = {
     },
     {
       "id": "5cf27257130f3a00011f4e8b",
-      "name": "Nestlé Nesquik Kakaolu Buğday ve Mısır Gevreği 700g   (700 g)",
+      "name": "Nestlé Nesquik Kakaolu Buğday ve Mısır Gevreği (700 g)",
       "category": "Genel",
       "brand": "Nestlé",
-      "description": "Nestlé Nesquik Kakaolu Buğday ve Mısır Gevreği 700g   (700 g)",
+      "description": "Nestlé Nesquik Kakaolu Buğday ve Mısır Gevreği (700 g)",
       "image": "https://cdn-image.getir.com/market/product/5067f3e0-95a0-4fce-a9df-5a9968367b97.jpg",
       "barcodes": [
         {
@@ -106163,10 +106175,10 @@ const PRODUCTS_DATA = {
     },
     {
       "id": "60d076736ef8f5a34f459f5c",
-      "name": "Ecocold - Kiwi 1270 2D  - ETB Dolabı  (Ecocold 2 Kapılı/ 0-2 °C)",
+      "name": "EcoCold 1270 2 Kapılı Dikey +4 İçecek Dolabı (Ecocold 2 Kapılı/ 0-2 °C)",
       "category": "Genel",
-      "brand": "Ecocold",
-      "description": "Ecocold - Kiwi 1270 2D  - ETB Dolabı  (Ecocold 2 Kapılı/ 0-2 °C)",
+      "brand": "EcoCold",
+      "description": "EcoCold 1270 2 Kapılı Dikey +4 İçecek Dolabı (Ecocold 2 Kapılı/ 0-2 °C)",
       "image": "https://cdn-image.getir.com/market/product/5586631c-dcb2-4a23-88dd-0f4278d1d34f.png",
       "barcodes": [
         {
@@ -117999,10 +118011,10 @@ const PRODUCTS_DATA = {
     },
     {
       "id": "6202977b2255df05a65908eb",
-      "name": "Ecocold - Kiwi 1620 3D  - ETB Dolabı  (Ecocold 3 Kapılı/ 0-2 °C)",
+      "name": "EcoCold 1620 3 Kapılı Dikey +4 İçecek Dolabı (Ecocold 3 Kapılı/ 0-2 °C)",
       "category": "Genel",
-      "brand": "Ecocold",
-      "description": "Ecocold - Kiwi 1620 3D  - ETB Dolabı  (Ecocold 3 Kapılı/ 0-2 °C)",
+      "brand": "EcoCold",
+      "description": "EcoCold 1620 3 Kapılı Dikey +4 İçecek Dolabı (Ecocold 3 Kapılı/ 0-2 °C)",
       "image": "https://cdn-image.getir.com/market/product/989f0731-09a1-4ca7-a095-8e3270c2ad5b.png",
       "barcodes": [
         {
@@ -137605,6 +137617,12 @@ const PRODUCTS_DATA = {
           "size": "85 g",
           "type": "CUSTOM",
           "variant": "Mama"
+        },
+        {
+          "code": "8445292081184",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -137624,6 +137642,12 @@ const PRODUCTS_DATA = {
           "size": "85 g",
           "type": "CUSTOM",
           "variant": "Mama"
+        },
+        {
+          "code": "8445292081344",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -144197,6 +144221,12 @@ const PRODUCTS_DATA = {
           "size": "85 g",
           "type": "CUSTOM",
           "variant": "Konservesi"
+        },
+        {
+          "code": "8445292081443",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -148067,6 +148097,12 @@ const PRODUCTS_DATA = {
           "size": "",
           "type": "CUSTOM",
           "variant": "Mama"
+        },
+        {
+          "code": "8445292081627",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -150497,7 +150533,7 @@ const PRODUCTS_DATA = {
       "category": "Genel",
       "brand": "Analizli",
       "description": "Analizli Kaliforniya Biber Paket (650 g)",
-      "image": "https://cdn-image.getir.com/market/product/25a2879a-ce44-4c9a-a422-3f4e6b165250.jpg",
+      "image": "https://cdn-image.getir.com/market/product/75cfa1c8-c909-45ab-959f-911dc9dbc8fc.png",
       "barcodes": [
         {
           "code": "1234567891120",
@@ -161344,6 +161380,25 @@ const PRODUCTS_DATA = {
           "size": "",
           "type": "CUSTOM",
           "variant": "Kartları"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "66b0c32812fc7ad315a797fb",
+      "name": "La Lorraine Taze Baget (2 x 110 g)",
+      "category": "Genel",
+      "brand": "La",
+      "description": "La Lorraine Taze Baget (2 x 110 g)",
+      "image": "https://cdn-image.getir.com/market/product/dd1fe1f1-2b0b-4265-b25f-8c4cc3041bd4.jpg",
+      "barcodes": [
+        {
+          "code": "66990addc0f970edb6d176af_g10_gb_x2",
+          "size": "2 x 110 g",
+          "type": "CUSTOM",
+          "variant": "Baget"
         }
       ],
       "shelf": "-",
@@ -175218,10 +175273,16 @@ const PRODUCTS_DATA = {
       "image": "https://cdn-image.getir.com/market/product/20210bac-ddfe-4811-8307-c633f3cf71ba.jpg",
       "barcodes": [
         {
-          "code": "8699245861006",
+          "code": "8699245851007",
           "size": "10 L",
           "type": "CUSTOM",
           "variant": "Kumu"
+        },
+        {
+          "code": "8699245861006",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -175237,10 +175298,16 @@ const PRODUCTS_DATA = {
       "image": "https://cdn-image.getir.com/market/product/77d13c84-8c20-4958-89b0-4d710dfba01e.jpg",
       "barcodes": [
         {
-          "code": "8699245861105",
+          "code": "8699245851106",
           "size": "5 L",
           "type": "CUSTOM",
           "variant": "Kumu"
+        },
+        {
+          "code": "8699245861105",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -176741,6 +176808,25 @@ const PRODUCTS_DATA = {
           "size": "70 g",
           "type": "CUSTOM",
           "variant": "Balık"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "68d4f7e0c748d2926523cd61",
+      "name": "Antico Borgo Savoiardı Kedi Dili (200 g)",
+      "category": "Genel",
+      "brand": "Antico",
+      "description": "Antico Borgo Savoiardı Kedi Dili (200 g)",
+      "image": "https://cdn-image.getir.com/market/product/f12e2e88-6600-44dc-82b8-ca7485b4434b.jpg",
+      "barcodes": [
+        {
+          "code": "8002720005060",
+          "size": "200 g",
+          "type": "CUSTOM",
+          "variant": "Dili"
         }
       ],
       "shelf": "-",
@@ -178477,6 +178563,25 @@ const PRODUCTS_DATA = {
       "stock": null
     },
     {
+      "id": "690b5295f76b3010a209a698",
+      "name": "Alpro Yulaf Badem Sütü (1 L)",
+      "category": "Süt Ürünleri",
+      "brand": "Alpro",
+      "description": "Alpro Yulaf Badem Sütü (1 L)",
+      "image": "https://cdn-image.getir.com/market/product/81dbf623-87ad-493b-a9dd-5e8b55fbae8b.jpg",
+      "barcodes": [
+        {
+          "code": "5411188124726",
+          "size": "1 L",
+          "type": "CUSTOM",
+          "variant": "Sütü"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "690c5c9b58923382e23d557a",
       "name": "Ülker Çikolata Meşhur Dubai Lezzeti (35 g)",
       "category": "Genel",
@@ -178584,6 +178689,25 @@ const PRODUCTS_DATA = {
           "size": "32 g",
           "type": "CUSTOM",
           "variant": "Waffle"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "691187a850f3ca1f3ec1e80e",
+      "name": "Omo Kapsül Beyazlar ve Renkliler (18 Yıkama)",
+      "category": "Genel",
+      "brand": "Omo",
+      "description": "Omo Kapsül Beyazlar ve Renkliler (18 Yıkama)",
+      "image": "https://cdn-image.getir.com/market/product/c5cc07f5-3c5b-4823-830d-070f389a285b.jpg",
+      "barcodes": [
+        {
+          "code": "8683130134221",
+          "size": "18 Yıkama",
+          "type": "CUSTOM",
+          "variant": "Renkliler"
         }
       ],
       "shelf": "-",
@@ -179237,6 +179361,25 @@ const PRODUCTS_DATA = {
       "stock": null
     },
     {
+      "id": "6924535ef9486b8a42c9c8bc",
+      "name": "Doyfarm Piliç Nugget (300 g)",
+      "category": "Genel",
+      "brand": "Doyfarm",
+      "description": "Doyfarm Piliç Nugget (300 g)",
+      "image": "https://cdn-image.getir.com/market/product/44aedcf0-15bb-4e84-9fd9-3652563c3eec.jpg",
+      "barcodes": [
+        {
+          "code": "8696415360536",
+          "size": "300 g",
+          "type": "CUSTOM",
+          "variant": "Nugget"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "6926c3fb9f70dbc093c15303",
       "name": "Çizi Çıtır Peynir Biftek Süper Boy (120 g)",
       "category": "Süt Ürünleri",
@@ -179268,6 +179411,44 @@ const PRODUCTS_DATA = {
           "size": "50 g",
           "type": "CUSTOM",
           "variant": "Peynir&Biftek"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "692702124724f6fbbb4e17aa",
+      "name": "Doğuş Mistik Çayı Süzen Poşet (12'li)",
+      "category": "İçecek",
+      "brand": "Doğuş",
+      "description": "Doğuş Mistik Çayı Süzen Poşet (12'li)",
+      "image": "https://cdn-image.getir.com/market/product/4a654c61-e305-4927-8eef-afbe1239e014.jpg",
+      "barcodes": [
+        {
+          "code": "8690719104148",
+          "size": "12'li",
+          "type": "CUSTOM",
+          "variant": "Poşet"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "692722f14724f6fbbb4e5fc9",
+      "name": "Tokana Beypazarı İnce Yaprak Sarması (500 g)",
+      "category": "Genel",
+      "brand": "Tokana",
+      "description": "Tokana Beypazarı İnce Yaprak Sarması (500 g)",
+      "image": "https://cdn-image.getir.com/market/product/a54639ba-4077-44ae-811d-58aced23dec4.jpg",
+      "barcodes": [
+        {
+          "code": "8698636386319",
+          "size": "500 g",
+          "type": "CUSTOM",
+          "variant": "Sarması"
         }
       ],
       "shelf": "-",
@@ -179363,6 +179544,101 @@ const PRODUCTS_DATA = {
           "size": "33 g",
           "type": "CUSTOM",
           "variant": "Soslu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "693185d9f7c5398e1b62b0d6",
+      "name": "Calve x Cheetos Peynir Aromalı Sos (240g)",
+      "category": "Süt Ürünleri",
+      "brand": "Calve",
+      "description": "Calve x Cheetos Peynir Aromalı Sos (240g)",
+      "image": "https://cdn-image.getir.com/market/product/6b8244a4-5ac5-435b-a4e0-c070d449f1ab.jpg",
+      "barcodes": [
+        {
+          "code": "8683130135242",
+          "size": "240g",
+          "type": "CUSTOM",
+          "variant": "Aromalı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "693185f9cfd4139752c84f31",
+      "name": "Hellmann's Hardal (250g)",
+      "category": "Genel",
+      "brand": "Hellmann's",
+      "description": "Hellmann's Hardal (250g)",
+      "image": "https://cdn-image.getir.com/market/product/8781f7ca-d9c0-43c5-8a4e-e058cf63f374.jpg",
+      "barcodes": [
+        {
+          "code": "8690637805868",
+          "size": "250g",
+          "type": "CUSTOM",
+          "variant": "Hardal"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "69318603f1bd5dbcf5c31cff",
+      "name": "Hellmann's Bbq Ret (285g)",
+      "category": "Genel",
+      "brand": "Hellmann's",
+      "description": "Hellmann's Bbq Ret (285g)",
+      "image": "https://cdn-image.getir.com/market/product/60b733de-67cb-41fc-b41f-8a352e058120.jpg",
+      "barcodes": [
+        {
+          "code": "8690637835988",
+          "size": "285g",
+          "type": "CUSTOM",
+          "variant": "Ret"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6931862097e7da3821a2be88",
+      "name": "Calve Mayonez (540g)",
+      "category": "Genel",
+      "brand": "Calve",
+      "description": "Calve Mayonez (540g)",
+      "image": "https://cdn-image.getir.com/market/product/9e6fd39a-4f67-4686-bbc8-f0ddef366917.jpg",
+      "barcodes": [
+        {
+          "code": "8690637905179",
+          "size": "540g",
+          "type": "CUSTOM",
+          "variant": "Mayonez"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6931862a52557515c43f1d61",
+      "name": "Calve Ketçap (610g)",
+      "category": "Genel",
+      "brand": "Calve",
+      "description": "Calve Ketçap (610g)",
+      "image": "https://cdn-image.getir.com/market/product/269e30c5-4bfa-428a-ba13-79571a4c1523.jpg",
+      "barcodes": [
+        {
+          "code": "8690637905193",
+          "size": "610g",
+          "type": "CUSTOM",
+          "variant": "Ketçap"
         }
       ],
       "shelf": "-",
