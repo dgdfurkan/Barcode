@@ -1,6 +1,9 @@
 -- Telegram Notification Trigger for guest_chats table
 -- This trigger sends Telegram notifications when guest users send messages
 
+-- Ensure pg_net extension is enabled
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
 -- Function to notify Telegram on guest chat updates
 CREATE OR REPLACE FUNCTION notify_telegram_on_guest_chat()
 RETURNS TRIGGER AS $$
@@ -9,18 +12,22 @@ declare
     old_msgs jsonb := '[]'::jsonb;
     last_msg jsonb;
     endpoint text := 'https://ytekbbxvfdheiexsojpx.functions.supabase.co/telegram-notify';
+    error_msg text;
 begin
     -- Parse JSON arrays safely
     begin
-        if new.chat_messages is not null then
+        if new.chat_messages is not null and new.chat_messages::text <> '' then
             new_msgs := new.chat_messages::jsonb;
         end if;
     exception when others then
+        -- Log error but continue
+        error_msg := SQLERRM;
+        raise notice 'Error parsing new chat_messages: %', error_msg;
         return new;
     end;
 
     begin
-        if old.chat_messages is not null then
+        if old.chat_messages is not null and old.chat_messages::text <> '' then
             old_msgs := old.chat_messages::jsonb;
         end if;
     exception when others then
@@ -41,24 +48,32 @@ begin
         return new;
     end if;
 
-    -- Note: pg_net.http_post doesn't support custom headers easily
-    -- Edge Function should be public or accept requests without auth
-    -- For now, we'll send without auth header (function should handle this)
-    perform net.http_post(
-        url := endpoint,
-        body := jsonb_build_object(
-            'username', new.username,
-            'message', last_msg ->> 'message',
-            'timestamp', last_msg ->> 'timestamp'
-        )::text,
-        headers := jsonb_build_object(
-            'Content-Type', 'application/json'
-        )
-    );
+    -- Send Telegram notification using pg_net
+    begin
+        perform net.http_post(
+            url := endpoint,
+            body := jsonb_build_object(
+                'username', new.username,
+                'message', last_msg ->> 'message',
+                'timestamp', last_msg ->> 'timestamp'
+            )::text,
+            headers := jsonb_build_object(
+                'Content-Type', 'application/json'
+            )
+        );
+        
+        raise notice 'Telegram notification sent for guest user: %, message: %', new.username, last_msg ->> 'message';
+    exception when others then
+        -- Log error but don't block the update
+        error_msg := SQLERRM;
+        raise warning 'Failed to send Telegram notification for guest user %: %', new.username, error_msg;
+    end;
 
     return new;
 exception when others then
-    -- Fail silently to avoid blocking chat updates
+    -- Log error but don't block the update
+    error_msg := SQLERRM;
+    raise warning 'Error in notify_telegram_on_guest_chat: %', error_msg;
     return new;
 end;
 $$ LANGUAGE plpgsql;
