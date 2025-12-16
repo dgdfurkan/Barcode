@@ -2,27 +2,28 @@
 const SUPABASE_URL = 'https://ytekbbxvfdheiexsojpx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
 
-// Supabase client
-let supabase;
-
 // Initialize Supabase
 function initSupabase() {
     try {
-        // Load Supabase from CDN if not already loaded
-        if (typeof window.supabase === 'undefined') {
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-            script.onload = () => {
+        // Wait for Supabase to be loaded from CDN (index.html loads it)
+        const checkSupabase = setInterval(() => {
+            if (typeof window.supabase !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+                clearInterval(checkSupabase);
+                
+                // Create Supabase client
                 window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                supabase = window.supabase;
                 console.log('Supabase initialized successfully');
-            };
-            document.head.appendChild(script);
-        } else {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            window.supabase = supabase;
-            console.log('Supabase initialized successfully');
-        }
+            }
+        }, 100);
+        
+        // Timeout after 5 seconds
+        setTimeout(() => {
+            clearInterval(checkSupabase);
+            if (!window.supabase || typeof window.supabase.from !== 'function') {
+                console.error('Supabase initialization failed: Supabase not loaded from CDN');
+                console.log('Running in demo mode - Supabase not configured');
+            }
+        }, 5000);
     } catch (error) {
         console.error('Supabase initialization failed:', error);
         console.log('Running in demo mode - Supabase not configured');
