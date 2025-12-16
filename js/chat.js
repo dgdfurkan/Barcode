@@ -179,67 +179,112 @@ class ChatSystem {
     }
 
     async checkUserStatus() {
+        // Öncelik 1: Aktif oturum kontrolü
         const session = window.authUtils?.checkAuth();
         if (session && session.username) {
             this.currentUser = session.username;
+            this.isGuest = false;
             this.updateChatHeader();
             console.log('🔍 Using authenticated user:', this.currentUser);
-        } else {
-            // Try to get username from localStorage or URL
-            const storedUsername = localStorage.getItem('currentUser') || localStorage.getItem('username');
-            const tempChatUser = localStorage.getItem('tempChatUser'); // For trial expired users
-            const sessionData = JSON.parse(localStorage.getItem('session') || '{}');
-            
-            if (sessionData.username) {
-                this.currentUser = sessionData.username;
-                console.log('🔍 Using session username:', this.currentUser);
-            } else if (tempChatUser) {
-                this.currentUser = tempChatUser;
-                console.log('🔍 Using temp chat user (trial expired):', this.currentUser);
-            } else if (storedUsername) {
-                this.currentUser = storedUsername;
-                console.log('🔍 Using stored username:', this.currentUser);
-            } else {
-                // Check for guest user (IP-based)
-                if (window.guestUserManager) {
-                    try {
-                        const guestUser = await window.guestUserManager.getOrCreateGuestUser();
-                        this.currentUser = guestUser;
-                        this.isGuest = true;
-                        console.log('🔍 Using guest user:', this.currentUser);
-                    } catch (error) {
-                        console.error('Error getting guest user:', error);
-                        this.currentUser = 'ProductSearchUser';
+            return;
+        }
+
+        // Öncelik 2: IP'ye göre en son giriş yapılan kayıtlı kullanıcıyı bul
+        if (window.supabase && window.guestUserManager) {
+            try {
+                const clientIP = await window.guestUserManager.getClientIP();
+                
+                // user_ip_tracking tablosundan IP'ye göre en son giriş yapan kullanıcıyı bul
+                const { data: ipTracking, error: ipError } = await window.supabase
+                    .from('user_ip_tracking')
+                    .select(`
+                        user_id,
+                        last_seen,
+                        users!inner(username)
+                    `)
+                    .eq('ip_address', clientIP)
+                    .eq('is_blocked', false)
+                    .order('last_seen', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (!ipError && ipTracking && ipTracking.users && ipTracking.users.username) {
+                    this.currentUser = ipTracking.users.username;
+                    this.isGuest = false;
+                    this.updateChatHeader();
+                    console.log('🔍 Using registered user from IP tracking:', this.currentUser, 'for IP:', clientIP);
+                    return;
+                }
+            } catch (error) {
+                console.error('❌ Error checking IP tracking:', error);
+            }
+        }
+
+        // Öncelik 3: localStorage'dan geçici kullanıcı bilgileri
+        const storedUsername = localStorage.getItem('currentUser') || localStorage.getItem('username');
+        const tempChatUser = localStorage.getItem('tempChatUser'); // For trial expired users
+        const sessionData = JSON.parse(localStorage.getItem('session') || '{}');
+        
+        if (sessionData.username) {
+            this.currentUser = sessionData.username;
+            this.isGuest = false;
+            this.updateChatHeader();
+            console.log('🔍 Using session username:', this.currentUser);
+            return;
+        } else if (tempChatUser) {
+            this.currentUser = tempChatUser;
+            this.isGuest = false;
+            this.updateChatHeader();
+            console.log('🔍 Using temp chat user (trial expired):', this.currentUser);
+            return;
+        } else if (storedUsername) {
+            this.currentUser = storedUsername;
+            this.isGuest = false;
+            this.updateChatHeader();
+            console.log('🔍 Using stored username:', this.currentUser);
+            return;
+        }
+
+        // Öncelik 4: Guest kullanıcı (IP bazlı)
+        if (window.guestUserManager) {
+            try {
+                const guestUser = await window.guestUserManager.getOrCreateGuestUser();
+                this.currentUser = guestUser;
+                this.isGuest = true;
+                this.updateChatHeader();
+                console.log('🔍 Using guest user:', this.currentUser);
+                return;
+            } catch (error) {
+                console.error('❌ Error getting guest user:', error);
+            }
+        }
+
+        // Son çare: localStorage'dan herhangi bir kullanıcı bilgisi
+        const authKeys = ['user', 'authUser', 'loggedInUser'];
+        let foundUser = null;
+        
+        for (const key of authKeys) {
+            const userData = localStorage.getItem(key);
+            if (userData) {
+                try {
+                    const parsed = JSON.parse(userData);
+                    if (parsed.username) {
+                        foundUser = parsed.username;
+                        break;
                     }
-                } else {
-                    // Last resort: try to get from any auth-related localStorage
-                    const authKeys = ['user', 'authUser', 'loggedInUser'];
-                    let foundUser = null;
-                    
-                    for (const key of authKeys) {
-                        const userData = localStorage.getItem(key);
-                        if (userData) {
-                            try {
-                                const parsed = JSON.parse(userData);
-                                if (parsed.username) {
-                                    foundUser = parsed.username;
-                                    break;
-                                }
-                            } catch (e) {
-                                if (typeof userData === 'string' && userData.length > 0) {
-                                    foundUser = userData;
-                                    break;
-                                }
-                            }
-                        }
+                } catch (e) {
+                    if (typeof userData === 'string' && userData.length > 0) {
+                        foundUser = userData;
+                        break;
                     }
-                    
-                    this.currentUser = foundUser || 'ProductSearchUser';
-                    console.log('🔍 Final username resolution:', this.currentUser);
                 }
             }
-            this.updateChatHeader();
         }
+        
+        this.currentUser = foundUser || 'ProductSearchUser';
+        this.isGuest = false;
+        this.updateChatHeader();
+        console.log('🔍 Final username resolution:', this.currentUser);
     }
 
     updateChatHeader() {
