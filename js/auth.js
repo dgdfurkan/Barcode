@@ -2,16 +2,13 @@
 const SUPABASE_URL = 'https://ytekbbxvfdheiexsojpx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
 
-// Initialize Supabase
+// Initialize Supabase (client is initialized in index.html, this just verifies it's ready)
 function initSupabase() {
     try {
-        // Wait for Supabase to be loaded from CDN (index.html loads it)
+        // Wait for Supabase client to be ready (initialized in index.html)
         const checkSupabase = setInterval(() => {
-            if (typeof window.supabase !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+            if (window.supabase && typeof window.supabase.from === 'function') {
                 clearInterval(checkSupabase);
-                
-                // Create Supabase client
-                window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 console.log('Supabase initialized successfully');
             }
         }, 100);
@@ -20,7 +17,7 @@ function initSupabase() {
         setTimeout(() => {
             clearInterval(checkSupabase);
             if (!window.supabase || typeof window.supabase.from !== 'function') {
-                console.error('Supabase initialization failed: Supabase not loaded from CDN');
+                console.error('Supabase initialization failed: Supabase client not ready');
                 console.log('Running in demo mode - Supabase not configured');
             }
         }, 5000);
