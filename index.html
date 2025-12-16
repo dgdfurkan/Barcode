@@ -408,16 +408,12 @@
                     console.log('✅ Supabase client initialized in index.html');
                 } else {
                     // Retry after a short delay
-                    setTimeout(initSupabaseClient, 100);
+                    setTimeout(initSupabaseClient, 50);
                 }
             };
             
-            // Start initialization
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', initSupabaseClient);
-            } else {
-                initSupabaseClient();
-            }
+            // Start initialization immediately (don't wait for DOMContentLoaded)
+            initSupabaseClient();
         })();
     </script>
     <script src="js/auth.js"></script>
