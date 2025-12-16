@@ -126,20 +126,39 @@ async function login(username, password) {
         let user = null;
         
         // Try Supabase first
-        if (supabase) {
+        if (window.supabase && typeof window.supabase.from === 'function') {
             try {
                 // Set current user context for RLS
-                await supabase.rpc('set_current_user', { user_name: username });
+                await window.supabase.rpc('set_current_user', { user_name: username });
                 
-                const { data, error } = await supabase
+                // Get user without password first (password might be protected by RLS)
+                const { data, error } = await window.supabase
                     .from('users')
-                    .select('id, username, password, company, contact_email, trial_end, allowed_ips, is_active, is_admin, premium_features, created_at, updated_at')
+                    .select('id, username, company, contact_email, trial_end, allowed_ips, is_active, is_admin, premium_features, created_at, updated_at')
                     .eq('username', username)
                     .single();
                 
                 if (!error && data) {
-                    user = data;
-                    console.log('User found in Supabase:', user);
+                    // Try to get password separately
+                    try {
+                        const { data: pwdData, error: pwdError } = await window.supabase
+                            .from('users')
+                            .select('password')
+                            .eq('username', username)
+                            .single();
+                        
+                        if (!pwdError && pwdData && pwdData.password) {
+                            user = { ...data, password: pwdData.password };
+                        } else {
+                            // Password is protected, we'll verify it via a different method
+                            user = { ...data, password: null };
+                        }
+                        console.log('User found in Supabase:', user);
+                    } catch (pwdErr) {
+                        // Password query failed, use user without password
+                        user = { ...data, password: null };
+                        console.log('User found in Supabase (password protected):', user);
+                    }
                 }
             } catch (error) {
                 console.warn('Supabase error:', error);
@@ -162,6 +181,30 @@ async function login(username, password) {
         }
         
         // Check password
+        if (user.password === null) {
+            // Password is protected by RLS, try to get it via a direct query with all fields
+            try {
+                const { data: fullUser, error: fullError } = await window.supabase
+                    .from('users')
+                    .select('password')
+                    .eq('username', username)
+                    .single();
+                
+                if (!fullError && fullUser && fullUser.password) {
+                    user.password = fullUser.password;
+                } else {
+                    // If we still can't get password, it means RLS is blocking it
+                    // In this case, we need to verify password server-side or use a different method
+                    // For now, throw an error
+                    RATE_LIMIT.record(clientIP);
+                    throw new Error('Şifre doğrulanamadı! Lütfen yönetici ile iletişime geçin.');
+                }
+            } catch (pwdErr) {
+                RATE_LIMIT.record(clientIP);
+                throw new Error('Şifre doğrulanamadı!');
+            }
+        }
+        
         if (user.password !== password) {
             RATE_LIMIT.record(clientIP); // Record failed attempt
             throw new Error('Hatalı şifre!');
@@ -585,9 +628,9 @@ async function checkIPTracking(userId, clientIP, maxIPCount) {
     try {
         console.log('checkIPTracking called with:', { userId, clientIP, maxIPCount });
         
-        if (supabase) {
+        if (window.supabase && typeof window.supabase.rpc === 'function') {
             // Use Supabase function
-            const { data, error } = await supabase.rpc('track_user_ip', {
+            const { data, error } = await window.supabase.rpc('track_user_ip', {
                 p_user_id: userId,
                 p_ip_address: clientIP
             });
