@@ -19,6 +19,7 @@ class AdminPanel {
         this.updates = [];
         this.currentUpdateSteps = [];
         this.editingUpdateId = null;
+        this.adminSettings = null;
     }
 
     async init() {
@@ -42,6 +43,9 @@ class AdminPanel {
 
         // Initialize tabs
         this.initTabs();
+
+        // Load admin settings once on init (tab switch refreshes again)
+        await this.loadAdminSettings();
 
         // Setup realtime chat updates
         this.setupChatRealtime();
@@ -270,14 +274,20 @@ class AdminPanel {
             this.generateWithGemini();
         });
 
-        // Settings save/load
-        this.loadAdminSettings();
-        
-        // Save settings when switching away from settings tab
-        const settingsInputs = document.querySelectorAll('#settings-tab input, #settings-tab select');
-        settingsInputs.forEach(input => {
-            input.addEventListener('change', () => {
-                this.saveAdminSettings();
+        document.getElementById('saveAdminSettingsBtn')?.addEventListener('click', () => {
+            this.saveAdminSettings();
+        });
+        document.getElementById('sendTelegramTestBtn')?.addEventListener('click', () => {
+            this.sendTelegramTestMessage();
+        });
+        document.querySelectorAll('[data-toggle-password]')?.forEach(toggleBtn => {
+            toggleBtn.addEventListener('click', () => {
+                const targetId = toggleBtn.getAttribute('data-toggle-password');
+                const input = document.getElementById(targetId);
+                if (input) {
+                    input.type = input.type === 'password' ? 'text' : 'password';
+                    toggleBtn.textContent = input.type === 'password' ? 'Göster' : 'Gizle';
+                }
             });
         });
     }
@@ -315,7 +325,7 @@ class AdminPanel {
         } else if (tabName === 'product-import') {
             await this.loadProductImportTab();
         } else if (tabName === 'settings') {
-            this.loadAdminSettings();
+            await this.loadAdminSettings();
         }
     }
 

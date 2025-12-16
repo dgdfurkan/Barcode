@@ -2490,88 +2490,215 @@ AdminPanel.prototype.renderMediaContent = function(step) {
     }
 };
 
+const ADMIN_SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
+
+AdminPanel.prototype.getAdminSettingsRow = async function(forceRefresh = false) {
+    if (this.adminSettings && !forceRefresh) {
+        return this.adminSettings;
+    }
+
+    if (!window.supabase) {
+        console.warn('Supabase mevcut değil, admin ayarları yüklenemedi');
+        return null;
+    }
+
+    const { data, error } = await window.supabase
+        .from('admin_settings')
+        .select('*')
+        .eq('id', ADMIN_SETTINGS_ID)
+        .single();
+
+    if (error && error.code !== 'PGRST116') {
+        console.error('Admin ayarları alınamadı:', error);
+        return null;
+    }
+
+    // Eğer satır yoksa oluştur
+    if (error && error.code === 'PGRST116') {
+        const { data: inserted, error: insertError } = await window.supabase
+            .from('admin_settings')
+            .insert({ id: ADMIN_SETTINGS_ID })
+            .select('*')
+            .single();
+
+        if (insertError) {
+            console.error('Admin ayarları oluşturulamadı:', insertError);
+            return null;
+        }
+
+        this.adminSettings = inserted;
+        return inserted;
+    }
+
+    this.adminSettings = data;
+    return data;
+};
+
 AdminPanel.prototype.getGeminiApiKey = function() {
-    return localStorage.getItem('admin_gemini_api_key') || '';
+    return (this.adminSettings && this.adminSettings.gemini_api_key) || '';
 };
 
 AdminPanel.prototype.setGeminiApiKey = function(apiKey) {
-    localStorage.setItem('admin_gemini_api_key', apiKey);
+    this.adminSettings = {
+        ...(this.adminSettings || {}),
+        gemini_api_key: apiKey
+    };
 };
 
 // Cloudinary Settings
 AdminPanel.prototype.getCloudinaryCloudName = function() {
-    return localStorage.getItem('admin_cloudinary_cloud_name') || '';
+    return (this.adminSettings && this.adminSettings.cloudinary_cloud_name) || '';
 };
 
 AdminPanel.prototype.setCloudinaryCloudName = function(cloudName) {
-    localStorage.setItem('admin_cloudinary_cloud_name', cloudName);
+    this.adminSettings = {
+        ...(this.adminSettings || {}),
+        cloudinary_cloud_name: cloudName
+    };
 };
 
 AdminPanel.prototype.getCloudinaryApiKey = function() {
-    return localStorage.getItem('admin_cloudinary_api_key') || '';
+    return (this.adminSettings && this.adminSettings.cloudinary_api_key) || '';
 };
 
 AdminPanel.prototype.setCloudinaryApiKey = function(apiKey) {
-    localStorage.setItem('admin_cloudinary_api_key', apiKey);
+    this.adminSettings = {
+        ...(this.adminSettings || {}),
+        cloudinary_api_key: apiKey
+    };
 };
 
 AdminPanel.prototype.getCloudinaryUploadPreset = function() {
-    return localStorage.getItem('admin_cloudinary_upload_preset') || '';
+    return (this.adminSettings && this.adminSettings.cloudinary_upload_preset) || '';
 };
 
 AdminPanel.prototype.setCloudinaryUploadPreset = function(preset) {
-    localStorage.setItem('admin_cloudinary_upload_preset', preset);
+    this.adminSettings = {
+        ...(this.adminSettings || {}),
+        cloudinary_upload_preset: preset
+    };
 };
 
-AdminPanel.prototype.loadAdminSettings = function() {
-    // Load Gemini API Key
-    const apiKey = this.getGeminiApiKey();
-    const apiKeyInput = document.getElementById('geminiApiKey');
-    if (apiKeyInput) {
-        apiKeyInput.value = apiKey;
-    }
-    
-    // Load Cloudinary Settings
-    const cloudName = this.getCloudinaryCloudName();
-    const cloudNameInput = document.getElementById('cloudinaryCloudName');
-    if (cloudNameInput) {
-        cloudNameInput.value = cloudName;
-    }
-    
-    const cloudinaryApiKey = this.getCloudinaryApiKey();
-    const cloudinaryApiKeyInput = document.getElementById('cloudinaryApiKey');
-    if (cloudinaryApiKeyInput) {
-        cloudinaryApiKeyInput.value = cloudinaryApiKey;
-    }
-    
-    const uploadPreset = this.getCloudinaryUploadPreset();
-    const uploadPresetInput = document.getElementById('cloudinaryUploadPreset');
-    if (uploadPresetInput) {
-        uploadPresetInput.value = uploadPreset;
+AdminPanel.prototype.loadAdminSettings = async function() {
+    try {
+        const settings = await this.getAdminSettingsRow(true);
+
+        const apiKeyInput = document.getElementById('geminiApiKey');
+        if (apiKeyInput) {
+            apiKeyInput.value = settings?.gemini_api_key || '';
+        }
+
+        const cloudNameInput = document.getElementById('cloudinaryCloudName');
+        if (cloudNameInput) {
+            cloudNameInput.value = settings?.cloudinary_cloud_name || '';
+        }
+
+        const cloudinaryApiKeyInput = document.getElementById('cloudinaryApiKey');
+        if (cloudinaryApiKeyInput) {
+            cloudinaryApiKeyInput.value = settings?.cloudinary_api_key || '';
+        }
+
+        const uploadPresetInput = document.getElementById('cloudinaryUploadPreset');
+        if (uploadPresetInput) {
+            uploadPresetInput.value = settings?.cloudinary_upload_preset || '';
+        }
+
+        const telegramTokenInput = document.getElementById('telegramBotToken');
+        if (telegramTokenInput) {
+            telegramTokenInput.value = settings?.telegram_bot_token || '';
+        }
+
+        const telegramChatInput = document.getElementById('telegramChatId');
+        if (telegramChatInput) {
+            telegramChatInput.value = settings?.telegram_chat_id || '';
+        }
+
+        const testBtn = document.getElementById('sendTelegramTestBtn');
+        if (testBtn) {
+            testBtn.disabled = !(settings?.telegram_bot_token && settings?.telegram_chat_id);
+        }
+    } catch (error) {
+        console.error('Admin ayarları yüklenirken hata:', error);
     }
 };
 
-AdminPanel.prototype.saveAdminSettings = function() {
-    // Save Gemini API Key
-    const apiKeyInput = document.getElementById('geminiApiKey');
-    if (apiKeyInput) {
-        this.setGeminiApiKey(apiKeyInput.value.trim());
+AdminPanel.prototype.saveAdminSettings = async function() {
+    try {
+        if (!window.supabase) {
+            alert('Supabase yapılandırması bulunamadı.');
+            return;
+        }
+
+        const payload = {
+            id: ADMIN_SETTINGS_ID,
+            gemini_api_key: document.getElementById('geminiApiKey')?.value.trim() || null,
+            cloudinary_cloud_name: document.getElementById('cloudinaryCloudName')?.value.trim() || null,
+            cloudinary_api_key: document.getElementById('cloudinaryApiKey')?.value.trim() || null,
+            cloudinary_upload_preset: document.getElementById('cloudinaryUploadPreset')?.value.trim() || null,
+            telegram_bot_token: document.getElementById('telegramBotToken')?.value.trim() || null,
+            telegram_chat_id: document.getElementById('telegramChatId')?.value.trim() || null,
+            updated_at: new Date().toISOString()
+        };
+
+        const { data, error } = await window.supabase
+            .from('admin_settings')
+            .upsert(payload, { onConflict: 'id' })
+            .select('*')
+            .single();
+
+        if (error) {
+            console.error('Admin ayarları kaydedilemedi:', error);
+            alert('Ayarlar kaydedilemedi, lütfen tekrar deneyin.');
+            return;
+        }
+
+        this.adminSettings = data;
+
+        const testBtn = document.getElementById('sendTelegramTestBtn');
+        if (testBtn) {
+            testBtn.disabled = !(data.telegram_bot_token && data.telegram_chat_id);
+        }
+
+        console.log('✅ Admin ayarları Supabase\'e kaydedildi');
+    } catch (error) {
+        console.error('Admin ayarları kaydedilirken hata:', error);
     }
-    
-    // Save Cloudinary Settings
-    const cloudNameInput = document.getElementById('cloudinaryCloudName');
-    if (cloudNameInput) {
-        this.setCloudinaryCloudName(cloudNameInput.value.trim());
-    }
-    
-    const cloudinaryApiKeyInput = document.getElementById('cloudinaryApiKey');
-    if (cloudinaryApiKeyInput) {
-        this.setCloudinaryApiKey(cloudinaryApiKeyInput.value.trim());
-    }
-    
-    const uploadPresetInput = document.getElementById('cloudinaryUploadPreset');
-    if (uploadPresetInput) {
-        this.setCloudinaryUploadPreset(uploadPresetInput.value.trim());
+};
+
+AdminPanel.prototype.sendTelegramTestMessage = async function() {
+    try {
+        const settings = await this.getAdminSettingsRow(true);
+        if (!settings?.telegram_bot_token || !settings?.telegram_chat_id) {
+            alert('Önce Telegram Bot Token ve Chat ID girin.');
+            return;
+        }
+
+        // Get anon key for authorization
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
+        
+        const response = await fetch('https://ytekbbxvfdheiexsojpx.functions.supabase.co/telegram-notify', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({
+                username: 'Admin',
+                message: 'Test başarılı!',
+                isTest: true
+            })
+        });
+
+        if (!response.ok) {
+            const detail = await response.text();
+            throw new Error(detail || 'Telegram test mesajı gönderilemedi');
+        }
+
+        console.log('✅ Telegram test mesajı gönderildi');
+        alert('Test mesajı Telegram botuna gönderildi.');
+    } catch (error) {
+        console.error('Telegram test mesajı hatası:', error);
+        alert('Test mesajı gönderilemedi: ' + error.message);
     }
 };
 
