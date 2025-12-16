@@ -9,7 +9,66 @@ class ChatSystem {
         this.hasUnreadMessages = false;
         this.initialLoadComplete = false; // İlk yükleme tamamlandı mı
         this.lastKnownMessageIds = new Set(); // Bilinen mesaj ID'leri
+        this.lastRenderedDate = null; // Son render edilen tarih (tarih ayraçları için)
+        this.chatScrollHandler = null; // Scroll handler reference
         this.init();
+    }
+    
+    // Tarih formatlama utility fonksiyonu - WhatsApp tarzı
+    formatChatDate(dateString) {
+        if (!dateString) return '';
+        
+        const messageDate = new Date(dateString);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        // Reset time to compare only dates
+        const messageDateOnly = new Date(messageDate.getFullYear(), messageDate.getMonth(), messageDate.getDate());
+        const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+        
+        // Bugün
+        if (messageDateOnly.getTime() === todayOnly.getTime()) {
+            return 'Bugün';
+        }
+        
+        // Dün
+        if (messageDateOnly.getTime() === yesterdayOnly.getTime()) {
+            return 'Dün';
+        }
+        
+        // Son 1 hafta içinde (bugün ve dün hariç)
+        const daysDiff = Math.floor((todayOnly - messageDateOnly) / (1000 * 60 * 60 * 24));
+        if (daysDiff >= 2 && daysDiff <= 7) {
+            // Sadece gün ismi
+            const dayNames = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+            return dayNames[messageDate.getDay()];
+        }
+        
+        // 1 haftadan eski - tam tarih formatı
+        const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 
+                            'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+        const dayNames = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+        
+        let formattedDate = `${messageDate.getDate()} ${monthNames[messageDate.getMonth()]} ${dayNames[messageDate.getDay()]}`;
+        
+        // Yılı sadece mevcut yıldan farklıysa ekle
+        if (messageDate.getFullYear() !== today.getFullYear()) {
+            formattedDate += ` ${messageDate.getFullYear()}`;
+        }
+        
+        return formattedDate;
+    }
+    
+    // Tarih karşılaştırma için yardımcı fonksiyon (sadece tarih, saat değil)
+    isSameDate(date1, date2) {
+        if (!date1 || !date2) return false;
+        const d1 = new Date(date1);
+        const d2 = new Date(date2);
+        return d1.getFullYear() === d2.getFullYear() &&
+               d1.getMonth() === d2.getMonth() &&
+               d1.getDate() === d2.getDate();
     }
 
     init() {
@@ -330,12 +389,35 @@ class ChatSystem {
         const messagesContainer = document.getElementById('chatMessages');
         if (!messagesContainer) return;
         
+        const msgTimestamp = timestamp ? (typeof timestamp === 'string' ? timestamp : new Date(timestamp).toISOString()) : new Date().toISOString();
+        const msgDate = new Date(msgTimestamp);
+        const currentDate = msgDate.toDateString();
+        
+        // Tarih değiştiyse tarih ayracı ekle
+        if (this.lastRenderedDate !== currentDate) {
+            const dateDivider = document.createElement('div');
+            const formattedDate = this.formatChatDate(msgTimestamp);
+            dateDivider.className = 'flex justify-center my-4';
+            dateDivider.innerHTML = `
+                <div class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-xs font-medium">
+                    ${formattedDate}
+                </div>
+            `;
+            messagesContainer.appendChild(dateDivider);
+            this.lastRenderedDate = currentDate;
+        }
+        
         const messageDiv = document.createElement('div');
         
-        const time = timestamp || new Date().toLocaleTimeString('tr-TR', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        });
+        // Saat formatı - saniye yok, sadece saat:dakika
+        const time = timestamp ? 
+            (typeof timestamp === 'string' ? 
+                new Date(timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) :
+                timestamp) :
+            new Date().toLocaleTimeString('tr-TR', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
         
         // Get status icon (WhatsApp style) with new dual status system
         const getStatusIcon = () => {
@@ -357,7 +439,7 @@ class ChatSystem {
         
         if (sender === 'user') {
             messageDiv.innerHTML = `
-                <div class="flex justify-end">
+                <div class="flex justify-end mb-3" data-message-timestamp="${msgTimestamp}">
                     <div class="max-w-xs">
                         <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
                             ${text}
@@ -371,7 +453,7 @@ class ChatSystem {
             `;
         } else if (sender === 'system') {
             messageDiv.innerHTML = `
-                <div class="flex justify-center">
+                <div class="flex justify-center mb-3" data-message-timestamp="${msgTimestamp}">
                     <div class="max-w-xs">
                         <div class="bg-blue-100 text-blue-800 px-3 py-2 rounded-lg text-sm text-center">
                             ${text}
@@ -382,7 +464,7 @@ class ChatSystem {
             `;
         } else {
             messageDiv.innerHTML = `
-                <div class="flex justify-start">
+                <div class="flex justify-start mb-3" data-message-timestamp="${msgTimestamp}">
                     <div class="max-w-xs">
                         <div class="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm shadow-sm">
                             ${text}
@@ -396,13 +478,16 @@ class ChatSystem {
         messagesContainer.appendChild(messageDiv);
         this.scrollToBottom();
         
+        // Sticky header'ı güncelle
+        this.updateStickyDateHeader();
+        
         // Add to messages array
         this.messages.push({
             text,
             sender,
-            timestamp: timestamp || new Date().toISOString(),
+            timestamp: msgTimestamp,
             user: this.currentUser,
-            status: status
+            status: messageData?.adminStatus || messageData?.userStatus || 'sent'
         });
     }
 
@@ -612,18 +697,21 @@ class ChatSystem {
                         messagesContainer.innerHTML = '';
                     }
                     
+                    // Reset last rendered date
+                    this.lastRenderedDate = null;
+                    
                     // Update messages array
                     this.messages = chatMessages;
                     
                     // Render all messages
                     chatMessages.forEach(msg => {
                         if (msg.sender === 'user') {
-                            this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                            this.addMessage(msg.message, 'user', msg.timestamp, {
                                 adminStatus: msg.adminStatus || 'unread',
                                 userStatus: msg.userStatus || 'sent'
                             });
                         } else if (msg.sender === 'admin') {
-                            this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                            this.addMessage(msg.message, 'admin', msg.timestamp, {
                                 adminStatus: msg.adminStatus || 'sent',
                                 userStatus: msg.userStatus || 'unread'
                             });
@@ -657,18 +745,21 @@ class ChatSystem {
                     messagesContainer.innerHTML = '';
                 }
                 
+                // Reset last rendered date
+                this.lastRenderedDate = null;
+                
                 // Update messages array
                 this.messages = chatMessages;
                 
                 // Render all messages
                 chatMessages.forEach(msg => {
                     if (msg.sender === 'user') {
-                        this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                        this.addMessage(msg.message, 'user', msg.timestamp, {
                             adminStatus: msg.adminStatus || 'unread',
                             userStatus: msg.userStatus || 'sent'
                         });
                     } else if (msg.sender === 'admin') {
-                        this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                        this.addMessage(msg.message, 'admin', msg.timestamp, {
                             adminStatus: msg.adminStatus || 'sent',
                             userStatus: msg.userStatus || 'unread'
                         });
@@ -677,6 +768,9 @@ class ChatSystem {
                 
                 // Scroll to bottom
                 this.scrollToBottom();
+                
+                // Setup sticky header
+                this.setupStickyDateHeader();
                 
                 // Record existing messages
                 if (!this.initialLoadComplete) {
@@ -764,18 +858,21 @@ class ChatSystem {
                         messagesContainer.innerHTML = '';
                     }
                     
+                    // Reset last rendered date
+                    this.lastRenderedDate = null;
+                    
                     // Update messages array
                     this.messages = chatMessages;
                     
                         // Render all messages with correct status
                         chatMessages.forEach(msg => {
                             if (msg.sender === 'user') {
-                                this.addMessage(msg.message, 'user', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                                this.addMessage(msg.message, 'user', msg.timestamp, {
                                     adminStatus: msg.adminStatus || 'unread',
                                     userStatus: msg.userStatus || 'sent'
                                 });
                             } else if (msg.sender === 'admin') {
-                                this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), {
+                                this.addMessage(msg.message, 'admin', msg.timestamp, {
                                     adminStatus: msg.adminStatus || 'sent',
                                     userStatus: msg.userStatus || 'unread'
                                 });
@@ -784,6 +881,9 @@ class ChatSystem {
                     
                     // Scroll to bottom
                     this.scrollToBottom();
+                    
+                    // Setup sticky header
+                    this.setupStickyDateHeader();
                         
                         console.log('✅ Rendered', chatMessages.length, 'messages from Supabase');
                         
@@ -1110,7 +1210,7 @@ class ChatSystem {
                     
                     // Add new admin messages to UI
                     newAdminMessages.forEach(msg => {
-                        this.addMessage(msg.message, 'admin', new Date(msg.timestamp).toLocaleTimeString('tr-TR'), msg.status);
+                        this.addMessage(msg.message, 'admin', msg.timestamp, msg.status);
                     });
                     
                     // Mark as unread and show notification
@@ -1549,6 +1649,113 @@ class ChatSystem {
             openChatBtn.style.top = 'auto';
             openChatBtn.style.zIndex = '9999';
             console.log('🔧 Chat button position fixed to bottom-right');
+        }
+    }
+    
+    // Sticky tarih header için scroll event listener
+    setupStickyDateHeader() {
+        const chatMessagesArea = document.getElementById('chatMessages');
+        const dateHeader = document.getElementById('chatDateHeader');
+        
+        if (!chatMessagesArea || !dateHeader) return;
+        
+        // Önceki scroll handler'ı temizle
+        if (this.chatScrollHandler) {
+            chatMessagesArea.removeEventListener('scroll', this.chatScrollHandler);
+        }
+        
+        // Throttled scroll handler
+        let ticking = false;
+        this.chatScrollHandler = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    this.updateStickyDateHeader();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+        
+        chatMessagesArea.addEventListener('scroll', this.chatScrollHandler);
+        
+        // İlk yüklemede header'ı göster
+        this.updateStickyDateHeader();
+    }
+    
+    // Sticky header'ı görünen mesajların tarihine göre güncelle
+    updateStickyDateHeader() {
+        const chatMessagesArea = document.getElementById('chatMessages');
+        const dateHeader = document.getElementById('chatDateHeader');
+        const dateHeaderText = document.getElementById('chatDateHeaderText');
+        
+        if (!chatMessagesArea || !dateHeader || !dateHeaderText) {
+            console.log('❌ Chat elements not found for sticky header');
+            return;
+        }
+        
+        const messages = chatMessagesArea.querySelectorAll('[data-message-timestamp]');
+        console.log('🔍 Found messages:', messages.length);
+        
+        if (messages.length === 0) {
+            dateHeader.classList.add('hidden');
+            return;
+        }
+        
+        // Scroll pozisyonuna göre görünen mesajları bul
+        const scrollTop = chatMessagesArea.scrollTop;
+        const containerHeight = chatMessagesArea.clientHeight;
+        
+        // En üstteki görünen mesajı bul
+        let visibleMessage = null;
+        let minDistance = Infinity;
+        
+        messages.forEach((msgElement) => {
+            const rect = msgElement.getBoundingClientRect();
+            const containerRect = chatMessagesArea.getBoundingClientRect();
+            const elementTop = rect.top - containerRect.top + scrollTop;
+            const elementBottom = elementTop + rect.height;
+            
+            // Mesaj görünür alanda mı? (viewport içinde)
+            if (elementTop <= scrollTop + containerHeight && elementBottom >= scrollTop) {
+                // En üstteki görünen mesajı bul
+                const distance = Math.abs(elementTop - scrollTop);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    visibleMessage = msgElement;
+                }
+            }
+        });
+        
+        // Görünen mesaj bulunduysa header'ı göster
+        if (visibleMessage) {
+            const timestamp = visibleMessage.getAttribute('data-message-timestamp');
+            if (timestamp) {
+                try {
+                    const formattedDate = this.formatChatDate(timestamp);
+                    dateHeaderText.textContent = formattedDate;
+                    dateHeader.classList.remove('hidden');
+                    console.log('✅ Sticky header updated:', formattedDate);
+                    return;
+                } catch (e) {
+                    console.error('❌ Error formatting date:', e);
+                }
+            }
+        }
+        
+        // Fallback: İlk mesajın tarihini göster ve header'ı açık tut
+        const firstMessage = messages[0];
+        const timestamp = firstMessage.getAttribute('data-message-timestamp');
+        if (timestamp) {
+            try {
+                const formattedDate = this.formatChatDate(timestamp);
+                dateHeaderText.textContent = formattedDate;
+                dateHeader.classList.remove('hidden');
+                console.log('✅ Sticky header updated (fallback):', formattedDate);
+            } catch (e) {
+                console.error('❌ Error formatting date (fallback):', e);
+            }
+        } else {
+            dateHeader.classList.add('hidden');
         }
     }
 }

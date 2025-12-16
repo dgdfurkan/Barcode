@@ -2175,18 +2175,33 @@ AdminPanel.prototype.renderChatUsers = async function(users) {
     
     // Render users with async message previews
     const userElements = await Promise.all(users.map(async (username) => {
-        const lastMessage = await this.getLastMessagePreview(username);
+        const messageData = await this.getLastMessagePreview(username);
+        const lastMessage = messageData.preview || messageData; // Backward compatibility
+        const unreadCount = messageData.unreadCount || 0;
+        
+        // Modern badge design - only show if there are unread messages
+        const badgeHtml = unreadCount > 0 ? `
+            <div class="relative">
+                <div class="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-lg shadow-red-500/50"></div>
+                ${unreadCount > 1 ? `
+                    <div class="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
+                        ${unreadCount > 9 ? '9+' : unreadCount}
+                    </div>
+                ` : ''}
+            </div>
+        ` : '';
+        
         return `
             <div class="p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors" onclick="adminPanel.selectChatUser('${username}')">
                 <div class="flex items-center space-x-3">
                     <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
                         ${username.charAt(0).toUpperCase()}
                     </div>
-                    <div class="flex-1">
-                        <h4 class="font-medium text-gray-900">${username}</h4>
-                        <p class="text-xs text-gray-500">${lastMessage}</p>
+                    <div class="flex-1 min-w-0">
+                        <h4 class="font-medium text-gray-900 truncate">${username}</h4>
+                        <p class="text-xs text-gray-500 truncate">${lastMessage}</p>
                     </div>
-                    <div class="w-2 h-2 bg-red-500 rounded-full"></div>
+                    ${badgeHtml}
                 </div>
             </div>
         `;
@@ -2197,43 +2212,104 @@ AdminPanel.prototype.renderChatUsers = async function(users) {
 };
 
 AdminPanel.prototype.getLastMessagePreview = async function(username) {
-    // Get last message for this user from Supabase
+    // Get last message and unread count for this user
     try {
+        const isGuest = username && (username.startsWith('Kullanıcı') || /^Guest/.test(username));
+        
         if (window.supabase) {
-            const { data, error } = await window.supabase
-                .from('users')
-                .select('chat_messages')
-                .eq('username', username)
-                .single();
+            let chatMessages = [];
+            
+            if (isGuest) {
+                // Load guest chat messages
+                const { data: guestChatData, error: guestError } = await window.supabase
+                    .from('guest_chats')
+                    .select('chat_messages')
+                    .eq('username', username)
+                    .single();
 
-            if (!error && data && data.chat_messages) {
-                const chatMessages = JSON.parse(data.chat_messages);
-                if (chatMessages.length > 0) {
-                    const lastMessage = chatMessages[chatMessages.length - 1];
-                    const messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
-                    return messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
+                if (!guestError && guestChatData && guestChatData.chat_messages) {
+                    chatMessages = JSON.parse(guestChatData.chat_messages);
                 }
+            } else {
+                // Load regular user chat messages
+                const { data, error } = await window.supabase
+                    .from('users')
+                    .select('chat_messages')
+                    .eq('username', username)
+                    .single();
+
+                if (!error && data && data.chat_messages) {
+                    chatMessages = JSON.parse(data.chat_messages);
+                }
+            }
+            
+            if (chatMessages.length > 0) {
+                const lastMessage = chatMessages[chatMessages.length - 1];
+                const messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
+                const preview = messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
+                
+                // Count unread messages (adminStatus: 'unread' for user messages)
+                const unreadCount = chatMessages.filter(msg => 
+                    msg.sender === 'user' && msg.adminStatus === 'unread'
+                ).length;
+                
+                return {
+                    preview: preview,
+                    unreadCount: unreadCount
+                };
             }
         }
         
         // Fallback to localStorage
-        const messages = JSON.parse(localStorage.getItem('messages') || '[]');
-        const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
-        const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
-        const userMessages = JSON.parse(localStorage.getItem('userMessages') || '[]');
-        
-        const allMessages = [...messages, ...chatMessages, ...globalMessages, ...userMessages];
-        const userMessagesFiltered = allMessages.filter(msg => msg.username === username);
-        
-        if (userMessagesFiltered.length > 0) {
-            const lastMessage = userMessagesFiltered[userMessagesFiltered.length - 1];
-            const messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
-            return messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
+        if (isGuest) {
+            const guestChats = JSON.parse(localStorage.getItem('guestChats') || '{}');
+            if (guestChats[username] && guestChats[username].chat_messages) {
+                const chatMessages = guestChats[username].chat_messages;
+                if (chatMessages.length > 0) {
+                    const lastMessage = chatMessages[chatMessages.length - 1];
+                    const messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
+                    const preview = messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
+                    const unreadCount = chatMessages.filter(msg => 
+                        msg.sender === 'user' && msg.adminStatus === 'unread'
+                    ).length;
+                    return {
+                        preview: preview,
+                        unreadCount: unreadCount
+                    };
+                }
+            }
+        } else {
+            const messages = JSON.parse(localStorage.getItem('messages') || '[]');
+            const chatMessages = JSON.parse(localStorage.getItem('chatMessages') || '[]');
+            const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
+            const userMessages = JSON.parse(localStorage.getItem('userMessages') || '[]');
+            
+            const allMessages = [...messages, ...chatMessages, ...globalMessages, ...userMessages];
+            const userMessagesFiltered = allMessages.filter(msg => msg.username === username);
+            
+            if (userMessagesFiltered.length > 0) {
+                const lastMessage = userMessagesFiltered[userMessagesFiltered.length - 1];
+                const messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
+                const preview = messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
+                
+                // Count unread messages from localStorage
+                const unreadCount = userMessagesFiltered.filter(msg => 
+                    msg.sender === 'user' && (msg.adminStatus === 'unread' || (!msg.adminStatus && msg.status !== 'read'))
+                ).length;
+                
+                return {
+                    preview: preview,
+                    unreadCount: unreadCount
+                };
+            }
         }
     } catch (error) {
         console.error('Error getting last message preview:', error);
     }
-    return 'Henüz mesaj yok';
+    return {
+        preview: 'Henüz mesaj yok',
+        unreadCount: 0
+    };
 };
 
 AdminPanel.prototype.clearChat = async function() {
@@ -2456,6 +2532,63 @@ AdminPanel.prototype.loadChatMessagesFromLocalStorage = function(username) {
     this.renderChatMessages(userMessagesFiltered);
 };
 
+// Tarih formatlama utility fonksiyonu - WhatsApp tarzı
+AdminPanel.prototype.formatChatDate = function(dateString) {
+    if (!dateString) return '';
+    
+    const messageDate = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    // Reset time to compare only dates
+    const messageDateOnly = new Date(messageDate.getFullYear(), messageDate.getMonth(), messageDate.getDate());
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+    
+    // Bugün
+    if (messageDateOnly.getTime() === todayOnly.getTime()) {
+        return 'Bugün';
+    }
+    
+    // Dün
+    if (messageDateOnly.getTime() === yesterdayOnly.getTime()) {
+        return 'Dün';
+    }
+    
+    // Son 1 hafta içinde (bugün ve dün hariç)
+    const daysDiff = Math.floor((todayOnly - messageDateOnly) / (1000 * 60 * 60 * 24));
+    if (daysDiff >= 2 && daysDiff <= 7) {
+        // Sadece gün ismi
+        const dayNames = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+        return dayNames[messageDate.getDay()];
+    }
+    
+    // 1 haftadan eski - tam tarih formatı
+    const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 
+                        'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    const dayNames = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+    
+    let formattedDate = `${messageDate.getDate()} ${monthNames[messageDate.getMonth()]} ${dayNames[messageDate.getDay()]}`;
+    
+    // Yılı sadece mevcut yıldan farklıysa ekle
+    if (messageDate.getFullYear() !== today.getFullYear()) {
+        formattedDate += ` ${messageDate.getFullYear()}`;
+    }
+    
+    return formattedDate;
+};
+
+// Tarih karşılaştırma için yardımcı fonksiyon (sadece tarih, saat değil)
+AdminPanel.prototype.isSameDate = function(date1, date2) {
+    if (!date1 || !date2) return false;
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    return d1.getFullYear() === d2.getFullYear() &&
+           d1.getMonth() === d2.getMonth() &&
+           d1.getDate() === d2.getDate();
+};
+
 AdminPanel.prototype.renderChatMessages = function(messages) {
     const chatMessagesArea = document.getElementById('chatMessagesArea');
     if (!chatMessagesArea) return;
@@ -2472,8 +2605,27 @@ AdminPanel.prototype.renderChatMessages = function(messages) {
         return;
     }
 
-    chatMessagesArea.innerHTML = messages.map((msg, index) => {
-        const time = new Date(msg.timestamp || msg.created_at).toLocaleTimeString('tr-TR', { 
+    let html = '';
+    let previousDate = null;
+    
+    messages.forEach((msg, index) => {
+        const msgDate = msg.timestamp || msg.created_at;
+        const currentDate = msgDate ? new Date(msgDate).toDateString() : null;
+        
+        // Tarih değiştiyse tarih ayracı ekle
+        if (currentDate && previousDate !== currentDate) {
+            const formattedDate = this.formatChatDate(msgDate);
+            html += `
+                <div class="flex justify-center my-4">
+                    <div class="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-xs font-medium">
+                        ${formattedDate}
+                    </div>
+                </div>
+            `;
+            previousDate = currentDate;
+        }
+        
+        const time = new Date(msgDate).toLocaleTimeString('tr-TR', { 
             hour: '2-digit', 
             minute: '2-digit' 
         });
@@ -2482,8 +2634,8 @@ AdminPanel.prototype.renderChatMessages = function(messages) {
         const messageContent = msg.message || msg.content || msg.text || 'Mesaj içeriği bulunamadı';
         
         if (msg.sender === 'admin') {
-            return `
-                <div class="flex justify-end mb-3 group">
+            html += `
+                <div class="flex justify-end mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
                     <div class="max-w-xs">
                         <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
                             ${messageContent}
@@ -2500,8 +2652,8 @@ AdminPanel.prototype.renderChatMessages = function(messages) {
                 </div>
             `;
         } else {
-            return `
-                <div class="flex justify-start mb-3 group">
+            html += `
+                <div class="flex justify-start mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
                     <div class="max-w-xs">
                         <div class="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm shadow-sm">
                             ${messageContent}
@@ -2518,10 +2670,99 @@ AdminPanel.prototype.renderChatMessages = function(messages) {
                 </div>
             `;
         }
-    }).join('');
+    });
+    
+    chatMessagesArea.innerHTML = html;
 
     // Scroll to bottom
     chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
+    
+    // Setup sticky date header with scroll listener
+    this.setupStickyDateHeader(chatMessagesArea);
+};
+
+// Sticky tarih header için scroll event listener
+AdminPanel.prototype.setupStickyDateHeader = function(chatMessagesArea) {
+    const dateHeader = document.getElementById('chatDateHeader');
+    const dateHeaderText = document.getElementById('chatDateHeaderText');
+    
+    if (!dateHeader || !dateHeaderText || !chatMessagesArea) return;
+    
+    // Önceki scroll handler'ı temizle
+    if (this.chatScrollHandler) {
+        chatMessagesArea.removeEventListener('scroll', this.chatScrollHandler);
+    }
+    
+    // Throttled scroll handler
+    let ticking = false;
+    this.chatScrollHandler = () => {
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                this.updateStickyDateHeader(chatMessagesArea, dateHeader, dateHeaderText);
+                ticking = false;
+            });
+            ticking = true;
+        }
+    };
+    
+    chatMessagesArea.addEventListener('scroll', this.chatScrollHandler);
+    
+    // İlk yüklemede header'ı göster
+    this.updateStickyDateHeader(chatMessagesArea, dateHeader, dateHeaderText);
+};
+
+// Sticky header'ı görünen mesajların tarihine göre güncelle
+AdminPanel.prototype.updateStickyDateHeader = function(chatMessagesArea, dateHeader, dateHeaderText) {
+    const messages = chatMessagesArea.querySelectorAll('[data-message-timestamp]');
+    if (messages.length === 0) {
+        dateHeader.classList.add('hidden');
+        return;
+    }
+    
+    // Scroll pozisyonuna göre görünen mesajları bul
+    const containerTop = chatMessagesArea.scrollTop;
+    const containerHeight = chatMessagesArea.clientHeight;
+    const viewportTop = containerTop;
+    const viewportBottom = containerTop + containerHeight;
+    
+    let visibleMessage = null;
+    let minDistance = Infinity;
+    
+    messages.forEach((msgElement) => {
+        const rect = msgElement.getBoundingClientRect();
+        const containerRect = chatMessagesArea.getBoundingClientRect();
+        const elementTop = rect.top - containerRect.top + chatMessagesArea.scrollTop;
+        const elementBottom = elementTop + rect.height;
+        
+        // Mesaj görünür alanda mı?
+        if (elementTop <= viewportBottom && elementBottom >= viewportTop) {
+            // En üstteki görünen mesajı bul
+            const distance = Math.abs(elementTop - viewportTop);
+            if (distance < minDistance) {
+                minDistance = distance;
+                visibleMessage = msgElement;
+            }
+        }
+    });
+    
+    if (visibleMessage) {
+        const timestamp = visibleMessage.getAttribute('data-message-timestamp');
+        if (timestamp) {
+            try {
+                const formattedDate = this.formatChatDate(timestamp);
+                dateHeaderText.textContent = formattedDate;
+                dateHeader.classList.remove('hidden');
+                return;
+            } catch (e) {
+                console.error('Error formatting date:', e);
+            }
+        }
+    }
+    
+    // Eğer görünen mesaj bulunamazsa veya en üstteyse header'ı gizle
+    if (chatMessagesArea.scrollTop < 50) {
+        dateHeader.classList.add('hidden');
+    }
 };
 
 AdminPanel.prototype.deleteMessage = async function(messageIndex) {
