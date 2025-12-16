@@ -385,9 +385,43 @@ class ChatSystem {
         await this.saveMessageToSupabase(message);
     }
 
+    showEmptyState() {
+        const messagesContainer = document.getElementById('chatMessages');
+        if (!messagesContainer) return;
+        
+        // Placeholder mesajı zaten varsa ekleme
+        if (messagesContainer.querySelector('#chatEmptyState')) return;
+        
+        const emptyState = document.createElement('div');
+        emptyState.id = 'chatEmptyState';
+        emptyState.className = 'flex flex-col items-center justify-center h-full text-center px-4 py-8';
+        emptyState.innerHTML = `
+            <div class="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                </svg>
+            </div>
+            <p class="text-gray-500 text-sm font-medium mb-1">Henüz mesaj yok</p>
+            <p class="text-gray-400 text-xs">Destek ekibimizle iletişime geçmek için mesajınızı yazın</p>
+        `;
+        messagesContainer.appendChild(emptyState);
+    }
+
+    hideEmptyState() {
+        const messagesContainer = document.getElementById('chatMessages');
+        if (!messagesContainer) return;
+        const emptyState = messagesContainer.querySelector('#chatEmptyState');
+        if (emptyState) {
+            emptyState.remove();
+        }
+    }
+
     addMessage(text, sender, timestamp = null, messageData = null) {
         const messagesContainer = document.getElementById('chatMessages');
         if (!messagesContainer) return;
+        
+        // Placeholder'ı kaldır
+        this.hideEmptyState();
         
         const msgTimestamp = timestamp ? (typeof timestamp === 'string' ? timestamp : new Date(timestamp).toISOString()) : new Date().toISOString();
         const msgDate = new Date(msgTimestamp);
@@ -704,19 +738,23 @@ class ChatSystem {
                     this.messages = chatMessages;
                     
                     // Render all messages
-                    chatMessages.forEach(msg => {
-                        if (msg.sender === 'user') {
-                            this.addMessage(msg.message, 'user', msg.timestamp, {
-                                adminStatus: msg.adminStatus || 'unread',
-                                userStatus: msg.userStatus || 'sent'
-                            });
-                        } else if (msg.sender === 'admin') {
-                            this.addMessage(msg.message, 'admin', msg.timestamp, {
-                                adminStatus: msg.adminStatus || 'sent',
-                                userStatus: msg.userStatus || 'unread'
-                            });
-                        }
-                    });
+                    if (chatMessages.length === 0) {
+                        this.showEmptyState();
+                    } else {
+                        chatMessages.forEach(msg => {
+                            if (msg.sender === 'user') {
+                                this.addMessage(msg.message, 'user', msg.timestamp, {
+                                    adminStatus: msg.adminStatus || 'unread',
+                                    userStatus: msg.userStatus || 'sent'
+                                });
+                            } else if (msg.sender === 'admin') {
+                                this.addMessage(msg.message, 'admin', msg.timestamp, {
+                                    adminStatus: msg.adminStatus || 'sent',
+                                    userStatus: msg.userStatus || 'unread'
+                                });
+                            }
+                        });
+                    }
                     
                     // Scroll to bottom
                     this.scrollToBottom();
@@ -752,19 +790,23 @@ class ChatSystem {
                 this.messages = chatMessages;
                 
                 // Render all messages
-                chatMessages.forEach(msg => {
-                    if (msg.sender === 'user') {
-                        this.addMessage(msg.message, 'user', msg.timestamp, {
-                            adminStatus: msg.adminStatus || 'unread',
-                            userStatus: msg.userStatus || 'sent'
-                        });
-                    } else if (msg.sender === 'admin') {
-                        this.addMessage(msg.message, 'admin', msg.timestamp, {
-                            adminStatus: msg.adminStatus || 'sent',
-                            userStatus: msg.userStatus || 'unread'
-                        });
-                    }
-                });
+                if (chatMessages.length === 0) {
+                    this.showEmptyState();
+                } else {
+                    chatMessages.forEach(msg => {
+                        if (msg.sender === 'user') {
+                            this.addMessage(msg.message, 'user', msg.timestamp, {
+                                adminStatus: msg.adminStatus || 'unread',
+                                userStatus: msg.userStatus || 'sent'
+                            });
+                        } else if (msg.sender === 'admin') {
+                            this.addMessage(msg.message, 'admin', msg.timestamp, {
+                                adminStatus: msg.adminStatus || 'sent',
+                                userStatus: msg.userStatus || 'unread'
+                            });
+                        }
+                    });
+                }
                 
                 // Scroll to bottom
                 this.scrollToBottom();
@@ -787,6 +829,8 @@ class ChatSystem {
                     messagesContainer.innerHTML = '';
                 }
                 this.messages = [];
+                // Show empty state
+                this.showEmptyState();
             }
         } catch (error) {
             console.error('❌ Error loading guest chat history:', error);
@@ -795,6 +839,8 @@ class ChatSystem {
                 messagesContainer.innerHTML = '';
             }
             this.messages = [];
+            // Show empty state
+            this.showEmptyState();
         }
     }
 
@@ -865,19 +911,23 @@ class ChatSystem {
                     this.messages = chatMessages;
                     
                         // Render all messages with correct status
-                        chatMessages.forEach(msg => {
-                            if (msg.sender === 'user') {
-                                this.addMessage(msg.message, 'user', msg.timestamp, {
-                                    adminStatus: msg.adminStatus || 'unread',
-                                    userStatus: msg.userStatus || 'sent'
-                                });
-                            } else if (msg.sender === 'admin') {
-                                this.addMessage(msg.message, 'admin', msg.timestamp, {
-                                    adminStatus: msg.adminStatus || 'sent',
-                                    userStatus: msg.userStatus || 'unread'
-                                });
-                            }
-                        });
+                        if (chatMessages.length === 0) {
+                            this.showEmptyState();
+                        } else {
+                            chatMessages.forEach(msg => {
+                                if (msg.sender === 'user') {
+                                    this.addMessage(msg.message, 'user', msg.timestamp, {
+                                        adminStatus: msg.adminStatus || 'unread',
+                                        userStatus: msg.userStatus || 'sent'
+                                    });
+                                } else if (msg.sender === 'admin') {
+                                    this.addMessage(msg.message, 'admin', msg.timestamp, {
+                                        adminStatus: msg.adminStatus || 'sent',
+                                        userStatus: msg.userStatus || 'unread'
+                                    });
+                                }
+                            });
+                        }
                     
                     // Scroll to bottom
                     this.scrollToBottom();
@@ -915,6 +965,8 @@ class ChatSystem {
                         messagesContainer.innerHTML = '';
                     }
                     this.messages = [];
+                    // Show empty state
+                    this.showEmptyState();
                 }
             } else {
                 console.log('💬 No Supabase or user, clearing chat');
@@ -923,6 +975,8 @@ class ChatSystem {
                     messagesContainer.innerHTML = '';
                 }
                 this.messages = [];
+                // Show empty state
+                this.showEmptyState();
             }
             
         } catch (error) {
@@ -933,6 +987,8 @@ class ChatSystem {
                 messagesContainer.innerHTML = '';
             }
             this.messages = [];
+            // Show empty state
+            this.showEmptyState();
         }
     }
 
