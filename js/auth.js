@@ -131,7 +131,7 @@ async function login(username, password) {
                 // Try to get user with password first
                 const { data, error } = await window.supabase
                     .from('users')
-                    .select('id, username, password, company, contact_email, trial_end, allowed_ips, is_active, is_admin, premium_features, created_at, updated_at')
+                    .select('id, username, password, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at')
                     .eq('username', username)
                     .single();
                 
@@ -144,7 +144,7 @@ async function login(username, password) {
                     
                     const { data: userData, error: userError } = await window.supabase
                         .from('users')
-                        .select('id, username, company, contact_email, trial_end, allowed_ips, is_active, is_admin, premium_features, created_at, updated_at')
+                        .select('id, username, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at')
                         .eq('username', username)
                         .single();
                     
@@ -225,10 +225,12 @@ async function login(username, password) {
         }
         
         // Check IP whitelist (handle both camelCase and snake_case)
+        // If allowed_ips doesn't exist in database, default to allowing all IPs
         const allowedIPs = user.allowedIPs || user.allowed_ips;
-        if (!validateIP(clientIP, allowedIPs)) {
+        if (allowedIPs && !validateIP(clientIP, allowedIPs)) {
             throw new Error(`Bu IP adresinden giriş yapılamaz! (${clientIP})`);
         }
+        // If allowedIPs is null/undefined, allow all IPs (backward compatibility)
         
         // Check trial expiry (handle both camelCase and snake_case)
         const trialEnd = user.trialEnd || user.trial_end;

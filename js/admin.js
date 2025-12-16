@@ -335,7 +335,7 @@ class AdminPanel {
             if (window.supabase) {
                 const { data, error } = await window.supabase
                     .from('users')
-                    .select('id, username, password, company, contact_email, trial_end, allowed_ips, is_active, is_admin, premium_features, created_at, updated_at, chat_messages, last_chat_update, max_ip_count, ip_tracking_enabled')
+                    .select('id, username, password, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, chat_messages, last_chat_update, max_ip_count, ip_tracking_enabled')
                     .order('created_at', { ascending: false });
                 
                 if (!error && data) {
