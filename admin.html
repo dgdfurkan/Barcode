@@ -6,6 +6,28 @@
     <title>Admin Panel - Product Search System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <!-- Initialize Supabase immediately after CDN load -->
+    <script>
+        // Initialize Supabase client after CDN loads
+        (function() {
+            const SUPABASE_URL = 'https://ytekbbxvfdheiexsojpx.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
+            
+            // Wait for Supabase to be loaded from CDN
+            const initSupabaseClient = () => {
+                if (typeof window.supabase !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+                    window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    console.log('✅ Supabase client initialized in admin.html');
+                } else {
+                    // Retry after a short delay
+                    setTimeout(initSupabaseClient, 50);
+                }
+            };
+            
+            // Start initialization immediately (don't wait for DOMContentLoaded)
+            initSupabaseClient();
+        })();
+    </script>
     <style>
         .glass-effect {
             background: rgba(255, 255, 255, 0.1);
