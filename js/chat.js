@@ -1450,15 +1450,39 @@ class ChatSystem {
     async checkForNewMessages() {
         try {
             if (window.supabase && this.currentUser) {
-                // Get user's current chat messages from Supabase
-                const { data, error } = await window.supabase
-                    .from('users')
-                    .select('chat_messages, last_chat_update')
-                    .eq('username', this.currentUser)
-                    .single();
+                // Check if guest user
+                const isGuest = this.isGuest || (window.guestUserManager && window.guestUserManager.isGuestUser(this.currentUser));
+                
+                let data = null;
+                let error = null;
+                
+                if (isGuest) {
+                    // Guest kullanıcı için guest_chats tablosunu kontrol et
+                    const { data: guestData, error: guestError } = await window.supabase
+                        .from('guest_chats')
+                        .select('chat_messages, last_chat_update')
+                        .eq('username', this.currentUser)
+                        .maybeSingle();
+                    
+                    data = guestData;
+                    error = guestError;
+                } else {
+                    // Kayıtlı kullanıcı için users tablosunu kontrol et
+                    const { data: userData, error: userError } = await window.supabase
+                        .from('users')
+                        .select('chat_messages, last_chat_update')
+                        .eq('username', this.currentUser)
+                        .maybeSingle();
+                    
+                    data = userData;
+                    error = userError;
+                }
 
                 if (error) {
-                    console.error('❌ Error checking for new messages:', error);
+                    // PGRST116 = no rows found, bu normal (guest user için)
+                    if (error.code !== 'PGRST116') {
+                        console.error('❌ Error checking for new messages:', error);
+                    }
                     return;
                 }
 
