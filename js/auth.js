@@ -135,7 +135,7 @@ async function login(username, password) {
                 
                 const { data, error } = await supabase
                     .from('users')
-                    .select('*')
+                    .select('id, username, password, company, contact_email, trial_end, allowed_ips, is_active, is_admin, premium_features, created_at, updated_at')
                     .eq('username', username)
                     .single();
                 
