@@ -674,46 +674,41 @@ class AdminPanel {
                 return;
             }
 
-            // Get current user data to check if they're active
-            const { data: userData, error: fetchError } = await window.supabase
-                .from('users')
-                .select('last_chat_update, username')
-                .eq('username', username)
-                .single();
-
-            if (fetchError) {
-                console.error('❌ Error fetching user data:', fetchError);
-                alert('❌ Kullanıcı bilgileri alınırken hata oluştu: ' + fetchError.message);
-                return;
-            }
-
-            // Update last_chat_update to trigger realtime and refresh
-            // We'll use a special pattern: add "REFRESH" prefix to timestamp
-            const refreshTimestamp = 'REFRESH_' + new Date().toISOString();
-            const { error } = await window.supabase
-                .from('users')
-                .update({ 
-                    last_chat_update: refreshTimestamp
-                })
-                .eq('username', username);
-
-            if (error) {
-                console.error('❌ Error triggering refresh:', error);
-                alert('❌ Sayfa yenileme komutu gönderilirken hata oluştu: ' + error.message);
-                return;
-            }
-
-            // Reset to normal timestamp after 1 second
-            setTimeout(async () => {
-                await window.supabase
-                    .from('users')
-                    .update({ 
-                        last_chat_update: new Date().toISOString()
-                    })
-                    .eq('username', username);
-            }, 1000);
-
-            alert(`✅ ${username} kullanıcısına sayfa yenileme komutu gönderildi!\n\nKullanıcı aktif bir oturumda ise sayfası otomatik olarak yenilenecektir.`);
+            // Use Supabase Broadcast channel to send refresh command to user
+            // This is more reliable than updating database fields
+            const channelName = `user-refresh-${username}`;
+            const channel = window.supabase.channel(channelName);
+            
+            // Subscribe to channel first (required for broadcast)
+            channel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    // Send broadcast message
+                    channel.send({
+                        type: 'broadcast',
+                        event: 'refresh-page',
+                        payload: { 
+                            username: username,
+                            timestamp: new Date().toISOString()
+                        }
+                    }).then(() => {
+                        console.log('✅ Refresh command sent via broadcast');
+                        alert(`✅ ${username} kullanıcısına sayfa yenileme komutu gönderildi!\n\nKullanıcı aktif bir oturumda ise sayfası otomatik olarak yenilenecektir.`);
+                        
+                        // Cleanup channel after sending
+                        setTimeout(() => {
+                            window.supabase.removeChannel(channel);
+                        }, 1000);
+                    }).catch((error) => {
+                        console.error('❌ Error sending refresh command:', error);
+                        window.supabase.removeChannel(channel);
+                        alert('❌ Sayfa yenileme komutu gönderilirken hata oluştu: ' + error.message);
+                    });
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    console.error('❌ Channel subscription failed:', status);
+                    window.supabase.removeChannel(channel);
+                    alert('❌ Sayfa yenileme komutu gönderilirken hata oluştu: Channel bağlantı hatası');
+                }
+            });
 
         } catch (error) {
             console.error('❌ Error refreshing user page:', error);
@@ -2366,8 +2361,19 @@ AdminPanel.prototype.renderChatUsers = async function(users) {
     // Render users with async message previews
     const userElements = await Promise.all(users.map(async (username) => {
         const messageData = await this.getLastMessagePreview(username);
-        const lastMessage = messageData.preview || messageData; // Backward compatibility
+        let lastMessage = messageData.preview || messageData; // Backward compatibility
         const unreadCount = messageData.unreadCount || 0;
+        
+        // Escape HTML to prevent XSS and broken HTML
+        const escapeHtml = (text) => {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        };
+        lastMessage = escapeHtml(String(lastMessage));
+        
+        // Escape username for onclick attribute
+        const escapedUsername = String(username).replace(/'/g, "\\'").replace(/"/g, '&quot;');
         
         // Modern badge design - only show if there are unread messages
         const badgeHtml = unreadCount > 0 ? `
@@ -2382,13 +2388,13 @@ AdminPanel.prototype.renderChatUsers = async function(users) {
         ` : '';
         
         return `
-            <div class="p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors" onclick="adminPanel.selectChatUser('${username}')">
+            <div class="p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors" onclick="adminPanel.selectChatUser('${escapedUsername}')">
                 <div class="flex items-center space-x-3">
                     <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                        ${username.charAt(0).toUpperCase()}
+                        ${escapeHtml(username.charAt(0).toUpperCase())}
                     </div>
                     <div class="flex-1 min-w-0">
-                        <h4 class="font-medium text-gray-900 truncate">${username}</h4>
+                        <h4 class="font-medium text-gray-900 truncate">${escapeHtml(username)}</h4>
                         <p class="text-xs text-gray-500 truncate">${lastMessage}</p>
                     </div>
                     ${badgeHtml}
@@ -2584,7 +2590,23 @@ AdminPanel.prototype.getLastMessagePreview = async function(username) {
             
             if (chatMessages.length > 0) {
                 const lastMessage = chatMessages[chatMessages.length - 1];
-                const messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
+                let messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
+                
+                // Check if message contains image
+                const isImageMessage = window.ImageUtils && window.ImageUtils.isImageMessage(messageText);
+                if (isImageMessage) {
+                    messageText = '[Görsel]';
+                } else {
+                    // Remove HTML tags and escape special characters
+                    const tempDiv = document.createElement('div');
+                    tempDiv.textContent = messageText;
+                    messageText = tempDiv.textContent || tempDiv.innerText || messageText;
+                    // Also remove any remaining HTML entities
+                    messageText = messageText.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                    // Remove HTML tags
+                    messageText = messageText.replace(/<[^>]*>/g, '');
+                }
+                
                 const preview = messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
                 
                 // Count unread messages (adminStatus: 'unread' for user messages)
@@ -2606,7 +2628,23 @@ AdminPanel.prototype.getLastMessagePreview = async function(username) {
                 const chatMessages = guestChats[username].chat_messages;
                 if (chatMessages.length > 0) {
                     const lastMessage = chatMessages[chatMessages.length - 1];
-                    const messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
+                    let messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
+                    
+                    // Check if message contains image
+                    const isImageMessage = window.ImageUtils && window.ImageUtils.isImageMessage(messageText);
+                    if (isImageMessage) {
+                        messageText = '[Görsel]';
+                    } else {
+                        // Remove HTML tags and escape special characters
+                        const tempDiv = document.createElement('div');
+                        tempDiv.textContent = messageText;
+                        messageText = tempDiv.textContent || tempDiv.innerText || messageText;
+                        // Also remove any remaining HTML entities
+                        messageText = messageText.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                        // Remove HTML tags
+                        messageText = messageText.replace(/<[^>]*>/g, '');
+                    }
+                    
                     const preview = messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
                     const unreadCount = chatMessages.filter(msg => 
                         msg.sender === 'user' && msg.adminStatus === 'unread'
@@ -2628,7 +2666,23 @@ AdminPanel.prototype.getLastMessagePreview = async function(username) {
             
             if (userMessagesFiltered.length > 0) {
                 const lastMessage = userMessagesFiltered[userMessagesFiltered.length - 1];
-                const messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
+                let messageText = lastMessage.message || lastMessage.content || lastMessage.text || 'Mesaj içeriği bulunamadı';
+                
+                // Check if message contains image
+                const isImageMessage = window.ImageUtils && window.ImageUtils.isImageMessage(messageText);
+                if (isImageMessage) {
+                    messageText = '[Görsel]';
+                } else {
+                    // Remove HTML tags and escape special characters
+                    const tempDiv = document.createElement('div');
+                    tempDiv.textContent = messageText;
+                    messageText = tempDiv.textContent || tempDiv.innerText || messageText;
+                    // Also remove any remaining HTML entities
+                    messageText = messageText.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                    // Remove HTML tags
+                    messageText = messageText.replace(/<[^>]*>/g, '');
+                }
+                
                 const preview = messageText.length > 30 ? messageText.substring(0, 30) + '...' : messageText;
                 
                 // Count unread messages from localStorage

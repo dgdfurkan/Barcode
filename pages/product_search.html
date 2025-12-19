@@ -8602,6 +8602,23 @@
             
             // Supabase realtime subscription - trial_end değişikliklerini dinle
             if (window.supabase && session.username) {
+                // Setup broadcast channel for admin refresh commands
+                const refreshChannelName = `user-refresh-${session.username}`;
+                window.refreshSubscription = window.supabase
+                    .channel(refreshChannelName)
+                    .on('broadcast', { event: 'refresh-page' }, (payload) => {
+                        console.log('🔄 Admin requested page refresh via broadcast');
+                        // Show notification if available
+                        if (window.showNotification) {
+                            window.showNotification('Sayfa yenileniyor...', 'info');
+                        }
+                        // Refresh page after short delay
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 500);
+                    })
+                    .subscribe();
+                
                 window.trialEndSubscription = window.supabase
                     .channel(`user_trial_end_${session.username}`)
                     .on('postgres_changes', {
@@ -8611,21 +8628,6 @@
                         filter: `username=eq.${session.username}`
                     }, async (payload) => {
                         const newTrialEnd = payload.new?.trial_end || payload.new?.trialEnd;
-                        const newLastChatUpdate = payload.new?.last_chat_update;
-                        
-                        // Check if admin requested page refresh (last_chat_update contains "REFRESH" prefix)
-                        if (newLastChatUpdate && typeof newLastChatUpdate === 'string' && newLastChatUpdate.startsWith('REFRESH_')) {
-                            console.log('🔄 Admin requested page refresh detected');
-                            // Show notification if available
-                            if (window.showNotification) {
-                                window.showNotification('Sayfa yenileniyor...', 'info');
-                            }
-                            // Refresh page after short delay
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 500);
-                            return;
-                        }
                         
                         const oldTrialEnd = payload.old?.trial_end || payload.old?.trialEnd;
                         
@@ -8657,6 +8659,9 @@
                 window.addEventListener('beforeunload', () => {
                     if (window.trialEndSubscription && window.supabase) {
                         window.supabase.removeChannel(window.trialEndSubscription);
+                    }
+                    if (window.refreshSubscription && window.supabase) {
+                        window.supabase.removeChannel(window.refreshSubscription);
                     }
                 });
                 
