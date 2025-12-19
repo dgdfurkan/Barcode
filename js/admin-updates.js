@@ -1,6 +1,11 @@
 // Updates Management Functions for Admin Panel
 // This file contains all update management functionality
 
+// Ensure AdminPanel is defined
+if (typeof AdminPanel === 'undefined') {
+    console.error('AdminPanel is not defined. Make sure admin.js is loaded before admin-updates.js');
+}
+
 // Available icons for steps
 const AVAILABLE_ICONS = [
     { name: 'Roket', value: '🚀' },
