@@ -44,6 +44,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="temp_products.js"></script>
     <script src="../js/auth.js"></script>
+    <script src="../js/image-lightbox.js"></script>
     <script src="../js/trial-notifications.js"></script>
     <script src="../js/user-manager.js"></script>
     <script src="../js/premium-features.js"></script>
@@ -488,6 +489,22 @@
             padding: 8px;
             border-radius: 4px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Grid view barcode SVG responsive styling */
+        .barcode-svg svg {
+            width: 100%;
+            height: auto;
+            max-height: 60px;
+            min-height: 60px;
+        }
+        
+        .barcode-svg {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 60px;
+            padding: 2px 0 0 0;
         }
 
         /* Reduce glare on entire page when anti-glare mode is active */
@@ -1099,15 +1116,32 @@
         <!-- Search Section -->
         <section class="mb-8">
             <div class="bg-surface rounded-xl border border-border shadow-sm p-6">
-                <div class="flex items-center space-x-3 mb-4">
-                    <div class="bg-primary-50 rounded-lg p-2">
-                        <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="bg-primary-50 rounded-lg p-2">
+                            <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-text-primary">Ürün Arama</h2>
+                            <p class="text-sm text-text-secondary">Ürün adını yazarak barkod bilgilerine ulaşın</p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 class="text-lg font-semibold text-text-primary">Ürün Arama</h2>
-                        <p class="text-sm text-text-secondary">Ürün adını yazarak barkod bilgilerine ulaşın</p>
+                    <!-- View Toggle Buttons -->
+                    <div class="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+                        <button id="viewListBtn" class="view-toggle-btn active flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all duration-200 bg-blue-50 border border-blue-200 text-black hover:bg-gray-100" title="Liste Görünümü">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                            </svg>
+                            <span class="text-xs font-medium">Liste</span>
+                        </button>
+                        <button id="viewGridBtn" class="view-toggle-btn flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all duration-200 text-black hover:bg-gray-100" title="Grid Görünümü">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                            </svg>
+                            <span class="text-xs font-medium">Grid</span>
+                        </button>
                     </div>
                 </div>
                 
@@ -1211,6 +1245,13 @@
                 <!-- Mobile Card View -->
                 <div id="mobileResults" class="md:hidden divide-y divide-border">
                     <!-- Mobile cards will be populated here -->
+                </div>
+                
+                <!-- Grid View -->
+                <div id="gridResultsContainer" class="hidden p-6">
+                    <div id="gridResults" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                        <!-- Grid items will be populated here -->
+                    </div>
                 </div>
             </div>
         </section>
@@ -1704,6 +1745,93 @@
         const resultsTableBody = document.getElementById('resultsTableBody');
         const mobileResults = document.getElementById('mobileResults');
         const resultCount = document.getElementById('resultCount');
+        
+        // View Mode State Management
+        let currentViewMode = localStorage.getItem('productViewMode') || 'list';
+        let lastSearchResults = null;
+        
+        // View Mode Functions
+        function setViewMode(mode) {
+            if (mode !== 'list' && mode !== 'grid') {
+                console.warn('Invalid view mode:', mode);
+                return;
+            }
+            
+            currentViewMode = mode;
+            localStorage.setItem('productViewMode', mode);
+            updateViewButtons();
+            
+            // Toggle containers - Find table container by finding the parent of resultsTableBody
+            const resultsTableBody = document.getElementById('resultsTableBody');
+            const tableContainer = resultsTableBody ? resultsTableBody.closest('.hidden.md\\:block, .md\\:block') : document.querySelector('#resultsSection > div > .hidden.md\\:block, #resultsSection > div > .md\\:block');
+            const mobileContainer = document.getElementById('mobileResults');
+            const gridContainer = document.getElementById('gridResultsContainer');
+            
+            if (mode === 'list') {
+                // Show list view containers
+                if (tableContainer) {
+                    tableContainer.classList.remove('hidden');
+                    tableContainer.style.display = '';
+                }
+                if (mobileContainer) {
+                    mobileContainer.classList.remove('hidden');
+                    mobileContainer.style.display = '';
+                }
+                // Hide grid container
+                if (gridContainer) {
+                    gridContainer.classList.add('hidden');
+                    gridContainer.style.display = 'none';
+                }
+            } else {
+                // Hide list view containers
+                if (tableContainer) {
+                    tableContainer.classList.add('hidden');
+                    tableContainer.style.display = 'none';
+                }
+                if (mobileContainer) {
+                    mobileContainer.classList.add('hidden');
+                    mobileContainer.style.display = 'none';
+                }
+                // Show grid container
+                if (gridContainer) {
+                    gridContainer.classList.remove('hidden');
+                    gridContainer.style.display = '';
+                }
+            }
+            
+            // Re-render results if we have any
+            if (lastSearchResults) {
+                displayResults(lastSearchResults);
+            }
+        }
+        
+        function updateViewButtons() {
+            const listBtn = document.getElementById('viewListBtn');
+            const gridBtn = document.getElementById('viewGridBtn');
+            
+            if (listBtn && gridBtn) {
+                // Reset both buttons
+                [listBtn, gridBtn].forEach(btn => {
+                    btn.classList.remove('active', 'bg-blue-50', 'border', 'border-blue-200', 'hover:bg-gray-100');
+                    btn.classList.add('text-black');
+                });
+                
+                if (currentViewMode === 'list') {
+                    // List button is active
+                    listBtn.classList.add('active', 'bg-blue-50', 'border', 'border-blue-200');
+                } else {
+                    // Grid button is active
+                    gridBtn.classList.add('active', 'bg-blue-50', 'border', 'border-blue-200');
+                }
+                
+                // Add hover to inactive button
+                if (currentViewMode === 'list') {
+                    gridBtn.classList.add('hover:bg-gray-100');
+                } else {
+                    listBtn.classList.add('hover:bg-gray-100');
+                }
+            }
+        }
         const exportResults = document.getElementById('exportResults');
 
         // ----- Otomatik Yapıştırma Ayarı (Premium Özellik Kontrolü ile) -----
@@ -2034,8 +2162,10 @@
                     x += barWidth;
                 }
                 
-                // Add text below barcode
-                svg += `<text x="${width/2}" y="${height - 5}" text-anchor="middle" font-family="monospace" font-size="12" fill="black">${text}</text>`;
+                // Add text below barcode - adjust for grid view (height >= 60)
+                const fontSize = height >= 60 ? 16 : 12;
+                const textY = height >= 60 ? height - 2 : height - 5;
+                svg += `<text x="${width/2}" y="${textY}" text-anchor="middle" font-family="monospace" font-size="${fontSize}" fill="black" font-weight="${height >= 60 ? '500' : 'normal'}">${text}</text>`;
                 svg += '</svg>';
                 
                 return svg;
@@ -2487,6 +2617,322 @@
             prevBtn.classList.toggle('opacity-50', prevBtn.disabled);
             nextBtn.classList.toggle('opacity-50', nextBtn.disabled);
         }
+        
+        // Grid view barcode state management
+        const gridBarcodeStates = {};
+        
+        function getGridBarcodeIndex(productId, barcodesLength) {
+            if (!gridBarcodeStates[productId]) {
+                gridBarcodeStates[productId] = 0;
+            }
+            return gridBarcodeStates[productId];
+        }
+        
+        function setGridBarcodeIndex(productId, index, barcodesLength) {
+            if (index >= 0 && index < barcodesLength) {
+                gridBarcodeStates[productId] = index;
+            }
+        }
+        
+        // Copy current barcode from grid view
+        function copyGridBarcode(productId, barcodesLength) {
+            // Find product from lastSearchResults
+            let product = null;
+            if (lastSearchResults) {
+                if (lastSearchResults.grouped) {
+                    for (const group of lastSearchResults.grouped) {
+                        product = group.active.find(p => p.id.toString() === productId) || 
+                                 group.outOfStock.find(p => p.id.toString() === productId);
+                        if (product) break;
+                    }
+                } else {
+                    product = (lastSearchResults.active || []).find(p => p.id.toString() === productId) ||
+                             (lastSearchResults.outOfStock || []).find(p => p.id.toString() === productId);
+                }
+            }
+            
+            if (!product) {
+                product = products.find(p => p.id.toString() === productId);
+            }
+            
+            if (product && product.barcodes) {
+                const currentIndex = getGridBarcodeIndex(productId, barcodesLength);
+                const currentBarcode = product.barcodes[currentIndex];
+                if (currentBarcode && currentBarcode.code) {
+                    copyProductText(currentBarcode.code);
+                }
+            }
+        }
+        
+        function navigateGridBarcode(productId, direction, barcodesLength) {
+            const currentIndex = getGridBarcodeIndex(productId, barcodesLength);
+            let newIndex = currentIndex;
+            
+            if (direction === 'next' && currentIndex < barcodesLength - 1) {
+                newIndex = currentIndex + 1;
+            } else if (direction === 'prev' && currentIndex > 0) {
+                newIndex = currentIndex - 1;
+            }
+            
+            setGridBarcodeIndex(productId, newIndex, barcodesLength);
+            
+            // Update the displayed barcode in the grid
+            const gridCard = document.querySelector(`[data-product-id="${productId}"]`);
+            if (gridCard) {
+                // Find product from lastSearchResults
+                let product = null;
+                if (lastSearchResults) {
+                    if (lastSearchResults.grouped) {
+                        for (const group of lastSearchResults.grouped) {
+                            product = group.active.find(p => p.id.toString() === productId) || 
+                                     group.outOfStock.find(p => p.id.toString() === productId);
+                            if (product) break;
+                        }
+                    } else {
+                        product = (lastSearchResults.active || []).find(p => p.id.toString() === productId) ||
+                                 (lastSearchResults.outOfStock || []).find(p => p.id.toString() === productId);
+                    }
+                }
+                
+                if (!product) {
+                    product = products.find(p => p.id.toString() === productId);
+                }
+                
+                if (product && product.barcodes && product.barcodes[newIndex]) {
+                    const barcode = product.barcodes[newIndex];
+                    const barcodeCode = barcode.code || '';
+                    
+                    // Update barcode visual
+                    const barcodeVisualContainer = gridCard.querySelector(`[id^="grid-barcode-${productId}-"]`);
+                    if (barcodeVisualContainer) {
+                        const featureEnabled = getAntiGlareSetting();
+                        const userPreference = typeof getUserAntiGlarePreference === 'function' ? getUserAntiGlarePreference() : false;
+                        const useAntiGlare = featureEnabled && userPreference;
+                        
+                        if (useAntiGlare) {
+                            // QR Code mode
+                            barcodeVisualContainer.innerHTML = '<div class="animate-pulse text-gray-400 text-xs">QR Code oluşturuluyor...</div>';
+                            const QRCodeLib = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
+                            if (QRCodeLib) {
+                                generateQRCode(barcodeCode, 120).then(qrDataUrl => {
+                                    barcodeVisualContainer.innerHTML = `<img src="${qrDataUrl}" alt="QR Code: ${barcodeCode}" class="mx-auto" style="max-width: 120px; height: auto; display: block;">`;
+                                }).catch(error => {
+                                    console.error('QR Code generation failed:', error);
+                                    barcodeVisualContainer.innerHTML = generateCode128SVG(barcodeCode, 300, 60);
+                                });
+                            }
+                        } else {
+                            // Normal barcode mode - larger size for better readability
+                            barcodeVisualContainer.innerHTML = generateCode128SVG(barcodeCode, 300, 60);
+                        }
+                    }
+                    
+                    // Update barcode visual container onclick
+                    const barcodeVisualWrapper = gridCard.querySelector(`.barcode-svg[data-product-id="${productId}"]`);
+                    if (barcodeVisualWrapper) {
+                        barcodeVisualWrapper.setAttribute('onclick', `copyGridBarcode('${productId}', ${barcodesLength})`);
+                    }
+                    
+                    // Update counter (in the flex container with navigation buttons)
+                    const navContainer = gridCard.querySelector('.flex.items-center.gap-1');
+                    if (navContainer && barcodesLength > 1) {
+                        const counterSpan = navContainer.querySelector('.text-xs.text-slate-400');
+                        if (counterSpan) {
+                            counterSpan.textContent = `${newIndex + 1} / ${barcodesLength}`;
+                        }
+                    }
+                    
+                    // Update navigation buttons
+                    const prevBtn = gridCard.querySelector('.grid-barcode-prev');
+                    const nextBtn = gridCard.querySelector('.grid-barcode-next');
+                    if (prevBtn) {
+                        prevBtn.disabled = newIndex === 0;
+                        prevBtn.classList.toggle('opacity-30', newIndex === 0);
+                        prevBtn.classList.toggle('cursor-not-allowed', newIndex === 0);
+                    }
+                    if (nextBtn) {
+                        nextBtn.disabled = newIndex >= barcodesLength - 1;
+                        nextBtn.classList.toggle('opacity-30', newIndex >= barcodesLength - 1);
+                        nextBtn.classList.toggle('cursor-not-allowed', newIndex >= barcodesLength - 1);
+                    }
+                }
+            }
+        }
+        
+        // Display results in grid view
+        function displayResultsGrid(searchResults) {
+            const gridContainer = document.getElementById('gridResults');
+            const gridResultsContainer = document.getElementById('gridResultsContainer');
+            if (!gridContainer || !gridResultsContainer) return;
+            
+            // Hide loading state and show results
+            hideLoading();
+            showResults();
+            
+            // Ensure grid container is visible and hide list containers
+            const resultsTableBody = document.getElementById('resultsTableBody');
+            const tableContainer = resultsTableBody ? resultsTableBody.closest('.hidden.md\\:block, .md\\:block') : null;
+            const mobileContainer = document.getElementById('mobileResults');
+            
+            // Hide list view containers
+            if (tableContainer) {
+                tableContainer.classList.add('hidden');
+                tableContainer.style.display = 'none';
+            }
+            if (mobileContainer) {
+                mobileContainer.classList.add('hidden');
+                mobileContainer.style.display = 'none';
+            }
+            
+            // Show grid container
+            gridResultsContainer.classList.remove('hidden');
+            gridResultsContainer.style.display = '';
+            
+            // Check if we have grouped results
+            let allProducts = [];
+            let outOfStockProductIds = new Set();
+            
+            if (searchResults.grouped) {
+                searchResults.grouped.forEach(group => {
+                    allProducts = allProducts.concat(group.active, group.outOfStock);
+                    group.outOfStock.forEach(p => outOfStockProductIds.add(p.id));
+                });
+            } else {
+                const activeResults = searchResults.active || [];
+                const outOfStockResults = searchResults.outOfStock || [];
+                allProducts = activeResults.concat(outOfStockResults);
+                outOfStockResults.forEach(p => outOfStockProductIds.add(p.id));
+            }
+            
+            if (allProducts.length === 0) {
+                gridContainer.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">Ürün bulunamadı</p>';
+                return;
+            }
+            
+            // Update result count
+            if (resultCount) {
+                if (searchResults.grouped) {
+                    const totalResults = allProducts.length;
+                    resultCount.textContent = `${totalResults} ürün bulundu (${searchResults.grouped.length} arama terimi)`;
+                } else {
+                    const totalResults = allProducts.length;
+                    resultCount.textContent = `${totalResults} ürün bulundu`;
+                }
+            }
+            
+            // Get anti-glare setting
+            const featureEnabled = getAntiGlareSetting();
+            const userPreference = typeof getUserAntiGlarePreference === 'function' ? getUserAntiGlarePreference() : false;
+            const useAntiGlare = featureEnabled && userPreference;
+            
+            gridContainer.innerHTML = allProducts.map(product => {
+                const barcodes = product.barcodes || [];
+                const currentBarcodeIndex = getGridBarcodeIndex(product.id, barcodes.length);
+                const currentBarcode = barcodes.length > 0 ? barcodes[currentBarcodeIndex] : null;
+                const barcodeCode = currentBarcode ? currentBarcode.code : 'Barkod Yok';
+                const barcodeSize = currentBarcode ? currentBarcode.size : '';
+                const barcodeVariant = currentBarcode ? currentBarcode.variant : '';
+                const productName = String(product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const productImage = product.image || 'https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D';
+                const isOutOfStock = outOfStockProductIds.has(product.id);
+                const hasMultipleBarcodes = barcodes.length > 1;
+                
+                // Generate barcode visual
+                let barcodeVisualHtml = '';
+                const placeholderId = `grid-barcode-${product.id}-${currentBarcodeIndex}`;
+                
+                if (currentBarcode) {
+                    if (useAntiGlare) {
+                        // QR Code mode
+                        barcodeVisualHtml = `<div id="${placeholderId}" class="flex justify-center items-center" style="min-height: 80px;"><div class="animate-pulse text-gray-400 text-xs">QR Code oluşturuluyor...</div></div>`;
+                        // Generate QR code after DOM is ready
+                        setTimeout(() => {
+                            const QRCodeLib = window.QRCode || window.qrcode || (typeof QRCode !== 'undefined' ? QRCode : null);
+                            if (QRCodeLib) {
+                                generateQRCode(barcodeCode, 120).then(qrDataUrl => {
+                                    const placeholder = document.getElementById(placeholderId);
+                                    if (placeholder) {
+                                        placeholder.innerHTML = `<img src="${qrDataUrl}" alt="QR Code: ${barcodeCode}" class="mx-auto" style="max-width: 120px; height: auto; display: block;">`;
+                                    }
+                                }).catch(error => {
+                                    console.error('QR Code generation failed:', error);
+                                    const placeholder = document.getElementById(placeholderId);
+                                    if (placeholder) {
+                                        placeholder.innerHTML = generateCode128SVG(barcodeCode, 300, 60);
+                                    }
+                                });
+                            }
+                        }, 100);
+                    } else {
+                        // Normal barcode mode - larger size for better readability
+                        barcodeVisualHtml = generateCode128SVG(barcodeCode, 300, 60);
+                    }
+                }
+                
+                return `
+                    <div class="group bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden ${isOutOfStock ? 'opacity-60' : ''}" data-product-id="${product.id}">
+                        <!-- Image Area -->
+                        <div class="h-48 p-2 bg-slate-50 flex items-center justify-center relative cursor-pointer" onclick="showImageModal('${productImage.replace(/'/g, "\\'")}', '${productName}')">
+                            <img src="${productImage}" 
+                                 alt="${product.name}" 
+                                 class="w-auto h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-300"
+                                 onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                        </div>
+                        
+                        <!-- Content Area -->
+                        <div class="px-5 pt-5 pb-3 flex-1 flex flex-col">
+                            <!-- Product Name -->
+                            <div class="mb-3">
+                                <h3 class="font-semibold text-slate-800 leading-snug line-clamp-2 cursor-pointer hover:text-indigo-600 transition-colors" 
+                                    onclick="copyProductText('${productName}')" 
+                                    title="Ürün adını kopyalamak için tıklayın">
+                                    ${product.name}
+                                </h3>
+                            </div>
+                            
+                            <!-- Barcode Section -->
+                            <div class="mt-auto pt-3 pb-0 border-t border-slate-100">
+                                ${hasMultipleBarcodes ? `
+                                    <div class="flex items-center justify-end mb-1">
+                                        <span class="text-xs text-slate-400 mr-1.5">${currentBarcodeIndex + 1} / ${barcodes.length}</span>
+                                        <button class="grid-barcode-nav grid-barcode-prev p-0.5 text-slate-400 hover:text-slate-600 transition-colors ${currentBarcodeIndex === 0 ? 'opacity-30 cursor-not-allowed' : ''}" 
+                                                onclick="navigateGridBarcode('${product.id}', 'prev', ${barcodes.length}); event.stopPropagation();"
+                                                ${currentBarcodeIndex === 0 ? 'disabled' : ''}
+                                                title="Önceki barkod">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                            </svg>
+                                        </button>
+                                        <button class="grid-barcode-nav grid-barcode-next p-0.5 text-slate-400 hover:text-slate-600 transition-colors ${currentBarcodeIndex >= barcodes.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}" 
+                                                onclick="navigateGridBarcode('${product.id}', 'next', ${barcodes.length}); event.stopPropagation();"
+                                                ${currentBarcodeIndex >= barcodes.length - 1 ? 'disabled' : ''}
+                                                title="Sonraki barkod">
+                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                ` : ''}
+                                
+                                <!-- Barcode Visual -->
+                                <div class="barcode-svg opacity-80 group-hover:opacity-100 transition-opacity cursor-pointer" 
+                                     onclick="copyGridBarcode('${product.id}', ${barcodes.length})" 
+                                     title="Barkodu kopyalamak için tıklayın"
+                                     data-product-id="${product.id}">
+                                    <div id="${placeholderId}">
+                                        ${barcodeVisualHtml}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Make functions globally accessible
+        window.navigateGridBarcode = navigateGridBarcode;
+        window.copyGridBarcode = copyGridBarcode;
 
         // Load products from embedded JavaScript data
         // Load products from user data + default products from PRODUCTS_DATA
@@ -4639,6 +5085,37 @@
 
         // Display results
         function displayResults(searchResults) {
+            // Store results for re-rendering on view mode change
+            lastSearchResults = searchResults;
+            
+            // Check view mode and render accordingly
+            if (currentViewMode === 'grid') {
+                displayResultsGrid(searchResults);
+                return;
+            }
+            
+            // Ensure list view containers are visible and hide grid container
+            const resultsTableBody = document.getElementById('resultsTableBody');
+            const tableContainer = resultsTableBody ? resultsTableBody.closest('.hidden.md\\:block, .md\\:block') : document.querySelector('#resultsSection > div > .hidden.md\\:block, #resultsSection > div > .md\\:block');
+            const mobileContainer = document.getElementById('mobileResults');
+            const gridResultsContainer = document.getElementById('gridResultsContainer');
+            
+            // Show list view containers
+            if (tableContainer) {
+                tableContainer.classList.remove('hidden');
+                tableContainer.style.display = '';
+            }
+            if (mobileContainer) {
+                mobileContainer.classList.remove('hidden');
+                mobileContainer.style.display = '';
+            }
+            
+            // Hide grid container
+            if (gridResultsContainer) {
+                gridResultsContainer.classList.add('hidden');
+                gridResultsContainer.style.display = 'none';
+            }
+            
             // Check if we have grouped results (comma-separated search)
             if (searchResults.grouped) {
                 displayGroupedResults(searchResults.grouped);
@@ -4826,6 +5303,37 @@
 
         // Display grouped results for comma-separated search
         function displayGroupedResults(groupedResults) {
+            // Store results for re-rendering on view mode change
+            lastSearchResults = { grouped: groupedResults };
+            
+            // Check view mode and render accordingly
+            if (currentViewMode === 'grid') {
+                displayResultsGrid({ grouped: groupedResults });
+                return;
+            }
+            
+            // Ensure list view containers are visible and hide grid container
+            const resultsTableBody = document.getElementById('resultsTableBody');
+            const tableContainer = resultsTableBody ? resultsTableBody.closest('.hidden.md\\:block, .md\\:block') : document.querySelector('#resultsSection > div > .hidden.md\\:block, #resultsSection > div > .md\\:block');
+            const mobileContainer = document.getElementById('mobileResults');
+            const gridResultsContainer = document.getElementById('gridResultsContainer');
+            
+            // Show list view containers
+            if (tableContainer) {
+                tableContainer.classList.remove('hidden');
+                tableContainer.style.display = '';
+            }
+            if (mobileContainer) {
+                mobileContainer.classList.remove('hidden');
+                mobileContainer.style.display = '';
+            }
+            
+            // Hide grid container
+            if (gridResultsContainer) {
+                gridResultsContainer.classList.add('hidden');
+                gridResultsContainer.style.display = 'none';
+            }
+            
             let totalResults = 0;
             let hasAnyResults = false;
             
@@ -7399,6 +7907,25 @@
         }
         
         // Settings event listeners
+        // Initialize view mode on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Set initial view mode from localStorage
+            updateViewButtons();
+            setViewMode(currentViewMode);
+            
+            // Add event listeners for view toggle buttons
+            const listBtn = document.getElementById('viewListBtn');
+            const gridBtn = document.getElementById('viewGridBtn');
+            
+            if (listBtn) {
+                listBtn.addEventListener('click', () => setViewMode('list'));
+            }
+            
+            if (gridBtn) {
+                gridBtn.addEventListener('click', () => setViewMode('grid'));
+            }
+        });
+        
         document.addEventListener('DOMContentLoaded', () => {
             // Add Product button
             document.getElementById('addProductBtn').addEventListener('click', showAddProductModal);

@@ -524,20 +524,43 @@ class ChatSystem {
         const isRead = (sender === 'user' && messageData?.adminStatus === 'read') || 
                       (sender === 'admin' && messageData?.userStatus === 'read');
         
+        // Check if message contains image
+        const isImageMessage = window.ImageUtils && window.ImageUtils.isImageMessage(text);
+        const imageData = isImageMessage ? window.ImageUtils.detectImageInMessage(text) : null;
+        
         if (sender === 'user') {
-            messageDiv.innerHTML = `
-                <div class="flex justify-end mb-3" data-message-timestamp="${msgTimestamp}">
-                    <div class="max-w-xs">
-                        <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
-                            ${text}
-                        </div>
-                        <div class="text-xs text-gray-500 mt-1 text-right flex items-center justify-end space-x-1">
-                            <span>${time}</span>
-                            <span class="${isRead ? 'text-green-500' : 'text-gray-400'}">${statusIcon}</span>
+            if (isImageMessage && imageData) {
+                // Render user image message
+                messageDiv.innerHTML = `
+                    <div class="flex justify-end mb-3" data-message-timestamp="${msgTimestamp}">
+                        <div class="max-w-xs">
+                            <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onclick="if(window.imageLightbox) window.imageLightbox.open('${imageData.imageUrl.replace(/'/g, "\\'")}', '${imageData.alt.replace(/'/g, "\\'")}')">
+                                <img src="${imageData.imageUrl}" alt="${imageData.alt || 'Görsel'}" class="w-full h-auto max-h-48 object-contain" style="max-width: 280px;" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'p-3 text-white text-sm\\'>Görsel yüklenemedi</div>'">
+                            </div>
+                            ${imageData.alt ? `<div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 text-xs">${imageData.alt}</div>` : ''}
+                            <div class="text-xs text-gray-500 mt-1 text-right flex items-center justify-end space-x-1">
+                                <span>${time}</span>
+                                <span class="${isRead ? 'text-green-500' : 'text-gray-400'}">${statusIcon}</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // Regular user text message
+                messageDiv.innerHTML = `
+                    <div class="flex justify-end mb-3" data-message-timestamp="${msgTimestamp}">
+                        <div class="max-w-xs">
+                            <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
+                                ${text}
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1 text-right flex items-center justify-end space-x-1">
+                                <span>${time}</span>
+                                <span class="${isRead ? 'text-green-500' : 'text-gray-400'}">${statusIcon}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         } else if (sender === 'system') {
             messageDiv.innerHTML = `
                 <div class="flex justify-center mb-3" data-message-timestamp="${msgTimestamp}">
@@ -550,16 +573,33 @@ class ChatSystem {
                 </div>
             `;
         } else {
-            messageDiv.innerHTML = `
-                <div class="flex justify-start mb-3" data-message-timestamp="${msgTimestamp}">
-                    <div class="max-w-xs">
-                        <div class="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm shadow-sm">
-                            ${text}
+            // Admin message - check if image
+            if (isImageMessage && imageData) {
+                // Render admin image message
+                messageDiv.innerHTML = `
+                    <div class="flex justify-start mb-3" data-message-timestamp="${msgTimestamp}">
+                        <div class="max-w-xs">
+                            <div class="bg-white border border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity shadow-sm" onclick="if(window.imageLightbox) window.imageLightbox.open('${imageData.imageUrl.replace(/'/g, "\\'")}', '${imageData.alt.replace(/'/g, "\\'")}')">
+                                <img src="${imageData.imageUrl}" alt="${imageData.alt || 'Görsel'}" class="w-full h-auto max-h-48 object-contain" style="max-width: 280px;" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'p-3 text-gray-700 text-sm\\'>Görsel yüklenemedi</div>'">
+                            </div>
+                            ${imageData.alt ? `<div class="bg-white border border-gray-200 px-3 py-1 text-xs">${imageData.alt}</div>` : ''}
+                            <div class="text-xs text-gray-500 mt-1">Destek • ${time}</div>
                         </div>
-                        <div class="text-xs text-gray-500 mt-1">Destek • ${time}</div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // Regular admin text message
+                messageDiv.innerHTML = `
+                    <div class="flex justify-start mb-3" data-message-timestamp="${msgTimestamp}">
+                        <div class="max-w-xs">
+                            <div class="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm shadow-sm">
+                                ${text}
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">Destek • ${time}</div>
+                        </div>
+                    </div>
+                `;
+            }
         }
         
         messagesContainer.appendChild(messageDiv);

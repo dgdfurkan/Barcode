@@ -2904,31 +2904,70 @@ AdminPanel.prototype.renderChatMessages = function(messages) {
         // Get message content
         const messageContent = msg.message || msg.content || msg.text || 'Mesaj içeriği bulunamadı';
         
+        // Check if message contains image
+        const isImageMessage = window.ImageUtils && window.ImageUtils.isImageMessage(messageContent);
+        const imageData = isImageMessage ? window.ImageUtils.detectImageInMessage(messageContent) : null;
+        
         if (msg.sender === 'admin') {
-            html += `
-                <div class="flex justify-end mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
-                    <div class="max-w-xs">
-                        <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
-                            ${messageContent}
-                        </div>
-                        <div class="text-xs text-gray-500 mt-1 text-right flex items-center justify-end space-x-2">
-                            <span>Admin • ${time}</span>
-                            <button onclick="adminPanel.deleteMessage(${index})" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                </svg>
-                            </button>
+            // Render image message
+            if (isImageMessage && imageData) {
+                html += `
+                    <div class="flex justify-end mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
+                        <div class="max-w-xs">
+                            <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onclick="if(window.imageLightbox) window.imageLightbox.open('${imageData.imageUrl.replace(/'/g, "\\'")}', '${imageData.alt.replace(/'/g, "\\'")}')">
+                                <img src="${imageData.imageUrl}" alt="${imageData.alt || 'Görsel'}" class="w-full h-auto max-h-48 object-contain" style="max-width: 280px;" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'p-3 text-white text-sm\\'>Görsel yüklenemedi</div>'">
+                            </div>
+                            ${imageData.alt ? `<div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 text-xs">${imageData.alt}</div>` : ''}
+                            <div class="text-xs text-gray-500 mt-1 text-right">Admin • ${time}</div>
                         </div>
                     </div>
-                </div>
-            `;
-        } else {
-            html += `
-                <div class="flex justify-start mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
-                    <div class="max-w-xs">
-                        <div class="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm shadow-sm">
-                            ${messageContent}
+                `;
+            } else {
+                // Regular text message
+                html += `
+                    <div class="flex justify-end mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
+                        <div class="max-w-xs">
+                            <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
+                                ${messageContent}
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1 text-right flex items-center justify-end space-x-2">
+                                <span>Admin • ${time}</span>
+                                <button onclick="adminPanel.deleteMessage(${index})" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
+                    </div>
+                `;
+            }
+        } else {
+            // User message - check if image
+            const isUserImageMessage = window.ImageUtils && window.ImageUtils.isImageMessage(messageContent);
+            const userImageData = isUserImageMessage ? window.ImageUtils.detectImageInMessage(messageContent) : null;
+            
+            if (isUserImageMessage && userImageData) {
+                // Render user image message
+                html += `
+                    <div class="flex justify-start mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
+                        <div class="max-w-xs">
+                            <div class="bg-white border border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity shadow-sm" onclick="if(window.imageLightbox) window.imageLightbox.open('${userImageData.imageUrl.replace(/'/g, "\\'")}', '${userImageData.alt.replace(/'/g, "\\'")}')">
+                                <img src="${userImageData.imageUrl}" alt="${userImageData.alt || 'Görsel'}" class="w-full h-auto max-h-48 object-contain" style="max-width: 280px;" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'p-3 text-gray-700 text-sm\\'>Görsel yüklenemedi</div>'">
+                            </div>
+                            ${userImageData.alt ? `<div class="bg-white border border-gray-200 px-3 py-1 text-xs">${userImageData.alt}</div>` : ''}
+                            <div class="text-xs text-gray-500 mt-1">${msg.username || 'Kullanıcı'} • ${time}</div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Regular user text message
+                html += `
+                    <div class="flex justify-start mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
+                        <div class="max-w-xs">
+                            <div class="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm shadow-sm">
+                                ${messageContent}
+                            </div>
                         <div class="text-xs text-gray-500 mt-1 flex items-center space-x-2">
                             <span>${msg.username || 'Kullanıcı'} • ${time}</span>
                             <button onclick="adminPanel.deleteMessage(${index})" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity">
@@ -3132,17 +3171,38 @@ AdminPanel.prototype.addAdminMessageToUI = function(message) {
         minute: '2-digit' 
     });
     
+    // Check if message contains image
+    const isImageMessage = window.ImageUtils && window.ImageUtils.isImageMessage(message);
+    const imageData = isImageMessage ? window.ImageUtils.detectImageInMessage(message) : null;
+    
     const messageDiv = document.createElement('div');
-    messageDiv.innerHTML = `
-        <div class="flex justify-end mb-3">
-            <div class="max-w-xs">
-                <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
-                    ${message}
+    
+    if (isImageMessage && imageData) {
+        // Render image message
+        messageDiv.innerHTML = `
+            <div class="flex justify-end mb-3">
+                <div class="max-w-xs">
+                    <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onclick="if(window.imageLightbox) window.imageLightbox.open('${imageData.imageUrl.replace(/'/g, "\\'")}', '${imageData.alt.replace(/'/g, "\\'")}')">
+                        <img src="${imageData.imageUrl}" alt="${imageData.alt || 'Görsel'}" class="w-full h-auto max-h-48 object-contain" style="max-width: 280px;" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'p-3 text-white text-sm\\'>Görsel yüklenemedi</div>'">
+                    </div>
+                    ${imageData.alt ? `<div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 text-xs">${imageData.alt}</div>` : ''}
+                    <div class="text-xs text-gray-500 mt-1 text-right">Admin • ${time}</div>
                 </div>
-                <div class="text-xs text-gray-500 mt-1 text-right">Admin • ${time}</div>
             </div>
-        </div>
-    `;
+        `;
+    } else {
+        // Regular text message
+        messageDiv.innerHTML = `
+            <div class="flex justify-end mb-3">
+                <div class="max-w-xs">
+                    <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
+                        ${message}
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1 text-right">Admin • ${time}</div>
+                </div>
+            </div>
+        `;
+    }
     
     chatMessagesArea.appendChild(messageDiv);
     chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
