@@ -126,6 +126,10 @@ class AdminPanel {
             this.updateUser();
         });
 
+        document.getElementById('refreshUserPage').addEventListener('click', () => {
+            this.refreshUserPage();
+        });
+
         // Toggle password visibility
         document.getElementById('toggleEditPassword').addEventListener('click', () => {
             this.togglePasswordVisibility('editPassword', 'toggleEditPassword');
@@ -651,6 +655,70 @@ class AdminPanel {
 
         // Show modal
         document.getElementById('editUserModal').classList.remove('hidden');
+    }
+
+    async refreshUserPage() {
+        const username = this.currentEditUser;
+        if (!username) {
+            alert('❌ Kullanıcı seçilmedi!');
+            return;
+        }
+
+        if (!confirm(`⚠️ ${username} kullanıcısının sayfasını yenilemek istediğinizden emin misiniz?`)) {
+            return;
+        }
+
+        try {
+            if (!window.supabase) {
+                alert('❌ Supabase bağlantısı yok!');
+                return;
+            }
+
+            // Get current user data to check if they're active
+            const { data: userData, error: fetchError } = await window.supabase
+                .from('users')
+                .select('last_chat_update, username')
+                .eq('username', username)
+                .single();
+
+            if (fetchError) {
+                console.error('❌ Error fetching user data:', fetchError);
+                alert('❌ Kullanıcı bilgileri alınırken hata oluştu: ' + fetchError.message);
+                return;
+            }
+
+            // Update last_chat_update to trigger realtime and refresh
+            // We'll use a special pattern: add "REFRESH" prefix to timestamp
+            const refreshTimestamp = 'REFRESH_' + new Date().toISOString();
+            const { error } = await window.supabase
+                .from('users')
+                .update({ 
+                    last_chat_update: refreshTimestamp
+                })
+                .eq('username', username);
+
+            if (error) {
+                console.error('❌ Error triggering refresh:', error);
+                alert('❌ Sayfa yenileme komutu gönderilirken hata oluştu: ' + error.message);
+                return;
+            }
+
+            // Reset to normal timestamp after 1 second
+            setTimeout(async () => {
+                await window.supabase
+                    .from('users')
+                    .update({ 
+                        last_chat_update: new Date().toISOString()
+                    })
+                    .eq('username', username);
+            }, 1000);
+
+            alert(`✅ ${username} kullanıcısına sayfa yenileme komutu gönderildi!\n\nKullanıcı aktif bir oturumda ise sayfası otomatik olarak yenilenecektir.`);
+
+        } catch (error) {
+            console.error('❌ Error refreshing user page:', error);
+            alert('❌ Sayfa yenileme komutu gönderilirken hata oluştu: ' + error.message);
+        }
     }
 
     async updateUser() {
