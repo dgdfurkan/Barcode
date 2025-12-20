@@ -206,6 +206,9 @@ class AdminPanel {
             if (e.key === 'Enter') this.sendAdminMessage();
         });
         
+        // Setup message shortcuts system
+        this.setupMessageShortcuts();
+        
         // New Chat Modal event listeners
         document.getElementById('newChatBtn').addEventListener('click', () => this.openNewChatModal());
         document.getElementById('closeNewChatModal').addEventListener('click', () => this.closeNewChatModal());
@@ -3273,15 +3276,110 @@ AdminPanel.prototype.deleteMessage = async function(messageIndex) {
     }
 };
 
+// Message shortcuts configuration
+AdminPanel.prototype.messageShortcuts = {
+    'Abonelik Ücretleri': '<img src="https://i.ibb.co/prhvYM8J/Abonelik-Ucretleri.png" alt="Abonelik Ücretleri" border="0">',
+    'mrhb': 'Merhabalar, umarım iyisinizdir.'
+    // İleride buraya daha fazla kısayol eklenebilir
+    // Örnek: 'Fiyat Listesi': '<img src="..." alt="Fiyat Listesi" border="0">'
+};
+
+AdminPanel.prototype.setupMessageShortcuts = function() {
+    const messageInput = document.getElementById('adminMessageInput');
+    if (!messageInput) return;
+    
+    // Create shortcut preview container
+    const inputContainer = messageInput.parentElement;
+    const previewContainer = document.createElement('div');
+    previewContainer.id = 'shortcutPreview';
+    previewContainer.className = 'hidden mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm';
+    inputContainer.appendChild(previewContainer);
+    
+    // Listen for input changes
+    messageInput.addEventListener('input', (e) => {
+        const inputValue = e.target.value.trim();
+        this.checkMessageShortcuts(inputValue, previewContainer);
+    });
+    
+    // Clear preview on blur (optional - can be removed if you want preview to stay)
+    messageInput.addEventListener('blur', () => {
+        setTimeout(() => {
+            if (document.activeElement !== messageInput) {
+                previewContainer.classList.add('hidden');
+            }
+        }, 200);
+    });
+};
+
+AdminPanel.prototype.checkMessageShortcuts = function(inputValue, previewContainer) {
+    // Check if input matches any shortcut
+    for (const [shortcut, replacement] of Object.entries(this.messageShortcuts)) {
+        if (inputValue === shortcut) {
+            // Show preview with confirmation
+            previewContainer.innerHTML = `
+                <div class="flex items-start space-x-2">
+                    <div class="flex-1">
+                        <p class="text-blue-800 font-medium mb-1">📋 Kısayol Tespit Edildi!</p>
+                        <p class="text-blue-700 text-xs mb-2">"${shortcut}" → HTML görsel kodu</p>
+                        <div class="bg-white p-2 rounded border border-blue-300 text-xs font-mono text-gray-700 break-all mb-2">
+                            ${replacement}
+                        </div>
+                        <div class="flex space-x-2">
+                            <button id="confirmShortcut" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs font-medium">
+                                ✅ Kullan
+                            </button>
+                            <button id="cancelShortcut" class="px-3 py-1 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 text-xs font-medium">
+                                ❌ İptal
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            previewContainer.classList.remove('hidden');
+            
+            // Setup confirm button
+            const confirmBtn = previewContainer.querySelector('#confirmShortcut');
+            const cancelBtn = previewContainer.querySelector('#cancelShortcut');
+            
+            confirmBtn.addEventListener('click', () => {
+                const messageInput = document.getElementById('adminMessageInput');
+                messageInput.value = replacement;
+                previewContainer.classList.add('hidden');
+                messageInput.focus();
+            });
+            
+            cancelBtn.addEventListener('click', () => {
+                previewContainer.classList.add('hidden');
+            });
+            
+            return;
+        }
+    }
+    
+    // No shortcut found, hide preview
+    previewContainer.classList.add('hidden');
+};
+
 AdminPanel.prototype.sendAdminMessage = async function() {
     const messageInput = document.getElementById('adminMessageInput');
-    const message = messageInput.value.trim();
+    let message = messageInput.value.trim();
     
     if (!message || !this.selectedChatUser) return;
+    
+    // Check if message is a shortcut and replace it
+    if (this.messageShortcuts[message]) {
+        message = this.messageShortcuts[message];
+    }
 
     // Add message to UI immediately
     this.addAdminMessageToUI(message);
     messageInput.value = '';
+    
+    // Hide shortcut preview if visible
+    const previewContainer = document.getElementById('shortcutPreview');
+    if (previewContainer) {
+        previewContainer.classList.add('hidden');
+    }
 
     // Save to Supabase
     await this.saveAdminMessageToSupabase(message);
