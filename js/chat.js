@@ -221,70 +221,70 @@ class ChatSystem {
         }
 
         // Öncelik 3: localStorage'dan geçici kullanıcı bilgileri
-        const storedUsername = localStorage.getItem('currentUser') || localStorage.getItem('username');
-        const tempChatUser = localStorage.getItem('tempChatUser'); // For trial expired users
-        const sessionData = JSON.parse(localStorage.getItem('session') || '{}');
-        
-        if (sessionData.username) {
-            this.currentUser = sessionData.username;
+            const storedUsername = localStorage.getItem('currentUser') || localStorage.getItem('username');
+            const tempChatUser = localStorage.getItem('tempChatUser'); // For trial expired users
+            const sessionData = JSON.parse(localStorage.getItem('session') || '{}');
+            
+            if (sessionData.username) {
+                this.currentUser = sessionData.username;
             this.isGuest = false;
             this.updateChatHeader();
-            console.log('🔍 Using session username:', this.currentUser);
+                console.log('🔍 Using session username:', this.currentUser);
             return;
-        } else if (tempChatUser) {
-            this.currentUser = tempChatUser;
+            } else if (tempChatUser) {
+                this.currentUser = tempChatUser;
             this.isGuest = false;
             this.updateChatHeader();
-            console.log('🔍 Using temp chat user (trial expired):', this.currentUser);
+                console.log('🔍 Using temp chat user (trial expired):', this.currentUser);
             return;
-        } else if (storedUsername) {
-            this.currentUser = storedUsername;
+            } else if (storedUsername) {
+                this.currentUser = storedUsername;
             this.isGuest = false;
             this.updateChatHeader();
-            console.log('🔍 Using stored username:', this.currentUser);
+                console.log('🔍 Using stored username:', this.currentUser);
             return;
         }
 
         // Öncelik 4: Guest kullanıcı (IP bazlı)
-        if (window.guestUserManager) {
-            try {
-                const guestUser = await window.guestUserManager.getOrCreateGuestUser();
-                this.currentUser = guestUser;
-                this.isGuest = true;
+                if (window.guestUserManager) {
+                    try {
+                        const guestUser = await window.guestUserManager.getOrCreateGuestUser();
+                        this.currentUser = guestUser;
+                        this.isGuest = true;
                 this.updateChatHeader();
-                console.log('🔍 Using guest user:', this.currentUser);
+                        console.log('🔍 Using guest user:', this.currentUser);
                 return;
-            } catch (error) {
+                    } catch (error) {
                 console.error('❌ Error getting guest user:', error);
-            }
+                    }
         }
 
         // Son çare: localStorage'dan herhangi bir kullanıcı bilgisi
-        const authKeys = ['user', 'authUser', 'loggedInUser'];
-        let foundUser = null;
-        
-        for (const key of authKeys) {
-            const userData = localStorage.getItem(key);
-            if (userData) {
-                try {
-                    const parsed = JSON.parse(userData);
-                    if (parsed.username) {
-                        foundUser = parsed.username;
-                        break;
+                    const authKeys = ['user', 'authUser', 'loggedInUser'];
+                    let foundUser = null;
+                    
+                    for (const key of authKeys) {
+                        const userData = localStorage.getItem(key);
+                        if (userData) {
+                            try {
+                                const parsed = JSON.parse(userData);
+                                if (parsed.username) {
+                                    foundUser = parsed.username;
+                                    break;
+                                }
+                            } catch (e) {
+                                if (typeof userData === 'string' && userData.length > 0) {
+                                    foundUser = userData;
+                                    break;
+                                }
+                            }
+                        }
                     }
-                } catch (e) {
-                    if (typeof userData === 'string' && userData.length > 0) {
-                        foundUser = userData;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        this.currentUser = foundUser || 'ProductSearchUser';
+                    
+                    this.currentUser = foundUser || 'ProductSearchUser';
         this.isGuest = false;
         this.updateChatHeader();
-        console.log('🔍 Final username resolution:', this.currentUser);
+                    console.log('🔍 Final username resolution:', this.currentUser);
     }
 
     updateChatHeader() {
@@ -547,19 +547,19 @@ class ChatSystem {
                 `;
             } else {
                 // Regular user text message
-                messageDiv.innerHTML = `
-                    <div class="flex justify-end mb-3" data-message-timestamp="${msgTimestamp}">
-                        <div class="max-w-xs">
-                            <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
-                                ${text}
-                            </div>
-                            <div class="text-xs text-gray-500 mt-1 text-right flex items-center justify-end space-x-1">
-                                <span>${time}</span>
-                                <span class="${isRead ? 'text-green-500' : 'text-gray-400'}">${statusIcon}</span>
-                            </div>
+            messageDiv.innerHTML = `
+                <div class="flex justify-end mb-3" data-message-timestamp="${msgTimestamp}">
+                    <div class="max-w-xs">
+                        <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
+                            ${text}
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1 text-right flex items-center justify-end space-x-1">
+                            <span>${time}</span>
+                            <span class="${isRead ? 'text-green-500' : 'text-gray-400'}">${statusIcon}</span>
                         </div>
                     </div>
-                `;
+                </div>
+            `;
             }
         } else if (sender === 'system') {
             messageDiv.innerHTML = `
@@ -589,16 +589,16 @@ class ChatSystem {
                 `;
             } else {
                 // Regular admin text message
-                messageDiv.innerHTML = `
-                    <div class="flex justify-start mb-3" data-message-timestamp="${msgTimestamp}">
-                        <div class="max-w-xs">
-                            <div class="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm shadow-sm">
-                                ${text}
-                            </div>
-                            <div class="text-xs text-gray-500 mt-1">Destek • ${time}</div>
+            messageDiv.innerHTML = `
+                <div class="flex justify-start mb-3" data-message-timestamp="${msgTimestamp}">
+                    <div class="max-w-xs">
+                        <div class="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm shadow-sm">
+                            ${text}
                         </div>
+                        <div class="text-xs text-gray-500 mt-1">Destek • ${time}</div>
                     </div>
-                `;
+                </div>
+            `;
             }
         }
         
@@ -834,19 +834,19 @@ class ChatSystem {
                     if (chatMessages.length === 0) {
                         this.showEmptyState();
                     } else {
-                        chatMessages.forEach(msg => {
-                            if (msg.sender === 'user') {
-                                this.addMessage(msg.message, 'user', msg.timestamp, {
-                                    adminStatus: msg.adminStatus || 'unread',
-                                    userStatus: msg.userStatus || 'sent'
-                                });
-                            } else if (msg.sender === 'admin') {
-                                this.addMessage(msg.message, 'admin', msg.timestamp, {
-                                    adminStatus: msg.adminStatus || 'sent',
-                                    userStatus: msg.userStatus || 'unread'
-                                });
-                            }
-                        });
+                    chatMessages.forEach(msg => {
+                        if (msg.sender === 'user') {
+                            this.addMessage(msg.message, 'user', msg.timestamp, {
+                                adminStatus: msg.adminStatus || 'unread',
+                                userStatus: msg.userStatus || 'sent'
+                            });
+                        } else if (msg.sender === 'admin') {
+                            this.addMessage(msg.message, 'admin', msg.timestamp, {
+                                adminStatus: msg.adminStatus || 'sent',
+                                userStatus: msg.userStatus || 'unread'
+                            });
+                        }
+                    });
                     }
                     
                     // Scroll to bottom
@@ -886,19 +886,19 @@ class ChatSystem {
                 if (chatMessages.length === 0) {
                     this.showEmptyState();
                 } else {
-                    chatMessages.forEach(msg => {
-                        if (msg.sender === 'user') {
-                            this.addMessage(msg.message, 'user', msg.timestamp, {
-                                adminStatus: msg.adminStatus || 'unread',
-                                userStatus: msg.userStatus || 'sent'
-                            });
-                        } else if (msg.sender === 'admin') {
-                            this.addMessage(msg.message, 'admin', msg.timestamp, {
-                                adminStatus: msg.adminStatus || 'sent',
-                                userStatus: msg.userStatus || 'unread'
-                            });
-                        }
-                    });
+                chatMessages.forEach(msg => {
+                    if (msg.sender === 'user') {
+                        this.addMessage(msg.message, 'user', msg.timestamp, {
+                            adminStatus: msg.adminStatus || 'unread',
+                            userStatus: msg.userStatus || 'sent'
+                        });
+                    } else if (msg.sender === 'admin') {
+                        this.addMessage(msg.message, 'admin', msg.timestamp, {
+                            adminStatus: msg.adminStatus || 'sent',
+                            userStatus: msg.userStatus || 'unread'
+                        });
+                    }
+                });
                 }
                 
                 // Scroll to bottom
@@ -1007,19 +1007,19 @@ class ChatSystem {
                         if (chatMessages.length === 0) {
                             this.showEmptyState();
                         } else {
-                            chatMessages.forEach(msg => {
-                                if (msg.sender === 'user') {
-                                    this.addMessage(msg.message, 'user', msg.timestamp, {
-                                        adminStatus: msg.adminStatus || 'unread',
-                                        userStatus: msg.userStatus || 'sent'
-                                    });
-                                } else if (msg.sender === 'admin') {
-                                    this.addMessage(msg.message, 'admin', msg.timestamp, {
-                                        adminStatus: msg.adminStatus || 'sent',
-                                        userStatus: msg.userStatus || 'unread'
-                                    });
-                                }
-                            });
+                        chatMessages.forEach(msg => {
+                            if (msg.sender === 'user') {
+                                this.addMessage(msg.message, 'user', msg.timestamp, {
+                                    adminStatus: msg.adminStatus || 'unread',
+                                    userStatus: msg.userStatus || 'sent'
+                                });
+                            } else if (msg.sender === 'admin') {
+                                this.addMessage(msg.message, 'admin', msg.timestamp, {
+                                    adminStatus: msg.adminStatus || 'sent',
+                                    userStatus: msg.userStatus || 'unread'
+                                });
+                            }
+                        });
                         }
                     
                     // Scroll to bottom
@@ -1509,9 +1509,9 @@ class ChatSystem {
                 } else {
                     // Kayıtlı kullanıcı için users tablosunu kontrol et
                     const { data: userData, error: userError } = await window.supabase
-                        .from('users')
-                        .select('chat_messages, last_chat_update')
-                        .eq('username', this.currentUser)
+                    .from('users')
+                    .select('chat_messages, last_chat_update')
+                    .eq('username', this.currentUser)
                         .maybeSingle();
                     
                     data = userData;
@@ -1521,7 +1521,7 @@ class ChatSystem {
                 if (error) {
                     // PGRST116 = no rows found, bu normal (guest user için)
                     if (error.code !== 'PGRST116') {
-                        console.error('❌ Error checking for new messages:', error);
+                    console.error('❌ Error checking for new messages:', error);
                     }
                     return;
                 }

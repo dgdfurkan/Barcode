@@ -1773,6 +1773,63 @@
         // View Mode State Management
         let currentViewMode = localStorage.getItem('productViewMode') || 'list';
         let lastSearchResults = null;
+        let shouldScrollAfterSearch = false; // Flag to trigger scroll after search completes
+        
+        // Scroll to search area (between search section and initialState)
+        function scrollToSearchArea() {
+            try {
+                // Find the exact elements: section.mb-8 > div.bg-surface and #initialState > div.bg-surface
+                const searchSection = document.querySelector('section.mb-8');
+                const searchSectionDiv = searchSection ? searchSection.querySelector('div.bg-surface') : null;
+                const initialStateEl = document.getElementById('initialState');
+                const initialStateDiv = initialStateEl ? initialStateEl.querySelector('div.bg-surface') : null;
+                
+                if (!searchSectionDiv || !initialStateDiv) {
+                    console.debug('Scroll: Search section div or initialState div not found');
+                    return;
+                }
+                
+                // Wait a bit for DOM to settle (especially after search results are displayed)
+                setTimeout(() => {
+                    // Get positions relative to document
+                    const searchRect = searchSectionDiv.getBoundingClientRect();
+                    const initialStateRect = initialStateDiv.getBoundingClientRect();
+                    
+                    const searchSectionBottom = searchRect.bottom + window.scrollY;
+                    const initialStateTop = initialStateRect.top + window.scrollY;
+                    
+                    // Calculate midpoint - this will be the scroll position (top of viewport)
+                    const calculatedMidpoint = (searchSectionBottom + initialStateTop) / 2;
+                    // Multiply by 2.2 (2 * 1.1) as requested by user
+                    const midpoint = calculatedMidpoint * 2.2;
+                    
+                    // Check if already near the target (within 50px) - optional optimization
+                    const currentScroll = window.scrollY;
+                    if (Math.abs(currentScroll - midpoint) < 50) {
+                        console.debug('Scroll: Already near target position');
+                        return;
+                    }
+                    
+                    // Smooth scroll to midpoint - this will position the midpoint at the top of the viewport
+                    window.scrollTo({
+                        top: midpoint,
+                        behavior: 'smooth'
+                    });
+                    
+                    console.debug('Scroll: Scrolling to midpoint between search section and initialState', {
+                        searchSectionBottom,
+                        initialStateTop,
+                        calculatedMidpoint,
+                        midpoint,
+                        currentScroll,
+                        searchRect: { top: searchRect.top, bottom: searchRect.bottom },
+                        initialStateRect: { top: initialStateRect.top, bottom: initialStateRect.bottom }
+                    });
+                }, 150); // Small delay to ensure DOM is fully updated
+            } catch (error) {
+                console.warn('Scroll: Error during scroll:', error);
+            }
+        }
         
         // View Mode Functions
         function setViewMode(mode) {
@@ -1975,6 +2032,10 @@
                 // Varsa tablo verisini isimlere indirgeme
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
                 searchInput.value = parsed;
+                
+                // Set flag to scroll after search completes
+                shouldScrollAfterSearch = true;
+                
                 // input event tetikle
                 searchInput.dispatchEvent(new Event('input', { bubbles: true }));
             } catch (err) {
@@ -2056,6 +2117,10 @@
                 
                 // Paste the new content
                 searchInput.value = parsed;
+                
+                // Set flag to scroll after search completes
+                shouldScrollAfterSearch = true;
+                
                 searchInput.dispatchEvent(new Event('input', { bubbles: true }));
                 lastClipboardText = text; // Remember the raw clipboard text
                 lastPastTime = Date.now();
@@ -2829,7 +2894,10 @@
             }
             
             if (allProducts.length === 0) {
-                gridContainer.innerHTML = '<p class="col-span-full text-center text-gray-500 py-8">Ürün bulunamadı</p>';
+                // Hide grid container and show no results state (same as list view)
+                gridResultsContainer.classList.add('hidden');
+                gridResultsContainer.style.display = 'none';
+                showNoResults();
                 return;
             }
             
@@ -2952,6 +3020,17 @@
                     </div>
                 `;
             }).join('');
+            
+            // Scroll to search area after results are displayed (if flag is set)
+            if (shouldScrollAfterSearch) {
+                // Use requestAnimationFrame to ensure DOM is fully updated
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        scrollToSearchArea();
+                        shouldScrollAfterSearch = false; // Reset flag
+                    }, 200); // Increased delay to ensure all rendering is complete
+                });
+            }
         }
         
         // Make functions globally accessible
@@ -4502,6 +4581,11 @@
 
         // Advanced search algorithm with grouped results for comma-separated terms
         function performOptimizedSearch(products, searchTerms, isTableData = false) {
+            // Return empty results if no search terms
+            if (!searchTerms || searchTerms.length === 0) {
+                return { active: [], outOfStock: [] };
+            }
+            
             // Filter products - remove duplicates (keep first occurrence)
             let filteredProducts = products;
             const seen = new Map();
@@ -5323,6 +5407,17 @@
                     </div>
                 `).join('');
             }
+            
+            // Scroll to search area after results are displayed (if flag is set)
+            if (shouldScrollAfterSearch) {
+                // Use requestAnimationFrame to ensure DOM is fully updated
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        scrollToSearchArea();
+                        shouldScrollAfterSearch = false; // Reset flag
+                    }, 200); // Increased delay to ensure all rendering is complete
+                });
+            }
         }
 
         // Display grouped results for comma-separated search
@@ -5521,6 +5616,28 @@
             hideAllStates();
             noResultsState.classList.remove('hidden');
             stopRandomProductsRotation();
+            // Update result count to 0 when no results found
+            if (resultCount) {
+                resultCount.textContent = '0 ürün bulundu';
+            }
+            // Show resultsSection header so resultCount is visible, but hide table/grid containers
+            resultsSection.classList.remove('hidden');
+            const resultsTableBody = document.getElementById('resultsTableBody');
+            const tableContainer = resultsTableBody ? resultsTableBody.closest('.hidden.md\\:block, .md\\:block') : null;
+            const mobileContainer = document.getElementById('mobileResults');
+            const gridResultsContainer = document.getElementById('gridResultsContainer');
+            if (tableContainer) {
+                tableContainer.classList.add('hidden');
+                tableContainer.style.display = 'none';
+            }
+            if (mobileContainer) {
+                mobileContainer.classList.add('hidden');
+                mobileContainer.style.display = 'none';
+            }
+            if (gridResultsContainer) {
+                gridResultsContainer.classList.add('hidden');
+                gridResultsContainer.style.display = 'none';
+            }
         }
 
         function showInitialState() {
@@ -5672,6 +5789,9 @@
             if (parsedQuery !== pastedText) {
                 showTableParseNotification();
             }
+            
+            // Set flag to scroll after search completes
+            shouldScrollAfterSearch = true;
             
             // Trigger search
             performSearch(parsedQuery);

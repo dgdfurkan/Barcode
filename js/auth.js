@@ -19,7 +19,7 @@ function initSupabase() {
             if (!window.supabase || typeof window.supabase.from !== 'function') {
                 console.error('Supabase initialization failed: Supabase client not ready');
                 console.log('Running in demo mode - Supabase not configured');
-            }
+        }
         }, 5000);
     } catch (error) {
         console.error('Supabase initialization failed:', error);
