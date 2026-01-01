@@ -1037,6 +1037,877 @@
             .changelog-block-content {
                 padding: 1rem;
             }
+        }
+
+        /* ===== RESPONSIVE MOBILE & TABLET STYLES ===== */
+        
+        /* Hamburger Menu Styles */
+        .hamburger-menu-btn {
+            display: none;
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.375rem;
+            transition: background-color 0.2s;
+        }
+
+        .hamburger-menu-btn:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .hamburger-menu-btn svg {
+            width: 24px;
+            height: 24px;
+            stroke-width: 2;
+        }
+
+        .mobile-menu-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 40;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+        }
+
+        .mobile-menu-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .mobile-menu-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 280px;
+            height: 100vh;
+            background: white;
+            z-index: 50;
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in-out;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+
+        .mobile-menu-panel.active {
+            transform: translateX(0);
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .mobile-menu-panel {
+                width: 320px;
+            }
+        }
+
+        .mobile-menu-header {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .mobile-menu-close {
+            width: 44px;
+            height: 44px;
+            padding: 0;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.375rem;
+            transition: background-color 0.2s;
+        }
+
+        .mobile-menu-close:hover {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        .mobile-menu-close svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .mobile-menu-content {
+            padding: 1rem;
+        }
+
+        .mobile-menu-user-info {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 1rem;
+        }
+
+        .mobile-menu-user-name {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 0.25rem;
+        }
+
+        .mobile-menu-user-company {
+            font-size: 0.875rem;
+            color: #475569;
+        }
+
+        #mobileTrialCountdownInUserInfo {
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+        }
+
+        #mobileTrialCountdownInUserInfo svg {
+            flex-shrink: 0;
+        }
+
+        .mobile-menu-item {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            padding: 1rem;
+            background: transparent;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-bottom: 0.5rem;
+            text-align: left;
+            min-height: 44px;
+        }
+
+        .mobile-menu-item:hover {
+            background-color: #f1f5f9;
+        }
+
+        .mobile-menu-item svg {
+            width: 24px;
+            height: 24px;
+            margin-right: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .mobile-menu-item span {
+            font-size: 1rem;
+            color: #0f172a;
+        }
+
+        /* Icon Tooltip Styles */
+        .icon-tooltip {
+            position: absolute;
+            background-color: #1f2937;
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            z-index: 60;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-4px);
+            transition: opacity 0.2s, visibility 0.2s, transform 0.2s;
+            pointer-events: none;
+        }
+
+        .icon-tooltip.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .icon-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 4px solid transparent;
+            border-top-color: #1f2937;
+        }
+
+        /* Responsive Header Styles */
+        @media (max-width: 480px) {
+            /* Mobil Küçük */
+            header .max-w-7xl {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+
+            header h1 {
+                font-size: 1.125rem !important;
+            }
+
+            header p {
+                font-size: 0.75rem !important;
+            }
+
+            header img.w-8 {
+                width: 1.5rem !important;
+                height: 1.5rem !important;
+            }
+
+            #scanEffectContainer {
+                display: none !important;
+            }
+
+            #trialCountdownContainer {
+                display: none !important;
+            }
+
+            .header-user-info,
+            #addProductBtn,
+            #settingsBtn,
+            #logoutBtn,
+            header .w-10 {
+                display: none !important;
+            }
+
+            .hamburger-menu-btn {
+                display: flex !important;
+            }
+        }
+
+        @media (min-width: 481px) and (max-width: 768px) {
+            /* Mobil Orta */
+            header .max-w-7xl {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+            }
+
+            header h1 {
+                font-size: 1.25rem !important;
+            }
+
+            header p {
+                font-size: 0.875rem !important;
+            }
+
+            header img.w-8 {
+                width: 1.75rem !important;
+                height: 1.75rem !important;
+            }
+
+            #scanEffectContainer {
+                display: none !important;
+            }
+
+            #trialCountdownContainer {
+                display: none !important;
+            }
+
+            .header-user-info {
+                display: none !important;
+            }
+
+            #addProductBtn {
+                display: none !important;
+            }
+
+            #settingsBtn,
+            #logoutBtn {
+                padding: 0.5rem !important;
+                min-width: 44px;
+                min-height: 44px;
+            }
+
+            #settingsBtn span,
+            #logoutBtn span {
+                display: none !important;
+            }
+
+            #settingsBtn svg,
+            #logoutBtn svg {
+                width: 22px !important;
+                height: 22px !important;
+                margin-right: 0 !important;
+            }
+
+            .hamburger-menu-btn {
+                display: flex !important;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 900px) {
+            /* Tablet Küçük */
+            header h1 {
+                font-size: 1.5rem !important;
+            }
+
+            header img.w-8 {
+                width: 2rem !important;
+                height: 2rem !important;
+            }
+
+            #scanEffectContainer {
+                transform: scale(0.8);
+            }
+
+            #addProductBtn,
+            #settingsBtn,
+            #logoutBtn {
+                padding: 0.5rem 0.75rem !important;
+                font-size: 0.875rem !important;
+            }
+
+            #addProductBtn svg,
+            #settingsBtn svg,
+            #logoutBtn svg {
+                width: 18px !important;
+                height: 18px !important;
+            }
+        }
+
+        @media (min-width: 901px) and (max-width: 1024px) {
+            /* Tablet Orta */
+            #scanEffectContainer {
+                transform: scale(0.9);
+            }
+        }
+
+        @media (min-width: 1025px) {
+            /* Desktop - Mevcut görünüm korunacak */
+            .hamburger-menu-btn {
+                display: none !important;
+            }
+        }
+
+        /* ===== TRIAL MINIMIZED BADGE RESPONSIVE STYLES ===== */
+        @media (max-width: 768px) {
+            /* Mobil - Trial Badge hamburger menü butonunun altına yerleştir */
+            #trialMinimizedBadge {
+                top: 60px !important;
+                right: 1rem !important;
+                left: auto !important;
+                z-index: 30 !important; /* Hamburger menü butonundan (z-40) düşük */
+            }
+
+            /* Badge içeriğini mobilde daha kompakt yap */
+            #trialMinimizedBadge > div {
+                padding: 0.5rem 0.75rem !important;
+                font-size: 0.75rem !important;
+            }
+
+            #trialMinimizedBadge svg {
+                width: 1rem !important;
+                height: 1rem !important;
+            }
+
+            #trialMinimizedBadge span {
+                font-size: 0.75rem !important;
+            }
+        }
+
+        @media (min-width: 769px) {
+            /* Tablet ve Desktop - Header'ın biraz altında, hoş görünsün */
+            #trialMinimizedBadge {
+                top: 4rem !important;
+                right: 1rem !important;
+            }
+        }
+
+        /* ===== SEARCH FORM RESPONSIVE STYLES ===== */
+        @media (max-width: 480px) {
+            /* Mobil Küçük - Arama Formu */
+            section.mb-8 .bg-surface {
+                padding: 1rem !important;
+            }
+
+            #searchInput {
+                height: 48px !important;
+                font-size: 1rem !important;
+                padding-left: 2.5rem !important;
+                padding-right: 2.5rem !important;
+            }
+
+            .search-section-header {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 1rem !important;
+            }
+
+            .view-toggle-container {
+                width: 100% !important;
+                margin-top: 0.5rem !important;
+            }
+
+            .view-toggle-btn span {
+                display: none !important;
+            }
+
+            .view-toggle-btn {
+                min-width: 44px !important;
+                min-height: 44px !important;
+                padding: 0.5rem !important;
+                justify-content: center !important;
+            }
+
+            .view-toggle-btn svg {
+                width: 20px !important;
+                height: 20px !important;
+            }
+
+            .search-tips {
+                display: none !important;
+            }
+        }
+
+        @media (min-width: 481px) and (max-width: 768px) {
+            /* Mobil Orta - Arama Formu */
+            section.mb-8 .bg-surface {
+                padding: 1.25rem !important;
+            }
+
+            #searchInput {
+                height: 52px !important;
+                font-size: 1.125rem !important;
+                padding-left: 3rem !important;
+                padding-right: 3rem !important;
+            }
+
+            .search-section-header {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 1rem !important;
+            }
+
+            .view-toggle-container {
+                width: 100% !important;
+                margin-top: 0.5rem !important;
+            }
+
+            .view-toggle-btn span {
+                font-size: 0.75rem !important;
+            }
+
+            .view-toggle-btn {
+                min-width: 44px !important;
+                min-height: 44px !important;
+                padding: 0.5rem 0.75rem !important;
+            }
+
+            .view-toggle-btn svg {
+                width: 18px !important;
+                height: 18px !important;
+            }
+
+            .search-tips {
+                font-size: 0.625rem !important;
+                gap: 0.5rem !important;
+            }
+
+            .search-tips span {
+                padding: 0.25rem 0.5rem !important;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            /* Tablet - Arama Formu */
+            section.mb-8 .bg-surface {
+                padding: 1.5rem !important;
+            }
+
+            #searchInput {
+                height: 56px !important;
+                font-size: 1.125rem !important;
+            }
+
+            .view-toggle-btn svg {
+                width: 18px !important;
+                height: 18px !important;
+            }
+        }
+
+        /* ===== MODAL RESPONSIVE STYLES ===== */
+        @media (max-width: 480px) {
+            /* Mobil Küçük - Modal'lar */
+            #addProductModal > div,
+            #productListModal > div,
+            #productManagementModal > div,
+            #settingsModal > div,
+            #premiumFeatureDetailModal > div,
+            #keyboardShortcutsModal > div {
+                max-width: 100% !important;
+                width: 100% !important;
+                height: 100% !important;
+                max-height: 100% !important;
+                margin: 0 !important;
+                border-radius: 0 !important;
+                padding: 1rem !important;
+            }
+
+            #addProductModal h3,
+            #productListModal h3,
+            #productManagementModal h3,
+            #settingsModal h3,
+            #premiumFeatureDetailModal h3,
+            #keyboardShortcutsModal h3 {
+                font-size: 1.25rem !important;
+            }
+
+            #addProductModal button,
+            #productListModal button,
+            #productManagementModal button,
+            #settingsModal button,
+            #premiumFeatureDetailModal button,
+            #keyboardShortcutsModal button {
+                min-height: 44px !important;
+                font-size: 0.875rem !important;
+            }
+
+            #closeAddProduct,
+            #closeProductList,
+            #closeProductManagement,
+            #closeSettings,
+            #closeFeatureDetailModal,
+            #closeKeyboardShortcutsModal {
+                width: 48px !important;
+                height: 48px !important;
+            }
+
+            #closeAddProduct svg,
+            #closeProductList svg,
+            #closeProductManagement svg,
+            #closeSettings svg,
+            #closeFeatureDetailModal svg,
+            #closeKeyboardShortcutsModal svg {
+                width: 24px !important;
+                height: 24px !important;
+            }
+
+            #settingsModal .overflow-y-auto,
+            #productListModal .overflow-y-auto,
+            #productManagementModal .overflow-y-auto,
+            #keyboardShortcutsModal .overflow-y-auto {
+                font-size: 0.875rem !important;
+            }
+        }
+
+        @media (min-width: 481px) and (max-width: 768px) {
+            /* Mobil Orta - Modal'lar */
+            #addProductModal > div,
+            #productListModal > div,
+            #productManagementModal > div,
+            #settingsModal > div,
+            #premiumFeatureDetailModal > div,
+            #keyboardShortcutsModal > div {
+                max-width: 100% !important;
+                width: 100% !important;
+                height: 100% !important;
+                max-height: 100% !important;
+                margin: 0 !important;
+                border-radius: 0.5rem 0.5rem 0 0 !important;
+                padding: 1.25rem !important;
+            }
+
+            #addProductModal h3,
+            #productListModal h3,
+            #productManagementModal h3,
+            #settingsModal h3,
+            #premiumFeatureDetailModal h3,
+            #keyboardShortcutsModal h3 {
+                font-size: 1.5rem !important;
+            }
+
+            #addProductModal button,
+            #productListModal button,
+            #productManagementModal button,
+            #settingsModal button,
+            #premiumFeatureDetailModal button,
+            #keyboardShortcutsModal button {
+                min-height: 44px !important;
+                font-size: 0.875rem !important;
+            }
+
+            #closeAddProduct,
+            #closeProductList,
+            #closeProductManagement,
+            #closeSettings,
+            #closeFeatureDetailModal,
+            #closeKeyboardShortcutsModal {
+                width: 44px !important;
+                height: 44px !important;
+            }
+
+            #closeAddProduct svg,
+            #closeProductList svg,
+            #closeProductManagement svg,
+            #closeSettings svg,
+            #closeFeatureDetailModal svg,
+            #closeKeyboardShortcutsModal svg {
+                width: 22px !important;
+                height: 22px !important;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            /* Tablet - Modal'lar */
+            #addProductModal > div,
+            #productManagementModal > div,
+            #settingsModal > div,
+            #keyboardShortcutsModal > div {
+                max-width: 48rem !important;
+            }
+
+            #productListModal > div {
+                max-width: 56rem !important;
+            }
+
+            #premiumFeatureDetailModal > div {
+                max-width: 32rem !important;
+            }
+
+            #closeAddProduct,
+            #closeProductList,
+            #closeProductManagement,
+            #closeSettings,
+            #closeFeatureDetailModal,
+            #closeKeyboardShortcutsModal {
+                width: 40px !important;
+                height: 40px !important;
+            }
+
+            #closeAddProduct svg,
+            #closeProductList svg,
+            #closeProductManagement svg,
+            #closeSettings svg,
+            #closeFeatureDetailModal svg,
+            #closeKeyboardShortcutsModal svg {
+                width: 20px !important;
+                height: 20px !important;
+            }
+        }
+
+        /* ===== SETTINGS PANEL RESPONSIVE STYLES ===== */
+        @media (max-width: 480px) {
+            /* Mobil Küçük - Ayarlar Paneli */
+            #premiumFeaturesSettings {
+                grid-template-columns: 1fr !important;
+            }
+
+            #settingsModal .grid {
+                grid-template-columns: 1fr !important;
+            }
+
+            #settingsModal .overflow-y-auto {
+                padding: 0.75rem !important;
+            }
+
+            #settingsModal .bg-gradient-to-br,
+            #settingsModal .bg-primary-50,
+            #settingsModal .bg-blue-50,
+            #settingsModal .bg-yellow-50,
+            #settingsModal .bg-green-50 {
+                padding: 0.75rem !important;
+            }
+
+            #settingsModal h4 {
+                font-size: 0.875rem !important;
+            }
+
+            #settingsModal p,
+            #settingsModal span,
+            #settingsModal label {
+                font-size: 0.75rem !important;
+            }
+
+            #settingsModal button {
+                min-height: 44px !important;
+                font-size: 0.75rem !important;
+                padding: 0.5rem 0.75rem !important;
+            }
+
+            #settingsModal button svg {
+                width: 16px !important;
+                height: 16px !important;
+            }
+        }
+
+        @media (min-width: 481px) and (max-width: 768px) {
+            /* Mobil Orta - Ayarlar Paneli */
+            #premiumFeaturesSettings {
+                grid-template-columns: 1fr !important;
+            }
+
+            #settingsModal .grid {
+                grid-template-columns: 1fr !important;
+            }
+
+            #settingsModal .overflow-y-auto {
+                padding: 1rem !important;
+            }
+
+            #settingsModal .bg-gradient-to-br,
+            #settingsModal .bg-primary-50,
+            #settingsModal .bg-blue-50,
+            #settingsModal .bg-yellow-50,
+            #settingsModal .bg-green-50 {
+                padding: 1rem !important;
+            }
+
+            #settingsModal button {
+                min-height: 44px !important;
+                font-size: 0.875rem !important;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            /* Tablet - Ayarlar Paneli */
+            #premiumFeaturesSettings {
+                grid-template-columns: 1fr !important;
+            }
+
+            #settingsModal .grid {
+                grid-template-columns: 1fr !important;
+            }
+
+            #settingsModal .overflow-y-auto {
+                padding: 1.25rem !important;
+            }
+        }
+
+        /* ===== RESULTS SECTION RESPONSIVE STYLES ===== */
+        @media (max-width: 480px) {
+            /* Mobil Küçük - Sonuçlar */
+            #mobileResults > div {
+                padding: 0.75rem !important;
+            }
+
+            #mobileResults .text-sm,
+            #mobileResults .text-base {
+                font-size: 0.875rem !important;
+            }
+
+            #gridResults {
+                grid-template-columns: 1fr !important;
+                gap: 0.75rem !important;
+                padding: 0.75rem !important;
+            }
+
+            #gridResults > div {
+                padding: 0.5rem !important;
+            }
+
+            #gridResults svg,
+            #gridResults img {
+                max-width: 100% !important;
+            }
+        }
+
+        @media (min-width: 481px) and (max-width: 768px) {
+            /* Mobil Orta - Sonuçlar */
+            #mobileResults > div {
+                padding: 1rem !important;
+            }
+
+            #gridResults {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 1rem !important;
+                padding: 1rem !important;
+            }
+
+            #gridResults > div {
+                padding: 0.75rem !important;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            /* Tablet - Sonuçlar */
+            #gridResults {
+                grid-template-columns: repeat(3, 1fr) !important;
+            }
+        }
+
+        /* ===== FOOTER RESPONSIVE STYLES ===== */
+        @media (max-width: 480px) {
+            /* Mobil Küçük - Footer */
+            footer .max-w-7xl {
+                padding: 1rem 0.75rem !important;
+            }
+
+            footer .text-sm {
+                font-size: 0.75rem !important;
+            }
+
+            footer .flex {
+                flex-direction: column !important;
+                gap: 0.5rem !important;
+            }
+        }
+
+        @media (min-width: 481px) and (max-width: 768px) {
+            /* Mobil Orta - Footer */
+            footer .max-w-7xl {
+                padding: 1.25rem 1rem !important;
+            }
+
+            footer .flex {
+                flex-direction: column !important;
+                gap: 0.75rem !important;
+            }
+        }
+
+        /* ===== GENERAL RESPONSIVE IMPROVEMENTS ===== */
+        @media (max-width: 480px) {
+            /* Mobil Küçük - Genel */
+            .max-w-7xl {
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+            }
+
+            main {
+                padding-top: 1rem !important;
+                padding-bottom: 1rem !important;
+            }
+
+            .btn-primary,
+            .btn-secondary,
+            .btn-accent {
+                min-height: 44px !important;
+                padding: 0.5rem 0.75rem !important;
+                font-size: 0.875rem !important;
+            }
+
+            .btn-primary svg,
+            .btn-secondary svg,
+            .btn-accent svg {
+                width: 18px !important;
+                height: 18px !important;
+            }
+        }
+
+        @media (min-width: 481px) and (max-width: 768px) {
+            /* Mobil Orta - Genel */
+            .max-w-7xl {
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+            }
+
+            main {
+                padding-top: 1.5rem !important;
+                padding-bottom: 1.5rem !important;
+            }
+
+            .btn-primary,
+            .btn-secondary,
+            .btn-accent {
+                min-height: 44px !important;
+                padding: 0.625rem 1rem !important;
+            }
+        }
+
+        @media (min-width: 769px) and (max-width: 1024px) {
+            /* Tablet - Genel */
+            .max-w-7xl {
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+            }
+        }
 
             .changelog-title {
                 font-size: 1.125rem;
@@ -1066,12 +1937,12 @@
                 </div>
                 
                 <!-- User Info -->
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-4 header-user-info">
                     <button id="addProductBtn" class="btn-primary text-sm mr-2">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                         </svg>
-                        Ürün Ekle
+                        <span>Ürün Ekle</span>
                     </button>
                     
                     <!-- Trial Countdown (Süre) - Solda -->
@@ -1098,21 +1969,86 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
-                        Ayarlar
+                        <span>Ayarlar</span>
                     </button>
                     <button id="logoutBtn" class="btn-secondary text-sm">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                         </svg>
-                        Çıkış
+                        <span>Çıkış</span>
                     </button>
                     <div class="w-10 h-10 rounded-full overflow-hidden">
                         <img src="../assets/GunduzDevLogo.png" alt="GunduzDev Logo" class="w-full h-full object-cover">
                     </div>
                 </div>
+
+                <!-- Hamburger Menu Button -->
+                <button id="hamburgerMenuBtn" class="hamburger-menu-btn" aria-label="Menü">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
             </div>
         </div>
     </header>
+
+    <!-- Mobile Menu Overlay -->
+    <div id="mobileMenuOverlay" class="mobile-menu-overlay"></div>
+
+    <!-- Mobile Menu Panel -->
+    <div id="mobileMenuPanel" class="mobile-menu-panel">
+        <div class="mobile-menu-header">
+            <h2 class="text-lg font-semibold text-text-primary">Menü</h2>
+            <button id="mobileMenuClose" class="mobile-menu-close" aria-label="Menüyü Kapat">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="mobile-menu-content">
+            <!-- User Info -->
+            <div class="mobile-menu-user-info">
+                <p class="mobile-menu-user-name" id="mobileUserName">Yükleniyor...</p>
+                <p class="mobile-menu-user-company" id="mobileUserCompany">Yükleniyor...</p>
+                <!-- Trial Countdown - Kullanıcı bilgilerinin içinde -->
+                <div id="mobileTrialCountdownInUserInfo" class="flex items-center space-x-2 mt-2 pt-2 border-t border-gray-200" style="display: none;">
+                    <svg class="w-4 h-4 text-gray-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div class="flex items-center space-x-1">
+                        <span id="mobileTrialCountdownValue1InUserInfo" class="text-sm font-semibold text-gray-800">--</span>
+                        <span id="mobileTrialCountdownLabel1InUserInfo" class="text-xs text-gray-600">gün</span>
+                        <span id="mobileTrialCountdownSeparatorInUserInfo" class="text-xs text-gray-400 mx-1">•</span>
+                        <span id="mobileTrialCountdownValue2InUserInfo" class="text-sm font-semibold text-gray-800">--</span>
+                        <span id="mobileTrialCountdownLabel2InUserInfo" class="text-xs text-gray-600">saat</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Menu Items -->
+            <button id="mobileAddProductBtn" class="mobile-menu-item">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                <span>Ürün Ekle</span>
+            </button>
+
+            <button id="mobileSettingsBtn" class="mobile-menu-item">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <span>Ayarlar</span>
+            </button>
+
+            <button id="mobileLogoutBtn" class="mobile-menu-item">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
+                <span>Çıkış Yap</span>
+            </button>
+        </div>
+    </div>
 
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -1140,7 +2076,7 @@
         <!-- Search Section -->
         <section class="mb-8">
             <div class="bg-surface rounded-xl border border-border shadow-sm p-6">
-                <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center justify-between mb-4 search-section-header">
                     <div class="flex items-center space-x-3">
                         <div class="bg-primary-50 rounded-lg p-2">
                             <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1153,7 +2089,7 @@
                         </div>
                     </div>
                     <!-- View Toggle Buttons -->
-                    <div class="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+                    <div class="flex items-center space-x-2 bg-gray-100 rounded-lg p-1 view-toggle-container">
                         <button id="viewListBtn" class="view-toggle-btn active flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all duration-200 bg-blue-50 border border-blue-200 text-black hover:bg-gray-100" title="Liste Görünümü">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
@@ -1190,7 +2126,7 @@
                 </div>
                 
                 <!-- Search Tips -->
-                <div class="mt-4 flex flex-wrap gap-2">
+                <div class="mt-4 flex flex-wrap gap-2 search-tips">
                     <span class="text-xs text-text-secondary">İpucu:</span>
                     <span class="inline-flex items-center px-2 py-1 rounded-md bg-primary-50 text-primary text-xs">
                         Virgülle ayırarak birden fazla terim arayabilirsiniz
@@ -1769,6 +2705,305 @@
         const resultsTableBody = document.getElementById('resultsTableBody');
         const mobileResults = document.getElementById('mobileResults');
         const resultCount = document.getElementById('resultCount');
+
+        // Hamburger Menu Elements
+        const hamburgerMenuBtn = document.getElementById('hamburgerMenuBtn');
+        const mobileMenuOverlay = document.getElementById('mobileMenuOverlay');
+        const mobileMenuPanel = document.getElementById('mobileMenuPanel');
+        const mobileMenuClose = document.getElementById('mobileMenuClose');
+        const mobileAddProductBtn = document.getElementById('mobileAddProductBtn');
+        const mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
+        const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
+        const addProductBtn = document.getElementById('addProductBtn');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        // Hamburger Menu Functions
+        function openMobileMenu() {
+            if (mobileMenuOverlay && mobileMenuPanel) {
+                mobileMenuOverlay.classList.add('active');
+                mobileMenuPanel.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeMobileMenu() {
+            if (mobileMenuOverlay && mobileMenuPanel) {
+                mobileMenuOverlay.classList.remove('active');
+                mobileMenuPanel.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+        }
+
+        // Hamburger Menu Event Listeners
+        if (hamburgerMenuBtn) {
+            hamburgerMenuBtn.addEventListener('click', openMobileMenu);
+        }
+
+        if (mobileMenuClose) {
+            mobileMenuClose.addEventListener('click', closeMobileMenu);
+        }
+
+        if (mobileMenuOverlay) {
+            mobileMenuOverlay.addEventListener('click', closeMobileMenu);
+        }
+
+        // Mobile menu buttons - connect to desktop buttons
+        if (mobileAddProductBtn && addProductBtn) {
+            mobileAddProductBtn.addEventListener('click', () => {
+                addProductBtn.click();
+                closeMobileMenu();
+            });
+        }
+
+        if (mobileSettingsBtn && settingsBtn) {
+            mobileSettingsBtn.addEventListener('click', () => {
+                settingsBtn.click();
+                closeMobileMenu();
+            });
+        }
+
+        if (mobileLogoutBtn && logoutBtn) {
+            mobileLogoutBtn.addEventListener('click', () => {
+                logoutBtn.click();
+                closeMobileMenu();
+            });
+        }
+
+        // Sync user info to mobile menu
+        function syncUserInfoToMobileMenu() {
+            const userName = document.getElementById('userName');
+            const userCompany = document.getElementById('userCompany');
+            const mobileUserName = document.getElementById('mobileUserName');
+            const mobileUserCompany = document.getElementById('mobileUserCompany');
+
+            if (userName && mobileUserName) {
+                mobileUserName.textContent = userName.textContent;
+            }
+            if (userCompany && mobileUserCompany) {
+                mobileUserCompany.textContent = userCompany.textContent;
+            }
+        }
+
+        // Sync trial countdown to mobile menu
+        function syncTrialCountdownToMobileMenu() {
+            const trialCountdownContainer = document.getElementById('trialCountdownContainer');
+            const mobileTrialCountdownInUserInfo = document.getElementById('mobileTrialCountdownInUserInfo');
+            const trialCountdownValue1 = document.getElementById('trialCountdownValue1');
+            const trialCountdownValue2 = document.getElementById('trialCountdownValue2');
+            const trialCountdownLabel1 = document.getElementById('trialCountdownLabel1');
+            const trialCountdownLabel2 = document.getElementById('trialCountdownLabel2');
+            const mobileTrialCountdownValue1InUserInfo = document.getElementById('mobileTrialCountdownValue1InUserInfo');
+            const mobileTrialCountdownValue2InUserInfo = document.getElementById('mobileTrialCountdownValue2InUserInfo');
+            const mobileTrialCountdownLabel1InUserInfo = document.getElementById('mobileTrialCountdownLabel1InUserInfo');
+            const mobileTrialCountdownLabel2InUserInfo = document.getElementById('mobileTrialCountdownLabel2InUserInfo');
+
+            // Check if trial countdown exists
+            const hasTrialCountdown = trialCountdownContainer !== null;
+
+            // Always show trial countdown in user info section if container exists
+            if (hasTrialCountdown && mobileTrialCountdownInUserInfo) {
+                mobileTrialCountdownInUserInfo.style.display = 'flex';
+                
+                // Sync values to user info section
+                if (trialCountdownValue1 && mobileTrialCountdownValue1InUserInfo) {
+                    mobileTrialCountdownValue1InUserInfo.textContent = trialCountdownValue1.textContent || '--';
+                }
+                if (trialCountdownValue2 && mobileTrialCountdownValue2InUserInfo) {
+                    mobileTrialCountdownValue2InUserInfo.textContent = trialCountdownValue2.textContent || '--';
+                }
+                if (trialCountdownLabel1 && mobileTrialCountdownLabel1InUserInfo) {
+                    mobileTrialCountdownLabel1InUserInfo.textContent = trialCountdownLabel1.textContent || 'gün';
+                }
+                if (trialCountdownLabel2 && mobileTrialCountdownLabel2InUserInfo) {
+                    mobileTrialCountdownLabel2InUserInfo.textContent = trialCountdownLabel2.textContent || 'saat';
+                }
+            } else if (mobileTrialCountdownInUserInfo) {
+                // Hide if no trial countdown container exists
+                mobileTrialCountdownInUserInfo.style.display = 'none';
+            }
+        }
+
+        // Watch for user info and trial countdown changes
+        const userInfoObserver = new MutationObserver(() => {
+            syncUserInfoToMobileMenu();
+            syncTrialCountdownToMobileMenu();
+        });
+
+        const userNameEl = document.getElementById('userName');
+        const trialCountdownContainer = document.getElementById('trialCountdownContainer');
+        const trialCountdownValue1 = document.getElementById('trialCountdownValue1');
+        const trialCountdownValue2 = document.getElementById('trialCountdownValue2');
+        
+        if (userNameEl) {
+            userInfoObserver.observe(userNameEl, { childList: true, subtree: true, characterData: true });
+        }
+        if (trialCountdownContainer) {
+            userInfoObserver.observe(trialCountdownContainer, { attributes: true, attributeFilter: ['style'], childList: true, subtree: true });
+        }
+        // Watch trial countdown values for changes
+        if (trialCountdownValue1) {
+            userInfoObserver.observe(trialCountdownValue1, { childList: true, subtree: true, characterData: true });
+        }
+        if (trialCountdownValue2) {
+            userInfoObserver.observe(trialCountdownValue2, { childList: true, subtree: true, characterData: true });
+        }
+
+        // Initial sync
+        setTimeout(() => {
+            syncUserInfoToMobileMenu();
+            syncTrialCountdownToMobileMenu();
+        }, 1000);
+
+        // Sync trial countdown periodically (every 5 seconds) to catch updates
+        setInterval(() => {
+            syncTrialCountdownToMobileMenu();
+        }, 5000);
+
+        // ===== ICON TOOLTIP SYSTEM =====
+        function createTooltip(element, text) {
+            // Remove existing tooltip if any
+            const existingTooltip = element.querySelector('.icon-tooltip');
+            if (existingTooltip) {
+                existingTooltip.remove();
+            }
+
+            // Create tooltip element
+            const tooltip = document.createElement('div');
+            tooltip.className = 'icon-tooltip';
+            tooltip.textContent = text;
+            element.style.position = 'relative';
+            element.appendChild(tooltip);
+
+            // Check if mobile device
+            const isMobile = window.innerWidth <= 768;
+            let tooltipTimeout;
+            let longPressTimeout;
+
+            if (isMobile) {
+                // Mobile: Long press or tap to show tooltip
+                let touchStartTime = 0;
+                let touchEndTime = 0;
+
+                element.addEventListener('touchstart', (e) => {
+                    touchStartTime = Date.now();
+                    longPressTimeout = setTimeout(() => {
+                        showTooltip(tooltip, element);
+                    }, 500); // 500ms long press
+                });
+
+                element.addEventListener('touchend', (e) => {
+                    touchEndTime = Date.now();
+                    const touchDuration = touchEndTime - touchStartTime;
+                    clearTimeout(longPressTimeout);
+
+                    if (touchDuration < 500 && touchDuration > 0) {
+                        // Quick tap - show tooltip briefly
+                        showTooltip(tooltip, element);
+                        setTimeout(() => {
+                            hideTooltip(tooltip);
+                        }, 2000);
+                    }
+                });
+
+                element.addEventListener('touchcancel', () => {
+                    clearTimeout(longPressTimeout);
+                    hideTooltip(tooltip);
+                });
+            } else {
+                // Desktop: Hover to show tooltip
+                element.addEventListener('mouseenter', () => {
+                    showTooltip(tooltip, element);
+                });
+
+                element.addEventListener('mouseleave', () => {
+                    hideTooltip(tooltip);
+                });
+            }
+        }
+
+        function showTooltip(tooltip, element) {
+            tooltip.classList.add('show');
+            
+            // Position tooltip
+            const rect = element.getBoundingClientRect();
+            const tooltipRect = tooltip.getBoundingClientRect();
+            
+            // Position below by default
+            tooltip.style.top = '100%';
+            tooltip.style.left = '50%';
+            tooltip.style.transform = 'translateX(-50%)';
+            tooltip.style.marginTop = '8px';
+            
+            // Check if tooltip goes off screen
+            const tooltipLeft = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+            if (tooltipLeft < 0) {
+                tooltip.style.left = '0';
+                tooltip.style.transform = 'none';
+            } else if (tooltipLeft + tooltipRect.width > window.innerWidth) {
+                tooltip.style.left = 'auto';
+                tooltip.style.right = '0';
+                tooltip.style.transform = 'none';
+            }
+        }
+
+        function hideTooltip(tooltip) {
+            tooltip.classList.remove('show');
+        }
+
+        // Initialize tooltips for icon-only buttons
+        function initializeTooltips() {
+            // Wait for DOM to be ready
+            setTimeout(() => {
+                // Hamburger menu button
+                const hamburgerBtn = document.getElementById('hamburgerMenuBtn');
+                if (hamburgerBtn) {
+                    createTooltip(hamburgerBtn, 'Menü');
+                }
+
+                // Mobile menu items already have text, no tooltip needed
+
+                // View toggle buttons (when icon-only on mobile)
+                const viewListBtn = document.getElementById('viewListBtn');
+                const viewGridBtn = document.getElementById('viewGridBtn');
+                if (viewListBtn && window.innerWidth <= 480) {
+                    createTooltip(viewListBtn, 'Liste Görünümü');
+                }
+                if (viewGridBtn && window.innerWidth <= 480) {
+                    createTooltip(viewGridBtn, 'Grid Görünümü');
+                }
+
+                // Icon-only buttons in header (mobile)
+                if (window.innerWidth <= 768) {
+                    const settingsBtnIcon = document.getElementById('settingsBtn');
+                    const logoutBtnIcon = document.getElementById('logoutBtn');
+                    if (settingsBtnIcon && !settingsBtnIcon.querySelector('span')?.textContent.trim()) {
+                        createTooltip(settingsBtnIcon, 'Ayarlar');
+                    }
+                    if (logoutBtnIcon && !logoutBtnIcon.querySelector('span')?.textContent.trim()) {
+                        createTooltip(logoutBtnIcon, 'Çıkış Yap');
+                    }
+                }
+            }, 500);
+        }
+
+        // Initialize on load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeTooltips);
+        } else {
+            initializeTooltips();
+        }
+
+        // Re-initialize on resize (for responsive tooltips)
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                // Remove all tooltips and re-initialize
+                document.querySelectorAll('.icon-tooltip').forEach(tooltip => tooltip.remove());
+                initializeTooltips();
+            }, 250);
+        });
         
         // View Mode State Management
         let currentViewMode = localStorage.getItem('productViewMode') || 'list';

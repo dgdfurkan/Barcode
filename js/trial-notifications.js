@@ -36,7 +36,13 @@
             badge = document.createElement('div');
             badge.id = badgeId;
             badge.className = 'fixed top-4 right-4 z-40 cursor-pointer transition-all duration-300';
-            badge.style.cssText = 'pointer-events: auto;';
+            // Mobil ekranda hamburger menü butonunun üstüne gelmemesi için pozisyon ayarı
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                badge.style.cssText = 'pointer-events: auto; top: 60px; right: 1rem;';
+            } else {
+                badge.style.cssText = 'pointer-events: auto;';
+            }
             
             const updateBadgeTime = () => {
                 const now = new Date();
@@ -91,8 +97,43 @@
             badge.addEventListener('click', () => {
                 showTrialNotification(trialEnd, true);
             });
+
+            // Update badge position on resize
+            const updateBadgePosition = () => {
+                const isMobile = window.innerWidth <= 768;
+                if (isMobile) {
+                    // Mobil: Hamburger menü butonunun altına yerleştir (top: 60px = header height + padding)
+                    badge.style.top = '60px';
+                    badge.style.right = '1rem';
+                } else {
+                    // Desktop: Header'ın biraz altında, hoş görünsün
+                    badge.style.top = '4rem';
+                    badge.style.right = '1rem';
+                }
+            };
+
+            // Initial position
+            updateBadgePosition();
+
+            // Update on resize
+            window.addEventListener('resize', updateBadgePosition);
             
             document.body.appendChild(badge);
+        } else {
+            // Badge zaten var, pozisyonunu güncelle
+            const updateBadgePosition = () => {
+                const isMobile = window.innerWidth <= 768;
+                if (isMobile) {
+                    badge.style.top = '60px';
+                    badge.style.right = '1rem';
+                } else {
+                    // Desktop: Header'ın biraz altında, hoş görünsün
+                    badge.style.top = '4rem';
+                    badge.style.right = '1rem';
+                }
+            };
+            updateBadgePosition();
+            window.addEventListener('resize', updateBadgePosition);
         }
         
         return badge;
