@@ -51,10 +51,21 @@
     <script src="../js/barcode-scanner.js"></script>
     
     <style>
+        /* Prevent horizontal scroll on mobile */
+        html, body {
+            overflow-x: hidden;
+            max-width: 100vw;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
         /* Counting Page Specific Styles */
         .counting-container {
             max-width: 1400px;
             margin: 0 auto;
+            width: 100%;
         }
         
         /* Statistics Card Styles */
@@ -576,72 +587,77 @@
 </head>
 <body class="bg-gray-50">
     <!-- Header -->
-    <header class="bg-surface border-b border-border shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
-                <!-- Logo and Back Button -->
-                <div class="flex items-center space-x-3">
-                    <button id="backToSearchBtn" class="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Arama Sayfasına Dön">
-                        <svg class="w-6 h-6 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <header class="bg-surface border-b border-border shadow-sm sticky top-0 z-40">
+        <div class="w-full mx-auto px-2 sm:px-4 lg:px-8">
+            <div class="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
+                <!-- Left Side: Back Button + Table Controls -->
+                <div class="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
+                    <button id="backToSearchBtn" class="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0" title="Arama Sayfasına Dön">
+                        <svg class="w-5 h-5 sm:w-6 sm:h-6 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
                         </svg>
                     </button>
                     
-                    <!-- Table Selector -->
-                    <div class="flex items-center space-x-2">
+                    <!-- Table Selector - Mobile Optimized -->
+                    <div class="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
                         <!-- Custom Table Selector Dropdown -->
-                        <div class="relative">
+                        <div class="relative min-w-[120px] sm:min-w-[150px]">
                             <button 
                                 id="tableSelectorBtn" 
-                                class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white hover:bg-gray-50 flex items-center justify-between min-w-[150px] transition-colors"
+                                class="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white hover:bg-gray-50 flex items-center justify-between transition-colors min-h-[36px] sm:min-h-[40px]"
                             >
-                                <span id="tableSelectorText" class="text-gray-700">Tablo Seçin</span>
-                                <svg class="w-4 h-4 text-gray-500 ml-2 transition-transform" id="tableSelectorIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <span id="tableSelectorText" class="text-gray-700 truncate text-sm sm:text-base font-medium">Tablo Seçin</span>
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 ml-2 sm:ml-3 flex-shrink-0 transition-transform" id="tableSelectorIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                 </svg>
                             </button>
-                            <div id="tableSelectorDropdown" class="hidden absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <div id="tableSelectorDropdown" class="hidden absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto min-w-[200px]">
                                 <!-- Options will be populated by JavaScript -->
                             </div>
                         </div>
-                        <button id="renameTableBtn" class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Tablo Adını Değiştir">
-                            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                            </svg>
-                        </button>
-                        <button id="createTableBtn" class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Yeni Tablo Oluştur">
-                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                            </svg>
-                        </button>
-                        <button id="deleteTableBtn" class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-red-600" title="Tablo Sil" style="display: none;">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                        </button>
-                    </div>
-                    <div>
-                        <img src="../assets/logo.png" alt="Logo" class="w-8 h-8 object-contain inline-block mr-2">
-                        <h1 class="text-2xl font-bold text-text-primary inline-block">GunduzDev</h1>
+                        <!-- Table Action Buttons -->
+                        <div class="flex items-center space-x-0.5 sm:space-x-1 flex-shrink-0">
+                            <button id="renameTableBtn" class="p-1 sm:p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Tablo Adını Değiştir">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                            </button>
+                            <button id="createTableBtn" class="p-1 sm:p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Yeni Tablo Oluştur">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                </svg>
+                            </button>
+                            <button id="deleteTableBtn" class="p-1 sm:p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-red-600" title="Tablo Sil" style="display: none;">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- Page Title -->
-                <div class="flex-1 text-center">
-                    <h2 class="text-xl font-semibold text-text-primary">Stok Sayımı</h2>
+                <!-- Logo and Title - Hidden on mobile, shown on tablet+ -->
+                <div class="hidden md:flex items-center flex-shrink-0 mx-2 sm:mx-4">
+                    <img src="../assets/logo.png" alt="Logo" class="w-6 h-6 sm:w-8 sm:h-8 object-contain mr-2 flex-shrink-0">
+                    <h1 class="text-lg sm:text-xl md:text-2xl font-bold text-text-primary whitespace-nowrap">GunduzDev</h1>
                 </div>
                 
-                <!-- User Info -->
-                <div class="flex items-center space-x-4">
-                    <div class="text-right hidden sm:block">
-                        <p class="text-lg font-semibold text-text-primary" id="userName">Yükleniyor...</p>
-                        <p class="text-sm text-text-secondary" id="userCompany">Yükleniyor...</p>
+                <!-- Page Title - Hidden on mobile, shown on tablet+ -->
+                <div class="hidden lg:flex flex-1 text-center justify-center px-2 min-w-0">
+                    <h2 class="text-base sm:text-lg md:text-xl font-semibold text-text-primary truncate">Stok Sayımı</h2>
+                </div>
+                
+                <!-- Right Side: User Info + Logout -->
+                <div class="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+                    <div class="text-right hidden xl:block flex-shrink-0">
+                        <p class="text-sm lg:text-lg font-semibold text-text-primary truncate" id="userName">Yükleniyor...</p>
+                        <p class="text-xs lg:text-sm text-text-secondary truncate" id="userCompany">Yükleniyor...</p>
                     </div>
-                    <button id="logoutBtn" class="btn-secondary text-sm">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button id="logoutBtn" class="btn-secondary text-xs sm:text-sm p-1.5 sm:p-2 flex-shrink-0">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                         </svg>
-                        <span class="hidden sm:inline">Çıkış</span>
+                        <span class="hidden sm:inline ml-1 sm:ml-2">Çıkış</span>
                     </button>
                 </div>
             </div>
@@ -649,7 +665,7 @@
     </header>
 
     <!-- Main Content -->
-    <main class="counting-container px-4 sm:px-6 lg:px-8 py-6">
+    <main class="counting-container px-2 sm:px-4 lg:px-8 py-4 sm:py-6 w-full">
         <!-- Add Product Section -->
         <div class="bg-white rounded-xl shadow-md border border-gray-100 p-5 sm:p-6 mb-6">
             <h3 class="text-xl font-bold text-gray-900 mb-5 flex items-center space-x-2">
@@ -660,15 +676,15 @@
             </h3>
             <div class="flex flex-col sm:flex-row gap-4">
                 <!-- Manual Input -->
-                <div class="flex-1 relative">
-                    <div class="relative">
+                <div class="flex-1 relative min-w-0">
+                    <div class="relative w-full">
                         <input 
                             type="text" 
                             id="manualProductInput" 
                             placeholder="Ürün adı, barkod veya gram değeri girin..."
-                            class="w-full px-4 py-3 pl-11 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm font-medium bg-gray-50 focus:bg-white"
+                            class="w-full py-3 pl-12 sm:pl-14 md:pl-16 pr-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base font-medium bg-gray-50 focus:bg-white"
                         >
-                        <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="absolute left-3.5 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400 pointer-events-none z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
                     </div>
@@ -679,21 +695,21 @@
                 </div>
                 
                 <!-- Add Buttons -->
-                <div class="flex gap-3 flex-wrap sm:flex-nowrap">
-                    <button id="addProductBtn" class="modern-action-btn add-btn group flex-1 sm:flex-initial px-5 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Ürün ekle">
-                        <svg class="w-5 h-5 transform group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="flex gap-2 sm:gap-3 flex-wrap sm:flex-nowrap flex-shrink-0">
+                    <button id="addProductBtn" class="modern-action-btn add-btn group flex-1 sm:flex-initial px-3 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-1.5 sm:space-x-2.5 text-xs sm:text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Ürün ekle">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 transform group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                         </svg>
                         <span class="font-bold">Ekle</span>
                     </button>
-                    <button id="searchProductBtn" class="modern-action-btn search-btn group flex-1 sm:flex-initial px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Ürün ara">
-                        <svg class="w-5 h-5 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button id="searchProductBtn" class="modern-action-btn search-btn group flex-1 sm:flex-initial px-3 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-1.5 sm:space-x-2.5 text-xs sm:text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Ürün ara">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
                         <span class="font-bold hidden sm:inline">Ara</span>
                     </button>
-                    <button id="cameraScanBtn" class="modern-action-btn camera-btn group flex-1 sm:flex-initial px-5 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Kamera ile tarama">
-                        <svg class="w-5 h-5 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button id="cameraScanBtn" class="modern-action-btn camera-btn group flex-1 sm:flex-initial px-3 sm:px-5 py-2.5 sm:py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-1.5 sm:space-x-2.5 text-xs sm:text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Kamera ile tarama">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                         </svg>
                         <span class="font-bold hidden sm:inline">Kamera</span>
@@ -703,39 +719,71 @@
         </div>
 
         <!-- Sync Section -->
-        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
-            <div class="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                    <h3 class="text-lg font-semibold text-text-primary">Sistem Stokları</h3>
-                    <p class="text-sm text-text-secondary">Depo stoku girilen ürünler için sistem stoklarını getir</p>
+        <div class="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6 w-full">
+            <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 sm:gap-4">
+                <div class="flex-1 min-w-0 w-full lg:w-auto">
+                    <h3 class="text-base sm:text-lg font-semibold text-text-primary">Sistem Stokları</h3>
+                    <p class="text-xs sm:text-sm text-text-secondary">Depo stoku girilen ürünler için sistem stoklarını getir</p>
                 </div>
-                <div class="flex items-center gap-3 flex-wrap">
-                    <button id="resetWarehouseStocksBtn" class="modern-action-btn reset-btn group px-5 py-2.5 bg-gradient-to-r from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 text-orange-700 border border-orange-200 hover:border-orange-300 rounded-xl transition-all duration-200 flex items-center space-x-2.5 text-sm font-semibold shadow-sm hover:shadow-md" title="Tüm depo stoklarını sıfırla">
-                        <svg class="w-5 h-5 transform group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full lg:w-auto lg:flex-nowrap">
+                    <button id="resetWarehouseStocksBtn" class="modern-action-btn reset-btn group flex-1 lg:flex-initial px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 text-orange-700 border border-orange-200 hover:border-orange-300 rounded-xl transition-all duration-200 flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm font-semibold shadow-sm hover:shadow-md" title="Tüm depo stoklarını sıfırla">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 transform group-hover:rotate-90 transition-transform duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                         </svg>
-                        <span class="hidden sm:inline">Depo Stoklarını Sıfırla</span>
-                        <span class="sm:hidden">Depo Sıfırla</span>
+                        <span class="hidden md:inline">Depo Stoklarını Sıfırla</span>
+                        <span class="md:hidden">Depo Sıfırla</span>
                     </button>
-                    <button id="resetSystemStocksBtn" class="modern-action-btn reset-btn group px-5 py-2.5 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-purple-700 border border-purple-200 hover:border-purple-300 rounded-xl transition-all duration-200 flex items-center space-x-2.5 text-sm font-semibold shadow-sm hover:shadow-md" title="Tüm sistem stoklarını sıfırla">
-                        <svg class="w-5 h-5 transform group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button id="resetSystemStocksBtn" class="modern-action-btn reset-btn group flex-1 lg:flex-initial px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-purple-700 border border-purple-200 hover:border-purple-300 rounded-xl transition-all duration-200 flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm font-semibold shadow-sm hover:shadow-md" title="Tüm sistem stoklarını sıfırla">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 transform group-hover:rotate-90 transition-transform duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                         </svg>
-                        <span class="hidden sm:inline">Sistem Stoklarını Sıfırla</span>
-                        <span class="sm:hidden">Sistem Sıfırla</span>
+                        <span class="hidden md:inline">Sistem Stoklarını Sıfırla</span>
+                        <span class="md:hidden">Sistem Sıfırla</span>
                     </button>
-                    <button id="syncStocksBtn" class="modern-action-btn sync-btn group px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 flex items-center space-x-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Sistem stoklarını senkronize et">
-                        <svg class="w-5 h-5 transform group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button id="syncStocksBtn" class="modern-action-btn sync-btn group flex-1 lg:flex-initial px-4 sm:px-5 lg:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Sistem stoklarını senkronize et">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5 transform group-hover:rotate-180 transition-transform duration-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                         </svg>
-                        <span class="font-bold">Senkronize Et</span>
+                        <span class="font-bold whitespace-nowrap">Senkronize Et</span>
                     </button>
                 </div>
             </div>
         </div>
 
+        <!-- API Status Card -->
+        <div id="apiStatusCard" class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm p-3 sm:p-4 lg:p-5 mb-4 sm:mb-6 w-full hidden">
+            <div class="flex items-start justify-between">
+                <div class="flex items-start space-x-3 flex-1">
+                    <div class="flex-shrink-0 mt-1">
+                        <div id="apiStatusIcon" class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-sm font-semibold text-gray-900 mb-1">API Durumu</h4>
+                        <p id="apiStatusText" class="text-sm text-gray-600 mb-2">Token yükleniyor...</p>
+                        <div id="apiExpiryInfo" class="text-xs text-gray-500 space-y-1">
+                            <div class="flex items-center space-x-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span id="apiExpiryTime">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button id="refreshTokenBtn" class="ml-3 p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors" title="Token'ı yenile">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
         <!-- Statistics Section -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 mb-6">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6 w-full">
             <!-- Total Card -->
             <div class="bg-white rounded-2xl shadow-soft p-5 border border-gray-100 stat-card relative overflow-hidden group">
                 <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -773,9 +821,9 @@
         </div>
 
         <!-- Counting Table -->
-        <div class="bg-white rounded-lg shadow-md overflow-hidden">
-            <div class="p-4 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-text-primary">Sayım Tablosu</h3>
+        <div class="bg-white rounded-lg shadow-md overflow-hidden w-full">
+            <div class="p-3 sm:p-4 border-b border-gray-200">
+                <h3 class="text-base sm:text-lg font-semibold text-text-primary">Sayım Tablosu</h3>
             </div>
             
             

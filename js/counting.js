@@ -46,9 +46,104 @@ class CountingSystem {
             // Setup scroll listener for toast positioning
             this.setupToastScrollListener();
             
+            // Check and save API info from extension to Supabase on page load
+            this.checkAndSaveAPIInfoFromExtension();
+            
+            // Update API status card (with delay to ensure data is loaded)
+            setTimeout(() => {
+                this.updateAPIStatusCard();
+            }, 500);
+            
+            // Set up periodic API status updates (every 30 seconds)
+            setInterval(() => {
+                this.updateAPIStatusCard();
+            }, 30000);
+            
+            // Refresh token button event listener
+            const refreshTokenBtn = document.getElementById('refreshTokenBtn');
+            if (refreshTokenBtn) {
+                refreshTokenBtn.addEventListener('click', () => {
+                    this.checkAndSaveAPIInfoFromExtension();
+                    setTimeout(() => this.updateAPIStatusCard(), 1000);
+                });
+            }
+            
+            // Set up periodic API status updates (every 30 seconds)
+            setInterval(() => {
+                this.updateAPIStatusCard();
+            }, 30000);
+            
             console.log('✅ Counting system initialized');
         } catch (error) {
             console.error('Error initializing counting system:', error);
+        }
+    }
+    
+    // Check and save API info from extension to Supabase
+    async checkAndSaveAPIInfoFromExtension() {
+        try {
+            if (!window.supabase || !this.currentUser) {
+                return; // Supabase veya kullanıcı yoksa atla
+            }
+            
+            let apiInfo = null;
+            
+            // Try to get API info from extension (background script)
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                try {
+                    const response = await new Promise((resolve) => {
+                        chrome.runtime.sendMessage(
+                            { type: 'GET_API_INFO' },
+                            (response) => {
+                                if (chrome.runtime.lastError) {
+                                    resolve(null);
+                                } else {
+                                    resolve(response);
+                                }
+                            }
+                        );
+                    });
+                    
+                    if (response && response.success && response.apiInfo) {
+                        apiInfo = response.apiInfo;
+                        console.log('🔑 ✅ chrome.storage\'dan franchise token bulundu');
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Extension API bilgisi alınamadı:', error);
+                }
+            }
+            
+            // Fallback: window.getirExtensionHelper
+            if (!apiInfo && typeof window !== 'undefined' && window.getirExtensionHelper) {
+                try {
+                    apiInfo = await window.getirExtensionHelper.getAPIInfo();
+                    console.log('🔑 ✅ window.getirExtensionHelper\'dan franchise token bulundu');
+                } catch (error) {
+                    console.warn('⚠️ window.getirExtensionHelper hatası:', error);
+                }
+            }
+            
+            // Fallback: localStorage
+            if (!apiInfo) {
+                const apiInfoKey = 'getir_api_info';
+                const apiInfoStr = localStorage.getItem(apiInfoKey);
+                if (apiInfoStr) {
+                    try {
+                        apiInfo = JSON.parse(apiInfoStr);
+                        console.log('🔑 ✅ localStorage\'dan franchise token bulundu');
+                    } catch (e) {
+                        console.warn('⚠️ localStorage parse hatası:', e);
+                    }
+                }
+            }
+            
+            // If API info found, save to Supabase
+            if (apiInfo && apiInfo.token) {
+                console.log('📤 Franchise API bilgileri kaydedildi');
+                await this.saveAPIInfoToSupabase(apiInfo);
+            }
+        } catch (error) {
+            console.warn('⚠️ API bilgileri kontrol edilemedi:', error);
         }
     }
 
@@ -543,6 +638,7 @@ class CountingSystem {
     async saveAPIInfoToSupabase(apiInfo) {
         try {
             if (!window.supabase || !this.currentUser) {
+                console.warn('⚠️ Supabase veya kullanıcı yok, API bilgileri kaydedilemedi');
                 return; // Supabase veya kullanıcı yoksa kaydetme
             }
 
@@ -551,11 +647,12 @@ class CountingSystem {
                 .from('users')
                 .select('counting_data')
                 .eq('username', this.currentUser.username)
-                .single();
+                .maybeSingle();
 
+            // Eğer kullanıcı bulunamadıysa veya counting_data yoksa, yeni oluştur
             if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = no rows returned
                 console.warn('⚠️ Supabase counting_data okuma hatası:', fetchError);
-                return;
+                // Hata varsa devam et, yeni yapı oluşturacağız
             }
 
             // counting_data'yı parse et veya yeni oluştur
@@ -571,10 +668,35 @@ class CountingSystem {
                 }
             }
 
+            // Eğer counting_data yoksa veya yapısı bozuksa, yeni yapı oluştur
+            if (!countingData || typeof countingData !== 'object') {
+                countingData = {
+                    _api_info: {},
+                    _tables: {},
+                    _currentTable: 'Ana Sayım'
+                };
+            }
+
+            // _tables yoksa oluştur
+            if (!countingData._tables || typeof countingData._tables !== 'object') {
+                countingData._tables = {};
+            }
+
+            // Mevcut tablo yoksa varsayılan tabloyu oluştur
+            if (!countingData._currentTable) {
+                countingData._currentTable = 'Ana Sayım';
+            }
+            if (!countingData._tables[countingData._currentTable]) {
+                countingData._tables[countingData._currentTable] = {};
+            }
+
             // Mevcut API bilgilerini kontrol et (değişiklik tespiti için)
             const existingAPIInfo = countingData._api_info || {};
+            const existingToken = existingAPIInfo.token ? (existingAPIInfo.token.startsWith('Bearer ') ? existingAPIInfo.token.substring(7).trim() : existingAPIInfo.token) : '';
+            const newToken = apiInfo.token ? (apiInfo.token.startsWith('Bearer ') ? apiInfo.token.substring(7).trim() : apiInfo.token) : '';
+            
             const hasChanged = 
-                existingAPIInfo.token !== apiInfo.token ||
+                existingToken !== newToken ||
                 existingAPIInfo.warehouseId !== apiInfo.warehouseId ||
                 existingAPIInfo.tokenExpiry !== apiInfo.tokenExpiry;
 
@@ -589,20 +711,27 @@ class CountingSystem {
                 timestamp: apiInfo.timestamp || Date.now()
             };
 
-            // Sadece değişiklik varsa Supabase'e kaydet
-            if (hasChanged) {
-                const { error: updateError } = await window.supabase
-                    .from('users')
-                    .update({ counting_data: countingData })
-                    .eq('username', this.currentUser.username);
+            // Her zaman Supabase'e kaydet (kullanıcıya özel veri yapısını güncellemek için)
+            const { error: updateError } = await window.supabase
+                .from('users')
+                .update({ counting_data: countingData })
+                .eq('username', this.currentUser.username);
 
-                if (updateError) {
-                    console.warn('⚠️ Supabase API bilgileri kayıt hatası:', updateError);
-                } else {
+            if (updateError) {
+                console.warn('⚠️ Supabase API bilgileri kayıt hatası:', updateError);
+            } else {
+                if (hasChanged) {
                     console.log('✅ API bilgileri Supabase\'e kaydedildi (counting_data._api_info)', {
+                        username: this.currentUser.username,
                         warehouseId: apiInfo.warehouseId,
-                        tokenLength: apiInfo.token ? apiInfo.token.substring(7).trim().length : 0,
-                        tokenExpiry: apiInfo.tokenExpiry ? new Date(apiInfo.tokenExpiry).toLocaleString('tr-TR') : 'N/A'
+                        tokenLength: newToken.length,
+                        tokenExpiry: apiInfo.tokenExpiry ? new Date(apiInfo.tokenExpiry).toLocaleString('tr-TR') : 'N/A',
+                        changed: 'Token/Warehouse/Expiry güncellendi'
+                    });
+                } else {
+                    console.log('✅ API bilgileri Supabase\'de mevcut (değişiklik yok)', {
+                        username: this.currentUser.username,
+                        warehouseId: apiInfo.warehouseId
                     });
                 }
             }
@@ -1538,6 +1667,9 @@ class CountingSystem {
                             warehouseId: apiInfo.warehouseId,
                             stockEndpoint: apiInfo.stockEndpoint
                         });
+                        
+                        // API bilgilerini Supabase'e kaydet (kullanıcıya özel)
+                        await this.saveAPIInfoToSupabase(apiInfo);
                     } else if (response && !response.success) {
                         console.warn('⚠️ Background script API bilgileri döndürmedi:', response.error);
                     } else if (!response) {
@@ -1557,6 +1689,11 @@ class CountingSystem {
                     console.log('🔍 window.getirExtensionHelper kullanılıyor...');
                     apiInfo = await window.getirExtensionHelper.getAPIInfo();
                     console.log('✅ API bilgileri window.getirExtensionHelper\'dan alındı');
+                    
+                    // API bilgilerini Supabase'e kaydet (kullanıcıya özel)
+                    if (apiInfo) {
+                        await this.saveAPIInfoToSupabase(apiInfo);
+                    }
                 } catch (error) {
                     console.warn('⚠️ window.getirExtensionHelper hatası:', error.message);
                 }
@@ -1571,6 +1708,11 @@ class CountingSystem {
                     try {
                         apiInfo = JSON.parse(apiInfoStr);
                         console.log('📥 API bilgileri localStorage\'dan alındı (fallback)');
+                        
+                        // API bilgilerini Supabase'e kaydet (kullanıcıya özel)
+                        if (apiInfo) {
+                            await this.saveAPIInfoToSupabase(apiInfo);
+                        }
                     } catch (e) {
                         console.warn('⚠️ localStorage parse hatası:', e);
                     }
@@ -3114,6 +3256,152 @@ class CountingSystem {
                 }
             }
         });
+    }
+    
+    // Update API status card
+    async updateAPIStatusCard() {
+        try {
+            const apiStatusCard = document.getElementById('apiStatusCard');
+            const apiStatusIcon = document.getElementById('apiStatusIcon');
+            const apiStatusText = document.getElementById('apiStatusText');
+            const apiExpiryTime = document.getElementById('apiExpiryTime');
+            
+            if (!apiStatusCard || !apiStatusIcon || !apiStatusText || !apiExpiryTime) {
+                return;
+            }
+            
+            // Get API info from Supabase or extension
+            let apiInfo = null;
+            
+            // Try to get from Supabase first
+            if (window.supabase && this.currentUser) {
+                const { data: userData } = await window.supabase
+                    .from('users')
+                    .select('counting_data')
+                    .eq('username', this.currentUser.username)
+                    .maybeSingle();
+                
+                if (userData && userData.counting_data) {
+                    const countingData = typeof userData.counting_data === 'string' 
+                        ? JSON.parse(userData.counting_data) 
+                        : userData.counting_data;
+                    apiInfo = countingData._api_info || null;
+                }
+            }
+            
+            // Fallback: Try extension
+            if (!apiInfo) {
+                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                    try {
+                        const response = await new Promise((resolve) => {
+                            chrome.runtime.sendMessage(
+                                { type: 'GET_API_INFO' },
+                                (response) => {
+                                    if (chrome.runtime.lastError) {
+                                        resolve(null);
+                                    } else {
+                                        resolve(response);
+                                    }
+                                }
+                            );
+                        });
+                        
+                        if (response && response.success && response.apiInfo) {
+                            apiInfo = response.apiInfo;
+                        }
+                    } catch (error) {
+                        // Silent fail
+                    }
+                }
+            }
+            
+            // Fallback: localStorage
+            if (!apiInfo) {
+                const apiInfoKey = 'getir_api_info';
+                const apiInfoStr = localStorage.getItem(apiInfoKey);
+                if (apiInfoStr) {
+                    try {
+                        apiInfo = JSON.parse(apiInfoStr);
+                    } catch (e) {
+                        // Silent fail
+                    }
+                }
+            }
+            
+            // Update card based on API info
+            if (apiInfo && apiInfo.token) {
+                apiStatusCard.classList.remove('hidden');
+                
+                const tokenExpiry = apiInfo.tokenExpiry;
+                const now = Date.now();
+                
+                if (tokenExpiry) {
+                    const expiryTime = new Date(tokenExpiry).getTime();
+                    const timeRemaining = expiryTime - now;
+                    const minutesRemaining = Math.floor(timeRemaining / (1000 * 60));
+                    const hoursRemaining = Math.floor(minutesRemaining / 60);
+                    const daysRemaining = Math.floor(hoursRemaining / 24);
+                    
+                    // Determine status
+                    if (timeRemaining < 0) {
+                        // Expired
+                        apiStatusCard.className = 'bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
+                        apiStatusIcon.className = 'w-10 h-10 rounded-full bg-red-100 flex items-center justify-center';
+                        apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+                        apiStatusText.textContent = 'Token süresi dolmuş';
+                        apiExpiryTime.innerHTML = '<span class="text-red-600 font-medium">Lütfen Getir franchise sayfasını yenileyin</span>';
+                    } else if (timeRemaining < 5 * 60 * 1000) {
+                        // Expiring soon (less than 5 minutes)
+                        apiStatusCard.className = 'bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
+                        apiStatusIcon.className = 'w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center';
+                        apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
+                        apiStatusText.textContent = 'Token yakında dolacak';
+                        apiExpiryTime.innerHTML = `<span class="text-yellow-700 font-medium">${minutesRemaining} dakika içinde Getir franchise sayfasını yenileyin</span>`;
+                    } else {
+                        // Valid
+                        apiStatusCard.className = 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
+                        apiStatusIcon.className = 'w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center';
+                        apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+                        apiStatusText.textContent = 'API güncel ve aktif';
+                        
+                        // Format remaining time
+                        let timeText = '';
+                        if (daysRemaining > 0) {
+                            timeText = `${daysRemaining} gün ${hoursRemaining % 24} saat`;
+                        } else if (hoursRemaining > 0) {
+                            timeText = `${hoursRemaining} saat ${minutesRemaining % 60} dakika`;
+                        } else {
+                            timeText = `${minutesRemaining} dakika`;
+                        }
+                        
+                        const expiryDate = new Date(tokenExpiry).toLocaleString('tr-TR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        
+                        apiExpiryTime.innerHTML = `
+                            <span class="text-gray-600">Kalan süre: <span class="font-medium text-blue-700">${timeText}</span></span><br>
+                            <span class="text-gray-500 text-xs mt-1">Son kullanma: ${expiryDate}</span>
+                        `;
+                    }
+                } else {
+                    // No expiry info
+                    apiStatusCard.className = 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
+                    apiStatusIcon.className = 'w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center';
+                    apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+                    apiStatusText.textContent = 'API aktif';
+                    apiExpiryTime.innerHTML = '<span class="text-gray-500">Token bilgisi mevcut</span>';
+                }
+            } else {
+                // No API info
+                apiStatusCard.classList.add('hidden');
+            }
+        } catch (error) {
+            console.warn('⚠️ API durumu güncellenemedi:', error);
+        }
     }
 }
 
