@@ -1919,27 +1919,52 @@ class CountingSystem {
             
             let response;
             try {
+                // apiInfo.headers içinden User-Agent'ı filtrele (CORS hatası vermemesi için)
+                const safeHeaders = {};
+                if (apiInfo.headers && typeof apiInfo.headers === 'object') {
+                    Object.keys(apiInfo.headers).forEach(key => {
+                        // User-Agent ve user-agent header'larını atla
+                        if (key.toLowerCase() !== 'user-agent') {
+                            safeHeaders[key] = apiInfo.headers[key];
+                        } else {
+                            console.warn('⚠️ User-Agent header filtrelendi:', key);
+                        }
+                    });
+                }
+                
+                // Final headers objesi - User-Agent kesinlikle olmamalı
+                const finalHeaders = {
+                    'Content-Type': 'application/json',
+                    'Authorization': authToken,
+                    'Origin': 'https://franchise.getir.com',
+                    'Referer': 'https://franchise.getir.com/',
+                    'Accept': '*/*',
+                    'Accept-Language': 'tr-TR,tr;q=0.9',
+                    // User-Agent header'ı kaldırıldı - CORS tarafından izin verilmiyor
+                    ...safeHeaders // Sadece güvenli header'ları ekle
+                };
+                
+                // Son kontrol: User-Agent var mı?
+                if (finalHeaders['User-Agent'] || finalHeaders['user-agent']) {
+                    delete finalHeaders['User-Agent'];
+                    delete finalHeaders['user-agent'];
+                    console.warn('⚠️ User-Agent header final headers\'dan kaldırıldı');
+                }
+                
                 console.log('📤 Fetch çağrısı başlatılıyor...', {
                     url: urlWithParams,
                     method: 'POST',
                     hasToken: !!authToken,
                     tokenLength: authToken ? authToken.length : 0,
                     warehouseId: warehouseId,
-                    productId: productId
+                    productId: productId,
+                    headersCount: Object.keys(finalHeaders).length,
+                    headerKeys: Object.keys(finalHeaders)
                 });
                 
                 response = await fetch(urlWithParams, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': authToken,
-                        'Origin': 'https://franchise.getir.com',
-                        'Referer': 'https://franchise.getir.com/',
-                        'Accept': '*/*',
-                        'Accept-Language': 'tr-TR,tr;q=0.9'
-                        // User-Agent header'ı kaldırıldı - CORS tarafından izin verilmiyor
-                        // ...(apiInfo.headers || {}) - apiInfo.headers içinde User-Agent varsa sorun çıkarabilir
-                    },
+                    headers: finalHeaders,
                     body: JSON.stringify(requestBody),
                     // CORS için mode ve credentials ayarları
                     mode: 'cors',
