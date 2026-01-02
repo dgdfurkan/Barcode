@@ -18,6 +18,7 @@
         stock: 'https://franchise-api-gateway.getirapi.com/stocks', // Sabit endpoint
         token: null,
         warehouseId: null, // Warehouse ID'yi response'dan yakalayacağız
+        warehouseName: null, // Warehouse name'i DOM'dan veya API'den yakalayacağız
         headers: {},
         baseUrl: 'https://franchise-api-gateway.getirapi.com',
         captured: false,
@@ -50,6 +51,58 @@
         }
     };
 
+    // DOM'dan warehouse name'i yakala
+    function extractWarehouseNameFromDOM() {
+        try {
+            // Franchise sayfasında depo adını bulabileceğimiz yerler
+            const selectors = [
+                'h1', 'h2', 'h3', // Başlıklar
+                '[class*="warehouse"]', '[class*="depo"]', // Warehouse/depo class'ları
+                '[data-warehouse]', '[data-depo]', // Data attribute'ları
+                'nav', 'header', 'aside', // Navigation, header, sidebar
+                '.sidebar', '.header', '.nav', // Yaygın class'lar
+            ];
+            
+            // Önce data attribute'lardan dene
+            const dataWarehouse = document.querySelector('[data-warehouse-name], [data-warehouse], [data-depo-name]');
+            if (dataWarehouse) {
+                const name = dataWarehouse.getAttribute('data-warehouse-name') || 
+                           dataWarehouse.getAttribute('data-warehouse') ||
+                           dataWarehouse.getAttribute('data-depo-name') ||
+                           dataWarehouse.textContent?.trim();
+                if (name && name.length > 0 && name.length < 100) {
+                    return name;
+                }
+            }
+            
+            // Başlıklardan dene
+            const headings = document.querySelectorAll('h1, h2, h3');
+            for (const heading of headings) {
+                const text = heading.textContent?.trim();
+                if (text && text.length > 0 && text.length < 100 && 
+                    !text.includes('Getir') && !text.includes('Franchise') &&
+                    !text.includes('Stok') && !text.includes('Stock')) {
+                    // Muhtemelen depo adı
+                    return text;
+                }
+            }
+            
+            // Meta tag'lerden dene
+            const metaWarehouse = document.querySelector('meta[name="warehouse-name"], meta[property="warehouse-name"]');
+            if (metaWarehouse) {
+                const name = metaWarehouse.getAttribute('content');
+                if (name && name.length > 0 && name.length < 100) {
+                    return name;
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.warn('⚠️ DOM\'dan warehouse name çıkarılamadı:', error);
+            return null;
+        }
+    }
+    
     // JWT token'dan expiry zamanını çıkar
     function getTokenExpiry(token) {
         try {
@@ -170,6 +223,7 @@
             countingData._api_info = {
                 token: apiInfo.token,
                 warehouseId: apiInfo.warehouseId,
+                warehouseName: apiInfo.warehouseName || null,
                 tokenExpiry: apiInfo.tokenExpiry,
                 baseUrl: apiInfo.baseUrl,
                 stockEndpoint: apiInfo.stockEndpoint,
@@ -208,6 +262,15 @@
             // Ayrıca counting.js tarafında da kontrol yapılacak
         }
         
+        // DOM'dan warehouse name'i yakala (eğer henüz yakalanmadıysa)
+        if (!apiEndpoints.warehouseName && document.readyState === 'complete') {
+            const warehouseName = extractWarehouseNameFromDOM();
+            if (warehouseName) {
+                apiEndpoints.warehouseName = warehouseName;
+                console.log('🏭 ✅ Warehouse name DOM\'dan yakalandı:', warehouseName);
+            }
+        }
+        
         const tokenValue = apiEndpoints.token.startsWith('Bearer ') ? apiEndpoints.token.substring(7).trim() : apiEndpoints.token;
         
         const apiInfo = {
@@ -215,12 +278,13 @@
             stockEndpoint: apiEndpoints.stock,
             token: apiEndpoints.token, // Bearer token olarak
             warehouseId: apiEndpoints.warehouseId || '5dcafe6ae2c61b1e52cf1704', // Default warehouse ID
+            warehouseName: apiEndpoints.warehouseName || null, // Warehouse name
             headers: apiEndpoints.headers,
             timestamp: Date.now(),
             tokenExpiry: apiEndpoints.tokenExpiry
         };
         
-        // Değişiklik tespiti: Token, warehouse ID veya expiry değişti mi?
+        // Değişiklik tespiti: Token, warehouse ID, warehouse name veya expiry değişti mi?
         let hasChanged = false;
         if (!previousAPIInfo) {
             hasChanged = true; // İlk kayıt
@@ -230,6 +294,7 @@
             
             if (prevToken !== currToken || 
                 previousAPIInfo.warehouseId !== apiInfo.warehouseId ||
+                previousAPIInfo.warehouseName !== apiInfo.warehouseName ||
                 previousAPIInfo.tokenExpiry !== apiInfo.tokenExpiry) {
                 hasChanged = true;
             }
@@ -344,14 +409,19 @@
                         console.log('  - Token:', apiEndpoints.token ? '✅ Mevcut (' + apiEndpoints.token.substring(7, 37) + '...)' : '❌ Yok');
                         console.log('  - Warehouse ID:', apiEndpoints.warehouseId || '❌ Yok');
                         
-                        // Warehouse ID'yi response'dan çıkar (her response'da güncelle)
+                        // Warehouse ID ve name'i response'dan çıkar (her response'da güncelle)
                         if (data && response.status === 200) {
                             let foundWarehouseId = null;
+                            let foundWarehouseName = null;
                             
                             // Eğer data array ise, ilk elemandan warehouse ID'yi al
                             if (Array.isArray(data) && data.length > 0) {
                                 if (data[0].warehouse) {
                                     foundWarehouseId = data[0].warehouse;
+                                }
+                                // Warehouse name'i de kontrol et
+                                if (data[0].warehouseName || data[0].warehouse?.name) {
+                                    foundWarehouseName = data[0].warehouseName || data[0].warehouse?.name;
                                 }
                             } 
                             // Eğer data.data array ise
@@ -359,10 +429,15 @@
                                 if (data.data[0].warehouse) {
                                     foundWarehouseId = data.data[0].warehouse;
                                 }
+                                // Warehouse name'i de kontrol et
+                                if (data.data[0].warehouseName || data.data[0].warehouse?.name) {
+                                    foundWarehouseName = data.data[0].warehouseName || data.data[0].warehouse?.name;
+                                }
                             }
                             // Eğer direkt warehouse field'ı varsa
                             else if (data.warehouse) {
-                                foundWarehouseId = data.warehouse;
+                                foundWarehouseId = typeof data.warehouse === 'string' ? data.warehouse : data.warehouse._id || data.warehouse.id;
+                                foundWarehouseName = typeof data.warehouse === 'object' ? (data.warehouse.name || data.warehouse.warehouseName) : null;
                             }
                             
                             // Warehouse ID bulunduysa ve değiştiyse güncelle
@@ -374,6 +449,13 @@
                                 // İlk kez bulunuyorsa
                                 apiEndpoints.warehouseId = foundWarehouseId;
                                 console.log('🏭 ✅ Warehouse ID yakalandı (response\'dan):', apiEndpoints.warehouseId);
+                                sendAPIInfoToCountingPage();
+                            }
+                            
+                            // Warehouse name bulunduysa güncelle
+                            if (foundWarehouseName && foundWarehouseName !== apiEndpoints.warehouseName) {
+                                apiEndpoints.warehouseName = foundWarehouseName;
+                                console.log('🏭 ✅ Warehouse name yakalandı (response\'dan):', apiEndpoints.warehouseName);
                                 sendAPIInfoToCountingPage();
                             }
                         }
