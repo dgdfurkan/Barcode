@@ -1919,6 +1919,15 @@ class CountingSystem {
             
             let response;
             try {
+                console.log('📤 Fetch çağrısı başlatılıyor...', {
+                    url: urlWithParams,
+                    method: 'POST',
+                    hasToken: !!authToken,
+                    tokenLength: authToken ? authToken.length : 0,
+                    warehouseId: warehouseId,
+                    productId: productId
+                });
+                
                 response = await fetch(urlWithParams, {
                     method: 'POST',
                     headers: {
@@ -1931,19 +1940,35 @@ class CountingSystem {
                         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
                         ...(apiInfo.headers || {})
                     },
-                    body: JSON.stringify(requestBody)
+                    body: JSON.stringify(requestBody),
+                    // CORS için mode ve credentials ayarları
+                    mode: 'cors',
+                    credentials: 'omit'
+                });
+                
+                console.log('✅ Fetch çağrısı tamamlandı, response alındı:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok,
+                    headers: Object.fromEntries(response.headers.entries())
                 });
             } catch (fetchError) {
-                console.error('❌ Fetch hatası:', fetchError);
-                // Network hatası veya CORS hatası
-                if (fetchError.message && fetchError.message.includes('Failed to fetch')) {
-                    throw new Error('Ağ hatası: API\'ye bağlanılamadı. İnternet bağlantınızı kontrol edin veya daha sonra tekrar deneyin.');
-                } else if (fetchError.message && fetchError.message.includes('NetworkError')) {
-                    throw new Error('Ağ hatası: API\'ye bağlanılamadı. İnternet bağlantınızı kontrol edin.');
+                console.error('❌ Fetch hatası detayları:', {
+                    name: fetchError.name,
+                    message: fetchError.message,
+                    stack: fetchError.stack,
+                    error: fetchError
+                });
+                
+                // CORS hatası kontrolü
+                if (fetchError.message && (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError'))) {
+                    // CORS hatası olabilir - backend proxy gerekebilir
+                    console.error('⚠️ CORS veya Network hatası tespit edildi. Bu, mobil tarayıcılarda yaygın bir sorundur.');
+                    throw new Error('API\'ye erişilemiyor. Bu, tarayıcı güvenlik kısıtlamaları nedeniyle olabilir. Lütfen:\n1. İnternet bağlantınızı kontrol edin\n2. Sayfayı yenileyip tekrar deneyin\n3. Farklı bir ağ deneyin');
                 } else if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
-                    throw new Error('Ağ hatası: API çağrısı yapılamadı. Lütfen sayfayı yenileyip tekrar deneyin.');
+                    throw new Error('API çağrısı yapılamadı. Lütfen sayfayı yenileyip tekrar deneyin.');
                 }
-                throw new Error('API çağrısı başarısız: ' + (fetchError.message || 'Bilinmeyen hata'));
+                throw new Error('API çağrısı başarısız: ' + (fetchError.message || fetchError.name || 'Bilinmeyen hata'));
             }
             
             if (!response.ok) {
