@@ -1992,8 +1992,21 @@ class CountingSystem {
                 throw new Error(`API hatası: ${response.status} ${response.statusText}`);
             }
             
-            const data = await response.json();
-            console.log('📥 API yanıtı alındı:', JSON.stringify(data, null, 2));
+            let data;
+            try {
+                const responseText = await response.text();
+                console.log('📥 API yanıtı (text, ilk 500 karakter):', responseText.substring(0, 500));
+                try {
+                    data = JSON.parse(responseText);
+                    console.log('📥 API yanıtı (parsed, ilk 1000 karakter):', JSON.stringify(data, null, 2).substring(0, 1000));
+                } catch (parseError) {
+                    console.error('❌ JSON parse hatası:', parseError);
+                    throw new Error('API yanıtı geçersiz JSON formatında: ' + responseText.substring(0, 200));
+                }
+            } catch (textError) {
+                console.error('❌ Response text okuma hatası:', textError);
+                throw new Error('API yanıtı okunamadı: ' + (textError.message || 'Bilinmeyen hata'));
+            }
             
             // Response format'ına göre stok değerini bul
             let stock = null;
