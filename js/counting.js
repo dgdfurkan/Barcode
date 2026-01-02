@@ -2336,6 +2336,9 @@ class CountingSystem {
                                 <input 
                                     type="number" 
                                     class="warehouse-stock-input w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all"
+                                    type="number"
+                                    min="0"
+                                    step="1"
                                     value="${data.warehouseStock !== null ? data.warehouseStock : ''}"
                                     placeholder="0"
                                     data-product-id="${productId}"
@@ -2495,6 +2498,9 @@ class CountingSystem {
                                     <input 
                                         type="number" 
                                         class="warehouse-stock-input w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all"
+                                        type="number"
+                                        min="0"
+                                        step="1"
                                         value="${data.warehouseStock !== null ? data.warehouseStock : ''}"
                                         placeholder="0"
                                         data-product-id="${productId}"
@@ -2590,10 +2596,43 @@ class CountingSystem {
         // Warehouse stock inputs
         const warehouseInputs = document.querySelectorAll('.warehouse-stock-input');
         warehouseInputs.forEach(input => {
+            // Sadece sayı girişine izin ver (negatif ve ondalık sayıları engelle)
+            input.addEventListener('input', (e) => {
+                let value = e.target.value;
+                // Negatif işareti ve ondalık noktayı kaldır
+                value = value.replace(/[^0-9]/g, '');
+                // Eğer değer değiştiyse güncelle
+                if (e.target.value !== value) {
+                    e.target.value = value;
+                }
+            });
+            
             input.addEventListener('change', (e) => {
                 const productId = e.target.dataset.productId;
-                const value = e.target.value.trim() === '' ? null : Number(e.target.value);
+                let value = e.target.value.trim();
+                
+                // Boşsa null, değilse sayıya çevir
+                if (value === '') {
+                    value = null;
+                } else {
+                    // Sadece pozitif tam sayıları kabul et
+                    const numValue = Math.max(0, Math.floor(Number(value)));
+                    value = numValue;
+                    // Input değerini de güncelle (negatif veya ondalık girilmişse)
+                    if (e.target.value !== String(value)) {
+                        e.target.value = value === 0 ? '' : value;
+                    }
+                }
+                
                 this.updateProductStock(productId, value, null);
+            });
+            
+            // Klavye ile negatif veya ondalık girişini engelle
+            input.addEventListener('keydown', (e) => {
+                // Eksi işareti, nokta, virgül ve e/E (bilimsel gösterim) engelle
+                if (e.key === '-' || e.key === '.' || e.key === ',' || e.key === 'e' || e.key === 'E') {
+                    e.preventDefault();
+                }
             });
         });
 
