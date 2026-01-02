@@ -1917,24 +1917,53 @@ class CountingSystem {
                 warehouseId: warehouseId
             });
             
-            const response = await fetch(urlWithParams, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': authToken,
-                    'Origin': 'https://franchise.getir.com',
-                    'Referer': 'https://franchise.getir.com/',
-                    'Accept': '*/*',
-                    'Accept-Language': 'tr-TR,tr;q=0.9',
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
-                    ...(apiInfo.headers || {})
-                },
-                body: JSON.stringify(requestBody)
-            });
+            let response;
+            try {
+                response = await fetch(urlWithParams, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': authToken,
+                        'Origin': 'https://franchise.getir.com',
+                        'Referer': 'https://franchise.getir.com/',
+                        'Accept': '*/*',
+                        'Accept-Language': 'tr-TR,tr;q=0.9',
+                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
+                        ...(apiInfo.headers || {})
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+            } catch (fetchError) {
+                console.error('❌ Fetch hatası:', fetchError);
+                // Network hatası veya CORS hatası
+                if (fetchError.message && fetchError.message.includes('Failed to fetch')) {
+                    throw new Error('Ağ hatası: API\'ye bağlanılamadı. İnternet bağlantınızı kontrol edin veya daha sonra tekrar deneyin.');
+                } else if (fetchError.message && fetchError.message.includes('NetworkError')) {
+                    throw new Error('Ağ hatası: API\'ye bağlanılamadı. İnternet bağlantınızı kontrol edin.');
+                } else if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
+                    throw new Error('Ağ hatası: API çağrısı yapılamadı. Lütfen sayfayı yenileyip tekrar deneyin.');
+                }
+                throw new Error('API çağrısı başarısız: ' + (fetchError.message || 'Bilinmeyen hata'));
+            }
             
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ API hatası:', response.status, errorText);
+                let errorText = '';
+                try {
+                    errorText = await response.text();
+                } catch (e) {
+                    errorText = 'Yanıt okunamadı';
+                }
+                console.error('❌ API hatası:', response.status, response.statusText, errorText);
+                
+                if (response.status === 401) {
+                    throw new Error('Yetkilendirme hatası: Token geçersiz veya süresi dolmuş. Lütfen Getir franchise sayfasını yenileyin.');
+                } else if (response.status === 403) {
+                    throw new Error('Erişim reddedildi: Token yetkisi yetersiz. Lütfen Getir franchise sayfasını yenileyin.');
+                } else if (response.status === 404) {
+                    throw new Error('API endpoint bulunamadı. Lütfen daha sonra tekrar deneyin.');
+                } else if (response.status >= 500) {
+                    throw new Error('Sunucu hatası: API geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.');
+                }
                 throw new Error(`API hatası: ${response.status} ${response.statusText}`);
             }
             
