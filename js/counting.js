@@ -1936,9 +1936,9 @@ class CountingSystem {
                         'Origin': 'https://franchise.getir.com',
                         'Referer': 'https://franchise.getir.com/',
                         'Accept': '*/*',
-                        'Accept-Language': 'tr-TR,tr;q=0.9',
-                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36',
-                        ...(apiInfo.headers || {})
+                        'Accept-Language': 'tr-TR,tr;q=0.9'
+                        // User-Agent header'ı kaldırıldı - CORS tarafından izin verilmiyor
+                        // ...(apiInfo.headers || {}) - apiInfo.headers içinde User-Agent varsa sorun çıkarabilir
                     },
                     body: JSON.stringify(requestBody),
                     // CORS için mode ve credentials ayarları
@@ -1964,10 +1964,30 @@ class CountingSystem {
                 if (fetchError.message && (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError'))) {
                     // CORS hatası olabilir - backend proxy gerekebilir
                     console.error('⚠️ CORS veya Network hatası tespit edildi. Bu, mobil tarayıcılarda yaygın bir sorundur.');
-                    throw new Error('API\'ye erişilemiyor. Bu, tarayıcı güvenlik kısıtlamaları nedeniyle olabilir. Lütfen:\n1. İnternet bağlantınızı kontrol edin\n2. Sayfayı yenileyip tekrar deneyin\n3. Farklı bir ağ deneyin');
+                    const errorDetails = {
+                        name: fetchError.name,
+                        message: fetchError.message,
+                        stack: fetchError.stack,
+                        url: urlWithParams,
+                        hasToken: !!authToken,
+                        tokenLength: authToken ? authToken.length : 0
+                    };
+                    console.error('📋 Hata detayları:', errorDetails);
+                    throw new Error('API\'ye erişilemiyor (CORS/Network hatası). Detaylar: ' + fetchError.message + ' | URL: ' + urlWithParams.substring(0, 50) + '...');
                 } else if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
-                    throw new Error('API çağrısı yapılamadı. Lütfen sayfayı yenileyip tekrar deneyin.');
+                    console.error('📋 TypeError detayları:', {
+                        name: fetchError.name,
+                        message: fetchError.message,
+                        stack: fetchError.stack
+                    });
+                    throw new Error('API çağrısı yapılamadı: ' + fetchError.message + '. Lütfen sayfayı yenileyip tekrar deneyin.');
                 }
+                console.error('📋 Genel hata detayları:', {
+                    name: fetchError.name,
+                    message: fetchError.message,
+                    stack: fetchError.stack,
+                    error: fetchError
+                });
                 throw new Error('API çağrısı başarısız: ' + (fetchError.message || fetchError.name || 'Bilinmeyen hata'));
             }
             
