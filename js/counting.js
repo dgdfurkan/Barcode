@@ -1636,14 +1636,28 @@ class CountingSystem {
             console.log('  - chrome.runtime.id:', typeof chrome !== 'undefined' && chrome.runtime ? chrome.runtime.id : 'yok');
             
             // ÖNCE SUPABASE'DEN OKU (Mobil için)
-            if (!apiInfo && window.supabase && this.currentUser) {
+            if (!apiInfo && window.supabase) {
                 try {
-                    console.log('🔍 Supabase\'den API bilgileri okunuyor...');
-                    const { data: userData, error } = await window.supabase
-                        .from('users')
-                        .select('counting_data')
-                        .eq('username', this.currentUser.username)
-                        .maybeSingle();
+                    // currentUser yoksa auth'dan al
+                    let username = null;
+                    if (this.currentUser && this.currentUser.username) {
+                        username = this.currentUser.username;
+                    } else if (window.authUtils && window.authUtils.checkAuth) {
+                        const session = window.authUtils.checkAuth();
+                        if (session && session.username) {
+                            username = session.username;
+                        }
+                    }
+                    
+                    if (!username) {
+                        console.warn('⚠️ Kullanıcı adı bulunamadı, Supabase\'den okuma yapılamıyor');
+                    } else {
+                        console.log('🔍 Supabase\'den API bilgileri okunuyor (kullanıcı:', username, ')...');
+                        const { data: userData, error } = await window.supabase
+                            .from('users')
+                            .select('counting_data')
+                            .eq('username', username)
+                            .maybeSingle();
                     
                     if (!error && userData && userData.counting_data) {
                         const countingData = typeof userData.counting_data === 'string' 
@@ -1651,23 +1665,41 @@ class CountingSystem {
                             : userData.counting_data;
                         
                         if (countingData._api_info && countingData._api_info.token) {
+                            // Token'ın Bearer prefix'i olup olmadığını kontrol et
+                            let token = countingData._api_info.token;
+                            if (!token.startsWith('Bearer ')) {
+                                token = 'Bearer ' + token.trim();
+                            }
+                            
                             apiInfo = {
-                                token: countingData._api_info.token,
+                                token: token,
                                 warehouseId: countingData._api_info.warehouseId,
+                                warehouseName: countingData._api_info.warehouseName || null,
                                 tokenExpiry: countingData._api_info.tokenExpiry,
-                                baseUrl: countingData._api_info.baseUrl,
+                                baseUrl: countingData._api_info.baseUrl || 'https://franchise-api-gateway.getirapi.com',
                                 stockEndpoint: countingData._api_info.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks',
                                 timestamp: countingData._api_info.timestamp
                             };
                             console.log('✅ API bilgileri Supabase\'den alındı:', {
                                 hasToken: !!apiInfo.token,
                                 warehouseId: apiInfo.warehouseId,
-                                stockEndpoint: apiInfo.stockEndpoint
+                                warehouseName: apiInfo.warehouseName,
+                                stockEndpoint: apiInfo.stockEndpoint,
+                                tokenLength: token.length,
+                                tokenPrefix: token.substring(0, 7)
                             });
+                        } else {
+                            console.warn('⚠️ Supabase\'de _api_info veya token bulunamadı');
                         }
+                    } else if (error) {
+                        console.warn('⚠️ Supabase okuma hatası:', error);
+                    } else {
+                        console.warn('⚠️ Supabase\'de counting_data bulunamadı');
+                    }
                     }
                 } catch (error) {
                     console.warn('⚠️ Supabase API bilgileri okuma hatası:', error);
+                    console.error('Hata detayı:', error);
                 }
             }
             
@@ -1867,18 +1899,29 @@ class CountingSystem {
             
             const urlWithParams = `${endpoint}?limit=100&offset=0`;
             
+            // Token'ın Bearer prefix'i olup olmadığını kontrol et ve düzelt
+            let authToken = apiInfo.token;
+            if (!authToken) {
+                throw new Error('Token bulunamadı. Lütfen Getir franchise sayfasını açın ve sayfayı yenileyin.');
+            }
+            if (!authToken.startsWith('Bearer ')) {
+                authToken = 'Bearer ' + authToken.trim();
+            }
+            
             console.log('📤 API isteği gönderiliyor:', { 
                 url: urlWithParams, 
                 method: 'POST',
                 body: requestBody,
-                hasToken: !!apiInfo.token
+                hasToken: !!authToken,
+                tokenPrefix: authToken.substring(0, 7),
+                warehouseId: warehouseId
             });
             
             const response = await fetch(urlWithParams, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': apiInfo.token,
+                    'Authorization': authToken,
                     'Origin': 'https://franchise.getir.com',
                     'Referer': 'https://franchise.getir.com/',
                     'Accept': '*/*',
