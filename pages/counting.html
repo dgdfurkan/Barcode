@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Stok Sayımı - Barcode</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/logo.png?v=2">
+    <link rel="icon" type="image/png" sizes="16x16" href="../assets/logo.png?v=2">
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
+    <link rel="shortcut icon" href="../assets/logo.png?v=2">
+    
+    <link rel="stylesheet" href="../css/main.css" />
+    <link rel="stylesheet" href="../css/tailwind.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase Client Library -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <!-- Initialize Supabase immediately after CDN load -->
+    <script>
+        // Initialize Supabase client after CDN loads
+        (function() {
+            const SUPABASE_URL = 'https://ytekbbxvfdheiexsojpx.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
+            
+            // Wait for Supabase to be loaded from CDN
+            const initSupabaseClient = () => {
+                if (typeof window.supabase !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+                    window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    console.log('✅ Supabase client initialized in counting.html');
+                } else {
+                    // Retry after a short delay
+                    setTimeout(initSupabaseClient, 50);
+                }
+            };
+            
+            // Start initialization immediately (don't wait for DOMContentLoaded)
+            initSupabaseClient();
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script src="temp_products.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/user-manager.js"></script>
+    <script src="../js/premium-features.js"></script>
+    <script src="../js/trial-notifications.js"></script>
+    <script src="../js/notifications.js"></script>
+    <script src="../js/test-counting-supabase.js"></script>
+    <script src="../js/counting.js"></script>
+    <script src="../js/barcode-scanner.js"></script>
+    
+    <style>
+        /* Counting Page Specific Styles */
+        .counting-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Statistics Card Styles */
+        .shadow-soft {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        
+        .stat-card {
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+        
+        .product-card {
+            transition: all 0.2s;
+        }
+        
+        .product-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Modern Product Card Styles */
+        .product-card-modern {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .product-card-modern:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        @media (min-width: 640px) {
+            .product-card-modern {
+                max-width: 100%;
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            #countingCardView {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+                gap: 1.5rem;
+            }
+        }
+        
+        /* Modern Table Row Styles */
+        .product-row-modern {
+            transition: all 0.2s ease;
+        }
+        
+        .product-row-modern:hover {
+            background: linear-gradient(to right, rgba(59, 130, 246, 0.05), rgba(99, 102, 241, 0.05));
+        }
+        
+        /* Table styling improvements */
+        table tbody tr {
+            border-bottom: 1px solid #f3f4f6;
+        }
+        
+        table tbody tr:last-child {
+            border-bottom: none;
+        }
+        
+        .difference-positive {
+            color: #10b981;
+        }
+        
+        .difference-negative {
+            color: #ef4444;
+        }
+        
+        .difference-zero {
+            color: #6b7280;
+        }
+        
+        .difference-empty {
+            color: #9ca3af;
+        }
+        
+        /* Modern Action Buttons */
+        .modern-action-btn {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .modern-action-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .modern-action-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .modern-action-btn span,
+        .modern-action-btn svg {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .sync-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .reset-btn:active {
+            transform: scale(0.98);
+        }
+        
+        /* Responsive Styles */
+        @media (max-width: 480px) {
+            .counting-container {
+                padding: 0.5rem;
+            }
+            
+            .product-card {
+                padding: 0.75rem;
+            }
+            
+            header h2 {
+                font-size: 1.125rem !important;
+            }
+            
+            header .text-xl {
+                font-size: 1rem !important;
+            }
+            
+            /* Buttons - larger touch targets */
+            #addProductBtn, #searchProductBtn, #cameraScanBtn, #syncStocksBtn {
+                min-height: 44px !important;
+                padding: 0.75rem 1rem !important;
+                font-size: 0.875rem !important;
+            }
+            
+            /* Inputs - larger touch targets */
+            #manualProductInput {
+                min-height: 44px !important;
+                font-size: 1rem !important;
+                padding: 0.75rem 1rem !important;
+            }
+            
+            /* Statistics cards */
+            .grid.grid-cols-1.sm\\:grid-cols-3 {
+                gap: 0.75rem !important;
+            }
+            
+            /* Table - hide on mobile, show cards */
+            .hidden.md\\:block {
+                display: none !important;
+            }
+            
+            #countingCardView {
+                display: block !important;
+            }
+        }
+        
+        @media (min-width: 481px) and (max-width: 768px) {
+            .counting-container {
+                padding: 1rem;
+            }
+            
+            /* Buttons */
+            #addProductBtn, #searchProductBtn, #cameraScanBtn, #syncStocksBtn {
+                min-height: 44px !important;
+                padding: 0.625rem 1rem !important;
+            }
+            
+            /* Inputs */
+            #manualProductInput {
+                min-height: 44px !important;
+                padding: 0.625rem 1rem !important;
+            }
+            
+            /* Table - hide on tablet, show cards */
+            .hidden.md\\:block {
+                display: none !important;
+            }
+            
+            #countingCardView {
+                display: block !important;
+            }
+        }
+        
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .counting-container {
+                padding: 1.5rem;
+            }
+            
+            /* Table - show on tablet */
+            .hidden.md\\:block {
+                display: block !important;
+            }
+            
+            #countingCardView {
+                display: none !important;
+            }
+        }
+        
+        @media (min-width: 1025px) {
+            /* Desktop - full table view */
+            .hidden.md\\:block {
+                display: block !important;
+            }
+            
+            #countingCardView {
+                display: none !important;
+            }
+        }
+        
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Sync button spinner */
+        .sync-single-product-btn .spinner {
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        
+        /* Virtual Scroll Container */
+        .virtual-scroll-container {
+            overflow-y: auto;
+            height: 600px;
+        }
+        
+        @media (max-width: 768px) {
+            .virtual-scroll-container {
+                height: 400px;
+            }
+        }
+        
+        /* Camera Scanner Styles */
+        #cameraScannerModal {
+            z-index: 100;
+        }
+        
+        #cameraVideo {
+            width: 100%;
+            max-width: 640px;
+            height: auto;
+            border-radius: 0.5rem;
+        }
+        
+        .scanner-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 250px;
+            border: 2px solid #3b82f6;
+            border-radius: 0.5rem;
+            pointer-events: none;
+        }
+        
+        .scanner-overlay::before,
+        .scanner-overlay::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #3b82f6;
+        }
+        
+        .scanner-overlay::before {
+            top: -3px;
+            left: -3px;
+            border-right: none;
+            border-bottom: none;
+        }
+        
+        .scanner-overlay::after {
+            bottom: -3px;
+            right: -3px;
+            border-left: none;
+            border-top: none;
+        }
+        
+        /* Modal Responsive Styles */
+        @media (max-width: 768px) {
+            #productSearchModal > div,
+            #cameraScannerModal > div {
+                max-width: 100% !important;
+                width: 100% !important;
+                height: 100% !important;
+                max-height: 100% !important;
+                margin: 0 !important;
+                border-radius: 0 !important;
+            }
+            
+            #productSearchModal .overflow-y-auto,
+            #cameraScannerModal .p-6 {
+                padding: 1rem !important;
+            }
+        }
+        
+        /* Toast Notification Styles */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 400px;
+            pointer-events: none;
+            /* Scroll edildiğinde de sabit kalması için */
+        }
+        
+        .toast {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 280px;
+            max-width: 400px;
+            pointer-events: auto;
+            transform: translateX(450px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-left: 4px solid;
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        
+        .toast.hide {
+            transform: translateX(450px);
+            opacity: 0;
+        }
+        
+        .toast-success {
+            border-left-color: #10b981;
+        }
+        
+        .toast-info {
+            border-left-color: #3b82f6;
+        }
+        
+        .toast-error {
+            border-left-color: #ef4444;
+        }
+        
+        .toast-warning {
+            border-left-color: #f59e0b;
+        }
+        
+        .toast-icon {
+            flex-shrink: 0;
+            width: 24px;
+            height: 24px;
+        }
+        
+        .toast-content {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .toast-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        
+        .toast-message {
+            font-size: 13px;
+            color: #6b7280;
+            line-height: 1.4;
+        }
+        
+        .toast-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 0 0 12px 12px;
+            overflow: hidden;
+        }
+        
+        .toast-progress-bar {
+            height: 100%;
+            background: currentColor;
+            transition: width linear;
+            border-radius: 0 0 12px 12px;
+        }
+        
+        .toast-close {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+            color: #6b7280;
+        }
+        
+        .toast-close:hover {
+            opacity: 1;
+        }
+        
+        @media (max-width: 640px) {
+            .toast-container {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+            
+            .toast {
+                min-width: auto;
+                max-width: none;
+            }
+        }
+        
+        /* Animate spin for sync progress */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        
+        /* Custom Table Selector Dropdown Styles */
+        .table-selector-option {
+            padding: 10px 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .table-selector-option:hover {
+            background-color: #f3f4f6;
+        }
+        
+        .table-selector-option.active {
+            background-color: #eff6ff;
+            color: #2563eb;
+            font-weight: 600;
+        }
+        
+        .table-selector-option.active .check-icon {
+            display: block;
+        }
+        
+        .table-selector-option .check-icon {
+            display: none;
+            width: 16px;
+            height: 16px;
+            color: #2563eb;
+        }
+        
+        #tableSelectorDropdown {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #f1f5f9;
+        }
+        
+        #tableSelectorDropdown::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        #tableSelectorDropdown::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+        }
+        
+        #tableSelectorDropdown::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        
+        #tableSelectorDropdown::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        #tableSelectorBtn.open #tableSelectorIcon {
+            transform: rotate(180deg);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-surface border-b border-border shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo and Back Button -->
+                <div class="flex items-center space-x-3">
+                    <button id="backToSearchBtn" class="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Arama Sayfasına Dön">
+                        <svg class="w-6 h-6 text-text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                        </svg>
+                    </button>
+                    
+                    <!-- Table Selector -->
+                    <div class="flex items-center space-x-2">
+                        <!-- Custom Table Selector Dropdown -->
+                        <div class="relative">
+                            <button 
+                                id="tableSelectorBtn" 
+                                class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white hover:bg-gray-50 flex items-center justify-between min-w-[150px] transition-colors"
+                            >
+                                <span id="tableSelectorText" class="text-gray-700">Tablo Seçin</span>
+                                <svg class="w-4 h-4 text-gray-500 ml-2 transition-transform" id="tableSelectorIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </button>
+                            <div id="tableSelectorDropdown" class="hidden absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                <!-- Options will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        <button id="renameTableBtn" class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Tablo Adını Değiştir">
+                            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                        </button>
+                        <button id="createTableBtn" class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Yeni Tablo Oluştur">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                        </button>
+                        <button id="deleteTableBtn" class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-red-600" title="Tablo Sil" style="display: none;">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div>
+                        <img src="../assets/logo.png" alt="Logo" class="w-8 h-8 object-contain inline-block mr-2">
+                        <h1 class="text-2xl font-bold text-text-primary inline-block">GunduzDev</h1>
+                    </div>
+                </div>
+                
+                <!-- Page Title -->
+                <div class="flex-1 text-center">
+                    <h2 class="text-xl font-semibold text-text-primary">Stok Sayımı</h2>
+                </div>
+                
+                <!-- User Info -->
+                <div class="flex items-center space-x-4">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-lg font-semibold text-text-primary" id="userName">Yükleniyor...</p>
+                        <p class="text-sm text-text-secondary" id="userCompany">Yükleniyor...</p>
+                    </div>
+                    <button id="logoutBtn" class="btn-secondary text-sm">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                        <span class="hidden sm:inline">Çıkış</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="counting-container px-4 sm:px-6 lg:px-8 py-6">
+        <!-- Add Product Section -->
+        <div class="bg-white rounded-xl shadow-md border border-gray-100 p-5 sm:p-6 mb-6">
+            <h3 class="text-xl font-bold text-gray-900 mb-5 flex items-center space-x-2">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                <span>Ürün Ekle</span>
+            </h3>
+            <div class="flex flex-col sm:flex-row gap-4">
+                <!-- Manual Input -->
+                <div class="flex-1 relative">
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="manualProductInput" 
+                            placeholder="Ürün adı, barkod veya gram değeri girin..."
+                            class="w-full px-4 py-3 pl-11 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm font-medium bg-gray-50 focus:bg-white"
+                        >
+                        <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <!-- Search Results Dropdown -->
+                    <div id="manualInputResults" class="hidden absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                        <!-- Results will be inserted here -->
+                    </div>
+                </div>
+                
+                <!-- Add Buttons -->
+                <div class="flex gap-3 flex-wrap sm:flex-nowrap">
+                    <button id="addProductBtn" class="modern-action-btn add-btn group flex-1 sm:flex-initial px-5 py-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Ürün ekle">
+                        <svg class="w-5 h-5 transform group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        <span class="font-bold">Ekle</span>
+                    </button>
+                    <button id="searchProductBtn" class="modern-action-btn search-btn group flex-1 sm:flex-initial px-5 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Ürün ara">
+                        <svg class="w-5 h-5 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <span class="font-bold hidden sm:inline">Ara</span>
+                    </button>
+                    <button id="cameraScanBtn" class="modern-action-btn camera-btn group flex-1 sm:flex-initial px-5 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Kamera ile tarama">
+                        <svg class="w-5 h-5 transform group-hover:scale-110 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        <span class="font-bold hidden sm:inline">Kamera</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sync Section -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-text-primary">Sistem Stokları</h3>
+                    <p class="text-sm text-text-secondary">Depo stoku girilen ürünler için sistem stoklarını getir</p>
+                </div>
+                <div class="flex items-center gap-3 flex-wrap">
+                    <button id="resetWarehouseStocksBtn" class="modern-action-btn reset-btn group px-5 py-2.5 bg-gradient-to-r from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 text-orange-700 border border-orange-200 hover:border-orange-300 rounded-xl transition-all duration-200 flex items-center space-x-2.5 text-sm font-semibold shadow-sm hover:shadow-md" title="Tüm depo stoklarını sıfırla">
+                        <svg class="w-5 h-5 transform group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        <span class="hidden sm:inline">Depo Stoklarını Sıfırla</span>
+                        <span class="sm:hidden">Depo Sıfırla</span>
+                    </button>
+                    <button id="resetSystemStocksBtn" class="modern-action-btn reset-btn group px-5 py-2.5 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-purple-700 border border-purple-200 hover:border-purple-300 rounded-xl transition-all duration-200 flex items-center space-x-2.5 text-sm font-semibold shadow-sm hover:shadow-md" title="Tüm sistem stoklarını sıfırla">
+                        <svg class="w-5 h-5 transform group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        <span class="hidden sm:inline">Sistem Stoklarını Sıfırla</span>
+                        <span class="sm:hidden">Sistem Sıfırla</span>
+                    </button>
+                    <button id="syncStocksBtn" class="modern-action-btn sync-btn group px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 flex items-center space-x-2.5 text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Sistem stoklarını senkronize et">
+                        <svg class="w-5 h-5 transform group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        <span class="font-bold">Senkronize Et</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistics Section -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6 mb-6">
+            <!-- Total Card -->
+            <div class="bg-white rounded-2xl shadow-soft p-5 border border-gray-100 stat-card relative overflow-hidden group">
+                <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <svg class="w-16 h-16 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path></svg>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Toplam Sayılan</p>
+                    <p class="text-3xl font-bold text-gray-800 tracking-tight" id="totalProductsCount">0</p>
+                </div>
+                <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-indigo-300"></div>
+            </div>
+            
+            <!-- Positive Difference Card -->
+            <div class="bg-white rounded-2xl shadow-soft p-5 border border-gray-100 stat-card relative overflow-hidden group">
+                <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <svg class="w-16 h-16 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd"></path></svg>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Fazla Ürün</p>
+                    <p class="text-3xl font-bold text-emerald-600 tracking-tight" id="positiveDifferenceCount">0</p>
+                </div>
+                <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500 to-emerald-300"></div>
+            </div>
+            <!-- Negative Difference Card -->
+            <div class="bg-white rounded-2xl shadow-soft p-5 border border-gray-100 stat-card relative overflow-hidden group">
+                <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <svg class="w-16 h-16 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12 13a1 1 0 100 2h5a1 1 0 001-1V9a1 1 0 10-2 0v2.586l-4.293-4.293a1 1 0 00-1.414 0L8 9.586 3.707 5.293a1 1 0 00-1.414 1.414l5 5a1 1 0 001.414 0L11 9.414 14.586 13H12z" clip-rule="evenodd"></path></svg>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-gray-500 mb-1">Eksik Ürün</p>
+                    <p class="text-3xl font-bold text-rose-600 tracking-tight" id="negativeDifferenceCount">0</p>
+                </div>
+                <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500 to-rose-300"></div>
+            </div>
+        </div>
+
+        <!-- Counting Table -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden">
+            <div class="p-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-text-primary">Sayım Tablosu</h3>
+            </div>
+            
+            
+            <!-- Desktop Table View -->
+            <div class="hidden md:block overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Görsel</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header cursor-pointer hover:bg-gray-100 transition-colors" data-sort-field="productName">
+                                <div class="flex items-center space-x-1">
+                                    <span>Ürün Adı</span>
+                                    <div class="sort-icons flex flex-col">
+                                        <svg class="w-3 h-3 sort-asc-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                                        </svg>
+                                        <svg class="w-3 h-3 sort-desc-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header cursor-pointer hover:bg-gray-100 transition-colors" data-sort-field="warehouseStock">
+                                <div class="flex items-center space-x-1">
+                                    <span>Depo Stoku</span>
+                                    <div class="sort-icons flex flex-col">
+                                        <svg class="w-3 h-3 sort-asc-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                                        </svg>
+                                        <svg class="w-3 h-3 sort-desc-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header cursor-pointer hover:bg-gray-100 transition-colors" data-sort-field="systemStock">
+                                <div class="flex items-center space-x-1">
+                                    <span>Sistem Stoku</span>
+                                    <div class="sort-icons flex flex-col">
+                                        <svg class="w-3 h-3 sort-asc-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                                        </svg>
+                                        <svg class="w-3 h-3 sort-desc-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header cursor-pointer hover:bg-gray-100 transition-colors" data-sort-field="difference">
+                                <div class="flex items-center space-x-1">
+                                    <span>Fark</span>
+                                    <div class="sort-icons flex flex-col">
+                                        <svg class="w-3 h-3 sort-asc-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                                        </svg>
+                                        <svg class="w-3 h-3 sort-desc-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sortable-header cursor-pointer hover:bg-gray-100 transition-colors" data-sort-field="date">
+                                <div class="flex items-center space-x-1">
+                                    <span>Tarih/Saat</span>
+                                    <div class="sort-icons flex flex-col">
+                                        <svg class="w-3 h-3 sort-asc-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                                        </svg>
+                                        <svg class="w-3 h-3 sort-desc-icon text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="display: none;">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                            </th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody id="countingTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Table rows will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Mobile Card View -->
+            <div id="countingCardView" class="md:hidden p-4 space-y-4">
+                <!-- Cards will be inserted here -->
+            </div>
+            
+            <!-- Empty State -->
+            <div id="emptyState" class="p-12 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">Henüz ürün eklenmedi</h3>
+                <p class="mt-1 text-sm text-gray-500">Ürün eklemek için yukarıdaki formu kullanın</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Product Search Modal -->
+    <div id="productSearchModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-text-primary">Ürün Ara</h3>
+                <button id="closeProductSearchModal" class="text-text-secondary hover:text-text-primary transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 flex-1 overflow-y-auto">
+                <input 
+                    type="text" 
+                    id="productSearchInput" 
+                    placeholder="Ürün adı veya barkod ile ara..."
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
+                >
+                <div id="productSearchResults" class="space-y-2">
+                    <!-- Search results will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Table Modal -->
+    <div id="createTableModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-text-primary">Yeni Tablo Oluştur</h3>
+                <button id="closeCreateTableModal" class="text-text-secondary hover:text-text-primary transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Tablo Adı</label>
+                    <input 
+                        type="text" 
+                        id="newTableNameInput" 
+                        placeholder="Örn: Depo 1, Ana Sayım..."
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        maxlength="50"
+                    >
+                    <p class="mt-1 text-xs text-gray-500">Maksimum 50 karakter</p>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button id="cancelCreateTableBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        İptal
+                    </button>
+                    <button id="confirmCreateTableBtn" class="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+                        Oluştur
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Table Modal -->
+    <div id="renameTableModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-text-primary">Tablo Adını Değiştir</h3>
+                <button id="closeRenameTableModal" class="text-text-secondary hover:text-text-primary transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Mevcut Tablo Adı</label>
+                    <p id="currentTableNameDisplay" class="text-gray-600 bg-gray-50 px-3 py-2 rounded-lg"></p>
+                </div>
+                <div class="mb-6">
+                    <label for="newTableNameInput" class="block text-sm font-medium text-gray-700 mb-2">Yeni Tablo Adı</label>
+                    <input 
+                        type="text" 
+                        id="newTableNameInput" 
+                        placeholder="Tablo adı girin..."
+                        maxlength="50"
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                </div>
+                <div class="flex gap-3">
+                    <button id="cancelRenameTableBtn" class="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors font-medium">
+                        İptal
+                    </button>
+                    <button id="confirmRenameTableBtn" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium">
+                        Değiştir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Table Modal -->
+    <div id="deleteTableModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-text-primary">Tablo Sil</h3>
+                <button id="closeDeleteTableModal" class="text-text-secondary hover:text-text-primary transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6">
+                <div class="mb-4">
+                    <div class="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <p class="text-center text-gray-700 mb-2">
+                        <span class="font-semibold" id="deleteTableNameDisplay"></span> tablosunu silmek istediğinize emin misiniz?
+                    </p>
+                    <p class="text-center text-sm text-gray-500">
+                        Bu işlem geri alınamaz. Tablodaki tüm ürün verileri silinecektir.
+                    </p>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button id="cancelDeleteTableBtn" class="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        İptal
+                    </button>
+                    <button id="confirmDeleteTableBtn" class="px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+                        Sil
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Camera Scanner Modal -->
+    <div id="cameraScannerModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-text-primary">Barkod Oku</h3>
+                <button id="closeCameraScannerModal" class="text-text-secondary hover:text-text-primary transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 flex-1 flex flex-col items-center justify-center">
+                <div class="relative">
+                    <video id="cameraVideo" autoplay playsinline></video>
+                    <div class="scanner-overlay"></div>
+                </div>
+                <p class="mt-4 text-sm text-gray-600 text-center">Barkodu kameraya gösterin</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check authentication
+            const session = window.authUtils?.checkAuth();
+            if (!session) {
+                window.location.href = '../index.html';
+                return;
+            }
+            
+            // Check premium feature
+            if (window.premiumFeatures) {
+                await window.premiumFeatures.init();
+                const hasCountingFeature = window.premiumFeatures.checkPremiumFeature('stokSayimi');
+                if (!hasCountingFeature) {
+                    alert('Bu özellik premium üyeler için. Lütfen premium üyelik satın alın.');
+                    window.location.href = 'product_search.html';
+                    return;
+                }
+            }
+            
+            // Initialize user manager
+            if (window.userDataManager) {
+                await window.userDataManager.init();
+            }
+            
+            // Load user info
+            if (session) {
+                document.getElementById('userName').textContent = session.username || 'Kullanıcı';
+                document.getElementById('userCompany').textContent = session.company || 'Depo';
+            }
+            
+            // Initialize counting system
+            if (window.countingSystem) {
+                await window.countingSystem.init();
+            }
+            
+            // Back to search button
+            document.getElementById('backToSearchBtn').addEventListener('click', () => {
+                window.location.href = 'product_search.html';
+            });
+            
+            // Logout button
+            document.getElementById('logoutBtn').addEventListener('click', () => {
+                window.authUtils.logout();
+            });
+        });
+    </script>
+</body>
+</html>
+

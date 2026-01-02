@@ -27,7 +27,9 @@ class UserDataManager {
                     .from('user_data')
                     .select('custom_products, settings')
                     .eq('username', this.currentUser.username)
-                    .single();
+                    .order('updated_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
                 
                 if (!error && data && (data.custom_products !== null || data.settings !== null)) {
                     // New structure: separate columns
@@ -121,10 +123,36 @@ class UserDataManager {
                     updated_at: new Date().toISOString()
                 };
                 
-                // IMPORTANT: Do NOT write to 'data' column - it will not be used
-                const { error } = await window.supabase
+                // Önce mevcut satırı bul (en son güncellenmiş olanı)
+                const { data: existingData, error: findError } = await window.supabase
                     .from('user_data')
-                    .upsert(updateData);
+                    .select('id')
+                    .eq('username', this.currentUser.username)
+                    .order('updated_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+                
+                if (findError && findError.code !== 'PGRST116') {
+                    // PGRST116 = no rows found, bu normal
+                    console.error('Error finding existing data:', findError);
+                }
+                
+                // Eğer mevcut satır varsa update, yoksa insert
+                let error;
+                if (existingData && existingData.id) {
+                    // Update existing row
+                    const { error: updateError } = await window.supabase
+                        .from('user_data')
+                        .update(updateData)
+                        .eq('id', existingData.id);
+                    error = updateError;
+                } else {
+                    // Insert new row
+                    const { error: insertError } = await window.supabase
+                        .from('user_data')
+                        .insert(updateData);
+                    error = insertError;
+                }
                 
                 if (error) {
                     // If new columns don't exist, inform user but don't write to data column

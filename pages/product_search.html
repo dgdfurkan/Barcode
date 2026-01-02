@@ -7508,8 +7508,33 @@
                 
                 // Special handling for keyboardShortcuts - checkbox + manage button
                 const isKeyboardShortcuts = featureKey === 'keyboardShortcuts';
+                const isStokSayimi = featureKey === 'stokSayimi';
                 
-                if (isKeyboardShortcuts) {
+                if (isStokSayimi && hasPremium) {
+                    // Special handling for stokSayimi - checkbox + go to counting page button
+                    featureItem.innerHTML = `
+                        <div class="flex items-center space-x-2 flex-1 cursor-pointer" onclick="showPremiumFeatureDetail('${featureKey}')">
+                            <span class="text-lg">${config.emoji}</span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center space-x-1">
+                                    <h5 class="font-semibold text-gray-900 text-sm truncate">${config.name}</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 ml-2">
+                            <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" onclick="event.stopPropagation();">
+                                <input type="checkbox" 
+                                       data-feature="${featureKey}"
+                                       class="sr-only peer" 
+                                       ${isEnabled ? 'checked' : ''}>
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                            <button class="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition-all shadow-sm hover:shadow-md" onclick="event.stopPropagation(); window.location.href='counting.html';">
+                                📊 Sayım Sayfası
+                            </button>
+                        </div>
+                    `;
+                } else if (isKeyboardShortcuts) {
                     featureItem.innerHTML = `
                         <div class="flex items-center space-x-2 flex-1 cursor-pointer" onclick="showPremiumFeatureDetail('${featureKey}')">
                             <span class="text-lg">${config.emoji}</span>
@@ -7689,73 +7714,17 @@
                     
                     ${hasPremium ? `
                         <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-5">
-                            <h4 class="font-semibold text-gray-900 mb-3 text-lg">🔧 Stok Sayımı Araçları</h4>
-                            <p class="text-gray-700 text-sm mb-4 leading-relaxed">
-                                Mevcut Stok sayfasında kullanabileceğiniz gelişmiş araçlar. Aşağıdaki dosyaları kopyalayıp Tampermonkey veya Greasemonkey'e yükleyebilirsiniz.
-                            </p>
-                            
-                            <!-- Limit Override Dosyası -->
-                            <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
-                                <div class="flex items-center justify-between mb-3">
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-2xl">🔧</span>
-                                        <div>
-                                            <h5 class="font-semibold text-gray-900">Limit Override Script</h5>
-                                            <p class="text-xs text-gray-600">limit-override.user.js</p>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        id="copyLimitOverrideBtn"
-                                        class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-lg transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
-                                        data-file="limit-override.user.js"
-                                    >
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                                        </svg>
-                                        <span>Kopyala</span>
-                                    </button>
-                                </div>
-                                <p class="text-xs text-gray-600 leading-relaxed">
-                                    Mevcut Stok sayfasında limit input field'ını değiştirir ve API çağrılarını intercept eder. Tüm ürünleri tek seferde görmenizi sağlar.
-                                </p>
+                            <div class="mb-4">
+                                <button onclick="window.location.href='counting.html';" class="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-all shadow-md hover:shadow-lg flex items-center justify-center space-x-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                    </svg>
+                                    <span>Sayım Sayfasına Git</span>
+                                </button>
                             </div>
-                            
-                            <!-- Excel Export Dosyası -->
-                            <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
-                                <div class="flex items-center justify-between mb-3">
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-2xl">📊</span>
-                                        <div>
-                                            <h5 class="font-semibold text-gray-900">Excel Export Script</h5>
-                                            <p class="text-xs text-gray-600">excel-export.user.js</p>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        id="copyExcelExportBtn"
-                                        class="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold rounded-lg transition-all shadow-md hover:shadow-lg flex items-center space-x-2"
-                                        data-file="excel-export.user.js"
-                                    >
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                                        </svg>
-                                        <span>Kopyala</span>
-                                    </button>
-                                </div>
-                                <p class="text-xs text-gray-600 leading-relaxed">
-                                    Mevcut Stok verilerini Excel'e görsellerle birlikte aktarır. Görseller direkt gömülü olarak Excel dosyasına eklenir.
-                                </p>
-                            </div>
-                            
-                            <!-- Kullanım talimatları -->
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <h5 class="font-semibold text-blue-900 mb-2">📖 Nasıl Kurulur?</h5>
-                                <ol class="text-sm text-blue-800 space-y-2 list-decimal list-inside">
-                                    <li>Tampermonkey veya Greasemonkey eklentisini tarayıcınıza kurun</li>
-                                    <li>Eklentiyi açın ve "Yeni script oluştur" seçeneğini seçin</li>
-                                    <li>Yukarıdaki butonlardan birine tıklayarak kodu kopyalayın</li>
-                                    <li>Kopyalanan kodu script editörüne yapıştırın ve kaydedin</li>
-                                    <li>Mevcut Stok sayfasına gidin, script otomatik olarak çalışacaktır</li>
-                                </ol>
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                <p class="text-green-800 text-sm font-medium">✓ Bu özelliğe erişiminiz var</p>
+                                <p class="text-green-600 text-xs mt-1">Sayım sayfasından stok sayımı yapabilirsiniz</p>
                             </div>
                         </div>
                     ` : `
