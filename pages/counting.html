@@ -763,7 +763,13 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <h4 class="text-sm font-semibold text-gray-900 mb-1">API Durumu</h4>
-                        <p id="apiStatusText" class="text-sm text-gray-600 mb-2">Token yükleniyor...</p>
+                        <p id="apiStatusText" class="text-sm text-gray-600 mb-1">Token yükleniyor...</p>
+                        <p id="apiWarehouseInfo" class="text-xs text-gray-500 mb-2 flex items-center space-x-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                            </svg>
+                            <span id="apiWarehouseName">-</span>
+                        </p>
                         <div id="apiExpiryInfo" class="text-xs text-gray-500 space-y-1">
                             <div class="flex items-center space-x-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

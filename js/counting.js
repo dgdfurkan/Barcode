@@ -1635,11 +1635,47 @@ class CountingSystem {
             console.log('  - chrome.runtime.sendMessage:', typeof chrome !== 'undefined' && chrome.runtime ? (chrome.runtime.sendMessage ? 'mevcut' : 'yok') : 'yok');
             console.log('  - chrome.runtime.id:', typeof chrome !== 'undefined' && chrome.runtime ? chrome.runtime.id : 'yok');
             
+            // ÖNCE SUPABASE'DEN OKU (Mobil için)
+            if (!apiInfo && window.supabase && this.currentUser) {
+                try {
+                    console.log('🔍 Supabase\'den API bilgileri okunuyor...');
+                    const { data: userData, error } = await window.supabase
+                        .from('users')
+                        .select('counting_data')
+                        .eq('username', this.currentUser.username)
+                        .maybeSingle();
+                    
+                    if (!error && userData && userData.counting_data) {
+                        const countingData = typeof userData.counting_data === 'string' 
+                            ? JSON.parse(userData.counting_data) 
+                            : userData.counting_data;
+                        
+                        if (countingData._api_info && countingData._api_info.token) {
+                            apiInfo = {
+                                token: countingData._api_info.token,
+                                warehouseId: countingData._api_info.warehouseId,
+                                tokenExpiry: countingData._api_info.tokenExpiry,
+                                baseUrl: countingData._api_info.baseUrl,
+                                stockEndpoint: countingData._api_info.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks',
+                                timestamp: countingData._api_info.timestamp
+                            };
+                            console.log('✅ API bilgileri Supabase\'den alındı:', {
+                                hasToken: !!apiInfo.token,
+                                warehouseId: apiInfo.warehouseId,
+                                stockEndpoint: apiInfo.stockEndpoint
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Supabase API bilgileri okuma hatası:', error);
+                }
+            }
+            
             try {
                 // Extension varsa background script'ten API bilgilerini al
                 // chrome.runtime.id sadece extension context'inde çalışır, normal sayfalarda undefined olur
                 // Bu yüzden direkt chrome.runtime.sendMessage kullanıyoruz (ID olmadan)
-                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                if (!apiInfo && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                     console.log('✅ Extension API mevcut, background script\'e mesaj gönderiliyor...');
                     
                     const response = await new Promise((resolveMessage) => {
@@ -1675,7 +1711,7 @@ class CountingSystem {
                     } else if (!response) {
                         console.log('ℹ️ Extension\'dan yanıt alınamadı (null)');
                     }
-                } else {
+                } else if (!apiInfo) {
                     console.warn('⚠️ chrome.runtime.sendMessage mevcut değil');
                     console.log('💡 Extension yüklü olmayabilir veya sayfa extension context\'inde değil');
                 }
@@ -1720,8 +1756,8 @@ class CountingSystem {
             }
             
             if (!apiInfo) {
-                console.log('ℹ️ API bilgileri bulunamadı. Lütfen Getir franchise sayfasını açın ve sayfayı yenileyin.');
-                reject(new Error('API bilgileri bulunamadı. Lütfen Getir franchise sayfasını açın (https://franchise.getir.com/stock/current) ve sayfayı yenileyin. Extension token\'ı yakalayacaktır.'));
+                console.log('ℹ️ API bilgileri bulunamadı. Supabase, extension ve localStorage kontrol edildi.');
+                reject(new Error('API bilgileri bulunamadı. Lütfen Getir franchise sayfasını açın (https://franchise.getir.com/stock/current) ve sayfayı yenileyin. Extension token\'ı yakalayacak ve Supabase\'e kaydedecektir.'));
                 return;
             }
             
@@ -3264,9 +3300,10 @@ class CountingSystem {
             const apiStatusCard = document.getElementById('apiStatusCard');
             const apiStatusIcon = document.getElementById('apiStatusIcon');
             const apiStatusText = document.getElementById('apiStatusText');
+            const apiWarehouseName = document.getElementById('apiWarehouseName');
             const apiExpiryTime = document.getElementById('apiExpiryTime');
             
-            if (!apiStatusCard || !apiStatusIcon || !apiStatusText || !apiExpiryTime) {
+            if (!apiStatusCard || !apiStatusIcon || !apiStatusText || !apiWarehouseName || !apiExpiryTime) {
                 return;
             }
             
@@ -3349,6 +3386,15 @@ class CountingSystem {
                         apiStatusIcon.className = 'w-10 h-10 rounded-full bg-red-100 flex items-center justify-center';
                         apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
                         apiStatusText.textContent = 'Token süresi dolmuş';
+                        
+                        // Warehouse bilgisi
+                        if (apiInfo.warehouseId) {
+                            const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                            apiWarehouseName.textContent = `Depo: ${warehouseName}`;
+                        } else {
+                            apiWarehouseName.textContent = 'Depo bilgisi yok';
+                        }
+                        
                         apiExpiryTime.innerHTML = '<span class="text-red-600 font-medium">Lütfen Getir franchise sayfasını yenileyin</span>';
                     } else if (timeRemaining < 5 * 60 * 1000) {
                         // Expiring soon (less than 5 minutes)
@@ -3356,6 +3402,15 @@ class CountingSystem {
                         apiStatusIcon.className = 'w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center';
                         apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
                         apiStatusText.textContent = 'Token yakında dolacak';
+                        
+                        // Warehouse bilgisi
+                        if (apiInfo.warehouseId) {
+                            const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                            apiWarehouseName.textContent = `Depo: ${warehouseName}`;
+                        } else {
+                            apiWarehouseName.textContent = 'Depo bilgisi yok';
+                        }
+                        
                         apiExpiryTime.innerHTML = `<span class="text-yellow-700 font-medium">${minutesRemaining} dakika içinde Getir franchise sayfasını yenileyin</span>`;
                     } else {
                         // Valid
@@ -3363,6 +3418,14 @@ class CountingSystem {
                         apiStatusIcon.className = 'w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center';
                         apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
                         apiStatusText.textContent = 'API güncel ve aktif';
+                        
+                        // Warehouse bilgisi
+                        if (apiInfo.warehouseId) {
+                            const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                            apiWarehouseName.textContent = `Depo: ${warehouseName}`;
+                        } else {
+                            apiWarehouseName.textContent = 'Depo bilgisi yok';
+                        }
                         
                         // Format remaining time
                         let timeText = '';
@@ -3393,6 +3456,15 @@ class CountingSystem {
                     apiStatusIcon.className = 'w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center';
                     apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
                     apiStatusText.textContent = 'API aktif';
+                    
+                    // Warehouse bilgisi
+                    if (apiInfo.warehouseId) {
+                        const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                        apiWarehouseName.textContent = `Depo: ${warehouseName}`;
+                    } else {
+                        apiWarehouseName.textContent = 'Depo bilgisi yok';
+                    }
+                    
                     apiExpiryTime.innerHTML = '<span class="text-gray-500">Token bilgisi mevcut</span>';
                 }
             } else {
