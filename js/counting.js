@@ -2335,8 +2335,9 @@ class CountingSystem {
                                 </div>
                                 <input 
                                     type="number" 
+                                    inputmode="numeric"
+                                    pattern="[0-9]*"
                                     class="warehouse-stock-input w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all"
-                                    type="number"
                                     min="0"
                                     step="1"
                                     value="${data.warehouseStock !== null ? data.warehouseStock : ''}"
@@ -2497,8 +2498,9 @@ class CountingSystem {
                                     </div>
                                     <input 
                                         type="number" 
+                                        inputmode="numeric"
+                                        pattern="[0-9]*"
                                         class="warehouse-stock-input w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all"
-                                        type="number"
                                         min="0"
                                         step="1"
                                         value="${data.warehouseStock !== null ? data.warehouseStock : ''}"
@@ -2596,14 +2598,48 @@ class CountingSystem {
         // Warehouse stock inputs
         const warehouseInputs = document.querySelectorAll('.warehouse-stock-input');
         warehouseInputs.forEach(input => {
-            // Sadece sayı girişine izin ver (negatif ve ondalık sayıları engelle)
+            // Klavye ile sadece sayı girişine izin ver (harfler, özel karakterler engelle)
+            input.addEventListener('keydown', (e) => {
+                // İzin verilen tuşlar: sayılar (0-9), Backspace, Delete, Tab, Arrow keys, Home, End
+                const allowedKeys = [
+                    'Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+                    'Home', 'End', 'Enter'
+                ];
+                
+                // Sayı tuşları (0-9) veya izin verilen tuşlar
+                const isNumber = e.key >= '0' && e.key <= '9';
+                const isAllowedKey = allowedKeys.includes(e.key);
+                
+                // Ctrl/Cmd + A, C, V, X gibi kısayolları izin ver
+                const isCtrlKey = e.ctrlKey || e.metaKey;
+                const isCopyPaste = isCtrlKey && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase());
+                
+                if (!isNumber && !isAllowedKey && !isCopyPaste) {
+                    e.preventDefault();
+                }
+            });
+            
+            // Input event'inde sadece sayıları kabul et (harfler, özel karakterler kaldır)
             input.addEventListener('input', (e) => {
                 let value = e.target.value;
-                // Negatif işareti ve ondalık noktayı kaldır
+                // Sadece sayıları bırak, diğer her şeyi kaldır
                 value = value.replace(/[^0-9]/g, '');
                 // Eğer değer değiştiyse güncelle
                 if (e.target.value !== value) {
                     e.target.value = value;
+                }
+            });
+            
+            // Paste event'inde de sadece sayıları kabul et
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                // Sadece sayıları al
+                const numbersOnly = pastedText.replace(/[^0-9]/g, '');
+                if (numbersOnly) {
+                    e.target.value = numbersOnly;
+                    // Change event'ini tetikle
+                    e.target.dispatchEvent(new Event('change'));
                 }
             });
             
@@ -2618,21 +2654,11 @@ class CountingSystem {
                     // Sadece pozitif tam sayıları kabul et
                     const numValue = Math.max(0, Math.floor(Number(value)));
                     value = numValue;
-                    // Input değerini de güncelle (negatif veya ondalık girilmişse)
-                    if (e.target.value !== String(value)) {
-                        e.target.value = value === 0 ? '' : value;
-                    }
+                    // Input değerini de güncelle
+                    e.target.value = value === 0 ? '' : String(value);
                 }
                 
                 this.updateProductStock(productId, value, null);
-            });
-            
-            // Klavye ile negatif veya ondalık girişini engelle
-            input.addEventListener('keydown', (e) => {
-                // Eksi işareti, nokta, virgül ve e/E (bilimsel gösterim) engelle
-                if (e.key === '-' || e.key === '.' || e.key === ',' || e.key === 'e' || e.key === 'E') {
-                    e.preventDefault();
-                }
             });
         });
 
