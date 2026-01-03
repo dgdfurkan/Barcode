@@ -2739,12 +2739,13 @@ class CountingSystem {
                 // Boşsa null, değilse sayıya çevir
                 if (value === '') {
                     value = null;
+                    e.target.value = ''; // Boş bırak
                 } else {
                     // Sadece pozitif tam sayıları kabul et
                     const numValue = Math.max(0, Math.floor(Number(value)));
                     value = numValue;
-                    // Input değerini de güncelle
-                    e.target.value = value === 0 ? '' : String(value);
+                    // Input değerini güncelle (0'ı da göster)
+                    e.target.value = String(value);
                 }
                 
                 this.updateProductStock(productId, value, null);
@@ -2777,9 +2778,10 @@ class CountingSystem {
                 const productId = btn.dataset.productId;
                 const input = document.querySelector(`.warehouse-stock-input[data-product-id="${productId}"]`);
                 if (input) {
-                    let currentValue = parseInt(input.value) || 0;
+                    // Boş string veya NaN ise 0 olarak kabul et
+                    let currentValue = input.value === '' || isNaN(parseInt(input.value)) ? 0 : parseInt(input.value);
                     currentValue = Math.max(0, currentValue - 1); // Minimum 0
-                    input.value = currentValue === 0 ? '' : currentValue;
+                    input.value = String(currentValue); // 0'ı da göster
                     // Change event'ini tetikle
                     input.dispatchEvent(new Event('change', { bubbles: true }));
                 }
