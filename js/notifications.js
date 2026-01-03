@@ -410,7 +410,8 @@ class NotificationSystem {
             'offlineMode': 'İnternet bağlantınız olmasa bile sık kullandığınız ürünleri arayabilirsiniz. Çevrimdışı mod ile kesintisiz çalışma devam eder.',
             'advancedFilters': 'Gelişmiş filtreleme seçenekleri ile ürünleri kategori, marka, stok durumu gibi kriterlere göre filtreleyebilirsiniz.',
             'unlimitedHistory': 'Arama geçmişiniz sınırsız saklanır. Daha önce aradığınız ürünleri kolayca tekrar bulabilirsiniz.',
-            'favorites': 'Sık kullandığınız ürünleri favorilere ekleyip hızlı erişim sağlayabilirsiniz. Zaman kazandıran pratik bir özellik.'
+            'favorites': 'Sık kullandığınız ürünleri favorilere ekleyip hızlı erişim sağlayabilirsiniz. Zaman kazandıran pratik bir özellik.',
+            'stokSayimi': 'Getir franchise depolarında fiziksel stok sayımını dijitalleştirin. Depo stoklarınızı girin, sistem Getir API\'den otomatik olarak mevcut stok bilgisini çeker ve farkları gösterir. Mobil, tablet ve PC\'de çalışır, birden fazla sayım tablosu oluşturabilirsiniz.'
         };
         return descriptions[featureName] || 'Bu özellik çalışma verimliliğinizi artırır.';
     }
