@@ -2556,21 +2556,21 @@ class CountingSystem {
                             <!-- Stock Information Grid -->
                             <div class="grid grid-cols-2 gap-3 sm:gap-4">
                                 <!-- Depo Stoku -->
-                                <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-3 border border-orange-100">
-                                    <div class="flex items-center space-x-2 mb-2">
-                                        <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-2 sm:p-3 border border-orange-100">
+                                    <div class="flex items-center space-x-1 sm:space-x-2 mb-1.5 sm:mb-2">
+                                        <svg class="w-3 h-3 sm:w-4 sm:h-4 text-orange-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                         </svg>
                                         <span class="text-xs font-semibold text-orange-700 uppercase tracking-wide">Depo</span>
                                     </div>
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-1 sm:gap-2">
                                         <button 
                                             type="button"
-                                            class="warehouse-stock-decrease-btn flex-shrink-0 w-10 h-10 flex items-center justify-center bg-white border-2 border-orange-300 rounded-lg text-orange-600 hover:bg-orange-50 hover:border-orange-400 active:bg-orange-100 active:scale-95 transition-all duration-150 shadow-sm"
+                                            class="warehouse-stock-decrease-btn flex-shrink-0 w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center bg-white border border-orange-300 sm:border-2 rounded-md sm:rounded-lg text-orange-600 hover:bg-orange-50 hover:border-orange-400 active:bg-orange-100 active:scale-95 transition-all duration-150 shadow-sm"
                                             data-product-id="${productId}"
                                             title="Azalt"
                                         >
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg class="w-3.5 h-3.5 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/>
                                             </svg>
                                         </button>
@@ -2578,7 +2578,7 @@ class CountingSystem {
                                             type="number" 
                                             inputmode="numeric"
                                             pattern="[0-9]*"
-                                            class="warehouse-stock-input flex-1 min-w-0 px-2 py-2.5 bg-white border-2 border-orange-200 rounded-lg text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all text-center"
+                                            class="warehouse-stock-input flex-1 min-w-[60px] px-1.5 sm:px-2 py-1.5 sm:py-2.5 bg-white border-2 border-orange-200 rounded-lg text-sm sm:text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all text-center"
                                             min="0"
                                             step="1"
                                             value="${data.warehouseStock !== null ? data.warehouseStock : ''}"
@@ -2587,11 +2587,11 @@ class CountingSystem {
                                         >
                                         <button 
                                             type="button"
-                                            class="warehouse-stock-increase-btn flex-shrink-0 w-10 h-10 flex items-center justify-center bg-white border-2 border-orange-300 rounded-lg text-orange-600 hover:bg-orange-50 hover:border-orange-400 active:bg-orange-100 active:scale-95 transition-all duration-150 shadow-sm"
+                                            class="warehouse-stock-increase-btn flex-shrink-0 w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center bg-white border border-orange-300 sm:border-2 rounded-md sm:rounded-lg text-orange-600 hover:bg-orange-50 hover:border-orange-400 active:bg-orange-100 active:scale-95 transition-all duration-150 shadow-sm"
                                             data-product-id="${productId}"
                                             title="Artır"
                                         >
-                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg class="w-3.5 h-3.5 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
                                             </svg>
                                         </button>
