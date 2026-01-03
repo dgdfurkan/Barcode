@@ -3103,11 +3103,35 @@ class CountingSystem {
                 comparison = Number(stockA) - Number(stockB);
                 if (direction === 'desc') comparison *= -1;
             } else if (field === 'difference') {
-                const diffA = this.calculateDifference(a.data.warehouseStock, a.data.systemStock);
-                const diffB = this.calculateDifference(b.data.warehouseStock, b.data.systemStock);
-                const valueA = diffA.value ?? -Infinity;
-                const valueB = diffB.value ?? -Infinity;
-                comparison = Number(valueA) - Number(valueB);
+                // Gerçek fark değerini hesapla (negatif veya pozitif)
+                // calculateDifference negatif farklar için Math.abs kullanıyor, bu yüzden direkt hesaplama yapıyoruz
+                const warehouseA = a.data.warehouseStock ?? null;
+                const systemA = a.data.systemStock ?? null;
+                const warehouseB = b.data.warehouseStock ?? null;
+                const systemB = b.data.systemStock ?? null;
+                
+                // Her iki değer de varsa farkı hesapla, yoksa null
+                let valueA = null;
+                let valueB = null;
+                
+                if (warehouseA !== null && warehouseA !== undefined && systemA !== null && systemA !== undefined) {
+                    valueA = Number(warehouseA) - Number(systemA);
+                }
+                if (warehouseB !== null && warehouseB !== undefined && systemB !== null && systemB !== undefined) {
+                    valueB = Number(warehouseB) - Number(systemB);
+                }
+                
+                // null değerleri en sona at
+                if (valueA === null && valueB === null) {
+                    comparison = 0;
+                } else if (valueA === null) {
+                    comparison = 1; // A null ise B'den sonra
+                } else if (valueB === null) {
+                    comparison = -1; // B null ise A'dan sonra
+                } else {
+                    comparison = Number(valueA) - Number(valueB);
+                }
+                
                 if (direction === 'desc') comparison *= -1;
             } else if (field === 'date') {
                 const dateA = a.data.lastUpdated ? new Date(a.data.lastUpdated).getTime() : 0;
