@@ -2330,7 +2330,7 @@ class CountingSystem {
                                       diff.type === 'negative' ? 'bg-rose-100 text-rose-700 border-rose-200' : 
                                       diff.type === 'zero' ? 'bg-gray-100 text-gray-700 border-gray-200' : 
                                       'bg-gray-50 text-gray-500 border-gray-200';
-                
+
                 return `
                     <tr class="product-row-modern hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/50 transition-all duration-200 border-b border-gray-100" data-product-id="${productId}">
                         <!-- Görsel -->
@@ -2378,17 +2378,39 @@ class CountingSystem {
                                     </svg>
                                     <span class="text-xs font-semibold text-orange-700 uppercase">Depo</span>
                                 </div>
-                                <input 
-                                    type="number" 
-                                    inputmode="numeric"
-                                    pattern="[0-9]*"
-                                    class="warehouse-stock-input w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-sm font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all"
-                                    min="0"
-                                    step="1"
-                                    value="${data.warehouseStock !== null ? data.warehouseStock : ''}"
-                                    placeholder="0"
-                                    data-product-id="${productId}"
-                                >
+                                <div class="flex items-center gap-1.5">
+                                    <button 
+                                        type="button"
+                                        class="warehouse-stock-decrease-btn flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white border-2 border-orange-300 rounded-lg text-orange-600 hover:bg-orange-50 hover:border-orange-400 active:bg-orange-100 active:scale-95 transition-all duration-150 shadow-sm"
+                                        data-product-id="${productId}"
+                                        title="Azalt"
+                                    >
+                                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/>
+                                        </svg>
+                                    </button>
+                            <input 
+                                type="number" 
+                                        inputmode="numeric"
+                                        pattern="[0-9]*"
+                                        class="warehouse-stock-input flex-1 min-w-0 px-2 sm:px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-sm sm:text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all text-center"
+                                        min="0"
+                                        step="1"
+                                value="${data.warehouseStock !== null ? data.warehouseStock : ''}"
+                                placeholder="0"
+                                data-product-id="${productId}"
+                            >
+                                    <button 
+                                        type="button"
+                                        class="warehouse-stock-increase-btn flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center bg-white border-2 border-orange-300 rounded-lg text-orange-600 hover:bg-orange-50 hover:border-orange-400 active:bg-orange-100 active:scale-95 transition-all duration-150 shadow-sm"
+                                        data-product-id="${productId}"
+                                        title="Artır"
+                                    >
+                                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </td>
                         
@@ -2401,11 +2423,11 @@ class CountingSystem {
                                     </svg>
                                     <span class="text-xs font-semibold text-blue-700 uppercase">Sistem</span>
                                 </div>
-                                ${data.systemStock !== null && data.systemStock !== undefined ? 
+                            ${data.systemStock !== null && data.systemStock !== undefined ? 
                                     `<div class="flex items-center justify-between">
                                         <span class="text-base font-bold text-gray-900">${data.systemStock}</span>
                                         ${data.warehouseStock !== null && data.warehouseStock !== undefined ? 
-                                            `<button 
+                                `<button 
                                                 class="refresh-system-stock-btn p-1.5 bg-white hover:bg-blue-100 text-blue-600 rounded-lg transition-all shadow-sm hover:shadow"
                                                 data-product-id="${productId}"
                                                 data-barcode="${product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : ''}"
@@ -2426,17 +2448,17 @@ class CountingSystem {
                                         </div>` :
                                         `<button 
                                             class="sync-single-product-btn w-full px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-sm font-semibold rounded-lg transition-all shadow-md hover:shadow-lg transform hover:scale-105 flex items-center justify-center space-x-2"
-                                            data-product-id="${productId}"
-                                            data-barcode="${product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : ''}"
-                                            title="Sistem stokunu getir"
-                                        >
+                                    data-product-id="${productId}"
+                                    data-barcode="${product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : ''}"
+                                    title="Sistem stokunu getir"
+                                >
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                            </svg>
-                                            <span>Getir</span>
-                                        </button>`
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                    <span>Getir</span>
+                                </button>`
                                     )
-                                }
+                            }
                             </div>
                         </td>
                         
@@ -2445,7 +2467,7 @@ class CountingSystem {
                             <div class="flex items-center justify-center">
                                 <span class="px-3 py-1.5 rounded-lg text-sm font-bold border-2 ${diffBadgeClass}">
                                     ${diff.value !== null ? `${diffIcon} ${Math.abs(diff.value)}` : '-'}
-                                </span>
+                            </span>
                             </div>
                         </td>
                         
@@ -2492,7 +2514,7 @@ class CountingSystem {
                                       diff.type === 'negative' ? 'bg-rose-100 text-rose-700 border-rose-200' : 
                                       diff.type === 'zero' ? 'bg-gray-100 text-gray-700 border-gray-200' : 
                                       'bg-gray-50 text-gray-500 border-gray-200';
-                
+
                 return `
                     <div class="product-card-modern bg-white rounded-2xl shadow-md hover:shadow-lg border border-gray-100 overflow-hidden transition-all duration-300 transform hover:-translate-y-1" data-product-id="${productId}">
                         <!-- Header with Image and Title -->
@@ -2506,7 +2528,7 @@ class CountingSystem {
                                         </div>` : ''
                                     }
                                 </div>
-                                <div class="flex-1 min-w-0">
+                            <div class="flex-1 min-w-0">
                                     <h4 class="text-base sm:text-lg font-bold text-gray-900 leading-tight mb-1.5">${product.name || 'Bilinmeyen Ürün'}</h4>
                                     ${product.barcodes && product.barcodes.length > 0 ? 
                                         `<div class="flex flex-wrap gap-1.5 mt-2">
@@ -2541,17 +2563,39 @@ class CountingSystem {
                                         </svg>
                                         <span class="text-xs font-semibold text-orange-700 uppercase tracking-wide">Depo</span>
                                     </div>
-                                    <input 
-                                        type="number" 
-                                        inputmode="numeric"
-                                        pattern="[0-9]*"
-                                        class="warehouse-stock-input w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all"
-                                        min="0"
-                                        step="1"
-                                        value="${data.warehouseStock !== null ? data.warehouseStock : ''}"
-                                        placeholder="0"
-                                        data-product-id="${productId}"
-                                    >
+                                    <div class="flex items-center gap-2">
+                                        <button 
+                                            type="button"
+                                            class="warehouse-stock-decrease-btn flex-shrink-0 w-10 h-10 flex items-center justify-center bg-white border-2 border-orange-300 rounded-lg text-orange-600 hover:bg-orange-50 hover:border-orange-400 active:bg-orange-100 active:scale-95 transition-all duration-150 shadow-sm"
+                                            data-product-id="${productId}"
+                                            title="Azalt"
+                                        >
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/>
+                                            </svg>
+                                        </button>
+                                        <input 
+                                            type="number" 
+                                            inputmode="numeric"
+                                            pattern="[0-9]*"
+                                            class="warehouse-stock-input flex-1 min-w-0 px-2 py-2.5 bg-white border-2 border-orange-200 rounded-lg text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all text-center"
+                                            min="0"
+                                            step="1"
+                                            value="${data.warehouseStock !== null ? data.warehouseStock : ''}"
+                                            placeholder="0"
+                                            data-product-id="${productId}"
+                                        >
+                                        <button 
+                                            type="button"
+                                            class="warehouse-stock-increase-btn flex-shrink-0 w-10 h-10 flex items-center justify-center bg-white border-2 border-orange-300 rounded-lg text-orange-600 hover:bg-orange-50 hover:border-orange-400 active:bg-orange-100 active:scale-95 transition-all duration-150 shadow-sm"
+                                            data-product-id="${productId}"
+                                            title="Artır"
+                                        >
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                                            </svg>
+                                        </button>
+                                    </div>
                                 </div>
                                 
                                 <!-- Sistem Stoku -->
@@ -2562,11 +2606,11 @@ class CountingSystem {
                                         </svg>
                                         <span class="text-xs font-semibold text-blue-700 uppercase tracking-wide">Sistem</span>
                                     </div>
-                                    ${data.systemStock !== null && data.systemStock !== undefined ? 
+                                        ${data.systemStock !== null && data.systemStock !== undefined ? 
                                         `<div class="flex items-center justify-between">
                                             <span class="text-lg font-bold text-gray-900">${data.systemStock}</span>
                                             ${data.warehouseStock !== null && data.warehouseStock !== undefined ? 
-                                                `<button 
+                                            `<button 
                                                     class="refresh-system-stock-btn p-1.5 bg-white hover:bg-blue-100 text-blue-600 rounded-lg transition-all shadow-sm hover:shadow"
                                                     data-product-id="${productId}"
                                                     data-barcode="${product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : ''}"
@@ -2597,8 +2641,8 @@ class CountingSystem {
                                                 <span>Getir</span>
                                             </button>`
                                         )
-                                    }
-                                </div>
+                                        }
+                                    </div>
                             </div>
                             
                             <!-- Difference Badge and Date -->
@@ -2607,28 +2651,28 @@ class CountingSystem {
                                     <span class="text-xs font-medium text-gray-500 uppercase">Fark:</span>
                                     <span class="px-3 py-1.5 rounded-lg text-sm font-bold border-2 ${diffBadgeClass}">
                                         ${diff.value !== null ? `${diffIcon} ${Math.abs(diff.value)}` : '-'}
-                                    </span>
-                                </div>
+                                        </span>
+                                    </div>
                                 <div class="flex items-center space-x-1.5 text-xs text-gray-500">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                     </svg>
                                     <span class="font-medium">${this.formatDateTime(data.lastUpdated)}</span>
                                 </div>
-                            </div>
-                        </div>
-                        
+                                    </div>
+                                </div>
+                                
                         <!-- Footer with Delete Button -->
                         <div class="px-4 sm:px-5 pb-4 sm:pb-5">
-                            <button 
+                                <button 
                                 class="delete-product-btn w-full px-4 py-2.5 bg-gradient-to-r from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 text-red-600 hover:text-red-700 border-2 border-red-200 hover:border-red-300 rounded-xl text-sm font-semibold transition-all flex items-center justify-center space-x-2 shadow-sm hover:shadow"
-                                data-product-id="${productId}"
-                            >
+                                    data-product-id="${productId}"
+                                >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                 </svg>
                                 <span>Ürünü Sil</span>
-                            </button>
+                                </button>
                         </div>
                     </div>
                 `;
@@ -2704,6 +2748,41 @@ class CountingSystem {
                 }
                 
                 this.updateProductStock(productId, value, null);
+            });
+        });
+
+        // Warehouse stock increase/decrease buttons
+        const increaseButtons = document.querySelectorAll('.warehouse-stock-increase-btn');
+        increaseButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const productId = btn.dataset.productId;
+                const input = document.querySelector(`.warehouse-stock-input[data-product-id="${productId}"]`);
+                if (input) {
+                    let currentValue = parseInt(input.value) || 0;
+                    currentValue += 1;
+                    input.value = currentValue;
+                    // Change event'ini tetikle
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            });
+        });
+
+        const decreaseButtons = document.querySelectorAll('.warehouse-stock-decrease-btn');
+        decreaseButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const productId = btn.dataset.productId;
+                const input = document.querySelector(`.warehouse-stock-input[data-product-id="${productId}"]`);
+                if (input) {
+                    let currentValue = parseInt(input.value) || 0;
+                    currentValue = Math.max(0, currentValue - 1); // Minimum 0
+                    input.value = currentValue === 0 ? '' : currentValue;
+                    // Change event'ini tetikle
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
             });
         });
 
@@ -2949,7 +3028,7 @@ class CountingSystem {
                     
                     if (!isAlreadyAdded) {
                         // Add product
-                        this.addProductToCounting(product);
+                    this.addProductToCounting(product);
                         
                         // Find and update the button (could be clicked directly or via card)
                         // Try multiple ways to find the button
