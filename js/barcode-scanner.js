@@ -108,9 +108,11 @@ class BarcodeScanner {
             // En iyi tarayıcıyı tespit et ve kullan
             this.scannerType = this.detectBestScanner();
             
-            if (window.DEBUG_BARCODE_SCANNER) {
-                console.log('🔍 Tespit edilen tarayıcı tipi:', this.scannerType);
-            }
+            console.log('🔍 Tespit edilen tarayıcı tipi:', this.scannerType, {
+                hasBarcodeDetector: 'BarcodeDetector' in window,
+                hasHtml5Qrcode: !!window.Html5Qrcode,
+                hasZXing: !!window.ZXing
+            });
             
             await this.startScanLoop();
 
@@ -145,40 +147,61 @@ class BarcodeScanner {
 
     async startScanLoop() {
         // En iyi tarayıcıyı kullan (detectBestScanner zaten çağrıldı)
+        console.log('🎯 startScanLoop başlatılıyor, scannerType:', this.scannerType);
+        
         switch(this.scannerType) {
             case 'native':
-                await this.scanWithNativeAPI();
+                console.log('📱 Native API kullanılıyor...');
+                const nativeResult = await this.scanWithNativeAPI();
+                if (!nativeResult) {
+                    console.warn('⚠️ Native API başarısız, fallback deneniyor...');
+                    this.scannerType = 'html5qrcode';
+                    this.scanWithHtml5Qrcode();
+                }
                 break;
             case 'html5qrcode':
-                this.scanWithHtml5Qrcode();
+                console.log('📱 Html5-Qrcode kullanılıyor...');
+                const html5Result = this.scanWithHtml5Qrcode();
+                if (!html5Result) {
+                    console.warn('⚠️ Html5-Qrcode başarısız, ZXing deneniyor...');
+                    this.scannerType = 'zxing';
+                    if (typeof ZXing !== 'undefined' && window.ZXing) {
+                        this.scanWithZXing();
+                    } else {
+                        await this.loadZXingLibrary();
+                    }
+                }
                 break;
             case 'zxing':
+                console.log('📱 ZXing kullanılıyor...');
                 if (typeof ZXing !== 'undefined' && window.ZXing) {
                     this.scanWithZXing();
                 } else {
                     // Fallback: Try to load ZXing from CDN
+                    console.log('📥 ZXing yükleniyor...');
                     await this.loadZXingLibrary();
                 }
                 break;
             default:
                 // Hiçbir tarayıcı bulunamadı, ZXing'i yüklemeyi dene
+                console.warn('⚠️ Hiçbir tarayıcı bulunamadı, ZXing yükleniyor...');
                 await this.loadZXingLibrary();
         }
     }
 
     async scanWithNativeAPI() {
         if (!('BarcodeDetector' in window)) {
-            if (window.DEBUG_BARCODE_SCANNER) {
-                console.warn('⚠️ Barcode Detection API desteklenmiyor');
-            }
+            console.warn('⚠️ Barcode Detection API desteklenmiyor');
             return false;
         }
 
         if (!this.scanning || !this.video) {
+            console.warn('⚠️ scanWithNativeAPI: scanning veya video yok');
             return false;
         }
 
         try {
+            console.log('📱 Native API başlatılıyor...');
             // BarcodeDetector oluştur
             if (!this.nativeDetector) {
                 this.nativeDetector = new BarcodeDetector({
@@ -204,6 +227,7 @@ class BarcodeScanner {
                     
                     if (barcodes.length > 0) {
                         const barcode = barcodes[0];
+                        console.log('✅ Barkod bulundu (Native API):', barcode.rawValue);
                         
                         // Koordinat bilgilerini hazırla
                         const result = {
@@ -216,9 +240,7 @@ class BarcodeScanner {
                     }
                 } catch (error) {
                     // Hata normal (barkod bulunamadı veya frame okunamadı)
-                    if (window.DEBUG_BARCODE_SCANNER && error.name !== 'NotFoundError') {
-                        console.warn('⚠️ Native API scan error:', error);
-                    }
+                    // Sessizce devam et
                 }
 
                 // Devam et
@@ -230,9 +252,7 @@ class BarcodeScanner {
             // İlk frame'i tara
             scanFrame();
             
-            if (window.DEBUG_BARCODE_SCANNER) {
-                console.log('✅ Native Barcode Detection API başlatıldı');
-            }
+            console.log('✅ Native Barcode Detection API başlatıldı');
             
             return true;
         } catch (error) {
@@ -296,28 +316,64 @@ class BarcodeScanner {
 
     scanWithHtml5Qrcode() {
         if (!window.Html5Qrcode) {
-            if (window.DEBUG_BARCODE_SCANNER) {
-                console.warn('⚠️ Html5-Qrcode bulunamadı');
-            }
+            console.warn('⚠️ Html5-Qrcode bulunamadı');
             return false;
         }
 
         if (!this.scanning || !this.video) {
+            console.warn('⚠️ scanWithHtml5Qrcode: scanning veya video yok');
             return false;
         }
 
         try {
+            console.log('📱 Html5-Qrcode başlatılıyor...');
+            
+            // Safari için video element kontrolü
+            const videoElement = document.getElementById("cameraVideo");
+            if (!videoElement) {
+                console.error('❌ cameraVideo elementi bulunamadı');
+                return false;
+            }
+            
             const html5QrCode = new Html5Qrcode("cameraVideo");
+            
+            // Safari için optimize edilmiş ayarlar
+            const config = {
+                fps: 10,
+                qrbox: function(viewfinderWidth, viewfinderHeight) {
+                    // Mobil için daha küçük qrbox
+                    const minEdgePercentage = 0.7;
+                    const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+                    const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+                    return {
+                        width: qrboxSize,
+                        height: qrboxSize
+                    };
+                },
+                aspectRatio: 1.0,
+                disableFlip: false, // Açı düzeltme için
+                videoConstraints: {
+                    facingMode: "environment"
+                }
+            };
+            
+            // Html5-Qrcode kendi video stream'ini oluşturur
+            // Mevcut stream'i durdur ve Html5-Qrcode'un kendi stream'ini kullanmasına izin ver
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
+                this.stream = null;
+            }
+            if (this.video && this.video.srcObject) {
+                this.video.srcObject = null;
+            }
             
             html5QrCode.start(
                 { facingMode: "environment" },
-                {
-                    fps: 10,
-                    qrbox: { width: 250, height: 250 },
-                    aspectRatio: 1.0
-                },
+                config,
                 (decodedText, decodedResult) => {
                     if (!this.scanning) return;
+                    
+                    console.log('✅ Barkod bulundu (Html5-Qrcode):', decodedText);
                     
                     // Barkod bulundu
                     // decodedResult içinde koordinat bilgisi var
@@ -330,26 +386,36 @@ class BarcodeScanner {
                 },
                 (errorMessage) => {
                     // Hata (normal - barkod bulunamadı)
-                    // Sessizce devam et
+                    // Sessizce devam et - sadece gerçek hataları logla
+                    if (errorMessage && !errorMessage.includes('No QR code') && !errorMessage.includes('NotFoundException') && !errorMessage.includes('No MultiFormat')) {
+                        // Gerçek hataları logla (spam önleme)
+                        if (Math.random() < 0.01) {
+                            console.warn('⚠️ Html5-Qrcode scan error:', errorMessage);
+                        }
+                    }
                 }
-            ).catch((err) => {
+            ).then(() => {
+                console.log('✅ Html5-Qrcode başlatıldı');
+                this.html5QrCodeInstance = html5QrCode;
+            }).catch((err) => {
                 console.error('❌ Html5-Qrcode başlatma hatası:', err);
                 // Fallback'e geç
                 if (this.scanning) {
+                    console.log('🔄 ZXing fallback\'e geçiliyor...');
                     this.scannerType = 'zxing';
                     this.startScanLoop();
                 }
             });
             
-            this.html5QrCodeInstance = html5QrCode;
-            
-            if (window.DEBUG_BARCODE_SCANNER) {
-                console.log('✅ Html5-Qrcode başlatıldı');
-            }
-            
             return true;
         } catch (error) {
             console.error('❌ Html5-Qrcode hatası:', error);
+            // Fallback'e geç
+            if (this.scanning) {
+                console.log('🔄 ZXing fallback\'e geçiliyor (catch)...');
+                this.scannerType = 'zxing';
+                this.startScanLoop();
+            }
             return false;
         }
     }
