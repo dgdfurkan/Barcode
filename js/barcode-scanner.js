@@ -12,6 +12,25 @@ class BarcodeScanner {
         this.canvasInitialized = false; // Canvas boyutlandırma optimizasyonu için
         this.lastVideoWidth = 0; // Video boyut değişikliği kontrolü
         this.lastVideoHeight = 0;
+        this.html5QrCodeInstance = null; // Html5-Qrcode instance
+        this.nativeDetector = null; // Barcode Detection API detector
+        this.scannerType = null; // Kullanılan tarayıcı tipi
+    }
+
+    detectBestScanner() {
+        // 1. Barcode Detection API kontrolü (Chrome/Edge)
+        if ('BarcodeDetector' in window) {
+            return 'native'; // Chrome native API
+        }
+        // 2. Html5-Qrcode kontrolü
+        if (window.Html5Qrcode) {
+            return 'html5qrcode';
+        }
+        // 3. ZXing fallback (mevcut)
+        if (window.ZXing) {
+            return 'zxing';
+        }
+        return null;
     }
 
     async startScanning() {
@@ -85,9 +104,19 @@ class BarcodeScanner {
 
             // Start scanning
             this.scanning = true;
+            
+            // En iyi tarayıcıyı tespit et ve kullan
+            this.scannerType = this.detectBestScanner();
+            
+            if (window.DEBUG_BARCODE_SCANNER) {
+                console.log('🔍 Tespit edilen tarayıcı tipi:', this.scannerType);
+            }
+            
             await this.startScanLoop();
 
-            console.log('✅ Camera started');
+            if (window.DEBUG_BARCODE_SCANNER) {
+                console.log('✅ Camera started');
+            }
         } catch (error) {
             console.error('❌ Kamera başlatma hatası:', error);
             
@@ -115,12 +144,100 @@ class BarcodeScanner {
     }
 
     async startScanLoop() {
-        // Try to use ZXing library if available
-        if (typeof ZXing !== 'undefined' && window.ZXing) {
-            this.scanWithZXing();
-        } else {
-            // Fallback: Try to load ZXing from CDN
-            await this.loadZXingLibrary();
+        // En iyi tarayıcıyı kullan (detectBestScanner zaten çağrıldı)
+        switch(this.scannerType) {
+            case 'native':
+                await this.scanWithNativeAPI();
+                break;
+            case 'html5qrcode':
+                this.scanWithHtml5Qrcode();
+                break;
+            case 'zxing':
+                if (typeof ZXing !== 'undefined' && window.ZXing) {
+                    this.scanWithZXing();
+                } else {
+                    // Fallback: Try to load ZXing from CDN
+                    await this.loadZXingLibrary();
+                }
+                break;
+            default:
+                // Hiçbir tarayıcı bulunamadı, ZXing'i yüklemeyi dene
+                await this.loadZXingLibrary();
+        }
+    }
+
+    async scanWithNativeAPI() {
+        if (!('BarcodeDetector' in window)) {
+            if (window.DEBUG_BARCODE_SCANNER) {
+                console.warn('⚠️ Barcode Detection API desteklenmiyor');
+            }
+            return false;
+        }
+
+        if (!this.scanning || !this.video) {
+            return false;
+        }
+
+        try {
+            // BarcodeDetector oluştur
+            if (!this.nativeDetector) {
+                this.nativeDetector = new BarcodeDetector({
+                    formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code']
+                });
+            }
+
+            // Video'dan frame oku ve tara (her 150ms'de bir)
+            const scanFrame = async () => {
+                if (!this.scanning || !this.video || this.video.readyState < 2) {
+                    return;
+                }
+
+                try {
+                    // Video'dan ImageBitmap oluştur
+                    const imageBitmap = await createImageBitmap(this.video);
+                    
+                    // Barkodları tara
+                    const barcodes = await this.nativeDetector.detect(imageBitmap);
+                    
+                    // ImageBitmap'i temizle
+                    imageBitmap.close();
+                    
+                    if (barcodes.length > 0) {
+                        const barcode = barcodes[0];
+                        
+                        // Koordinat bilgilerini hazırla
+                        const result = {
+                            rawValue: barcode.rawValue,
+                            boundingBox: barcode.boundingBox,
+                            cornerPoints: barcode.cornerPoints || []
+                        };
+                        
+                        this.handleBarcodeDetected(barcode.rawValue, result);
+                    }
+                } catch (error) {
+                    // Hata normal (barkod bulunamadı veya frame okunamadı)
+                    if (window.DEBUG_BARCODE_SCANNER && error.name !== 'NotFoundError') {
+                        console.warn('⚠️ Native API scan error:', error);
+                    }
+                }
+
+                // Devam et
+                if (this.scanning) {
+                    setTimeout(scanFrame, 150); // 150ms throttle
+                }
+            };
+
+            // İlk frame'i tara
+            scanFrame();
+            
+            if (window.DEBUG_BARCODE_SCANNER) {
+                console.log('✅ Native Barcode Detection API başlatıldı');
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('❌ Native API başlatma hatası:', error);
+            return false;
         }
     }
 
@@ -174,6 +291,66 @@ class BarcodeScanner {
         } catch (error) {
             console.error('❌ ZXing yükleme hatası:', error);
             this.scanWithFallback();
+        }
+    }
+
+    scanWithHtml5Qrcode() {
+        if (!window.Html5Qrcode) {
+            if (window.DEBUG_BARCODE_SCANNER) {
+                console.warn('⚠️ Html5-Qrcode bulunamadı');
+            }
+            return false;
+        }
+
+        if (!this.scanning || !this.video) {
+            return false;
+        }
+
+        try {
+            const html5QrCode = new Html5Qrcode("cameraVideo");
+            
+            html5QrCode.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0
+                },
+                (decodedText, decodedResult) => {
+                    if (!this.scanning) return;
+                    
+                    // Barkod bulundu
+                    // decodedResult içinde koordinat bilgisi var
+                    const result = {
+                        rawValue: decodedText,
+                        decodedResult: decodedResult
+                    };
+                    
+                    this.handleBarcodeDetected(decodedText, result);
+                },
+                (errorMessage) => {
+                    // Hata (normal - barkod bulunamadı)
+                    // Sessizce devam et
+                }
+            ).catch((err) => {
+                console.error('❌ Html5-Qrcode başlatma hatası:', err);
+                // Fallback'e geç
+                if (this.scanning) {
+                    this.scannerType = 'zxing';
+                    this.startScanLoop();
+                }
+            });
+            
+            this.html5QrCodeInstance = html5QrCode;
+            
+            if (window.DEBUG_BARCODE_SCANNER) {
+                console.log('✅ Html5-Qrcode başlatıldı');
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('❌ Html5-Qrcode hatası:', error);
+            return false;
         }
     }
 
@@ -650,9 +827,9 @@ class BarcodeScanner {
         // Yeşil yanıp sönme efekti
         this.showSuccessFlash();
 
-        // Barkod çerçevesini çiz (eğer result varsa)
+        // Barkod çerçevesini göster (eğer result varsa)
         if (result) {
-            this.drawBarcodeBox(result);
+            this.showBarcodeFrame(result);
         }
 
         // Find product by barcode
@@ -668,7 +845,7 @@ class BarcodeScanner {
                     }
                     this.playWarningSound(); // Farklı bir ses
                     // Çerçeveyi temizle
-                    setTimeout(() => this.clearBarcodeBox(), 1000);
+                    setTimeout(() => this.hideBarcodeFrame(), 1000);
                     return; // Eklemeyi engelle
                 }
 
@@ -691,8 +868,10 @@ class BarcodeScanner {
                 if (window.countingSystem.showToast) {
                     window.countingSystem.showToast(`Barkod "${code}" için ürün bulunamadı`, 'error', 3000);
                 }
+                // Error sesi çal
+                this.playErrorSound();
                 // Çerçeveyi temizle
-                setTimeout(() => this.clearBarcodeBox(), 1000);
+                setTimeout(() => this.hideBarcodeFrame(), 1000);
             }
         } else {
             console.warn('Counting system not found');
@@ -794,6 +973,98 @@ class BarcodeScanner {
         }
     }
 
+    showBarcodeFrame(result) {
+        // HTML/CSS çerçeveyi göster (daha performanslı)
+        const htmlFrame = document.getElementById('barcodeFrameOverlay');
+        if (htmlFrame && this.video) {
+            // Video boyutlarını al
+            const videoRect = this.video.getBoundingClientRect();
+            const videoWidth = this.video.videoWidth || 640;
+            const videoHeight = this.video.videoHeight || 480;
+            
+            // Koordinatları hesapla (result'tan gelen koordinatlar video koordinatlarında)
+            let boundingBox = null;
+            
+            if (result.boundingBox) {
+                // Native API'den gelen boundingBox
+                boundingBox = result.boundingBox;
+            } else if (result.cornerPoints && result.cornerPoints.length >= 4) {
+                // Corner points'ten bounding box hesapla
+                const xs = result.cornerPoints.map(p => p.x || (typeof p.getX === 'function' ? p.getX() : 0));
+                const ys = result.cornerPoints.map(p => p.y || (typeof p.getY === 'function' ? p.getY() : 0));
+                const minX = Math.min(...xs);
+                const maxX = Math.max(...xs);
+                const minY = Math.min(...ys);
+                const maxY = Math.max(...ys);
+                boundingBox = {
+                    x: minX,
+                    y: minY,
+                    width: maxX - minX,
+                    height: maxY - minY
+                };
+            } else if (result.decodedResult && result.decodedResult.resultPoints) {
+                // Html5-Qrcode'dan gelen koordinatlar
+                const points = result.decodedResult.resultPoints;
+                if (points.length >= 4) {
+                    const xs = points.map(p => p.x || 0);
+                    const ys = points.map(p => p.y || 0);
+                    const minX = Math.min(...xs);
+                    const maxX = Math.max(...xs);
+                    const minY = Math.min(...ys);
+                    const maxY = Math.max(...ys);
+                    boundingBox = {
+                        x: minX,
+                        y: minY,
+                        width: maxX - minX,
+                        height: maxY - minY
+                    };
+                }
+            }
+            
+            if (boundingBox) {
+                // Video koordinatlarını viewport koordinatlarına dönüştür
+                const scaleX = videoRect.width / videoWidth;
+                const scaleY = videoRect.height / videoHeight;
+                
+                // Çerçeveyi konumlandır
+                htmlFrame.style.left = `${boundingBox.x * scaleX}px`;
+                htmlFrame.style.top = `${boundingBox.y * scaleY}px`;
+                htmlFrame.style.width = `${boundingBox.width * scaleX}px`;
+                htmlFrame.style.height = `${boundingBox.height * scaleY}px`;
+                htmlFrame.classList.remove('hidden');
+                
+                // 1 saniye sonra gizle
+                setTimeout(() => {
+                    this.hideBarcodeFrame();
+                }, 1000);
+            } else {
+                // Koordinat yoksa, merkezde göster
+                htmlFrame.style.left = '50%';
+                htmlFrame.style.top = '50%';
+                htmlFrame.style.width = '200px';
+                htmlFrame.style.height = '200px';
+                htmlFrame.style.transform = 'translate(-50%, -50%)';
+                htmlFrame.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    this.hideBarcodeFrame();
+                }, 1000);
+            }
+        }
+        
+        // Canvas çerçevesini de çiz (fallback)
+        this.drawBarcodeBox(result);
+    }
+
+    hideBarcodeFrame() {
+        const htmlFrame = document.getElementById('barcodeFrameOverlay');
+        if (htmlFrame) {
+            htmlFrame.classList.add('hidden');
+        }
+        // Canvas'ı da temizle
+        this.clearBarcodeBoxCanvas();
+    }
+
     drawBarcodeBox(result) {
         const overlayCanvas = document.getElementById('barcodeOverlayCanvas');
         if (!overlayCanvas || !this.video) return;
@@ -817,8 +1088,30 @@ class BarcodeScanner {
             // ZXing koordinatlarını al
             let points = null;
             
-            // ZXing'in farklı versiyonlarında farklı metodlar olabilir
-            if (result && typeof result.getResultPoints === 'function') {
+            // Farklı API'lerden koordinatları al
+            if (result && result.cornerPoints && result.cornerPoints.length >= 4) {
+                // Native API'den gelen cornerPoints
+                points = result.cornerPoints.map(p => ({
+                    getX: () => p.x || 0,
+                    getY: () => p.y || 0
+                }));
+            } else if (result && result.boundingBox) {
+                // Native API'den gelen boundingBox
+                const box = result.boundingBox;
+                points = [
+                    { getX: () => box.x, getY: () => box.y },
+                    { getX: () => box.x + box.width, getY: () => box.y },
+                    { getX: () => box.x + box.width, getY: () => box.y + box.height },
+                    { getX: () => box.x, getY: () => box.y + box.height }
+                ];
+            } else if (result && result.decodedResult && result.decodedResult.resultPoints) {
+                // Html5-Qrcode'dan gelen koordinatlar
+                points = result.decodedResult.resultPoints.map(p => ({
+                    getX: () => p.x || 0,
+                    getY: () => p.y || 0
+                }));
+            } else if (result && typeof result.getResultPoints === 'function') {
+                // ZXing'den gelen koordinatlar
                 points = result.getResultPoints();
             } else if (result && result.resultPoints) {
                 points = result.resultPoints;
@@ -888,6 +1181,16 @@ class BarcodeScanner {
     }
 
     clearBarcodeBox() {
+        // HTML çerçeveyi gizle
+        const htmlFrame = document.getElementById('barcodeFrameOverlay');
+        if (htmlFrame) {
+            htmlFrame.classList.add('hidden');
+        }
+        // Canvas'ı temizle
+        this.clearBarcodeBoxCanvas();
+    }
+
+    clearBarcodeBoxCanvas() {
         const overlayCanvas = document.getElementById('barcodeOverlayCanvas');
         if (!overlayCanvas) return;
         
@@ -909,8 +1212,24 @@ class BarcodeScanner {
     stopScanning() {
         this.scanning = false;
 
+        // Html5-Qrcode'u durdur
+        if (this.html5QrCodeInstance) {
+            try {
+                this.html5QrCodeInstance.stop().then(() => {
+                    if (window.DEBUG_BARCODE_SCANNER) {
+                        console.log('✅ Html5-Qrcode durduruldu');
+                    }
+                }).catch((err) => {
+                    // Sessizce devam et
+                });
+            } catch (error) {
+                // Sessizce devam et
+            }
+            this.html5QrCodeInstance = null;
+        }
+
         // Barkod çerçevesini temizle
-        this.clearBarcodeBox();
+        this.hideBarcodeFrame();
 
         // Stop QuaggaJS if running
         if (this.quaggaInstance && typeof this.quaggaInstance.stop === 'function') {
