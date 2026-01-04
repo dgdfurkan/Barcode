@@ -12,8 +12,6 @@ class BarcodeScanner {
         this.canvasInitialized = false; // Canvas boyutlandırma optimizasyonu için
         this.lastVideoWidth = 0; // Video boyut değişikliği kontrolü
         this.lastVideoHeight = 0;
-        this.currentAngleIndex = 0; // Round-robin açı seçimi için
-        this.angles = [0, 90, 180, 270]; // Denenecek açılar
     }
 
     async startScanning() {
@@ -414,25 +412,67 @@ class BarcodeScanner {
 
                 // decodeFromImageElement kullan (canvas'tan image oluştur)
                 const img = new Image();
-                img.onload = async () => {
+                img.onload = () => {
                     if (!this.scanning) return;
 
                     try {
-                        // Multi-angle decoding: Round-robin yaklaşımı ile farklı açıları dene
-                        const result = await this.decodeWithMultipleAngles(codeReader, img);
-                        
-                        if (result && this.scanning) {
-                            const code = result.getText();
-                            // Sadece debug modunda log göster
-                            if (window.DEBUG_BARCODE_SCANNER) {
-                                console.log('✅ Barcode detected:', code);
+                        if (typeof codeReader.decodeFromImageElement === 'function') {
+                            // ZXing'in decodeFromImageElement'i promise döndürüyor
+                            const decodePromise = codeReader.decodeFromImageElement(img);
+                            
+                            // Promise ise
+                            if (decodePromise && typeof decodePromise.then === 'function') {
+                                decodePromise
+                                    .then((result) => {
+                                        if (!this.scanning) return;
+                                        
+                                        if (result) {
+                                            const code = result.getText();
+                                            // Sadece debug modunda log göster
+                                            if (window.DEBUG_BARCODE_SCANNER) {
+                                                console.log('✅ Barcode detected:', code);
+                                            }
+                                            this.handleBarcodeDetected(code, result);
+                                        }
+                                        
+                                        // Devam et (her zaman)
+                                        if (this.scanning) {
+                                            requestAnimationFrame(scanFrame);
+                                        }
+                                    })
+                                    .catch((err) => {
+                                        // Tüm hataları sessizce geç (barkod bulunamadı normal)
+                                        // "No MultiFormat Readers were able to detect the code" normal bir durum
+                                        // Devam et
+                                        if (this.scanning) {
+                                            requestAnimationFrame(scanFrame);
+                                        }
+                                    });
+                            } else {
+                                // Callback versiyonu (eski API - genelde kullanılmaz)
+                                codeReader.decodeFromImageElement(img, (result, err) => {
+                                    if (!this.scanning) return;
+
+                                    if (result) {
+                                        const code = result.getText();
+                                        // Sadece debug modunda log göster
+                                        if (window.DEBUG_BARCODE_SCANNER) {
+                                            console.log('✅ Barcode detected (Callback):', code);
+                                        }
+                                        this.handleBarcodeDetected(code, result);
+                                    }
+                                    
+                                    // Devam et
+                                    if (this.scanning) {
+                                        requestAnimationFrame(scanFrame);
+                                    }
+                                });
                             }
-                            this.handleBarcodeDetected(code, result);
-                        }
-                        
-                        // Devam et (her zaman)
-                        if (this.scanning) {
-                            requestAnimationFrame(scanFrame);
+                        } else {
+                            // ZXing API'si bulunamadı
+                            if (this.scanning) {
+                                requestAnimationFrame(scanFrame);
+                            }
                         }
                     } catch (error) {
                         // Sessizce devam et (hata normal - barkod bulunamadı)
@@ -861,79 +901,6 @@ class BarcodeScanner {
         overlayCanvas.classList.remove('barcode-detected');
     }
 
-    rotateImageAsync(image, angle) {
-        return new Promise((resolve) => {
-            try {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                if (!ctx) {
-                    resolve(image); // Canvas context alınamazsa orijinal image'i döndür
-                    return;
-                }
-                
-                // Açıya göre canvas boyutlarını ayarla
-                if (angle === 90 || angle === 270) {
-                    canvas.width = image.height;
-                    canvas.height = image.width;
-                } else {
-                    canvas.width = image.width;
-                    canvas.height = image.height;
-                }
-                
-                // Rotate ve çiz
-                ctx.translate(canvas.width / 2, canvas.height / 2);
-                ctx.rotate((angle * Math.PI) / 180);
-                ctx.drawImage(image, -image.width / 2, -image.height / 2);
-                
-                // Yeni image oluştur
-                const rotatedImg = new Image();
-                rotatedImg.onload = () => resolve(rotatedImg);
-                rotatedImg.onerror = () => resolve(image); // Hata durumunda orijinal image'i döndür
-                rotatedImg.src = canvas.toDataURL('image/png');
-            } catch (error) {
-                // Hata durumunda orijinal image'i döndür
-                if (window.DEBUG_BARCODE_SCANNER) {
-                    console.warn('⚠️ Image rotation hatası:', error);
-                }
-                resolve(image);
-            }
-        });
-    }
-
-    async decodeWithMultipleAngles(codeReader, originalImg) {
-        // Round-robin: Her frame'de sadece bir açıyı dene
-        const angle = this.angles[this.currentAngleIndex];
-        this.currentAngleIndex = (this.currentAngleIndex + 1) % this.angles.length;
-        
-        if (!this.scanning) return null;
-        
-        let imgToDecode = originalImg;
-        
-        // 0° dışında rotate et
-        if (angle !== 0) {
-            imgToDecode = await this.rotateImageAsync(originalImg, angle);
-        }
-        
-        try {
-            if (typeof codeReader.decodeFromImageElement === 'function') {
-                const decodePromise = codeReader.decodeFromImageElement(imgToDecode);
-                
-                if (decodePromise && typeof decodePromise.then === 'function') {
-                    const result = await decodePromise;
-                    if (result) {
-                        return result; // Başarılı, dur
-                    }
-                }
-            }
-        } catch (err) {
-            // Devam et, bir sonraki frame'de bir sonraki açıyı dene
-            // (Round-robin zaten bir sonraki açıya geçecek)
-        }
-        
-        return null; // Bu açıda bulunamadı
-    }
-
     setContinuousMode(enabled) {
         this.continuousMode = enabled;
         console.log('🔄 Seri okuma modu:', enabled ? 'Aktif' : 'Kapalı');
@@ -993,9 +960,6 @@ class BarcodeScanner {
         this.canvasInitialized = false;
         this.lastVideoWidth = 0;
         this.lastVideoHeight = 0;
-        
-        // Açı index'ini resetle
-        this.currentAngleIndex = 0;
 
         // Close modal
         const modal = document.getElementById('cameraScannerModal');
