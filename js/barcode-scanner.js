@@ -361,22 +361,36 @@ class BarcodeScanner {
             const config = {
                 fps: 10,
                 qrbox: function(viewfinderWidth, viewfinderHeight) {
+                    // Viewfinder boyutları henüz hazır değilse, sabit bir değer kullan
+                    if (viewfinderWidth === 0 || viewfinderHeight === 0) {
+                        console.log('📐 Viewfinder hazır değil, sabit qrbox kullanılıyor: 250x250');
+                        return {
+                            width: 250,
+                            height: 250
+                        };
+                    }
+                    
                     // Mobil için qrbox - minimum 50px olmalı
                     const minEdgePercentage = 0.7;
                     const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
                     let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
                     
-                    // Minimum 50px kontrolü
-                    if (qrboxSize < 50) {
-                        qrboxSize = 50;
+                    // Minimum 250px (mobil için daha büyük)
+                    if (qrboxSize < 250) {
+                        qrboxSize = 250;
                     }
                     
                     // Maksimum viewfinder boyutunu aşmamalı
                     if (qrboxSize > viewfinderWidth) {
-                        qrboxSize = viewfinderWidth;
+                        qrboxSize = Math.floor(viewfinderWidth * 0.9);
                     }
                     if (qrboxSize > viewfinderHeight) {
-                        qrboxSize = viewfinderHeight;
+                        qrboxSize = Math.floor(viewfinderHeight * 0.9);
+                    }
+                    
+                    // Tekrar minimum kontrolü
+                    if (qrboxSize < 250) {
+                        qrboxSize = 250;
                     }
                     
                     console.log('📐 qrbox boyutu:', qrboxSize, 'viewfinder:', viewfinderWidth, 'x', viewfinderHeight);
