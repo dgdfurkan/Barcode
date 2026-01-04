@@ -361,37 +361,29 @@ class BarcodeScanner {
             const config = {
                 fps: 10,
                 qrbox: function(viewfinderWidth, viewfinderHeight) {
-                    // Viewfinder boyutları henüz hazır değilse, sabit bir değer kullan
-                    if (viewfinderWidth === 0 || viewfinderHeight === 0) {
-                        console.log('📐 Viewfinder hazır değil, sabit qrbox kullanılıyor: 250x250');
+                    // Viewfinder boyutları henüz hazır değilse, küçük bir sabit değer kullan
+                    if (viewfinderWidth === 0 || viewfinderHeight === 0 || viewfinderWidth < 50 || viewfinderHeight < 50) {
+                        console.log('📐 Viewfinder hazır değil, küçük qrbox kullanılıyor: 150x150');
                         return {
-                            width: 250,
-                            height: 250
+                            width: 150,
+                            height: 150
                         };
                     }
                     
-                    // Mobil için qrbox - minimum 50px olmalı
-                    const minEdgePercentage = 0.7;
+                    // Mobil için qrbox - viewfinder'ın %70'i, minimum 150px
                     const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-                    let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+                    let qrboxSize = Math.floor(minEdgeSize * 0.7);
                     
-                    // Minimum 250px (mobil için daha büyük)
-                    if (qrboxSize < 250) {
-                        qrboxSize = 250;
-                    }
+                    // Minimum 150px, maksimum viewfinder'ın %90'ı
+                    const maxSize = Math.floor(minEdgeSize * 0.9);
+                    qrboxSize = Math.max(150, Math.min(qrboxSize, maxSize));
                     
-                    // Maksimum viewfinder boyutunu aşmamalı
-                    if (qrboxSize > viewfinderWidth) {
-                        qrboxSize = Math.floor(viewfinderWidth * 0.9);
-                    }
-                    if (qrboxSize > viewfinderHeight) {
-                        qrboxSize = Math.floor(viewfinderHeight * 0.9);
-                    }
+                    // Viewfinder boyutlarını aşmamalı
+                    qrboxSize = Math.min(qrboxSize, viewfinderWidth);
+                    qrboxSize = Math.min(qrboxSize, viewfinderHeight);
                     
-                    // Tekrar minimum kontrolü
-                    if (qrboxSize < 250) {
-                        qrboxSize = 250;
-                    }
+                    // Son kontrol: minimum 150px
+                    qrboxSize = Math.max(150, qrboxSize);
                     
                     console.log('📐 qrbox boyutu:', qrboxSize, 'viewfinder:', viewfinderWidth, 'x', viewfinderHeight);
                     
@@ -422,9 +414,14 @@ class BarcodeScanner {
                     this.handleBarcodeDetected(decodedText, result);
                 },
                 (errorMessage) => {
-                    // Hata (normal - barkod bulunamadı)
+                    // Hata (normal - barkod bulunamadı veya parse hatası)
                     // Sessizce devam et - sadece gerçek hataları logla
-                    if (errorMessage && !errorMessage.includes('No QR code') && !errorMessage.includes('NotFoundException') && !errorMessage.includes('No MultiFormat')) {
+                    if (errorMessage && 
+                        !errorMessage.includes('No QR code') && 
+                        !errorMessage.includes('NotFoundException') && 
+                        !errorMessage.includes('No MultiFormat') &&
+                        !errorMessage.includes('IndexSizeError') &&
+                        !errorMessage.includes('parse error')) {
                         // Gerçek hataları logla (spam önleme)
                         if (Math.random() < 0.01) {
                             console.warn('⚠️ Html5-Qrcode scan error:', errorMessage);
