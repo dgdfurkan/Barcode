@@ -538,7 +538,7 @@ class BarcodeScanner {
         }
     }
     
-    fallbackToZXing(html5QrCodeInstance) {
+    async fallbackToZXing(html5QrCodeInstance) {
         if (!this.scanning) return;
         
         console.log('🔄 ZXing fallback\'e geçiliyor...');
@@ -566,9 +566,69 @@ class BarcodeScanner {
             this.video.srcObject = null;
         }
         
-        // ZXing'e geç
-        this.scannerType = 'zxing';
-        this.startScanLoop();
+        // ZXing için stream oluştur (Html5-Qrcode başarısız oldu, normal stream oluştur)
+        try {
+            console.log('📹 ZXing için video stream oluşturuluyor...');
+            
+            let constraints = {
+                video: {
+                    facingMode: 'environment' // Use back camera on mobile
+                }
+            };
+
+            // Önce basit constraints ile dene
+            try {
+                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } catch (error) {
+                // Eğer environment kamera bulunamazsa, herhangi bir kamerayı dene
+                if (error.name === 'OverconstrainedError' || error.name === 'NotFoundError') {
+                    console.log('⚠️ Back camera bulunamadı, herhangi bir kamera deneniyor...');
+                    constraints = {
+                        video: true // En basit constraint - cihaz ne destekliyorsa onu kullan
+                    };
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                } else {
+                    throw error; // Diğer hataları yukarı fırlat
+                }
+            }
+
+            // Set video source
+            this.video.srcObject = this.stream;
+            
+            // Video element'in metadata yüklenmesini bekle
+            await new Promise((resolve) => {
+                if (this.video.readyState >= 2) {
+                    resolve();
+                } else {
+                    this.video.addEventListener('loadedmetadata', resolve, { once: true });
+                    // Timeout: 3 saniye
+                    setTimeout(resolve, 3000);
+                }
+            });
+            
+            await this.video.play();
+            
+            console.log('✅ ZXing için video stream oluşturuldu:', {
+                readyState: this.video.readyState,
+                videoWidth: this.video.videoWidth,
+                videoHeight: this.video.videoHeight,
+                paused: this.video.paused
+            });
+            
+            // ZXing'e geç
+            this.scannerType = 'zxing';
+            this.startScanLoop();
+            
+        } catch (error) {
+            console.error('❌ ZXing için video stream oluşturma hatası:', error);
+            
+            // Toast bildirimi göster (eğer varsa)
+            if (window.countingSystem && window.countingSystem.showToast) {
+                window.countingSystem.showToast('Kamera erişimi başarısız. Lütfen tarayıcı ayarlarından kamera izinlerini açın.', 'error', 5000);
+            }
+            
+            this.stopScanning();
+        }
     }
 
     scanWithZXing() {
