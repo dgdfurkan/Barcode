@@ -336,7 +336,7 @@
             height: auto;
             border-radius: 0.5rem;
             background: #000;
-            transform: scaleX(-1); /* Mirror effect for better UX */
+            /* Arka kamera için yansıma yok, ön kamera için gerekirse eklenebilir */
         }
         
         /* Telefon için video optimizasyonu */
@@ -403,18 +403,37 @@
                 max-height: 100% !important;
                 margin: 0 !important;
                 border-radius: 0 !important;
+                display: flex !important;
+                flex-direction: column !important;
+            }
+            
+            #cameraScannerModal > div {
+                overflow: hidden !important;
+            }
+            
+            #cameraScannerModal .overflow-y-auto {
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                overscroll-behavior: contain !important;
             }
             
             #cameraVideo {
                 width: 100%;
                 height: auto;
-                max-height: 70vh;
+                max-height: 50vh;
                 object-fit: cover;
             }
             
             #productSearchModal .overflow-y-auto,
             #cameraScannerModal .p-6 {
                 padding: 1rem !important;
+            }
+            
+            /* Seri okuma toggle'ı mobilde görünür yap ve scroll edilebilir yap */
+            #cameraScannerModal .mt-6 {
+                margin-top: 1.5rem !important;
+                margin-bottom: 1rem !important;
+                padding-bottom: 1rem !important;
             }
         }
         
@@ -1097,8 +1116,8 @@
 
     <!-- Camera Scanner Modal -->
     <div id="cameraScannerModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden flex flex-col">
-            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden flex flex-col max-h-[90vh] sm:max-h-none">
+            <div class="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
                 <h3 class="text-xl font-bold text-text-primary">Barkod Oku</h3>
                 <button id="closeCameraScannerModal" class="text-text-secondary hover:text-text-primary transition-colors">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1106,21 +1125,21 @@
                     </svg>
                 </button>
             </div>
-            <div class="p-6 flex-1 flex flex-col items-center justify-center">
-                <div class="relative w-full max-w-md">
+            <div class="p-6 flex-1 flex flex-col items-center justify-center min-h-0 overflow-y-auto" style="max-height: calc(90vh - 80px);">
+                <div class="relative w-full max-w-md flex-shrink-0">
                     <video id="cameraVideo" autoplay playsinline class="w-full rounded-lg"></video>
                     <div class="scanner-overlay"></div>
                 </div>
-                <p class="mt-4 text-sm text-gray-600 text-center">Barkodu kameraya gösterin</p>
+                <p class="mt-4 text-sm text-gray-600 text-center flex-shrink-0">Barkodu kameraya gösterin</p>
                 
                 <!-- Seri Okuma Toggle -->
-                <div class="mt-6 flex items-center justify-center space-x-3 bg-gray-50 rounded-xl p-4">
-                    <span class="text-sm font-medium text-gray-700">Seri Okuma</span>
-                    <label class="relative inline-flex items-center cursor-pointer">
+                <div class="mt-6 mb-4 flex items-center justify-center space-x-2 sm:space-x-3 bg-gray-50 rounded-xl p-3 sm:p-4 flex-shrink-0 w-full max-w-md">
+                    <span class="text-sm font-medium text-gray-700 whitespace-nowrap">Seri Okuma</span>
+                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
                         <input type="checkbox" id="continuousScanToggle" class="sr-only peer">
                         <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-pink-600"></div>
                     </label>
-                    <span class="text-xs text-gray-500">Aktif: Kamera açık kalır</span>
+                    <span class="text-xs text-gray-500 whitespace-nowrap hidden sm:inline">Aktif: Kamera açık kalır</span>
                 </div>
             </div>
         </div>
