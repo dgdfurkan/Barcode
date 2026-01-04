@@ -431,13 +431,99 @@ class BarcodeScanner {
             ).then(() => {
                 console.log('✅ Html5-Qrcode başlatıldı');
                 this.html5QrCodeInstance = html5QrCode;
+                
+                // Video stream validation
+                const checkVideoStream = () => {
+                    const video = document.getElementById("cameraVideo");
+                    if (!video) {
+                        console.warn('⚠️ Video elementi bulunamadı');
+                        return false;
+                    }
+                    
+                    const stream = video.srcObject;
+                    if (!stream) {
+                        console.warn('⚠️ Video stream bulunamadı');
+                        return false;
+                    }
+                    
+                    const tracks = stream.getVideoTracks();
+                    if (tracks.length === 0) {
+                        console.warn('⚠️ Video track bulunamadı');
+                        return false;
+                    }
+                    
+                    const activeTrack = tracks[0];
+                    if (activeTrack.readyState !== 'live' || !activeTrack.enabled) {
+                        console.warn('⚠️ Video track aktif değil:', {
+                            readyState: activeTrack.readyState,
+                            enabled: activeTrack.enabled
+                        });
+                        return false;
+                    }
+                    
+                    // Video boyutları kontrolü (metadata yüklenene kadar 0 olabilir)
+                    // Bu yüzden sadece stream ve track kontrolü yapıyoruz
+                    console.log('✅ Video stream doğrulandı:', {
+                        hasStream: !!stream,
+                        tracksCount: tracks.length,
+                        trackReadyState: activeTrack.readyState,
+                        trackEnabled: activeTrack.enabled,
+                        videoWidth: video.videoWidth,
+                        videoHeight: video.videoHeight
+                    });
+                    
+                    return true;
+                };
+                
+                // İlk kontrol (hemen)
+                let streamValid = checkVideoStream();
+                
+                // Eğer stream yoksa, biraz bekle ve tekrar kontrol et
+                if (!streamValid) {
+                    console.log('⏳ Video stream henüz hazır değil, bekleniyor...');
+                    setTimeout(() => {
+                        streamValid = checkVideoStream();
+                        if (!streamValid) {
+                            console.warn('⚠️ Video stream hala hazır değil, ZXing fallback\'e geçiliyor...');
+                            this.fallbackToZXing(html5QrCode);
+                        }
+                    }, 1000);
+                }
+                
+                // Timeout-based fallback (5 saniye sonra)
+                setTimeout(() => {
+                    if (!this.scanning) return;
+                    
+                    const video = document.getElementById("cameraVideo");
+                    if (!video || !video.srcObject) {
+                        console.warn('⚠️ Timeout: Video stream oluşturulamadı, ZXing fallback\'e geçiliyor...');
+                        this.fallbackToZXing(html5QrCode);
+                        return;
+                    }
+                    
+                    const stream = video.srcObject;
+                    const tracks = stream.getVideoTracks();
+                    if (tracks.length === 0 || tracks[0].readyState !== 'live') {
+                        console.warn('⚠️ Timeout: Video track aktif değil, ZXing fallback\'e geçiliyor...');
+                        this.fallbackToZXing(html5QrCode);
+                        return;
+                    }
+                    
+                    // Video boyutları hala 0 ise, stream çalışmıyor demektir
+                    if (video.videoWidth === 0 || video.videoHeight === 0) {
+                        console.warn('⚠️ Timeout: Video boyutları hala 0, ZXing fallback\'e geçiliyor...');
+                        this.fallbackToZXing(html5QrCode);
+                        return;
+                    }
+                    
+                    console.log('✅ Video stream başarıyla oluşturuldu ve çalışıyor');
+                }, 5000);
+                
             }).catch((err) => {
                 console.error('❌ Html5-Qrcode başlatma hatası:', err);
                 // Fallback'e geç
                 if (this.scanning) {
-                    console.log('🔄 ZXing fallback\'e geçiliyor...');
-                    this.scannerType = 'zxing';
-                    this.startScanLoop();
+                    this.fallbackToZXing(null);
                 }
             });
             
@@ -446,12 +532,43 @@ class BarcodeScanner {
             console.error('❌ Html5-Qrcode hatası:', error);
             // Fallback'e geç
             if (this.scanning) {
-                console.log('🔄 ZXing fallback\'e geçiliyor (catch)...');
-                this.scannerType = 'zxing';
-                this.startScanLoop();
+                this.fallbackToZXing(null);
             }
             return false;
         }
+    }
+    
+    fallbackToZXing(html5QrCodeInstance) {
+        if (!this.scanning) return;
+        
+        console.log('🔄 ZXing fallback\'e geçiliyor...');
+        
+        // Html5-Qrcode'u durdur
+        if (html5QrCodeInstance) {
+            try {
+                html5QrCodeInstance.stop().then(() => {
+                    console.log('✅ Html5-Qrcode durduruldu');
+                }).catch((err) => {
+                    console.warn('⚠️ Html5-Qrcode durdurma hatası:', err);
+                });
+            } catch (error) {
+                console.warn('⚠️ Html5-Qrcode durdurma hatası:', error);
+            }
+        }
+        
+        // Stream'i temizle
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+            this.stream = null;
+        }
+        
+        if (this.video && this.video.srcObject) {
+            this.video.srcObject = null;
+        }
+        
+        // ZXing'e geç
+        this.scannerType = 'zxing';
+        this.startScanLoop();
     }
 
     scanWithZXing() {
@@ -542,11 +659,11 @@ class BarcodeScanner {
                         return;
                     }
 
-                    if (result) {
-                        const code = result.getText();
+                if (result) {
+                    const code = result.getText();
                         console.log('✅ Barcode detected (ZXing):', code);
-                        this.handleBarcodeDetected(code);
-                    }
+                    this.handleBarcodeDetected(code);
+                }
                     
                     if (err) {
                         // NotFoundException normal (henüz barkod bulunamadı)
