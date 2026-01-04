@@ -1,0 +1,2824 @@
+{
+  "_tables": {
+    "Sütler": {
+      "56baf8262660e20f007c8723": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T16:50:24.507042Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T17:05:24.507042Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T17:35:24.507042Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "57c9cd03c411bc030020dc08": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T15:47:24.507061Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T16:02:24.507061Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T16:32:24.507061Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "58230ba75b31d60004487ba2": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T14:44:24.507065Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T14:59:24.507065Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T15:29:24.507065Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "58230def5b31d60004487d4d": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T13:41:24.507069Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T13:56:24.507069Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T14:26:24.507069Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "582310505b31d60004487ebe": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T12:38:24.507072Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T12:53:24.507072Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T13:23:24.507072Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "595b834d683fc200042c9c12": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T11:35:24.507076Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T11:50:24.507076Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T12:20:24.507076Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "595b8788683fc200042c9e9c": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T10:32:24.507080Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T10:47:24.507080Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T11:17:24.507080Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "59b14d42b573340004d1a143": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T09:29:24.507084Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T09:44:24.507084Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T10:14:24.507084Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "59b14de830b1e30004a2961d": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T08:26:24.507087Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T08:41:24.507087Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T09:11:24.507087Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ac345d7ac945e00049c1c75": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T07:23:24.507091Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T07:38:24.507091Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T08:08:24.507091Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ac8856f80e2c70004513062": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T06:20:24.507095Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T06:35:24.507095Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T07:05:24.507095Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5b34da30c89934000467b958": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T05:17:24.507099Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T05:32:24.507099Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T06:02:24.507099Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5b97864bf31c400004eb82b0": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T16:14:24.507102Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T16:29:24.507102Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T16:59:24.507102Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5bc97fe4b555e900179c5472": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T15:11:24.507106Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T15:26:24.507106Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T15:56:24.507106Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5beadf0d5b2e3c0017799664": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T14:08:24.507110Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T14:23:24.507110Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T14:53:24.507110Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5c923de2b54cbf0001ea0648": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T13:05:24.507114Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T13:20:24.507114Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T13:50:24.507114Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5c923df828d5f000012cc884": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T12:02:24.507118Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T12:17:24.507118Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T12:47:24.507118Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ce65824a72a950001cc88e3": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T10:59:24.507122Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T11:14:24.507122Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T11:44:24.507122Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ceae032c461e70001cc97a0": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T09:56:24.507125Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T10:11:24.507125Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T10:41:24.507125Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ceae03bc461e70001cc985f": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T08:53:24.507129Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T09:08:24.507129Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T09:38:24.507129Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      }
+    },
+    "Gazlı İçecekler": {
+      "55e6ce954ef8d40c00d1fbde": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T16:50:24.507133Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T17:05:24.507133Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T17:35:24.507133Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55e6d02c4ef8d40c00d1fc36": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T15:48:24.507145Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T16:03:24.507145Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T16:33:24.507145Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "565c0571762af60c00783d45": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T14:46:24.507149Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T15:01:24.507149Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T15:31:24.507149Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "565c07f5762af60c00783f3c": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T13:44:24.507152Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T13:59:24.507152Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T14:29:24.507152Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "59024b386532a700044603fe": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T12:42:24.507156Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T12:57:24.507156Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T13:27:24.507156Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "59024d406532a700044604c0": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T11:40:24.507159Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T11:55:24.507159Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T12:25:24.507159Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ac4b343138ef30004553092": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T10:38:24.507163Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T10:53:24.507163Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T11:23:24.507163Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ac760c1679a5e0004bf4155": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T09:36:24.507167Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T09:51:24.507167Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T10:21:24.507167Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ac761a2b306630004c8dc4b": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T08:34:24.507170Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T08:49:24.507170Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T09:19:24.507170Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5bcecb97c1ee950030b0be67": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T07:32:24.507174Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T07:47:24.507174Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T08:17:24.507174Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5be3f1662201b20012a3a4d7": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T06:30:24.507177Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T06:45:24.507177Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T07:15:24.507177Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5be3f1bf75dff10018ca95ca": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T05:28:24.507181Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T05:43:24.507181Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T06:13:24.507181Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5be3f27cd0dba200184748f2": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T16:26:24.507185Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T16:41:24.507185Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T17:11:24.507185Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ce6581afd9b330001c4a85b": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T15:24:24.507188Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T15:39:24.507188Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T16:09:24.507188Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ce6581dfd9b330001c4a8b0": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T14:22:24.507192Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T14:37:24.507192Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T15:07:24.507192Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ce6581fa72a950001cc8819": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T13:20:24.507196Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T13:35:24.507196Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T14:05:24.507196Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ceae0369d3ea8000196e116": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T12:18:24.507201Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T12:33:24.507201Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T13:03:24.507201Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ceae036c461e70001cc97ed": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T11:16:24.507204Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T11:31:24.507204Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T12:01:24.507204Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      }
+    },
+    "Meyve Suları": {
+      "567803e4b232ae0f00f4c70a": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T16:50:24.507208Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T17:05:24.507208Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T17:35:24.507208Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5832cacc54857e0004164ef0": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T15:46:24.507211Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T16:01:24.507211Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T16:31:24.507211Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5832cc9b54857e00041650d7": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T14:42:24.507215Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T14:57:24.507215Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T15:27:24.507215Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5832cd8554857e00041651b6": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T13:38:24.507218Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T13:53:24.507218Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T14:23:24.507218Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5832ce9554857e00041652dd": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T12:34:24.507222Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T12:49:24.507222Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T13:19:24.507222Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "586b9b30aabf9a0004bb61db": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T11:30:24.507225Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T11:45:24.507225Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T12:15:24.507225Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5adf42f459337c000436e569": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T10:26:24.507229Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T10:41:24.507229Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T11:11:24.507229Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5adf43fa59337c000436e66f": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T09:22:24.507232Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T09:37:24.507232Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T10:07:24.507232Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5adf44ee080fca0004ff2538": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T08:18:24.507236Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T08:33:24.507236Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T09:03:24.507236Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5adf461459337c000436e8de": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T07:14:24.507240Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T07:29:24.507240Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T07:59:24.507240Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5adf46d5080fca0004ff273c": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T06:10:24.507243Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T06:25:24.507243Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T06:55:24.507243Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ce6580ea72a950001cc8731": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T05:06:24.507247Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T05:21:24.507247Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T05:51:24.507247Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ce6581ea72a950001cc87d9": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T16:02:24.507251Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T16:17:24.507251Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T16:47:24.507251Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ce6581ea72a950001cc87ee": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T14:58:24.507254Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T15:13:24.507254Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T15:43:24.507254Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ce65820fd9b330001c4a93c": {
+        "history": [
+          {
+            "timestamp": "2025-12-31T13:54:24.507259Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2025-12-31T14:09:24.507259Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2025-12-31T14:39:24.507259Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      }
+    },
+    "Evcil Hayvan Ürünleri": {
+      "55983faab1dc700c006a724d": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T16:50:24.507263Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T17:05:24.507263Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T17:35:24.507263Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55983ff7b1dc700c006a7259": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T15:47:24.507267Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T16:02:24.507267Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T16:32:24.507267Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55984015b1dc700c006a725d": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T14:44:24.507270Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T14:59:24.507270Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T15:29:24.507270Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5598402fb1dc700c006a7261": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T13:41:24.507274Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T13:56:24.507274Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T14:26:24.507274Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55a37cc0927bd20c002b0daa": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T12:38:24.507326Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T12:53:24.507326Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T13:23:24.507326Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55c48a50beca570c0066cb62": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T11:35:24.507332Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T11:50:24.507332Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T12:20:24.507332Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5671959589ad5d0f009fa012": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T10:32:24.507337Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T10:47:24.507337Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T11:17:24.507337Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "577fa0a491436203000e300a": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T09:29:24.507342Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T09:44:24.507342Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T10:14:24.507342Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "57f35e4121b86d0003d26028": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T08:26:24.507349Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T08:41:24.507349Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T09:11:24.507349Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "57f3625bbbfa040003d6c312": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T07:23:24.507353Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T07:38:24.507353Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T08:08:24.507353Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "57f362a721b86d0003d26362": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T06:20:24.507357Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T06:35:24.507357Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T07:05:24.507357Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "57f362f821b86d0003d26397": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T05:17:24.507362Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T05:32:24.507362Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T06:02:24.507362Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "57f3652fbbfa040003d6c4f2": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T16:14:24.507366Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T16:29:24.507366Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T16:59:24.507366Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "57f3658821b86d0003d2654f": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T15:11:24.507370Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T15:26:24.507370Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T15:56:24.507370Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "582c6827040f2f0004e69210": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T14:08:24.507389Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T14:23:24.507389Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T14:53:24.507389Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "586dfeb21b76f5000443e56e": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T13:05:24.507393Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T13:20:24.507393Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T13:50:24.507393Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "58ecd0e4d0995400047aeaf1": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T12:02:24.507399Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T12:17:24.507399Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T12:47:24.507399Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5a0f01724db252000428b703": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T10:59:24.507403Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T11:14:24.507403Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T11:44:24.507403Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5a27a01bf5a2790004ee27ec": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T09:56:24.507407Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T10:11:24.507407Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T10:41:24.507407Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5a27a10a895861000453f8fa": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T08:53:24.507411Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T09:08:24.507411Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T09:38:24.507411Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      }
+    },
+    "Kutu Dondurmalar": {
+      "559fe8d9f462100c00461cfa": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T16:50:24.507416Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T17:05:24.507416Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T17:35:24.507416Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "559fec01f462100c00461d5c": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T15:48:24.507420Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T16:03:24.507420Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T16:33:24.507420Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "559fed86f462100c00461d8b": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T14:46:24.507424Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T15:01:24.507424Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T15:31:24.507424Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "559fef68f462100c00461dbf": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T13:44:24.507428Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T13:59:24.507428Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T14:29:24.507428Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "559ff55ef462100c00461e5e": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T12:42:24.507432Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T12:57:24.507432Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T13:27:24.507432Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55db3afcf9e1c10c00435947": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T11:40:24.507436Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T11:55:24.507436Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T12:25:24.507436Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55db3c1ef9e1c10c004359c5": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T10:38:24.507439Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T10:53:24.507439Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T11:23:24.507439Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "56f28185e14e220300d7ad0e": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T09:36:24.507443Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T09:51:24.507443Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T10:21:24.507443Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "570757d0cde6070300eb4fa2": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T08:34:24.507447Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T08:49:24.507447Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T09:19:24.507447Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "57075944cde6070300eb5d10": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T07:32:24.507453Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T07:47:24.507453Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T08:17:24.507453Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "572469a3d9a14503000d2f3c": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T06:30:24.507457Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T06:45:24.507457Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T07:15:24.507457Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "579b4079ec619403005140d7": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T05:28:24.507461Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T05:43:24.507461Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T06:13:24.507461Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5831a534cac74c0004189dba": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T16:26:24.507465Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T16:41:24.507465Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T17:11:24.507465Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5831a5f5cac74c0004189e48": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T15:24:24.507469Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T15:39:24.507469Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T16:09:24.507469Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "58d38fbd09492e0004044254": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T14:22:24.507473Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T14:37:24.507473Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T15:07:24.507473Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      }
+    },
+    "Sakızlar": {
+      "559bfc8347c6ab0c001ce41a": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T16:50:24.507477Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T17:05:24.507477Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T17:35:24.507477Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5a39ecf53574d30004bbc865": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T15:45:24.507547Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T16:00:24.507547Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T16:30:24.507547Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5a4f49e5eb516b000437ad3e": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T14:40:24.507552Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T14:55:24.507552Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T15:25:24.507552Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5a4f4dd8eb516b000437adc0": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T13:35:24.507556Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T13:50:24.507556Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T14:20:24.507556Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5b33b88c5a06d70004ee3fe1": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T12:30:24.507560Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T12:45:24.507560Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T13:15:24.507560Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ced4829d349d10001e7050d": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T11:25:24.507567Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T11:40:24.507567Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T12:10:24.507567Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ced4831d349d10001e70583": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T10:20:24.507571Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T10:35:24.507571Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T11:05:24.507571Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ced4831d349d10001e70585": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T09:15:24.507575Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T09:30:24.507575Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T10:00:24.507575Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5f9ff09af9121a0f99b41ea0": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T08:10:24.507578Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T08:25:24.507578Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T08:55:24.507578Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5f9ff7809395827ff481f631": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T07:05:24.507582Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T07:20:24.507582Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T07:50:24.507582Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "6281f13c28b33b3b37e72f5b": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T06:00:24.507590Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T06:15:24.507590Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T06:45:24.507590Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "6281f16c50dd2e523600e9f3": {
+        "history": [
+          {
+            "timestamp": "2026-01-02T04:55:24.507594Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-02T05:10:24.507594Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-02T05:40:24.507594Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      }
+    },
+    "Sucuklar": {
+      "5901c54a9d21350004cf6c4f": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T16:50:24.507598Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T17:05:24.507598Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T17:35:24.507598Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "598c4ad53e19400004bbac4b": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T15:47:24.507604Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T16:02:24.507604Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T16:32:24.507604Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "598c4c2fa4be8c000421231f": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T14:44:24.507608Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T14:59:24.507608Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T15:29:24.507608Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5a4dda487614470004f36b28": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T13:41:24.507612Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T13:56:24.507612Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T14:26:24.507612Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5a86db1aaec00c000434c94b": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T12:38:24.507615Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T12:53:24.507615Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T13:23:24.507615Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5a86e06e1bc08f0004e03d3c": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T11:35:24.507622Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T11:50:24.507622Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T12:20:24.507622Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ad39fb0f6e69f0004bbb1dd": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T10:32:24.507626Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T10:47:24.507626Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T11:17:24.507626Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5ad3a0d35c45a0000419466e": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T09:29:24.507630Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T09:44:24.507630Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T10:14:24.507630Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5b4459dba959fe0004d89ab7": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T08:26:24.507634Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T08:41:24.507634Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T09:11:24.507634Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5b5ec7e24472c500047d76c3": {
+        "history": [
+          {
+            "timestamp": "2026-01-01T07:23:24.507638Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-01T07:38:24.507638Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-01T08:08:24.507638Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      }
+    },
+    "Raf A1": {
+      "559823ceb1dc700c006a7098": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T16:50:24.510079Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T17:05:24.510079Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T17:35:24.510079Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "559823f7b1dc700c006a709c": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T15:48:24.510095Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T16:03:24.510095Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T16:33:24.510095Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55982415b1dc700c006a70a0": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T14:46:24.510099Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T15:01:24.510099Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T15:31:24.510099Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55984600ed30fe0c005b1a09": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T13:44:24.510103Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T13:59:24.510103Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T14:29:24.510103Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55a0d935c0f1430c00405f16": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T12:42:24.510109Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T12:57:24.510109Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T13:27:24.510109Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55c4967f08d6d80c00e7fed3": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T11:40:24.510113Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T11:55:24.510113Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T12:25:24.510113Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5669a3e52201b40f00a7e0a2": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T10:38:24.510117Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T10:53:24.510117Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T11:23:24.510117Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "566fc767f9facb0f00b2025c": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T09:36:24.510120Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T09:51:24.510120Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T10:21:24.510120Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "56baf8262660e20f007c8723": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T16:34:24.510124Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T16:49:24.510124Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T17:19:24.510124Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "57021e5df2e0b303007e7a7e": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T15:32:24.510128Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T15:47:24.510128Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T16:17:24.510128Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5736fa234c007703004f941c": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T14:30:24.510132Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T14:45:24.510132Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T15:15:24.510132Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "573a0e675284820300279e09": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T13:28:24.510136Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T13:43:24.510136Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T14:13:24.510136Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "574b3235e4e92303005fd5f3": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T12:26:24.510139Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T12:41:24.510139Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T13:11:24.510139Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "574b361cdee8a90300f1947f": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T11:24:24.510143Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T11:39:24.510143Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T12:09:24.510143Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5760f8d32a4afd0300a53361": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T10:22:24.510147Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T10:37:24.510147Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T11:07:24.510147Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      }
+    },
+    "Raf B2": {
+      "55982dfbb1dc700c006a7106": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T16:50:24.510151Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T17:05:24.510151Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T17:35:24.510151Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55982ea3b1dc700c006a711a": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T15:47:24.510155Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T16:02:24.510155Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T16:32:24.510155Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "559831b7b1dc700c006a71a8": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T14:44:24.510158Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T14:59:24.510158Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T15:29:24.510158Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "559831ecb1dc700c006a71b4": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T13:41:24.510162Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T13:56:24.510162Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T14:26:24.510162Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5598325cb1dc700c006a71c0": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T12:38:24.510165Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T12:53:24.510165Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T13:23:24.510165Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5598443ab1dc700c006a72c7": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T11:35:24.510169Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T11:50:24.510169Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T12:20:24.510169Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "559ff55ef462100c00461e5e": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T10:32:24.510174Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T10:47:24.510174Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T11:17:24.510174Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55b25973a7602a0c0019ca99": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T09:29:24.510177Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T09:44:24.510177Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T10:14:24.510177Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55b259f3a7602a0c0019cabc": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T16:26:24.510181Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T16:41:24.510181Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T17:11:24.510181Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55e6bdd04ef8d40c00d1f91d": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T15:23:24.510185Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T15:38:24.510185Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T16:08:24.510185Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55e6c7364ef8d40c00d1fa88": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T14:20:24.510188Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T14:35:24.510188Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T15:05:24.510188Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55e6ce954ef8d40c00d1fbde": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T13:17:24.510192Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T13:32:24.510192Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T14:02:24.510192Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "55e6d02c4ef8d40c00d1fc36": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T12:14:24.510196Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T12:29:24.510196Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T12:59:24.510196Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "56125cdf1a6f060c00215f17": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T11:11:24.510200Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T11:26:24.510200Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T11:56:24.510200Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5618d4bb599c160c007d63e6": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T10:08:24.510203Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T10:23:24.510203Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T10:53:24.510203Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      }
+    },
+    "Raf C3": {
+      "5620c670cbc1de0c00f0f772": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T16:50:24.510207Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T17:05:24.510207Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T17:35:24.510207Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "565965be783d200c00662501": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T15:46:24.510211Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T16:01:24.510211Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T16:31:24.510211Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "56596a4b783d200c00662852": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T14:42:24.510214Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T14:57:24.510214Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T15:27:24.510214Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "565c271c762af60c00796a84": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T13:38:24.510218Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T13:53:24.510218Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T14:23:24.510218Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "565c2e7c762af60c0079798c": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T12:34:24.510221Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T12:49:24.510221Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T13:19:24.510221Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "566031ffbd8dab0c00937b60": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T11:30:24.510225Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T11:45:24.510225Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T12:15:24.510225Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5669754947d9ef0f0055077d": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T10:26:24.510228Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T10:41:24.510228Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T11:11:24.510228Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5669757547d9ef0f0055079b": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T09:22:24.510232Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T09:37:24.510232Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T10:07:24.510232Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5669a4002201b40f00a7e0d6": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T16:18:24.510237Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T16:33:24.510237Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T17:03:24.510237Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5669a4292201b40f00a7e0ec": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T15:14:24.510240Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T15:29:24.510240Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T15:59:24.510240Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "566eccc7f9facb0f00b1b638": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T14:10:24.510244Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T14:25:24.510244Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T14:55:24.510244Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "566fc639f9facb0f00b201d8": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T13:06:24.510247Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T13:21:24.510247Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T13:51:24.510247Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5671959589ad5d0f009fa012": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T12:02:24.510251Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T12:17:24.510251Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T12:47:24.510251Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5683e84c06df100f0046fc8f": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T10:58:24.510254Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T11:13:24.510254Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T11:43:24.510254Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      },
+      "5684073006df100f00470ca1": {
+        "history": [
+          {
+            "timestamp": "2026-01-03T09:54:24.510258Z",
+            "systemStock": null,
+            "warehouseStock": null
+          },
+          {
+            "timestamp": "2026-01-03T10:09:24.510258Z",
+            "systemStock": null,
+            "warehouseStock": null
+          }
+        ],
+        "lastUpdated": "2026-01-03T10:39:24.510258Z",
+        "systemStock": null,
+        "apiFetchFailed": false,
+        "warehouseStock": null
+      }
+    }
+  },
+  "_api_info": {
+    "token": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwdWJsaWNLZXkiOiJhNDg5YmIyNC0yOThkLTQ4YWItYjJkMS1jMWEzYWZlYWIwMmMiLCJ1c2VySWQiOiI2OTUzYjZlYWE4NzIyNTY1MzkyNDVhYWEiLCJpYXQiOjE3NjczNjg1NDIsImV4cCI6MTc2NzQ1NDk0Mn0.gK3O8Rsy_CnoYsIiBQ3zHK2s0PYIAyfJIe0l_hM2Tf8",
+    "baseUrl": "https://franchise-api-gateway.getirapi.com",
+    "timestamp": 1767450924510,
+    "lastUpdated": "2026-01-03T17:35:24.510264Z",
+    "tokenExpiry": 1767537324510,
+    "warehouseId": "5dcafe6ae2c61b1e52cf1704",
+    "stockEndpoint": "https://franchise-api-gateway.getirapi.com/stocks"
+  },
+  "_currentTable": "Sütler"
+}

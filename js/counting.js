@@ -7,6 +7,9 @@ class CountingSystem {
         this.STORAGE_KEY = 'counting_data';
         this.currentTableName = 'Ana Sayım'; // Aktif sayım tablosu
         this.currentSort = null; // { field: 'productName', direction: 'asc' } or null
+        this.lastTokenCheckTime = null; // Son token kontrol zamanı (gereksiz çağrıları önlemek için)
+        this.lastTokenExpiry = null; // Son kontrol edilen token expiry (değişiklik tespiti için)
+        this.isTokenUpdateInProgress = false; // Token güncelleme devam ediyor mu? (çoklu çağrıları önlemek için)
     }
 
     async init() {
@@ -137,10 +140,88 @@ class CountingSystem {
                 }
             }
             
-            // If API info found, save to Supabase
+            // If API info found, check if it's more valid than existing one
             if (apiInfo && apiInfo.token) {
-                console.log('📤 Franchise API bilgileri kaydedildi');
-                await this.saveAPIInfoToSupabase(apiInfo);
+                // Mevcut Supabase'deki token expiry'sini kontrol et
+                let shouldUpdate = true;
+                let existingExpiry = null;
+                
+                if (window.supabase && this.currentUser) {
+                    try {
+                        const { data: userData } = await window.supabase
+                            .from('users')
+                            .select('counting_data')
+                            .eq('username', this.currentUser.username)
+                            .maybeSingle();
+                        
+                        if (userData && userData.counting_data) {
+                            const countingData = typeof userData.counting_data === 'string' 
+                                ? JSON.parse(userData.counting_data) 
+                                : userData.counting_data;
+                            existingExpiry = countingData._api_info?.tokenExpiry;
+                        }
+                    } catch (e) {
+                        // Silent fail
+                    }
+                }
+                
+                // Token expiry karşılaştırması yap
+                if (existingExpiry && apiInfo.tokenExpiry) {
+                    // Her iki expiry'yi de timestamp'e çevir
+                    let existingExpiryTime = null;
+                    let newExpiryTime = null;
+                    
+                    if (typeof existingExpiry === 'number') {
+                        existingExpiryTime = existingExpiry;
+                    } else if (typeof existingExpiry === 'string') {
+                        existingExpiryTime = new Date(existingExpiry).getTime();
+                        if (isNaN(existingExpiryTime)) {
+                            existingExpiryTime = parseInt(existingExpiry, 10);
+                        }
+                    }
+                    
+                    if (typeof apiInfo.tokenExpiry === 'number') {
+                        newExpiryTime = apiInfo.tokenExpiry;
+                    } else if (typeof apiInfo.tokenExpiry === 'string') {
+                        newExpiryTime = new Date(apiInfo.tokenExpiry).getTime();
+                        if (isNaN(newExpiryTime)) {
+                            newExpiryTime = parseInt(apiInfo.tokenExpiry, 10);
+                        }
+                    }
+                    
+                    // Eğer yeni token'ın expiry'si mevcut olandan daha geçerliyse (daha uzun süre kaldıysa) güncelle
+                    if (existingExpiryTime && newExpiryTime && !isNaN(existingExpiryTime) && !isNaN(newExpiryTime)) {
+                        const existingTimeRemaining = existingExpiryTime - Date.now();
+                        const newTimeRemaining = newExpiryTime - Date.now();
+                        
+                        if (newTimeRemaining > existingTimeRemaining) {
+                            // Yeni token daha geçerli, güncelle
+                            console.log('🔄 Yeni token daha geçerli, güncelleniyor:', {
+                                existingTimeRemaining: Math.floor(existingTimeRemaining / (1000 * 60 * 60)) + ' saat',
+                                newTimeRemaining: Math.floor(newTimeRemaining / (1000 * 60 * 60)) + ' saat'
+                            });
+                            shouldUpdate = true;
+                        } else {
+                            // Mevcut token daha geçerli, güncelleme
+                            console.log('ℹ️ Mevcut token daha geçerli, güncelleme yapılmıyor:', {
+                                existingTimeRemaining: Math.floor(existingTimeRemaining / (1000 * 60 * 60)) + ' saat',
+                                newTimeRemaining: Math.floor(newTimeRemaining / (1000 * 60 * 60)) + ' saat'
+                            });
+                            shouldUpdate = false;
+                        }
+                    }
+                }
+                
+                // Eğer güncelleme gerekiyorsa Supabase'e kaydet
+                if (shouldUpdate) {
+                    console.log('📤 Franchise API bilgileri kaydedildi');
+                    await this.saveAPIInfoToSupabase(apiInfo);
+                    
+                    // Token expiry'yi güncelle (yeni token çekildiğinde tekrar kontrol yapılmasın)
+                    if (apiInfo.tokenExpiry) {
+                        this.lastTokenExpiry = apiInfo.tokenExpiry;
+                    }
+                }
             }
         } catch (error) {
             console.warn('⚠️ API bilgileri kontrol edilemedi:', error);
@@ -3632,8 +3713,9 @@ class CountingSystem {
                 return;
             }
             
-            // Get API info from Supabase or extension
+            // Get API info from Supabase and extension (karşılaştırma için)
             let apiInfo = null;
+            let extensionApiInfo = null;
             
             // Try to get from Supabase first
             if (window.supabase && this.currentUser) {
@@ -3651,43 +3733,103 @@ class CountingSystem {
                 }
             }
             
-            // Fallback: Try extension
-            if (!apiInfo) {
-                if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                    try {
-                        const response = await new Promise((resolve) => {
-                            chrome.runtime.sendMessage(
-                                { type: 'GET_API_INFO' },
-                                (response) => {
-                                    if (chrome.runtime.lastError) {
-                                        resolve(null);
-                                    } else {
-                                        resolve(response);
-                                    }
+            // Try extension (karşılaştırma için)
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                try {
+                    const response = await new Promise((resolve) => {
+                        chrome.runtime.sendMessage(
+                            { type: 'GET_API_INFO' },
+                            (response) => {
+                                if (chrome.runtime.lastError) {
+                                    resolve(null);
+                                } else {
+                                    resolve(response);
                                 }
-                            );
-                        });
-                        
-                        if (response && response.success && response.apiInfo) {
-                            apiInfo = response.apiInfo;
-                        }
-                    } catch (error) {
+                            }
+                        );
+                    });
+                    
+                    if (response && response.success && response.apiInfo) {
+                        extensionApiInfo = response.apiInfo;
+                    }
+                } catch (error) {
+                    // Silent fail
+                }
+            }
+            
+            // Fallback: window.getirExtensionHelper
+            if (!extensionApiInfo && typeof window !== 'undefined' && window.getirExtensionHelper) {
+                try {
+                    extensionApiInfo = await window.getirExtensionHelper.getAPIInfo();
+                } catch (error) {
+                    // Silent fail
+                }
+            }
+            
+            // Fallback: localStorage
+            if (!extensionApiInfo) {
+                const apiInfoKey = 'getir_api_info';
+                const apiInfoStr = localStorage.getItem(apiInfoKey);
+                if (apiInfoStr) {
+                    try {
+                        extensionApiInfo = JSON.parse(apiInfoStr);
+                    } catch (e) {
                         // Silent fail
                     }
                 }
             }
             
-            // Fallback: localStorage
-            if (!apiInfo) {
-                const apiInfoKey = 'getir_api_info';
-                const apiInfoStr = localStorage.getItem(apiInfoKey);
-                if (apiInfoStr) {
-                    try {
-                        apiInfo = JSON.parse(apiInfoStr);
-                    } catch (e) {
-                        // Silent fail
+            // Extension'dan gelen token'ı Supabase'dekiyle karşılaştır
+            // Eğer extension'daki token daha geçerliyse (daha uzun süre kaldıysa), güncelle
+            if (extensionApiInfo && extensionApiInfo.token && apiInfo && apiInfo.token) {
+                // Her iki token'ın expiry'sini karşılaştır
+                let supabaseExpiryTime = null;
+                let extensionExpiryTime = null;
+                
+                if (apiInfo.tokenExpiry) {
+                    if (typeof apiInfo.tokenExpiry === 'number') {
+                        supabaseExpiryTime = apiInfo.tokenExpiry;
+                    } else if (typeof apiInfo.tokenExpiry === 'string') {
+                        supabaseExpiryTime = new Date(apiInfo.tokenExpiry).getTime();
+                        if (isNaN(supabaseExpiryTime)) {
+                            supabaseExpiryTime = parseInt(apiInfo.tokenExpiry, 10);
+                        }
                     }
                 }
+                
+                if (extensionApiInfo.tokenExpiry) {
+                    if (typeof extensionApiInfo.tokenExpiry === 'number') {
+                        extensionExpiryTime = extensionApiInfo.tokenExpiry;
+                    } else if (typeof extensionApiInfo.tokenExpiry === 'string') {
+                        extensionExpiryTime = new Date(extensionApiInfo.tokenExpiry).getTime();
+                        if (isNaN(extensionExpiryTime)) {
+                            extensionExpiryTime = parseInt(extensionApiInfo.tokenExpiry, 10);
+                        }
+                    }
+                }
+                
+                // Eğer extension'daki token daha geçerliyse (daha uzun süre kaldıysa), güncelle
+                if (supabaseExpiryTime && extensionExpiryTime && !isNaN(supabaseExpiryTime) && !isNaN(extensionExpiryTime)) {
+                    const supabaseTimeRemaining = supabaseExpiryTime - Date.now();
+                    const extensionTimeRemaining = extensionExpiryTime - Date.now();
+                    
+                    if (extensionTimeRemaining > supabaseTimeRemaining) {
+                        // Extension'daki token daha geçerli, güncelle
+                        console.log('🔄 Extension\'dan gelen token daha geçerli, güncelleniyor:', {
+                            supabaseTimeRemaining: Math.floor(supabaseTimeRemaining / (1000 * 60 * 60)) + ' saat',
+                            extensionTimeRemaining: Math.floor(extensionTimeRemaining / (1000 * 60 * 60)) + ' saat'
+                        });
+                        apiInfo = extensionApiInfo;
+                        // Supabase'e kaydet
+                        await this.checkAndSaveAPIInfoFromExtension();
+                    }
+                }
+            } else if (extensionApiInfo && extensionApiInfo.token && !apiInfo) {
+                // Supabase'de token yok ama extension'da var, kullan
+                apiInfo = extensionApiInfo;
+            } else if (!apiInfo && extensionApiInfo) {
+                // Fallback: extension'dan gelen token'ı kullan
+                apiInfo = extensionApiInfo;
             }
             
             // Update card based on API info
@@ -3698,14 +3840,88 @@ class CountingSystem {
                 const now = Date.now();
                 
                 if (tokenExpiry) {
-                    const expiryTime = new Date(tokenExpiry).getTime();
-                    const timeRemaining = expiryTime - now;
-                    const minutesRemaining = Math.floor(timeRemaining / (1000 * 60));
-                    const hoursRemaining = Math.floor(minutesRemaining / 60);
-                    const daysRemaining = Math.floor(hoursRemaining / 24);
+                    // Token expiry'yi parse et (timestamp veya string olabilir)
+                    let expiryTime;
+                    if (typeof tokenExpiry === 'number') {
+                        expiryTime = tokenExpiry;
+                    } else if (typeof tokenExpiry === 'string') {
+                        // String ise parse et
+                        expiryTime = new Date(tokenExpiry).getTime();
+                        // Eğer parse edilemediyse (NaN), timestamp olarak dene
+                        if (isNaN(expiryTime)) {
+                            expiryTime = parseInt(tokenExpiry, 10);
+                        }
+                    } else {
+                        expiryTime = null;
+                    }
+                    
+                    // Geçerli bir timestamp değilse atla
+                    if (!expiryTime || isNaN(expiryTime)) {
+                        console.warn('⚠️ Token expiry geçersiz format:', tokenExpiry);
+                    }
+                    
+                    const timeRemaining = expiryTime && !isNaN(expiryTime) ? expiryTime - now : null;
+                    
+                    // Token expiry kontrolü: Eğer token süresi geçmişse veya 5 dakika içinde geçecekse,
+                    // ve son kontrol zamanından 30 saniye geçmişse, yeni token çek
+                    const shouldCheckForNewToken = timeRemaining !== null && 
+                                                   (timeRemaining < 0 || timeRemaining < 5 * 60 * 1000) && 
+                                                   (!this.lastTokenCheckTime || (now - this.lastTokenCheckTime) > 30000) &&
+                                                   (this.lastTokenExpiry !== tokenExpiry) &&
+                                                   !this.isTokenUpdateInProgress;
+                    
+                    // Time remaining değerlerini hesapla
+                    const minutesRemaining = timeRemaining !== null ? Math.floor(timeRemaining / (1000 * 60)) : 0;
+                    const hoursRemaining = timeRemaining !== null ? Math.floor(minutesRemaining / 60) : 0;
+                    const daysRemaining = timeRemaining !== null ? Math.floor(hoursRemaining / 24) : 0;
+                    
+                    if (shouldCheckForNewToken) {
+                        console.log('🔄 Token otomatik güncelleme tetiklendi:', {
+                            timeRemaining: timeRemaining,
+                            minutesRemaining: minutesRemaining,
+                            lastCheckTime: this.lastTokenCheckTime,
+                            lastTokenExpiry: this.lastTokenExpiry,
+                            currentTokenExpiry: tokenExpiry
+                        });
+                        
+                        // Yeni token çekmeyi dene
+                        this.lastTokenCheckTime = now;
+                        this.lastTokenExpiry = tokenExpiry;
+                        this.isTokenUpdateInProgress = true;
+                        
+                        // Extension'dan yeni token çek
+                        try {
+                            await this.checkAndSaveAPIInfoFromExtension();
+                            console.log('✅ Token otomatik güncelleme başarılı');
+                            // Token güncelleme sonrası UI'ı yenile (kısa bir gecikme ile)
+                            setTimeout(() => {
+                                this.isTokenUpdateInProgress = false;
+                                this.updateAPIStatusCard();
+                            }, 1000);
+                        } catch (error) {
+                            console.warn('⚠️ Token güncelleme hatası:', error);
+                            this.isTokenUpdateInProgress = false;
+                        }
+                    }
                     
                     // Determine status
-                    if (timeRemaining < 0) {
+                    if (timeRemaining === null || isNaN(timeRemaining)) {
+                        // Token expiry geçersiz format
+                        apiStatusCard.className = 'bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
+                        apiStatusIcon.className = 'w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center';
+                        apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
+                        apiStatusText.textContent = 'Token bilgisi eksik';
+                        
+                        // Warehouse bilgisi
+                        if (apiInfo.warehouseId) {
+                            const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                            apiWarehouseName.textContent = `Depo: ${warehouseName}`;
+                        } else {
+                            apiWarehouseName.textContent = 'Depo bilgisi yok';
+                        }
+                        
+                        apiExpiryTime.innerHTML = '<span class="text-yellow-700">Token expiry bilgisi geçersiz format</span>';
+                    } else if (timeRemaining < 0) {
                         // Expired
                         apiStatusCard.className = 'bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
                         apiStatusIcon.className = 'w-10 h-10 rounded-full bg-red-100 flex items-center justify-center';
