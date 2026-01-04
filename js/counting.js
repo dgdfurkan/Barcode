@@ -906,6 +906,16 @@ class CountingSystem {
                 cameraScannerModal.classList.add('hidden');
             });
         }
+
+        // Seri okuma toggle butonu
+        const continuousScanToggle = document.getElementById('continuousScanToggle');
+        if (continuousScanToggle) {
+            continuousScanToggle.addEventListener('change', (e) => {
+                if (window.barcodeScanner) {
+                    window.barcodeScanner.setContinuousMode(e.target.checked);
+                }
+            });
+        }
         
         // Table management event listeners
         const tableSelectorBtn = document.getElementById('tableSelectorBtn');

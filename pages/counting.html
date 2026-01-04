@@ -335,6 +335,17 @@
             max-width: 640px;
             height: auto;
             border-radius: 0.5rem;
+            background: #000;
+            transform: scaleX(-1); /* Mirror effect for better UX */
+        }
+        
+        /* Telefon için video optimizasyonu */
+        @media (max-width: 768px) {
+            #cameraVideo {
+                max-width: 100%;
+                max-height: 60vh;
+                object-fit: cover;
+            }
         }
         
         .scanner-overlay {
@@ -372,6 +383,16 @@
             border-top: none;
         }
         
+        /* Yeşil yanıp sönme efekti */
+        #cameraFlashOverlay {
+            transition: opacity 0.2s ease-in-out;
+        }
+        
+        /* Seri okuma toggle stili */
+        #continuousScanToggle:checked ~ span {
+            color: #9333ea;
+        }
+        
         /* Modal Responsive Styles */
         @media (max-width: 768px) {
             #productSearchModal > div,
@@ -382,6 +403,13 @@
                 max-height: 100% !important;
                 margin: 0 !important;
                 border-radius: 0 !important;
+            }
+            
+            #cameraVideo {
+                width: 100%;
+                height: auto;
+                max-height: 70vh;
+                object-fit: cover;
             }
             
             #productSearchModal .overflow-y-auto,
@@ -1079,11 +1107,21 @@
                 </button>
             </div>
             <div class="p-6 flex-1 flex flex-col items-center justify-center">
-                <div class="relative">
-                    <video id="cameraVideo" autoplay playsinline></video>
+                <div class="relative w-full max-w-md">
+                    <video id="cameraVideo" autoplay playsinline class="w-full rounded-lg"></video>
                     <div class="scanner-overlay"></div>
                 </div>
                 <p class="mt-4 text-sm text-gray-600 text-center">Barkodu kameraya gösterin</p>
+                
+                <!-- Seri Okuma Toggle -->
+                <div class="mt-6 flex items-center justify-center space-x-3 bg-gray-50 rounded-xl p-4">
+                    <span class="text-sm font-medium text-gray-700">Seri Okuma</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="continuousScanToggle" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-pink-600"></div>
+                    </label>
+                    <span class="text-xs text-gray-500">Aktif: Kamera açık kalır</span>
+                </div>
             </div>
         </div>
     </div>
