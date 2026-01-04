@@ -374,9 +374,10 @@ class BarcodeScanner {
                     return;
                 }
 
-                // Performans için canvas boyutunu küçült (max 400px genişlik)
-                // Barkod okuma için yeterli çözünürlük
-                const scale = Math.min(1, 400 / currentVideoWidth);
+                // Performans için canvas boyutunu optimize et (max 800px genişlik)
+                // Barkod okuma için yeterli çözünürlük (400px çok küçüktü, 600px de yeterli olmayabilir)
+                // Video 640px ise tam boyut kullan, daha büyükse scale et
+                const scale = Math.min(1, 800 / currentVideoWidth);
                 currentCanvasWidth = Math.floor(currentVideoWidth * scale);
                 currentCanvasHeight = Math.floor(currentVideoHeight * scale);
 
@@ -402,12 +403,12 @@ class BarcodeScanner {
                     frameCount = 0;
                 }
 
-                // Decode işlemini throttle et (her 500ms'de bir decode et - performans için)
-                // Telefonun kapanmaması için çok daha az sıklıkta
-                if (now - lastDecodeTime < 500) {
+                // Decode işlemini throttle et (her 250ms'de bir decode et - performans ve okuma dengesi)
+                // 300ms hala yavaş olabilir, barkod okuma için daha sık deneme
+                if (now - lastDecodeTime < 250) {
                     // Çok sık decode etme, sadece frame'i atla
                     if (this.scanning) {
-                        setTimeout(scanFrame, 200); // requestAnimationFrame yerine setTimeout (daha kontrollü)
+                        setTimeout(scanFrame, 150); // requestAnimationFrame yerine setTimeout (daha kontrollü)
                     }
                     return;
                 }
@@ -504,8 +505,9 @@ class BarcodeScanner {
                         setTimeout(scanFrame, 200);
                     }
                 };
-                // JPEG kullan (PNG'den daha küçük, daha hızlı) - quality 0.8 (yeterli kalite, daha küçük dosya)
-                img.src = this.canvas.toDataURL('image/jpeg', 0.8);
+                // PNG kullan (JPEG'den daha yüksek kalite, barkod okuma için kritik)
+                // JPEG compression barkod okumayı bozabilir, PNG daha güvenilir
+                img.src = this.canvas.toDataURL('image/png');
 
             } catch (error) {
                 console.warn('⚠️ Canvas decoding hatası:', error);
