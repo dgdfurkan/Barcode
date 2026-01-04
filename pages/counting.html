@@ -336,15 +336,18 @@
             height: auto;
             border-radius: 0.5rem;
             background: #000;
-            /* Arka kamera için yansıma yok, ön kamera için gerekirse eklenebilir */
+            transform: none !important; /* Yansıma yok - arka kamera için normal görüntü */
+            -webkit-transform: none !important;
         }
         
         /* Telefon için video optimizasyonu */
         @media (max-width: 768px) {
             #cameraVideo {
                 max-width: 100%;
-                max-height: 60vh;
+                max-height: 55vh;
                 object-fit: cover;
+                transform: none !important;
+                -webkit-transform: none !important;
             }
         }
         
@@ -1117,30 +1120,34 @@
     <!-- Camera Scanner Modal -->
     <div id="cameraScannerModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden flex flex-col max-h-[90vh] sm:max-h-none">
-            <div class="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
-                <h3 class="text-xl font-bold text-text-primary">Barkod Oku</h3>
-                <button id="closeCameraScannerModal" class="text-text-secondary hover:text-text-primary transition-colors">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
+                <h3 class="text-lg sm:text-xl font-bold text-text-primary">Barkod Oku</h3>
+                <button id="closeCameraScannerModal" class="text-text-secondary hover:text-text-primary transition-colors p-1">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                 </button>
             </div>
-            <div class="p-6 flex-1 flex flex-col items-center justify-center min-h-0 overflow-y-auto" style="max-height: calc(90vh - 80px);">
+            <div class="p-4 sm:p-6 flex-1 flex flex-col items-center justify-center min-h-0 overflow-y-auto" style="max-height: calc(90vh - 80px);">
+                <!-- Seri Okuma Toggle - Üstte, video'dan önce -->
+                <div class="mb-4 w-full max-w-md flex items-center justify-between bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-3 sm:p-4 flex-shrink-0 border border-purple-100">
+                    <div class="flex items-center space-x-2 sm:space-x-3">
+                        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        <span class="text-sm sm:text-base font-semibold text-gray-800">Seri Okuma</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                        <input type="checkbox" id="continuousScanToggle" class="sr-only peer">
+                        <div class="w-12 h-6 bg-gray-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-pink-600"></div>
+                    </label>
+                </div>
+                
                 <div class="relative w-full max-w-md flex-shrink-0">
-                    <video id="cameraVideo" autoplay playsinline class="w-full rounded-lg"></video>
+                    <video id="cameraVideo" autoplay playsinline class="w-full rounded-lg" style="transform: none !important; -webkit-transform: none !important;"></video>
                     <div class="scanner-overlay"></div>
                 </div>
                 <p class="mt-4 text-sm text-gray-600 text-center flex-shrink-0">Barkodu kameraya gösterin</p>
-                
-                <!-- Seri Okuma Toggle -->
-                <div class="mt-6 mb-4 flex items-center justify-center space-x-2 sm:space-x-3 bg-gray-50 rounded-xl p-3 sm:p-4 flex-shrink-0 w-full max-w-md">
-                    <span class="text-sm font-medium text-gray-700 whitespace-nowrap">Seri Okuma</span>
-                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
-                        <input type="checkbox" id="continuousScanToggle" class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-purple-600 peer-checked:to-pink-600"></div>
-                    </label>
-                    <span class="text-xs text-gray-500 whitespace-nowrap hidden sm:inline">Aktif: Kamera açık kalır</span>
-                </div>
             </div>
         </div>
     </div>
