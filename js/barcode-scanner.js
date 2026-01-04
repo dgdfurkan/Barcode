@@ -9,11 +9,6 @@ class BarcodeScanner {
         this.continuousMode = false; // Seri okuma modu
         this.lastScannedCode = null; // Son okunan barkod (tekrar okumayı önlemek için)
         this.lastScanTime = 0; // Son okuma zamanı
-        this.overlayCanvas = null; // Barkod overlay için canvas
-        this.overlayContext = null;
-        this.barcodeBoxTimeout = null; // Overlay timeout
-        this.audioContext = null; // Ses için audio context
-        this.scannedBarcodes = new Set(); // Bu oturumda okunan barkodlar (duplicate kontrolü için)
     }
 
     async startScanning() {
@@ -346,12 +341,6 @@ class BarcodeScanner {
         let frameCount = 0;
         let lastLogTime = Date.now();
         let lastDecodeTime = 0;
-        
-        // Video ve canvas boyutlarını closure'da tut
-        let currentVideoWidth = 0;
-        let currentVideoHeight = 0;
-        let currentCanvasWidth = 0;
-        let currentCanvasHeight = 0;
 
         const scanFrame = () => {
             if (!this.scanning || !this.video) {
@@ -360,63 +349,56 @@ class BarcodeScanner {
 
             // Video hazır değilse bekle
             if (this.video.readyState < 2) {
-                setTimeout(scanFrame, 200);
+                setTimeout(scanFrame, 100);
                 return;
             }
 
             try {
-                // Canvas boyutlarını video'ya göre ayarla (performans için küçült)
-                currentVideoWidth = this.video.videoWidth || 640;
-                currentVideoHeight = this.video.videoHeight || 480;
+                // Canvas boyutlarını video'ya göre ayarla
+                const videoWidth = this.video.videoWidth || 640;
+                const videoHeight = this.video.videoHeight || 480;
                 
-                if (currentVideoWidth === 0 || currentVideoHeight === 0) {
-                    setTimeout(scanFrame, 200);
+                if (videoWidth === 0 || videoHeight === 0) {
+                    setTimeout(scanFrame, 100);
                     return;
                 }
 
-                // Canvas boyutunu video boyutuna göre ayarla
-                // Video 640px ise tam boyut kullan (barkod okuma için en iyi)
-                // Daha büyükse scale et (max 800px performans için)
-                const maxWidth = Math.min(800, currentVideoWidth);
-                const scale = Math.min(1, maxWidth / currentVideoWidth);
-                currentCanvasWidth = Math.floor(currentVideoWidth * scale);
-                currentCanvasHeight = Math.floor(currentVideoHeight * scale);
+                this.canvas.width = videoWidth;
+                this.canvas.height = videoHeight;
 
-                // Canvas boyutunu sadece değiştiyse güncelle (performans)
-                if (this.canvas.width !== currentCanvasWidth || this.canvas.height !== currentCanvasHeight) {
-                    this.canvas.width = currentCanvasWidth;
-                    this.canvas.height = currentCanvasHeight;
-                }
+                // Video frame'ini canvas'a çiz
+                this.canvasContext.drawImage(this.video, 0, 0, videoWidth, videoHeight);
 
-                // Video frame'ini canvas'a çiz (küçültülmüş boyutta)
-                this.canvasContext.drawImage(this.video, 0, 0, currentCanvasWidth, currentCanvasHeight);
+                // Canvas'tan image data al
+                const imageData = this.canvasContext.getImageData(0, 0, videoWidth, videoHeight);
+                
+                // ZXing ile decode et - decodeFromImageElement kullan (daha güvenilir)
+                // decodeFromImageData genelde çalışmıyor, bu yüzden direkt decodeFromImageElement kullanıyoruz
 
-                // Progress log (her 5 saniyede bir) - daha az log, performans için
+                // Progress log (her 2 saniyede bir) - frame okuma başlamadan önce
                 frameCount++;
                 const now = Date.now();
-                if (now - lastLogTime > 5000) {
+                if (now - lastLogTime > 2000) {
                     console.log('🔍 Barkod aranıyor...', {
                         frameCount,
-                        canvasSize: `${currentCanvasWidth}x${currentCanvasHeight}`,
-                        videoSize: `${currentVideoWidth}x${currentVideoHeight}`
+                        videoSize: `${videoWidth}x${videoHeight}`,
+                        readyState: this.video.readyState
                     });
                     lastLogTime = now;
                     frameCount = 0;
                 }
 
-                // Decode işlemini throttle et (her 200ms'de bir decode et - performans ve okuma dengesi)
-                // Daha sık deneme = daha hızlı algılama, ama performansı koru
-                if (now - lastDecodeTime < 200) {
+                // Decode işlemini throttle et (her 100ms'de bir decode et, performans için)
+                if (now - lastDecodeTime < 100) {
                     // Çok sık decode etme, sadece frame'i atla
                     if (this.scanning) {
-                        setTimeout(scanFrame, 100); // requestAnimationFrame yerine setTimeout (daha kontrollü)
+                        requestAnimationFrame(scanFrame);
                     }
                     return;
                 }
                 lastDecodeTime = now;
 
                 // decodeFromImageElement kullan (canvas'tan image oluştur)
-                // JPEG kullan (PNG'den daha küçük, daha hızlı)
                 const img = new Image();
                 img.onload = () => {
                     if (!this.scanning) return;
@@ -434,33 +416,13 @@ class BarcodeScanner {
                                         
                                         if (result) {
                                             const code = result.getText();
-                                            
-                                            // Duplicate kontrolü
-                                            if (this.scannedBarcodes.has(code)) {
-                                                console.log('⚠️ Bu barkod zaten okundu:', code);
-                                                this.showDuplicateWarning();
-                                                if (this.scanning) {
-                                                    setTimeout(scanFrame, 200);
-                                                }
-                                                return;
-                                            }
-                                            
-                                            // Pozisyon bilgisini al ve çiz
-                                            this.drawBarcodeBox(result, currentCanvasWidth, currentCanvasHeight, currentVideoWidth, currentVideoHeight);
-                                            
-                                            // Ses çal
-                                            this.playSuccessSound();
-                                            
-                                            // Barkodu işaretle
-                                            this.scannedBarcodes.add(code);
-                                            
                                             console.log('✅ Barcode detected:', code);
                                             this.handleBarcodeDetected(code);
                                         }
                                         
-                                        // Devam et (her zaman) - setTimeout kullan (daha kontrollü)
+                                        // Devam et (her zaman)
                                         if (this.scanning) {
-                                            setTimeout(scanFrame, 200);
+                                            requestAnimationFrame(scanFrame);
                                         }
                                     })
                                     .catch((err) => {
@@ -468,7 +430,7 @@ class BarcodeScanner {
                                         // "No MultiFormat Readers were able to detect the code" normal bir durum
                                         // Devam et
                                         if (this.scanning) {
-                                            setTimeout(scanFrame, 200);
+                                            requestAnimationFrame(scanFrame);
                                         }
                                     });
                             } else {
@@ -484,44 +446,42 @@ class BarcodeScanner {
                                     
                                     // Devam et
                                     if (this.scanning) {
-                                        setTimeout(scanFrame, 200);
+                                        requestAnimationFrame(scanFrame);
                                     }
                                 });
                             }
                         } else {
                             // ZXing API'si bulunamadı
                             if (this.scanning) {
-                                setTimeout(scanFrame, 200);
+                                requestAnimationFrame(scanFrame);
                             }
                         }
                     } catch (error) {
                         // Sessizce devam et (hata normal - barkod bulunamadı)
                         if (this.scanning) {
-                            setTimeout(scanFrame, 200);
+                            requestAnimationFrame(scanFrame);
                         }
                     }
                 };
                 img.onerror = () => {
                     if (this.scanning) {
-                        setTimeout(scanFrame, 200);
+                        requestAnimationFrame(scanFrame);
                     }
                 };
-                // PNG kullan (JPEG'den daha yüksek kalite, barkod okuma için kritik)
-                // JPEG compression barkod okumayı bozabilir, PNG daha güvenilir
                 img.src = this.canvas.toDataURL('image/png');
 
             } catch (error) {
                 console.warn('⚠️ Canvas decoding hatası:', error);
                 if (this.scanning) {
-                    setTimeout(scanFrame, 200);
+                    setTimeout(scanFrame, 100);
                 }
             }
         };
 
-        // İlk frame'i oku (setTimeout kullan - daha kontrollü, performans için)
-        setTimeout(scanFrame, 300); // İlk başlatma için biraz bekle
+        // İlk frame'i oku (requestAnimationFrame kullan - daha smooth)
+        requestAnimationFrame(scanFrame);
         this.codeReader = codeReader;
-        console.log('✅ Canvas decoding başlatıldı (performans optimizasyonlu)');
+        console.log('✅ Canvas decoding başlatıldı (requestAnimationFrame ile)');
     }
 
     decodeFromCanvasDirect(codeReader, imageData) {
@@ -712,136 +672,15 @@ class BarcodeScanner {
         if (!flashOverlay) {
             flashOverlay = document.createElement('div');
             flashOverlay.id = 'cameraFlashOverlay';
-            flashOverlay.style.cssText = 'position: absolute; inset: 0; background: rgba(16, 185, 129, 0.4); z-index: 60; pointer-events: none; transition: opacity 0.2s ease-in-out; border-radius: 0.5rem;';
-            const videoContainer = modal.querySelector('.relative');
-            if (videoContainer) {
-                videoContainer.appendChild(flashOverlay);
-            } else {
-                modal.appendChild(flashOverlay);
-            }
+            flashOverlay.className = 'fixed inset-0 bg-green-500 bg-opacity-50 z-50 pointer-events-none transition-opacity duration-200';
+            modal.appendChild(flashOverlay);
         }
 
         // Yeşil yanıp sönme efekti
         flashOverlay.style.opacity = '0.8';
         setTimeout(() => {
-            if (flashOverlay) {
-                flashOverlay.style.opacity = '0';
-            }
+            flashOverlay.style.opacity = '0';
         }, 200);
-    }
-
-    drawBarcodeBox(result, canvasWidth, canvasHeight, videoWidth, videoHeight) {
-        try {
-            // Overlay canvas'ı oluştur veya al
-            if (!this.overlayCanvas) {
-                this.overlayCanvas = document.getElementById('barcodeOverlay');
-                if (!this.overlayCanvas) {
-                    console.warn('⚠️ Overlay canvas bulunamadı');
-                    return;
-                }
-                this.overlayContext = this.overlayCanvas.getContext('2d');
-            }
-
-            // Video element'inin boyutlarını al
-            const videoElement = this.video;
-            if (!videoElement) return;
-
-            const videoRect = videoElement.getBoundingClientRect();
-            this.overlayCanvas.width = videoRect.width;
-            this.overlayCanvas.height = videoRect.height;
-
-            // ZXing result'tan pozisyon bilgisini al
-            let points = [];
-            try {
-                // ZXing'in getResultPoints() metodu
-                if (typeof result.getResultPoints === 'function') {
-                    points = result.getResultPoints();
-                } else if (result.resultPoints) {
-                    points = result.resultPoints;
-                } else if (result.getBoundingBox) {
-                    const box = result.getBoundingBox();
-                    if (box) {
-                        points = [
-                            { x: box.x, y: box.y },
-                            { x: box.x + box.width, y: box.y },
-                            { x: box.x + box.width, y: box.y + box.height },
-                            { x: box.x, y: box.y + box.height }
-                        ];
-                    }
-                }
-            } catch (e) {
-                console.warn('⚠️ Pozisyon bilgisi alınamadı:', e);
-            }
-
-            // Canvas'ı temizle
-            this.overlayContext.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-
-            // Eğer pozisyon bilgisi yoksa, merkeze bir kutu çiz
-            if (!points || points.length === 0) {
-                // Merkeze küçük bir kutu çiz
-                const centerX = videoRect.width / 2;
-                const centerY = videoRect.height / 2;
-                const boxSize = 150;
-                
-                this.overlayContext.strokeStyle = '#10b981'; // Yeşil
-                this.overlayContext.lineWidth = 4;
-                this.overlayContext.strokeRect(
-                    centerX - boxSize / 2,
-                    centerY - boxSize / 2,
-                    boxSize,
-                    boxSize
-                );
-            } else {
-                // Pozisyon bilgisini video boyutuna göre ölçekle
-                const scaleX = videoRect.width / canvasWidth;
-                const scaleY = videoRect.height / canvasHeight;
-
-                // Yeşil kutu çiz
-                this.overlayContext.strokeStyle = '#10b981'; // Yeşil
-                this.overlayContext.lineWidth = 4;
-                this.overlayContext.beginPath();
-
-                // İlk noktadan başla
-                const firstPoint = points[0];
-                const x = (firstPoint.x !== undefined ? firstPoint.x : firstPoint.getX()) * scaleX;
-                const y = (firstPoint.y !== undefined ? firstPoint.y : firstPoint.getY()) * scaleY;
-                this.overlayContext.moveTo(x, y);
-
-                // Diğer noktaları çiz
-                for (let i = 1; i < points.length; i++) {
-                    const point = points[i];
-                    const px = (point.x !== undefined ? point.x : point.getX()) * scaleX;
-                    const py = (point.y !== undefined ? point.y : point.getY()) * scaleY;
-                    this.overlayContext.lineTo(px, py);
-                }
-
-                // Kapat
-                this.overlayContext.closePath();
-                this.overlayContext.stroke();
-
-                // Köşelere küçük daireler ekle (daha şık görünüm)
-                this.overlayContext.fillStyle = '#10b981';
-                points.forEach(point => {
-                    const px = (point.x !== undefined ? point.x : point.getX()) * scaleX;
-                    const py = (point.y !== undefined ? point.y : point.getY()) * scaleY;
-                    this.overlayContext.beginPath();
-                    this.overlayContext.arc(px, py, 6, 0, 2 * Math.PI);
-                    this.overlayContext.fill();
-                });
-            }
-
-            // 1.5 saniye sonra overlay'i temizle
-            if (this.barcodeBoxTimeout) {
-                clearTimeout(this.barcodeBoxTimeout);
-            }
-            this.barcodeBoxTimeout = setTimeout(() => {
-                if (this.overlayContext && this.overlayCanvas) {
-                    this.overlayContext.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-                }
-            }, 1500);
-        } catch (error) {
-            console.warn('⚠️ Barkod kutusu çizme hatası:', error);
-        }
     }
 
     setContinuousMode(enabled) {
@@ -851,15 +690,6 @@ class BarcodeScanner {
 
     stopScanning() {
         this.scanning = false;
-
-        // Overlay'i temizle
-        if (this.barcodeBoxTimeout) {
-            clearTimeout(this.barcodeBoxTimeout);
-            this.barcodeBoxTimeout = null;
-        }
-        if (this.overlayContext) {
-            this.overlayContext.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-        }
 
         // Stop QuaggaJS if running
         if (this.quaggaInstance && typeof this.quaggaInstance.stop === 'function') {
@@ -908,9 +738,6 @@ class BarcodeScanner {
         if (modal) {
             modal.classList.add('hidden');
         }
-
-        // Scanned barcodes'u temizle (yeni oturum için)
-        this.scannedBarcodes.clear();
 
         console.log('✅ Camera stopped');
     }
