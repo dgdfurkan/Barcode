@@ -391,6 +391,33 @@
             transition: opacity 0.2s ease-in-out;
         }
         
+        /* Barkod overlay canvas */
+        #barcodeOverlayCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            border-radius: 0.5rem;
+        }
+        
+        .barcode-detected {
+            animation: barcodePulse 0.5s ease-in-out;
+        }
+        
+        @keyframes barcodePulse {
+            0%, 100% { 
+                opacity: 1; 
+                filter: brightness(1);
+            }
+            50% { 
+                opacity: 0.8; 
+                filter: brightness(1.2);
+            }
+        }
+        
         /* Seri okuma toggle stili */
         #continuousScanToggle:checked ~ span {
             color: #9333ea;
@@ -1145,6 +1172,7 @@
                 
                 <div class="relative w-full max-w-md flex-shrink-0">
                     <video id="cameraVideo" autoplay playsinline class="w-full rounded-lg" style="transform: none !important; -webkit-transform: none !important;"></video>
+                    <canvas id="barcodeOverlayCanvas" class="absolute inset-0 pointer-events-none z-10 rounded-lg"></canvas>
                     <div class="scanner-overlay"></div>
                 </div>
                 <p class="mt-4 text-sm text-gray-600 text-center flex-shrink-0">Barkodu kameraya gösterin</p>
