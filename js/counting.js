@@ -94,8 +94,12 @@ class CountingSystem {
             // Try to get API info from extension (background script)
             if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                 try {
+                    // Extension ID'yi al (extension helper'dan veya hardcoded)
+                    const extensionId = window.getirExtensionHelper?.extensionId || 'dhgdhdnnpeakmomlgpgmokecmdmeoebn';
+                    
                     const response = await new Promise((resolve) => {
                         chrome.runtime.sendMessage(
+                            extensionId,
                             { type: 'GET_API_INFO' },
                             (response) => {
                                 if (chrome.runtime.lastError) {
@@ -1801,15 +1805,19 @@ class CountingSystem {
                 if (!apiInfo && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                     console.log('✅ Extension API mevcut, background script\'e mesaj gönderiliyor...');
                     
+                    // Extension ID'yi al (extension helper'dan veya hardcoded)
+                    const extensionId = window.getirExtensionHelper?.extensionId || 'dhgdhdnnpeakmomlgpgmokecmdmeoebn';
+                    
                     const response = await new Promise((resolveMessage) => {
-                        // ID olmadan gönder (externally_connectable sayesinde çalışır)
+                        // Extension ID ile gönder
                         chrome.runtime.sendMessage(
+                            extensionId,
                             { type: 'GET_API_INFO' },
                             (response) => {
                                 if (chrome.runtime.lastError) {
                                     console.error('❌ Extension mesaj hatası:', chrome.runtime.lastError.message);
                                     console.log('💡 Extension yüklü değil veya erişilemiyor. Extension\'ı kontrol edin.');
-                                    console.log('💡 Extension ID:', chrome.runtime.id || 'bulunamadı');
+                                    console.log('💡 Extension ID:', extensionId);
                                     resolveMessage(null);
                                 } else {
                                     console.log('📥 Extension\'dan yanıt alındı:', response ? 'var' : 'yok');
@@ -3746,8 +3754,12 @@ class CountingSystem {
             // Try extension (karşılaştırma için)
             if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                 try {
+                    // Extension ID'yi al (extension helper'dan veya hardcoded)
+                    const extensionId = window.getirExtensionHelper?.extensionId || 'dhgdhdnnpeakmomlgpgmokecmdmeoebn';
+                    
                     const response = await new Promise((resolve) => {
                         chrome.runtime.sendMessage(
+                            extensionId,
                             { type: 'GET_API_INFO' },
                             (response) => {
                                 if (chrome.runtime.lastError) {

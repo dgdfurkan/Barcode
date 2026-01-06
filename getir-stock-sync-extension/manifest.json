@@ -33,7 +33,8 @@
     "matches": [
       "http://localhost/*",
       "http://127.0.0.1/*",
-      "https://franchise.getir.com/*"
+      "https://franchise.getir.com/*",
+      "https://dgdfurkan.github.io/*"
     ]
   },
   "background": {
