@@ -97,14 +97,18 @@ class CountingSystem {
                     // Extension ID'yi al (extension helper'dan veya hardcoded)
                     const extensionId = window.getirExtensionHelper?.extensionId || 'dhgdhdnnpeakmomlgpgmokecmdmeoebn';
                     
+                    console.log('📤 Extension\'a mesaj gönderiliyor...', { extensionId, hasChrome: !!chrome });
+                    
                     const response = await new Promise((resolve) => {
                         chrome.runtime.sendMessage(
                             extensionId,
                             { type: 'GET_API_INFO' },
                             (response) => {
                                 if (chrome.runtime.lastError) {
+                                    console.warn('⚠️ Extension mesaj hatası:', chrome.runtime.lastError.message);
                                     resolve(null);
                                 } else {
+                                    console.log('📥 Extension\'dan yanıt alındı:', response ? 'var' : 'yok', response);
                                     resolve(response);
                                 }
                             }
@@ -113,11 +117,19 @@ class CountingSystem {
                     
                     if (response && response.success && response.apiInfo) {
                         apiInfo = response.apiInfo;
-                        console.log('🔑 ✅ chrome.storage\'dan franchise token bulundu');
+                        console.log('🔑 ✅ chrome.storage\'dan franchise token bulundu', {
+                            hasToken: !!apiInfo.token,
+                            tokenLength: apiInfo.token?.length,
+                            tokenExpiry: apiInfo.tokenExpiry
+                        });
+                    } else {
+                        console.warn('⚠️ Extension yanıtı geçersiz veya boş:', response);
                     }
                 } catch (error) {
                     console.warn('⚠️ Extension API bilgisi alınamadı:', error);
                 }
+            } else {
+                console.warn('⚠️ chrome.runtime.sendMessage mevcut değil');
             }
             
             // Fallback: window.getirExtensionHelper
@@ -3803,52 +3815,64 @@ class CountingSystem {
             
             // Extension'dan gelen token'ı Supabase'dekiyle karşılaştır
             // Eğer extension'daki token daha geçerliyse (daha uzun süre kaldıysa), güncelle
-            if (extensionApiInfo && extensionApiInfo.token && apiInfo && apiInfo.token) {
-                // Her iki token'ın expiry'sini karşılaştır
-                let supabaseExpiryTime = null;
-                let extensionExpiryTime = null;
-                
-                if (apiInfo.tokenExpiry) {
-                    if (typeof apiInfo.tokenExpiry === 'number') {
-                        supabaseExpiryTime = apiInfo.tokenExpiry;
-                    } else if (typeof apiInfo.tokenExpiry === 'string') {
-                        supabaseExpiryTime = new Date(apiInfo.tokenExpiry).getTime();
-                        if (isNaN(supabaseExpiryTime)) {
-                            supabaseExpiryTime = parseInt(apiInfo.tokenExpiry, 10);
-                        }
-                    }
-                }
-                
-                if (extensionApiInfo.tokenExpiry) {
-                    if (typeof extensionApiInfo.tokenExpiry === 'number') {
-                        extensionExpiryTime = extensionApiInfo.tokenExpiry;
-                    } else if (typeof extensionApiInfo.tokenExpiry === 'string') {
-                        extensionExpiryTime = new Date(extensionApiInfo.tokenExpiry).getTime();
-                        if (isNaN(extensionExpiryTime)) {
-                            extensionExpiryTime = parseInt(extensionApiInfo.tokenExpiry, 10);
-                        }
-                    }
-                }
-                
-                // Eğer extension'daki token daha geçerliyse (daha uzun süre kaldıysa), güncelle
-                if (supabaseExpiryTime && extensionExpiryTime && !isNaN(supabaseExpiryTime) && !isNaN(extensionExpiryTime)) {
-                    const supabaseTimeRemaining = supabaseExpiryTime - Date.now();
-                    const extensionTimeRemaining = extensionExpiryTime - Date.now();
+            if (extensionApiInfo && extensionApiInfo.token) {
+                // Eğer Supabase'de token yoksa, extension'dan gelen token'ı kullan
+                if (!apiInfo || !apiInfo.token) {
+                    console.log('🔄 Supabase\'de token yok, extension\'dan gelen token kullanılıyor');
+                    apiInfo = extensionApiInfo;
+                    // Supabase'e kaydet
+                    await this.checkAndSaveAPIInfoFromExtension();
+                } else {
+                    // Her iki token'ın expiry'sini karşılaştır
+                    let supabaseExpiryTime = null;
+                    let extensionExpiryTime = null;
                     
-                    if (extensionTimeRemaining > supabaseTimeRemaining) {
-                        // Extension'daki token daha geçerli, güncelle
-                        console.log('🔄 Extension\'dan gelen token daha geçerli, güncelleniyor:', {
-                            supabaseTimeRemaining: Math.floor(supabaseTimeRemaining / (1000 * 60 * 60)) + ' saat',
-                            extensionTimeRemaining: Math.floor(extensionTimeRemaining / (1000 * 60 * 60)) + ' saat'
-                        });
+                    if (apiInfo.tokenExpiry) {
+                        if (typeof apiInfo.tokenExpiry === 'number') {
+                            supabaseExpiryTime = apiInfo.tokenExpiry;
+                        } else if (typeof apiInfo.tokenExpiry === 'string') {
+                            supabaseExpiryTime = new Date(apiInfo.tokenExpiry).getTime();
+                            if (isNaN(supabaseExpiryTime)) {
+                                supabaseExpiryTime = parseInt(apiInfo.tokenExpiry, 10);
+                            }
+                        }
+                    }
+                    
+                    if (extensionApiInfo.tokenExpiry) {
+                        if (typeof extensionApiInfo.tokenExpiry === 'number') {
+                            extensionExpiryTime = extensionApiInfo.tokenExpiry;
+                        } else if (typeof extensionApiInfo.tokenExpiry === 'string') {
+                            extensionExpiryTime = new Date(extensionApiInfo.tokenExpiry).getTime();
+                            if (isNaN(extensionExpiryTime)) {
+                                extensionExpiryTime = parseInt(extensionApiInfo.tokenExpiry, 10);
+                            }
+                        }
+                    }
+                    
+                    // Eğer extension'daki token daha geçerliyse (daha uzun süre kaldıysa), güncelle
+                    if (supabaseExpiryTime && extensionExpiryTime && !isNaN(supabaseExpiryTime) && !isNaN(extensionExpiryTime)) {
+                        const supabaseTimeRemaining = supabaseExpiryTime - Date.now();
+                        const extensionTimeRemaining = extensionExpiryTime - Date.now();
+                        
+                        if (extensionTimeRemaining > supabaseTimeRemaining) {
+                            // Extension'daki token daha geçerli, güncelle
+                            console.log('🔄 Extension\'dan gelen token daha geçerli, güncelleniyor:', {
+                                supabaseTimeRemaining: Math.floor(supabaseTimeRemaining / (1000 * 60)) + ' dakika',
+                                extensionTimeRemaining: Math.floor(extensionTimeRemaining / (1000 * 60)) + ' dakika'
+                            });
+                            apiInfo = extensionApiInfo;
+                            // Supabase'e kaydet
+                            await this.checkAndSaveAPIInfoFromExtension();
+                        } else {
+                            console.log('ℹ️ Supabase\'deki token daha geçerli, güncelleme yapılmıyor');
+                        }
+                    } else if (extensionExpiryTime && !isNaN(extensionExpiryTime)) {
+                        // Supabase'de expiry yok ama extension'da var, güncelle
+                        console.log('🔄 Extension\'da expiry var, Supabase\'e güncelleniyor');
                         apiInfo = extensionApiInfo;
-                        // Supabase'e kaydet
                         await this.checkAndSaveAPIInfoFromExtension();
                     }
                 }
-            } else if (extensionApiInfo && extensionApiInfo.token && !apiInfo) {
-                // Supabase'de token yok ama extension'da var, kullan
-                apiInfo = extensionApiInfo;
             } else if (!apiInfo && extensionApiInfo) {
                 // Fallback: extension'dan gelen token'ı kullan
                 apiInfo = extensionApiInfo;
