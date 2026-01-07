@@ -23,7 +23,7 @@
       "run_at": "document_start"
     },
     {
-      "matches": ["http://localhost/*", "http://127.0.0.1/*", "file:///*"],
+      "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://dgdfurkan.github.io/*", "file:///*"],
       "js": ["content.js"],
       "run_at": "document_start",
       "all_frames": false
