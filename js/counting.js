@@ -872,6 +872,18 @@ class CountingSystem {
             });
         }
 
+        // Terminal scan button
+        const terminalScanBtn = document.getElementById('terminalScanBtn');
+        if (terminalScanBtn) {
+            terminalScanBtn.addEventListener('click', () => {
+                if (window.terminalScanner) {
+                    window.terminalScanner.startScanning();
+                } else {
+                    alert('Terminal okuyucu henüz yüklenmedi. Lütfen sayfayı yenileyin.');
+                }
+            });
+        }
+
         // Sync stocks button
         const syncStocksBtn = document.getElementById('syncStocksBtn');
         if (syncStocksBtn) {
