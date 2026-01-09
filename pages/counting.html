@@ -493,7 +493,7 @@
             position: fixed;
             top: 20px;
             right: 20px;
-            z-index: 9999;
+            z-index: 10000;
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -743,7 +743,7 @@
                 <!-- Page Title - Hidden on mobile, shown on tablet+ -->
                 <div class="hidden lg:flex flex-1 text-center justify-center px-2 min-w-0">
                     <h2 class="text-base sm:text-lg md:text-xl font-semibold text-text-primary truncate">Stok Sayımı</h2>
-                </div>
+                    </div>
                 
                 <!-- Right Side: User Info + Logout -->
                 <div class="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
@@ -776,9 +776,9 @@
                 <!-- Manual Input -->
                 <div class="flex-1 relative min-w-0">
                     <div class="relative w-full">
-                        <input 
-                            type="text" 
-                            id="manualProductInput" 
+                    <input 
+                        type="text" 
+                        id="manualProductInput" 
                             placeholder="Ürün adı, barkod veya gram değeri girin..."
                             class="w-full py-3 pl-12 sm:pl-14 md:pl-16 pr-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base font-medium bg-gray-50 focus:bg-white"
                         >
@@ -833,7 +833,7 @@
                     <button id="resetWarehouseStocksBtn" class="modern-action-btn reset-btn group flex-1 lg:flex-initial px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 text-orange-700 border border-orange-200 hover:border-orange-300 rounded-xl transition-all duration-200 flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm font-semibold shadow-sm hover:shadow-md" title="Tüm depo stoklarını sıfırla">
                         <svg class="w-4 h-4 sm:w-5 sm:h-5 transform group-hover:rotate-90 transition-transform duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                        </svg>
+                    </svg>
                         <span class="hidden md:inline">Depo Stoklarını Sıfırla</span>
                         <span class="md:hidden">Depo Sıfırla</span>
                     </button>
@@ -849,10 +849,10 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                         </svg>
                         <span class="font-bold whitespace-nowrap">Senkronize Et</span>
-                    </button>
-                </div>
+                </button>
             </div>
         </div>
+                    </div>
 
         <!-- API Status Card -->
         <div id="apiStatusCard" class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm p-3 sm:p-4 lg:p-5 mb-4 sm:mb-6 w-full hidden">
@@ -860,11 +860,11 @@
                 <div class="flex items-start space-x-3 flex-1">
                     <div class="flex-shrink-0 mt-1">
                         <div id="apiStatusIcon" class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                        </div>
+                        </svg>
                     </div>
+                </div>
                     <div class="flex-1 min-w-0">
                         <h4 class="text-sm font-semibold text-gray-900 mb-1">API Durumu</h4>
                         <p id="apiStatusText" class="text-sm text-gray-600 mb-1">Token yükleniyor...</p>
@@ -880,17 +880,17 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
                                 <span id="apiExpiryTime">-</span>
-                            </div>
-                        </div>
+            </div>
+                    </div>
                     </div>
                 </div>
                 <button id="refreshTokenBtn" class="ml-3 p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors" title="Token'ı yenile">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
+                        </svg>
                 </button>
-            </div>
-        </div>
+                    </div>
+                </div>
 
         <!-- Statistics Section -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6 w-full">
@@ -898,13 +898,13 @@
             <div class="bg-white rounded-2xl shadow-soft p-5 border border-gray-100 stat-card relative overflow-hidden group">
                 <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                     <svg class="w-16 h-16 text-blue-600" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path></svg>
-                </div>
-                <div>
+            </div>
+                    <div>
                     <p class="text-sm font-medium text-gray-500 mb-1">Toplam Sayılan</p>
                     <p class="text-3xl font-bold text-gray-800 tracking-tight" id="totalProductsCount">0</p>
-                </div>
+                    </div>
                 <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-indigo-300"></div>
-            </div>
+                    </div>
             
             <!-- Positive Difference Card -->
             <div class="bg-white rounded-2xl shadow-soft p-5 border border-gray-100 stat-card relative overflow-hidden group">
@@ -1254,7 +1254,9 @@
                     autocorrect="off"
                     autocapitalize="off"
                     spellcheck="false"
+                    inputmode="none"
                     placeholder=""
+                    style="position: absolute; left: -9999px; width: 1px; height: 1px;"
                 />
                 
                 <!-- Flash Overlay -->

@@ -30,9 +30,18 @@ class TerminalScanner {
             // Clear input
             this.inputElement.value = '';
             
-            // Focus input (for terminal devices)
+            // Remove readonly temporarily to allow terminal input
+            this.inputElement.removeAttribute('readonly');
+            
+            // Focus input (for terminal devices) - but prevent mobile keyboard
             setTimeout(() => {
+                // Focus without triggering mobile keyboard
                 this.inputElement.focus();
+                // Blur immediately to prevent keyboard, but keep listening
+                setTimeout(() => {
+                    // Re-focus for terminal devices (HID mode works even without visible keyboard)
+                    this.inputElement.focus();
+                }, 50);
             }, 100);
 
             // Setup event listeners
@@ -162,8 +171,11 @@ class TerminalScanner {
                 const existingProduct = window.countingSystem.countingData[product.productId];
                 if (existingProduct) {
                     // Product already added, show warning
+                    console.log('⚠️ Ürün zaten ekli:', product.name);
                     if (window.countingSystem.showToast) {
                         window.countingSystem.showToast('Bu ürün zaten sayım tablosunda!', 'warning', 2000);
+                    } else {
+                        console.warn('showToast fonksiyonu bulunamadı');
                     }
                     this.playWarningSound();
                     this.showWarningFlash();
@@ -178,17 +190,23 @@ class TerminalScanner {
                 });
                 
                 // Success feedback
+                console.log('✅ Ürün eklendi:', product.name);
                 this.playSuccessSound();
                 this.showSuccessFlash();
                 
                 // Toast notification
                 if (window.countingSystem.showToast) {
                     window.countingSystem.showToast(`${product.name || 'Ürün'} eklendi`, 'success', 2000);
+                } else {
+                    console.warn('showToast fonksiyonu bulunamadı');
                 }
             } else {
                 // Product not found
+                console.log('❌ Ürün bulunamadı:', barcode);
                 if (window.countingSystem.showToast) {
                     window.countingSystem.showToast(`Barkod "${barcode}" için ürün bulunamadı`, 'error', 3000);
+                } else {
+                    console.warn('showToast fonksiyonu bulunamadı');
                 }
                 // Error feedback
                 this.playErrorSound();
