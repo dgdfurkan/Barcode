@@ -303,7 +303,7 @@ class BarcodeScanner {
                                 reject(new Error('ZXing not available'));
                             }
                         }, 500);
-                    };
+                };
                     
                 script.onerror = () => {
                         clearTimeout(timeout);

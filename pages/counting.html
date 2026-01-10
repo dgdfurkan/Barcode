@@ -681,6 +681,105 @@
         #tableSelectorBtn.open #tableSelectorIcon {
             transform: rotate(180deg);
         }
+        
+        /* Rapid Counting Mode Styles */
+        #rapidCountingGridContainer .rapid-product-card {
+            position: relative;
+            background: white;
+            border-radius: 1rem;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 2px solid;
+        }
+        
+        #rapidCountingGridContainer .rapid-product-card.counted {
+            border-color: #10b981;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+        
+        #rapidCountingGridContainer .rapid-product-card.not-counted {
+            border-color: #60a5fa;
+            box-shadow: 0 2px 8px rgba(96, 165, 250, 0.15);
+        }
+        
+        #rapidCountingGridContainer .rapid-product-card:active {
+            transform: scale(0.98);
+        }
+        
+        #rapidCountingGridContainer .rapid-product-card .product-status-icon {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            width: 1.5rem;
+            height: 1.5rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        
+        #rapidCountingGridContainer .rapid-product-card.counted .product-status-icon {
+            background: #10b981;
+            color: white;
+        }
+        
+        #rapidCountingGridContainer .rapid-product-card.not-counted .product-status-icon {
+            background: #dbeafe;
+            border: 2px solid #60a5fa;
+        }
+        
+        /* Bottom Sheet Modal Styles */
+        .counting-bottom-sheet {
+            pointer-events: none;
+        }
+        
+        .counting-bottom-sheet.show {
+            pointer-events: auto;
+        }
+        
+        .counting-bottom-sheet.show .counting-bottom-sheet-content {
+            transform: translateY(0);
+        }
+        
+        .counting-bottom-sheet .counting-bottom-sheet-content {
+            transform: translateY(100%);
+            max-height: 90vh;
+        }
+        
+        .counting-bottom-sheet.show #countingBottomSheetBackdrop {
+            opacity: 1;
+        }
+        
+        .counting-bottom-sheet #countingBottomSheetBackdrop {
+            opacity: 0;
+            transition: opacity 0.3s ease-out;
+        }
+        
+        /* Prevent body scroll when modal is open */
+        body.bottom-sheet-open {
+            overflow: hidden;
+        }
+        
+        /* Keypad button active state */
+        .keypad-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Responsive adjustments for bottom sheet */
+        @media (max-width: 640px) {
+            .counting-bottom-sheet-content {
+                max-height: 85vh;
+            }
+        }
+        
+        @media (min-width: 1024px) {
+            .counting-bottom-sheet-content {
+                max-width: 600px;
+                margin: 0 auto;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -932,10 +1031,25 @@
 
         <!-- Counting Table -->
         <div class="bg-white rounded-lg shadow-md overflow-hidden w-full">
-            <div class="p-3 sm:p-4 border-b border-gray-200">
+            <div class="p-3 sm:p-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 class="text-base sm:text-lg font-semibold text-text-primary">Sayım Tablosu</h3>
+                <!-- View Mode Toggle -->
+                <div class="flex items-center space-x-2">
+                    <button id="viewModeToggle" class="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium">
+                        <svg id="viewModeIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+                        </svg>
+                        <span id="viewModeText">Rapid Mode</span>
+                    </button>
+                </div>
             </div>
             
+            <!-- Rapid Counting Mode Grid View -->
+            <div id="rapidCountingGrid" class="hidden p-4">
+                <div id="rapidCountingGridContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                    <!-- Grid items will be inserted here -->
+                </div>
+            </div>
             
             <!-- Desktop Table View -->
             <div class="hidden md:block overflow-x-auto">
@@ -1266,6 +1380,99 @@
                     <p class="text-sm text-gray-600">Terminal cihazınızla barkod okutun</p>
                     <p class="text-xs text-gray-500 mt-2">Barkod otomatik olarak algılanacak</p>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rapid Counting Bottom Sheet Modal -->
+    <div id="countingBottomSheet" class="counting-bottom-sheet fixed inset-x-0 bottom-0 z-50 hidden">
+        <!-- Backdrop -->
+        <div id="countingBottomSheetBackdrop" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"></div>
+        
+        <!-- Bottom Sheet Content -->
+        <div class="counting-bottom-sheet-content bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-hidden flex flex-col transform transition-transform duration-300 ease-out">
+            <!-- Drag Handle -->
+            <div class="flex justify-center pt-3 pb-2">
+                <div class="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="px-4 pb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span id="countingProgressText" class="text-sm font-medium text-gray-700">İlerleme: 0/0 Ürün Sayıldı (0 Atlandı)</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div id="countingProgressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <!-- Product Info -->
+            <div class="px-4 pb-4 border-b border-gray-200">
+                <div class="flex items-center space-x-4">
+                    <img id="countingProductImage" src="" alt="" class="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl border-2 border-gray-200">
+                    <div class="flex-1 min-w-0">
+                        <h4 id="countingProductName" class="text-base sm:text-lg font-bold text-gray-900 truncate"></h4>
+                        <p id="countingProductBarcode" class="text-xs sm:text-sm text-gray-600 font-mono mt-1"></p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- DEPO Input Section -->
+            <div class="px-4 py-4">
+                <label class="block text-sm font-semibold text-gray-700 mb-3">DEPO</label>
+                <div class="flex items-center gap-3">
+                    <button id="countingDecreaseBtn" class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 rounded-xl text-gray-700 font-bold text-xl transition-all active:scale-95">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/>
+                        </svg>
+                    </button>
+                    <input 
+                        type="number" 
+                        id="countingDepoInput" 
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        class="flex-1 px-4 py-3 bg-white border-2 border-gray-300 rounded-xl text-2xl font-bold text-gray-900 text-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        min="0"
+                        step="1"
+                        placeholder="0"
+                    >
+                    <button id="countingIncreaseBtn" class="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-gray-100 hover:bg-gray-200 border-2 border-gray-300 rounded-xl text-gray-700 font-bold text-xl transition-all active:scale-95">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Numeric Keypad -->
+            <div class="px-4 pb-4">
+                <div class="grid grid-cols-3 gap-2">
+                    <button class="keypad-btn h-14 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-xl text-xl font-bold text-gray-900 transition-all active:scale-95" data-key="1">1</button>
+                    <button class="keypad-btn h-14 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-xl text-xl font-bold text-gray-900 transition-all active:scale-95" data-key="2">2</button>
+                    <button class="keypad-btn h-14 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-xl text-xl font-bold text-gray-900 transition-all active:scale-95" data-key="3">3</button>
+                    <button class="keypad-btn h-14 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-xl text-xl font-bold text-gray-900 transition-all active:scale-95" data-key="4">4</button>
+                    <button class="keypad-btn h-14 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-xl text-xl font-bold text-gray-900 transition-all active:scale-95" data-key="5">5</button>
+                    <button class="keypad-btn h-14 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-xl text-xl font-bold text-gray-900 transition-all active:scale-95" data-key="6">6</button>
+                    <button class="keypad-btn h-14 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-xl text-xl font-bold text-gray-900 transition-all active:scale-95" data-key="7">7</button>
+                    <button class="keypad-btn h-14 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-xl text-xl font-bold text-gray-900 transition-all active:scale-95" data-key="8">8</button>
+                    <button class="keypad-btn h-14 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-xl text-xl font-bold text-gray-900 transition-all active:scale-95" data-key="9">9</button>
+                    <button class="keypad-btn h-14 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-xl text-xl font-bold text-gray-900 transition-all active:scale-95" data-key="0">0</button>
+                    <button id="keypadBackspace" class="h-14 bg-red-100 hover:bg-red-200 active:bg-red-300 rounded-xl text-xl font-bold text-red-700 transition-all active:scale-95 flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414 6.414a2 2 0 001.414.586H19a2 2 0 002-2V7a2 2 0 00-2-2h-8.172a2 2 0 00-1.414.586L3 12z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="px-4 pb-6 pt-2 flex gap-3">
+                <button id="countingSaveBtn" class="flex-1 px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-xl active:scale-95">
+                    Kaydet
+                </button>
+                <button id="countingSkipBtn" class="flex-1 px-6 py-4 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-xl active:scale-95">
+                    Atla
+                </button>
             </div>
         </div>
     </div>
