@@ -1237,7 +1237,7 @@ class CountingSystem {
         const increaseBtn = document.getElementById('countingIncreaseBtn');
         const decreaseBtn = document.getElementById('countingDecreaseBtn');
         const saveBtn = document.getElementById('countingSaveBtn');
-        const skipBtn = document.getElementById('countingSkipBtn');
+        const prevBtn = document.getElementById('countingPrevBtn');
         const backdrop = document.getElementById('countingBottomSheetBackdrop');
         const keypadButtons = document.querySelectorAll('.keypad-btn');
         const backspaceBtn = document.getElementById('keypadBackspace');
@@ -1336,20 +1336,32 @@ class CountingSystem {
             });
         }
 
-        // Skip button
-        if (skipBtn) {
-            skipBtn.addEventListener('click', () => {
+        // Previous button (go to previous uncounted product)
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
                 if (!this.currentCountingProduct) return;
                 
-                this.skippedProducts.add(this.currentCountingProduct);
-                this.closeCountingBottomSheet();
-                
-                // Update rapid mode if active
-                if (this.currentViewMode === 'rapid') {
-                    this.renderRapidCountingMode();
+                const prevProductId = this.findPreviousUncountedProduct(this.currentCountingProduct);
+                if (prevProductId) {
+                    // Save current product first
+                    const depoInput = document.getElementById('countingDepoInput');
+                    if (depoInput) {
+                        const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
+                        this.updateProductStock(this.currentCountingProduct, value, null);
+                        this.skippedProducts.delete(this.currentCountingProduct);
+                    }
+                    
+                    // Open previous product
+                    this.openCountingBottomSheet(prevProductId);
+                    
+                    // Update rapid mode if active
+                    if (this.currentViewMode === 'rapid') {
+                        this.renderRapidCountingMode();
+                    }
+                    
+                    this.updateStatistics();
+                    this.updateCountingProgress();
                 }
-                
-                this.updateCountingProgress();
             });
         }
 
@@ -1412,6 +1424,54 @@ class CountingSystem {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     if (saveBtn) saveBtn.click();
+                }
+            });
+        }
+
+        // Refresh System Stock Button
+        const refreshSystemStockBtn = document.getElementById('countingRefreshSystemStockBtn');
+        if (refreshSystemStockBtn) {
+            refreshSystemStockBtn.addEventListener('click', async () => {
+                if (!this.currentCountingProduct) return;
+                
+                const product = this.allProducts.find(p => p.id === this.currentCountingProduct);
+                if (!product) return;
+                
+                const barcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : '';
+                if (!barcode) {
+                    this.showToast('Bu ürün için barkod bulunamadı', 'error', 3000);
+                    return;
+                }
+
+                // Disable button and show loading
+                refreshSystemStockBtn.disabled = true;
+                const originalHTML = refreshSystemStockBtn.innerHTML;
+                refreshSystemStockBtn.innerHTML = '<div class="spinner" style="width: 8px; height: 8px; border: 1.5px solid #e5e7eb; border-top: 1.5px solid #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>';
+
+                try {
+                    const stock = await this.requestStockFromExtension(null, barcode, this.currentCountingProduct);
+                    if (stock !== null && stock !== undefined) {
+                        this.updateProductStock(this.currentCountingProduct, null, stock);
+                        this.showToast('Sistem stoku yenilendi', 'success', 2000);
+                        
+                        // Update system stock display
+                        const systemStockElement = document.getElementById('countingSystemStock');
+                        if (systemStockElement) {
+                            systemStockElement.textContent = `Sistem: ${stock}`;
+                        }
+                        
+                        // Update stock indicator
+                        const stockIndicator = document.getElementById('countingStockIndicator');
+                        this.updateStockIndicator(this.currentCountingProduct, stockIndicator);
+                    } else {
+                        this.showToast('Ürün stoku bulunamadı', 'info', 3000);
+                    }
+                } catch (error) {
+                    console.error('Error refreshing system stock:', error);
+                    this.showToast('Stok alınamadı: ' + (error.message || 'Bilinmeyen hata'), 'error', 3000);
+                } finally {
+                    refreshSystemStockBtn.disabled = false;
+                    refreshSystemStockBtn.innerHTML = originalHTML;
                 }
             });
         }
@@ -3188,23 +3248,35 @@ class CountingSystem {
             const isCounted = data.warehouseStock !== null && data.warehouseStock !== undefined;
             const isSkipped = this.skippedProducts.has(productId);
             
-            // Calculate stock difference for color indicator
+            // Calculate stock difference for border color and icon
             const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
             let stockIndicator = '';
+            let borderClass = '';
+            let statusIcon = '';
+            
             if (isCounted && data.systemStock !== null && data.systemStock !== undefined) {
                 if (diff.type === 'positive') {
-                    // Fazla stok - yeşil gösterge (subtle)
+                    // Fazla stok - yeşil çerçeve ve yeşil yuvarlak + yukarı ok
                     stockIndicator = '<div class="stock-indicator bg-emerald-400"></div>';
+                    borderClass = 'border-2 border-green-500';
+                    statusIcon = '<div class="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg></div>';
                 } else if (diff.type === 'negative') {
-                    // Eksik stok - kırmızı gösterge (subtle)
+                    // Eksik stok - kırmızı çerçeve ve kırmızı yuvarlak + aşağı ok
                     stockIndicator = '<div class="stock-indicator bg-rose-400"></div>';
+                    borderClass = 'border-2 border-red-500';
+                    statusIcon = '<div class="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg></div>';
+                } else {
+                    // Eşit - normal çerçeve ve yeşil tik
+                    borderClass = '';
+                    statusIcon = '<svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
                 }
+            } else {
+                // Sayılmamış - mavi yuvarlak
+                borderClass = '';
+                statusIcon = '<div class="w-3 h-3 border-2 border-blue-500 rounded-full"></div>';
             }
             
             const cardClass = isCounted ? 'counted' : 'not-counted';
-            const statusIcon = isCounted 
-                ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
-                : '<div class="w-3 h-3 border-2 border-blue-500 rounded-full"></div>';
             
             // Always show product name, not Qty
             const productName = product.name || 'Ürün';
@@ -3212,7 +3284,7 @@ class CountingSystem {
             const barcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : '';
 
             return `
-                <div class="rapid-product-card ${cardClass}" data-product-id="${productId}">
+                <div class="rapid-product-card ${cardClass} ${borderClass}" data-product-id="${productId}">
                     <div class="product-status-icon">
                         ${statusIcon}
                     </div>
@@ -3273,6 +3345,39 @@ class CountingSystem {
         return null; // No uncounted product found
     }
 
+    findPreviousUncountedProduct(currentProductId) {
+        // Get all product IDs from countingData (excluding non-product keys)
+        const productIds = Object.keys(this.countingData).filter(
+            key => key !== '_api_info' && key !== '_tables' && key !== '_currentTable'
+        );
+        
+        // Find current product index
+        const currentIndex = productIds.indexOf(currentProductId);
+        if (currentIndex === -1) return null;
+        
+        // Start searching backwards from previous product
+        for (let i = currentIndex - 1; i >= 0; i--) {
+            const productId = productIds[i];
+            const data = this.countingData[productId] || {};
+            // Check if product is not counted (warehouseStock is null/undefined)
+            if (data.warehouseStock === null || data.warehouseStock === undefined) {
+                return productId;
+            }
+        }
+        
+        // If not found before current, search from end
+        for (let i = productIds.length - 1; i > currentIndex; i--) {
+            const productId = productIds[i];
+            const data = this.countingData[productId] || {};
+            // Check if product is not counted (warehouseStock is null/undefined)
+            if (data.warehouseStock === null || data.warehouseStock === undefined) {
+                return productId;
+            }
+        }
+        
+        return null; // No uncounted product found
+    }
+
     openCountingBottomSheet(productId) {
         const product = this.allProducts.find(p => p.id === productId);
         if (!product) return;
@@ -3317,6 +3422,19 @@ class CountingSystem {
 
         // Update progress
         this.updateCountingProgress();
+
+        // Update previous button state
+        const prevBtn = document.getElementById('countingPrevBtn');
+        if (prevBtn) {
+            const prevProductId = this.findPreviousUncountedProduct(productId);
+            if (prevProductId) {
+                prevBtn.disabled = false;
+                prevBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                prevBtn.disabled = true;
+                prevBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
 
         // Update next button state
         const nextBtn = document.getElementById('countingNextBtn');
@@ -3371,8 +3489,8 @@ class CountingSystem {
         
         if (diff.type === 'zero') {
             indicatorElement.innerHTML = `
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
-                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                     </svg>
                     Eşit
@@ -3380,8 +3498,8 @@ class CountingSystem {
             `;
         } else if (diff.type === 'positive') {
             indicatorElement.innerHTML = `
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">
-                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
                     </svg>
                     +${diff.value} Fazla
@@ -3389,8 +3507,8 @@ class CountingSystem {
             `;
         } else if (diff.type === 'negative') {
             indicatorElement.innerHTML = `
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-200">
-                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
                     </svg>
                     -${diff.value} Eksik

@@ -684,13 +684,23 @@
         }
         
         #rapidCountingGridContainer .rapid-product-card.counted {
-            border-color: #10b981;
-            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
+            border-color: #e5e7eb;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
         }
         
         #rapidCountingGridContainer .rapid-product-card.not-counted {
             border-color: #60a5fa;
             box-shadow: 0 1px 4px rgba(96, 165, 250, 0.15);
+        }
+        
+        #rapidCountingGridContainer .rapid-product-card.border-2.border-green-500 {
+            border-color: #10b981 !important;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+        }
+        
+        #rapidCountingGridContainer .rapid-product-card.border-2.border-red-500 {
+            border-color: #ef4444 !important;
+            box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
         }
         
         #rapidCountingGridContainer .rapid-product-card:active {
@@ -711,13 +721,18 @@
         }
         
         #rapidCountingGridContainer .rapid-product-card.counted .product-status-icon {
-            background: #10b981;
+            background: transparent;
             color: white;
         }
         
         #rapidCountingGridContainer .rapid-product-card.counted .product-status-icon svg {
-            width: 0.625rem;
-            height: 0.625rem;
+            width: 1rem;
+            height: 1rem;
+        }
+        
+        #rapidCountingGridContainer .rapid-product-card.counted .product-status-icon div {
+            width: 1rem;
+            height: 1rem;
         }
         
         #rapidCountingGridContainer .rapid-product-card.not-counted .product-status-icon {
@@ -1454,7 +1469,15 @@
                         <p id="countingProductBarcode" class="text-[10px] text-gray-500 font-mono mt-0.5"></p>
                         <div class="mt-1.5 flex items-center space-x-2">
                             <!-- System Stock -->
-                            <span id="countingSystemStock" class="text-[10px] text-gray-500 font-medium"></span>
+                            <div class="flex items-center space-x-1">
+                                <span id="countingSystemStock" class="text-xs text-gray-500 font-medium"></span>
+                                <!-- Refresh System Stock Button -->
+                                <button id="countingRefreshSystemStockBtn" class="p-0.5 hover:bg-blue-50 text-blue-600 rounded transition-colors" title="Sistem stokunu yenile">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                </button>
+                            </div>
                             <!-- Stock Difference Indicator -->
                             <div id="countingStockIndicator" class="flex items-center space-x-1.5">
                                 <!-- Will be populated by JavaScript -->
@@ -1515,8 +1538,8 @@
             
             <!-- Action Buttons -->
             <div class="px-3 pb-4 pt-1.5 flex gap-2">
-                <button id="countingSkipBtn" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg active:scale-95">
-                    Atla
+                <button id="countingPrevBtn" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-purple-600 disabled:hover:to-pink-600">
+                    Önceki
                 </button>
                 <button id="countingNextBtn" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-indigo-600">
                     Sıradaki
