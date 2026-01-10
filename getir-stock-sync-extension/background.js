@@ -354,16 +354,21 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     }
 });
 
-// Periyodik olarak Supabase'den pending istekleri kontrol et
-// OPTİMİZE EDİLDİ: 2 saniyeden 30 saniyeye çıkarıldı - güvenlik nedeniyle
+// Supabase'den pending istekleri kontrol et - SADECE SAYFA YÜKLENDİĞİNDE BİRKAÇ KERE
+// setInterval KALDIRILDI - Güvenlik nedeniyle sürekli polling yapılmıyor
 let pollingActive = false;
-setInterval(async () => {
+let pollingAttempts = 0;
+const maxPollingAttempts = 3; // İlk yüklemede sadece 3 kere çalış
+
+async function checkSupabaseRequests() {
     if (pollingActive) return; // Prevent overlapping polls
+    if (pollingAttempts >= maxPollingAttempts) return; // Maksimum deneme sayısına ulaşıldı
+    
     pollingActive = true;
+    pollingAttempts++;
     
     try {
         if (!supabaseClient) {
-            // Log yazma - sessizce çalış
             // Supabase yoksa chrome.storage'ı kontrol et (fallback)
             const storage = await chrome.storage.local.get(['getir_stock_request', 'getir_api_request']);
             
@@ -383,14 +388,12 @@ setInterval(async () => {
         }
 
         // Supabase'den tüm kullanıcıların pending isteklerini al
-        // Log yazma - sessizce çalış
         const allUsersData = await supabaseQuery('stock_requests', 'GET', null, {}, {
             orderBy: 'updated_at',
             orderAsc: true
         });
 
         if (!allUsersData || !Array.isArray(allUsersData)) {
-            // Log yazma - sessizce çalış
             pollingActive = false;
             return;
         }
@@ -419,7 +422,6 @@ setInterval(async () => {
                 try {
                     // İsteği pending'den processing'e taşı
                     await moveRequestToProcessing(request.username, request.request_id);
-                    // Log yazma - sessizce çalış
                     
                     // İsteği işle
                     await handleStockRequestFromSupabase(request);
@@ -434,7 +436,6 @@ setInterval(async () => {
                 }
             }
         }
-        // Pending istek yoksa log yazma
     } catch (error) {
         // Sadece kritik hatalarda log yaz
         if (error.message && !error.message.includes('network')) {
@@ -443,9 +444,30 @@ setInterval(async () => {
     } finally {
         pollingActive = false;
     }
-}, 30000); // Her 30 saniye kontrol et (2 saniyeden 30 saniyeye çıkarıldı - güvenlik nedeniyle)
+}
 
-// Log yazma - sessizce başlat
+// Extension yüklendiğinde veya başlatıldığında birkaç kere çalıştır
+chrome.runtime.onInstalled.addListener(() => {
+    // İlk yüklemede hemen çalıştır
+    checkSupabaseRequests();
+    // 2 saniye sonra tekrar çalıştır
+    setTimeout(() => checkSupabaseRequests(), 2000);
+    // 4 saniye sonra son kez çalıştır
+    setTimeout(() => checkSupabaseRequests(), 4000);
+});
+
+chrome.runtime.onStartup.addListener(() => {
+    // Extension başlatıldığında da aynı şekilde
+    pollingAttempts = 0; // Deneme sayacını sıfırla
+    checkSupabaseRequests();
+    setTimeout(() => checkSupabaseRequests(), 2000);
+    setTimeout(() => checkSupabaseRequests(), 4000);
+});
+
+// İlk yüklemede de çalıştır (background script yüklendiğinde)
+checkSupabaseRequests();
+setTimeout(() => checkSupabaseRequests(), 2000);
+setTimeout(() => checkSupabaseRequests(), 4000);
 
 // Cleanup mekanizması - eski completed/failed istekleri temizle
 // OPTİMİZE EDİLDİ: Log'lar kaldırıldı - sessizce çalışır
