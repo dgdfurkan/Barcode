@@ -3331,19 +3331,27 @@ class CountingSystem {
             }
         }
 
-        // Show modal
+        // Show modal with smooth animation
         const bottomSheet = document.getElementById('countingBottomSheet');
         if (bottomSheet) {
+            // Remove hidden class first
             bottomSheet.classList.remove('hidden');
-            bottomSheet.classList.add('show');
-            document.body.classList.add('bottom-sheet-open');
             
-            // Focus on input
+            // Force reflow to ensure the element is visible before animation
+            void bottomSheet.offsetHeight;
+            
+            // Add show class after a tiny delay to trigger smooth animation
+            requestAnimationFrame(() => {
+                bottomSheet.classList.add('show');
+                document.body.classList.add('bottom-sheet-open');
+            });
+            
+            // Focus on input after animation
             setTimeout(() => {
                 if (depoInput) {
                     depoInput.focus();
                 }
-            }, 300);
+            }, 450);
         }
     }
 
@@ -3425,9 +3433,10 @@ class CountingSystem {
             bottomSheet.classList.remove('show');
             document.body.classList.remove('bottom-sheet-open');
             
+            // Wait for animation to complete before hiding
             setTimeout(() => {
                 bottomSheet.classList.add('hidden');
-            }, 300);
+            }, 400);
         }
         
         this.currentCountingProduct = null;

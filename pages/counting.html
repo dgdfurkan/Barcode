@@ -784,6 +784,7 @@
         .counting-bottom-sheet .counting-bottom-sheet-content {
             transform: translateY(100%);
             max-height: 75vh;
+            transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
         }
         
         .counting-bottom-sheet.show #countingBottomSheetBackdrop {
@@ -792,7 +793,7 @@
         
         .counting-bottom-sheet #countingBottomSheetBackdrop {
             opacity: 0;
-            transition: opacity 0.3s ease-out;
+            transition: opacity 0.4s ease-out;
         }
         
         /* Prevent body scroll when modal is open */
@@ -1428,7 +1429,7 @@
         <div id="countingBottomSheetBackdrop" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"></div>
         
         <!-- Bottom Sheet Content -->
-        <div class="counting-bottom-sheet-content bg-white rounded-t-2xl shadow-2xl max-h-[75vh] overflow-hidden flex flex-col transform transition-transform duration-300 ease-out">
+        <div class="counting-bottom-sheet-content bg-white rounded-t-2xl shadow-2xl max-h-[75vh] overflow-hidden flex flex-col transform">
             <!-- Drag Handle -->
             <div class="flex justify-center pt-2 pb-1.5">
                 <div class="w-10 h-1 bg-gray-300 rounded-full"></div>
