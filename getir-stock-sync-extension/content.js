@@ -612,7 +612,6 @@
                         }
                         sendAPIInfoToCountingPage();
                     }
-                } // Pasif mod kontrolü kapanışı
                     
                     return response;
                 } catch (error) {

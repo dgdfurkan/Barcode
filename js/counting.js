@@ -30,11 +30,17 @@ class CountingSystem {
             // Load counting data
             await this.loadCountingData();
             
+            // Load view mode from localStorage BEFORE rendering
+            this.currentViewMode = localStorage.getItem('counting_view_mode') || 'table';
+            
             // Setup event listeners
             this.setupEventListeners();
             
-            // Render table
+            // Render table (will render grid if mode is rapid)
             this.renderTable();
+            
+            // Update view mode display after render
+            this.updateViewMode();
             
             // Update statistics
             this.updateStatistics();
@@ -97,26 +103,40 @@ class CountingSystem {
             // Try to get API info from extension (background script)
             if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
                 try {
-                    // Extension ID'yi al (extension helper'dan veya hardcoded)
-                    const extensionId = window.getirExtensionHelper?.extensionId || 'dhgdhdnnpeakmomlgpgmokecmdmeoebn';
-                    
-                    console.log('📤 Extension\'a mesaj gönderiliyor...', { extensionId, hasChrome: !!chrome });
-                    
-                    const response = await new Promise((resolve) => {
-                        chrome.runtime.sendMessage(
-                            extensionId,
-                            { type: 'GET_API_INFO' },
-                            (response) => {
-                                if (chrome.runtime.lastError) {
-                                    console.warn('⚠️ Extension mesaj hatası:', chrome.runtime.lastError.message);
-                                    resolve(null);
-                                } else {
-                                    console.log('📥 Extension\'dan yanıt alındı:', response ? 'var' : 'yok', response);
-                                    resolve(response);
+                    // Extension helper varsa onu kullan, yoksa direkt chrome.runtime.sendMessage kullan
+                    if (window.getirExtensionHelper && window.getirExtensionHelper.getAPIInfo) {
+                        console.log('📤 Extension helper kullanılıyor...');
+                        apiInfo = await window.getirExtensionHelper.getAPIInfo();
+                        if (apiInfo && apiInfo.token) {
+                            console.log('🔑 ✅ Extension helper\'dan franchise token bulundu', {
+                                hasToken: !!apiInfo.token,
+                                tokenLength: apiInfo.token?.length,
+                                tokenExpiry: apiInfo.tokenExpiry
+                            });
+                        }
+                    } else if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
+                        // Extension ID'yi al (hardcoded)
+                        const extensionId = 'dhgdhdnnpeakmomlgpgmokecmdmeoebn';
+                        
+                        console.log('📤 Extension\'a mesaj gönderiliyor...', { extensionId, hasChrome: !!chrome });
+                        
+                        const response = await new Promise((resolve) => {
+                            // Doğru syntax: chrome.runtime.sendMessage(extensionId, message, callback)
+                            chrome.runtime.sendMessage(
+                                extensionId,
+                                { type: 'GET_API_INFO' },
+                                (response) => {
+                                    if (chrome.runtime.lastError) {
+                                        // Extension yüklü değil veya content script inject edilmemiş
+                                        console.warn('⚠️ Extension mesaj hatası:', chrome.runtime.lastError.message);
+                                        resolve(null);
+                                    } else {
+                                        console.log('📥 Extension\'dan yanıt alındı:', response ? 'var' : 'yok', response);
+                                        resolve(response);
+                                    }
                                 }
-                            }
-                        );
-                    });
+                            );
+                        });
                     
                     if (response && response.success && response.apiInfo) {
                         apiInfo = response.apiInfo;
@@ -1272,6 +1292,25 @@ class CountingSystem {
             });
         }
 
+        // Update stock indicator when input changes
+        if (depoInput) {
+            depoInput.addEventListener('input', () => {
+                if (this.currentCountingProduct) {
+                    const stockIndicator = document.getElementById('countingStockIndicator');
+                    // Temporarily update countingData for calculation
+                    const tempWarehouseStock = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
+                    const originalData = this.countingData[this.currentCountingProduct] || {};
+                    const tempData = { ...originalData, warehouseStock: tempWarehouseStock };
+                    this.countingData[this.currentCountingProduct] = tempData;
+                    
+                    this.updateStockIndicator(this.currentCountingProduct, stockIndicator);
+                    
+                    // Restore original data (will be saved when save button is clicked)
+                    this.countingData[this.currentCountingProduct] = originalData;
+                }
+            });
+        }
+
         // Save button
         if (saveBtn) {
             saveBtn.addEventListener('click', () => {
@@ -1348,51 +1387,99 @@ class CountingSystem {
 
     setupViewModeToggle() {
         const toggleBtn = document.getElementById('viewModeToggle');
-        const viewModeText = document.getElementById('viewModeText');
-        const viewModeIcon = document.getElementById('viewModeIcon');
-        const rapidGrid = document.getElementById('rapidCountingGrid');
-        const tableView = document.querySelector('.hidden.md\\:block');
 
         if (!toggleBtn) return;
 
-        // Load saved view mode
-        this.currentViewMode = localStorage.getItem('counting_view_mode') || 'table';
-        this.updateViewMode();
+        // View mode already loaded in init(), don't reload it here
 
         toggleBtn.addEventListener('click', () => {
             this.currentViewMode = this.currentViewMode === 'table' ? 'rapid' : 'table';
             localStorage.setItem('counting_view_mode', this.currentViewMode);
             this.updateViewMode();
+            // Re-render based on new mode
+            if (this.currentViewMode === 'rapid') {
+                this.renderRapidCountingMode();
+            } else {
+                this.renderTable();
+            }
         });
-
-        // Initial view mode update
-        this.updateViewMode();
     }
 
     updateViewMode() {
         const viewModeText = document.getElementById('viewModeText');
         const viewModeIcon = document.getElementById('viewModeIcon');
         const rapidGrid = document.getElementById('rapidCountingGrid');
-        const tableView = document.querySelector('.hidden.md\\:block');
+        const tableView = document.getElementById('desktopTableView');
         const cardView = document.getElementById('countingCardView');
+        const emptyState = document.getElementById('emptyState');
 
         if (this.currentViewMode === 'rapid') {
+            // Add body class for CSS targeting
+            document.body.classList.add('grid-mode-active');
+            
             if (viewModeText) viewModeText.textContent = 'Tablo Görünümü';
             if (viewModeIcon) {
                 viewModeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>';
             }
-            if (rapidGrid) rapidGrid.classList.remove('hidden');
-            if (tableView) tableView.classList.add('hidden');
-            if (cardView) cardView.classList.add('hidden');
+            // Grid mode: Show grid, hide table and card views
+            if (rapidGrid) {
+                rapidGrid.classList.remove('hidden');
+                rapidGrid.style.display = '';
+            }
+            if (tableView) {
+                tableView.classList.add('hidden');
+                tableView.classList.remove('md:block');
+                tableView.style.display = 'none';
+                tableView.style.visibility = 'hidden';
+            }
+            if (cardView) {
+                cardView.classList.add('hidden');
+                cardView.classList.remove('md:hidden');
+                cardView.style.display = 'none';
+                cardView.style.visibility = 'hidden';
+            }
+            // Hide empty state in grid mode
+            if (emptyState) {
+                emptyState.classList.add('hidden');
+                emptyState.style.display = 'none';
+                emptyState.style.height = '0';
+                emptyState.style.overflow = 'hidden';
+            }
             this.renderRapidCountingMode();
         } else {
-            if (viewModeText) viewModeText.textContent = 'Rapid Mode';
+            // Remove body class for CSS targeting
+            document.body.classList.remove('grid-mode-active');
+            
+            if (viewModeText) viewModeText.textContent = 'Grid Mod';
             if (viewModeIcon) {
                 viewModeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>';
             }
-            if (rapidGrid) rapidGrid.classList.add('hidden');
-            if (tableView) tableView.classList.remove('hidden');
-            if (cardView) cardView.classList.remove('hidden');
+            // Table mode: Hide grid, show table and card views (responsive)
+            if (rapidGrid) {
+                rapidGrid.classList.add('hidden');
+                rapidGrid.style.display = 'none';
+            }
+            if (tableView) {
+                tableView.classList.remove('hidden');
+                tableView.classList.add('md:block');
+                // Remove inline styles to let Tailwind CSS work properly
+                tableView.style.removeProperty('display');
+                tableView.style.removeProperty('visibility');
+                // Ensure mobile hiding - CSS will handle it with !important
+            }
+            if (cardView) {
+                cardView.classList.remove('hidden');
+                cardView.classList.add('md:hidden');
+                // Remove inline styles to let Tailwind CSS work properly
+                cardView.style.removeProperty('display');
+                cardView.style.removeProperty('visibility');
+            }
+            // Empty state will be handled by renderTable()
+            if (emptyState) {
+                emptyState.style.removeProperty('display');
+                emptyState.style.removeProperty('height');
+                emptyState.style.removeProperty('overflow');
+            }
         }
     }
 
@@ -2629,6 +2716,12 @@ class CountingSystem {
     }
 
     renderTable() {
+        // If grid mode is active, don't render table - render grid instead
+        if (this.currentViewMode === 'rapid') {
+            this.renderRapidCountingMode();
+            return;
+        }
+        
         const tableBody = document.getElementById('countingTableBody');
         const cardView = document.getElementById('countingCardView');
         const emptyState = document.getElementById('emptyState');
@@ -2641,13 +2734,23 @@ class CountingSystem {
         if (productIds.length === 0) {
             if (tableBody) tableBody.innerHTML = '';
             if (cardView) cardView.innerHTML = '';
-            if (emptyState) emptyState.classList.remove('hidden');
+            if (emptyState) {
+                emptyState.classList.remove('hidden');
+                emptyState.style.removeProperty('display');
+                emptyState.style.removeProperty('height');
+                emptyState.style.removeProperty('overflow');
+            }
             // Update sort icons
             this.updateSortIcons();
             return;
         }
 
-        if (emptyState) emptyState.classList.add('hidden');
+        if (emptyState) {
+            emptyState.classList.add('hidden');
+            emptyState.style.removeProperty('display');
+            emptyState.style.removeProperty('height');
+            emptyState.style.removeProperty('overflow');
+        }
 
         // Apply sorting
         const sortedProductIds = this.applySorting(productIds);
@@ -3052,12 +3155,27 @@ class CountingSystem {
 
             const isCounted = data.warehouseStock !== null && data.warehouseStock !== undefined;
             const isSkipped = this.skippedProducts.has(productId);
+            
+            // Calculate stock difference for color indicator
+            const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
+            let stockIndicator = '';
+            if (isCounted && data.systemStock !== null && data.systemStock !== undefined) {
+                if (diff.type === 'positive') {
+                    // Fazla stok - yeşil gösterge (subtle)
+                    stockIndicator = '<div class="stock-indicator bg-emerald-400"></div>';
+                } else if (diff.type === 'negative') {
+                    // Eksik stok - kırmızı gösterge (subtle)
+                    stockIndicator = '<div class="stock-indicator bg-rose-400"></div>';
+                }
+            }
+            
             const cardClass = isCounted ? 'counted' : 'not-counted';
             const statusIcon = isCounted 
                 ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
                 : '<div class="w-3 h-3 border-2 border-blue-500 rounded-full"></div>';
             
-            const quantityText = isCounted ? `Qty: ${data.warehouseStock}` : (product.name || 'Ürün');
+            // Always show product name, not Qty
+            const productName = product.name || 'Ürün';
             const productImage = product.image || '../assets/logo.png';
             const barcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : '';
 
@@ -3066,11 +3184,13 @@ class CountingSystem {
                     <div class="product-status-icon">
                         ${statusIcon}
                     </div>
-                    <div class="p-3">
-                        <img src="${productImage}" alt="${product.name || ''}" class="w-full h-24 sm:h-32 object-cover rounded-lg mb-2" onerror="this.src='../assets/logo.png'">
-                        <div class="text-center">
-                            <p class="text-xs sm:text-sm font-semibold text-gray-900 line-clamp-2 mb-1">${quantityText}</p>
-                            ${barcode ? `<p class="text-xs text-gray-500 font-mono"># ${barcode}</p>` : ''}
+                    ${stockIndicator}
+                    <div class="flex-1 flex flex-col p-1 sm:p-1.5 overflow-hidden">
+                        <div class="flex-1 flex items-center justify-center mb-0.5 sm:mb-1 min-h-0 overflow-hidden">
+                            <img src="${productImage}" alt="${product.name || ''}" class="max-w-full max-h-full w-auto h-auto object-contain" onerror="this.src='../assets/logo.png'">
+                        </div>
+                        <div class="text-center flex-shrink-0 px-0.5">
+                            <p class="text-[9px] sm:text-[10px] font-semibold text-gray-900 line-clamp-1 leading-tight truncate">${productName}</p>
                         </div>
                     </div>
                 </div>
@@ -3100,6 +3220,7 @@ class CountingSystem {
         const productName = document.getElementById('countingProductName');
         const productBarcode = document.getElementById('countingProductBarcode');
         const depoInput = document.getElementById('countingDepoInput');
+        const stockIndicator = document.getElementById('countingStockIndicator');
 
         if (productImage) {
             productImage.src = product.image || '../assets/logo.png';
@@ -3115,6 +3236,9 @@ class CountingSystem {
         if (depoInput) {
             depoInput.value = data.warehouseStock !== null && data.warehouseStock !== undefined ? data.warehouseStock : '';
         }
+
+        // Update stock indicator
+        this.updateStockIndicator(productId, stockIndicator);
 
         // Update progress
         this.updateCountingProgress();
@@ -3132,6 +3256,52 @@ class CountingSystem {
                     depoInput.focus();
                 }
             }, 300);
+        }
+    }
+
+    updateStockIndicator(productId, indicatorElement) {
+        if (!indicatorElement) return;
+
+        const data = this.countingData[productId] || {};
+        const warehouseStock = data.warehouseStock !== null && data.warehouseStock !== undefined ? data.warehouseStock : null;
+        const systemStock = data.systemStock !== null && data.systemStock !== undefined ? data.systemStock : null;
+
+        if (warehouseStock === null || systemStock === null) {
+            indicatorElement.innerHTML = '';
+            return;
+        }
+
+        const diff = this.calculateDifference(warehouseStock, systemStock);
+        
+        if (diff.type === 'zero') {
+            indicatorElement.innerHTML = `
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Eşit
+                </span>
+            `;
+        } else if (diff.type === 'positive') {
+            indicatorElement.innerHTML = `
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                    +${diff.value} Fazla
+                </span>
+            `;
+        } else if (diff.type === 'negative') {
+            indicatorElement.innerHTML = `
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-200">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
+                    </svg>
+                    -${diff.value} Eksik
+                </span>
+            `;
+        } else {
+            indicatorElement.innerHTML = '';
         }
     }
 
@@ -3160,7 +3330,7 @@ class CountingSystem {
         const progressBar = document.getElementById('countingProgressBar');
 
         if (progressText) {
-            progressText.textContent = `İlerleme: ${countedProducts}/${totalProducts} Ürün Sayıldı${skippedCount > 0 ? ` (${skippedCount} Atlandı)` : ''}`;
+            progressText.textContent = `İlerleme: ${countedProducts}/${totalProducts}${skippedCount > 0 ? ` (${skippedCount} Atlandı)` : ''}`;
         }
 
         if (progressBar && totalProducts > 0) {
