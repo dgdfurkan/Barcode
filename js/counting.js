@@ -1479,6 +1479,71 @@ class CountingSystem {
                 }
             });
         }
+
+        // Setup product image lightbox
+        this.setupProductImageLightbox();
+    }
+
+    setupProductImageLightbox() {
+        const productImage = document.getElementById('countingProductImage');
+        const lightbox = document.getElementById('productImageLightbox');
+        const lightboxImage = document.getElementById('lightboxProductImage');
+        const closeLightboxBtn = document.getElementById('closeLightboxBtn');
+
+        if (!productImage || !lightbox || !lightboxImage) return;
+
+        // Open lightbox on image click
+        productImage.addEventListener('click', () => {
+            const imageSrc = productImage.src;
+            if (imageSrc) {
+                lightboxImage.src = imageSrc;
+                lightboxImage.alt = productImage.alt || '';
+                lightbox.classList.remove('hidden');
+                document.body.classList.add('lightbox-open');
+                
+                // Trigger animation
+                requestAnimationFrame(() => {
+                    lightbox.classList.add('show');
+                });
+            }
+        });
+
+        // Close lightbox on backdrop click (anywhere outside the image)
+        lightbox.addEventListener('click', (e) => {
+            // Close if clicking on backdrop or container div, but not on the image or close button
+            const isImage = e.target === lightboxImage || lightboxImage.contains(e.target);
+            const isCloseButton = closeLightboxBtn && (e.target === closeLightboxBtn || closeLightboxBtn.contains(e.target));
+            
+            if (!isImage && !isCloseButton) {
+                this.closeProductImageLightbox();
+            }
+        });
+
+        // Close lightbox on close button click
+        if (closeLightboxBtn) {
+            closeLightboxBtn.addEventListener('click', () => {
+                this.closeProductImageLightbox();
+            });
+        }
+
+        // Close lightbox on ESC key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && lightbox && !lightbox.classList.contains('hidden')) {
+                this.closeProductImageLightbox();
+            }
+        });
+    }
+
+    closeProductImageLightbox() {
+        const lightbox = document.getElementById('productImageLightbox');
+        if (!lightbox) return;
+
+        lightbox.classList.remove('show');
+        document.body.classList.remove('lightbox-open');
+        
+        setTimeout(() => {
+            lightbox.classList.add('hidden');
+        }, 300);
     }
 
     setupViewModeToggle() {

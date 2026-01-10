@@ -839,6 +839,33 @@
                 margin: 0 auto;
             }
         }
+        
+        /* Product Image Lightbox */
+        #productImageLightbox {
+            opacity: 0;
+            transition: opacity 0.3s ease-out;
+        }
+        
+        #productImageLightbox.show {
+            opacity: 1;
+        }
+        
+        #productImageLightbox #lightboxProductImage {
+            transform: scale(0.8);
+            transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        
+        #productImageLightbox.show #lightboxProductImage {
+            transform: scale(1);
+        }
+        
+        #productImageLightbox:not(.show) {
+            pointer-events: none;
+        }
+        
+        body.lightbox-open {
+            overflow: hidden;
+        }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -1468,7 +1495,7 @@
             <!-- Product Info -->
             <div class="px-3 pb-2.5 border-b border-gray-100">
                 <div class="flex items-center space-x-2.5">
-                    <img id="countingProductImage" src="" alt="" class="w-12 h-12 object-cover rounded-lg border border-gray-200 flex-shrink-0">
+                    <img id="countingProductImage" src="" alt="" class="w-12 h-12 object-cover rounded-lg border border-gray-200 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
                     <div class="flex-1 min-w-0">
                         <h4 id="countingProductName" class="text-sm font-semibold text-gray-900 truncate leading-tight"></h4>
                         <p id="countingProductBarcode" class="text-[10px] text-gray-500 font-mono mt-0.5"></p>
@@ -1550,6 +1577,18 @@
                     Sıradaki
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Product Image Lightbox -->
+    <div id="productImageLightbox" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm">
+        <div class="relative w-full h-full flex items-center justify-center p-4">
+            <img id="lightboxProductImage" src="" alt="" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
+            <button id="closeLightboxBtn" class="absolute top-4 right-4 w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center text-white transition-all">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
         </div>
     </div>
 
