@@ -5,8 +5,28 @@ console.log('✅ Background script yüklendi');
 
 // Token ve warehouse ID yakalama için webRequest listener
 // Bu browser seviyesinde çalışır, sayfa script'lerinden bağımsız
+// OPTİMİZE EDİLDİ: Sadece token yoksa veya geçersizse aktif çalışır
+let backgroundTokenState = {
+    token: null,
+    tokenExpiry: null,
+    passiveMode: false
+};
+
+// Token geçerliliğini kontrol et
+function isTokenValidInBackground(tokenExpiry) {
+    if (!tokenExpiry) return false;
+    const now = Date.now();
+    // 5 dakika önceden expire olmuş say (güvenlik için)
+    return now < (tokenExpiry - 5 * 60 * 1000);
+}
+
 chrome.webRequest.onBeforeSendHeaders.addListener(
     (details) => {
+        // Pasif modda ve token geçerliyse, sessizce çalış (log yazma)
+        if (backgroundTokenState.passiveMode && backgroundTokenState.token && isTokenValidInBackground(backgroundTokenState.tokenExpiry)) {
+            return; // Pasif modda, sadece sessizce dinle
+        }
+        
         // Sadece Getir API çağrılarını dinle
         if (details.url.includes('getirapi.com') || details.url.includes('franchise-api-gateway.getirapi.com')) {
             const headers = details.requestHeaders || [];
@@ -21,23 +41,30 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                 
                 // JWT token kontrolü
                 if (token.startsWith('eyJ') && token.length > 100) {
-                    console.log('🔑 ✅ Token yakalandı (webRequest):', token.substring(0, 30) + '...');
+                    // Token değiştiyse veya ilk kez yakalanıyorsa log yaz
+                    if (!backgroundTokenState.token || backgroundTokenState.token !== authHeader.value) {
+                        console.log('🔑 ✅ Token yakalandı (webRequest):', token.substring(0, 30) + '...');
                     
-                    // Token expiry'yi hesapla
-                    let tokenExpiry = null;
-                    try {
-                        const parts = token.split('.');
-                        if (parts.length === 3) {
-                            const payload = parts[1];
-                            const padded = payload + '='.repeat((4 - payload.length % 4) % 4);
-                            const decoded = JSON.parse(atob(padded));
-                            if (decoded.exp) {
-                                tokenExpiry = decoded.exp * 1000;
+                        // Token expiry'yi hesapla
+                        let tokenExpiry = null;
+                        try {
+                            const parts = token.split('.');
+                            if (parts.length === 3) {
+                                const payload = parts[1];
+                                const padded = payload + '='.repeat((4 - payload.length % 4) % 4);
+                                const decoded = JSON.parse(atob(padded));
+                                if (decoded.exp) {
+                                    tokenExpiry = decoded.exp * 1000;
+                                }
                             }
+                        } catch (e) {
+                            console.warn('⚠️ Token expiry çıkarılamadı:', e);
                         }
-                    } catch (e) {
-                        console.warn('⚠️ Token expiry çıkarılamadı:', e);
-                    }
+                        
+                        // Token'ı kaydet ve pasif moda geç
+                        backgroundTokenState.token = authHeader.value;
+                        backgroundTokenState.tokenExpiry = tokenExpiry;
+                        backgroundTokenState.passiveMode = true;
                     
                     // Warehouse ID'yi request body'den çıkarmaya çalış (POST ise)
                     let warehouseId = null;
@@ -53,23 +80,29 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                         }
                     }
                     
-                    // Franchise sayfasına token'ı gönder
-                    chrome.tabs.query({ url: 'https://franchise.getir.com/*' }, (tabs) => {
-                        if (tabs && tabs.length > 0) {
-                            tabs.forEach(tab => {
-                                chrome.tabs.sendMessage(tab.id, {
-                                    type: 'TOKEN_CAPTURED',
-                                    token: authHeader.value, // Bearer token olarak
-                                    tokenExpiry: tokenExpiry,
-                                    url: details.url,
-                                    warehouseId: warehouseId
-                                }).catch(err => {
-                                    // Content script henüz yüklenmemiş olabilir, sorun değil
-                                    console.log('ℹ️ Token gönderilemedi (content script henüz yüklenmemiş):', err.message);
+                        // Franchise sayfasına token'ı gönder (sadece token değiştiyse)
+                        chrome.tabs.query({ url: 'https://franchise.getir.com/*' }, (tabs) => {
+                            if (tabs && tabs.length > 0) {
+                                tabs.forEach(tab => {
+                                    chrome.tabs.sendMessage(tab.id, {
+                                        type: 'TOKEN_CAPTURED',
+                                        token: authHeader.value, // Bearer token olarak
+                                        tokenExpiry: tokenExpiry,
+                                        url: details.url,
+                                        warehouseId: warehouseId
+                                    }).catch(err => {
+                                        // Content script henüz yüklenmemiş olabilir, sorun değil
+                                        // Pasif modda log yazma
+                                    });
                                 });
-                            });
+                            }
+                        });
+                    } else {
+                        // Token zaten mevcut, pasif moda geç
+                        if (!backgroundTokenState.passiveMode) {
+                            backgroundTokenState.passiveMode = true;
                         }
-                    });
+                    }
                 }
             }
         }
@@ -84,8 +117,14 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 );
 
 // Response'dan warehouse ID yakalama için onCompleted listener
+// OPTİMİZE EDİLDİ: Pasif modda sadece sessizce çalışır
 chrome.webRequest.onCompleted.addListener(
     (details) => {
+        // Pasif modda ve token geçerliyse, sessizce çalış (log yazma)
+        if (backgroundTokenState.passiveMode && backgroundTokenState.token && isTokenValidInBackground(backgroundTokenState.tokenExpiry)) {
+            return; // Pasif modda, sadece sessizce dinle
+        }
+        
         // Sadece Getir API çağrılarını dinle ve başarılı response'ları yakala
         if ((details.url.includes('getirapi.com') || details.url.includes('franchise-api-gateway.getirapi.com')) 
             && details.statusCode === 200) {
@@ -115,7 +154,10 @@ chrome.webRequest.onCompleted.addListener(
                     }
                     
                     if (warehouseId) {
-                        console.log('🏭 ✅ Warehouse ID yakalandı (webRequest response):', warehouseId);
+                        // Pasif modda log yazma
+                        if (!backgroundTokenState.passiveMode) {
+                            console.log('🏭 ✅ Warehouse ID yakalandı (webRequest response):', warehouseId);
+                        }
                         
                         // Franchise sayfasına warehouse ID'yi gönder
                         chrome.tabs.query({ url: 'https://franchise.getir.com/*' }, (tabs) => {

@@ -22,7 +22,10 @@
         headers: {},
         baseUrl: 'https://franchise-api-gateway.getirapi.com',
         captured: false,
-        tokenExpiry: null // Token'ın expire zamanı (JWT'den çıkarılacak)
+        tokenExpiry: null, // Token'ın expire zamanı (JWT'den çıkarılacak)
+        initialAttempts: 0, // İlk yüklemede yapılan deneme sayısı
+        maxInitialAttempts: 2, // İlk yüklemede maksimum 2 deneme
+        passiveMode: false // Token yakalandıktan sonra pasif moda geç
     };
     
     // Console log optimizasyonu için debounce mekanizması
@@ -345,6 +348,7 @@
         const fetchOptions = args[1] || {};
         
         // Getir API çağrılarını yakala ve detaylı log'la
+        // PASIF MOD: Token varsa ve geçerliyse, sadece sessizce dinle (log yazma)
         if (typeof url === 'string') {
                     // Tüm Getir API domain'lerini kontrol et
                     const isAPIRequest = url.includes('getirapi.com') || 
@@ -354,44 +358,57 @@
                                         url.includes('product') || 
                                         url.includes('franchise');
             
+            // Pasif mod: Token varsa ve geçerliyse, sadece sessizce token güncelle (log yazma)
+            const isPassiveMode = apiEndpoints.passiveMode && apiEndpoints.token && isTokenValid();
+            
             if (isAPIRequest) {
-                console.log('🌐 ========== API ÇAĞRISI YAKALANDI ==========');
-                console.log('📍 URL:', url);
-                console.log('📤 Method:', fetchOptions.method || 'GET');
-                        console.log('📋 Headers:', headersToString(fetchOptions.headers));
-                if (fetchOptions.body) {
-                    try {
-                        const bodyObj = typeof fetchOptions.body === 'string' ? JSON.parse(fetchOptions.body) : fetchOptions.body;
-                        console.log('📦 Request Body:', JSON.stringify(bodyObj, null, 2));
+                // Pasif modda sadece token değişikliklerini yakala, log yazma
+                if (!isPassiveMode) {
+                    console.log('🌐 ========== API ÇAĞRISI YAKALANDI ==========');
+                    console.log('📍 URL:', url);
+                    console.log('📤 Method:', fetchOptions.method || 'GET');
+                    console.log('📋 Headers:', headersToString(fetchOptions.headers));
+                    if (fetchOptions.body) {
+                        try {
+                            const bodyObj = typeof fetchOptions.body === 'string' ? JSON.parse(fetchOptions.body) : fetchOptions.body;
+                            console.log('📦 Request Body:', JSON.stringify(bodyObj, null, 2));
                         
-                        // Request body'den warehouse ID'yi yakala (warehouseIds array'inden veya warehouse field'ından)
-                        if (bodyObj) {
-                            // warehouseIds array'inden yakala
-                            if (bodyObj.warehouseIds && Array.isArray(bodyObj.warehouseIds) && bodyObj.warehouseIds.length > 0) {
-                                const newWarehouseId = bodyObj.warehouseIds[0];
-                                if (newWarehouseId && newWarehouseId !== apiEndpoints.warehouseId) {
-                                    apiEndpoints.warehouseId = newWarehouseId;
-                                    console.log('🏭 Warehouse ID yakalandı (request body - warehouseIds):', apiEndpoints.warehouseId);
+                            // Request body'den warehouse ID'yi yakala (warehouseIds array'inden veya warehouse field'ından)
+                            if (bodyObj) {
+                                // warehouseIds array'inden yakala
+                                if (bodyObj.warehouseIds && Array.isArray(bodyObj.warehouseIds) && bodyObj.warehouseIds.length > 0) {
+                                    const newWarehouseId = bodyObj.warehouseIds[0];
+                                    if (newWarehouseId && newWarehouseId !== apiEndpoints.warehouseId) {
+                                        apiEndpoints.warehouseId = newWarehouseId;
+                                        if (!isPassiveMode) {
+                                            console.log('🏭 Warehouse ID yakalandı (request body - warehouseIds):', apiEndpoints.warehouseId);
+                                        }
+                                        sendAPIInfoToCountingPage();
+                                    }
+                                }
+                                // warehouse field'ından yakala
+                                else if (bodyObj.warehouse && bodyObj.warehouse !== apiEndpoints.warehouseId) {
+                                    apiEndpoints.warehouseId = bodyObj.warehouse;
+                                    if (!isPassiveMode) {
+                                        console.log('🏭 Warehouse ID yakalandı (request body - warehouse):', apiEndpoints.warehouseId);
+                                    }
+                                    sendAPIInfoToCountingPage();
+                                }
+                                // warehouseId field'ından yakala
+                                else if (bodyObj.warehouseId && bodyObj.warehouseId !== apiEndpoints.warehouseId) {
+                                    apiEndpoints.warehouseId = bodyObj.warehouseId;
+                                    if (!isPassiveMode) {
+                                        console.log('🏭 Warehouse ID yakalandı (request body - warehouseId):', apiEndpoints.warehouseId);
+                                    }
                                     sendAPIInfoToCountingPage();
                                 }
                             }
-                            // warehouse field'ından yakala
-                            else if (bodyObj.warehouse && bodyObj.warehouse !== apiEndpoints.warehouseId) {
-                                apiEndpoints.warehouseId = bodyObj.warehouse;
-                                console.log('🏭 Warehouse ID yakalandı (request body - warehouse):', apiEndpoints.warehouseId);
-                                sendAPIInfoToCountingPage();
-                            }
-                            // warehouseId field'ından yakala
-                            else if (bodyObj.warehouseId && bodyObj.warehouseId !== apiEndpoints.warehouseId) {
-                                apiEndpoints.warehouseId = bodyObj.warehouseId;
-                                console.log('🏭 Warehouse ID yakalandı (request body - warehouseId):', apiEndpoints.warehouseId);
-                                sendAPIInfoToCountingPage();
+                        } catch (e) {
+                            if (!isPassiveMode) {
+                                console.log('📦 Request Body:', fetchOptions.body);
                             }
                         }
-                    } catch (e) {
-                        console.log('📦 Request Body:', fetchOptions.body);
                     }
-                }
                 
                 // Response'u da yakala
                 try {
@@ -400,14 +417,16 @@
                     
                     // Response'u log'la (async) ve warehouse ID'yi yakala
                     responseClone.json().then(data => {
-                        console.log('📥 Response Status:', response.status, response.statusText);
-                        console.log('📥 Response Headers:', Object.fromEntries(response.headers.entries()));
-                        console.log('📥 Response Body (ilk 500 karakter):', JSON.stringify(data, null, 2).substring(0, 500) + '...');
-                        
-                        // Token ve warehouse ID durumunu logla
-                        console.log('📊 Mevcut durum:');
-                        console.log('  - Token:', apiEndpoints.token ? '✅ Mevcut (' + apiEndpoints.token.substring(7, 37) + '...)' : '❌ Yok');
-                        console.log('  - Warehouse ID:', apiEndpoints.warehouseId || '❌ Yok');
+                        if (!isPassiveMode) {
+                            console.log('📥 Response Status:', response.status, response.statusText);
+                            console.log('📥 Response Headers:', Object.fromEntries(response.headers.entries()));
+                            console.log('📥 Response Body (ilk 500 karakter):', JSON.stringify(data, null, 2).substring(0, 500) + '...');
+                            
+                            // Token ve warehouse ID durumunu logla
+                            console.log('📊 Mevcut durum:');
+                            console.log('  - Token:', apiEndpoints.token ? '✅ Mevcut (' + apiEndpoints.token.substring(7, 37) + '...)' : '❌ Yok');
+                            console.log('  - Warehouse ID:', apiEndpoints.warehouseId || '❌ Yok');
+                        }
                         
                         // Warehouse ID ve name'i response'dan çıkar (her response'da güncelle)
                         if (data && response.status === 200) {
@@ -443,24 +462,32 @@
                             // Warehouse ID bulunduysa ve değiştiyse güncelle
                             if (foundWarehouseId && foundWarehouseId !== apiEndpoints.warehouseId) {
                                 apiEndpoints.warehouseId = foundWarehouseId;
-                                console.log('🏭 ✅ Warehouse ID güncellendi (response\'dan):', apiEndpoints.warehouseId);
+                                if (!isPassiveMode) {
+                                    console.log('🏭 ✅ Warehouse ID güncellendi (response\'dan):', apiEndpoints.warehouseId);
+                                }
                                 sendAPIInfoToCountingPage();
                             } else if (foundWarehouseId && !apiEndpoints.warehouseId) {
                                 // İlk kez bulunuyorsa
                                 apiEndpoints.warehouseId = foundWarehouseId;
-                                console.log('🏭 ✅ Warehouse ID yakalandı (response\'dan):', apiEndpoints.warehouseId);
+                                if (!isPassiveMode) {
+                                    console.log('🏭 ✅ Warehouse ID yakalandı (response\'dan):', apiEndpoints.warehouseId);
+                                }
                                 sendAPIInfoToCountingPage();
                             }
                             
                             // Warehouse name bulunduysa güncelle
                             if (foundWarehouseName && foundWarehouseName !== apiEndpoints.warehouseName) {
                                 apiEndpoints.warehouseName = foundWarehouseName;
-                                console.log('🏭 ✅ Warehouse name yakalandı (response\'dan):', apiEndpoints.warehouseName);
+                                if (!isPassiveMode) {
+                                    console.log('🏭 ✅ Warehouse name yakalandı (response\'dan):', apiEndpoints.warehouseName);
+                                }
                                 sendAPIInfoToCountingPage();
                             }
                         }
                         
-                        console.log('🌐 ===========================================');
+                        if (!isPassiveMode) {
+                            console.log('🌐 ===========================================');
+                        }
                     }).catch((error) => {
                         console.warn('⚠️ Response JSON parse edilemedi:', error);
                         responseClone.text().then(text => {
@@ -473,12 +500,15 @@
                     });
                     
                     // Token'ı yakala - Tüm Getir API çağrılarında kontrol et
+                    // Pasif modda sadece token değişikliklerini yakala, log yazma
                     if (fetchOptions.headers && isAPIRequest) {
                         const authHeader = getHeaderValue(fetchOptions.headers, 'Authorization') || 
                                          getHeaderValue(fetchOptions.headers, 'authorization');
                         
                         if (authHeader) {
-                            console.log('🔍 Authorization header bulundu:', authHeader.substring(0, 30) + '...');
+                            if (!isPassiveMode) {
+                                console.log('🔍 Authorization header bulundu:', authHeader.substring(0, 30) + '...');
+                            }
                             
                             if (authHeader.startsWith('Bearer ')) {
                             const token = authHeader.substring(7).trim();
@@ -497,24 +527,42 @@
                                     'Referer': 'https://franchise.getir.com/'
                                 };
                                 apiEndpoints.captured = true;
-                                console.log('🔑 ✅ Franchise token yakalandı:', token.substring(0, 30) + '... (uzunluk: ' + token.length + ')');
-                                        if (apiEndpoints.tokenExpiry) {
-                                            console.log('⏰ Token expiry:', new Date(apiEndpoints.tokenExpiry).toLocaleString('tr-TR'));
-                                        }
+                                // Token yakalandıktan sonra pasif moda geç
+                                apiEndpoints.passiveMode = true;
+                                
+                                if (!isPassiveMode) {
+                                    console.log('🔑 ✅ Franchise token yakalandı:', token.substring(0, 30) + '... (uzunluk: ' + token.length + ')');
+                                    console.log('🔇 Pasif moda geçildi - artık sessizce çalışacak');
+                                    if (apiEndpoints.tokenExpiry) {
+                                        console.log('⏰ Token expiry:', new Date(apiEndpoints.tokenExpiry).toLocaleString('tr-TR'));
+                                    }
+                                }
                                 sendAPIInfoToCountingPage();
                                     } else {
-                                        console.log('ℹ️ Token zaten mevcut, güncelleme gerekmiyor');
+                                        // Token zaten mevcut, pasif moda geç
+                                        if (!apiEndpoints.passiveMode) {
+                                            apiEndpoints.passiveMode = true;
+                                            if (!isPassiveMode) {
+                                                console.log('ℹ️ Token zaten mevcut, pasif moda geçildi');
+                                            }
+                                        }
                                     }
                                 } else {
-                                    console.warn('⚠️ Token JWT formatında değil veya çok kısa:', token.substring(0, 20) + '...');
+                                    if (!isPassiveMode) {
+                                        console.warn('⚠️ Token JWT formatında değil veya çok kısa:', token.substring(0, 20) + '...');
+                                    }
                                 }
                             } else {
-                                console.warn('⚠️ Authorization header Bearer ile başlamıyor:', authHeader.substring(0, 20) + '...');
+                                if (!isPassiveMode) {
+                                    console.warn('⚠️ Authorization header Bearer ile başlamıyor:', authHeader.substring(0, 20) + '...');
+                                }
                             }
                         } else {
-                            console.log('ℹ️ Authorization header bulunamadı');
+                            if (!isPassiveMode) {
+                                console.log('ℹ️ Authorization header bulunamadı');
+                            }
                         }
-                    } else if (isAPIRequest) {
+                    } else if (isAPIRequest && !isPassiveMode) {
                         console.warn('⚠️ API çağrısı yakalandı ama headers yok');
                     }
                     
@@ -524,7 +572,9 @@
                             const urlObj = new URL(url);
                             apiEndpoints.baseUrl = urlObj.origin;
                             apiEndpoints.captured = true;
-                            console.log('🌐 Base URL kaydedildi:', apiEndpoints.baseUrl);
+                            if (!isPassiveMode) {
+                                console.log('🌐 Base URL kaydedildi:', apiEndpoints.baseUrl);
+                            }
                             sendAPIInfoToCountingPage();
                         } catch (e) {
                             apiEndpoints.baseUrl = window.location.origin;
@@ -539,12 +589,16 @@
                         if (url.includes('franchise-api-gateway.getirapi.com/stocks')) {
                             apiEndpoints.stock = 'https://franchise-api-gateway.getirapi.com/stocks';
                             apiEndpoints.captured = true;
-                            console.log('📦 Stock endpoint kaydedildi (API Gateway):', apiEndpoints.stock);
+                            if (!isPassiveMode) {
+                                console.log('📦 Stock endpoint kaydedildi (API Gateway):', apiEndpoints.stock);
+                            }
                             sendAPIInfoToCountingPage();
                         } else if (!apiEndpoints.stock) {
                             apiEndpoints.stock = url.split('?')[0]; // Query string'i temizle
                             apiEndpoints.captured = true;
-                            console.log('📦 Stock endpoint kaydedildi:', apiEndpoints.stock);
+                            if (!isPassiveMode) {
+                                console.log('📦 Stock endpoint kaydedildi:', apiEndpoints.stock);
+                            }
                             sendAPIInfoToCountingPage();
                         }
                     }
@@ -553,9 +607,12 @@
                     if ((url.includes('search') || url.includes('product')) && !apiEndpoints.search) {
                         apiEndpoints.search = url.split('?')[0];
                         apiEndpoints.captured = true;
-                        console.log('🔍 Search endpoint kaydedildi:', apiEndpoints.search);
+                        if (!isPassiveMode) {
+                            console.log('🔍 Search endpoint kaydedildi:', apiEndpoints.search);
+                        }
                         sendAPIInfoToCountingPage();
                     }
+                } // Pasif mod kontrolü kapanışı
                     
                     return response;
                 } catch (error) {
@@ -600,15 +657,22 @@
                                        url.includes('product') || 
                                        url.includes('franchise'));
         
+        // Pasif mod: Token varsa ve geçerliyse, sadece sessizce dinle (log yazma)
+        const isPassiveMode = apiEndpoints.passiveMode && apiEndpoints.token && isTokenValid();
+        
         if (isXHRAPIRequest) {
-            console.log('🌐 ========== XHR API ÇAĞRISI YAKALANDI ==========');
-            console.log('📍 URL:', url);
-            console.log('📤 Method:', method);
-            console.log('📋 Headers:', headersToString(headers));
+            if (!isPassiveMode) {
+                console.log('🌐 ========== XHR API ÇAĞRISI YAKALANDI ==========');
+                console.log('📍 URL:', url);
+                console.log('📤 Method:', method);
+                console.log('📋 Headers:', headersToString(headers));
+            }
             if (body) {
                 try {
                     const bodyObj = typeof body === 'string' ? JSON.parse(body) : body;
-                    console.log('📦 Request Body:', JSON.stringify(bodyObj, null, 2));
+                    if (!isPassiveMode) {
+                        console.log('📦 Request Body:', JSON.stringify(bodyObj, null, 2));
+                    }
                     
                     // Request body'den warehouse ID'yi yakala (XHR için)
                     if (bodyObj) {
@@ -617,25 +681,33 @@
                             const newWarehouseId = bodyObj.warehouseIds[0];
                             if (newWarehouseId && newWarehouseId !== apiEndpoints.warehouseId) {
                                 apiEndpoints.warehouseId = newWarehouseId;
-                                console.log('🏭 Warehouse ID yakalandı (XHR request body - warehouseIds):', apiEndpoints.warehouseId);
+                                if (!isPassiveMode) {
+                                    console.log('🏭 Warehouse ID yakalandı (XHR request body - warehouseIds):', apiEndpoints.warehouseId);
+                                }
                                 sendAPIInfoToCountingPage();
                             }
                         }
                         // warehouse field'ından yakala
                         else if (bodyObj.warehouse && bodyObj.warehouse !== apiEndpoints.warehouseId) {
                             apiEndpoints.warehouseId = bodyObj.warehouse;
-                            console.log('🏭 Warehouse ID yakalandı (XHR request body - warehouse):', apiEndpoints.warehouseId);
+                            if (!isPassiveMode) {
+                                console.log('🏭 Warehouse ID yakalandı (XHR request body - warehouse):', apiEndpoints.warehouseId);
+                            }
                             sendAPIInfoToCountingPage();
                         }
                         // warehouseId field'ından yakala
                         else if (bodyObj.warehouseId && bodyObj.warehouseId !== apiEndpoints.warehouseId) {
                             apiEndpoints.warehouseId = bodyObj.warehouseId;
-                            console.log('🏭 Warehouse ID yakalandı (XHR request body - warehouseId):', apiEndpoints.warehouseId);
+                            if (!isPassiveMode) {
+                                console.log('🏭 Warehouse ID yakalandı (XHR request body - warehouseId):', apiEndpoints.warehouseId);
+                            }
                             sendAPIInfoToCountingPage();
                         }
                     }
                 } catch (e) {
-                    console.log('📦 Request Body:', body);
+                    if (!isPassiveMode) {
+                        console.log('📦 Request Body:', body);
+                    }
                 }
             }
             
@@ -649,7 +721,9 @@
                                  this.getRequestHeader?.('authorization');
                 
                 if (authHeader) {
-                    console.log('🔍 Authorization header bulundu (XHR):', authHeader.substring(0, 30) + '...');
+                    if (!isPassiveMode) {
+                        console.log('🔍 Authorization header bulundu (XHR):', authHeader.substring(0, 30) + '...');
+                    }
                     
                     if (authHeader.startsWith('Bearer ')) {
                     const token = authHeader.substring(7).trim();
@@ -668,22 +742,39 @@
                             'Referer': 'https://franchise.getir.com/'
                         };
                         apiEndpoints.captured = true;
-                        console.log('🔑 ✅ Franchise token yakalandı (XHR):', token.substring(0, 30) + '... (uzunluk: ' + token.length + ')');
-                                if (apiEndpoints.tokenExpiry) {
-                                    console.log('⏰ Token expiry:', new Date(apiEndpoints.tokenExpiry).toLocaleString('tr-TR'));
-                                }
+                        apiEndpoints.passiveMode = true; // Token yakalandı, pasif moda geç
+                        
+                        if (!isPassiveMode) {
+                            console.log('🔑 ✅ Franchise token yakalandı (XHR):', token.substring(0, 30) + '... (uzunluk: ' + token.length + ')');
+                            console.log('🔇 Pasif moda geçildi - artık sessizce çalışacak');
+                            if (apiEndpoints.tokenExpiry) {
+                                console.log('⏰ Token expiry:', new Date(apiEndpoints.tokenExpiry).toLocaleString('tr-TR'));
+                            }
+                        }
                         sendAPIInfoToCountingPage();
                             } else {
-                                console.log('ℹ️ Token zaten mevcut (XHR), güncelleme gerekmiyor');
+                                // Token zaten mevcut, pasif moda geç
+                                if (!apiEndpoints.passiveMode) {
+                                    apiEndpoints.passiveMode = true;
+                                    if (!isPassiveMode) {
+                                        console.log('ℹ️ Token zaten mevcut (XHR), pasif moda geçildi');
+                                    }
+                                }
                             }
                         } else {
-                            console.warn('⚠️ Token JWT formatında değil veya çok kısa (XHR):', token.substring(0, 20) + '...');
+                            if (!isPassiveMode) {
+                                console.warn('⚠️ Token JWT formatında değil veya çok kısa (XHR):', token.substring(0, 20) + '...');
+                            }
                         }
                     } else {
-                        console.warn('⚠️ Authorization header Bearer ile başlamıyor (XHR):', authHeader.substring(0, 20) + '...');
+                        if (!isPassiveMode) {
+                            console.warn('⚠️ Authorization header Bearer ile başlamıyor (XHR):', authHeader.substring(0, 20) + '...');
+                        }
                     }
                 } else {
-                    console.log('ℹ️ Authorization header bulunamadı (XHR)');
+                    if (!isPassiveMode) {
+                        console.log('ℹ️ Authorization header bulunamadı (XHR)');
+                    }
                 }
             }
             
@@ -692,8 +783,10 @@
                 if (this.status === 200) {
                     try {
                         const responseText = this.responseText;
-                        console.log('📥 XHR Response Status:', this.status, this.statusText);
-                        console.log('📥 XHR Response Body (ilk 500 karakter):', responseText.substring(0, 500) + '...');
+                        if (!isPassiveMode) {
+                            console.log('📥 XHR Response Status:', this.status, this.statusText);
+                            console.log('📥 XHR Response Body (ilk 500 karakter):', responseText.substring(0, 500) + '...');
+                        }
                         
                         const responseData = JSON.parse(responseText);
                         
@@ -716,29 +809,41 @@
                             // Warehouse ID bulunduysa ve değiştiyse güncelle
                             if (foundWarehouseId && foundWarehouseId !== apiEndpoints.warehouseId) {
                                 apiEndpoints.warehouseId = foundWarehouseId;
-                                console.log('🏭 ✅ Warehouse ID güncellendi (XHR response\'dan):', apiEndpoints.warehouseId);
+                                if (!isPassiveMode) {
+                                    console.log('🏭 ✅ Warehouse ID güncellendi (XHR response\'dan):', apiEndpoints.warehouseId);
+                                }
                                 sendAPIInfoToCountingPage();
                             } else if (foundWarehouseId && !apiEndpoints.warehouseId) {
                                 // İlk kez bulunuyorsa
                                 apiEndpoints.warehouseId = foundWarehouseId;
-                                console.log('🏭 ✅ Warehouse ID yakalandı (XHR response\'dan):', apiEndpoints.warehouseId);
+                                if (!isPassiveMode) {
+                                    console.log('🏭 ✅ Warehouse ID yakalandı (XHR response\'dan):', apiEndpoints.warehouseId);
+                                }
                                 sendAPIInfoToCountingPage();
-                            } else if (!foundWarehouseId) {
+                            } else if (!foundWarehouseId && !isPassiveMode) {
                                 console.log('ℹ️ XHR Response\'da warehouse ID bulunamadı');
                             }
                             
-                            // Mevcut durumu logla
-                            console.log('📊 XHR Mevcut durum:');
-                            console.log('  - Token:', apiEndpoints.token ? '✅ Mevcut' : '❌ Yok');
-                            console.log('  - Warehouse ID:', apiEndpoints.warehouseId || '❌ Yok');
+                            // Mevcut durumu logla (sadece pasif mod değilse)
+                            if (!isPassiveMode) {
+                                console.log('📊 XHR Mevcut durum:');
+                                console.log('  - Token:', apiEndpoints.token ? '✅ Mevcut' : '❌ Yok');
+                                console.log('  - Warehouse ID:', apiEndpoints.warehouseId || '❌ Yok');
+                            }
                         }
                     } catch (e) {
-                        console.warn('⚠️ XHR Response parse edilemedi:', e);
+                        if (!isPassiveMode) {
+                            console.warn('⚠️ XHR Response parse edilemedi:', e);
+                        }
                     }
                 } else {
-                    console.warn('⚠️ XHR Response başarısız:', this.status, this.statusText);
+                    if (!isPassiveMode) {
+                        console.warn('⚠️ XHR Response başarısız:', this.status, this.statusText);
+                    }
                 }
-                console.log('🌐 ===========================================');
+                if (!isPassiveMode) {
+                    console.log('🌐 ===========================================');
+                }
             });
             
             // Base URL'i kaydet
@@ -747,7 +852,9 @@
                     const urlObj = new URL(url);
                     apiEndpoints.baseUrl = urlObj.origin;
                     apiEndpoints.captured = true;
-                    console.log('🌐 Base URL kaydedildi (XHR):', apiEndpoints.baseUrl);
+                    if (!isPassiveMode) {
+                        console.log('🌐 Base URL kaydedildi (XHR):', apiEndpoints.baseUrl);
+                    }
                     sendAPIInfoToCountingPage();
                 } catch (e) {
                     // Relative URL
@@ -760,12 +867,16 @@
                     const baseUrl = url.split('?')[0];
                     apiEndpoints.stock = baseUrl;
                     apiEndpoints.captured = true;
-                    console.log('📦 Stock endpoint kaydedildi (XHR - API Gateway):', apiEndpoints.stock);
+                    if (!isPassiveMode) {
+                        console.log('📦 Stock endpoint kaydedildi (XHR - API Gateway):', apiEndpoints.stock);
+                    }
                     sendAPIInfoToCountingPage();
                 } else if (url.includes('stock')) {
                     apiEndpoints.stock = url.split('?')[0];
                     apiEndpoints.captured = true;
-                    console.log('📦 Stock endpoint kaydedildi (XHR):', apiEndpoints.stock);
+                    if (!isPassiveMode) {
+                        console.log('📦 Stock endpoint kaydedildi (XHR):', apiEndpoints.stock);
+                    }
                     sendAPIInfoToCountingPage();
                 }
             }
@@ -786,7 +897,22 @@
     }
 
     // Token kontrolü (sayfa yüklendiğinde) - ÖNCE chrome.storage, SONRA localStorage
+    // Sadece ilk 2 denemede çalışır, sonra pasif moda geçer
     function checkLocalStorageForToken() {
+        // Pasif modda veya maksimum deneme sayısına ulaşıldıysa, sadece token yoksa kontrol et
+        if (apiEndpoints.passiveMode && apiEndpoints.token && isTokenValid()) {
+            return; // Pasif modda ve token geçerli, kontrol etme
+        }
+        
+        // İlk yüklemede maksimum 2 deneme
+        if (apiEndpoints.initialAttempts >= apiEndpoints.maxInitialAttempts) {
+            if (apiEndpoints.token && isTokenValid()) {
+                apiEndpoints.passiveMode = true;
+                return; // Token var ve geçerli, pasif moda geç
+            }
+            // Token yoksa veya geçersizse, sessizce kontrol et (log yazma)
+        }
+        
         // ÖNCE chrome.storage.local'dan oku (tüm origin'lerden erişilebilir)
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
             chrome.storage.local.get(['getir_api_info'], (result) => {
@@ -817,13 +943,21 @@
                             apiEndpoints.tokenExpiry = tokenExpiry;
                             apiEndpoints.warehouseId = apiInfo.warehouseId || apiEndpoints.warehouseId;
                             apiEndpoints.captured = true;
-                            logDebounce.log('🔑 ✅ chrome.storage\'dan franchise token bulundu', {
-                                tokenLength: tokenValue.length,
-                                tokenExpiry: tokenExpiry ? new Date(tokenExpiry).toLocaleString('tr-TR') : 'N/A'
-                            }, 'chrome_storage_token');
+                            apiEndpoints.passiveMode = true; // Token yakalandı, pasif moda geç
+                            apiEndpoints.initialAttempts = apiEndpoints.maxInitialAttempts; // Deneme sayısını maksimuma çıkar
+                            
+                            if (apiEndpoints.initialAttempts < apiEndpoints.maxInitialAttempts) {
+                                logDebounce.log('🔑 ✅ chrome.storage\'dan franchise token bulundu', {
+                                    tokenLength: tokenValue.length,
+                                    tokenExpiry: tokenExpiry ? new Date(tokenExpiry).toLocaleString('tr-TR') : 'N/A'
+                                }, 'chrome_storage_token');
+                            }
                             sendAPIInfoToCountingPage();
                         }
-                        // Token zaten mevcut, log yazma (tekrar önleme)
+                        // Token zaten mevcut, pasif moda geç
+                        if (!apiEndpoints.passiveMode) {
+                            apiEndpoints.passiveMode = true;
+                        }
                         return; // chrome.storage'dan bulduk, localStorage'a bakma
                     }
                 }
@@ -864,9 +998,14 @@
                             apiEndpoints.tokenExpiry = tokenExpiry;
                             apiEndpoints.warehouseId = apiInfo.warehouseId || apiEndpoints.warehouseId;
                             apiEndpoints.captured = true;
-                            console.log('🔑 ✅ localStorage\'dan getir_api_info token bulundu:', tokenValue.substring(0, 30) + '... (uzunluk: ' + tokenValue.length + ')');
-                            if (tokenExpiry) {
-                                console.log('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
+                            apiEndpoints.passiveMode = true; // Token yakalandı, pasif moda geç
+                            apiEndpoints.initialAttempts = apiEndpoints.maxInitialAttempts; // Deneme sayısını maksimuma çıkar
+                            
+                            if (apiEndpoints.initialAttempts < apiEndpoints.maxInitialAttempts) {
+                                console.log('🔑 ✅ localStorage\'dan getir_api_info token bulundu:', tokenValue.substring(0, 30) + '... (uzunluk: ' + tokenValue.length + ')');
+                                if (tokenExpiry) {
+                                    console.log('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
+                                }
                             }
                             sendAPIInfoToCountingPage();
                             return; // getir_api_info'dan bulduk, diğerlerini kontrol etme
@@ -902,9 +1041,14 @@
                             apiEndpoints.token = bearerToken;
                             apiEndpoints.tokenExpiry = tokenExpiry;
                             apiEndpoints.captured = true;
-                            console.log('🔑 ✅ localStorage\'dan franchise token bulundu (fallback):', value.substring(0, 30) + '... (uzunluk: ' + value.length + ')');
-                            if (tokenExpiry) {
-                                console.log('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
+                            apiEndpoints.passiveMode = true; // Token yakalandı, pasif moda geç
+                            apiEndpoints.initialAttempts = apiEndpoints.maxInitialAttempts; // Deneme sayısını maksimuma çıkar
+                            
+                            if (apiEndpoints.initialAttempts < apiEndpoints.maxInitialAttempts) {
+                                console.log('🔑 ✅ localStorage\'dan franchise token bulundu (fallback):', value.substring(0, 30) + '... (uzunluk: ' + value.length + ')');
+                                if (tokenExpiry) {
+                                    console.log('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
+                                }
                             }
                             sendAPIInfoToCountingPage();
                         }
@@ -938,9 +1082,14 @@
                         apiEndpoints.token = bearerToken;
                         apiEndpoints.tokenExpiry = tokenExpiry;
                         apiEndpoints.captured = true;
-                        console.log('🔑 ✅ localStorage\'a franchise token kaydedildi:', value.substring(0, 30) + '... (uzunluk: ' + value.length + ')');
-                        if (tokenExpiry) {
-                            console.log('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
+                        apiEndpoints.passiveMode = true; // Token yakalandı, pasif moda geç
+                        apiEndpoints.initialAttempts = apiEndpoints.maxInitialAttempts; // Deneme sayısını maksimuma çıkar
+                        
+                        if (apiEndpoints.initialAttempts < apiEndpoints.maxInitialAttempts) {
+                            console.log('🔑 ✅ localStorage\'a franchise token kaydedildi:', value.substring(0, 30) + '... (uzunluk: ' + value.length + ')');
+                            if (tokenExpiry) {
+                                console.log('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
+                            }
                         }
                         sendAPIInfoToCountingPage();
                     }
@@ -953,41 +1102,52 @@
 
     // Sayfa yüklendiğinde localStorage'dan token kontrol et
     // ÖNCE getir_api_info'dan oku (en güncel token), sonra diğerlerini kontrol et
+    // Sadece ilk 2 denemede çalışır
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        apiEndpoints.initialAttempts++;
         checkLocalStorageForToken();
-        console.log('✅ Sayfa hazır, franchise token yakalama aktif');
+        if (apiEndpoints.initialAttempts <= apiEndpoints.maxInitialAttempts) {
+            console.log('✅ Sayfa hazır, franchise token yakalama aktif (deneme ' + apiEndpoints.initialAttempts + '/' + apiEndpoints.maxInitialAttempts + ')');
+        }
     } else {
         window.addEventListener('load', () => {
+            apiEndpoints.initialAttempts++;
             checkLocalStorageForToken();
-            console.log('✅ Sayfa yüklendi, franchise token yakalama aktif');
+            if (apiEndpoints.initialAttempts <= apiEndpoints.maxInitialAttempts) {
+                console.log('✅ Sayfa yüklendi, franchise token yakalama aktif (deneme ' + apiEndpoints.initialAttempts + '/' + apiEndpoints.maxInitialAttempts + ')');
+            }
         });
         document.addEventListener('DOMContentLoaded', () => {
+            apiEndpoints.initialAttempts++;
             checkLocalStorageForToken();
-            console.log('✅ DOM hazır, franchise token yakalama aktif');
+            if (apiEndpoints.initialAttempts <= apiEndpoints.maxInitialAttempts) {
+                console.log('✅ DOM hazır, franchise token yakalama aktif (deneme ' + apiEndpoints.initialAttempts + '/' + apiEndpoints.maxInitialAttempts + ')');
+            }
         });
     }
 
     // WebRequest'ten token yakalandığında, eski token'ları override et
     // Bu sayede yeni token her zaman öncelikli olur
 
-    // Periyodik olarak localStorage'dan token kontrol et (her 2 saniyede bir - fallback)
-    setInterval(() => {
-        checkLocalStorageForToken();
-        if (apiEndpoints.captured && apiEndpoints.token) {
-            sendAPIInfoToCountingPage();
-        }
-        // Token yoksa log yazma (tekrar önleme)
-    }, 2000); // 2 saniyede bir kontrol et
+    // Periyodik token kontrolü KALDIRILDI - Güvenlik nedeniyle
+    // Sadece sayfa yüklendiğinde ve API çağrılarında token yakalanacak
+    // setInterval kaldırıldı - sürekli kontrol güvenlik sistemini tetikliyor
     
     // Sayfa yüklendikten sonra da API çağrılarını dinle (fallback)
     // Eğer sayfa yüklenirken API çağrıları kaçırıldıysa, sayfa yüklendikten sonra da dinle
+    // Sadece ilk 2 denemede log yaz
     window.addEventListener('load', () => {
-        logDebounce.log('📄 Sayfa yüklendi, fallback mekanizması aktif', null, 'page_loaded');
-        
-        // Mevcut durumu kontrol et
-        if (!apiEndpoints.token) {
-            logDebounce.log('⚠️ Sayfa yüklendi ama token henüz yakalanmadı', null, 'token_missing');
-        } else {
+        if (apiEndpoints.initialAttempts <= apiEndpoints.maxInitialAttempts) {
+            logDebounce.log('📄 Sayfa yüklendi, fallback mekanizması aktif', null, 'page_loaded');
+            
+            // Mevcut durumu kontrol et
+            if (!apiEndpoints.token) {
+                logDebounce.log('⚠️ Sayfa yüklendi ama token henüz yakalanmadı', null, 'token_missing');
+            } else {
+                sendAPIInfoToCountingPage();
+            }
+        } else if (apiEndpoints.token) {
+            // Pasif modda sadece API bilgilerini gönder, log yazma
             sendAPIInfoToCountingPage();
         }
     });
