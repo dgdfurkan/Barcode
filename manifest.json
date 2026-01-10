@@ -15,7 +15,7 @@
       "purpose": "any maskable"
     }
   ],
-  "start_url": "/",
+  "start_url": "/Barcode/",
   "display": "standalone",
   "theme_color": "#1e293b",
   "background_color": "#ffffff",
