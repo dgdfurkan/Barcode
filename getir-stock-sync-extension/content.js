@@ -409,6 +409,7 @@
                             }
                         }
                     }
+                } // Pasif mod kontrolü kapanışı
                 
                 // Response'u da yakala
                 try {
@@ -1310,7 +1311,8 @@
             },
             isAvailable: function() {
                 return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage;
-            }
+            },
+            extensionId: 'dhgdhdnnpeakmomlgpgmokecmdmeoebn'
         };
         console.log('✅ Extension helper fonksiyonları window.getirExtensionHelper olarak eklendi');
     }

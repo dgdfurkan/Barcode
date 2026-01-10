@@ -137,16 +137,17 @@ class CountingSystem {
                                 }
                             );
                         });
-                    
-                    if (response && response.success && response.apiInfo) {
-                        apiInfo = response.apiInfo;
-                        console.log('🔑 ✅ chrome.storage\'dan franchise token bulundu', {
-                            hasToken: !!apiInfo.token,
-                            tokenLength: apiInfo.token?.length,
-                            tokenExpiry: apiInfo.tokenExpiry
-                        });
-                    } else {
-                        console.warn('⚠️ Extension yanıtı geçersiz veya boş:', response);
+                        
+                        if (response && response.success && response.apiInfo) {
+                            apiInfo = response.apiInfo;
+                            console.log('🔑 ✅ chrome.storage\'dan franchise token bulundu', {
+                                hasToken: !!apiInfo.token,
+                                tokenLength: apiInfo.token?.length,
+                                tokenExpiry: apiInfo.tokenExpiry
+                            });
+                        } else {
+                            console.warn('⚠️ Extension yanıtı geçersiz veya boş:', response);
+                        }
                     }
                 } catch (error) {
                     console.warn('⚠️ Extension API bilgisi alınamadı:', error);
