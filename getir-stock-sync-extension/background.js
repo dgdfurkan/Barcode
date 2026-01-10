@@ -355,6 +355,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 });
 
 // Periyodik olarak Supabase'den pending istekleri kontrol et
+// OPTİMİZE EDİLDİ: 2 saniyeden 30 saniyeye çıkarıldı - güvenlik nedeniyle
 let pollingActive = false;
 setInterval(async () => {
     if (pollingActive) return; // Prevent overlapping polls
@@ -362,7 +363,7 @@ setInterval(async () => {
     
     try {
         if (!supabaseClient) {
-            console.log('⚠️ Supabase client yok, chrome.storage kontrol ediliyor...');
+            // Log yazma - sessizce çalış
             // Supabase yoksa chrome.storage'ı kontrol et (fallback)
             const storage = await chrome.storage.local.get(['getir_stock_request', 'getir_api_request']);
             
@@ -371,7 +372,7 @@ setInterval(async () => {
                 storage.getir_stock_request._processing = true;
                 await chrome.storage.local.set({ getir_stock_request: storage.getir_stock_request });
                 
-                console.log('📦 Stok isteği bulundu (chrome.storage):', request);
+                // Sadece hata durumunda log yaz
                 handleStockRequest(request.barcode, request.productName, request.requestId)
                     .catch(error => {
                         console.error('❌ Stok isteği işlenirken hata:', error);
@@ -382,14 +383,14 @@ setInterval(async () => {
         }
 
         // Supabase'den tüm kullanıcıların pending isteklerini al
-        console.log('🔍 Supabase\'den pending istekler kontrol ediliyor...');
+        // Log yazma - sessizce çalış
         const allUsersData = await supabaseQuery('stock_requests', 'GET', null, {}, {
             orderBy: 'updated_at',
             orderAsc: true
         });
 
         if (!allUsersData || !Array.isArray(allUsersData)) {
-            console.log('ℹ️ Supabase\'den veri dönmedi');
+            // Log yazma - sessizce çalış
             pollingActive = false;
             return;
         }
@@ -408,6 +409,7 @@ setInterval(async () => {
         }
 
         if (allPendingRequests.length > 0) {
+            // Sadece istek varsa log yaz
             console.log(`📦 ${allPendingRequests.length} pending istek bulundu`);
             
             // İlk 10 isteği işle (limit)
@@ -417,7 +419,7 @@ setInterval(async () => {
                 try {
                     // İsteği pending'den processing'e taşı
                     await moveRequestToProcessing(request.username, request.request_id);
-                    console.log('📦 Stok isteği processing olarak işaretlendi:', request.request_id);
+                    // Log yazma - sessizce çalış
                     
                     // İsteği işle
                     await handleStockRequestFromSupabase(request);
@@ -431,22 +433,25 @@ setInterval(async () => {
                     }
                 }
             }
-        } else {
-            console.log('ℹ️ Pending istek yok');
         }
+        // Pending istek yoksa log yazma
     } catch (error) {
-        console.error('❌ Error checking Supabase:', error);
+        // Sadece kritik hatalarda log yaz
+        if (error.message && !error.message.includes('network')) {
+            console.error('❌ Error checking Supabase:', error);
+        }
     } finally {
         pollingActive = false;
     }
-}, 2000); // Her 2 saniye kontrol et
+}, 30000); // Her 30 saniye kontrol et (2 saniyeden 30 saniyeye çıkarıldı - güvenlik nedeniyle)
 
-console.log('🔄 Supabase polling başlatıldı (her 2 saniyede bir)');
+// Log yazma - sessizce başlat
 
 // Cleanup mekanizması - eski completed/failed istekleri temizle
+// OPTİMİZE EDİLDİ: Log'lar kaldırıldı - sessizce çalışır
 setInterval(async () => {
     try {
-        console.log('🧹 Cleanup: Eski istekler temizleniyor...');
+        // Log yazma - sessizce çalış
         const allUsersData = await supabaseQuery('stock_requests', 'GET', null, {});
         
         if (allUsersData && Array.isArray(allUsersData)) {
@@ -465,7 +470,7 @@ setInterval(async () => {
                         });
                         if (requests.completed.length !== beforeCount) {
                             updated = true;
-                            console.log(`🧹 ${userData.username}: ${beforeCount - requests.completed.length} eski completed istek temizlendi`);
+                            // Log yazma - sessizce çalış
                         }
                     }
                     
@@ -479,7 +484,7 @@ setInterval(async () => {
                         });
                         if (requests.failed.length !== beforeCount) {
                             updated = true;
-                            console.log(`🧹 ${userData.username}: ${beforeCount - requests.failed.length} eski failed istek temizlendi`);
+                            // Log yazma - sessizce çalış
                         }
                     }
                     
@@ -491,11 +496,14 @@ setInterval(async () => {
             }
         }
     } catch (error) {
-        console.error('❌ Cleanup hatası:', error);
+        // Sadece kritik hatalarda log yaz
+        if (error.message && !error.message.includes('network')) {
+            console.error('❌ Cleanup hatası:', error);
+        }
     }
 }, 5 * 60 * 1000); // Her 5 dakikada bir cleanup yap
 
-console.log('🧹 Cleanup mekanizması başlatıldı (her 5 dakikada bir)');
+// Log yazma - sessizce başlat
 
 // Message listener - content script'ten veya counting.html'den gelen mesajları dinle
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
