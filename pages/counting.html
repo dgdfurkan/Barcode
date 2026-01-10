@@ -1525,7 +1525,7 @@
             // Check authentication
             const session = window.authUtils?.checkAuth();
             if (!session) {
-                window.location.href = '../index.html';
+                window.location.replace('../index.html');
                 return;
             }
             
@@ -1535,7 +1535,7 @@
                 const hasCountingFeature = window.premiumFeatures.checkPremiumFeature('stokSayimi');
                 if (!hasCountingFeature) {
                     alert('Bu özellik premium üyeler için. Lütfen premium üyelik satın alın.');
-                    window.location.href = 'product_search.html';
+                    window.location.replace('product_search.html');
                     return;
                 }
             }
@@ -1557,8 +1557,9 @@
             }
             
             // Back to search button
+            // Use replace() to prevent Safari UI from showing during navigation in standalone mode
             document.getElementById('backToSearchBtn').addEventListener('click', () => {
-                window.location.href = 'product_search.html';
+                window.location.replace('product_search.html');
             });
             
             // Logout button

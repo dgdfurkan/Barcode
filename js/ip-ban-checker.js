@@ -165,10 +165,11 @@
                     // Fallback logout
                     localStorage.removeItem('userSession');
                     localStorage.removeItem('authToken');
+                    // Use replace() to prevent Safari UI from showing during navigation in standalone mode
                     if (window.location.pathname.includes('/pages/')) {
-                        window.location.href = '../index.html';
+                        window.location.replace('../index.html');
                     } else {
-                        window.location.href = 'index.html';
+                        window.location.replace('index.html');
                     }
                 }
 

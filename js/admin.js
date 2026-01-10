@@ -27,7 +27,8 @@ class AdminPanel {
         const session = window.authUtils.checkAuth();
         if (!session || !session.isAdmin) {
             alert('Bu sayfaya erişim yetkiniz yok!');
-            window.location.href = 'index.html';
+            // Use replace() to prevent Safari UI from showing during navigation in standalone mode
+            window.location.replace('index.html');
             return;
         }
 

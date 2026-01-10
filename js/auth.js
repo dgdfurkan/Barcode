@@ -339,11 +339,12 @@ async function login(username, password) {
         localStorage.setItem('authToken', btoa(unescape(encodeURIComponent(JSON.stringify(sessionData))))); // Safe base64 encoding
         
         // Redirect to dashboard or admin panel
+        // Use replace() to prevent Safari UI from showing during navigation in standalone mode
         const isAdmin = user.isAdmin || user.is_admin || false;
         if (isAdmin) {
-            window.location.href = 'admin.html';
+            window.location.replace('admin.html');
         } else {
-            window.location.href = 'pages/product_search.html';
+            window.location.replace('pages/product_search.html');
         }
         
     } catch (error) {
@@ -511,12 +512,13 @@ function logout() {
     localStorage.removeItem('authToken');
     
     // Determine correct path based on current location
+    // Use replace() to prevent Safari UI from showing during navigation in standalone mode
     if (window.location.pathname.includes('/pages/')) {
-        window.location.href = '../index.html';
+        window.location.replace('../index.html');
     } else if (window.location.pathname.includes('/admin')) {
-        window.location.href = 'index.html';
+        window.location.replace('index.html');
     } else {
-        window.location.href = 'index.html';
+        window.location.replace('index.html');
     }
 }
 
@@ -536,18 +538,18 @@ function showUserInfo(session) {
     const goToAppBtn = document.getElementById('goToApp');
     const logoutFromIndexBtn = document.getElementById('logoutFromIndex');
     
-    if (goToAppBtn) {
-        goToAppBtn.onclick = () => {
-            const currentSession = checkAuth();
-            if (currentSession) {
-                if (currentSession.isAdmin) {
-                    window.location.href = 'admin.html';
-                } else {
-                    window.location.href = 'pages/product_search.html';
+        if (goToAppBtn) {
+            goToAppBtn.onclick = () => {
+                const currentSession = checkAuth();
+                if (currentSession) {
+                    if (currentSession.isAdmin) {
+                        window.location.replace('admin.html');
+                    } else {
+                        window.location.replace('pages/product_search.html');
+                    }
                 }
-            }
-        };
-    }
+            };
+        }
     
     if (logoutFromIndexBtn) {
         logoutFromIndexBtn.onclick = () => {
@@ -588,9 +590,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const session = checkAuth();
             if (session) {
                 if (session.isAdmin) {
-                    window.location.href = 'admin.html';
+                    window.location.replace('admin.html');
                 } else {
-                    window.location.href = 'pages/product_search.html';
+                    window.location.replace('pages/product_search.html');
                 }
             }
         });
