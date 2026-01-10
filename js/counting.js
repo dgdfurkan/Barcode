@@ -13,6 +13,7 @@ class CountingSystem {
         this.currentViewMode = localStorage.getItem('counting_view_mode') || 'table'; // 'table' | 'rapid'
         this.currentCountingProduct = null; // Açık modal'daki ürün ID
         this.skippedProducts = new Set(); // Atlanan ürün ID'leri
+        this.autoSaveTimeout = null; // Otomatik kaydetme için timeout
     }
 
     async init() {
@@ -1293,7 +1294,7 @@ class CountingSystem {
             });
         }
 
-        // Update stock indicator when input changes
+        // Update stock indicator and auto-save when input changes
         if (depoInput) {
             depoInput.addEventListener('input', () => {
                 if (this.currentCountingProduct) {
@@ -1306,32 +1307,32 @@ class CountingSystem {
                     
                     this.updateStockIndicator(this.currentCountingProduct, stockIndicator);
                     
-                    // Restore original data (will be saved when save button is clicked)
+                    // Restore original data temporarily
                     this.countingData[this.currentCountingProduct] = originalData;
+                    
+                    // Auto-save after 1 second of no input
+                    if (this.autoSaveTimeout) {
+                        clearTimeout(this.autoSaveTimeout);
+                    }
+                    
+                    this.autoSaveTimeout = setTimeout(() => {
+                        if (this.currentCountingProduct) {
+                            const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
+                            this.updateProductStock(this.currentCountingProduct, value, null);
+                            
+                            // Remove from skipped if was skipped
+                            this.skippedProducts.delete(this.currentCountingProduct);
+                            
+                            // Update rapid mode if active
+                            if (this.currentViewMode === 'rapid') {
+                                this.renderRapidCountingMode();
+                            }
+                            
+                            this.updateStatistics();
+                            this.updateCountingProgress();
+                        }
+                    }, 1000); // 1 second debounce
                 }
-            });
-        }
-
-        // Save button
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => {
-                if (!this.currentCountingProduct) return;
-                
-                const value = depoInput ? (depoInput.value.trim() === '' ? null : parseInt(depoInput.value)) : null;
-                this.updateProductStock(this.currentCountingProduct, value, null);
-                
-                // Remove from skipped if was skipped
-                this.skippedProducts.delete(this.currentCountingProduct);
-                
-                this.closeCountingBottomSheet();
-                
-                // Update rapid mode if active
-                if (this.currentViewMode === 'rapid') {
-                    this.renderRapidCountingMode();
-                }
-                
-                this.updateStatistics();
-                this.updateCountingProgress();
             });
         }
 
@@ -1349,6 +1350,36 @@ class CountingSystem {
                 }
                 
                 this.updateCountingProgress();
+            });
+        }
+
+        // Next button (go to next uncounted product)
+        const nextBtn = document.getElementById('countingNextBtn');
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                if (!this.currentCountingProduct) return;
+                
+                const nextProductId = this.findNextUncountedProduct(this.currentCountingProduct);
+                if (nextProductId) {
+                    // Save current product first
+                    const depoInput = document.getElementById('countingDepoInput');
+                    if (depoInput) {
+                        const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
+                        this.updateProductStock(this.currentCountingProduct, value, null);
+                        this.skippedProducts.delete(this.currentCountingProduct);
+                    }
+                    
+                    // Open next product
+                    this.openCountingBottomSheet(nextProductId);
+                    
+                    // Update rapid mode if active
+                    if (this.currentViewMode === 'rapid') {
+                        this.renderRapidCountingMode();
+                    }
+                    
+                    this.updateStatistics();
+                    this.updateCountingProgress();
+                }
             });
         }
 
@@ -3209,6 +3240,39 @@ class CountingSystem {
         });
     }
 
+    findNextUncountedProduct(currentProductId) {
+        // Get all product IDs from countingData (excluding non-product keys)
+        const productIds = Object.keys(this.countingData).filter(
+            key => key !== '_api_info' && key !== '_tables' && key !== '_currentTable'
+        );
+        
+        // Find current product index
+        const currentIndex = productIds.indexOf(currentProductId);
+        if (currentIndex === -1) return null;
+        
+        // Start searching from next product
+        for (let i = currentIndex + 1; i < productIds.length; i++) {
+            const productId = productIds[i];
+            const data = this.countingData[productId] || {};
+            // Check if product is not counted (warehouseStock is null/undefined)
+            if (data.warehouseStock === null || data.warehouseStock === undefined) {
+                return productId;
+            }
+        }
+        
+        // If not found after current, search from beginning
+        for (let i = 0; i < currentIndex; i++) {
+            const productId = productIds[i];
+            const data = this.countingData[productId] || {};
+            // Check if product is not counted (warehouseStock is null/undefined)
+            if (data.warehouseStock === null || data.warehouseStock === undefined) {
+                return productId;
+            }
+        }
+        
+        return null; // No uncounted product found
+    }
+
     openCountingBottomSheet(productId) {
         const product = this.allProducts.find(p => p.id === productId);
         if (!product) return;
@@ -3222,6 +3286,7 @@ class CountingSystem {
         const productBarcode = document.getElementById('countingProductBarcode');
         const depoInput = document.getElementById('countingDepoInput');
         const stockIndicator = document.getElementById('countingStockIndicator');
+        const systemStockElement = document.getElementById('countingSystemStock');
 
         if (productImage) {
             productImage.src = product.image || '../assets/logo.png';
@@ -3237,12 +3302,34 @@ class CountingSystem {
         if (depoInput) {
             depoInput.value = data.warehouseStock !== null && data.warehouseStock !== undefined ? data.warehouseStock : '';
         }
+        
+        // Update system stock display
+        if (systemStockElement) {
+            if (data.systemStock !== null && data.systemStock !== undefined) {
+                systemStockElement.textContent = `Sistem: ${data.systemStock}`;
+            } else {
+                systemStockElement.textContent = '';
+            }
+        }
 
         // Update stock indicator
         this.updateStockIndicator(productId, stockIndicator);
 
         // Update progress
         this.updateCountingProgress();
+
+        // Update next button state
+        const nextBtn = document.getElementById('countingNextBtn');
+        if (nextBtn) {
+            const nextProductId = this.findNextUncountedProduct(productId);
+            if (nextProductId) {
+                nextBtn.disabled = false;
+                nextBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                nextBtn.disabled = true;
+                nextBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
 
         // Show modal
         const bottomSheet = document.getElementById('countingBottomSheet');
@@ -3307,6 +3394,32 @@ class CountingSystem {
     }
 
     closeCountingBottomSheet() {
+        // Clear any pending auto-save
+        if (this.autoSaveTimeout) {
+            clearTimeout(this.autoSaveTimeout);
+            this.autoSaveTimeout = null;
+        }
+        
+        // Save final value before closing
+        if (this.currentCountingProduct) {
+            const depoInput = document.getElementById('countingDepoInput');
+            if (depoInput) {
+                const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
+                this.updateProductStock(this.currentCountingProduct, value, null);
+                
+                // Remove from skipped if was skipped
+                this.skippedProducts.delete(this.currentCountingProduct);
+                
+                // Update rapid mode if active
+                if (this.currentViewMode === 'rapid') {
+                    this.renderRapidCountingMode();
+                }
+                
+                this.updateStatistics();
+                this.updateCountingProgress();
+            }
+        }
+        
         const bottomSheet = document.getElementById('countingBottomSheet');
         if (bottomSheet) {
             bottomSheet.classList.remove('show');

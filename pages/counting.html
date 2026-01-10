@@ -1451,9 +1451,13 @@
                     <div class="flex-1 min-w-0">
                         <h4 id="countingProductName" class="text-sm font-semibold text-gray-900 truncate leading-tight"></h4>
                         <p id="countingProductBarcode" class="text-[10px] text-gray-500 font-mono mt-0.5"></p>
-                        <!-- Stock Difference Indicator -->
-                        <div id="countingStockIndicator" class="mt-1.5 flex items-center space-x-1.5">
-                            <!-- Will be populated by JavaScript -->
+                        <div class="mt-1.5 flex items-center space-x-2">
+                            <!-- System Stock -->
+                            <span id="countingSystemStock" class="text-[10px] text-gray-500 font-medium"></span>
+                            <!-- Stock Difference Indicator -->
+                            <div id="countingStockIndicator" class="flex items-center space-x-1.5">
+                                <!-- Will be populated by JavaScript -->
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1498,6 +1502,7 @@
                     <button class="keypad-btn h-10 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg text-base font-semibold text-gray-900 transition-all active:scale-95" data-key="7">7</button>
                     <button class="keypad-btn h-10 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg text-base font-semibold text-gray-900 transition-all active:scale-95" data-key="8">8</button>
                     <button class="keypad-btn h-10 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg text-base font-semibold text-gray-900 transition-all active:scale-95" data-key="9">9</button>
+                    <div></div>
                     <button class="keypad-btn h-10 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded-lg text-base font-semibold text-gray-900 transition-all active:scale-95" data-key="0">0</button>
                     <button id="keypadBackspace" class="h-10 bg-red-100 hover:bg-red-200 active:bg-red-300 rounded-lg text-base font-semibold text-red-700 transition-all active:scale-95 flex items-center justify-center">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1509,11 +1514,11 @@
             
             <!-- Action Buttons -->
             <div class="px-3 pb-4 pt-1.5 flex gap-2">
-                <button id="countingSaveBtn" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg active:scale-95">
-                    Kaydet
-                </button>
                 <button id="countingSkipBtn" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg active:scale-95">
                     Atla
+                </button>
+                <button id="countingNextBtn" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-indigo-600">
+                    Sıradaki
                 </button>
             </div>
         </div>
