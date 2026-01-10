@@ -4395,13 +4395,25 @@ class CountingSystem {
                     }
                     
                     // Eğer extension'daki token daha geçerliyse (daha uzun süre kaldıysa), güncelle
-                    if (supabaseExpiryTime && extensionExpiryTime && !isNaN(supabaseExpiryTime) && !isNaN(extensionExpiryTime)) {
+                    // Extension'dan gelen token'ı öncelikli olarak kabul et
+                    // Çünkü extension daha güncel token yakalıyor
+                    const supabaseToken = apiInfo?.token?.substring(7)?.trim() || '';
+                    const extensionToken = extensionApiInfo?.token?.substring(7)?.trim() || '';
+                    
+                    // Token değeri farklıysa veya extension'dan gelen token daha güncelse, güncelle
+                    if (extensionToken && extensionToken !== supabaseToken) {
+                        // Token değeri farklı, extension'dan gelen token'ı kullan
+                        console.log('🔄 Extension\'dan yeni token geldi, güncelleniyor');
+                        apiInfo = extensionApiInfo;
+                        await this.checkAndSaveAPIInfoFromExtension();
+                    } else if (supabaseExpiryTime && extensionExpiryTime && !isNaN(supabaseExpiryTime) && !isNaN(extensionExpiryTime)) {
                         const supabaseTimeRemaining = supabaseExpiryTime - Date.now();
                         const extensionTimeRemaining = extensionExpiryTime - Date.now();
                         
-                        if (extensionTimeRemaining > supabaseTimeRemaining) {
-                            // Extension'daki token daha geçerli, güncelle
-                            console.log('🔄 Extension\'dan gelen token daha geçerli, güncelleniyor:', {
+                        // Extension'daki token daha geçerliyse (daha uzun süre kaldıysa) veya her ikisi de süresi dolmuşsa extension'ı kullan
+                        if (extensionTimeRemaining > supabaseTimeRemaining || (extensionTimeRemaining < 0 && supabaseTimeRemaining < 0)) {
+                            // Extension'daki token daha geçerli veya her ikisi de süresi dolmuş, extension'ı kullan
+                            console.log('🔄 Extension\'dan gelen token kullanılıyor:', {
                                 supabaseTimeRemaining: Math.floor(supabaseTimeRemaining / (1000 * 60)) + ' dakika',
                                 extensionTimeRemaining: Math.floor(extensionTimeRemaining / (1000 * 60)) + ' dakika'
                             });
@@ -4414,6 +4426,11 @@ class CountingSystem {
                     } else if (extensionExpiryTime && !isNaN(extensionExpiryTime)) {
                         // Supabase'de expiry yok ama extension'da var, güncelle
                         console.log('🔄 Extension\'da expiry var, Supabase\'e güncelleniyor');
+                        apiInfo = extensionApiInfo;
+                        await this.checkAndSaveAPIInfoFromExtension();
+                    } else if (extensionToken && !supabaseToken) {
+                        // Extension'da token var ama Supabase'de yok, güncelle
+                        console.log('🔄 Extension\'da token var, Supabase\'e güncelleniyor');
                         apiInfo = extensionApiInfo;
                         await this.checkAndSaveAPIInfoFromExtension();
                     }
