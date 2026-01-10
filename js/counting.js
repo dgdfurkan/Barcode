@@ -10,6 +10,9 @@ class CountingSystem {
         this.lastTokenCheckTime = null; // Son token kontrol zamanı (gereksiz çağrıları önlemek için)
         this.lastTokenExpiry = null; // Son kontrol edilen token expiry (değişiklik tespiti için)
         this.isTokenUpdateInProgress = false; // Token güncelleme devam ediyor mu? (çoklu çağrıları önlemek için)
+        this.currentViewMode = localStorage.getItem('counting_view_mode') || 'table'; // 'table' | 'rapid'
+        this.currentCountingProduct = null; // Açık modal'daki ürün ID
+        this.skippedProducts = new Set(); // Atlanan ürün ID'leri
     }
 
     async init() {
@@ -1199,6 +1202,198 @@ class CountingSystem {
                 }
             });
         }
+
+        // Setup counting bottom sheet
+        this.setupCountingBottomSheet();
+        
+        // Setup view mode toggle
+        this.setupViewModeToggle();
+    }
+
+    setupCountingBottomSheet() {
+        const depoInput = document.getElementById('countingDepoInput');
+        const increaseBtn = document.getElementById('countingIncreaseBtn');
+        const decreaseBtn = document.getElementById('countingDecreaseBtn');
+        const saveBtn = document.getElementById('countingSaveBtn');
+        const skipBtn = document.getElementById('countingSkipBtn');
+        const backdrop = document.getElementById('countingBottomSheetBackdrop');
+        const keypadButtons = document.querySelectorAll('.keypad-btn');
+        const backspaceBtn = document.getElementById('keypadBackspace');
+
+        // +/- buttons
+        if (increaseBtn) {
+            increaseBtn.addEventListener('click', () => {
+                if (depoInput) {
+                    const currentValue = parseInt(depoInput.value) || 0;
+                    depoInput.value = currentValue + 1;
+                    depoInput.dispatchEvent(new Event('input'));
+                }
+            });
+        }
+
+        if (decreaseBtn) {
+            decreaseBtn.addEventListener('click', () => {
+                if (depoInput) {
+                    const currentValue = parseInt(depoInput.value) || 0;
+                    depoInput.value = Math.max(0, currentValue - 1);
+                    depoInput.dispatchEvent(new Event('input'));
+                }
+            });
+        }
+
+        // Numeric keypad
+        keypadButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.key;
+                if (key && depoInput) {
+                    const currentValue = depoInput.value || '0';
+                    if (currentValue === '0') {
+                        depoInput.value = key;
+                    } else {
+                        depoInput.value = currentValue + key;
+                    }
+                    depoInput.dispatchEvent(new Event('input'));
+                }
+            });
+        });
+
+        // Backspace button
+        if (backspaceBtn) {
+            backspaceBtn.addEventListener('click', () => {
+                if (depoInput) {
+                    const currentValue = depoInput.value.toString();
+                    if (currentValue.length > 1) {
+                        depoInput.value = currentValue.slice(0, -1);
+                    } else {
+                        depoInput.value = '0';
+                    }
+                    depoInput.dispatchEvent(new Event('input'));
+                }
+            });
+        }
+
+        // Save button
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                if (!this.currentCountingProduct) return;
+                
+                const value = depoInput ? (depoInput.value.trim() === '' ? null : parseInt(depoInput.value)) : null;
+                this.updateProductStock(this.currentCountingProduct, value, null);
+                
+                // Remove from skipped if was skipped
+                this.skippedProducts.delete(this.currentCountingProduct);
+                
+                this.closeCountingBottomSheet();
+                
+                // Update rapid mode if active
+                if (this.currentViewMode === 'rapid') {
+                    this.renderRapidCountingMode();
+                }
+                
+                this.updateStatistics();
+                this.updateCountingProgress();
+            });
+        }
+
+        // Skip button
+        if (skipBtn) {
+            skipBtn.addEventListener('click', () => {
+                if (!this.currentCountingProduct) return;
+                
+                this.skippedProducts.add(this.currentCountingProduct);
+                this.closeCountingBottomSheet();
+                
+                // Update rapid mode if active
+                if (this.currentViewMode === 'rapid') {
+                    this.renderRapidCountingMode();
+                }
+                
+                this.updateCountingProgress();
+            });
+        }
+
+        // Backdrop click to close
+        if (backdrop) {
+            backdrop.addEventListener('click', () => {
+                this.closeCountingBottomSheet();
+            });
+        }
+
+        // ESC key to close
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const bottomSheet = document.getElementById('countingBottomSheet');
+                if (bottomSheet && !bottomSheet.classList.contains('hidden')) {
+                    this.closeCountingBottomSheet();
+                }
+            }
+        });
+
+        // Input validation
+        if (depoInput) {
+            depoInput.addEventListener('input', (e) => {
+                let value = e.target.value.replace(/[^0-9]/g, '');
+                if (value === '') value = '0';
+                e.target.value = value;
+            });
+
+            depoInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (saveBtn) saveBtn.click();
+                }
+            });
+        }
+    }
+
+    setupViewModeToggle() {
+        const toggleBtn = document.getElementById('viewModeToggle');
+        const viewModeText = document.getElementById('viewModeText');
+        const viewModeIcon = document.getElementById('viewModeIcon');
+        const rapidGrid = document.getElementById('rapidCountingGrid');
+        const tableView = document.querySelector('.hidden.md\\:block');
+
+        if (!toggleBtn) return;
+
+        // Load saved view mode
+        this.currentViewMode = localStorage.getItem('counting_view_mode') || 'table';
+        this.updateViewMode();
+
+        toggleBtn.addEventListener('click', () => {
+            this.currentViewMode = this.currentViewMode === 'table' ? 'rapid' : 'table';
+            localStorage.setItem('counting_view_mode', this.currentViewMode);
+            this.updateViewMode();
+        });
+
+        // Initial view mode update
+        this.updateViewMode();
+    }
+
+    updateViewMode() {
+        const viewModeText = document.getElementById('viewModeText');
+        const viewModeIcon = document.getElementById('viewModeIcon');
+        const rapidGrid = document.getElementById('rapidCountingGrid');
+        const tableView = document.querySelector('.hidden.md\\:block');
+        const cardView = document.getElementById('countingCardView');
+
+        if (this.currentViewMode === 'rapid') {
+            if (viewModeText) viewModeText.textContent = 'Tablo Görünümü';
+            if (viewModeIcon) {
+                viewModeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>';
+            }
+            if (rapidGrid) rapidGrid.classList.remove('hidden');
+            if (tableView) tableView.classList.add('hidden');
+            if (cardView) cardView.classList.add('hidden');
+            this.renderRapidCountingMode();
+        } else {
+            if (viewModeText) viewModeText.textContent = 'Rapid Mode';
+            if (viewModeIcon) {
+                viewModeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>';
+            }
+            if (rapidGrid) rapidGrid.classList.add('hidden');
+            if (tableView) tableView.classList.remove('hidden');
+            if (cardView) cardView.classList.remove('hidden');
+        }
     }
 
     handleManualAdd() {
@@ -1283,7 +1478,14 @@ class CountingSystem {
         // Save and render
         this.saveCountingData();
         this.renderTable();
+        
+        // Update rapid mode if active
+        if (this.currentViewMode === 'rapid') {
+            this.renderRapidCountingMode();
+        }
+        
         this.updateStatistics();
+        this.updateCountingProgress();
     }
 
     updateProductStock(productId, warehouseStock, systemStock = null) {
@@ -1319,7 +1521,14 @@ class CountingSystem {
         // Save and render
         this.saveCountingData();
         this.renderTable();
+        
+        // Update rapid mode if active
+        if (this.currentViewMode === 'rapid') {
+            this.renderRapidCountingMode();
+        }
+        
         this.updateStatistics();
+        this.updateCountingProgress();
     }
 
     deleteProduct(productId) {
@@ -1388,9 +1597,17 @@ class CountingSystem {
         deleteBtn.addEventListener('click', () => {
             // Ürünü sil
             delete this.countingData[productId];
+            this.skippedProducts.delete(productId);
             this.saveCountingData();
             this.renderTable();
+            
+            // Update rapid mode if active
+            if (this.currentViewMode === 'rapid') {
+                this.renderRapidCountingMode();
+            }
+            
             this.updateStatistics();
+            this.updateCountingProgress();
             
             // Başarı bildirimi göster (küçük toast)
             this.showSuccessToast('Ürün silindi');
@@ -2804,6 +3021,152 @@ class CountingSystem {
 
         // Setup event listeners for inputs and delete buttons
         this.setupTableEventListeners();
+        
+        // Render rapid counting mode if active
+        if (this.currentViewMode === 'rapid') {
+            this.renderRapidCountingMode();
+        }
+    }
+
+    renderRapidCountingMode() {
+        const gridContainer = document.getElementById('rapidCountingGridContainer');
+        if (!gridContainer) return;
+
+        // _api_info, _tables, _currentTable'u filtrele (sistem bilgisi, ürün değil)
+        const productIds = Object.keys(this.countingData).filter(key => 
+            key !== '_api_info' && key !== '_tables' && key !== '_currentTable'
+        );
+        
+        if (productIds.length === 0) {
+            gridContainer.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">Henüz ürün eklenmedi</div>';
+            return;
+        }
+
+        // Apply sorting
+        const sortedProductIds = this.applySorting(productIds);
+
+        gridContainer.innerHTML = sortedProductIds.map(productId => {
+            const data = this.countingData[productId];
+            const product = this.allProducts.find(p => p.id === productId);
+            if (!product) return '';
+
+            const isCounted = data.warehouseStock !== null && data.warehouseStock !== undefined;
+            const isSkipped = this.skippedProducts.has(productId);
+            const cardClass = isCounted ? 'counted' : 'not-counted';
+            const statusIcon = isCounted 
+                ? '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>'
+                : '<div class="w-3 h-3 border-2 border-blue-500 rounded-full"></div>';
+            
+            const quantityText = isCounted ? `Qty: ${data.warehouseStock}` : (product.name || 'Ürün');
+            const productImage = product.image || '../assets/logo.png';
+            const barcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : '';
+
+            return `
+                <div class="rapid-product-card ${cardClass}" data-product-id="${productId}">
+                    <div class="product-status-icon">
+                        ${statusIcon}
+                    </div>
+                    <div class="p-3">
+                        <img src="${productImage}" alt="${product.name || ''}" class="w-full h-24 sm:h-32 object-cover rounded-lg mb-2" onerror="this.src='../assets/logo.png'">
+                        <div class="text-center">
+                            <p class="text-xs sm:text-sm font-semibold text-gray-900 line-clamp-2 mb-1">${quantityText}</p>
+                            ${barcode ? `<p class="text-xs text-gray-500 font-mono"># ${barcode}</p>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // Setup click event listeners for cards
+        gridContainer.querySelectorAll('.rapid-product-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const productId = card.dataset.productId;
+                if (productId) {
+                    this.openCountingBottomSheet(productId);
+                }
+            });
+        });
+    }
+
+    openCountingBottomSheet(productId) {
+        const product = this.allProducts.find(p => p.id === productId);
+        if (!product) return;
+
+        const data = this.countingData[productId] || {};
+        this.currentCountingProduct = productId;
+
+        // Update product info in modal
+        const productImage = document.getElementById('countingProductImage');
+        const productName = document.getElementById('countingProductName');
+        const productBarcode = document.getElementById('countingProductBarcode');
+        const depoInput = document.getElementById('countingDepoInput');
+
+        if (productImage) {
+            productImage.src = product.image || '../assets/logo.png';
+            productImage.alt = product.name || '';
+        }
+        if (productName) {
+            productName.textContent = product.name || 'Bilinmeyen Ürün';
+        }
+        if (productBarcode) {
+            const barcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : 'Barkod yok';
+            productBarcode.textContent = `# ${barcode}`;
+        }
+        if (depoInput) {
+            depoInput.value = data.warehouseStock !== null && data.warehouseStock !== undefined ? data.warehouseStock : '';
+        }
+
+        // Update progress
+        this.updateCountingProgress();
+
+        // Show modal
+        const bottomSheet = document.getElementById('countingBottomSheet');
+        if (bottomSheet) {
+            bottomSheet.classList.remove('hidden');
+            bottomSheet.classList.add('show');
+            document.body.classList.add('bottom-sheet-open');
+            
+            // Focus on input
+            setTimeout(() => {
+                if (depoInput) {
+                    depoInput.focus();
+                }
+            }, 300);
+        }
+    }
+
+    closeCountingBottomSheet() {
+        const bottomSheet = document.getElementById('countingBottomSheet');
+        if (bottomSheet) {
+            bottomSheet.classList.remove('show');
+            document.body.classList.remove('bottom-sheet-open');
+            
+            setTimeout(() => {
+                bottomSheet.classList.add('hidden');
+            }, 300);
+        }
+        
+        this.currentCountingProduct = null;
+    }
+
+    updateCountingProgress() {
+        const totalProducts = Object.keys(this.countingData).length;
+        const countedProducts = Object.values(this.countingData).filter(
+            data => data.warehouseStock !== null && data.warehouseStock !== undefined
+        ).length;
+        const skippedCount = this.skippedProducts.size;
+
+        const progressText = document.getElementById('countingProgressText');
+        const progressBar = document.getElementById('countingProgressBar');
+
+        if (progressText) {
+            progressText.textContent = `İlerleme: ${countedProducts}/${totalProducts} Ürün Sayıldı${skippedCount > 0 ? ` (${skippedCount} Atlandı)` : ''}`;
+        }
+
+        if (progressBar && totalProducts > 0) {
+            const percentage = (countedProducts / totalProducts) * 100;
+            progressBar.style.width = `${percentage}%`;
+        }
     }
 
     setupTableEventListeners() {
