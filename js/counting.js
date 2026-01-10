@@ -1449,9 +1449,13 @@ class CountingSystem {
                 refreshSystemStockBtn.innerHTML = '<div class="spinner" style="width: 8px; height: 8px; border: 1.5px solid #e5e7eb; border-top: 1.5px solid #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>';
 
                 try {
-                    const stock = await this.requestStockFromExtension(null, barcode, this.currentCountingProduct);
+                    const result = await this.requestStockFromExtension(null, barcode, this.currentCountingProduct);
+                    const stock = typeof result === 'number' ? result : (result?.stock ?? null);
+                    const price = typeof result === 'object' ? result?.price : null;
+                    const priceText = typeof result === 'object' ? result?.priceText : null;
+                    
                     if (stock !== null && stock !== undefined) {
-                        this.updateProductStock(this.currentCountingProduct, null, stock);
+                        this.updateProductStock(this.currentCountingProduct, null, stock, price, priceText);
                         this.showToast('Sistem stoku yenilendi', 'success', 2000);
                         
                         // Update system stock display
@@ -1667,7 +1671,7 @@ class CountingSystem {
         this.updateCountingProgress();
     }
 
-    updateProductStock(productId, warehouseStock, systemStock = null) {
+    updateProductStock(productId, warehouseStock, systemStock = null, price = null, priceText = null) {
         if (!this.countingData[productId]) {
             console.error('Product not found in counting data:', productId);
             return;
@@ -1694,6 +1698,13 @@ class CountingSystem {
         // systemStock = 0 durumu da kabul edilmeli
         if (systemStock !== null && systemStock !== undefined) {
             this.countingData[productId].systemStock = Number(systemStock);
+        }
+        // Price bilgisini kaydet
+        if (price !== null && price !== undefined) {
+            this.countingData[productId].price = Number(price);
+        }
+        if (priceText !== null && priceText !== undefined) {
+            this.countingData[productId].priceText = priceText;
         }
         this.countingData[productId].lastUpdated = now.toISOString();
 
@@ -2022,16 +2033,19 @@ class CountingSystem {
 
                 // Try to fetch stock
                 try {
-                    const stock = await this.requestStockFromExtension(product.name, barcode, productId);
+                    const result = await this.requestStockFromExtension(product.name, barcode, productId);
+                    const stock = typeof result === 'number' ? result : (result?.stock ?? null);
+                    const price = typeof result === 'object' ? result?.price : null;
+                    const priceText = typeof result === 'object' ? result?.priceText : null;
                     
                     if (stock !== null && stock !== undefined) {
                         // Success - update stock and clear failed flag
                         if (this.countingData[productId]) {
                             this.countingData[productId].apiFetchFailed = false;
                         }
-                        this.updateProductStock(productId, null, stock);
+                        this.updateProductStock(productId, null, stock, price, priceText);
                     updatedCount++;
-                        console.log(`✅ ${product.name || productId}: ${stock}`);
+                        console.log(`✅ ${product.name || productId}: ${stock}${price ? ` (Fiyat: ${priceText || price})` : ''}`);
                     } else {
                         // Not found - mark as failed
                         if (this.countingData[productId]) {
@@ -2117,7 +2131,8 @@ class CountingSystem {
             for (const product of productsToSync) {
                 try {
                     // Product ID öncelikli - direkt product ID ile arama yap (en hızlı ve güvenilir)
-                    const stock = await this.requestStockFromExtension(product.name, product.barcode, product.productId);
+                    const result = await this.requestStockFromExtension(product.name, product.barcode, product.productId);
+                    const stock = typeof result === 'number' ? result : (result?.stock ?? null);
                     if (stock !== null && stock !== undefined) {
                         systemStocks[product.id] = stock;
                     }
@@ -2347,8 +2362,16 @@ class CountingSystem {
                 await this.saveAPIInfoToSupabase(apiInfo);
                 
                 try {
-                    const stock = await this.fetchStockFromAPI(apiInfo, barcode, productName, productId);
-                    resolve(stock);
+                    const result = await this.fetchStockFromAPI(apiInfo, barcode, productName, productId);
+                    // Backward compatibility: if result is a number, return it as stock
+                    // Otherwise return the full object
+                    if (typeof result === 'number') {
+                        resolve(result);
+                    } else if (result && typeof result === 'object' && result.stock !== undefined) {
+                        resolve(result);
+                    } else {
+                        resolve(result);
+                    }
                 } catch (apiError) {
                     console.error('❌ API çağrısı başarısız:', apiError);
                     reject(apiError);
@@ -2361,6 +2384,121 @@ class CountingSystem {
     }
 
     // API'den direkt stok getir (Direkt fetch ile - Extension'a gerek yok)
+    // Test function to see full API response
+    async testAPIRequest(barcode) {
+        try {
+            // Get API info
+            let apiInfo = null;
+            if (this.countingData._api_info) {
+                apiInfo = this.countingData._api_info;
+            } else if (window.supabase) {
+                const session = window.authUtils?.checkAuth();
+                if (session && session.username) {
+                    const { data: userData } = await window.supabase
+                        .from('users')
+                        .select('counting_data')
+                        .eq('username', session.username)
+                        .maybeSingle();
+                    if (userData?.counting_data) {
+                        const cd = typeof userData.counting_data === 'string' 
+                            ? JSON.parse(userData.counting_data) 
+                            : userData.counting_data;
+                        apiInfo = cd._api_info;
+                    }
+                }
+            }
+            
+            if (!apiInfo || !apiInfo.token) {
+                console.error('❌ API bilgisi bulunamadı');
+                return null;
+            }
+            
+            // Find product by barcode
+            const product = this.findProductByBarcode(barcode);
+            const productId = product?.id || product?.productId;
+            
+            console.log('🧪 Test API Request:', { barcode, productId, productName: product?.name });
+            
+            // Make API request
+            const endpoint = apiInfo.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks';
+            const warehouseId = apiInfo.warehouseId || '5dcafe6ae2c61b1e52cf1704';
+            
+            let authToken = apiInfo.token;
+            if (!authToken.startsWith('Bearer ')) {
+                authToken = 'Bearer ' + authToken.trim();
+            }
+            
+            const requestBody = {
+                warehouseIds: [warehouseId],
+                productIds: productId ? [productId] : [],
+                sort: { available: 1 }
+            };
+            
+            // If no productId, search by barcode in response
+            if (!productId && barcode) {
+                requestBody.productIds = [];
+            }
+            
+            console.log('📤 Request:', {
+                url: `${endpoint}?limit=100&offset=0`,
+                method: 'POST',
+                body: requestBody
+            });
+            
+            const response = await fetch(`${endpoint}?limit=100&offset=0`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': authToken,
+                    'Origin': 'https://franchise.getir.com',
+                    'Referer': 'https://franchise.getir.com/',
+                    'Accept': '*/*'
+                },
+                body: JSON.stringify(requestBody)
+            });
+            
+            const responseText = await response.text();
+            const data = JSON.parse(responseText);
+            
+            console.log('📥 FULL API RESPONSE:', JSON.stringify(data, null, 2));
+            
+            // If productId, find the specific product
+            if (productId && data.data && Array.isArray(data.data)) {
+                const foundProduct = data.data.find(item => {
+                    const itemProductId = item._id || item.id || item.product?._id || item.product?.id;
+                    return itemProductId === productId || String(itemProductId) === String(productId);
+                });
+                if (foundProduct) {
+                    console.log('📦 FOUND PRODUCT:', JSON.stringify(foundProduct, null, 2));
+                    return foundProduct;
+                }
+            }
+            
+            // If barcode, search in response
+            if (barcode && data.data && Array.isArray(data.data)) {
+                const foundProduct = data.data.find(item => {
+                    if (item.packagingInfo) {
+                        for (const key in item.packagingInfo) {
+                            if (item.packagingInfo[key]?.barcodes?.includes(String(barcode))) {
+                                return true;
+                            }
+                        }
+                    }
+                    return item.barcode === String(barcode);
+                });
+                if (foundProduct) {
+                    console.log('📦 FOUND PRODUCT BY BARCODE:', JSON.stringify(foundProduct, null, 2));
+                    return foundProduct;
+                }
+            }
+            
+            return data;
+        } catch (error) {
+            console.error('❌ Test API Error:', error);
+            return null;
+        }
+    }
+
     async fetchStockFromAPI(apiInfo, barcode, productName, productId = null) {
         try {
             console.log('🌐 Direkt API çağrısı yapılıyor:', { 
@@ -2669,8 +2807,25 @@ class CountingSystem {
             
             // 0 değeri de geçerli bir stok değeridir
             if (stock !== null && stock !== undefined) {
+                // Price bilgisini de al
+                let price = null;
+                let priceText = null;
+                if (foundProduct) {
+                    price = foundProduct.price !== null && foundProduct.price !== undefined ? foundProduct.price : null;
+                    priceText = foundProduct.priceText || null;
+                }
+                
                 console.log('✅ Stok değeri bulundu:', stock, foundProduct ? `(Ürün: ${foundProduct.name?.tr || foundProduct.fullName?.tr || 'N/A'})` : '');
-                return stock; // 0 dahil tüm sayısal değerler geçerli
+                if (price !== null) {
+                    console.log('💰 Fiyat bilgisi bulundu:', price, priceText ? `(${priceText})` : '');
+                }
+                
+                // Return object with stock and price
+                return {
+                    stock: stock,
+                    price: price,
+                    priceText: priceText
+                };
             }
             
             console.warn('⚠️ API yanıtında stok değeri bulunamadı. Response:', data);
@@ -3266,9 +3421,10 @@ class CountingSystem {
                     borderClass = 'border-2 border-red-500';
                     statusIcon = '<div class="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg></div>';
                 } else {
-                    // Eşit - normal çerçeve ve yeşil tik
-                    borderClass = '';
-                    statusIcon = '<svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                    // Eşit - gri çerçeve ve gri yuvarlak + eşittir işareti
+                    stockIndicator = '<div class="stock-indicator bg-gray-300"></div>';
+                    borderClass = 'border-2 border-gray-400';
+                    statusIcon = '<div class="w-4 h-4 bg-gray-400 rounded-full flex items-center justify-center"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 9h14M5 15h14"/></svg></div>';
                 }
             } else {
                 // Sayılmamış - mavi yuvarlak
@@ -3713,13 +3869,17 @@ class CountingSystem {
                 btn.innerHTML = '<div class="spinner" style="width: 10px; height: 10px; border: 2px solid #f3f4f4; border-top: 2px solid #6b7280; border-radius: 50%; animation: spin 1s linear infinite;"></div>';
 
                 try {
-                    const stock = await this.requestStockFromExtension(null, barcode, productId);
+                    const result = await this.requestStockFromExtension(null, barcode, productId);
+                    const stock = typeof result === 'number' ? result : (result?.stock ?? null);
+                    const price = typeof result === 'object' ? result?.price : null;
+                    const priceText = typeof result === 'object' ? result?.priceText : null;
+                    
                     if (stock !== null && stock !== undefined) {
                         // Başarılı - apiFetchFailed flag'ini temizle
                         if (this.countingData[productId]) {
                             this.countingData[productId].apiFetchFailed = false;
                         }
-                        this.updateProductStock(productId, null, stock);
+                        this.updateProductStock(productId, null, stock, price, priceText);
                         // Toast bildirimi göster
                         this.showToast('Stok güncellendi', 'success', 3000);
                     } else {
@@ -3765,13 +3925,17 @@ class CountingSystem {
                 btn.innerHTML = '<div class="spinner" style="width: 12px; height: 12px; border: 2px solid #f3f4f6; border-top: 2px solid white; border-radius: 50%; animation: spin 1s linear infinite;"></div>';
 
                 try {
-                    const stock = await this.requestStockFromExtension(null, barcode, productId);
+                    const result = await this.requestStockFromExtension(null, barcode, productId);
+                    const stock = typeof result === 'number' ? result : (result?.stock ?? null);
+                    const price = typeof result === 'object' ? result?.price : null;
+                    const priceText = typeof result === 'object' ? result?.priceText : null;
+                    
                     if (stock !== null && stock !== undefined) {
                         // Başarılı - apiFetchFailed flag'ini temizle
                         if (this.countingData[productId]) {
                             this.countingData[productId].apiFetchFailed = false;
                         }
-                        this.updateProductStock(productId, null, stock);
+                        this.updateProductStock(productId, null, stock, price, priceText);
                         // Bildirim kaldırıldı - stok sessizce güncelleniyor
                     } else {
                         // Bulunamadı - apiFetchFailed flag'ini set et
