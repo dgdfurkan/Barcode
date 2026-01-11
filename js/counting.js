@@ -14,6 +14,19 @@ class CountingSystem {
         this.currentCountingProduct = null; // Açık modal'daki ürün ID
         this.skippedProducts = new Set(); // Atlanan ürün ID'leri
         this.autoSaveTimeout = null; // Otomatik kaydetme için timeout
+        this.currentTab = localStorage.getItem('counting_active_tab') || 'sayim'; // 'sayim' | 'finans'
+        this.selectedFinancialTable = 'all'; // Seçili finans tablosu ('all' veya table name)
+        this.productSortOrder = 'desc'; // 'asc' | 'desc' - Finans tabındaki ürün sıralaması
+        this.financialProducts = []; // Finans tabındaki ürünler (sıralama için)
+        this.categoryPieChart = null; // Chart.js pie chart instance
+        this.categoryBarChart = null; // Chart.js bar chart instance
+        this.topProfitProductsChart = null; // Top profit products chart
+        this.topLossProductsChart = null; // Top loss products chart
+        this.topValueProductsChart = null; // Top value products chart
+        this.topStockDiffChart = null; // Top stock difference chart
+        this.currentChartIndex = 0; // Current chart index in carousel
+        this.totalCharts = 6; // Total number of charts
+        this.chartCarouselSetup = false; // Chart carousel setup flag
     }
 
     async init() {
@@ -37,11 +50,18 @@ class CountingSystem {
             // Setup event listeners
             this.setupEventListeners();
             
-            // Render table (will render grid if mode is rapid)
-            this.renderTable();
+            // Setup tab system
+            this.setupTabSystem();
             
-            // Update view mode display after render
-            this.updateViewMode();
+            // Render based on current tab
+            if (this.currentTab === 'finans') {
+                this.renderFinancialTab();
+            } else {
+                // Render table (will render grid if mode is rapid)
+                this.renderTable();
+                // Update view mode display after render
+                this.updateViewMode();
+            }
             
             // Update statistics
             this.updateStatistics();
@@ -280,6 +300,59 @@ class CountingSystem {
         } catch (error) {
             console.error('Error loading products:', error);
             this.allProducts = [];
+        }
+    }
+
+    async loadFullCountingData() {
+        try {
+            let fullData = null;
+            
+            // Try to load from Supabase first (users.counting_data column)
+            if (window.supabase && this.currentUser) {
+                const { data, error } = await window.supabase
+                    .from('users')
+                    .select('counting_data')
+                    .eq('username', this.currentUser.username)
+                    .maybeSingle();
+
+                if (!error && data && data.counting_data) {
+                    fullData = data.counting_data;
+                }
+            }
+
+            // Fallback to localStorage
+            if (!fullData) {
+                const storageKey = `${this.STORAGE_KEY}_${this.currentUser?.username || 'default'}`;
+                const stored = localStorage.getItem(storageKey);
+                if (stored) {
+                    fullData = JSON.parse(stored);
+                }
+            }
+
+            // Migrate old structure if needed
+            if (fullData) {
+                fullData = this.migrateToNestedStructure(fullData);
+            } else {
+                // Initialize new structure
+                fullData = {
+                    _api_info: {},
+                    _tables: {
+                        'Ana Sayım': {}
+                    },
+                    _currentTable: 'Ana Sayım'
+                };
+            }
+
+            return fullData;
+        } catch (error) {
+            console.error('Error loading full counting data:', error);
+            return {
+                _api_info: {},
+                _tables: {
+                    'Ana Sayım': {}
+                },
+                _currentTable: 'Ana Sayım'
+            };
         }
     }
 
@@ -703,7 +776,8 @@ class CountingSystem {
         
         // Update button text
         const currentTable = tables.find(t => t.isCurrent);
-        tableSelectorText.textContent = currentTable ? currentTable.name : (this.currentTableName || 'Tablo Seçin');
+        const tableName = currentTable ? currentTable.name : (this.currentTableName || 'Tablo Seçin');
+        tableSelectorText.textContent = tableName;
         
         // Clear and populate dropdown
         tableSelectorDropdown.innerHTML = '';
@@ -1241,6 +1315,20 @@ class CountingSystem {
         const backdrop = document.getElementById('countingBottomSheetBackdrop');
         const keypadButtons = document.querySelectorAll('.keypad-btn');
         const backspaceBtn = document.getElementById('keypadBackspace');
+        const deleteProductBtn = document.getElementById('countingDeleteProductBtn');
+
+        // Prevent keyboard from opening when clicking on input
+        if (depoInput) {
+            depoInput.addEventListener('focus', (e) => {
+                e.preventDefault();
+                e.target.blur();
+            });
+            
+            depoInput.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.target.blur();
+            });
+        }
 
         // +/- buttons
         if (increaseBtn) {
@@ -1290,6 +1378,16 @@ class CountingSystem {
                         depoInput.value = '0';
                     }
                     depoInput.dispatchEvent(new Event('input'));
+                }
+            });
+        }
+
+        // Delete product button
+        if (deleteProductBtn) {
+            deleteProductBtn.addEventListener('click', () => {
+                if (this.currentCountingProduct) {
+                    // Show delete confirmation modal
+                    this.showDeleteConfirmModal(this.currentCountingProduct);
                 }
             });
         }
@@ -1482,6 +1580,73 @@ class CountingSystem {
 
         // Setup product image lightbox
         this.setupProductImageLightbox();
+    }
+
+    setupTabSystem() {
+        const tabFinans = document.getElementById('tabFinans');
+        const tabSayim = document.getElementById('tabSayim');
+        const finansTabContent = document.getElementById('finansTabContent');
+        const sayimTabContent = document.getElementById('sayimTabContent');
+
+        // Tab button clicks
+        if (tabFinans) {
+            tabFinans.addEventListener('click', () => {
+                this.switchTab('finans');
+            });
+        }
+
+        if (tabSayim) {
+            tabSayim.addEventListener('click', () => {
+                this.switchTab('sayim');
+            });
+        }
+
+        // Initialize tab display
+        this.updateTabDisplay();
+    }
+
+    switchTab(tab) {
+        if (this.currentTab === tab) return;
+
+        this.currentTab = tab;
+        localStorage.setItem('counting_active_tab', tab);
+        this.updateTabDisplay();
+
+        if (tab === 'finans') {
+            this.renderFinancialTab();
+        } else {
+            this.renderTable();
+            this.updateViewMode();
+        }
+    }
+
+    updateTabDisplay() {
+        const tabFinans = document.getElementById('tabFinans');
+        const tabSayim = document.getElementById('tabSayim');
+        const finansTabContent = document.getElementById('finansTabContent');
+        const sayimTabContent = document.getElementById('sayimTabContent');
+
+        // Update tab buttons
+        if (tabFinans && tabSayim) {
+            if (this.currentTab === 'finans') {
+                tabFinans.classList.add('active');
+                tabSayim.classList.remove('active');
+            } else {
+                tabFinans.classList.remove('active');
+                tabSayim.classList.add('active');
+            }
+        }
+
+        // Update content visibility
+        if (finansTabContent && sayimTabContent) {
+            if (this.currentTab === 'finans') {
+                finansTabContent.classList.remove('hidden');
+                sayimTabContent.classList.add('hidden');
+            } else {
+                finansTabContent.classList.add('hidden');
+                sayimTabContent.classList.remove('hidden');
+            }
+        }
     }
 
     setupProductImageLightbox() {
@@ -1805,7 +1970,7 @@ class CountingSystem {
         // Modal overlay oluştur
         const overlay = document.createElement('div');
         overlay.id = 'deleteConfirmModal';
-        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50';
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]';
         overlay.style.backdropFilter = 'blur(4px)';
         
         overlay.innerHTML = `
@@ -1854,6 +2019,13 @@ class CountingSystem {
             delete this.countingData[productId];
             this.skippedProducts.delete(productId);
             this.saveCountingData();
+            
+            // Close bottom sheet if it's open
+            const bottomSheet = document.getElementById('countingBottomSheet');
+            if (bottomSheet && !bottomSheet.classList.contains('hidden')) {
+                this.closeCountingBottomSheet();
+            }
+            
             this.renderTable();
             
             // Update rapid mode if active
@@ -2867,6 +3039,96 @@ class CountingSystem {
                     } else {
                         stock = null;
                     }
+                    
+                    // Kategori bilgisini API'den al ve allProducts array'ini güncelle (eski format için de)
+                    if (productId && foundProduct) {
+                        let category = null;
+                        let subCategory = null;
+                        
+                        // 1. Öncelik: category.name.tr veya category.name.en (object formatı)
+                        if (foundProduct.category) {
+                            if (typeof foundProduct.category === 'string') {
+                                category = foundProduct.category;
+                            } else if (foundProduct.category.name) {
+                                // name object ise tr veya en al
+                                category = foundProduct.category.name.tr || 
+                                          foundProduct.category.name.en || 
+                                          foundProduct.category.name;
+                            } else if (foundProduct.category.tr) {
+                                category = foundProduct.category.tr;
+                            } else if (foundProduct.category.en) {
+                                category = foundProduct.category.en;
+                            }
+                        }
+                        // 2. categoryName field'ı (string)
+                        else if (foundProduct.categoryName) {
+                            category = foundProduct.categoryName;
+                        }
+                        // 3. product.category (nested)
+                        else if (foundProduct.product?.category) {
+                            if (typeof foundProduct.product.category === 'string') {
+                                category = foundProduct.product.category;
+                            } else if (foundProduct.product.category.name) {
+                                category = foundProduct.product.category.name.tr || 
+                                          foundProduct.product.category.name.en;
+                            }
+                        }
+                        // 4. masterCategoryV2.name.tr (yeni format)
+                        else if (foundProduct.masterCategoryV2?.name) {
+                            category = foundProduct.masterCategoryV2.name.tr || 
+                                      foundProduct.masterCategoryV2.name.en;
+                        }
+                        
+                        // Alt kategori bilgisini al
+                        if (foundProduct.subCategory) {
+                            if (typeof foundProduct.subCategory === 'string') {
+                                subCategory = foundProduct.subCategory;
+                            } else if (foundProduct.subCategory.name) {
+                                subCategory = foundProduct.subCategory.name.tr || 
+                                            foundProduct.subCategory.name.en;
+                            }
+                        } else if (foundProduct.subCategoryName) {
+                            subCategory = foundProduct.subCategoryName;
+                        } else if (foundProduct.product?.subCategory) {
+                            if (typeof foundProduct.product.subCategory === 'string') {
+                                subCategory = foundProduct.product.subCategory;
+                            } else if (foundProduct.product.subCategory.name) {
+                                subCategory = foundProduct.product.subCategory.name.tr || 
+                                            foundProduct.product.subCategory.name.en;
+                            }
+                        }
+                        
+                        // allProducts array'indeki ürünü güncelle
+                        if (category) {
+                            const productIndex = this.allProducts.findIndex(p => p.id === productId);
+                            if (productIndex !== -1) {
+                                // Kategori bilgisini güncelle (sadece yoksa veya "Genel" ise)
+                                if (!this.allProducts[productIndex].category || 
+                                    this.allProducts[productIndex].category === 'Genel') {
+                                    this.allProducts[productIndex].category = category;
+                                    console.log(`✅ Kategori güncellendi (eski format): ${productId} -> ${category}${subCategory ? ` (Alt: ${subCategory})` : ''}`);
+                                }
+                                
+                                // Alt kategori bilgisini de ekle (varsa)
+                                if (subCategory && !this.allProducts[productIndex].subCategory) {
+                                    this.allProducts[productIndex].subCategory = subCategory;
+                                }
+                            }
+                        } else {
+                            // Debug: Kategori bulunamadıysa logla
+                            const currentProduct = this.allProducts.find(p => p.id === productId);
+                            if (currentProduct && (!currentProduct.category || currentProduct.category === 'Genel')) {
+                                console.log('⚠️ Kategori bulunamadı (eski format):', {
+                                    productId,
+                                    hasCategory: !!foundProduct.category,
+                                    hasCategoryName: !!foundProduct.categoryName,
+                                    hasMasterCategoryV2: !!foundProduct.masterCategoryV2,
+                                    categoryType: foundProduct.category ? typeof foundProduct.category : 'none',
+                                    categoryKeys: foundProduct.category ? Object.keys(foundProduct.category) : []
+                                });
+                            }
+                        }
+                    }
                 }
             }
             
@@ -2875,9 +3137,101 @@ class CountingSystem {
                 // Price bilgisini de al
                 let price = null;
                 let priceText = null;
+                
                 if (foundProduct) {
                     price = foundProduct.price !== null && foundProduct.price !== undefined ? foundProduct.price : null;
                     priceText = foundProduct.priceText || null;
+                    
+                    // Kategori bilgisini API'den al ve allProducts array'ini güncelle
+                    if (productId && foundProduct) {
+                        // Kategori bilgisini farklı formatlardan al
+                        let category = null;
+                        let subCategory = null;
+                        
+                        // 1. Öncelik: category.name.tr veya category.name.en (object formatı)
+                        if (foundProduct.category) {
+                            if (typeof foundProduct.category === 'string') {
+                                category = foundProduct.category;
+                            } else if (foundProduct.category.name) {
+                                // name object ise tr veya en al
+                                category = foundProduct.category.name.tr || 
+                                          foundProduct.category.name.en || 
+                                          foundProduct.category.name;
+                            } else if (foundProduct.category.tr) {
+                                category = foundProduct.category.tr;
+                            } else if (foundProduct.category.en) {
+                                category = foundProduct.category.en;
+                            }
+                        }
+                        // 2. categoryName field'ı (string)
+                        else if (foundProduct.categoryName) {
+                            category = foundProduct.categoryName;
+                        }
+                        // 3. product.category (nested)
+                        else if (foundProduct.product?.category) {
+                            if (typeof foundProduct.product.category === 'string') {
+                                category = foundProduct.product.category;
+                            } else if (foundProduct.product.category.name) {
+                                category = foundProduct.product.category.name.tr || 
+                                          foundProduct.product.category.name.en;
+                            }
+                        }
+                        // 4. masterCategoryV2.name.tr (yeni format)
+                        else if (foundProduct.masterCategoryV2?.name) {
+                            category = foundProduct.masterCategoryV2.name.tr || 
+                                      foundProduct.masterCategoryV2.name.en;
+                        }
+                        
+                        // Alt kategori bilgisini al
+                        if (foundProduct.subCategory) {
+                            if (typeof foundProduct.subCategory === 'string') {
+                                subCategory = foundProduct.subCategory;
+                            } else if (foundProduct.subCategory.name) {
+                                subCategory = foundProduct.subCategory.name.tr || 
+                                            foundProduct.subCategory.name.en;
+                            }
+                        } else if (foundProduct.subCategoryName) {
+                            subCategory = foundProduct.subCategoryName;
+                        } else if (foundProduct.product?.subCategory) {
+                            if (typeof foundProduct.product.subCategory === 'string') {
+                                subCategory = foundProduct.product.subCategory;
+                            } else if (foundProduct.product.subCategory.name) {
+                                subCategory = foundProduct.product.subCategory.name.tr || 
+                                            foundProduct.product.subCategory.name.en;
+                            }
+                        }
+                        
+                        // allProducts array'indeki ürünü güncelle
+                        if (category) {
+                            const productIndex = this.allProducts.findIndex(p => p.id === productId);
+                            if (productIndex !== -1) {
+                                // Kategori bilgisini güncelle (sadece yoksa veya "Genel" ise)
+                                if (!this.allProducts[productIndex].category || 
+                                    this.allProducts[productIndex].category === 'Genel') {
+                                    this.allProducts[productIndex].category = category;
+                                    console.log(`✅ Kategori güncellendi: ${productId} -> ${category}${subCategory ? ` (Alt: ${subCategory})` : ''}`);
+                                }
+                                
+                                // Alt kategori bilgisini de ekle (varsa)
+                                if (subCategory && !this.allProducts[productIndex].subCategory) {
+                                    this.allProducts[productIndex].subCategory = subCategory;
+                                }
+                            }
+                        } else {
+                            // Debug: Kategori bulunamadıysa logla
+                            const currentProduct = this.allProducts.find(p => p.id === productId);
+                            if (currentProduct && (!currentProduct.category || currentProduct.category === 'Genel')) {
+                                console.log('⚠️ Kategori bulunamadı:', {
+                                    productId,
+                                    hasCategory: !!foundProduct.category,
+                                    hasCategoryName: !!foundProduct.categoryName,
+                                    hasMasterCategoryV2: !!foundProduct.masterCategoryV2,
+                                    categoryType: foundProduct.category ? typeof foundProduct.category : 'none',
+                                    categoryKeys: foundProduct.category ? Object.keys(foundProduct.category) : []
+                                });
+                            }
+                        }
+                    }
                 }
                 
                 console.log('✅ Stok değeri bulundu:', stock, foundProduct ? `(Ürün: ${foundProduct.name?.tr || foundProduct.fullName?.tr || 'N/A'})` : '');
@@ -3668,6 +4022,23 @@ class CountingSystem {
                 nextBtn.disabled = true;
                 nextBtn.classList.add('opacity-50', 'cursor-not-allowed');
             }
+        }
+
+        // Setup delete product button (re-setup in case modal was recreated)
+        const deleteProductBtn = document.getElementById('countingDeleteProductBtn');
+        if (deleteProductBtn) {
+            // Remove existing event listeners by cloning the button
+            const newDeleteBtn = deleteProductBtn.cloneNode(true);
+            deleteProductBtn.parentNode.replaceChild(newDeleteBtn, deleteProductBtn);
+            
+            // Add event listener to new button
+            newDeleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (this.currentCountingProduct) {
+                    // Show delete confirmation modal
+                    this.showDeleteConfirmModal(this.currentCountingProduct);
+                }
+            });
         }
 
         // Show modal with smooth animation
@@ -5092,6 +5463,1043 @@ class CountingSystem {
             }
         } catch (error) {
             console.warn('⚠️ API durumu güncellenemedi:', error);
+        }
+    }
+
+    // Financial Analysis Functions
+    async calculateFinancialData(tableName) {
+        try {
+            // Load full counting data to access all tables
+            const fullData = await this.loadFullCountingData();
+            if (!fullData || !fullData._tables || !fullData._tables[tableName]) {
+                return null;
+            }
+
+            const tableData = fullData._tables[tableName];
+            const products = [];
+            const categoryMap = {};
+
+            // Process each product in the table
+            for (const [productId, data] of Object.entries(tableData)) {
+                if (productId === '_api_info' || productId === '_tables' || productId === '_currentTable') {
+                    continue;
+                }
+
+                const product = this.allProducts.find(p => p.id === productId);
+                if (!product) continue;
+
+                const warehouseStock = data.warehouseStock ?? 0;
+                const systemStock = data.systemStock ?? 0;
+                const price = data.price ?? 0;
+                const priceText = data.priceText || '₺0,00';
+
+                if (price === 0 || price === null) continue;
+
+                const warehouseValue = warehouseStock * price;
+                const systemValue = systemStock * price;
+                const difference = warehouseValue - systemValue;
+
+                const category = product.category || 'Genel';
+
+                const productData = {
+                    productId,
+                    productName: product.name || 'Bilinmeyen Ürün',
+                    category,
+                    warehouseStock,
+                    systemStock,
+                    price,
+                    priceText,
+                    warehouseValue,
+                    systemValue,
+                    difference
+                };
+
+                products.push(productData);
+
+                // Aggregate by category
+                if (!categoryMap[category]) {
+                    categoryMap[category] = {
+                        category,
+                        warehouseValue: 0,
+                        systemValue: 0,
+                        difference: 0,
+                        productCount: 0
+                    };
+                }
+
+                categoryMap[category].warehouseValue += warehouseValue;
+                categoryMap[category].systemValue += systemValue;
+                categoryMap[category].difference += difference;
+                categoryMap[category].productCount += 1;
+            }
+
+            // Calculate summary
+            const totalWarehouseValue = products.reduce((sum, p) => sum + p.warehouseValue, 0);
+            const totalSystemValue = products.reduce((sum, p) => sum + p.systemValue, 0);
+            const profitLoss = totalWarehouseValue - totalSystemValue;
+            const productCount = products.length;
+            const countedProducts = products.filter(p => p.warehouseStock !== null && p.warehouseStock !== undefined).length;
+
+            const categories = Object.values(categoryMap).sort((a, b) => b.warehouseValue - a.warehouseValue);
+
+            return {
+                tableName,
+                summary: {
+                    totalWarehouseValue,
+                    totalSystemValue,
+                    profitLoss,
+                    productCount,
+                    countedProducts
+                },
+                categories,
+                products: products.sort((a, b) => b.warehouseValue - a.warehouseValue)
+            };
+        } catch (error) {
+            console.error('Error calculating financial data:', error);
+            return null;
+        }
+    }
+
+    async getAllTablesFinancialData() {
+        try {
+            const fullData = await this.loadFullCountingData();
+            if (!fullData || !fullData._tables) {
+                return [];
+            }
+
+            const tables = Object.keys(fullData._tables);
+            const financialData = [];
+
+            for (const tableName of tables) {
+                const data = await this.calculateFinancialData(tableName);
+                if (data) {
+                    financialData.push(data);
+                }
+            }
+
+            return financialData;
+        } catch (error) {
+            console.error('Error getting all tables financial data:', error);
+            return [];
+        }
+    }
+
+    getCategoryBreakdown(tableData) {
+        const categoryMap = {};
+
+        for (const product of tableData.products) {
+            const category = product.category || 'Genel';
+
+            if (!categoryMap[category]) {
+                categoryMap[category] = {
+                    category,
+                    warehouseValue: 0,
+                    systemValue: 0,
+                    difference: 0,
+                    productCount: 0
+                };
+            }
+
+            categoryMap[category].warehouseValue += product.warehouseValue;
+            categoryMap[category].systemValue += product.systemValue;
+            categoryMap[category].difference += product.difference;
+            categoryMap[category].productCount += 1;
+        }
+
+        return Object.values(categoryMap).sort((a, b) => b.warehouseValue - a.warehouseValue);
+    }
+
+    formatCurrency(value) {
+        return new Intl.NumberFormat('tr-TR', {
+            style: 'currency',
+            currency: 'TRY',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(value);
+    }
+
+    async renderFinancialTab() {
+        const finansTabContent = document.getElementById('finansTabContent');
+        if (!finansTabContent) return;
+
+        // Setup financial table selector (same as counting table selector)
+        this.setupFinancialTableSelector();
+        
+        // Update dropdown with current tables
+        this.updateFinancialTableSelector();
+
+        // Render initial data (default to all tables)
+        await this.renderAllTablesFinancialData();
+    }
+
+    setupFinancialTableSelector() {
+        const financialTableSelectorBtn = document.getElementById('financialTableSelectorBtn');
+        const financialTableSelectorText = document.getElementById('financialTableSelectorText');
+        const financialTableSelectorDropdown = document.getElementById('financialTableSelectorDropdown');
+        const financialTableSelectorIcon = document.getElementById('financialTableSelectorIcon');
+
+        if (!financialTableSelectorBtn || !financialTableSelectorText || !financialTableSelectorDropdown) return;
+
+        // Check if already set up (to avoid duplicate event listeners)
+        if (financialTableSelectorBtn.dataset.setup === 'true') return;
+        financialTableSelectorBtn.dataset.setup = 'true';
+
+        // Button click to toggle dropdown
+        financialTableSelectorBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            financialTableSelectorDropdown.classList.toggle('hidden');
+            if (financialTableSelectorIcon) {
+                financialTableSelectorIcon.style.transform = financialTableSelectorDropdown.classList.contains('hidden') 
+                    ? 'rotate(0deg)' 
+                    : 'rotate(180deg)';
+            }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!financialTableSelectorBtn.contains(e.target) && !financialTableSelectorDropdown.contains(e.target)) {
+                financialTableSelectorDropdown.classList.add('hidden');
+                if (financialTableSelectorIcon) {
+                    financialTableSelectorIcon.style.transform = 'rotate(0deg)';
+                }
+            }
+        });
+    }
+
+    updateFinancialTableSelector() {
+        const financialTableSelectorText = document.getElementById('financialTableSelectorText');
+        const financialTableSelectorDropdown = document.getElementById('financialTableSelectorDropdown');
+        const financialTableSelectorIcon = document.getElementById('financialTableSelectorIcon');
+
+        if (!financialTableSelectorText || !financialTableSelectorDropdown) return;
+
+        const tables = this.getTableList();
+        
+        // Update button text
+        if (this.selectedFinancialTable === 'all') {
+            financialTableSelectorText.textContent = 'Tüm Tablolar';
+        } else {
+            const selectedTable = tables.find(t => t.name === this.selectedFinancialTable);
+            financialTableSelectorText.textContent = selectedTable ? selectedTable.name : (this.selectedFinancialTable || 'Tüm Tablolar');
+        }
+
+        // Clear and populate dropdown
+        financialTableSelectorDropdown.innerHTML = '';
+
+        // Add "Tüm Tablolar" option
+        const allOption = document.createElement('div');
+        allOption.className = `table-selector-option ${this.selectedFinancialTable === 'all' ? 'active' : ''}`;
+        allOption.dataset.tableName = 'all';
+        allOption.innerHTML = `
+            <span>Tüm Tablolar</span>
+            <svg class="check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+        `;
+        allOption.addEventListener('click', async () => {
+            this.selectedFinancialTable = 'all';
+            await this.renderAllTablesFinancialData();
+            this.updateFinancialTableSelector();
+            financialTableSelectorDropdown.classList.add('hidden');
+            if (financialTableSelectorIcon) {
+                financialTableSelectorIcon.style.transform = 'rotate(0deg)';
+            }
+        });
+        financialTableSelectorDropdown.appendChild(allOption);
+
+        // Add table options
+        tables.forEach(table => {
+            const option = document.createElement('div');
+            option.className = `table-selector-option ${table.name === this.selectedFinancialTable ? 'active' : ''}`;
+            option.dataset.tableName = table.name;
+            option.innerHTML = `
+                <span>${this.escapeHtml(table.name)}${table.productCount ? ` <span class="text-gray-500 text-xs">(${table.productCount})</span>` : ''}</span>
+                <svg class="check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+            `;
+            
+            option.addEventListener('click', async () => {
+                this.selectedFinancialTable = table.name;
+                await this.renderSingleTableFinancialData(table.name);
+                this.updateFinancialTableSelector();
+                financialTableSelectorDropdown.classList.add('hidden');
+                if (financialTableSelectorIcon) {
+                    financialTableSelectorIcon.style.transform = 'rotate(0deg)';
+                }
+            });
+            
+            financialTableSelectorDropdown.appendChild(option);
+        });
+    }
+
+    async renderAllTablesFinancialData() {
+        const allData = await this.getAllTablesFinancialData();
+        
+        // Aggregate all tables
+        const aggregated = {
+            summary: {
+                totalWarehouseValue: 0,
+                totalSystemValue: 0,
+                profitLoss: 0,
+                productCount: 0,
+                countedProducts: 0
+            },
+            categories: {},
+            products: []
+        };
+
+        allData.forEach(tableData => {
+            aggregated.summary.totalWarehouseValue += tableData.summary.totalWarehouseValue;
+            aggregated.summary.totalSystemValue += tableData.summary.totalSystemValue;
+            aggregated.summary.profitLoss += tableData.summary.profitLoss;
+            aggregated.summary.productCount += tableData.summary.productCount;
+            aggregated.summary.countedProducts += tableData.summary.countedProducts;
+
+            tableData.categories.forEach(cat => {
+                if (!aggregated.categories[cat.category]) {
+                    aggregated.categories[cat.category] = { ...cat };
+                } else {
+                    aggregated.categories[cat.category].warehouseValue += cat.warehouseValue;
+                    aggregated.categories[cat.category].systemValue += cat.systemValue;
+                    aggregated.categories[cat.category].difference += cat.difference;
+                    aggregated.categories[cat.category].productCount += cat.productCount;
+                }
+            });
+
+            aggregated.products.push(...tableData.products);
+        });
+
+        this.renderFinancialSummary(aggregated.summary);
+        this.renderCategoryBreakdown(Object.values(aggregated.categories));
+        this.renderProductDetails(aggregated.products);
+        this.renderCharts(Object.values(aggregated.categories), aggregated.products);
+        this.renderTopProductsTables(aggregated.products);
+    }
+
+    async renderSingleTableFinancialData(tableName) {
+        const data = await this.calculateFinancialData(tableName);
+        if (!data) {
+            // Show empty state
+            this.renderFinancialSummary({ totalWarehouseValue: 0, totalSystemValue: 0, profitLoss: 0, productCount: 0, countedProducts: 0 });
+            this.renderCategoryBreakdown([]);
+            this.renderProductDetails([]);
+            return;
+        }
+
+        this.renderFinancialSummary(data.summary);
+        this.renderCategoryBreakdown(data.categories);
+        this.renderProductDetails(data.products);
+        this.renderCharts(data.categories, data.products);
+        this.renderTopProductsTables(data.products);
+    }
+
+    renderFinancialSummary(summary) {
+        const summaryCards = document.getElementById('financialSummaryCards');
+        if (!summaryCards) return;
+
+        summaryCards.innerHTML = `
+            <div class="financial-card warehouse">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-600 font-medium">Toplam Depo Değeri</div>
+                            <div class="text-xl sm:text-2xl font-bold text-gray-900">${this.formatCurrency(summary.totalWarehouseValue)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="financial-card system">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-600 font-medium">Toplam Sistem Değeri</div>
+                            <div class="text-xl sm:text-2xl font-bold text-gray-900">${this.formatCurrency(summary.totalSystemValue)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="financial-card ${summary.profitLoss >= 0 ? 'profit' : 'loss'}">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-10 h-10 rounded-lg ${summary.profitLoss >= 0 ? 'bg-green-100' : 'bg-red-100'} flex items-center justify-center">
+                            <svg class="w-6 h-6 ${summary.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${summary.profitLoss >= 0 ? 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6' : 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6'}"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-600 font-medium">Kar/Zarar</div>
+                            <div class="text-xl sm:text-2xl font-bold ${summary.profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}">${this.formatCurrency(summary.profitLoss)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="financial-card count">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="text-xs text-gray-600 font-medium">Ürün Sayısı</div>
+                            <div class="text-xl sm:text-2xl font-bold text-gray-900">${summary.countedProducts}/${summary.productCount}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    renderCategoryBreakdown(categories) {
+        const categoryBreakdownBody = document.getElementById('categoryBreakdownBody');
+        if (!categoryBreakdownBody) return;
+
+        if (categories.length === 0) {
+            categoryBreakdownBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                        Kategori verisi bulunamadı
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        categoryBreakdownBody.innerHTML = categories.map(cat => {
+            const rowClass = cat.difference >= 0 ? 'profit-row' : 'loss-row';
+            return `
+                <tr class="${rowClass}">
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900">${cat.category}</td>
+                    <td class="px-4 py-3 text-sm text-right font-semibold">${this.formatCurrency(cat.warehouseValue)}</td>
+                    <td class="px-4 py-3 text-sm text-right font-semibold">${this.formatCurrency(cat.systemValue)}</td>
+                    <td class="px-4 py-3 text-sm text-right font-semibold ${cat.difference >= 0 ? 'text-green-600' : 'text-red-600'}">
+                        ${cat.difference >= 0 ? '+' : ''}${this.formatCurrency(cat.difference)}
+                    </td>
+                    <td class="px-4 py-3 text-sm text-center text-gray-600">${cat.productCount}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    renderProductDetails(products) {
+        const productDetailsCards = document.getElementById('productDetailsCards');
+        const sortProductsDesc = document.getElementById('sortProductsDesc');
+        const sortProductsAsc = document.getElementById('sortProductsAsc');
+
+        // Store products for sorting
+        this.financialProducts = products;
+
+        // Filter out products with zero difference
+        const filteredProducts = products.filter(product => product.difference !== 0);
+
+        if (filteredProducts.length === 0) {
+            if (productDetailsCards) {
+                productDetailsCards.innerHTML = '<p class="text-center text-gray-500 py-6 text-sm">Farkı olan ürün bulunamadı</p>';
+            }
+            return;
+        }
+
+        // Sort products based on current sort order
+        const sortedProducts = [...filteredProducts].sort((a, b) => {
+            if (this.productSortOrder === 'desc') {
+                return a.difference - b.difference; // En çok zarardan en az zarara (negatiften pozitife)
+            } else {
+                return b.difference - a.difference; // En az zarardan en çok zarara (pozitiften negatife)
+            }
+        });
+
+        // Update sort button states
+        if (sortProductsDesc && sortProductsAsc) {
+            if (this.productSortOrder === 'desc') {
+                sortProductsDesc.classList.add('bg-blue-100', 'text-blue-700');
+                sortProductsDesc.classList.remove('bg-gray-100');
+                sortProductsAsc.classList.remove('bg-blue-100', 'text-blue-700');
+                sortProductsAsc.classList.add('bg-gray-100');
+            } else {
+                sortProductsAsc.classList.add('bg-blue-100', 'text-blue-700');
+                sortProductsAsc.classList.remove('bg-gray-100');
+                sortProductsDesc.classList.remove('bg-blue-100', 'text-blue-700');
+                sortProductsDesc.classList.add('bg-gray-100');
+            }
+        }
+
+        // Setup sort button listeners
+        if (sortProductsDesc) {
+            sortProductsDesc.onclick = () => {
+                this.productSortOrder = 'desc';
+                this.renderProductDetails(this.financialProducts);
+            };
+        }
+        if (sortProductsAsc) {
+            sortProductsAsc.onclick = () => {
+                this.productSortOrder = 'asc';
+                this.renderProductDetails(this.financialProducts);
+            };
+        }
+
+        // Compact card view for all devices
+        if (productDetailsCards) {
+            productDetailsCards.innerHTML = sortedProducts.map(product => {
+                const cardClass = product.difference > 0 ? 'profit' : product.difference < 0 ? 'loss' : 'zero';
+                const stockDiff = product.warehouseStock - product.systemStock;
+                const stockDiffText = stockDiff > 0 ? `+${stockDiff}` : stockDiff < 0 ? `${stockDiff}` : '0';
+                const stockDiffClass = stockDiff > 0 ? 'text-green-600' : stockDiff < 0 ? 'text-red-600' : 'text-gray-600';
+                
+                return `
+                    <div class="product-financial-card ${cardClass}">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="flex-1 min-w-0">
+                                <h4 class="text-sm font-semibold text-gray-900 truncate mb-1">${product.productName}</h4>
+                                <div class="flex items-center gap-3 text-xs text-gray-600">
+                                    <span>${product.category}</span>
+                                    <span>•</span>
+                                    <span>Depo: <strong>${product.warehouseStock}</strong></span>
+                                    <span>Sistem: <strong>${product.systemStock}</strong></span>
+                                    <span class="${stockDiffClass} font-semibold">(${stockDiffText})</span>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-end gap-1 flex-shrink-0">
+                                <div class="text-xs text-gray-500">Fark</div>
+                                <div class="text-sm font-bold ${product.difference > 0 ? 'text-green-600' : product.difference < 0 ? 'text-red-600' : 'text-gray-600'}">
+                                    ${product.difference >= 0 ? '+' : ''}${this.formatCurrency(product.difference)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    setupChartCarousel() {
+        const chartPrevBtn = document.getElementById('chartPrevBtn');
+        const chartNextBtn = document.getElementById('chartNextBtn');
+        const chartSlidesContainer = document.getElementById('chartSlidesContainer');
+        const chartDotsContainer = document.getElementById('chartDotsContainer');
+
+        if (!chartPrevBtn || !chartNextBtn || !chartSlidesContainer || !chartDotsContainer) return;
+
+        // Create dots dynamically
+        chartDotsContainer.innerHTML = '';
+        for (let i = 0; i < this.totalCharts; i++) {
+            const dot = document.createElement('button');
+            dot.className = `chart-dot w-2 h-2 rounded-full transition-all ${i === 0 ? 'bg-blue-600 active' : 'bg-gray-300'}`;
+            dot.dataset.chartIndex = i;
+            dot.addEventListener('click', () => {
+                this.currentChartIndex = i;
+                this.updateChartCarousel();
+            });
+            chartDotsContainer.appendChild(dot);
+        }
+
+        // Previous button
+        chartPrevBtn.addEventListener('click', () => {
+            this.currentChartIndex = (this.currentChartIndex - 1 + this.totalCharts) % this.totalCharts;
+            this.updateChartCarousel();
+        });
+
+        // Next button
+        chartNextBtn.addEventListener('click', () => {
+            this.currentChartIndex = (this.currentChartIndex + 1) % this.totalCharts;
+            this.updateChartCarousel();
+        });
+    }
+
+    updateChartCarousel() {
+        const chartSlidesContainer = document.getElementById('chartSlidesContainer');
+        const chartDots = document.querySelectorAll('.chart-dot');
+
+        if (!chartSlidesContainer) return;
+
+        // Move slides - each slide is 100% width, so translate by index * 100%
+        chartSlidesContainer.style.transform = `translateX(-${this.currentChartIndex * 100}%)`;
+
+        // Update dots
+        chartDots.forEach((dot, index) => {
+            if (index === this.currentChartIndex) {
+                dot.classList.add('active');
+                dot.classList.remove('bg-gray-300');
+                dot.classList.add('bg-blue-600');
+                dot.style.width = '8px';
+                dot.style.height = '8px';
+            } else {
+                dot.classList.remove('active');
+                dot.classList.remove('bg-blue-600');
+                dot.classList.add('bg-gray-300');
+                dot.style.width = '6px';
+                dot.style.height = '6px';
+            }
+        });
+    }
+
+    renderCharts(categories, products = []) {
+        if (!window.Chart) {
+            console.warn('Chart.js not loaded');
+            return;
+        }
+
+        // Setup carousel if not already done
+        if (!this.chartCarouselSetup) {
+            this.setupChartCarousel();
+            this.chartCarouselSetup = true;
+        }
+
+        // Destroy existing charts
+        if (this.categoryPieChart) this.categoryPieChart.destroy();
+        if (this.categoryBarChart) this.categoryBarChart.destroy();
+        if (this.topProfitProductsChart) this.topProfitProductsChart.destroy();
+        if (this.topLossProductsChart) this.topLossProductsChart.destroy();
+        if (this.topValueProductsChart) this.topValueProductsChart.destroy();
+        if (this.topStockDiffChart) this.topStockDiffChart.destroy();
+
+        if (!categories || categories.length === 0) {
+            return;
+        }
+
+        // Prepare data
+        const labels = categories.map(cat => cat.category);
+        const warehouseValues = categories.map(cat => cat.warehouseValue);
+        const differences = categories.map(cat => cat.difference);
+
+        // Generate colors
+        const colors = [
+            '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+            '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1'
+        ];
+
+        // Pie Chart - Category Distribution
+        const pieCtx = document.getElementById('categoryPieChart');
+        if (pieCtx) {
+            this.categoryPieChart = new Chart(pieCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: warehouseValues,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 10,
+                                font: {
+                                    size: 11
+                                },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const label = context.label || '';
+                                    const value = this.formatCurrency(context.parsed);
+                                    const total = warehouseValues.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Bar Chart - Category Profit/Loss
+        const barCtx = document.getElementById('categoryBarChart');
+        if (barCtx) {
+            this.categoryBarChart = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Kar/Zarar',
+                        data: differences,
+                        backgroundColor: differences.map(diff => 
+                            diff >= 0 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)'
+                        ),
+                        borderColor: differences.map(diff => 
+                            diff >= 0 ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)'
+                        ),
+                        borderWidth: 2,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => {
+                                    const value = this.formatCurrency(context.parsed.y);
+                                    return `Fark: ${value}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: (value) => {
+                                    return this.formatCurrency(value);
+                                },
+                                font: {
+                                    size: 10
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                font: {
+                                    size: 10
+                                },
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render product-based charts if products available
+        if (products && products.length > 0) {
+            this.renderTopProfitProductsChart(products);
+            this.renderTopLossProductsChart(products);
+            this.renderTopValueProductsChart(products);
+            this.renderTopStockDiffChart(products);
+        }
+    }
+
+    renderTopProfitProductsChart(products) {
+        // Filter and sort by profit (difference > 0)
+        const profitProducts = products
+            .filter(p => p.difference > 0)
+            .sort((a, b) => b.difference - a.difference)
+            .slice(0, 10);
+
+        if (profitProducts.length === 0) return;
+
+        const ctx = document.getElementById('topProfitProductsChart');
+        if (!ctx) return;
+
+        this.topProfitProductsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: profitProducts.map(p => p.productName.length > 20 ? p.productName.substring(0, 20) + '...' : p.productName),
+                datasets: [{
+                    label: 'Kar',
+                    data: profitProducts.map(p => p.difference),
+                    backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                    borderColor: 'rgb(16, 185, 129)',
+                    borderWidth: 2,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `Kar: ${this.formatCurrency(context.parsed.x)}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (value) => this.formatCurrency(value),
+                            font: { size: 10 }
+                        },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    },
+                    y: {
+                        ticks: {
+                            font: { size: 10 },
+                            maxRotation: 0
+                        },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    renderTopLossProductsChart(products) {
+        // Filter and sort by loss (difference < 0)
+        const lossProducts = products
+            .filter(p => p.difference < 0)
+            .sort((a, b) => a.difference - b.difference)
+            .slice(0, 10);
+
+        if (lossProducts.length === 0) return;
+
+        const ctx = document.getElementById('topLossProductsChart');
+        if (!ctx) return;
+
+        this.topLossProductsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: lossProducts.map(p => p.productName.length > 20 ? p.productName.substring(0, 20) + '...' : p.productName),
+                datasets: [{
+                    label: 'Zarar',
+                    data: lossProducts.map(p => Math.abs(p.difference)),
+                    backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                    borderColor: 'rgb(239, 68, 68)',
+                    borderWidth: 2,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `Zarar: ${this.formatCurrency(-context.parsed.x)}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (value) => this.formatCurrency(value),
+                            font: { size: 10 }
+                        },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    },
+                    y: {
+                        ticks: {
+                            font: { size: 10 },
+                            maxRotation: 0
+                        },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    renderTopValueProductsChart(products) {
+        // Sort by warehouse value
+        const topValueProducts = [...products]
+            .sort((a, b) => b.warehouseValue - a.warehouseValue)
+            .slice(0, 10);
+
+        if (topValueProducts.length === 0) return;
+
+        const ctx = document.getElementById('topValueProductsChart');
+        if (!ctx) return;
+
+        this.topValueProductsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: topValueProducts.map(p => p.productName.length > 15 ? p.productName.substring(0, 15) + '...' : p.productName),
+                datasets: [{
+                    label: 'Depo Değeri',
+                    data: topValueProducts.map(p => p.warehouseValue),
+                    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                    borderColor: 'rgb(59, 130, 246)',
+                    borderWidth: 2,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `Değer: ${this.formatCurrency(context.parsed.y)}`
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: (value) => this.formatCurrency(value),
+                            font: { size: 10 }
+                        },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    },
+                    x: {
+                        ticks: {
+                            font: { size: 10 },
+                            maxRotation: 45,
+                            minRotation: 45
+                        },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    renderTopStockDiffChart(products) {
+        // Calculate stock differences and sort
+        const stockDiffProducts = products
+            .map(p => ({
+                ...p,
+                stockDiff: Math.abs(p.warehouseStock - p.systemStock)
+            }))
+            .filter(p => p.stockDiff > 0)
+            .sort((a, b) => b.stockDiff - a.stockDiff)
+            .slice(0, 10);
+
+        if (stockDiffProducts.length === 0) return;
+
+        const ctx = document.getElementById('topStockDiffChart');
+        if (!ctx) return;
+
+        this.topStockDiffChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: stockDiffProducts.map(p => p.productName.length > 20 ? p.productName.substring(0, 20) + '...' : p.productName),
+                datasets: [{
+                    label: 'Stok Farkı',
+                    data: stockDiffProducts.map(p => p.stockDiff),
+                    backgroundColor: stockDiffProducts.map(p => {
+                        const diff = p.warehouseStock - p.systemStock;
+                        return diff > 0 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)';
+                    }),
+                    borderColor: stockDiffProducts.map(p => {
+                        const diff = p.warehouseStock - p.systemStock;
+                        return diff > 0 ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)';
+                    }),
+                    borderWidth: 2,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => {
+                                const product = stockDiffProducts[context.dataIndex];
+                                return `Fark: ${product.stockDiff} adet (Depo: ${product.warehouseStock}, Sistem: ${product.systemStock})`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            font: { size: 10 }
+                        },
+                        grid: { color: 'rgba(0, 0, 0, 0.05)' }
+                    },
+                    y: {
+                        ticks: {
+                            font: { size: 10 },
+                            maxRotation: 0
+                        },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    renderTopProductsTables(products) {
+        if (!products || products.length === 0) return;
+
+        const topProfitTable = document.getElementById('topProfitProductsTable');
+        const topLossTable = document.getElementById('topLossProductsTable');
+
+        // Top 10 Profit Products
+        if (topProfitTable) {
+            const profitProducts = products
+                .filter(p => p.difference > 0)
+                .sort((a, b) => b.difference - a.difference)
+                .slice(0, 10);
+
+            if (profitProducts.length === 0) {
+                topProfitTable.innerHTML = '<tr><td colspan="2" class="text-center py-4 text-gray-500 text-sm">Kar eden ürün bulunamadı</td></tr>';
+            } else {
+                topProfitTable.innerHTML = profitProducts.map((product, index) => `
+                    <tr class="hover:bg-green-50 transition-colors">
+                        <td class="py-2 px-2">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-green-600 font-bold text-xs">#${index + 1}</span>
+                                <span class="text-gray-900 font-medium text-xs">${product.productName.length > 30 ? product.productName.substring(0, 30) + '...' : product.productName}</span>
+                            </div>
+                        </td>
+                        <td class="py-2 px-2 text-right">
+                            <span class="text-green-700 font-bold text-sm">${this.formatCurrency(product.difference)}</span>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // Top 10 Loss Products
+        if (topLossTable) {
+            const lossProducts = products
+                .filter(p => p.difference < 0)
+                .sort((a, b) => a.difference - b.difference)
+                .slice(0, 10);
+
+            if (lossProducts.length === 0) {
+                topLossTable.innerHTML = '<tr><td colspan="2" class="text-center py-4 text-gray-500 text-sm">Zarar eden ürün bulunamadı</td></tr>';
+            } else {
+                topLossTable.innerHTML = lossProducts.map((product, index) => `
+                    <tr class="hover:bg-red-50 transition-colors">
+                        <td class="py-2 px-2">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-red-600 font-bold text-xs">#${index + 1}</span>
+                                <span class="text-gray-900 font-medium text-xs">${product.productName.length > 30 ? product.productName.substring(0, 30) + '...' : product.productName}</span>
+                            </div>
+                        </td>
+                        <td class="py-2 px-2 text-right">
+                            <span class="text-red-700 font-bold text-sm">${this.formatCurrency(product.difference)}</span>
+                        </td>
+                    </tr>
+                `).join('');
+            }
         }
     }
 }
