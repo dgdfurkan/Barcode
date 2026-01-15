@@ -177,6 +177,27 @@ class CountingSystem {
                 console.warn('⚠️ chrome.runtime.sendMessage mevcut değil');
             }
             
+            // Fallback: chrome.storage'dan direkt okuma (extension mesajlaşması çalışmazsa)
+            if (!apiInfo && typeof chrome !== 'undefined' && chrome.storage) {
+                try {
+                    apiInfo = await new Promise((resolve) => {
+                        chrome.storage.local.get(['getir_api_info'], (result) => {
+                            if (chrome.runtime.lastError) {
+                                console.warn('⚠️ chrome.storage okuma hatası:', chrome.runtime.lastError);
+                                resolve(null);
+                            } else if (result.getir_api_info) {
+                                console.log('🔑 ✅ chrome.storage\'dan direkt franchise token bulundu');
+                                resolve(result.getir_api_info);
+                            } else {
+                                resolve(null);
+                            }
+                        });
+                    });
+                } catch (error) {
+                    console.warn('⚠️ chrome.storage okuma hatası:', error);
+                }
+            }
+            
             // Fallback: window.getirExtensionHelper
             if (!apiInfo && typeof window !== 'undefined' && window.getirExtensionHelper) {
                 try {
@@ -203,9 +224,10 @@ class CountingSystem {
             
             // If API info found, check if it's more valid than existing one
             if (apiInfo && apiInfo.token) {
-                // Mevcut Supabase'deki token expiry'sini kontrol et
+                // Mevcut Supabase'deki token bilgilerini kontrol et
                 let shouldUpdate = true;
-                let existingExpiry = null;
+                let existingToken = null;
+                let existingTimestamp = 0;
                 
                 if (window.supabase && this.currentUser) {
                     try {
@@ -219,58 +241,37 @@ class CountingSystem {
                             const countingData = typeof userData.counting_data === 'string' 
                                 ? JSON.parse(userData.counting_data) 
                                 : userData.counting_data;
-                            existingExpiry = countingData._api_info?.tokenExpiry;
+                            existingToken = countingData._api_info?.token;
+                            existingTimestamp = countingData._api_info?.timestamp || 0;
                         }
                     } catch (e) {
                         // Silent fail
                     }
                 }
                 
-                // Token expiry karşılaştırması yap
-                if (existingExpiry && apiInfo.tokenExpiry) {
-                    // Her iki expiry'yi de timestamp'e çevir
-                    let existingExpiryTime = null;
-                    let newExpiryTime = null;
-                    
-                    if (typeof existingExpiry === 'number') {
-                        existingExpiryTime = existingExpiry;
-                    } else if (typeof existingExpiry === 'string') {
-                        existingExpiryTime = new Date(existingExpiry).getTime();
-                        if (isNaN(existingExpiryTime)) {
-                            existingExpiryTime = parseInt(existingExpiry, 10);
-                        }
+                // Token değeri ve timestamp karşılaştırması yap
+                const newToken = apiInfo.token;
+                const newTimestamp = apiInfo.timestamp || Date.now();
+                
+                // Token değeri farklıysa veya timestamp daha yeni ise her zaman güncelle
+                if (existingToken && existingToken === newToken && newTimestamp <= existingTimestamp) {
+                    // Token aynı ve timestamp daha eski, güncelleme yapma
+                    console.log('ℹ️ Token değeri aynı ve timestamp daha eski, güncelleme yapılmıyor:', {
+                        existingTimestamp: new Date(existingTimestamp).toLocaleString('tr-TR'),
+                        newTimestamp: new Date(newTimestamp).toLocaleString('tr-TR')
+                    });
+                    shouldUpdate = false;
+                } else {
+                    // Token değeri farklı veya timestamp daha yeni, güncelle
+                    if (existingToken !== newToken) {
+                        console.log('🔄 Token değeri değişti, güncelleniyor');
+                    } else if (newTimestamp > existingTimestamp) {
+                        console.log('🔄 Yeni token timestamp daha yeni, güncelleniyor:', {
+                            existingTimestamp: new Date(existingTimestamp).toLocaleString('tr-TR'),
+                            newTimestamp: new Date(newTimestamp).toLocaleString('tr-TR')
+                        });
                     }
-                    
-                    if (typeof apiInfo.tokenExpiry === 'number') {
-                        newExpiryTime = apiInfo.tokenExpiry;
-                    } else if (typeof apiInfo.tokenExpiry === 'string') {
-                        newExpiryTime = new Date(apiInfo.tokenExpiry).getTime();
-                        if (isNaN(newExpiryTime)) {
-                            newExpiryTime = parseInt(apiInfo.tokenExpiry, 10);
-                        }
-                    }
-                    
-                    // Eğer yeni token'ın expiry'si mevcut olandan daha geçerliyse (daha uzun süre kaldıysa) güncelle
-                    if (existingExpiryTime && newExpiryTime && !isNaN(existingExpiryTime) && !isNaN(newExpiryTime)) {
-                        const existingTimeRemaining = existingExpiryTime - Date.now();
-                        const newTimeRemaining = newExpiryTime - Date.now();
-                        
-                        if (newTimeRemaining > existingTimeRemaining) {
-                            // Yeni token daha geçerli, güncelle
-                            console.log('🔄 Yeni token daha geçerli, güncelleniyor:', {
-                                existingTimeRemaining: Math.floor(existingTimeRemaining / (1000 * 60 * 60)) + ' saat',
-                                newTimeRemaining: Math.floor(newTimeRemaining / (1000 * 60 * 60)) + ' saat'
-                            });
-                            shouldUpdate = true;
-                        } else {
-                            // Mevcut token daha geçerli, güncelleme
-                            console.log('ℹ️ Mevcut token daha geçerli, güncelleme yapılmıyor:', {
-                                existingTimeRemaining: Math.floor(existingTimeRemaining / (1000 * 60 * 60)) + ' saat',
-                                newTimeRemaining: Math.floor(newTimeRemaining / (1000 * 60 * 60)) + ' saat'
-                            });
-                            shouldUpdate = false;
-                        }
-                    }
+                    shouldUpdate = true;
                 }
                 
                 // Eğer güncelleme gerekiyorsa Supabase'e kaydet
