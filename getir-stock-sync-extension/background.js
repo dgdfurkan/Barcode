@@ -22,23 +22,13 @@ function isTokenValidInBackground(tokenExpiry) {
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
     (details) => {
-        // DEBUG: Tüm webRequest çağrılarını log'la
-        console.log('🔍 [WEBREQUEST] Request yakalandı:', {
-            url: details.url,
-            method: details.method,
-            hasHeaders: !!details.requestHeaders,
-            headerCount: details.requestHeaders ? details.requestHeaders.length : 0
-        });
-        
         // Pasif modda ve token geçerliyse, sessizce çalış (log yazma)
         if (backgroundTokenState.passiveMode && backgroundTokenState.token && isTokenValidInBackground(backgroundTokenState.tokenExpiry)) {
-            console.log('🔇 [WEBREQUEST] Pasif modda, atlanıyor');
             return; // Pasif modda, sadece sessizce dinle
         }
         
         // Sadece Getir API çağrılarını dinle
         if (details.url.includes('getirapi.com') || details.url.includes('franchise-api-gateway.getirapi.com')) {
-            console.log('🌐 [WEBREQUEST] Getir API çağrısı tespit edildi:', details.url);
             const headers = details.requestHeaders || [];
             
             // Authorization header'ını bul
@@ -46,20 +36,13 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                 h.name && h.name.toLowerCase() === 'authorization'
             );
             
-            console.log('🔍 [WEBREQUEST] Authorization header kontrolü:', {
-                found: !!authHeader,
-                value: authHeader ? authHeader.value.substring(0, 30) + '...' : 'N/A'
-            });
-            
             if (authHeader && authHeader.value && authHeader.value.startsWith('Bearer ')) {
                 const token = authHeader.value.substring(7).trim();
                 
                 // JWT token kontrolü
                 if (token.startsWith('eyJ') && token.length > 100) {
-                    // Token değiştiyse veya ilk kez yakalanıyorsa log yaz
+                    // Token değiştiyse veya ilk kez yakalanıyorsa
                     if (!backgroundTokenState.token || backgroundTokenState.token !== authHeader.value) {
-                        console.log('🔑 ✅ Token yakalandı (webRequest):', token.substring(0, 30) + '...');
-                    
                         // Token expiry'yi hesapla
                         let tokenExpiry = null;
                         try {
@@ -73,7 +56,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                                 }
                             }
                         } catch (e) {
-                            console.warn('⚠️ Token expiry çıkarılamadı:', e);
+                            // Silent fail
                         }
                         
                         // Token'ı kaydet ve pasif moda geç
@@ -81,20 +64,20 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                         backgroundTokenState.tokenExpiry = tokenExpiry;
                         backgroundTokenState.passiveMode = true;
                     
-                    // Warehouse ID'yi request body'den çıkarmaya çalış (POST ise)
-                    let warehouseId = null;
-                    if (details.method === 'POST' && details.requestBody) {
-                        try {
-                            const body = details.requestBody.formData || details.requestBody.raw;
-                            if (body) {
-                                // Request body'yi parse etmek için content script'e göndermemiz gerekebilir
-                                // Şimdilik sadece token'ı gönderelim
+                        // Warehouse ID'yi request body'den çıkarmaya çalış (POST ise)
+                        let warehouseId = null;
+                        if (details.method === 'POST' && details.requestBody) {
+                            try {
+                                const body = details.requestBody.formData || details.requestBody.raw;
+                                if (body) {
+                                    // Request body'yi parse etmek için content script'e göndermemiz gerekebilir
+                                    // Şimdilik sadece token'ı gönderelim
+                                }
+                            } catch (e) {
+                                // Request body parse edilemedi
                             }
-                        } catch (e) {
-                            // Request body parse edilemedi
                         }
-                    }
-                    
+                        
                         // Franchise sayfasına token'ı gönder (sadece token değiştiyse)
                         chrome.tabs.query({ url: 'https://franchise.getir.com/*' }, (tabs) => {
                             if (tabs && tabs.length > 0) {
@@ -106,10 +89,32 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                                         url: details.url,
                                         warehouseId: warehouseId
                                     }).catch(err => {
-                                        // Content script henüz yüklenmemiş olabilir, sorun değil
-                                        // Pasif modda log yazma
+                                        // Content script henüz yüklenmemiş olabilir, retry yap
+                                        setTimeout(() => {
+                                            chrome.tabs.sendMessage(tab.id, {
+                                                type: 'TOKEN_CAPTURED',
+                                                token: authHeader.value,
+                                                tokenExpiry: tokenExpiry,
+                                                url: details.url,
+                                                warehouseId: warehouseId
+                                            }).catch(() => {
+                                                // Silent fail - content script yüklenene kadar bekleyecek
+                                            });
+                                        }, 1000);
                                     });
                                 });
+                            }
+                        });
+                        
+                        // chrome.storage'a da kaydet (hemen erişilebilir olsun)
+                        chrome.storage.local.set({
+                            'getir_api_info': {
+                                token: authHeader.value,
+                                tokenExpiry: tokenExpiry,
+                                warehouseId: warehouseId,
+                                timestamp: Date.now(),
+                                baseUrl: 'https://franchise-api-gateway.getirapi.com',
+                                stockEndpoint: 'https://franchise-api-gateway.getirapi.com/stocks'
                             }
                         });
                     } else {
@@ -454,7 +459,7 @@ async function checkSupabaseRequests() {
     } catch (error) {
         // Sadece kritik hatalarda log yaz
         if (error.message && !error.message.includes('network')) {
-            console.error('❌ Error checking Supabase:', error);
+        console.error('❌ Error checking Supabase:', error);
         }
     } finally {
         pollingActive = false;
@@ -535,7 +540,7 @@ setInterval(async () => {
     } catch (error) {
         // Sadece kritik hatalarda log yaz
         if (error.message && !error.message.includes('network')) {
-            console.error('❌ Cleanup hatası:', error);
+        console.error('❌ Cleanup hatası:', error);
         }
     }
 }, 5 * 60 * 1000); // Her 5 dakikada bir cleanup yap
