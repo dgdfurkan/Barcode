@@ -22,19 +22,34 @@ function isTokenValidInBackground(tokenExpiry) {
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
     (details) => {
+        // DEBUG: Tüm webRequest çağrılarını log'la
+        console.log('🔍 [WEBREQUEST] Request yakalandı:', {
+            url: details.url,
+            method: details.method,
+            hasHeaders: !!details.requestHeaders,
+            headerCount: details.requestHeaders ? details.requestHeaders.length : 0
+        });
+        
         // Pasif modda ve token geçerliyse, sessizce çalış (log yazma)
         if (backgroundTokenState.passiveMode && backgroundTokenState.token && isTokenValidInBackground(backgroundTokenState.tokenExpiry)) {
+            console.log('🔇 [WEBREQUEST] Pasif modda, atlanıyor');
             return; // Pasif modda, sadece sessizce dinle
         }
         
         // Sadece Getir API çağrılarını dinle
         if (details.url.includes('getirapi.com') || details.url.includes('franchise-api-gateway.getirapi.com')) {
+            console.log('🌐 [WEBREQUEST] Getir API çağrısı tespit edildi:', details.url);
             const headers = details.requestHeaders || [];
             
             // Authorization header'ını bul
             const authHeader = headers.find(h => 
                 h.name && h.name.toLowerCase() === 'authorization'
             );
+            
+            console.log('🔍 [WEBREQUEST] Authorization header kontrolü:', {
+                found: !!authHeader,
+                value: authHeader ? authHeader.value.substring(0, 30) + '...' : 'N/A'
+            });
             
             if (authHeader && authHeader.value && authHeader.value.startsWith('Bearer ')) {
                 const token = authHeader.value.substring(7).trim();

@@ -363,6 +363,11 @@
         const url = args[0];
         const fetchOptions = args[1] || {};
         
+        // DEBUG: Tüm fetch çağrılarını log'la (sadece franchise sayfasında)
+        if (window.location.href.includes('franchise.getir.com')) {
+            console.log('🔍 [FETCH INTERCEPT] Fetch çağrısı yakalandı:', url);
+        }
+        
         // Getir API çağrılarını yakala ve detaylı log'la
         // PASIF MOD: Token varsa ve geçerliyse, sadece sessizce dinle (log yazma)
         if (typeof url === 'string') {
@@ -373,6 +378,11 @@
                                         url.includes('stock') || 
                                         url.includes('product') || 
                                         url.includes('franchise');
+            
+            // DEBUG: API request kontrolü
+            if (window.location.href.includes('franchise.getir.com') && isAPIRequest) {
+                console.log('🌐 [API REQUEST] Getir API çağrısı tespit edildi:', url);
+            }
             
             // Pasif mod: Token varsa ve geçerliyse, sadece sessizce token güncelle (log yazma)
             const isPassiveMode = apiEndpoints.passiveMode && apiEndpoints.token && isTokenValid();
@@ -519,19 +529,35 @@
                     // Token'ı yakala - Tüm Getir API çağrılarında kontrol et
                     // Pasif modda sadece token değişikliklerini yakala, log yazma
                     if (fetchOptions.headers && isAPIRequest) {
+                        // DEBUG: Headers'ı kontrol et
+                        if (window.location.href.includes('franchise.getir.com')) {
+                            console.log('🔍 [TOKEN CHECK] Headers kontrol ediliyor:', Object.keys(fetchOptions.headers || {}));
+                        }
+                        
                         const authHeader = getHeaderValue(fetchOptions.headers, 'Authorization') || 
                                          getHeaderValue(fetchOptions.headers, 'authorization');
                         
                         if (authHeader) {
+                            console.log('🔑 [TOKEN FOUND] Authorization header bulundu:', authHeader.substring(0, 30) + '...');
                             if (!isPassiveMode) {
                                 console.log('🔍 Authorization header bulundu:', authHeader.substring(0, 30) + '...');
                             }
                             
                             if (authHeader.startsWith('Bearer ')) {
                             const token = authHeader.substring(7).trim();
+                            console.log('🔑 [TOKEN PROCESS] Bearer token bulundu, işleniyor...', {
+                                startsWithEyJ: token.startsWith('eyJ'),
+                                tokenLength: token.length,
+                                isJWT: token.startsWith('eyJ') && token.length > 100
+                            });
+                            
                             // JWT token kontrolü (eyJ ile başlamalı)
                             if (token.startsWith('eyJ') && token.length > 100) {
                                     const tokenExpiry = getTokenExpiry(token);
+                                    console.log('✅ [TOKEN VALID] JWT token geçerli, kaydediliyor...', {
+                                        tokenLength: token.length,
+                                        tokenExpiry: tokenExpiry ? new Date(tokenExpiry).toLocaleString('tr-TR') : 'N/A'
+                                    });
                                     
                                     // Token değiştiyse veya ilk kez yakalanıyorsa güncelle
                                     if (!apiEndpoints.token || apiEndpoints.token !== authHeader) {
@@ -547,8 +573,8 @@
                                 // Token yakalandıktan sonra pasif moda geç
                                 apiEndpoints.passiveMode = true;
                                 
+                                console.log('🔑 ✅ [TOKEN SAVED] Franchise token yakalandı ve kaydedildi:', token.substring(0, 30) + '... (uzunluk: ' + token.length + ')');
                                 if (!isPassiveMode) {
-                                console.log('🔑 ✅ Franchise token yakalandı:', token.substring(0, 30) + '... (uzunluk: ' + token.length + ')');
                                     console.log('🔇 Pasif moda geçildi - artık sessizce çalışacak');
                                     if (apiEndpoints.tokenExpiry) {
                                         console.log('⏰ Token expiry:', new Date(apiEndpoints.tokenExpiry).toLocaleString('tr-TR'));
@@ -565,6 +591,11 @@
                                         }
                                     }
                                 } else {
+                                    console.warn('⚠️ [TOKEN INVALID] Token JWT formatında değil veya çok kısa:', {
+                                        startsWithEyJ: token.startsWith('eyJ'),
+                                        tokenLength: token.length,
+                                        tokenPreview: token.substring(0, 20) + '...'
+                                    });
                                     if (!isPassiveMode) {
                                         console.warn('⚠️ Token JWT formatında değil veya çok kısa:', token.substring(0, 20) + '...');
                                     }
@@ -575,6 +606,13 @@
                                 }
                             }
                         } else {
+                            if (window.location.href.includes('franchise.getir.com') && isAPIRequest) {
+                                console.warn('⚠️ [TOKEN MISSING] Authorization header bulunamadı!', {
+                                    url: url,
+                                    hasHeaders: !!fetchOptions.headers,
+                                    headerKeys: fetchOptions.headers ? Object.keys(fetchOptions.headers) : []
+                                });
+                            }
                             if (!isPassiveMode) {
                                 console.log('ℹ️ Authorization header bulunamadı');
                             }
@@ -723,8 +761,8 @@
                 } catch (e) {
                     if (!isPassiveMode) {
                     console.log('📦 Request Body:', body);
-                    }
                 }
+            }
             }
             
             // Response'u yakala (bu kısım yukarıda warehouse ID yakalama ile birleştirildi)
@@ -1160,8 +1198,8 @@
             if (!apiEndpoints.token) {
                 logDebounce.log('⚠️ Sayfa yüklendi ama token henüz yakalanmadı', null, 'token_missing');
             } else {
-                sendAPIInfoToCountingPage();
-            }
+            sendAPIInfoToCountingPage();
+        }
         } else if (apiEndpoints.token) {
             // Pasif modda sadece API bilgilerini gönder, log yazma
             sendAPIInfoToCountingPage();
