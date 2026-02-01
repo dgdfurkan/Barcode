@@ -743,7 +743,6 @@ class AdminPanel {
             }
 
             const updatedUser = {
-                password: password,
                 company: company,
                 contact_email: email,
                 trial_end: trialEnd.toISOString(),
@@ -752,13 +751,27 @@ class AdminPanel {
                 ip_tracking_enabled: ipTrackingEnabled,
                 is_active: isActive
             };
+            // Şifre boş değilse güncelle (boş gönderirsek NOT NULL/constraint hatası veya yanlışlıkla silinir)
+            if (password && String(password).trim() !== '') {
+                updatedUser.password = password.trim();
+            }
 
             // Update in Supabase
             if (window.supabase) {
-                await window.supabase
+                const { error } = await window.supabase
                     .from('users')
                     .update(updatedUser)
                     .eq('username', username);
+                if (error) {
+                    const msg = error.message || '';
+                    if (msg.includes('allowed_ips') || (msg.includes('column') && (msg.includes('max_ip_count') || msg.includes('ip_tracking_enabled')))) {
+                        const which = msg.includes('allowed_ips')
+                            ? 'allowed_ips kolonu için sql_files/add_allowed_ips_to_users.sql'
+                            : 'max_ip_count/ip_tracking_enabled için sql_files/supabase_ip_tracking.sql';
+                        throw new Error('Supabase\'de migration gerekli. SQL Editor\'da ' + which + ' dosyasını çalıştırın.');
+                    }
+                    throw error;
+                }
             }
 
             // Update local

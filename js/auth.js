@@ -131,7 +131,7 @@ async function login(username, password) {
                 // Try to get user with password first
                 const { data, error } = await window.supabase
                     .from('users')
-                    .select('id, username, password, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at')
+                    .select('id, username, password, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, max_ip_count, ip_tracking_enabled, allowed_ips')
                     .eq('username', username)
                     .single();
                 
@@ -144,7 +144,7 @@ async function login(username, password) {
                     
                     const { data: userData, error: userError } = await window.supabase
                         .from('users')
-                        .select('id, username, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at')
+                        .select('id, username, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, max_ip_count, ip_tracking_enabled, allowed_ips')
                         .eq('username', username)
                         .single();
                     

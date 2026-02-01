@@ -76,7 +76,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger
+-- Trigger (yeniden çalıştırılabilir: önce varsa kaldır)
+DROP TRIGGER IF EXISTS trigger_update_user_ip_tracking_updated_at ON user_ip_tracking;
 CREATE TRIGGER trigger_update_user_ip_tracking_updated_at
     BEFORE UPDATE ON user_ip_tracking
     FOR EACH ROW
