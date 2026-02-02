@@ -113,181 +113,138 @@ class CountingSystem {
     }
     
     // Check and save API info from extension to Supabase
+    // Öncelik: Supabase (okuma). Supabase süresi az/bitmişse eklentiden çek, Supabase'e yaz.
+    // Her zaman eklentiden en güncel token'ı alıp Supabase'e yazarız (böylece Supabase hep en uzun süreli token'a sahip olur).
     async checkAndSaveAPIInfoFromExtension() {
         try {
             if (!window.supabase || !this.currentUser) {
-                return; // Supabase veya kullanıcı yoksa atla
+                return;
             }
             
-            let apiInfo = null;
-            
-            // Try to get API info from extension (background script)
-            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            // 1) Önce Supabase'deki mevcut durumu al (öncelik Supabase)
+            let existingToken = null;
+            let existingTimestamp = 0;
+            let existingExpiry = null;
+            if (window.supabase && this.currentUser) {
                 try {
-                    // Extension helper varsa onu kullan, yoksa direkt chrome.runtime.sendMessage kullan
-                    if (window.getirExtensionHelper && window.getirExtensionHelper.getAPIInfo) {
-                        console.log('📤 Extension helper kullanılıyor...');
-                        apiInfo = await window.getirExtensionHelper.getAPIInfo();
-                        if (apiInfo && apiInfo.token) {
-                            console.log('🔑 ✅ Extension helper\'dan franchise token bulundu', {
-                                hasToken: !!apiInfo.token,
-                                tokenLength: apiInfo.token?.length,
-                                tokenExpiry: apiInfo.tokenExpiry
-                            });
-                        }
-                    } else if (chrome && chrome.runtime && chrome.runtime.sendMessage) {
-                        // Extension ID'yi al (hardcoded)
-                        const extensionId = 'dhgdhdnnpeakmomlgpgmokecmdmeoebn';
-                        
-                        console.log('📤 Extension\'a mesaj gönderiliyor...', { extensionId, hasChrome: !!chrome });
-                        
-                        const response = await new Promise((resolve) => {
-                            // Doğru syntax: chrome.runtime.sendMessage(extensionId, message, callback)
-                            chrome.runtime.sendMessage(
-                                extensionId,
-                                { type: 'GET_API_INFO' },
-                                (response) => {
-                                    if (chrome.runtime.lastError) {
-                                        // Extension yüklü değil veya content script inject edilmemiş
-                                        console.warn('⚠️ Extension mesaj hatası:', chrome.runtime.lastError.message);
-                                        resolve(null);
-                                    } else {
-                                        console.log('📥 Extension\'dan yanıt alındı:', response ? 'var' : 'yok', response);
-                                        resolve(response);
-                                    }
-                                }
-                            );
-                        });
-                        
-                        if (response && response.success && response.apiInfo) {
-                            apiInfo = response.apiInfo;
-                            console.log('🔑 ✅ chrome.storage\'dan franchise token bulundu', {
-                                hasToken: !!apiInfo.token,
-                                tokenLength: apiInfo.token?.length,
-                                tokenExpiry: apiInfo.tokenExpiry
-                            });
-                        } else {
-                            console.warn('⚠️ Extension yanıtı geçersiz veya boş:', response);
-                        }
+                    const { data: userData } = await window.supabase
+                        .from('users')
+                        .select('counting_data')
+                        .eq('username', this.currentUser.username)
+                        .maybeSingle();
+                    if (userData && userData.counting_data) {
+                        const countingData = typeof userData.counting_data === 'string'
+                            ? JSON.parse(userData.counting_data)
+                            : userData.counting_data;
+                        existingToken = countingData._api_info?.token;
+                        existingTimestamp = countingData._api_info?.timestamp || 0;
+                        existingExpiry = countingData._api_info?.tokenExpiry;
                     }
-                } catch (error) {
-                    console.warn('⚠️ Extension API bilgisi alınamadı:', error);
+                } catch (e) {
+                    // Silent
+                }
+            }
+            
+            const supabaseExpired = existingExpiry && (Date.now() >= (this.normalizeExpiry(existingExpiry) - 5 * 60 * 1000));
+            
+            // 2) Eklentiden token al. getirExtensionHelper content script ile gelir; bazen gecikmeli yüklenir.
+            let apiInfo = null;
+            if (window.getirExtensionHelper && window.getirExtensionHelper.getAPIInfo) {
+                try {
+                    apiInfo = await window.getirExtensionHelper.getAPIInfo();
+                    if (apiInfo && apiInfo.token) {
+                        console.log('🔑 Eklentiden franchise token alındı', { tokenLength: apiInfo.token?.length, tokenExpiry: apiInfo.tokenExpiry });
+                    }
+                } catch (err) {
+                    console.warn('⚠️ getirExtensionHelper.getAPIInfo hatası:', err?.message || err);
                 }
             } else {
-                console.warn('⚠️ chrome.runtime.sendMessage mevcut değil');
+                // Content script henüz yüklenmemiş olabilir; bir kez gecikmeli tekrar dene (site "göremiyor" sorunu)
+                if (!this._extensionRetryDone) {
+                    this._extensionRetryDone = true;
+                    setTimeout(() => this.checkAndSaveAPIInfoFromExtension(), 800);
+                    return;
+                }
             }
             
-            // Fallback: chrome.storage'dan direkt okuma (extension mesajlaşması çalışmazsa)
-            if (!apiInfo && typeof chrome !== 'undefined' && chrome.storage) {
+            // chrome (sayfa context'inde yok) varsa ek kaynaklar dene
+            if (!apiInfo && typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                try {
+                    const extensionId = 'dhgdhdnnpeakmomlgpgmokecmdmeoebn';
+                    const response = await new Promise((resolve) => {
+                        chrome.runtime.sendMessage(extensionId, { type: 'GET_API_INFO' }, (r) => {
+                            if (chrome.runtime.lastError) resolve(null);
+                            else resolve(r);
+                        });
+                    });
+                    if (response && response.success && response.apiInfo) apiInfo = response.apiInfo;
+                } catch (e) {
+                    // Silent
+                }
+            }
+            if (!apiInfo && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
                 try {
                     apiInfo = await new Promise((resolve) => {
                         chrome.storage.local.get(['getir_api_info'], (result) => {
-                            if (chrome.runtime.lastError) {
-                                console.warn('⚠️ chrome.storage okuma hatası:', chrome.runtime.lastError);
-                                resolve(null);
-                            } else if (result.getir_api_info) {
-                                console.log('🔑 ✅ chrome.storage\'dan direkt franchise token bulundu');
-                                resolve(result.getir_api_info);
-                            } else {
-                                resolve(null);
-                            }
+                            resolve(chrome.runtime.lastError ? null : result?.getir_api_info || null);
                         });
                     });
-                } catch (error) {
-                    console.warn('⚠️ chrome.storage okuma hatası:', error);
+                } catch (e) {
+                    // Silent
                 }
             }
             
-            // Fallback: window.getirExtensionHelper
-            if (!apiInfo && typeof window !== 'undefined' && window.getirExtensionHelper) {
-                try {
-                    apiInfo = await window.getirExtensionHelper.getAPIInfo();
-                    console.log('🔑 ✅ window.getirExtensionHelper\'dan franchise token bulundu');
-                } catch (error) {
-                    console.warn('⚠️ window.getirExtensionHelper hatası:', error);
-                }
-            }
-            
-            // Fallback: localStorage
             if (!apiInfo) {
-                const apiInfoKey = 'getir_api_info';
-                const apiInfoStr = localStorage.getItem(apiInfoKey);
-                if (apiInfoStr) {
-                    try {
-                        apiInfo = JSON.parse(apiInfoStr);
-                        console.log('🔑 ✅ localStorage\'dan franchise token bulundu');
-                    } catch (e) {
-                        console.warn('⚠️ localStorage parse hatası:', e);
-                    }
+                try {
+                    const raw = localStorage.getItem('getir_api_info');
+                    if (raw) apiInfo = JSON.parse(raw);
+                } catch (e) {
+                    // Silent
                 }
             }
             
-            // If API info found, check if it's more valid than existing one
+            // 3) Eklentiden token geldiyse: Supabase'de yoksa, süresi geçmişse veya eklenti daha güncel/uzun süreliyse Supabase'e yaz
             if (apiInfo && apiInfo.token) {
-                // Mevcut Supabase'deki token bilgilerini kontrol et
-                let shouldUpdate = true;
-                let existingToken = null;
-                let existingTimestamp = 0;
-                
-                if (window.supabase && this.currentUser) {
-                    try {
-                        const { data: userData } = await window.supabase
-                            .from('users')
-                            .select('counting_data')
-                            .eq('username', this.currentUser.username)
-                            .maybeSingle();
-                        
-                        if (userData && userData.counting_data) {
-                            const countingData = typeof userData.counting_data === 'string' 
-                                ? JSON.parse(userData.counting_data) 
-                                : userData.counting_data;
-                            existingToken = countingData._api_info?.token;
-                            existingTimestamp = countingData._api_info?.timestamp || 0;
-                        }
-                    } catch (e) {
-                        // Silent fail
-                    }
-                }
-                
-                // Token değeri ve timestamp karşılaştırması yap
                 const newToken = apiInfo.token;
                 const newTimestamp = apiInfo.timestamp || Date.now();
+                const newExpiry = apiInfo.tokenExpiry ? this.normalizeExpiry(apiInfo.tokenExpiry) : null;
                 
-                // Token değeri farklıysa veya timestamp daha yeni ise her zaman güncelle
-                if (existingToken && existingToken === newToken && newTimestamp <= existingTimestamp) {
-                    // Token aynı ve timestamp daha eski, güncelleme yapma
-                    console.log('ℹ️ Token değeri aynı ve timestamp daha eski, güncelleme yapılmıyor:', {
-                        existingTimestamp: new Date(existingTimestamp).toLocaleString('tr-TR'),
-                        newTimestamp: new Date(newTimestamp).toLocaleString('tr-TR')
-                    });
-                    shouldUpdate = false;
-                } else {
-                    // Token değeri farklı veya timestamp daha yeni, güncelle
-                    if (existingToken !== newToken) {
-                        console.log('🔄 Token değeri değişti, güncelleniyor');
-                    } else if (newTimestamp > existingTimestamp) {
-                        console.log('🔄 Yeni token timestamp daha yeni, güncelleniyor:', {
-                            existingTimestamp: new Date(existingTimestamp).toLocaleString('tr-TR'),
-                            newTimestamp: new Date(newTimestamp).toLocaleString('tr-TR')
-                        });
-                    }
+                let shouldUpdate = false;
+                if (!existingToken || supabaseExpired) {
                     shouldUpdate = true;
+                    if (supabaseExpired) console.log('🔄 Supabase token süresi dolmuş/az kaldı, eklentiden güncel token Supabase\'e yazılıyor');
+                } else if (newToken !== existingToken) {
+                    shouldUpdate = true;
+                    console.log('🔄 Token değeri değişti, Supabase güncelleniyor');
+                } else if (newTimestamp > existingTimestamp) {
+                    shouldUpdate = true;
+                    console.log('🔄 Eklentiden daha yeni timestamp, Supabase güncelleniyor');
+                } else if (newExpiry && existingExpiry && newExpiry > this.normalizeExpiry(existingExpiry)) {
+                    shouldUpdate = true;
+                    console.log('🔄 Eklentiden daha uzun süreli token, Supabase güncelleniyor');
                 }
                 
-                // Eğer güncelleme gerekiyorsa Supabase'e kaydet
                 if (shouldUpdate) {
-                    console.log('📤 Franchise API bilgileri kaydedildi');
                     await this.saveAPIInfoToSupabase(apiInfo);
-                    
-                    // Token expiry'yi güncelle (yeni token çekildiğinde tekrar kontrol yapılmasın)
-                    if (apiInfo.tokenExpiry) {
-                        this.lastTokenExpiry = apiInfo.tokenExpiry;
-                    }
+                    if (apiInfo.tokenExpiry) this.lastTokenExpiry = apiInfo.tokenExpiry;
                 }
             }
         } catch (error) {
             console.warn('⚠️ API bilgileri kontrol edilemedi:', error);
         }
+    }
+
+    // tokenExpiry (number | string) -> timestamp (ms)
+    normalizeExpiry(tokenExpiry) {
+        if (!tokenExpiry) return 0;
+        if (typeof tokenExpiry === 'number') return tokenExpiry;
+        if (typeof tokenExpiry === 'string') {
+            const t = new Date(tokenExpiry).getTime();
+            if (!isNaN(t)) return t;
+            const p = parseInt(tokenExpiry, 10);
+            return isNaN(p) ? 0 : p;
+        }
+        return 0;
     }
 
     async loadProducts() {
