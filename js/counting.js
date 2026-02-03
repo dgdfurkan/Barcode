@@ -58,7 +58,7 @@ class CountingSystem {
                 this.renderFinancialTab();
             } else {
                 // Render table (will render grid if mode is rapid)
-                this.renderTable();
+            this.renderTable();
                 // Update view mode display after render
                 this.updateViewMode();
             }
@@ -281,12 +281,12 @@ class CountingSystem {
             // Fallback to localStorage
             if (!fullData) {
                 const storageKey = `${this.STORAGE_KEY}_${this.currentUser?.username || 'default'}`;
-                const stored = localStorage.getItem(storageKey);
-                if (stored) {
+            const stored = localStorage.getItem(storageKey);
+            if (stored) {
                     fullData = JSON.parse(stored);
                 }
             }
-
+                
             // Migrate old structure if needed
             if (fullData) {
                 fullData = this.migrateToNestedStructure(fullData);
@@ -334,9 +334,9 @@ class CountingSystem {
 
             // Fallback to localStorage
             if (!fullData) {
-            const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
+                const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
+                const stored = localStorage.getItem(storageKey);
+                if (stored) {
                     fullData = JSON.parse(stored);
                 console.log('📦 Loaded counting data from localStorage');
                 }
@@ -349,7 +349,7 @@ class CountingSystem {
                 // Set current table name
                 if (fullData._currentTable) {
                     this.currentTableName = fullData._currentTable;
-            } else {
+                } else {
                     this.currentTableName = 'Ana Sayım';
                     fullData._currentTable = this.currentTableName;
                 }
@@ -363,15 +363,15 @@ class CountingSystem {
                         fullData._tables = {};
                     }
                     fullData._tables[this.currentTableName] = {};
-                this.countingData = {};
-            }
+                    this.countingData = {};
+                }
                 
                 // Save full structure back
                 await this.saveFullCountingData(fullData);
                 } else {
                 // Initialize new structure
                 this.currentTableName = 'Ana Sayım';
-                    this.countingData = {};
+                this.countingData = {};
                 const newStructure = {
                     _api_info: {},
                     _tables: {
@@ -2935,9 +2935,9 @@ class CountingSystem {
                         // Direkt barcode field'ı varsa
                         if (item.barcode === barcode || item.barcode === String(barcode)) {
                             return true;
-                        }
-                        return false;
-                    });
+                    }
+                    return false;
+                });
                 }
                 // Eğer productName varsa, isim ile eşleşeni bul
                 else if (productName) {
@@ -2979,13 +2979,13 @@ class CountingSystem {
                             }
                         }
                         return item.barcode === barcode || item.barcode === String(barcode);
-                    } else if (productName) {
+                        } else if (productName) {
                         const itemName = item.name || (item.fullName && (item.fullName.tr || item.fullName.en)) || '';
                         const nameStr = typeof itemName === 'string' ? itemName : (itemName.tr || itemName.en || '');
                         return nameStr.toLowerCase().includes(productName.toLowerCase());
-                    }
-                    return false;
-                });
+                        }
+                        return false;
+                    });
                 if (foundProduct) {
                     // 0 değeri de geçerli, bu yüzden || yerine explicit kontrol yap
                     if (foundProduct.available !== null && foundProduct.available !== undefined) {
