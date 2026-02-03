@@ -4,6 +4,11 @@
   "version": "1.0.0",
   "description": "Getir franchise stok sayfasından stok verilerini senkronize eder",
   "author": "GunduzDev",
+  "icons": {
+    "16": "icon128.png",
+    "48": "icon128.png",
+    "128": "icon128.png"
+  },
   "permissions": [
     "storage",
     "webRequest"
