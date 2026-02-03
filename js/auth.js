@@ -281,7 +281,7 @@ async function login(username, password) {
                 maxIPCount: user.max_ip_count || 5
             });
             
-            const ipTrackingResult = await checkIPTracking(user.id, clientIP, user.max_ip_count || 5);
+            const ipTrackingResult = await checkIPTracking(user.id, clientIP, user.max_ip_count || 5, user.username);
             console.log('IP Tracking Result:', ipTrackingResult);
             
             if (!ipTrackingResult.success) {
@@ -637,16 +637,15 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // IP Tracking Functions
-async function checkIPTracking(userId, clientIP, maxIPCount) {
+async function checkIPTracking(userId, clientIP, maxIPCount, username) {
     try {
         console.log('checkIPTracking called with:', { userId, clientIP, maxIPCount });
         
         if (window.supabase && typeof window.supabase.rpc === 'function') {
-            // Use Supabase function
-            const { data, error } = await window.supabase.rpc('track_user_ip', {
-                p_user_id: userId,
-                p_ip_address: clientIP
-            });
+            // Use Supabase function (username: user_ip_tracking tablosunda NOT NULL ise gerekli)
+            const params = { p_user_id: userId, p_ip_address: clientIP };
+            if (username != null) params.p_username = username;
+            const { data, error } = await window.supabase.rpc('track_user_ip', params);
 
             if (error) {
                 console.error('Supabase IP tracking error:', error);
