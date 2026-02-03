@@ -37,10 +37,9 @@
                 }
 
                 const { data, error } = await window.supabase
-                    .from('user_ip_tracking')
-                    .select('is_blocked, ip_address, user_id')
+                    .from('blocked_ips')
+                    .select('ip_address')
                     .eq('ip_address', clientIP)
-                    .eq('is_blocked', true)
                     .limit(1);
 
                 if (error) {
@@ -195,8 +194,8 @@
                     return userIPs.size > 1;
                 }
 
-                // Supabase'den kontrol et - user_ip_tracking tablosundan
-                // Önce username'e göre user_id bulmaya çalışalım
+                // users.tracked_ips'ten kontrol et
+                // Önce username'e göre user_id bul
                 let userId = null;
                 
                 // Eğer username bir ID ise direkt kullan
@@ -219,35 +218,27 @@
                     userId = username;
                 }
 
-                // user_ip_tracking tablosundan aktif IP'leri al
-                // NOT: user_id alanı UUID olabilir, ama username string olabilir
-                // Bu yüzden hem user_id hem de username ile arama yapalım
-                const { data, error } = await window.supabase
-                    .from('user_ip_tracking')
-                    .select('ip_address, is_blocked, user_id')
-                    .or(`user_id.eq.${userId},user_id.eq.${username}`)
-                    .eq('is_blocked', false); // Sadece banlanmamış IP'leri say
+                // users.tracked_ips'ten bu kullanıcının IP sayısını al
+                const { data: userRow, error } = await window.supabase
+                    .from('users')
+                    .select('tracked_ips')
+                    .eq('id', userId)
+                    .maybeSingle();
 
                 if (error) {
-                    console.error('Error checking user IPs:', error);
-                    // Hata durumunda localStorage'dan kontrol et
+                    console.error('Error checking user tracked_ips:', error);
                     const ipLogs = JSON.parse(localStorage.getItem('ipLogs') || '[]');
                     const userIPs = new Set();
-                    
                     ipLogs.forEach(log => {
                         if (log.user_id === username && log.logout_time === undefined) {
                             userIPs.add(log.ip_address);
                         }
                     });
-                    
                     return userIPs.size > 1;
                 }
 
-                // Banlanmamış ve aktif IP'leri filtrele
-                const activeIPs = (data || []).filter(ip => !ip.is_blocked);
-                const uniqueIPs = new Set(activeIPs.map(ip => ip.ip_address));
-                
-                return uniqueIPs.size > 1;
+                const tracked = Array.isArray(userRow?.tracked_ips) ? userRow.tracked_ips : [];
+                return tracked.length > 1;
 
             } catch (error) {
                 console.error('Error checking user multiple IPs:', error);
@@ -289,31 +280,20 @@
                 this.realtimeSubscription = supabaseClient
                     .channel(channelName)
                     .on('postgres_changes', {
-                        event: '*', // INSERT, UPDATE, DELETE
+                        event: '*',
                         schema: 'public',
-                        table: 'user_ip_tracking'
-                        // Filter kaldırıldı - tüm değişiklikleri dinle, sonra is_blocked kontrolü yap
+                        table: 'blocked_ips'
                     }, async (payload) => {
-                        // Payload yapısını kontrol et - Supabase farklı formatlar kullanabilir
                         const newData = payload.new || payload.record || {};
                         const oldData = payload.old || {};
-                        
                         const ip = newData.ip_address || oldData.ip_address;
-                        const isBlocked = newData.is_blocked === true;
-                        const wasBlocked = oldData.is_blocked === true;
+                        const eventType = payload.eventType || payload.event;
 
-                        // Sadece is_blocked true olan ve yeni banlanan IP'leri işle
-                        if (ip && isBlocked && !wasBlocked) {
-                            // Cache'i temizle (hemen temizle ki bir sonraki kontrol güncel veriyi alsın)
+                        if (eventType === 'INSERT' && ip) {
                             this.clearCache(ip);
-                            
-                            // Anlık olarak banlanan IP ile giriş yapılmış oturumları kontrol et ve at
                             await this.checkAndLogoutBannedIP(ip);
-                            
-                            // Callback'leri çağır
-                            await this.triggerBanChangeCallbacks(ip, isBlocked);
-                        } else if (ip && !isBlocked && wasBlocked) {
-                            // IP ban kaldırıldıysa sadece cache'i temizle
+                            await this.triggerBanChangeCallbacks(ip, true);
+                        } else if (eventType === 'DELETE' && ip) {
                             this.clearCache(ip);
                         }
                     })

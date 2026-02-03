@@ -131,7 +131,7 @@ async function login(username, password) {
                 // Try to get user with password first
                 const { data, error } = await window.supabase
                     .from('users')
-                    .select('id, username, password, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, max_ip_count, ip_tracking_enabled, allowed_ips')
+                    .select('id, username, password, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, max_ip_count, ip_tracking_enabled, allowed_ips, tracked_ips')
                     .eq('username', username)
                     .single();
                 
@@ -144,7 +144,7 @@ async function login(username, password) {
                     
                     const { data: userData, error: userError } = await window.supabase
                         .from('users')
-                        .select('id, username, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, max_ip_count, ip_tracking_enabled, allowed_ips')
+                        .select('id, username, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, max_ip_count, ip_tracking_enabled, allowed_ips, tracked_ips')
                         .eq('username', username)
                         .single();
                     
@@ -281,7 +281,7 @@ async function login(username, password) {
                 maxIPCount: user.max_ip_count || 5
             });
             
-            const ipTrackingResult = await checkIPTracking(user.id, clientIP, user.max_ip_count || 5, user.username);
+            const ipTrackingResult = await checkIPTracking(user.id, clientIP, user.max_ip_count || 5, user.username, user.tracked_ips);
             console.log('IP Tracking Result:', ipTrackingResult);
             
             if (!ipTrackingResult.success) {
@@ -636,90 +636,47 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// IP Tracking Functions
-async function checkIPTracking(userId, clientIP, maxIPCount, username) {
+// IP tracking: sadece users.tracked_ips + users.max_ip_count (user_ip_tracking kullanılmıyor)
+async function checkIPTracking(userId, clientIP, maxIPCount, username, tracked_ips) {
     try {
-        console.log('checkIPTracking called with:', { userId, clientIP, maxIPCount });
-        
-        if (window.supabase && typeof window.supabase.rpc === 'function') {
-            // Use Supabase function (username: user_ip_tracking tablosunda NOT NULL ise gerekli)
-            const params = { p_user_id: userId, p_ip_address: clientIP };
-            if (username != null) params.p_username = username;
-            const { data, error } = await window.supabase.rpc('track_user_ip', params);
+        const list = Array.isArray(tracked_ips) ? tracked_ips : (tracked_ips ? JSON.parse(JSON.stringify(tracked_ips)) : []);
+        const maxIP = Math.max(1, parseInt(maxIPCount, 10) || 5);
 
+        if (list.includes(clientIP)) {
+            return { success: true, message: 'IP zaten kayıtlı', ip_count: list.length, max_ip: maxIP, is_new: false };
+        }
+        if (list.length >= maxIP) {
+            return {
+                success: false,
+                message: 'Maksimum IP sayısı aşıldı',
+                ip_count: list.length,
+                max_ip: maxIP,
+                is_new: false
+            };
+        }
+
+        if (window.supabase && username) {
+            const newList = [...list, clientIP];
+            const { error } = await window.supabase
+                .from('users')
+                .update({ tracked_ips: newList })
+                .eq('username', username);
             if (error) {
-                console.error('Supabase IP tracking error:', error);
-                throw error;
-            }
-            
-            console.log('Supabase IP tracking result:', data);
-            return data;
-        } else {
-            // Fallback to local storage
-            const ipTrackingData = JSON.parse(localStorage.getItem('ipTrackingData') || '[]');
-            
-            // Check if IP already exists for this user
-            const existingIP = ipTrackingData.find(ip => 
-                ip.user_id === userId && ip.ip_address === clientIP
-            );
-
-            if (existingIP) {
-                // Update existing IP
-                existingIP.last_seen = new Date().toISOString();
-                existingIP.login_count = (existingIP.login_count || 0) + 1;
-                localStorage.setItem('ipTrackingData', JSON.stringify(ipTrackingData));
-                
-                return {
-                    success: true,
-                    message: 'IP güncellendi',
-                    is_new: false
-                };
-            } else {
-                // Check if user has reached max IP count
-                const userIPs = ipTrackingData.filter(ip => 
-                    ip.user_id === userId && !ip.is_blocked
-                );
-
-                if (userIPs.length >= maxIPCount) {
-                    return {
-                        success: false,
-                        message: 'Maksimum IP sayısı aşıldı',
-                        ip_count: userIPs.length,
-                        max_ip: maxIPCount,
-                        is_new: false
-                    };
-                }
-
-                // Add new IP
-                const newIP = {
-                    id: Date.now().toString(),
-                    user_id: userId,
-                    ip_address: clientIP,
-                    first_seen: new Date().toISOString(),
-                    last_seen: new Date().toISOString(),
-                    login_count: 1,
-                    is_blocked: false
-                };
-
-                ipTrackingData.push(newIP);
-                localStorage.setItem('ipTrackingData', JSON.stringify(ipTrackingData));
-
-                return {
-                    success: true,
-                    message: 'Yeni IP eklendi',
-                    ip_count: userIPs.length + 1,
-                    max_ip: maxIPCount,
-                    is_new: true
-                };
+                console.error('tracked_ips güncelleme hatası:', error);
+                return { success: false, message: 'IP takibi hatası', is_new: false };
             }
         }
+
+        return {
+            success: true,
+            message: 'Yeni IP eklendi',
+            ip_count: list.length + 1,
+            max_ip: maxIP,
+            is_new: true
+        };
     } catch (error) {
         console.error('IP tracking error:', error);
-        return {
-            success: false,
-            message: 'IP takibi hatası',
-            is_new: false
-        };
+        return { success: false, message: 'IP takibi hatası', is_new: false };
     }
 }
 

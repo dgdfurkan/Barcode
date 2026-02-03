@@ -194,25 +194,19 @@ class ChatSystem {
             try {
                 const clientIP = await window.guestUserManager.getClientIP();
                 
-                // user_ip_tracking tablosundan IP'ye göre en son giriş yapan kullanıcıyı bul
-                const { data: ipTracking, error: ipError } = await window.supabase
-                    .from('user_ip_tracking')
-                    .select(`
-                        user_id,
-                        last_seen,
-                        users!inner(username)
-                    `)
-                    .eq('ip_address', clientIP)
-                    .eq('is_blocked', false)
-                    .order('last_seen', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
+                // users.tracked_ips içinde bu IP olan kullanıcıyı bul
+                const { data: usersList, error: ipError } = await window.supabase
+                    .from('users')
+                    .select('username')
+                    .contains('tracked_ips', [clientIP])
+                    .limit(1);
 
-                if (!ipError && ipTracking && ipTracking.users && ipTracking.users.username) {
-                    this.currentUser = ipTracking.users.username;
+                const usersWithIP = Array.isArray(usersList) && usersList.length ? usersList[0] : null;
+                if (!ipError && usersWithIP && usersWithIP.username) {
+                    this.currentUser = usersWithIP.username;
                     this.isGuest = false;
                     this.updateChatHeader();
-                    console.log('🔍 Using registered user from IP tracking:', this.currentUser, 'for IP:', clientIP);
+                    console.log('🔍 Using registered user from tracked_ips:', this.currentUser, 'for IP:', clientIP);
                     return;
                 }
             } catch (error) {

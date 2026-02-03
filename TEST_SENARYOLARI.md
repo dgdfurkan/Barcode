@@ -3,7 +3,7 @@
 ## Sistem Özeti
 
 Yeni sistem şu öncelik sırasıyla çalışıyor:
-1. **Kayıtlı Kullanıcı** (user_ip_tracking'den IP'ye göre en son giriş)
+1. **Kayıtlı Kullanıcı** (users.tracked_ips'ten IP'ye göre eşleşen kullanıcı)
 2. **Guest Kullanıcı** (guest_chats'den IP'ye göre)
 3. **Yeni Guest Kullanıcı Oluşturma** (maksimum numara + 1)
 
@@ -64,13 +64,13 @@ Yeni sistem şu öncelik sırasıyla çalışıyor:
 
 **Hazırlık:**
 1. Bir kullanıcı hesabıyla giriş yap (örn: "testuser")
-2. Bu IP'den giriş yapıldığında `user_ip_tracking` tablosunda kayıt oluşur
+2. Bu IP'den giriş yapıldığında kullanıcının `users.tracked_ips` listesine IP eklenir
 3. Çıkış yap
 
 **Test:**
 1. Aynı IP'den (giriş yapmadan) index.html'i aç
 2. Sohbet butonuna tıkla
-3. Console'da şunu görmelisin: `🔍 Using registered user from IP tracking: testuser for IP: [IP_ADRESI]`
+3. Console'da şunu görmelisin: `🔍 Using registered user from tracked_ips: testuser for IP: [IP_ADRESI]`
 4. Chat header'da "Merhaba testuser! 👋" yazmalı
 
 **Beklenen Sonuç:**
@@ -221,18 +221,17 @@ Kontrol edilecekler:
 - `chat_messages`: JSON array formatında mesajlar
 - `last_chat_update`: Son mesaj zamanı
 
-### user_ip_tracking Tablosu:
+### users.tracked_ips (IP takibi):
 ```sql
-SELECT u.username, uit.ip_address, uit.last_seen 
-FROM user_ip_tracking uit
-JOIN users u ON uit.user_id = u.id
-ORDER BY uit.last_seen DESC
+SELECT id, username, tracked_ips, max_ip_count 
+FROM users 
+WHERE tracked_ips IS NOT NULL AND array_length(tracked_ips, 1) > 0
 LIMIT 10;
 ```
 
 Kontrol edilecekler:
-- IP adresine göre en son giriş yapan kullanıcı
-- `last_seen` tarihi
+- Kullanıcıya ait takip edilen IP listesi (`tracked_ips`)
+- `max_ip_count` sınırı
 
 ---
 

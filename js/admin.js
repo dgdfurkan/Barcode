@@ -1049,24 +1049,14 @@ class AdminPanel {
                     ip: ipAddress,
                     sessions: 0,
                     totalDuration: 0,
-                    lastSeen: ip.last_seen,
+                    lastSeen: null,
                     users: new Set(),
                     isSuspicious: false
                 };
             }
-            
-            ipStats[ipAddress].sessions += ip.login_count || 1;
-            totalSessions += ip.login_count || 1;
-            
-            if (ip.username) {
-                ipStats[ipAddress].users.add(ip.username);
-            }
-            
-            if (new Date(ip.last_seen) > new Date(ipStats[ipAddress].lastSeen)) {
-                ipStats[ipAddress].lastSeen = ip.last_seen;
-            }
-
-            // Detect suspicious activity
+            ipStats[ipAddress].sessions += 1;
+            totalSessions += 1;
+            if (ip.username) ipStats[ipAddress].users.add(ip.username);
             if (ipStats[ipAddress].sessions > 10 || ipStats[ipAddress].users.size > 3) {
                 ipStats[ipAddress].isSuspicious = true;
                 suspiciousCount++;
@@ -1080,9 +1070,7 @@ class AdminPanel {
             suspiciousIPs: suspiciousCount,
             topIPs: Object.values(ipStats)
                 .sort((a, b) => b.sessions - a.sessions),
-            timeline: this.ipTrackingData
-                .sort((a, b) => new Date(b.last_seen) - new Date(a.last_seen))
-                .slice(0, 50)
+            timeline: [...this.ipTrackingData].slice(0, 50)
         };
 
         this.renderIPAnalysis();
@@ -1341,13 +1329,10 @@ class AdminPanel {
         }
         
         const csvContent = [
-            ['Kullanıcı', 'IP Adresi', 'İlk Görülme', 'Son Görülme', 'Giriş Sayısı', 'Durum'],
+            ['Kullanıcı', 'IP Adresi', 'Durum'],
             ...this.ipTrackingData.map(ip => [
                 ip.username || 'Bilinmeyen',
                 ip.ip_address,
-                new Date(ip.first_seen).toLocaleString('tr-TR'),
-                new Date(ip.last_seen).toLocaleString('tr-TR'),
-                ip.login_count || 1,
                 ip.is_blocked ? 'Engelli' : 'Aktif'
             ])
         ].map(row => row.join(',')).join('\n');
@@ -1364,73 +1349,32 @@ class AdminPanel {
     }
 
     async addTestIPData() {
-        console.log('🧪 Adding test IP data...');
-        
+        console.log('🧪 Adding test IP data (users.tracked_ips)...');
         try {
-            // Get first user for testing
             const { data: users, error: usersError } = await window.supabase
                 .from('users')
-                .select('id, username')
+                .select('id, username, tracked_ips')
                 .limit(1);
-            
             if (usersError || !users || users.length === 0) {
-                console.error('❌ No users found for test data');
                 alert('Önce bir kullanıcı eklemeniz gerekiyor!');
                 return;
             }
-            
-            const testUser = users[0];
-            console.log('👤 Using test user:', testUser);
-            
-            const testData = [
-                {
-                    user_id: testUser.id,
-                    ip_address: '192.168.1.100',
-                    username: testUser.username,
-                    first_seen: new Date().toISOString(),
-                    last_seen: new Date().toISOString(),
-                    login_count: 5,
-                    is_blocked: false
-                },
-                {
-                    user_id: testUser.id,
-                    ip_address: '192.168.1.101',
-                    username: testUser.username,
-                    first_seen: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-                    last_seen: new Date().toISOString(),
-                    login_count: 12,
-                    is_blocked: false
-                },
-                {
-                    user_id: testUser.id,
-                    ip_address: '192.168.1.102',
-                    username: testUser.username,
-                    first_seen: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-                    last_seen: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-                    login_count: 3,
-                    is_blocked: true
-                }
-            ];
-            
-            console.log('📝 Inserting test data:', testData);
-            
-            const { data: insertData, error: insertError } = await window.supabase
-                .from('user_ip_tracking')
-                .insert(testData)
-                .select();
-            
-            if (insertError) {
-                console.error('❌ Error inserting test data:', insertError);
-                alert('Test verisi eklenirken hata oluştu: ' + insertError.message);
-            } else {
-                console.log('✅ Test data inserted:', insertData);
-                alert('✅ Test verisi başarıyla eklendi! (' + insertData.length + ' kayıt)');
-                this.loadIPTracking(); // Reload data
-            }
-            
+            const u = users[0];
+            const current = Array.isArray(u.tracked_ips) ? u.tracked_ips : [];
+            const testIPs = ['192.168.1.100', '192.168.1.101', '192.168.1.102'];
+            const added = testIPs.filter(ip => !current.includes(ip));
+            const newList = [...current];
+            added.forEach(ip => newList.push(ip));
+            const { error } = await window.supabase
+                .from('users')
+                .update({ tracked_ips: newList })
+                .eq('id', u.id);
+            if (error) throw error;
+            alert('✅ Test IP adresleri kullanıcıya eklendi: ' + (added.length ? added.join(', ') : 'zaten vardı'));
+            this.loadIPTracking();
         } catch (error) {
-            console.error('❌ Error adding test data:', error);
-            alert('Hata: ' + error.message);
+            console.error('❌ Error adding test IP data:', error);
+            alert('Hata: ' + (error?.message || error));
         }
     }
 
@@ -1456,49 +1400,28 @@ class AdminPanel {
                 console.log('✅ Users table OK:', users);
             }
             
-            // Test 2: Check user_ip_tracking table
-            console.log('🔍 Test 2: Checking user_ip_tracking table...');
-            const { data: ipTracking, error: ipError } = await window.supabase
-                .from('user_ip_tracking')
-                .select('*')
+            // Test 2: Check blocked_ips table
+            console.log('🔍 Test 2: Checking blocked_ips table...');
+            const { data: blockedCheck, error: blockedError } = await window.supabase
+                .from('blocked_ips')
+                .select('id')
                 .limit(1);
-            
-            if (ipError) {
-                console.error('❌ user_ip_tracking table error:', ipError);
+            if (blockedError) {
+                console.error('❌ blocked_ips table error:', blockedError);
             } else {
-                console.log('✅ user_ip_tracking table OK:', ipTracking);
+                console.log('✅ blocked_ips table OK:', blockedCheck);
             }
             
-            // Test 3: Check if we can insert test data
-            console.log('🔍 Test 3: Testing insert capability...');
-            const testData = {
-                user_id: users?.[0]?.id || '00000000-0000-0000-0000-000000000000',
-                ip_address: '127.0.0.1',
-                username: 'test_user',
-                first_seen: new Date().toISOString(),
-                last_seen: new Date().toISOString(),
-                login_count: 1,
-                is_blocked: false
-            };
-            
-            const { data: insertData, error: insertError } = await window.supabase
-                .from('user_ip_tracking')
-                .insert([testData])
-                .select();
-            
-            if (insertError) {
-                console.error('❌ Insert test error:', insertError);
+            // Test 3: Users.tracked_ips (read-only check)
+            console.log('🔍 Test 3: Checking users.tracked_ips...');
+            const { data: usersWithIPs, error: usersIPError } = await window.supabase
+                .from('users')
+                .select('id, username, tracked_ips')
+                .limit(1);
+            if (usersIPError) {
+                console.error('❌ users.tracked_ips error:', usersIPError);
             } else {
-                console.log('✅ Insert test OK:', insertData);
-                
-                // Clean up test data
-                if (insertData && insertData[0]) {
-                    await window.supabase
-                        .from('user_ip_tracking')
-                        .delete()
-                        .eq('id', insertData[0].id);
-                    console.log('🧹 Test data cleaned up');
-                }
+                console.log('✅ users.tracked_ips OK:', usersWithIPs);
             }
             
         } catch (error) {
@@ -1704,60 +1627,44 @@ class AdminPanel {
     // IP Tracking Functions
     async loadIPTracking() {
         try {
-            console.log('🔄 Loading IP tracking data...');
-            console.log('🔍 Supabase available:', !!window.supabase);
-            console.log('🔍 Supabase URL:', window.supabase?.supabaseUrl);
-            
-            if (window.supabase) {
-                console.log('📡 Fetching from Supabase...');
-                
-                // First, let's check if the table exists
-                const { data: tableCheck, error: tableError } = await window.supabase
-                    .from('user_ip_tracking')
-                    .select('count')
-                    .limit(1);
-                
-                if (tableError) {
-                    console.error('❌ Table check error:', tableError);
-                    console.log('💾 Falling back to local storage...');
-                    this.ipTrackingData = JSON.parse(localStorage.getItem('ipTrackingData') || '[]');
-                    console.log('📦 Local storage IP tracking data:', this.ipTrackingData);
-                    this.renderIPTracking();
-                    return;
-                }
-                
-                console.log('✅ Table exists, fetching data...');
-                
-                const { data, error } = await window.supabase
-                    .from('user_ip_tracking')
-                    .select(`
-                        *,
-                        users!inner(username)
-                    `)
-                    .order('last_seen', { ascending: false });
-
-                if (error) {
-                    console.error('❌ Supabase IP tracking error:', error);
-                    console.log('💾 Falling back to local storage...');
-                    this.ipTrackingData = JSON.parse(localStorage.getItem('ipTrackingData') || '[]');
-                    console.log('📦 Local storage IP tracking data:', this.ipTrackingData);
-                } else {
-                    console.log('✅ IP tracking data loaded from Supabase:', data);
-                    this.ipTrackingData = data || [];
-                }
-            } else {
-                // Fallback to local storage
-                console.log('💾 Supabase not available, using local storage...');
-                this.ipTrackingData = JSON.parse(localStorage.getItem('ipTrackingData') || '[]');
-                console.log('📦 Local storage IP tracking data:', this.ipTrackingData);
+            console.log('🔄 Loading IP tracking data (users.tracked_ips)...');
+            if (!window.supabase) {
+                this.ipTrackingData = [];
+                this.renderIPTracking();
+                return;
             }
-
+            const { data: usersData, error: usersError } = await window.supabase
+                .from('users')
+                .select('id, username, tracked_ips');
+            if (usersError) {
+                console.error('❌ Users/tracked_ips error:', usersError);
+                this.ipTrackingData = [];
+                this.renderIPTracking();
+                return;
+            }
+            const { data: blockedRows } = await window.supabase
+                .from('blocked_ips')
+                .select('ip_address');
+            const blockedSet = new Set((blockedRows || []).map(r => r.ip_address));
+            const flat = [];
+            (usersData || []).forEach(u => {
+                const ips = Array.isArray(u.tracked_ips) ? u.tracked_ips : [];
+                ips.forEach(ip => {
+                    flat.push({
+                        user_id: u.id,
+                        username: u.username || 'Bilinmeyen',
+                        ip_address: ip,
+                        is_blocked: blockedSet.has(ip),
+                        first_seen: null,
+                        last_seen: null,
+                        login_count: null
+                    });
+                });
+            });
+            this.ipTrackingData = flat;
             console.log('📊 Total IP tracking records:', this.ipTrackingData.length);
             this.renderIPTracking();
-            
-            // Also trigger IP analysis if we're on the IP Analysis tab
             if (this.currentTab === 'ipAnalysis') {
-                console.log('🔍 Triggering IP analysis...');
                 this.analyzeIPData();
             }
         } catch (error) {
@@ -1785,7 +1692,8 @@ class AdminPanel {
             const row = document.createElement('tr');
             const statusClass = ip.is_blocked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800';
             const statusText = ip.is_blocked ? 'Engellenen' : 'Aktif';
-            
+            const ipEsc = (ip.ip_address || '').replace(/'/g, "\\'");
+            const userIdEsc = (ip.user_id || '').replace(/'/g, "\\'");
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-900">${ip.username || 'Bilinmeyen'}</div>
@@ -1795,13 +1703,13 @@ class AdminPanel {
                     <div class="text-sm text-gray-900">${ip.ip_address}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm text-gray-900">${new Date(ip.first_seen).toLocaleString('tr-TR')}</div>
+                    <div class="text-sm text-gray-500">—</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm text-gray-900">${new Date(ip.last_seen).toLocaleString('tr-TR')}</div>
+                    <div class="text-sm text-gray-500">—</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm text-gray-900">${ip.login_count}</div>
+                    <div class="text-sm text-gray-500">—</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="px-2 py-1 rounded-full text-xs font-medium ${statusClass}">
@@ -1810,11 +1718,11 @@ class AdminPanel {
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div class="flex space-x-2">
-                        ${ip.is_blocked ? 
-                            `<button onclick="adminPanel.unblockIP('${ip.id}')" class="text-green-600 hover:text-green-900">Engeli Kaldır</button>` :
-                            `<button onclick="adminPanel.blockIPTracking('${ip.id}')" class="text-red-600 hover:text-red-900">Engelle</button>`
+                        ${ip.is_blocked ?
+                            `<button onclick="adminPanel.unblockIPByAddress('${ipEsc}')" class="text-green-600 hover:text-green-900">Engeli Kaldır</button>` :
+                            `<button onclick="adminPanel.blockIPTracking('${ipEsc}')" class="text-red-600 hover:text-red-900">Engelle</button>`
                         }
-                        <button onclick="adminPanel.deleteIPTracking('${ip.id}')" class="text-gray-600 hover:text-gray-900">Sil</button>
+                        <button onclick="adminPanel.deleteIPTracking('${userIdEsc}','${ipEsc}')" class="text-gray-600 hover:text-gray-900">Sil</button>
                     </div>
                 </td>
             `;
@@ -1822,55 +1730,31 @@ class AdminPanel {
         });
     }
 
-    async blockIPTracking(ipId) {
-        if (confirm('Bu IP adresini engellemek istediğinizden emin misiniz?')) {
-            try {
-                if (window.supabase) {
-                    const { error } = await window.supabase
-                        .from('user_ip_tracking')
-                        .update({ is_blocked: true })
-                        .eq('id', ipId);
-
-                    if (error) throw error;
-                } else {
-                    // Local storage fallback
-                    const index = this.ipTrackingData.findIndex(ip => ip.id === ipId);
-                    if (index !== -1) {
-                        this.ipTrackingData[index].is_blocked = true;
-                        localStorage.setItem('ipTrackingData', JSON.stringify(this.ipTrackingData));
-                    }
-                }
-
-                await this.loadIPTracking();
-                await this.loadBlockedIPs(); // Reload blocked IPs list
-                alert('IP adresi engellendi!');
-            } catch (error) {
-                console.error('Error blocking IP:', error);
-                alert('IP engellenirken hata oluştu!');
-            }
+    async blockIPTracking(ipAddress) {
+        if (!ipAddress || !confirm('Bu IP adresini engellemek istediğinizden emin misiniz?')) return;
+        try {
+            const { error } = await window.supabase
+                .from('blocked_ips')
+                .upsert({ ip_address: ipAddress }, { onConflict: 'ip_address' });
+            if (error) throw error;
+            await this.loadIPTracking();
+            await this.loadBlockedIPs();
+            alert('IP adresi engellendi!');
+        } catch (error) {
+            console.error('Error blocking IP:', error);
+            alert('IP engellenirken hata oluştu!');
         }
     }
 
-    async unblockIP(ipId) {
+    async unblockIP(blockedId) {
         try {
-            if (window.supabase) {
-                const { error } = await window.supabase
-                    .from('user_ip_tracking')
-                    .update({ is_blocked: false })
-                    .eq('id', ipId);
-
-                if (error) throw error;
-            } else {
-                // Local storage fallback
-                const index = this.ipTrackingData.findIndex(ip => ip.id === ipId);
-                if (index !== -1) {
-                    this.ipTrackingData[index].is_blocked = false;
-                    localStorage.setItem('ipTrackingData', JSON.stringify(this.ipTrackingData));
-                }
-            }
-
+            const { error } = await window.supabase
+                .from('blocked_ips')
+                .delete()
+                .eq('id', blockedId);
+            if (error) throw error;
             await this.loadIPTracking();
-            await this.loadBlockedIPs(); // Reload blocked IPs list
+            await this.loadBlockedIPs();
             alert('IP engeli kaldırıldı!');
         } catch (error) {
             console.error('Error unblocking IP:', error);
@@ -1878,22 +1762,31 @@ class AdminPanel {
         }
     }
 
-    // Load blocked IPs
+    async unblockIPByAddress(ipAddress) {
+        if (!ipAddress) return;
+        try {
+            const { error } = await window.supabase
+                .from('blocked_ips')
+                .delete()
+                .eq('ip_address', ipAddress);
+            if (error) throw error;
+            await this.loadIPTracking();
+            await this.loadBlockedIPs();
+            alert('IP engeli kaldırıldı!');
+        } catch (error) {
+            console.error('Error unblocking IP:', error);
+            alert('IP engeli kaldırılırken hata oluştu!');
+        }
+    }
+
     async loadBlockedIPs() {
         try {
-            if (!window.supabase) {
-                console.warn('Supabase not available for loading blocked IPs');
-                return;
-            }
-
+            if (!window.supabase) return;
             const { data, error } = await window.supabase
-                .from('user_ip_tracking')
-                .select('id, ip_address, is_blocked, first_seen, last_seen, updated_at, user_id')
-                .eq('is_blocked', true)
-                .order('updated_at', { ascending: false });
-
+                .from('blocked_ips')
+                .select('id, ip_address, created_at')
+                .order('created_at', { ascending: false });
             if (error) throw error;
-
             this.blockedIPsData = data || [];
             this.renderBlockedIPs();
         } catch (error) {
@@ -1917,94 +1810,51 @@ class AdminPanel {
 
         tbody.innerHTML = '';
 
-        // Group IPs by IP address to show related users
-        const ipGroups = {};
         this.blockedIPsData.forEach(ip => {
-            if (!ipGroups[ip.ip_address]) {
-                ipGroups[ip.ip_address] = [];
-            }
-            ipGroups[ip.ip_address].push(ip);
-        });
-
-        // Render each IP group
-        Object.entries(ipGroups).forEach(([ipAddress, ips]) => {
-            const firstIP = ips[0];
-            const latestUpdate = ips.reduce((latest, ip) => {
-                const ipDate = new Date(ip.updated_at || ip.last_seen);
-                const latestDate = new Date(latest.updated_at || latest.last_seen);
-                return ipDate > latestDate ? ip : latest;
-            }, firstIP);
-
-            // Get usernames for this IP
-            const userIds = [...new Set(ips.map(ip => ip.user_id).filter(Boolean))];
-            let usernames = [];
-            
-            if (userIds.length > 0 && this.users) {
-                usernames = userIds.map(userId => {
-                    const user = this.users.find(u => u.id === userId);
-                    return user ? user.username : null;
-                }).filter(Boolean);
-            }
-
             const row = document.createElement('tr');
             row.className = 'hover:bg-gray-50';
-            
-            const banDate = new Date(latestUpdate.updated_at || latestUpdate.last_seen);
-            const lastSeenDate = new Date(latestUpdate.last_seen);
-            
+            const banDate = new Date(ip.created_at || 0);
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center">
-                        <span class="text-sm font-medium text-gray-900">${ipAddress}</span>
-                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                            Engelli
-                        </span>
+                        <span class="text-sm font-medium text-gray-900">${ip.ip_address}</span>
+                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Engelli</span>
                     </div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm text-gray-900">
-                        ${usernames.length > 0 ? usernames.map(u => `<span class="inline-block bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs mr-1 mb-1">${u}</span>`).join('') : '<span class="text-gray-400">Kullanıcı bilgisi yok</span>'}
-                    </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${banDate.toLocaleDateString('tr-TR')} ${banDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${lastSeenDate.toLocaleDateString('tr-TR')} ${lastSeenDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                </td>
+                <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm text-gray-500">—</div></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${banDate.toLocaleDateString('tr-TR')} ${banDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">—</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button onclick="adminPanel.unblockIP('${firstIP.id}')" class="text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100 px-3 py-1 rounded text-xs">
-                        Engeli Kaldır
-                    </button>
+                    <button onclick="adminPanel.unblockIP('${ip.id}')" class="text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100 px-3 py-1 rounded text-xs">Engeli Kaldır</button>
                 </td>
             `;
-            
             tbody.appendChild(row);
         });
     }
 
-    async deleteIPTracking(ipId) {
-        if (confirm('Bu IP kaydını silmek istediğinizden emin misiniz?')) {
-            try {
-                if (window.supabase) {
-                    const { error } = await window.supabase
-                        .from('user_ip_tracking')
-                        .delete()
-                        .eq('id', ipId);
-
-                    if (error) throw error;
-                } else {
-                    // Local storage fallback
-                    this.ipTrackingData = this.ipTrackingData.filter(ip => ip.id !== ipId);
-                    localStorage.setItem('ipTrackingData', JSON.stringify(this.ipTrackingData));
-                }
-
-                await this.loadIPTracking();
-                alert('IP kaydı silindi!');
-            } catch (error) {
-                console.error('Error deleting IP tracking:', error);
-                alert('IP kaydı silinirken hata oluştu!');
+    async deleteIPTracking(userId, ipAddress) {
+        if (!userId || !ipAddress || !confirm('Bu IP kaydını kullanıcıdan kaldırmak istediğinizden emin misiniz?')) return;
+        try {
+            const { data: u, error: fetchErr } = await window.supabase
+                .from('users')
+                .select('tracked_ips')
+                .eq('id', userId)
+                .single();
+            if (fetchErr || !u) {
+                throw new Error(fetchErr?.message || 'Kullanıcı bulunamadı');
             }
+            const current = Array.isArray(u.tracked_ips) ? u.tracked_ips : [];
+            const updated = current.filter(ip => ip !== ipAddress);
+            const { error } = await window.supabase
+                .from('users')
+                .update({ tracked_ips: updated })
+                .eq('id', userId);
+            if (error) throw error;
+            await this.loadIPTracking();
+            alert('IP kaydı kaldırıldı!');
+        } catch (error) {
+            console.error('Error removing IP from user:', error);
+            alert('IP kaldırılırken hata oluştu!');
         }
     }
 }
