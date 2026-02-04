@@ -1267,6 +1267,7 @@
 
             .header-user-info,
             #addProductBtn,
+            #headerCountingPageBtn,
             #settingsBtn,
             #logoutBtn,
             header .w-10 {
@@ -1355,14 +1356,16 @@
 
             #addProductBtn,
             #settingsBtn,
-            #logoutBtn {
+            #logoutBtn,
+            #headerCountingPageBtn {
                 padding: 0.5rem 0.75rem !important;
                 font-size: 0.875rem !important;
             }
 
             #addProductBtn svg,
             #settingsBtn svg,
-            #logoutBtn svg {
+            #logoutBtn svg,
+            #headerCountingPageBtn svg {
                 width: 18px !important;
                 height: 18px !important;
             }
@@ -1949,6 +1952,14 @@
                         </svg>
                         <span>Ürün Ekle</span>
                     </button>
+
+                    <!-- Sayım Sayfası (sadece premium stokSayimi aktifse görünür) -->
+                    <button id="headerCountingPageBtn" class="btn-secondary text-sm mr-2 hidden" type="button" aria-label="Sayım Sayfası">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span>Sayım Sayfası</span>
+                    </button>
                     
                     <!-- Trial Countdown (Süre) - Solda -->
                     <div id="trialCountdownContainer" class="flex items-center space-x-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200">
@@ -2036,6 +2047,14 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                 </svg>
                 <span>Ürün Ekle</span>
+            </button>
+
+            <!-- Sayım Sayfası (sadece premium stokSayimi aktifse görünür) -->
+            <button id="mobileCountingPageBtn" class="mobile-menu-item hidden" type="button" aria-label="Sayım Sayfası">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Sayım Sayfası</span>
             </button>
 
             <button id="mobileSettingsBtn" class="mobile-menu-item">
@@ -2719,7 +2738,9 @@
         const mobileAddProductBtn = document.getElementById('mobileAddProductBtn');
         const mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
         const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
+        const mobileCountingPageBtn = document.getElementById('mobileCountingPageBtn');
         const addProductBtn = document.getElementById('addProductBtn');
+        const headerCountingPageBtn = document.getElementById('headerCountingPageBtn');
         const settingsBtn = document.getElementById('settingsBtn');
         const logoutBtn = document.getElementById('logoutBtn');
 
@@ -2772,6 +2793,19 @@
             mobileLogoutBtn.addEventListener('click', () => {
                 logoutBtn.click();
                 closeMobileMenu();
+            });
+        }
+
+        if (mobileCountingPageBtn) {
+            mobileCountingPageBtn.addEventListener('click', () => {
+                closeMobileMenu();
+                window.location.replace('counting.html');
+            });
+        }
+
+        if (headerCountingPageBtn) {
+            headerCountingPageBtn.addEventListener('click', () => {
+                window.location.replace('counting.html');
             });
         }
 
@@ -3207,6 +3241,34 @@
             } catch (e) {}
         }
         
+        // Sayım Sayfası butonlarını sadece stokSayimi premium aktifse göster (header + mobil menü)
+        async function updateCountingPageButtonsVisibility() {
+            const headerBtn = document.getElementById('headerCountingPageBtn');
+            const mobileBtn = document.getElementById('mobileCountingPageBtn');
+            if (!headerBtn && !mobileBtn) return;
+            try {
+                if (!window.authUtils || !window.authUtils.checkAuth()) {
+                    if (headerBtn) headerBtn.classList.add('hidden');
+                    if (mobileBtn) mobileBtn.classList.add('hidden');
+                    return;
+                }
+                if (window.premiumFeatures) {
+                    await window.premiumFeatures.init();
+                }
+                const hasStokSayimi = window.premiumFeatures && window.premiumFeatures.checkPremiumFeature('stokSayimi');
+                if (hasStokSayimi) {
+                    if (headerBtn) headerBtn.classList.remove('hidden');
+                    if (mobileBtn) mobileBtn.classList.remove('hidden');
+                } else {
+                    if (headerBtn) headerBtn.classList.add('hidden');
+                    if (mobileBtn) mobileBtn.classList.add('hidden');
+                }
+            } catch (e) {
+                if (headerBtn) headerBtn.classList.add('hidden');
+                if (mobileBtn) mobileBtn.classList.add('hidden');
+            }
+        }
+
         // Initialize premium features when ready
         async function initAutoPasteFeature() {
             // Wait for premium features to load
@@ -3244,6 +3306,7 @@
                         }
                     });
                 }
+                updateCountingPageButtonsVisibility();
             } else {
                 // Fallback: use local storage if premium features not loaded
                 if (autoPasteEnabledEl) {
@@ -3252,15 +3315,19 @@
                         setAutoPasteEnabled(autoPasteEnabledEl.checked);
                     });
                 }
+                updateCountingPageButtonsVisibility();
             }
         }
         
         // Initialize when page loads
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
-                setTimeout(initAutoPasteFeature, 1000); // Wait for auth to be ready
+                // Sayım butonlarını mümkün olan en kısa sürede güncelle (auth/premium hazır olur olmaz)
+                setTimeout(updateCountingPageButtonsVisibility, 150);
+                setTimeout(initAutoPasteFeature, 1000); // Wait for auth to be ready (auto-paste UI)
             });
         } else {
+            setTimeout(updateCountingPageButtonsVisibility, 150);
             setTimeout(initAutoPasteFeature, 1000);
         }
 

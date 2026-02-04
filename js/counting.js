@@ -27,6 +27,7 @@ class CountingSystem {
         this.currentChartIndex = 0; // Current chart index in carousel
         this.totalCharts = 6; // Total number of charts
         this.chartCarouselSetup = false; // Chart carousel setup flag
+        this.cameraScanAndCountMode = false; // Kamera: barkod okutunca sayım ekranı açılsın
     }
 
     async init() {
@@ -1001,6 +1002,14 @@ class CountingSystem {
                 }
             });
         }
+
+        // Sayarak ilerle toggle (kamera: okutunca sayım ekranı açılsın)
+        const cameraScanAndCountToggle = document.getElementById('cameraScanAndCountToggle');
+        if (cameraScanAndCountToggle) {
+            cameraScanAndCountToggle.addEventListener('change', (e) => {
+                this.cameraScanAndCountMode = !!e.target.checked;
+            });
+        }
         
         // Table management event listeners
         const tableSelectorBtn = document.getElementById('tableSelectorBtn');
@@ -1249,7 +1258,12 @@ class CountingSystem {
                 }, 300);
             });
             
-            // Hide results when clicking outside
+            // Dropdown içine tıklanınca kapanmasın: iç tıklamaları document'e iletme
+            if (manualInputResults) {
+                manualInputResults.addEventListener('click', (e) => e.stopPropagation());
+            }
+            
+            // Sadece boş bir alana (input ve dropdown dışına) tıklanınca kapat
             document.addEventListener('click', (e) => {
                 if (manualInputResults && !manualInput.contains(e.target) && !manualInputResults.contains(e.target)) {
                     manualInputResults.classList.add('hidden');
@@ -1914,6 +1928,24 @@ class CountingSystem {
         this.showDeleteConfirmModal(productId);
     }
 
+    // Sayım listesinden onay penceresi olmadan çıkar (manuel arama panelinden toggle için)
+    removeProductFromCountingSilent(productId) {
+        if (!this.countingData[productId]) return;
+        delete this.countingData[productId];
+        this.skippedProducts.delete(productId);
+        this.saveCountingData();
+        const bottomSheet = document.getElementById('countingBottomSheet');
+        if (bottomSheet && !bottomSheet.classList.contains('hidden') && this.currentCountingProduct === productId) {
+            this.closeCountingBottomSheet();
+        }
+        this.renderTable();
+        if (this.currentViewMode === 'rapid') {
+            this.renderRapidCountingMode();
+        }
+        this.updateStatistics();
+        this.updateCountingProgress();
+    }
+
     showDeleteConfirmModal(productId) {
         // Ürün bilgisini al
         const product = this.allProducts.find(p => p.id === productId);
@@ -1928,7 +1960,7 @@ class CountingSystem {
         // Modal overlay oluştur
         const overlay = document.createElement('div');
         overlay.id = 'deleteConfirmModal';
-        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]';
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[120]';
         overlay.style.backdropFilter = 'blur(4px)';
         
         overlay.innerHTML = `
@@ -3911,6 +3943,21 @@ class CountingSystem {
         return null; // No uncounted product found
     }
 
+    isCameraScanAndCountMode() {
+        return !!this.cameraScanAndCountMode;
+    }
+
+    // Kamera ile barkod okutulduktan sonra sayım ekranını aç (sayarak ilerle modu)
+    onCameraScannedProductOpenForCount(productId) {
+        const isSeriOkuma = window.barcodeScanner && window.barcodeScanner.continuousMode;
+        if (!isSeriOkuma) {
+            const cameraScannerModal = document.getElementById('cameraScannerModal');
+            if (cameraScannerModal) cameraScannerModal.classList.add('hidden');
+            if (window.barcodeScanner) window.barcodeScanner.stopScanning();
+        }
+        this.openCountingBottomSheet(productId);
+    }
+
     openCountingBottomSheet(productId) {
         const product = this.allProducts.find(p => p.id === productId);
         if (!product) return;
@@ -4601,13 +4648,12 @@ class CountingSystem {
         return productsWithData.map(item => item.productId);
     }
     
-    // Show manual input search results
+    // Show manual input search results (panel açık kalır; eklenenler tıklanınca çıkar)
     showManualInputResults(query) {
         const resultsContainer = document.getElementById('manualInputResults');
         if (!resultsContainer) return;
         
-        // Use advanced search similar to product_search.html
-        const results = this.advancedProductSearch(query, 10); // Limit to 10 results
+        const results = this.advancedProductSearch(query, 20);
         
         if (results.length === 0) {
             resultsContainer.innerHTML = '<div class="p-3 text-sm text-gray-500">Ürün bulunamadı</div>';
@@ -4618,20 +4664,23 @@ class CountingSystem {
         resultsContainer.innerHTML = results.map(product => {
             const isAlreadyAdded = this.countingData[product.id] !== undefined;
             return `
-                <div class="p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 ${isAlreadyAdded ? 'bg-green-50' : ''}" 
+                <div class="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 transition-colors ${isAlreadyAdded ? 'bg-green-50 hover:bg-green-100' : ''}" 
                      data-product-id="${product.id}"
                      onclick="window.countingSystem.addProductFromManualInput('${product.id}')">
                     <div class="flex items-center space-x-3">
-                        <img src="${product.image || '../assets/logo.png'}" alt="${product.name}" class="w-10 h-10 object-cover rounded">
-                        <div class="flex-1">
-                            <h4 class="text-sm font-medium text-gray-900">${product.name || 'Bilinmeyen Ürün'}</h4>
+                        <img src="${product.image || '../assets/logo.png'}" alt="${product.name}" class="w-10 h-10 object-cover rounded flex-shrink-0">
+                        <div class="flex-1 min-w-0">
+                            <h4 class="text-sm font-medium text-gray-900 truncate">${product.name || 'Bilinmeyen Ürün'}</h4>
                             ${product.barcodes && product.barcodes.length > 0 ? 
-                                `<p class="text-xs text-gray-500">${product.barcodes.length > 1 ? 
+                                `<p class="text-xs text-gray-500 truncate">${product.barcodes.length > 1 ? 
                                     `Barkodlar: ${product.barcodes.map(b => b.code).join(', ')}` : 
                                     `Barkod: ${product.barcodes[0].code}`
                                 }</p>` : ''
                             }
-                            ${isAlreadyAdded ? '<span class="text-xs text-green-600 font-medium">Eklendi</span>' : ''}
+                            ${isAlreadyAdded 
+                                ? '<span class="inline-flex items-center gap-1 mt-1 text-xs text-green-700 font-semibold">✓ Eklendi <span class="text-green-600 font-normal">(çıkarmak için tıkla)</span></span>' 
+                                : '<span class="text-xs text-blue-600 font-medium mt-1 inline-block">Ekle</span>'
+                            }
                         </div>
                     </div>
                 </div>
@@ -4641,19 +4690,24 @@ class CountingSystem {
         resultsContainer.classList.remove('hidden');
     }
     
-    // Add product from manual input dropdown
+    // Add product from manual input dropdown (toggle: ekliyse çıkar, değilse ekle; panel açık kalır)
     addProductFromManualInput(productId) {
         const product = this.allProducts.find(p => p.id === productId);
-        if (product) {
+        if (!product) return;
+
+        const manualInput = document.getElementById('manualProductInput');
+        const resultsContainer = document.getElementById('manualInputResults');
+        const currentQuery = manualInput ? manualInput.value.trim() : '';
+
+        if (this.countingData[productId]) {
+            this.removeProductFromCountingSilent(productId);
+        } else {
             this.addProductToCounting(product);
-            const manualInput = document.getElementById('manualProductInput');
-            if (manualInput) {
-                manualInput.value = '';
-            }
-            const resultsContainer = document.getElementById('manualInputResults');
-            if (resultsContainer) {
-                resultsContainer.classList.add('hidden');
-            }
+        }
+
+        // Paneli kapatma, input'u silme; aynı arama ile listeyi anlık güncelle (Eklendi durumları)
+        if (currentQuery.length >= 2 && resultsContainer) {
+            this.showManualInputResults(currentQuery);
         }
     }
     
@@ -4678,10 +4732,17 @@ class CountingSystem {
             
             let found = false;
             
-            // Check barcodes first (exact match)
+            // Check barcodes: önce tam eşleşme, yoksa kısmi (ilk/son 4 hane vb. ile arama)
             if (product.barcodes && product.barcodes.length > 0) {
                 for (const barcode of product.barcodes) {
-                    if (barcode.code && barcode.code.toLowerCase() === searchTerm) {
+                    if (!barcode.code) continue;
+                    const codeLower = barcode.code.toLowerCase();
+                    if (codeLower === searchTerm) {
+                        found = true;
+                        break;
+                    }
+                    // Kısmi barkod: yazılan kısım barkodun içinde geçiyorsa eşleşir (ilk 4, son 4 hane vb.)
+                    if (codeLower.includes(searchTerm)) {
                         found = true;
                         break;
                     }

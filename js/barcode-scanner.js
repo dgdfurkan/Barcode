@@ -1116,14 +1116,19 @@ class BarcodeScanner {
                 // Ürün zaten sayım tablosunda mı kontrol et
                 const existingProduct = window.countingSystem.countingData[product.productId];
                 if (existingProduct) {
-                    // Ürün zaten ekli, uyarı göster
-                    if (window.countingSystem.showToast) {
-                        window.countingSystem.showToast('Bu ürün zaten sayım tablosunda!', 'warning', 2000);
+                    // Sayarak ilerle modu: zaten ekli olsa bile sayım ekranını aç
+                    if (typeof window.countingSystem.isCameraScanAndCountMode === 'function' && window.countingSystem.isCameraScanAndCountMode()) {
+                        if (typeof window.countingSystem.onCameraScannedProductOpenForCount === 'function') {
+                            window.countingSystem.onCameraScannedProductOpenForCount(product.productId);
+                        }
+                    } else {
+                        if (window.countingSystem.showToast) {
+                            window.countingSystem.showToast('Bu ürün zaten sayım tablosunda!', 'warning', 2000);
+                        }
+                        this.playWarningSound();
+                        setTimeout(() => this.hideBarcodeFrame(), 1000);
                     }
-                    this.playWarningSound(); // Farklı bir ses
-                    // Çerçeveyi temizle
-                    setTimeout(() => this.hideBarcodeFrame(), 1000);
-                    return; // Eklemeyi engelle
+                    return;
                 }
 
                 // Ürünü ekle (addProductToCounting id bekliyor)
@@ -1139,6 +1144,13 @@ class BarcodeScanner {
                 // Toast bildirimi göster (browser notification değil)
                 if (window.countingSystem.showToast) {
                     window.countingSystem.showToast(`${product.name || 'Ürün'} eklendi`, 'success', 2000);
+                }
+
+                // Sayarak ilerle modu: sayım ekranını aç (depo stok gir + sistem stok al)
+                if (typeof window.countingSystem.isCameraScanAndCountMode === 'function' && window.countingSystem.isCameraScanAndCountMode()) {
+                    if (typeof window.countingSystem.onCameraScannedProductOpenForCount === 'function') {
+                        window.countingSystem.onCameraScannedProductOpenForCount(product.productId);
+                    }
                 }
             } else {
                 // Ürün bulunamadı
