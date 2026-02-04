@@ -10,7 +10,7 @@ class CountingSystem {
         this.lastTokenCheckTime = null; // Son token kontrol zamanı (gereksiz çağrıları önlemek için)
         this.lastTokenExpiry = null; // Son kontrol edilen token expiry (değişiklik tespiti için)
         this.isTokenUpdateInProgress = false; // Token güncelleme devam ediyor mu? (çoklu çağrıları önlemek için)
-        this.currentViewMode = localStorage.getItem('counting_view_mode') || 'table'; // 'table' | 'rapid'
+        this.currentViewMode = 'rapid'; // Her sayfa açılışında Grid (rapid) öncelik; kullanıcı o an değiştirebilir
         this.currentCountingProduct = null; // Açık modal'daki ürün ID
         this.skippedProducts = new Set(); // Atlanan ürün ID'leri
         this.autoSaveTimeout = null; // Otomatik kaydetme için timeout
@@ -45,8 +45,8 @@ class CountingSystem {
             // Load counting data
             await this.loadCountingData();
             
-            // Load view mode from localStorage BEFORE rendering
-            this.currentViewMode = localStorage.getItem('counting_view_mode') || 'table';
+            // Her gelişte Grid mod öncelik (localStorage okunmaz)
+            this.currentViewMode = 'rapid';
             
             // Setup event listeners
             this.setupEventListeners();
