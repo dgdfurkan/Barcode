@@ -1915,8 +1915,6 @@
                 padding-left: 1rem !important;
                 padding-right: 1rem !important;
             }
-        }
-
             .changelog-title {
                 font-size: 1.125rem;
             }
@@ -3322,12 +3320,9 @@
         // Initialize when page loads
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
-                // Sayım butonlarını mümkün olan en kısa sürede güncelle (auth/premium hazır olur olmaz)
-                setTimeout(updateCountingPageButtonsVisibility, 150);
-                setTimeout(initAutoPasteFeature, 1000); // Wait for auth to be ready (auto-paste UI)
+                setTimeout(initAutoPasteFeature, 1000); // Wait for auth to be ready
             });
         } else {
-            setTimeout(updateCountingPageButtonsVisibility, 150);
             setTimeout(initAutoPasteFeature, 1000);
         }
 
