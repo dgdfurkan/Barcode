@@ -7906,22 +7906,12 @@
             }
         }
         
-        // Show image search modal with bookmarklet installation
+        // Show image search modal (Getir Warehouse HTML Kopyalayıcı eklentisi)
         function showImageSearchModal(hasPremium) {
-            // Update modal header
             document.getElementById('featureDetailEmoji').textContent = '🖼️';
             document.getElementById('featureDetailName').textContent = 'Görsel Link Arama';
-            
             const detailContent = document.getElementById('featureDetailContent');
-            
-            // Load bookmarklet code (already minified)
-            fetch('../extension/getir-bookmarklet-bookmarklet.js')
-                .then(response => response.text())
-                .then(bookmarkletCode => {
-                    // Bookmarklet is already in correct format: javascript:(function(){...})();
-                    const bookmarkletName = '🧰 Getir Kısayol';
-                    
-                    detailContent.innerHTML = `
+            detailContent.innerHTML = `
                         <div class="space-y-4">
                             <div class="flex items-center space-x-2">
                                 ${hasPremium ? `
@@ -7941,12 +7931,8 @@
                                 <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-5">
                                     <h4 class="font-semibold text-gray-900 mb-3 text-lg">🔗 Getir Entegrasyonu</h4>
                                     
-                                    <!-- 1. Adım: Eklenti (önerilen - sayfa yenilense bile otomatik çalışır) -->
                                     <div class="bg-white rounded-lg p-4 border border-emerald-200 mb-4">
-                                        <h5 class="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                                            <span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs">1. Adım</span>
-                                            Getir Warehouse HTML Kopyalayıcı Eklentisi
-                                        </h5>
+                                        <h5 class="font-semibold text-gray-900 mb-2">Getir Warehouse HTML Kopyalayıcı Eklentisi</h5>
                                         <p class="text-gray-600 text-sm mb-3">
                                             warehouse.getir.com sayfasında otomatik çalışır. Sayfa yenilense bile 📋 butonları hep hazır olur.
                                         </p>
@@ -7956,63 +7942,22 @@
                                         <p class="text-xs text-gray-500 mt-2">Chrome'da chrome://extensions → Geliştirici modu → Paketlenmemiş öğe yükle → ZIP içindeki klasörü seçin</p>
                                     </div>
                                     
-                                    <!-- 2. Adım: Bookmarklet (alternatif) -->
-                                    <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
-                                        <h5 class="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                                            <span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs">2. Adım</span>
-                                            Bookmarklet (Alternatif)
-                                        </h5>
-                                        <p class="text-gray-700 text-sm mb-4 leading-relaxed">
-                                            Getir warehouse sitesinde çalışacak bir bookmarklet kurarak, ürün listelerindeki HTML'leri tek tıkla kopyalayabilirsiniz.
-                                        </p>
-                                    
-                                    <!-- Otomatik yönlendirme ayarı (bookmarklet için) -->
-                                    <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
-                                        <div class="flex items-center justify-between">
-                                            <div class="flex-1">
-                                                <label class="text-sm font-medium text-gray-900 flex items-center space-x-2 cursor-pointer">
-                                                    <span>🔄 Otomatik Yönlendirme</span>
-                                                </label>
-                                                <p class="text-xs text-gray-500 mt-1">Kopyalama sonrası otomatik olarak bu siteye yönlendir</p>
-                                            </div>
-                                            <label class="relative inline-flex items-center cursor-pointer">
-                                                <input type="checkbox" id="getirAutoRedirectSetting" class="sr-only peer">
-                                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                                            </label>
-                                        </div>
+                                    <div class="bg-white rounded-lg p-4 border border-gray-200 mb-4">
+                                        <h5 class="font-semibold text-gray-900 mb-2">⚙️ Ayarlar</h5>
+                                        <p class="text-gray-600 text-sm">Kopyalama sonrası bu siteye otomatik yönlendirme gibi ayarlar, eklenti ikonuna (toolbar) tıklayarak açılan pencereden yapılır.</p>
                                     </div>
                                     
-                                    <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
-                                        <h5 class="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
-                                            <span>📥 Kurulum</span>
-                                        </h5>
-                                        
-                                        <!-- Sürükle-bırak -->
-                                        <div class="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-dashed border-purple-400 rounded-lg p-6 text-center cursor-grab active:cursor-grabbing hover:from-purple-100 hover:to-pink-100 transition-all shadow-md hover:shadow-lg" 
-                                             id="dragBookmarklet"
-                                             draggable="true">
-                                            <div class="flex flex-col items-center justify-center space-y-3">
-                                                <span class="text-5xl">🧰</span>
-                                                <p class="text-xl font-bold text-purple-700 mb-1">Getir Kısayol</p>
-                                                <p class="text-sm text-gray-600">Bu butonu bookmark bar'a sürükleyin</p>
-                                                <p class="text-xs text-gray-500 mt-2">⬇️ Yukarıdaki butonu sürükleyip bookmark bar'a bırakın</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Kullanım talimatları -->
                                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                         <h5 class="font-semibold text-blue-900 mb-2">📖 Nasıl Kullanılır?</h5>
                                         <ol class="text-sm text-blue-800 space-y-2 list-decimal list-inside">
-                                            <li>Bookmarklet'i yukarıdaki yöntemlerden biriyle kurun</li>
-                                            <li>Getir warehouse sitesine gidin (warehouse.getir.com)</li>
+                                            <li>Eklentiyi yükleyin (ZIP indir → Chrome'da paketlenmemiş öğe yükle)</li>
+                                            <li>warehouse.getir.com sitesine gidin</li>
                                             <li>Ürün listesini görüntüleyin</li>
-                                            <li>Bookmarklet'e tıklayın - Her ürünün yanında 📋 butonu görünecek</li>
-                                            <li>Tek ürün için: Ürünün yanındaki 📋 butonuna tıklayın</li>
-                                            <li>Tüm ürünler için: Tablonun üstündeki "📋 Tümünü Kopyala" butonuna tıklayın</li>
-                                            <li>HTML otomatik kopyalanacak ve bu siteye yönlendirileceksiniz</li>
+                                            <li>Her ürünün yanında otomatik 📋 butonu görünür</li>
+                                            <li>Tek ürün: Ürünün yanındaki 📋 butonuna tıklayın</li>
+                                            <li>Tüm ürünler: "📋 Tümünü Kopyala" butonuna tıklayın</li>
+                                            <li>HTML panoya kopyalanır; isterseniz eklenti ayarından otomatik yönlendirme açabilirsiniz</li>
                                         </ol>
-                                    </div>
                                     </div>
                                 </div>
                             ` : `
@@ -8023,121 +7968,6 @@
                             `}
                         </div>
                     `;
-                    
-                    // Load and setup auto-redirect setting
-                    if (hasPremium) {
-                        const autoRedirectCheckbox = document.getElementById('getirAutoRedirectSetting');
-                        if (autoRedirectCheckbox) {
-                            // Load saved setting (default: false)
-                            try {
-                                const saved = localStorage.getItem('getirAutoRedirect');
-                                autoRedirectCheckbox.checked = saved === 'true';
-                            } catch (e) {
-                                autoRedirectCheckbox.checked = false;
-                            }
-                            
-                            // Save setting on change
-                            autoRedirectCheckbox.addEventListener('change', (e) => {
-                                try {
-                                    localStorage.setItem('getirAutoRedirect', e.target.checked ? 'true' : 'false');
-                                } catch (err) {
-                                    console.error('Error saving setting:', err);
-                                }
-                            });
-                        }
-                    }
-                    
-                    // Setup drag and drop
-                    if (hasPremium) {
-                        const dragElement = document.getElementById('dragBookmarklet');
-                        if (dragElement) {
-                            dragElement.addEventListener('dragstart', (e) => {
-                                // Create a temporary link element with proper bookmark name
-                                const link = document.createElement('a');
-                                link.href = bookmarkletCode;
-                                link.textContent = bookmarkletName;
-                                link.style.position = 'absolute';
-                                link.style.top = '-9999px';
-                                link.style.left = '-9999px';
-                                link.style.opacity = '0';
-                                link.style.pointerEvents = 'none';
-                                document.body.appendChild(link);
-                                
-                                // Create drag image with bookmark name
-                                const dragImage = document.createElement('div');
-                                dragImage.textContent = bookmarkletName;
-                                dragImage.style.position = 'absolute';
-                                dragImage.style.top = '-9999px';
-                                dragImage.style.fontSize = '14px';
-                                dragImage.style.fontWeight = 'normal';
-                                document.body.appendChild(dragImage);
-                                e.dataTransfer.setDragImage(dragImage, 0, 0);
-                                
-                                // Set bookmark data - multiple formats for browser compatibility
-                                // Primary method: text/html with link element
-                                const linkHTML = `<a href="${bookmarkletCode.replace(/"/g, '&quot;')}">${bookmarkletName}</a>`;
-                                e.dataTransfer.setData('text/html', linkHTML);
-                                
-                                // Also set as uri-list
-                                e.dataTransfer.setData('text/uri-list', bookmarkletCode);
-                                
-                                // For Chrome/Edge: DownloadURL format (bookmark name:URL)
-                                try {
-                                    // Chrome bookmark format: application/x-bookmark:UTF8:Name:URL
-                                    const chromeFormat = `application/x-bookmark:UTF8:${encodeURIComponent(bookmarkletName)}:${bookmarkletCode}`;
-                                    e.dataTransfer.setData('DownloadURL', chromeFormat);
-                                } catch (err) {
-                                    // Ignore if not supported
-                                }
-                                
-                                // Also try Firefox bookmark format
-                                try {
-                                    e.dataTransfer.setData('text/x-moz-url', `${bookmarkletCode}\n${bookmarkletName}`);
-                                    e.dataTransfer.setData('text/x-moz-url-priv', `${bookmarkletCode}\n${bookmarkletName}`);
-                                } catch (err) {
-                                    // Ignore if not supported
-                                }
-                                
-                                e.dataTransfer.effectAllowed = 'copy';
-                                
-                                // Clean up after drag
-                                setTimeout(() => {
-                                    if (document.body.contains(link)) document.body.removeChild(link);
-                                    if (document.body.contains(dragImage)) document.body.removeChild(dragImage);
-                                }, 100);
-                                
-                                // Visual feedback
-                                dragElement.style.opacity = '0.5';
-                                dragElement.style.cursor = 'grabbing';
-                                dragElement.style.transform = 'scale(0.95)';
-                            });
-                            
-                            dragElement.addEventListener('dragend', () => {
-                                dragElement.style.opacity = '1';
-                                dragElement.style.cursor = 'grab';
-                                dragElement.style.transform = 'scale(1)';
-                            });
-                            
-                            dragElement.addEventListener('dragenter', (e) => {
-                                e.preventDefault();
-                            });
-                            
-                            dragElement.addEventListener('dragover', (e) => {
-                                e.preventDefault();
-                            });
-                        }
-                    }
-                })
-                .catch(err => {
-                    console.error('Error loading bookmarklet:', err);
-                    detailContent.innerHTML = `
-                        <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                            <p class="text-red-800 text-sm">Bookmarklet dosyası yüklenemedi. Lütfen daha sonra tekrar deneyin.</p>
-                        </div>
-                    `;
-                });
-            
-            // Show modal
             document.getElementById('premiumFeatureDetailModal').classList.remove('hidden');
         }
         
