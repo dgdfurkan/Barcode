@@ -7940,11 +7940,33 @@
                             ${hasPremium ? `
                                 <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-5">
                                     <h4 class="font-semibold text-gray-900 mb-3 text-lg">🔗 Getir Entegrasyonu</h4>
-                                    <p class="text-gray-700 text-sm mb-4 leading-relaxed">
-                                        Getir warehouse sitesinde çalışacak bir bookmarklet kurarak, ürün listelerindeki HTML'leri tek tıkla kopyalayabilirsiniz.
-                                    </p>
                                     
-                                    <!-- Otomatik yönlendirme ayarı -->
+                                    <!-- 1. Adım: Eklenti (önerilen - sayfa yenilense bile otomatik çalışır) -->
+                                    <div class="bg-white rounded-lg p-4 border border-emerald-200 mb-4">
+                                        <h5 class="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                                            <span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs">1. Adım</span>
+                                            Getir Warehouse HTML Kopyalayıcı Eklentisi
+                                        </h5>
+                                        <p class="text-gray-600 text-sm mb-3">
+                                            warehouse.getir.com sayfasında otomatik çalışır. Sayfa yenilense bile 📋 butonları hep hazır olur.
+                                        </p>
+                                        <a href="https://raw.githubusercontent.com/dgdfurkan/Barcode/main/getir-warehouse-html-copy-extension.zip" download="getir-warehouse-html-copy-extension.zip" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all shadow-sm hover:shadow-md font-medium text-sm">
+                                            📥 Eklentiyi İndir (ZIP)
+                                        </a>
+                                        <p class="text-xs text-gray-500 mt-2">Chrome'da chrome://extensions → Geliştirici modu → Paketlenmemiş öğe yükle → ZIP içindeki klasörü seçin</p>
+                                    </div>
+                                    
+                                    <!-- 2. Adım: Bookmarklet (alternatif) -->
+                                    <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
+                                        <h5 class="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                                            <span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs">2. Adım</span>
+                                            Bookmarklet (Alternatif)
+                                        </h5>
+                                        <p class="text-gray-700 text-sm mb-4 leading-relaxed">
+                                            Getir warehouse sitesinde çalışacak bir bookmarklet kurarak, ürün listelerindeki HTML'leri tek tıkla kopyalayabilirsiniz.
+                                        </p>
+                                    
+                                    <!-- Otomatik yönlendirme ayarı (bookmarklet için) -->
                                     <div class="bg-white rounded-lg p-4 border border-purple-200 mb-4">
                                         <div class="flex items-center justify-between">
                                             <div class="flex-1">
@@ -7990,6 +8012,7 @@
                                             <li>Tüm ürünler için: Tablonun üstündeki "📋 Tümünü Kopyala" butonuna tıklayın</li>
                                             <li>HTML otomatik kopyalanacak ve bu siteye yönlendirileceksiniz</li>
                                         </ol>
+                                    </div>
                                     </div>
                                 </div>
                             ` : `
