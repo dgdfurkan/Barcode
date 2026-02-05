@@ -22,12 +22,18 @@ function isTokenValidInBackground(tokenExpiry) {
 
 chrome.webRequest.onBeforeSendHeaders.addListener(
     (details) => {
+        // SADECE franchise.getir.com'dan gelen istekleri işle (warehouse.getir.com vb. hariç)
+        const initiator = details.initiator || '';
+        if (!initiator.startsWith('https://franchise.getir.com')) {
+            return; // franchise.getir.com dışındaki sayfalardan gelen istekleri yoksay
+        }
+        
         // Pasif modda ve token geçerliyse, sessizce çalış (log yazma)
         if (backgroundTokenState.passiveMode && backgroundTokenState.token && isTokenValidInBackground(backgroundTokenState.tokenExpiry)) {
             return; // Pasif modda, sadece sessizce dinle
         }
         
-        // Sadece Getir API çağrılarını dinle
+        // Sadece Getir franchise API çağrılarını dinle
         if (details.url.includes('getirapi.com') || details.url.includes('franchise-api-gateway.getirapi.com')) {
             const headers = details.requestHeaders || [];
             
@@ -138,14 +144,21 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 
 // Response'dan warehouse ID yakalama için onCompleted listener
 // OPTİMİZE EDİLDİ: Pasif modda sadece sessizce çalışır
+// SADECE franchise.getir.com'dan gelen istekler işlenir
 chrome.webRequest.onCompleted.addListener(
     (details) => {
+        // SADECE franchise.getir.com'dan gelen istekleri işle
+        const initiator = details.initiator || '';
+        if (!initiator.startsWith('https://franchise.getir.com')) {
+            return;
+        }
+        
         // Pasif modda ve token geçerliyse, sessizce çalış (log yazma)
         if (backgroundTokenState.passiveMode && backgroundTokenState.token && isTokenValidInBackground(backgroundTokenState.tokenExpiry)) {
             return; // Pasif modda, sadece sessizce dinle
         }
         
-        // Sadece Getir API çağrılarını dinle ve başarılı response'ları yakala
+        // Sadece Getir franchise API çağrılarını dinle ve başarılı response'ları yakala
         if ((details.url.includes('getirapi.com') || details.url.includes('franchise-api-gateway.getirapi.com')) 
             && details.statusCode === 200) {
             

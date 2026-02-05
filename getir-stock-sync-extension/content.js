@@ -1,8 +1,15 @@
 // Getir Stok Senkronizasyonu - Chrome Extension Content Script
-// Sadece franchise token yakalama - API çağrıları counting.js'de yapılacak
+// SADECE franchise.getir.com - warehouse.getir.com ve diğer Getir alt alanlarında ÇALIŞMAZ
 
 (function() {
     'use strict';
+
+    // GÜVENLİK: Getir alt alanlarından SADECE franchise.getir.com'da çalış
+    // warehouse.getir.com, *.getir.com vb. sayfalarda hiçbir şey yapma - hemen çık
+    const hostname = window.location.hostname || '';
+    if (hostname.endsWith('.getir.com') && hostname !== 'franchise.getir.com') {
+        return; // warehouse.getir.com vb. - eklenti bu sitede çalışmaz
+    }
 
     console.log('✅ Getir Stok Senkronizasyonu extension yüklendi (Franchise Token & Warehouse ID Yakalama)');
     console.log('🔧 Extension ayarları:');
@@ -357,22 +364,21 @@
         }
     }
 
-    // Network isteklerini intercept et ve API endpoint'lerini bul
+    // Network isteklerini intercept et - SADECE franchise.getir.com sayfasında
+    // (warehouse.getir.com vb. diğer Getir sitelerinde çalışmaz)
     const originalFetch = window.fetch;
     window.fetch = async function(...args) {
         const url = args[0];
         const fetchOptions = args[1] || {};
         
-        // Getir API çağrılarını yakala ve detaylı log'la
-        // PASIF MOD: Token varsa ve geçerliyse, sadece sessizce dinle (log yazma)
+        // Sadece franchise.getir.com sayfasındayken token yakala
+        if (window.location.hostname !== 'franchise.getir.com') {
+            return originalFetch.apply(this, args);
+        }
+        
+        // Sadece franchise API (getirapi.com) çağrılarını yakala - warehouse.getir.com vb. hariç
         if (typeof url === 'string') {
-                    // Tüm Getir API domain'lerini kontrol et
-                    const isAPIRequest = url.includes('getirapi.com') || 
-                                        url.includes('getir.com') ||
-                                        url.includes('api') || 
-                                        url.includes('stock') || 
-                                        url.includes('product') || 
-                                        url.includes('franchise');
+                    const isAPIRequest = url.includes('getirapi.com') || url.includes('franchise-api-gateway.getirapi.com');
             
             // Pasif mod: Token varsa ve geçerliyse, sadece sessizce token güncelle (log yazma)
             const isPassiveMode = apiEndpoints.passiveMode && apiEndpoints.token && isTokenValid();
@@ -648,13 +654,9 @@
         const headers = this._headers || {};
         const body = args[0] || null;
         
-        // Getir API çağrılarını yakala - Tüm Getir API domain'lerini kontrol et
-        const isXHRAPIRequest = url && (url.includes('getirapi.com') || 
-                                       url.includes('getir.com') ||
-                                       url.includes('api') || 
-                                       url.includes('stock') || 
-                                       url.includes('product') || 
-                                       url.includes('franchise'));
+        // Sadece franchise.getir.com sayfasındayken ve franchise API (getirapi.com) çağrılarını yakala
+        const isOnFranchise = window.location.hostname === 'franchise.getir.com';
+        const isXHRAPIRequest = isOnFranchise && url && (url.includes('getirapi.com') || url.includes('franchise-api-gateway.getirapi.com'));
         
         // Pasif mod: Token varsa ve geçerliyse, sadece sessizce dinle (log yazma)
         const isPassiveMode = apiEndpoints.passiveMode && apiEndpoints.token && isTokenValid();
@@ -1159,8 +1161,8 @@
                 mutation.addedNodes.forEach((node) => {
                     if (node.tagName === 'SCRIPT' && node.src) {
                         const src = node.src;
-                        if (src.includes('getirapi.com') || src.includes('getir.com')) {
-                            console.log('🔍 Yeni Getir script yüklendi:', src);
+                        if (src.includes('getirapi.com') && window.location.hostname === 'franchise.getir.com') {
+                            console.log('🔍 Yeni franchise API script yüklendi:', src);
                         }
                     }
                 });
