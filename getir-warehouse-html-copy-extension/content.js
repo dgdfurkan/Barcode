@@ -4,9 +4,11 @@
 
 (function() {
     'use strict';
+    if (!window.location.pathname.includes('/dashboard/orders')) return;
 
     const BARCODE_SITE_URL = 'https://dgdfurkan.github.io/Barcode/pages/product_search.html';
     const STORAGE_KEY = 'getirAutoRedirect';
+    const ORDER_HTML_KEY = 'getirOrderHtml';
 
     const styles = `
         .getir-copy-btn {
@@ -56,6 +58,14 @@
     const styleSheet = document.createElement('style');
     styleSheet.textContent = styles;
     document.head.appendChild(styleSheet);
+
+    function showCopyNotification(count) {
+        const notification = document.createElement('div');
+        notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:10px 15px;border-radius:4px;z-index:100000;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
+        notification.textContent = count > 0 ? `✓ ${count} ürün kopyalandı!` : '✓ Storage\'a kaydedildi!';
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 2000);
+    }
 
     async function getAutoRedirect() {
         try {
@@ -133,57 +143,44 @@
         }
     }
 
-    async function copyAllRows() {
-        let rowContainer = null;
-        const allRows = document.querySelectorAll('.ant-row');
+    function findRowContainer(root = document) {
+        const allRows = root.querySelectorAll('.ant-row');
         for (const row of allRows) {
-            const cols = row.querySelectorAll('.ant-col');
-            let hasProductTables = false;
-            for (const col of cols) {
-                const tables = col.querySelectorAll('table');
-                if (tables.length > 0) {
-                    for (const table of tables) {
-                        const productRows = table.querySelectorAll('tbody tr');
-                        for (const tr of productRows) {
-                            const hasImage = tr.querySelector('img');
-                            const cells = tr.querySelectorAll('td');
-                            const hasProductName = Array.from(cells).some(cell => {
-                                const text = cell.textContent.trim();
-                                return text && text.length > 2 && !text.match(/^\d+$/) && !text.includes('#') && !text.includes('Ürün Adı') && !text.includes('Adet');
-                            });
-                            if (hasImage || hasProductName) {
-                                hasProductTables = true;
-                                break;
-                            }
-                        }
-                        if (hasProductTables) break;
-                    }
-                }
-                if (hasProductTables) break;
-            }
-            if (hasProductTables) {
-                rowContainer = row;
-                break;
+            if (row.closest('.ant-descriptions')) continue;
+            const tables = row.querySelectorAll('table tbody tr');
+            for (const tr of tables) {
+                if (tr.querySelector('img') || tr.querySelector('.ant-image img')) return row;
+                const cells = tr.querySelectorAll('td');
+                const hasName = Array.from(cells).some(c => {
+                    const t = c.textContent?.trim() || '';
+                    return t.length > 2 && !/^\d+$/.test(t) && !t.includes('Ürün Adı') && !t.includes('Adet');
+                });
+                if (hasName) return row;
             }
         }
-        if (rowContainer) {
-            const html = rowContainer.outerHTML;
-            const success = await copyToClipboard(html);
-            if (success) {
-                const notification = document.createElement('div');
-                notification.style.cssText = 'position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:10px 15px;border-radius:4px;z-index:10000;box-shadow:0 2px 5px rgba(0,0,0,0.2);';
-                const productCount = rowContainer.querySelectorAll('tbody tr.ant-table-row').length;
-                notification.textContent = `✓ ${productCount} ürün kopyalandı!`;
-                document.body.appendChild(notification);
-                setTimeout(() => notification.remove(), 2000);
-                if (await getAutoRedirect()) {
-                    setTimeout(navigateToBarcodeSite, 500);
-                }
-            } else {
-                alert('Kopyalama başarısız. Lütfen tekrar deneyin.');
-            }
-        } else {
+        return null;
+    }
+
+    async function copyAllRows() {
+        let html = null;
+        const rowContainer = findRowContainer();
+        if (rowContainer) html = rowContainer.outerHTML;
+        else {
+            const modal = document.querySelector('.ant-modal');
+            const body = modal?.querySelector('.ant-modal-body');
+            if (body) html = body.innerHTML;
+        }
+        if (!html) {
             alert('Kopyalanacak ürün tablosu bulunamadı.');
+            return;
+        }
+        const success = await copyToClipboard(html);
+        if (success) {
+            const count = rowContainer ? rowContainer.querySelectorAll('tbody tr.ant-table-row').length : (html.match(/ant-table-row/g) || html.match(/<tr/g) || []).length;
+            showCopyNotification(count);
+            if (await getAutoRedirect()) setTimeout(navigateToBarcodeSite, 500);
+        } else {
+            alert('Kopyalama başarısız. Lütfen tekrar deneyin.');
         }
     }
 
@@ -249,8 +246,6 @@
     }
 
     function addCopyAllButton() {
-        if (document.querySelector('.getir-copy-all-container')) return;
-        let rowContainer = null;
         const allRows = document.querySelectorAll('.ant-row');
         for (const row of allRows) {
             if (row.closest('.ant-descriptions')) continue;
@@ -273,25 +268,21 @@
                 }
                 if (hasProductTables) break;
             }
-            if (hasProductTables) {
-                rowContainer = row;
-                break;
-            }
-        }
-        if (!rowContainer) return;
-        const container = document.createElement('div');
-        container.className = 'getir-copy-all-container';
-        const btn = document.createElement('button');
-        btn.className = 'getir-copy-all-btn';
-        btn.textContent = '📋 Tümünü Kopyala';
-        btn.onclick = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            copyAllRows();
-        };
-        container.appendChild(btn);
-        if (rowContainer.parentNode) {
-            rowContainer.parentNode.insertBefore(container, rowContainer);
+            if (!hasProductTables) continue;
+            const parent = row.parentNode;
+            if (!parent || parent.querySelector('.getir-copy-all-container')) continue;
+            const container = document.createElement('div');
+            container.className = 'getir-copy-all-container';
+            const btn = document.createElement('button');
+            btn.className = 'getir-copy-all-btn';
+            btn.textContent = '📋 Tümünü Kopyala';
+            btn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                copyAllRows();
+            };
+            container.appendChild(btn);
+            parent.insertBefore(container, row);
         }
     }
 

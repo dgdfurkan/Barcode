@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="../css/main.css" />
     <link rel="stylesheet" href="../css/tailwind.css" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <!-- Supabase Client Library -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <!-- Initialize Supabase immediately after CDN load -->
@@ -496,14 +497,19 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
         }
 
-        /* Grid view barcode SVG responsive styling */
-        .barcode-svg svg {
+        /* Grid view barcode SVG - tam siyah, kaliteli vektör */
+        .barcode-svg svg,
+        .barcode-visual svg {
             width: 100%;
             height: auto;
             max-height: 90px;
             min-height: 90px;
         }
-        
+        /* Barkod altındaki sayı metni siyah; çubuklar JsBarcode lineColor ile (#000) */
+        .barcode-svg svg text,
+        .barcode-visual svg text {
+            fill: #000000;
+        }
         .barcode-svg {
             display: flex;
             justify-content: center;
@@ -3353,129 +3359,54 @@
             });
         }
 
-        // Otomatik yapıştırma: Sayfaya her gelişte çalışır (hem pageshow hem visibilitychange)
-        // Başka sayfadan kopyalayıp bu sayfaya geri gelindiğinde yapıştırır
+        // Otomatik yapıştırma: sadece premium + ayar açıksa panodan yapıştır (Getir'de Tümünü Kopyala / tekli kopya ile kopyalanan)
         let autoPasteDebounceTimer = null;
         let lastPastTime = 0;
-        let lastClipboardText = ''; // Track last pasted clipboard text
-        const AUTO_PASTE_DEBOUNCE_MS = 100; // Minimum 100ms between attempts
-        const MIN_TIME_BETWEEN_PASTES_MS = 50; // Minimum 50ms between actual pastes
+        let lastClipboardText = '';
+        const MIN_TIME_BETWEEN_PASTES_MS = 50;
 
         async function tryAutoPasteOnPageShow() {
-            // Debounce: prevent multiple rapid calls
             const now = Date.now();
-            if (now - lastPastTime < MIN_TIME_BETWEEN_PASTES_MS) {
-                return;
-            }
-
-            // Check premium feature with backend validation
+            if (now - lastPastTime < MIN_TIME_BETWEEN_PASTES_MS) return;
             const hasPremium = await checkAutoPastePremium();
-            if (!hasPremium) {
-                console.debug('Auto-paste: Premium feature not available');
-                return;
-            }
-            
-            // Check if user has enabled auto-paste in settings (CRITICAL: user preference check)
-            const isEnabled = isAutoPasteEnabled();
-            if (!isEnabled) {
-                console.debug('Auto-paste: Feature disabled in settings by user');
-                return;
-            }
-            
+            if (!hasPremium) return;
+            if (!isAutoPasteEnabled()) return;
             try {
-                if (!navigator.clipboard || !navigator.clipboard.readText) {
-                    console.debug('Auto-paste: Clipboard API not available');
-                    return;
-                }
-                
-                // Read clipboard - FAST, no delay
+                if (!navigator.clipboard?.readText) return;
                 const text = await navigator.clipboard.readText();
-                if (!text || text.trim() === '') {
-                    console.debug('Auto-paste: Clipboard is empty');
-                    return;
-                }
-                
-                // Parse table data if needed
+                if (!text || !text.trim()) return;
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
-                
-                if (!parsed || parsed.trim() === '') {
-                    console.debug('Auto-paste: Parsed text is empty');
+                if (!parsed || !parsed.trim()) return;
+                if (searchInput && searchInput.value.trim() === parsed.trim()) {
+                    lastClipboardText = text;
                     return;
                 }
-                
-                // CRITICAL: Skip if clipboard content matches what's already in search box
-                const currentSearchValue = searchInput.value.trim();
-                if (currentSearchValue === parsed.trim()) {
-                    console.debug('Auto-paste: Clipboard content same as search box, skipping');
-                    lastClipboardText = text; // Update to prevent re-checking
-                    return;
+                if (text === lastClipboardText) return;
+                if (searchInput) {
+                    searchInput.value = parsed;
+                    shouldScrollAfterSearch = true;
+                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    lastClipboardText = text;
+                    lastPastTime = Date.now();
                 }
-                
-                // Skip if same text was already pasted in this session (avoid duplicate pastes)
-                if (text === lastClipboardText) {
-                    console.debug('Auto-paste: Same clipboard text already pasted in this session, skipping');
-                    return;
-                }
-                
-                // Paste the new content
-                searchInput.value = parsed;
-                
-                // Set flag to scroll after search completes
-                shouldScrollAfterSearch = true;
-                
-                searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                lastClipboardText = text; // Remember the raw clipboard text
-                lastPastTime = Date.now();
-                console.log('✅ Auto-paste: Text pasted successfully:', parsed.substring(0, 50));
-            } catch (e) { 
-                // Permission denied or other clipboard errors - ignore silently
-                // This is normal when clipboard API is not available or permission not granted
-                console.debug('Auto-paste error:', e.message);
-            }
+            } catch (e) {}
         }
 
-        // Debounced auto-paste function
-        function debouncedAutoPaste() {
-            if (autoPasteDebounceTimer) {
-                clearTimeout(autoPasteDebounceTimer);
-            }
-            // Very short delay for performance - only to avoid race conditions
+        function scheduleAutoPaste() {
+            if (autoPasteDebounceTimer) clearTimeout(autoPasteDebounceTimer);
             autoPasteDebounceTimer = setTimeout(tryAutoPasteOnPageShow, 10);
         }
 
-        // Track page visibility - trigger auto-paste when page becomes visible
-        // Reset clipboard tracking when page becomes hidden (so new content can be pasted when returning)
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'hidden') {
-                // When page becomes hidden, reset clipboard tracking
-                // This ensures next time they come back, new clipboard content will be pasted
-                console.debug('📄 Page hidden - will check for new clipboard content on return');
-                lastClipboardText = ''; // Reset so new content can be detected
-            } else if (document.visibilityState === 'visible') {
-                console.debug('📄 Page became visible - attempting auto-paste');
-                debouncedAutoPaste();
-            }
+            if (document.visibilityState === 'hidden') lastClipboardText = '';
+            else if (document.visibilityState === 'visible') scheduleAutoPaste();
         });
-
-        // Trigger on pageshow (when page is shown - includes initial load, back/forward, returning from another tab/page)
         window.addEventListener('pageshow', (event) => {
-            // Reset clipboard tracking if page was restored from cache
-            if (event.persisted) {
-                console.debug('📄 Page restored from cache - resetting clipboard tracking');
-                lastClipboardText = ''; // Reset so new content can be detected
-            }
-            // Always try auto-paste when page is shown
-            console.debug('📄 Page shown (pageshow) - attempting auto-paste');
-            debouncedAutoPaste();
+            if (event.persisted) lastClipboardText = '';
+            scheduleAutoPaste();
         });
-
-        // Also trigger on focus (when tab/window gets focus) - for extra reliability
         window.addEventListener('focus', () => {
-            // Only if page is visible
-            if (document.visibilityState === 'visible') {
-                console.debug('📄 Window focused - attempting auto-paste');
-                debouncedAutoPaste();
-            }
+            if (document.visibilityState === 'visible') scheduleAutoPaste();
         });
 
         // Code128 Character Map
@@ -3512,7 +3443,69 @@
             '11010010000', '11010011100', '1100011101011'
         ];
 
-        // Generate Code128 Barcode SVG
+        // EAN-13 kontrol basamağı (12 hane → 13. hane)
+        function calculateEan13Checksum(code) {
+            if (code.length < 12) return null;
+            let sum = 0;
+            for (let i = 0; i < 12; i++) {
+                sum += parseInt(code[i], 10) * (i % 2 === 0 ? 1 : 3);
+            }
+            const r = sum % 10;
+            return r === 0 ? 0 : 10 - r;
+        }
+        function isEan13Compatible(text) {
+            if (!text || typeof text !== 'string') return false;
+            const digits = text.replace(/\D/g, '');
+            return digits.length === 12 || digits.length === 13;
+        }
+        function normalizeToEan13(text) {
+            const digits = String(text).replace(/\D/g, '');
+            if (digits.length === 12) return digits + calculateEan13Checksum(digits);
+            if (digits.length === 13) return digits;
+            return null;
+        }
+        // EAN-13 SVG (JsBarcode ile; el terminalleri EAN-13'ü en iyi okur)
+        function generateEan13SVG(code, width = 300, height = 80) {
+            const ean = normalizeToEan13(code);
+            if (!ean || typeof JsBarcode === 'undefined') return null;
+            try {
+                const wrap = document.createElement('div');
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                wrap.appendChild(svg);
+                wrap.style.cssText = 'position:absolute;left:-9999px;';
+                document.body.appendChild(wrap);
+                const barHeight = Math.max(28, (height - 22) * 0.7);
+                JsBarcode(svg, ean, {
+                    format: 'EAN13',
+                    lineColor: '#000000',
+                    width: 2,
+                    height: barHeight,
+                    displayValue: true,
+                    fontSize: 14,
+                    fontOptions: 'bold',
+                    background: 'transparent',
+                    margin: 4
+                });
+                svg.setAttribute('width', width);
+                svg.setAttribute('height', height);
+                const html = wrap.innerHTML;
+                document.body.removeChild(wrap);
+                return html;
+            } catch (e) {
+                return null;
+            }
+        }
+        // Tek fonksiyon: 12/13 haneli sayıysa EAN-13, değilse Code128 (performanslı, sistemi bozmaz)
+        function generateBarcodeSVG(text, width = 300, height = 80) {
+            const s = String(text || '').trim();
+            if (isEan13Compatible(s)) {
+                const svg = generateEan13SVG(s, width, height);
+                if (svg) return svg;
+            }
+            return generateCode128SVG(s || '', width, height);
+        }
+
+        // Generate Code128 Barcode SVG (alfanumerik / EAN-13 uygun olmayan kodlar)
         function generateCode128SVG(text, width = 300, height = 80) {
             try {
                 let checksum = 104; // Start B
@@ -3770,7 +3763,7 @@
                             console.error('❌ QR Code generation failed:', error);
                             const placeholder = document.getElementById(placeholderId);
                             if (placeholder) {
-                                placeholder.innerHTML = generateCode128SVG(barcodes[0].code, 200, 60);
+                                placeholder.innerHTML = generateBarcodeSVG(barcodes[0].code, 200, 60);
                             }
                         });
                         return true;
@@ -3795,7 +3788,7 @@
                                 console.error('❌ QRCode library failed to load after 10 seconds');
                                 const placeholder = document.getElementById(placeholderId);
                                 if (placeholder) {
-                                    placeholder.innerHTML = generateCode128SVG(barcodes[0].code, 200, 60);
+                                    placeholder.innerHTML = generateBarcodeSVG(barcodes[0].code, 200, 60);
                                 }
                             }
                         }, 100);
@@ -3822,7 +3815,7 @@
                     return `
                     <div class="barcode-item bg-gray-50 rounded-lg p-3 border cursor-pointer hover:bg-gray-100 transition-colors" onclick="copyProductText('${String(barcodes[0].code || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Barkodu kopyalamak için tıklayın">
                         <div class="barcode-visual mb-2">
-                            ${generateCode128SVG(barcodes[0].code, 200, 60)}
+                            ${generateBarcodeSVG(barcodes[0].code, 200, 60)}
                         </div>
                         <div class="text-xs space-y-1">
                             <div class="font-mono font-medium flex items-center justify-between">
@@ -3884,7 +3877,7 @@
                                         console.error('❌ QR Code generation failed:', error);
                                         const placeholder = document.getElementById(placeholderId);
                                         if (placeholder) {
-                                            placeholder.innerHTML = generateCode128SVG(barcode.code, 200, 60);
+                                            placeholder.innerHTML = generateBarcodeSVG(barcode.code, 200, 60);
                                         }
                                     });
                                     return true;
@@ -3909,7 +3902,7 @@
                                             console.error('❌ QRCode library failed to load after 5 seconds');
                                             const placeholder = document.getElementById(placeholderId);
                                             if (placeholder) {
-                                                placeholder.innerHTML = generateCode128SVG(barcode.code, 200, 60);
+                                                placeholder.innerHTML = generateBarcodeSVG(barcode.code, 200, 60);
                                             }
                                         }
                                     }, 100);
@@ -3935,7 +3928,7 @@
                                 return `
                             <div class="barcode-item bg-gray-50 rounded-lg p-3 border cursor-pointer hover:bg-gray-100 transition-colors ${index > 0 ? 'hidden' : ''}" data-index="${index}" onclick="copyProductText('${String(barcode.code || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Barkodu kopyalamak için tıklayın">
                                 <div class="barcode-visual mb-2">
-                                    ${generateCode128SVG(barcode.code, 200, 60)}
+                                    ${generateBarcodeSVG(barcode.code, 200, 60)}
                                 </div>
                                 <div class="text-xs space-y-1">
                                     <div class="font-mono font-medium flex items-center justify-between">
@@ -4109,12 +4102,12 @@
                                     barcodeVisualContainer.innerHTML = `<img src="${qrDataUrl}" alt="QR Code: ${barcodeCode}" class="mx-auto" style="max-width: 120px; height: auto; display: block;">`;
                                 }).catch(error => {
                                     console.error('QR Code generation failed:', error);
-                                    barcodeVisualContainer.innerHTML = generateCode128SVG(barcodeCode, 300, 90);
+                                    barcodeVisualContainer.innerHTML = generateBarcodeSVG(barcodeCode, 300, 90);
                                 });
                             }
                         } else {
                             // Normal barcode mode - larger size for better readability
-                            barcodeVisualContainer.innerHTML = generateCode128SVG(barcodeCode, 300, 90);
+                            barcodeVisualContainer.innerHTML = generateBarcodeSVG(barcodeCode, 300, 90);
                         }
                     }
                     
@@ -4252,14 +4245,14 @@
                                     console.error('QR Code generation failed:', error);
                                     const placeholder = document.getElementById(placeholderId);
                                     if (placeholder) {
-                                        placeholder.innerHTML = generateCode128SVG(barcodeCode, 300, 60);
+                                        placeholder.innerHTML = generateBarcodeSVG(barcodeCode, 300, 60);
                                     }
                                 });
                             }
                         }, 100);
                     } else {
                         // Normal barcode mode - larger size for better readability
-                        barcodeVisualHtml = generateCode128SVG(barcodeCode, 300, 90);
+                        barcodeVisualHtml = generateBarcodeSVG(barcodeCode, 300, 90);
                     }
                 }
                 
@@ -4309,7 +4302,7 @@
                                 ` : ''}
                                 
                                 <!-- Barcode Visual -->
-                                <div class="barcode-svg opacity-80 group-hover:opacity-100 transition-opacity cursor-pointer" 
+                                <div class="barcode-svg cursor-pointer" 
                                      onclick="copyGridBarcode('${product.id}', ${barcodes.length})" 
                                      title="Barkodu kopyalamak için tıklayın"
                                      data-product-id="${product.id}">
@@ -4465,7 +4458,7 @@
                      onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
                 <div class="ticker-name">${randomProduct.name}</div>
                 <div class="ticker-barcode">
-                    ${generateCode128SVG(barcode, 200, 50)}
+                    ${generateBarcodeSVG(barcode, 200, 50)}
                 </div>
             `;
             
@@ -7942,22 +7935,15 @@
                                         <p class="text-xs text-gray-500 mt-2">Chrome'da chrome://extensions → Geliştirici modu → Paketlenmemiş öğe yükle → ZIP içindeki klasörü seçin</p>
                                     </div>
                                     
-                                    <div class="bg-white rounded-lg p-4 border border-gray-200 mb-4">
-                                        <h5 class="font-semibold text-gray-900 mb-2">⚙️ Ayarlar</h5>
-                                        <p class="text-gray-600 text-sm">Kopyalama sonrası bu siteye otomatik yönlendirme gibi ayarlar, eklenti ikonuna (toolbar) tıklayarak açılan pencereden yapılır.</p>
-                                    </div>
-                                    
                                     <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                         <h5 class="font-semibold text-blue-900 mb-2">📖 Nasıl Kullanılır?</h5>
                                         <ol class="text-sm text-blue-800 space-y-2 list-decimal list-inside">
                                             <li>Eklentiyi yükleyin (ZIP indir → Chrome'da paketlenmemiş öğe yükle)</li>
-                                            <li>warehouse.getir.com sitesine gidin</li>
-                                            <li>Ürün listesini görüntüleyin</li>
-                                            <li>Her ürünün yanında otomatik 📋 butonu görünür</li>
-                                            <li>Tek ürün: Ürünün yanındaki 📋 butonuna tıklayın</li>
-                                            <li>Tüm ürünler: "📋 Tümünü Kopyala" butonuna tıklayın</li>
-                                            <li>HTML panoya kopyalanır; isterseniz eklenti ayarından otomatik yönlendirme açabilirsiniz</li>
+                                            <li>warehouse.getir.com → Siparişler sayfasına gidin</li>
+                                            <li>Siparişe tıklayıp "Tümünü Kopyala" veya tek ürün 📋 ile kopyalayın</li>
+                                            <li>Bu sayfaya gelince (Otomatik yapıştırma açıksa) panodaki veri otomatik yapıştırılır</li>
                                         </ol>
+                                        <p class="text-gray-600 text-sm mt-2">Eklenti ikonundan: Kopyalama sonrası yönlendirme açılır.</p>
                                     </div>
                                 </div>
                             ` : `

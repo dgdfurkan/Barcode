@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Getir Warehouse HTML Kopyalayıcı",
-  "version": "1.0.0",
+  "version": "1.1.2",
   "description": "Getir warehouse sitesinde ürün listelerindeki HTML'leri tek tıkla kopyalar. Sayfa yenilense bile otomatik çalışır.",
   "author": "GunduzDev",
   "icons": {
@@ -9,17 +9,49 @@
     "48": "icon128.png",
     "128": "icon128.png"
   },
-  "permissions": ["storage"],
-  "host_permissions": ["https://warehouse.getir.com/*"],
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://warehouse.getir.com/*",
+    "https://dgdfurkan.github.io/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://localhost/*",
+    "https://127.0.0.1/*",
+    "http://0.0.0.0/*"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Getir Warehouse HTML Kopyalayıcı"
   },
   "content_scripts": [
     {
-      "matches": ["https://warehouse.getir.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://warehouse.getir.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://dgdfurkan.github.io/Barcode/*",
+        "https://dgdfurkan.github.io/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://localhost/*",
+        "https://127.0.0.1/*",
+        "http://0.0.0.0/*"
+      ],
+      "js": [
+        "content-barcode.js"
+      ],
+      "run_at": "document_end"
     }
-  ]
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
 }
