@@ -818,8 +818,11 @@
         
         .counting-bottom-sheet .counting-bottom-sheet-content {
             transform: translateY(100%);
-            max-height: 75vh;
+            max-height: min(90vh, 100dvh);
             transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
         
         .counting-bottom-sheet.show #countingBottomSheetBackdrop {
@@ -844,7 +847,7 @@
         /* Responsive adjustments for bottom sheet */
         @media (max-width: 640px) {
             .counting-bottom-sheet-content {
-                max-height: 75vh;
+                max-height: min(90vh, 100dvh);
             }
         }
         
@@ -2093,15 +2096,15 @@
         <!-- Backdrop -->
         <div id="countingBottomSheetBackdrop" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"></div>
         
-        <!-- Bottom Sheet Content -->
-        <div class="counting-bottom-sheet-content bg-white rounded-t-2xl shadow-2xl max-h-[75vh] min-h-0 overflow-y-auto overscroll-y-contain flex flex-col transform">
+        <!-- Bottom Sheet Content: üst sabit, orta scroll, alt (Önceki/Sonraki) asla kaymaz -->
+        <div class="counting-bottom-sheet-content bg-white rounded-t-2xl shadow-2xl max-h-[min(90vh,100dvh)] min-h-0 overflow-hidden flex flex-col transform">
             <!-- Drag Handle -->
-            <div class="flex justify-center pt-2 pb-1.5">
+            <div class="flex shrink-0 justify-center pt-2 pb-1.5">
                 <div class="w-10 h-1 bg-gray-300 rounded-full"></div>
             </div>
             
             <!-- Progress Bar -->
-            <div class="px-3 pb-2">
+            <div class="shrink-0 px-3 pb-2">
                 <div class="flex items-center justify-between mb-1.5">
                     <span id="countingProgressText" class="text-xs font-medium text-gray-600">İlerleme: 0/0 (0 Atlandı)</span>
                 </div>
@@ -2110,6 +2113,8 @@
                 </div>
             </div>
             
+            <!-- Kaydırılabilir gövde: uzun ürün adı burada scroll olur; sheet yukarı max-h ile büyür, alt butonlar sabit -->
+            <div id="countingBottomSheetScrollArea" class="min-h-0 flex-1 overflow-y-auto overscroll-y-contain overflow-x-hidden">
             <!-- Product Info -->
             <div class="px-3 pb-2.5 border-b border-gray-100">
                 <div class="flex items-center space-x-2.5">
@@ -2202,9 +2207,10 @@
                     </button>
                 </div>
             </div>
+            </div><!-- /#countingBottomSheetScrollArea -->
             
-            <!-- Action Buttons -->
-            <div class="px-3 pb-4 pt-1.5 flex gap-2">
+            <!-- Action Buttons: sheet altına yapışık, scroll ile kaymaz -->
+            <div class="shrink-0 border-t border-gray-100 bg-white px-3 pt-2.5 pb-[max(1rem,env(safe-area-inset-bottom))] flex gap-2 shadow-[0_-4px_20px_-4px_rgba(0,0,0,0.06)]">
                 <button id="countingPrevBtn" class="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg font-semibold text-sm transition-all shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-purple-600 disabled:hover:to-pink-600">
                     Önceki
                 </button>
