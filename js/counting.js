@@ -6454,102 +6454,77 @@ class CountingSystem {
 
         const now = new Date().toLocaleString('tr-TR', { dateStyle: 'long', timeStyle: 'short' });
 
-        const execRow = (p, isMissing) => {
+        const execRow = (p) => {
             const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
             const name = this.escapeHtml(p.productName || '');
             const bc = p.barcode ? this.escapeHtml(p.barcode) : '—';
             const adet = p.stockDiff;
             const adetStr = adet > 0 ? `+${adet}` : `${adet}`;
+            const diffClass = p.difference < 0 ? 'text-red-600' : 'text-emerald-700';
             return `
-                <div class="financial-exec-row flex gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl border border-white/60 bg-white/70 backdrop-blur-sm shadow-sm ${
-                    isMissing ? 'ring-1 ring-amber-100/80' : 'ring-1 ring-emerald-100/80'
-                }">
-                    <div class="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-slate-100 ring-2 ring-white shadow ${
-                        isMissing ? 'ring-amber-100' : 'ring-emerald-100'
-                    }">
-                        <img src="${img}" alt="" class="w-full h-full object-cover" loading="lazy" />
+                <div class="financial-exec-row flex gap-2 py-1.5 px-1 sm:px-2 border-b border-slate-100 last:border-b-0 hover:bg-slate-50/60">
+                    <img src="${img}" alt="" class="h-9 w-9 shrink-0 rounded-md object-cover bg-slate-100" loading="lazy" />
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-medium leading-snug text-slate-900 [overflow-wrap:anywhere]">${name}</p>
+                        <p class="mt-0.5 font-mono text-[10px] text-slate-400">${bc}</p>
                     </div>
-                    <div class="min-w-0 flex-1 flex flex-col gap-1">
-                        <h4 class="text-sm sm:text-base font-semibold text-slate-900 leading-snug break-words">${name}</h4>
-                        <p class="font-mono text-[11px] sm:text-xs text-slate-500">${bc}</p>
-                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs">
-                            <span class="inline-flex items-center rounded-md px-2 py-0.5 font-semibold ${
-                                isMissing ? 'bg-rose-50 text-rose-800' : 'bg-emerald-50 text-emerald-800'
-                            }">Adet ${adetStr}</span>
-                            <span class="text-slate-600">Birim: <strong class="text-slate-800">${this.formatCurrency(p.price)}</strong></span>
-                            <span class="${p.difference < 0 ? 'text-rose-600' : 'text-emerald-600'} font-bold">${
-                p.difference >= 0 ? '+' : ''
-            }${this.formatCurrency(p.difference)}</span>
-                        </div>
+                    <div class="shrink-0 text-right text-[11px] leading-tight">
+                        <span class="font-mono tabular-nums text-slate-700">${adetStr}</span>
+                        <span class="mx-1 text-slate-300">·</span>
+                        <span class="text-slate-500">${this.formatCurrency(p.price)}</span>
+                        <div class="mt-0.5 font-semibold ${diffClass}">${p.difference >= 0 ? '+' : ''}${this.formatCurrency(p.difference)}</div>
                     </div>
                 </div>`;
         };
 
+        const emptyCol = (msg) =>
+            `<p class="px-2 py-4 text-center text-[11px] text-slate-400">${msg}</p>`;
+
         container.innerHTML = `
-            <div class="financial-exec-shell relative overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50 via-white to-slate-50/90 shadow-[0_25px_60px_-15px_rgba(15,23,42,0.12)]">
-                <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 via-slate-400 to-emerald-500"></div>
-                <div class="px-4 sm:px-8 pt-8 pb-6 sm:pt-10 sm:pb-8">
-                    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
-                        <div>
-                            <p class="text-[10px] sm:text-xs font-semibold uppercase tracking-[0.2em] text-slate-400 mb-1">Executive summary</p>
-                            <h3 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Stok uyumsuzluk raporu</h3>
-                            <p class="text-xs sm:text-sm text-slate-500 mt-1">${this.escapeHtml(scopeLabel)}</p>
+            <div class="financial-exec-shell overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div class="flex flex-col gap-0.5 border-b border-slate-100 px-3 py-2 sm:flex-row sm:items-baseline sm:justify-between">
+                    <h3 class="text-sm font-semibold text-slate-900">Stok uyumsuzluk raporu</h3>
+                    <p class="text-[11px] text-slate-500">${this.escapeHtml(scopeLabel)} · ${now}</p>
+                </div>
+                <div class="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100 bg-slate-50/90 px-1 py-2 text-center sm:px-3 sm:text-left">
+                    <div class="min-w-0 px-1">
+                        <div class="text-[10px] font-medium text-slate-500">Eksik (TL)</div>
+                        <div class="truncate text-xs font-semibold text-red-700">${this.formatCurrency(sumMissing)}</div>
+                    </div>
+                    <div class="min-w-0 px-1">
+                        <div class="text-[10px] font-medium text-slate-500">Fazla (TL)</div>
+                        <div class="truncate text-xs font-semibold text-emerald-700">${this.formatCurrency(sumSurplus)}</div>
+                    </div>
+                    <div class="min-w-0 px-1">
+                        <div class="text-[10px] font-medium text-slate-500">Net</div>
+                        <div class="truncate text-xs font-semibold ${
+                            safeSummary.profitLoss >= 0 ? 'text-emerald-800' : 'text-red-800'
+                        }">${this.formatCurrency(safeSummary.profitLoss)}</div>
+                    </div>
+                </div>
+                <div class="grid max-h-[min(260px,38vh)] grid-cols-1 divide-y divide-slate-100 overflow-y-auto overscroll-contain sm:max-h-[min(300px,42vh)] lg:grid-cols-2 lg:divide-x lg:divide-y-0">
+                    <div class="min-h-0 lg:max-h-full">
+                        <div class="sticky top-0 z-[1] bg-white/95 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-500 backdrop-blur-sm">
+                            Eksik · ${missing.length}
                         </div>
-                        <div class="text-left sm:text-right">
-                            <p class="text-[0.65rem] uppercase tracking-wider text-slate-400">Oluşturulma</p>
-                            <p class="text-sm font-medium text-slate-700">${now}</p>
+                        <div class="px-0 pb-1">
+                            ${
+                                missing.length === 0
+                                    ? emptyCol('Kayıt yok.')
+                                    : missing.map((p) => execRow(p)).join('')
+                            }
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                        <div class="rounded-2xl lg:rounded-r-none border border-amber-100/90 bg-gradient-to-b from-amber-50/50 to-white p-3 sm:p-4">
-                            <div class="flex items-center justify-between mb-3">
-                                <h4 class="text-sm font-bold text-amber-900 flex items-center gap-2">
-                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700" aria-hidden="true">↓</span>
-                                    Depoda eksik (sistemden az)
-                                </h4>
-                                <span class="text-xs font-semibold text-amber-800/80">${missing.length} ürün</span>
-                            </div>
-                            <div class="space-y-2 max-h-[min(520px,55vh)] overflow-y-auto pr-1">
-                                ${
-                                    missing.length === 0
-                                        ? '<p class="text-center text-sm text-amber-800/70 py-8">Bu kapsamda eksik stokta ürün yok.</p>'
-                                        : missing.map((p) => execRow(p, true)).join('')
-                                }
-                            </div>
+                    <div class="min-h-0 lg:max-h-full">
+                        <div class="sticky top-0 z-[1] bg-white/95 px-2 py-1.5 text-[10px] font-medium uppercase tracking-wide text-slate-500 backdrop-blur-sm">
+                            Fazla · ${surplus.length}
                         </div>
-                        <div class="rounded-2xl lg:rounded-l-none border border-emerald-100/90 bg-gradient-to-b from-emerald-50/50 to-white p-3 sm:p-4">
-                            <div class="flex items-center justify-between mb-3">
-                                <h4 class="text-sm font-bold text-emerald-900 flex items-center gap-2">
-                                    <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700" aria-hidden="true">↑</span>
-                                    Depoda fazla (sistemden çok)
-                                </h4>
-                                <span class="text-xs font-semibold text-emerald-800/80">${surplus.length} ürün</span>
-                            </div>
-                            <div class="space-y-2 max-h-[min(520px,55vh)] overflow-y-auto pr-1">
-                                ${
-                                    surplus.length === 0
-                                        ? '<p class="text-center text-sm text-emerald-800/70 py-8">Bu kapsamda fazla stokta ürün yok.</p>'
-                                        : surplus.map((p) => execRow(p, false)).join('')
-                                }
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-6 sm:mt-8 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-4 sm:px-8 py-5 sm:py-6 text-white shadow-inner">
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                            <div>
-                                <p class="text-[0.65rem] uppercase tracking-widest text-slate-400 mb-1">Eksikler (TL etkisi)</p>
-                                <p class="text-lg sm:text-xl font-bold text-rose-300">${this.formatCurrency(sumMissing)}</p>
-                            </div>
-                            <div>
-                                <p class="text-[0.65rem] uppercase tracking-widest text-slate-400 mb-1">Fazlalar (TL etkisi)</p>
-                                <p class="text-lg sm:text-xl font-bold text-emerald-300">${this.formatCurrency(sumSurplus)}</p>
-                            </div>
-                            <div class="sm:text-right sm:border-l sm:border-white/10 sm:pl-6">
-                                <p class="text-[0.65rem] uppercase tracking-widest text-slate-400 mb-1">Net kar / zarar</p>
-                                <p class="text-2xl sm:text-3xl font-bold tracking-tight ${
-                                    safeSummary.profitLoss >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                                }">${this.formatCurrency(safeSummary.profitLoss)}</p>
-                            </div>
+                        <div class="px-0 pb-1">
+                            ${
+                                surplus.length === 0
+                                    ? emptyCol('Kayıt yok.')
+                                    : surplus.map((p) => execRow(p)).join('')
+                            }
                         </div>
                     </div>
                 </div>
