@@ -21,7 +21,9 @@ warehouse.getir.com sayfasında ürün listelerine 📋 butonları ekleyen Chrom
 
 ## Sayım listesi (kontrol paneli)
 
-Sayım ekranında **Ürün Adı** ve **Ürün Barkodları** sütunlu Ant tablo göründüğünde, tablonun üstünde **«Sayım Listesini Kopyala»** butonu çıkar.
+Sayım ekranında **Ürün Adı** ve **Ürün Barkodları** sütunlu Ant tablo göründüğünde, tablonun hemen üstünde **«Sayım Listesini Kopyala»** butonu çıkar (tablo kutusunun içinde, en üstte). Görünmüyorsa sağ altta sabit **«Sayımı kopyala»** yedek butonu da eklenir.
+
+**Not:** Eklenti güncelledikten sonra `chrome://extensions` → bu eklenti → **Yenile** (↻) ile yeniden yükleyin.
 
 - Panoya `BARCODE_SAYIM_V1` + JSON yazılır (ürün sayısı güne göre değişir).
 - Barcode sayfasında **Sayım** sekmesi → **Günlük Sayım** → **Panodan İçe Aktar** → yapıştır → **Tabloya Ekle**.
