@@ -31,4 +31,14 @@ Sayım ekranında ürün + barkod içeren Ant tablo göründüğünde, sipariş 
 
 ## Ayarlar
 
-Eklenti ikonuna tıklayarak "Kopyalama sonrası Barcode sitesine yönlendir" seçeneğini açabilirsiniz.
+Eklenti ikonuna tıklayarak "Kopyalama sonrası Barcode sitesine yönlendir" seçeneğini açabilirsiniz. Açılır pencerede **sürüm numarası** ve **panoya kopyalanan örnekler** (sipariş HTML / sayım `BARCODE_SAYIM_V1`) gösterilir.
+
+## ZIP dağıtımı (repo kökü)
+
+Depo kökündeki `getir-warehouse-html-copy-extension.zip`, bu klasörün güncel kopyasıdır. Kod değişince yeniden üretip commit’e ekleyin:
+
+```bash
+cd /path/to/Barcode
+rm -f getir-warehouse-html-copy-extension.zip
+zip -r getir-warehouse-html-copy-extension.zip getir-warehouse-html-copy-extension -x "*.DS_Store"
+```
