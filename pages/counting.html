@@ -838,9 +838,15 @@
             transition: opacity 0.4s ease-out;
         }
         
-        /* Prevent body scroll when modal is open */
+        /* Sayım sheet açıkken arka plan kaymasın (desktop + mobil) */
+        html.bottom-sheet-open {
+            overflow: hidden !important;
+            height: 100%;
+            overscroll-behavior: none;
+        }
         body.bottom-sheet-open {
-            overflow: hidden;
+            overflow: hidden !important;
+            overscroll-behavior: none;
         }
         
         /* Keypad button active state */

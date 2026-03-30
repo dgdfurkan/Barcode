@@ -32,6 +32,9 @@ class CountingSystem {
         this.countingBottomSheetFromCameraSeriSayar = false;
         /** DEPO yanındaki kamera ile barkod doğrulama devam ediyor mu */
         this._barcodeVerifyInProgress = false;
+        /** Sayım bottom sheet açıkken arka plan scroll kilidi (iOS dahil) */
+        this._countingSheetBodyLocked = false;
+        this._countingSheetScrollY = 0;
         /** Genel tablolardan ayrılmak için günlük tablo adları: `Günlük|YYYY-MM-DD` */
         this.DAILY_TABLE_PREFIX = 'Günlük|';
     }
@@ -4460,6 +4463,33 @@ class CountingSystem {
         }
     }
 
+    lockCountingSheetScroll() {
+        if (this._countingSheetBodyLocked) return;
+        this._countingSheetBodyLocked = true;
+        this._countingSheetScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        document.documentElement.classList.add('bottom-sheet-open');
+        document.body.classList.add('bottom-sheet-open');
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${this._countingSheetScrollY}px`;
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.width = '100%';
+    }
+
+    unlockCountingSheetScroll() {
+        if (!this._countingSheetBodyLocked) return;
+        this._countingSheetBodyLocked = false;
+        const y = this._countingSheetScrollY || 0;
+        document.documentElement.classList.remove('bottom-sheet-open');
+        document.body.classList.remove('bottom-sheet-open');
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
+        window.scrollTo(0, y);
+    }
+
     // Kamera ile barkod okutulduktan sonra sayım ekranını aç (sayarak ilerle modu)
     onCameraScannedProductOpenForCount(productId) {
         const isSeriOkuma = window.barcodeScanner && window.barcodeScanner.continuousMode;
@@ -4607,7 +4637,7 @@ class CountingSystem {
             // Add show class after a tiny delay to trigger smooth animation
             requestAnimationFrame(() => {
                 bottomSheet.classList.add('show');
-                document.body.classList.add('bottom-sheet-open');
+                this.lockCountingSheetScroll();
             });
             
             // Focus on input after animation
@@ -4707,7 +4737,7 @@ class CountingSystem {
         const bottomSheet = document.getElementById('countingBottomSheet');
         if (bottomSheet) {
             bottomSheet.classList.remove('show');
-            document.body.classList.remove('bottom-sheet-open');
+            this.unlockCountingSheetScroll();
             
             // Wait for animation to complete before hiding
             setTimeout(() => {
@@ -4721,12 +4751,15 @@ class CountingSystem {
                     }
                 }
             }, 400);
-        } else if (resumeSeriSayarCamera && this.isSeriOkumaVeSayarakIlerle() && window.barcodeScanner) {
-            const bs = window.barcodeScanner;
-            if (typeof bs.resumeScanningAfterOverlay === 'function') {
-                void bs.resumeScanningAfterOverlay();
-            } else {
-                bs.startScanning();
+        } else {
+            this.unlockCountingSheetScroll();
+            if (resumeSeriSayarCamera && this.isSeriOkumaVeSayarakIlerle() && window.barcodeScanner) {
+                const bs = window.barcodeScanner;
+                if (typeof bs.resumeScanningAfterOverlay === 'function') {
+                    void bs.resumeScanningAfterOverlay();
+                } else {
+                    bs.startScanning();
+                }
             }
         }
         
