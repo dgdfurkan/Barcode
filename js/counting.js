@@ -6488,7 +6488,7 @@ class CountingSystem {
             <div class="bg-white rounded-xl shadow-md border border-gray-100 p-3 sm:p-4">
                 <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                        <h3 class="text-base font-bold tracking-tight text-gray-900 sm:text-lg">Stok özeti</h3>
+                        <h3 class="text-base font-bold tracking-tight text-gray-900 sm:text-lg">Stok Özeti</h3>
                         <p class="mt-0.5 text-xs text-gray-500">${this.escapeHtml(scopeShort)}</p>
                     </div>
                     <p class="text-[11px] text-gray-400">${this.escapeHtml(now)}</p>
