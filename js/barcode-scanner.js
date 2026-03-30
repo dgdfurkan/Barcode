@@ -1287,6 +1287,63 @@ class BarcodeScanner {
         }
     }
 
+    /**
+     * Sayım barkod doğrulama: eşleşti — ürün ekleme başarı sesinden farklı (yükselen arpej, üçgen dalga).
+     */
+    playVerificationMatchSound() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const freqs = [784, 988, 1175, 1319];
+            const step = 0.07;
+            const vol = 0.22;
+            freqs.forEach((freq, i) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.type = 'triangle';
+                osc.frequency.value = freq;
+                const t0 = audioContext.currentTime + i * step;
+                const t1 = t0 + step * 1.35;
+                gain.gain.setValueAtTime(0, t0);
+                gain.gain.linearRampToValueAtTime(vol, t0 + 0.012);
+                gain.gain.exponentialRampToValueAtTime(0.001, t1);
+                osc.start(t0);
+                osc.stop(t1 + 0.02);
+            });
+        } catch (e) {
+            if (window.DEBUG_BARCODE_SCANNER) console.warn('playVerificationMatchSound', e);
+        }
+    }
+
+    /**
+     * Sayım barkod doğrulama: eşleşmedi — tablo uyarı sesinden farklı (iniş, kare dalga, çift vuruş).
+     */
+    playVerificationMismatchSound() {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const playTone = (freq, startOffset, dur) => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.type = 'square';
+                osc.frequency.value = freq;
+                const t0 = audioContext.currentTime + startOffset;
+                const t1 = t0 + dur;
+                gain.gain.setValueAtTime(0, t0);
+                gain.gain.linearRampToValueAtTime(0.16, t0 + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, t1);
+                osc.start(t0);
+                osc.stop(t1 + 0.01);
+            };
+            playTone(340, 0, 0.14);
+            playTone(220, 0.18, 0.2);
+        } catch (e) {
+            if (window.DEBUG_BARCODE_SCANNER) console.warn('playVerificationMismatchSound', e);
+        }
+    }
+
     showBarcodeFrame(result) {
         // HTML/CSS çerçeveyi göster (daha performanslı)
         const htmlFrame = document.getElementById('barcodeFrameOverlay');

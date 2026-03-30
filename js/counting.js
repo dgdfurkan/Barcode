@@ -4419,14 +4419,22 @@ class CountingSystem {
             const match = expected.has(norm);
             if (match) {
                 this.showToast('Eşleşiyor: Okutulan barkod bu ürüne ait.', 'success', 3500);
-                if (typeof bs.playSuccessSound === 'function') bs.playSuccessSound();
+                if (typeof bs.playVerificationMatchSound === 'function') {
+                    bs.playVerificationMatchSound();
+                } else if (typeof bs.playSuccessSound === 'function') {
+                    bs.playSuccessSound();
+                }
             } else {
                 this.showToast(
                     'Eşleşmiyor: Okutulan barkod bu ürünün kayıtlı barkodlarıyla uyuşmuyor.',
                     'error',
                     4500
                 );
-                if (typeof bs.playWarningSound === 'function') bs.playWarningSound();
+                if (typeof bs.playVerificationMismatchSound === 'function') {
+                    bs.playVerificationMismatchSound();
+                } else if (typeof bs.playWarningSound === 'function') {
+                    bs.playWarningSound();
+                }
             }
             if (restoreSeriPause && typeof bs.pauseScanningKeepStream === 'function') {
                 bs.pauseScanningKeepStream();
