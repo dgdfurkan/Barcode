@@ -1498,6 +1498,73 @@ class BarcodeScanner {
         console.log('🔄 Seri okuma modu:', enabled ? 'Aktif' : 'Kapalı');
     }
 
+    /**
+     * Kamera iznini ve stream'i koruyarak sadece barkod çözümlemesini durdurur, modalı gizler.
+     * Seri okuma + sayım sheet için: tam stop/start yerine kullanılır (getUserMedia tekrarından kaçınır).
+     */
+    pauseScanningKeepStream() {
+        this.scanning = false;
+        this.hideBarcodeFrame();
+        const modal = document.getElementById('cameraScannerModal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    hasActiveCameraSession() {
+        if (this.html5QrCodeInstance) return true;
+        if (this.quaggaInstance) return true;
+        if (this.video && this.video.srcObject) {
+            const tracks = this.video.srcObject.getVideoTracks();
+            return tracks.some((t) => t.readyState === 'live');
+        }
+        if (this.stream) {
+            return this.stream.getVideoTracks().some((t) => t.readyState === 'live');
+        }
+        return false;
+    }
+
+    /**
+     * pauseScanningKeepStream sonrası: modalı gösterir, taramayı yeniden başlatır.
+     * Stream hâlâ yaşıyorsa startScanning() çağırmaz (soğuk başlatma yok).
+     */
+    async resumeScanningAfterOverlay() {
+        const modal = document.getElementById('cameraScannerModal');
+        if (modal) modal.classList.remove('hidden');
+
+        if (!this.hasActiveCameraSession()) {
+            return this.startScanning();
+        }
+
+        this.scanning = true;
+
+        if (this.video) {
+            try {
+                if (this.video.paused) await this.video.play();
+            } catch (e) {
+                /* sessiz */
+            }
+        }
+
+        if (this.scannerType === 'html5qrcode' && this.html5QrCodeInstance) {
+            return;
+        }
+
+        if (this.quaggaInstance) {
+            return;
+        }
+
+        if (this.scannerType === 'native') {
+            this.scanWithNativeAPI();
+            return;
+        }
+
+        if (this.scannerType === 'zxing' && this.codeReader && this.video) {
+            this.startZXingDecoding(this.codeReader);
+            return;
+        }
+
+        return this.startScanning();
+    }
+
     stopScanning() {
         this.scanning = false;
 

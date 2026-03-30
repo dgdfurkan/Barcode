@@ -4347,7 +4347,11 @@ class CountingSystem {
         const isSeriSayar = this.isSeriOkumaVeSayarakIlerle();
 
         if (isSeriSayar) {
-            if (window.barcodeScanner) window.barcodeScanner.stopScanning();
+            if (window.barcodeScanner && typeof window.barcodeScanner.pauseScanningKeepStream === 'function') {
+                window.barcodeScanner.pauseScanningKeepStream();
+            } else if (window.barcodeScanner) {
+                window.barcodeScanner.stopScanning();
+            }
         } else if (!isSeriOkuma) {
             const cameraScannerModal = document.getElementById('cameraScannerModal');
             if (cameraScannerModal) cameraScannerModal.classList.add('hidden');
@@ -4581,11 +4585,21 @@ class CountingSystem {
             setTimeout(() => {
                 bottomSheet.classList.add('hidden');
                 if (resumeSeriSayarCamera && this.isSeriOkumaVeSayarakIlerle() && window.barcodeScanner) {
-                    window.barcodeScanner.startScanning();
+                    const bs = window.barcodeScanner;
+                    if (typeof bs.resumeScanningAfterOverlay === 'function') {
+                        void bs.resumeScanningAfterOverlay();
+                    } else {
+                        bs.startScanning();
+                    }
                 }
             }, 400);
         } else if (resumeSeriSayarCamera && this.isSeriOkumaVeSayarakIlerle() && window.barcodeScanner) {
-            window.barcodeScanner.startScanning();
+            const bs = window.barcodeScanner;
+            if (typeof bs.resumeScanningAfterOverlay === 'function') {
+                void bs.resumeScanningAfterOverlay();
+            } else {
+                bs.startScanning();
+            }
         }
         
         this.currentCountingProduct = null;
