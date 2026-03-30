@@ -21,7 +21,7 @@ warehouse.getir.com sayfasında ürün listelerine 📋 butonları ekleyen Chrom
 
 ## Sayım listesi (kontrol paneli)
 
-Sayım ekranında **Ürün Adı** ve **Ürün Barkodları** sütunlu Ant tablo göründüğünde, tablonun hemen üstünde **«Sayım Listesini Kopyala»** butonu çıkar (tablo kutusunun içinde, en üstte). Görünmüyorsa sağ altta sabit **«Sayımı kopyala»** yedek butonu da eklenir.
+Sayım ekranında ürün + barkod içeren Ant tablo göründüğünde, sipariş sayfasındaki ile aynı **«📋 Tümünü Kopyala»** butonu (`getir-copy-all-btn`) tablonun hemen üstünde çıkar — çoğu ekranda tablo `ant-row` içinde olmadığı için buton **`ant-table-wrapper`** satırının üstüne eklenir.
 
 **Not:** Eklenti güncelledikten sonra `chrome://extensions` → bu eklenti → **Yenile** (↻) ile yeniden yükleyin.
 
