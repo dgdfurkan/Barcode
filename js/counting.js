@@ -6454,12 +6454,6 @@ class CountingSystem {
 
         const now = new Date().toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
-        const MAX_ROWS = 5;
-        const missShow = missing.slice(0, MAX_ROWS);
-        const surShow = surplus.slice(0, MAX_ROWS);
-        const missExtra = Math.max(0, missing.length - missShow.length);
-        const surExtra = Math.max(0, surplus.length - surShow.length);
-
         const productCard = (p, kind) => {
             const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
             const name = this.escapeHtml(p.productName || '');
@@ -6530,9 +6524,8 @@ class CountingSystem {
                             <span class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">${missing.length} kalem</span>
                         </div>
                         <div class="space-y-2">
-                            ${missing.length === 0 ? emptyCol('Eksik ürün yok.') : missShow.map((p) => productCard(p, 'miss')).join('')}
+                            ${missing.length === 0 ? emptyCol('Eksik ürün yok.') : missing.map((p) => productCard(p, 'miss')).join('')}
                         </div>
-                        ${missExtra > 0 ? `<p class="mt-2 text-[11px] leading-relaxed text-gray-400">+${missExtra} ürün daha — tam liste için yukarıdaki «Ürün Detayları».</p>` : ''}
                     </div>
                     <div>
                         <div class="mb-2 flex items-center justify-between gap-2">
@@ -6540,9 +6533,8 @@ class CountingSystem {
                             <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">${surplus.length} kalem</span>
                         </div>
                         <div class="space-y-2">
-                            ${surplus.length === 0 ? emptyCol('Fazla ürün yok.') : surShow.map((p) => productCard(p, 'plus')).join('')}
+                            ${surplus.length === 0 ? emptyCol('Fazla ürün yok.') : surplus.map((p) => productCard(p, 'plus')).join('')}
                         </div>
-                        ${surExtra > 0 ? `<p class="mt-2 text-[11px] leading-relaxed text-gray-400">+${surExtra} ürün daha — tam liste için yukarıdaki «Ürün Detayları».</p>` : ''}
                     </div>
                 </div>
             </div>
