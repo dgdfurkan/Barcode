@@ -913,6 +913,32 @@
             background: rgba(148, 163, 184, 0.4);
             border-radius: 9999px;
         }
+
+        /* Genel tablo listesi: wrap + en fazla 3 satır; taşan içerik dikey veya hafif yatay kayar */
+        .sayim-chip-scroll.sayim-chip-wrap {
+            flex-wrap: wrap;
+            align-content: flex-start;
+            align-items: flex-start;
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: calc(2.25rem * 3 + 0.5rem * 2);
+            scroll-snap-type: none;
+            min-height: 2.25rem;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+        }
+        .sayim-chip-scroll.sayim-chip-wrap::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .sayim-chip-scroll.sayim-chip-wrap::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sayim-chip-scroll.sayim-chip-wrap::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.45);
+            border-radius: 9999px;
+        }
+
         .sayim-seg {
             transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
         }
@@ -1452,7 +1478,7 @@
                         </div>
                     </div>
                     <p class="text-[10px] sm:text-[11px] text-slate-500 mt-1 mb-1.5 hidden sm:block">Sabit liste; isim verir, yeniden adlandırırsınız.</p>
-                    <div id="generalTableList" class="sayim-chip-scroll rounded-lg border border-slate-100/80 bg-slate-50/50 px-1" role="list" aria-label="Genel Sayım Tabloları"></div>
+                    <div id="generalTableList" class="sayim-chip-scroll sayim-chip-wrap rounded-lg border border-slate-100/80 bg-slate-50/50 px-1" role="list" aria-label="Genel Sayım Tabloları"></div>
                 </div>
 
                 <!-- Günlük panel -->
