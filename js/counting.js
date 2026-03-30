@@ -857,7 +857,7 @@ class CountingSystem {
         const displayName = this.formatTableDisplayName(this.currentTableName);
         const cnt = currentTable ? currentTable.productCount || 0 : 0;
         if (summaryText) {
-            const tag = this.isDailyTableName(this.currentTableName) ? ' (günlük)' : '';
+            const tag = this.isDailyTableName(this.currentTableName) ? ' (Günlük)' : '';
             summaryText.textContent = `${displayName}${tag} · ${cnt} ürün`;
         }
 
@@ -868,8 +868,8 @@ class CountingSystem {
             renameBtn.classList.toggle('opacity-40', lock);
             renameBtn.classList.toggle('pointer-events-none', lock);
             renameBtn.title = lock
-                ? 'Günlük sayım tablolarının adı sabittir'
-                : 'Seçili tablonun adını değiştir';
+                ? 'Günlük Sayım Tablolarının Adı Sabittir'
+                : 'Seçili Tablonun Adını Değiştir';
         }
 
         if (!generalList || !dailyList) {
@@ -931,7 +931,7 @@ class CountingSystem {
         if (dailyTables.length === 0) {
             const empty = document.createElement('p');
             empty.className = 'text-xs text-indigo-700/80 px-2 py-6 text-center';
-            empty.textContent = 'Henüz günlük kayıt yok. «Bugünü ekle» ile başlayın.';
+            empty.textContent = 'Henüz günlük kayıt yok. «Bugünü Ekle» ile başlayın.';
             dailyList.appendChild(empty);
         } else {
             dailyTables.forEach((table) => {
@@ -5215,7 +5215,7 @@ class CountingSystem {
     // Show rename table modal
     showRenameTableModal() {
         if (this.isDailyTableName(this.currentTableName)) {
-            this.showToast('Günlük sayım tablolarının adı tarih olarak sabittir; yeniden adlandırılamaz.', 'info', 4000);
+            this.showToast('Günlük Sayım Tablolarının Adı Tarih Olarak Sabittir; Yeniden Adlandırılamaz.', 'info', 4000);
             return;
         }
         const renameTableModal = document.getElementById('renameTableModal');
@@ -5237,7 +5237,7 @@ class CountingSystem {
     // Rename table
     async renameTable(oldName, newName) {
         if (this.isDailyTableName(oldName)) {
-            throw new Error('Günlük sayım tabloları yeniden adlandırılamaz');
+            throw new Error('Günlük Sayım Tabloları Yeniden Adlandırılamaz');
         }
         const trimmedNew = (newName || '').trim();
         if (!trimmedNew) {
