@@ -28,6 +28,8 @@ class CountingSystem {
         this.totalCharts = 6; // Total number of charts
         this.chartCarouselSetup = false; // Chart carousel setup flag
         this.cameraScanAndCountMode = false; // Kamera: barkod okutunca sayım ekranı açılsın
+        /** Genel tablolardan ayrılmak için günlük tablo adları: `Günlük|YYYY-MM-DD` */
+        this.DAILY_TABLE_PREFIX = 'Günlük|';
     }
 
     async init() {
@@ -574,9 +576,14 @@ class CountingSystem {
     }
 
     // Create a new table
-    async createTable(tableName) {
+    async createTable(tableName, options = {}) {
         if (!tableName || tableName.trim() === '') {
             throw new Error('Tablo adı boş olamaz');
+        }
+
+        const trimmed = tableName.trim();
+        if (!options.allowDaily && trimmed.startsWith(this.DAILY_TABLE_PREFIX)) {
+            throw new Error('Bu isim günlük sayım için ayrılmıştır; genel tabloda kullanılamaz');
         }
 
         // Save current table first
@@ -616,17 +623,17 @@ class CountingSystem {
         }
 
         // Check if table already exists
-        if (fullData._tables[tableName]) {
+        if (fullData._tables[trimmed]) {
             throw new Error('Bu isimde bir tablo zaten mevcut');
         }
 
         // Create new table
-        fullData._tables[tableName] = {};
+        fullData._tables[trimmed] = {};
         
         // Switch to new table
-        this.currentTableName = tableName;
+        this.currentTableName = trimmed;
         this.countingData = {};
-        fullData._currentTable = tableName;
+        fullData._currentTable = trimmed;
 
         await this.saveFullCountingData(fullData);
 
@@ -723,49 +730,235 @@ class CountingSystem {
         }));
     }
 
-    // Update table selector UI
+    isDailyTableName(name) {
+        return typeof name === 'string' && name.startsWith(this.DAILY_TABLE_PREFIX);
+    }
+
+    getIsoFromDailyTableName(name) {
+        if (!this.isDailyTableName(name)) return null;
+        return name.slice(this.DAILY_TABLE_PREFIX.length);
+    }
+
+    getLocalDateIso() {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    formatDailyDateLabelFromIso(iso) {
+        if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso || '';
+        const [yy, mm, dd] = iso.split('-').map(Number);
+        const dt = new Date(yy, mm - 1, dd);
+        return dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    formatTableDisplayName(name) {
+        if (!name) return '—';
+        if (this.isDailyTableName(name)) {
+            const iso = this.getIsoFromDailyTableName(name);
+            return this.formatDailyDateLabelFromIso(iso);
+        }
+        return name;
+    }
+
+    matchDailyImportRow(row) {
+        if (!row || typeof row !== 'object') return null;
+        const code = row.barcode != null ? String(row.barcode).trim() : '';
+        if (code) {
+            const byBarcode = this.allProducts.find((p) => {
+                if (!p.barcodes || !Array.isArray(p.barcodes)) return false;
+                return p.barcodes.some((b) => b && String(b.code).trim() === code);
+            });
+            if (byBarcode) return byBarcode;
+        }
+        if (row.name && String(row.name).trim()) {
+            return this.findProduct(String(row.name).trim());
+        }
+        return null;
+    }
+
+    async importDailyCountForToday() {
+        const iso = this.getLocalDateIso();
+        const tableName = this.DAILY_TABLE_PREFIX + iso;
+        const tables = this.getTableList();
+        const exists = tables.some((t) => t.name === tableName);
+        try {
+            if (!exists) {
+                await this.createTable(tableName, { allowDaily: true });
+            } else {
+                await this.switchTable(tableName);
+            }
+        } catch (err) {
+            this.showToast(err?.message || 'Tablo açılamadı', 'error', 4000);
+            return;
+        }
+
+        const fetchFn = window.DailyCountImport?.fetchDailyRowsForDate;
+        const rows = typeof fetchFn === 'function' ? await fetchFn(iso) : [];
+        if (!rows.length) {
+            this.showToast(
+                'Kontrol paneli verisi henüz bağlanmadı veya bugün için satır yok. (Konsolda `window.__DAILY_COUNT_MOCK_ROWS` ile test edebilirsiniz.)',
+                'info',
+                5000
+            );
+            this.updateTableSelector();
+            return;
+        }
+
+        let added = 0;
+        let skipped = 0;
+        for (const row of rows) {
+            const product = this.matchDailyImportRow(row);
+            if (!product) {
+                skipped++;
+                continue;
+            }
+            this.addProductToCounting(product, { skipSave: true });
+            if (
+                row.quantity !== undefined &&
+                row.quantity !== null &&
+                this.countingData[product.id]
+            ) {
+                const q = Number(row.quantity);
+                if (!Number.isNaN(q)) {
+                    this.countingData[product.id].warehouseStock = q;
+                    this.countingData[product.id].lastUpdated = new Date().toISOString();
+                }
+            }
+            added++;
+        }
+
+        await this.saveCountingData();
+        this.renderTable();
+        if (this.currentViewMode === 'rapid') {
+            this.renderRapidCountingMode();
+        }
+        this.updateStatistics();
+        this.updateCountingProgress();
+        this.updateTableSelector();
+        this.showToast(
+            `${added} ürün işlendi${skipped ? `, ${skipped} satır eşleşmedi` : ''}`,
+            added ? 'success' : 'warning',
+            4000
+        );
+    }
+
+    // Update table selector UI (genel liste + günlük liste)
     updateTableSelector() {
-        const tableSelectorBtn = document.getElementById('tableSelectorBtn');
-        const tableSelectorText = document.getElementById('tableSelectorText');
-        const tableSelectorDropdown = document.getElementById('tableSelectorDropdown');
-        
-        if (!tableSelectorBtn || !tableSelectorText || !tableSelectorDropdown) return;
+        const generalList = document.getElementById('generalTableList');
+        const dailyList = document.getElementById('dailyTableList');
+        const summaryText = document.getElementById('activeTableSummaryText');
+        const renameBtn = document.getElementById('renameTableBtn');
 
         const tables = this.getTableList();
-        
-        // Update button text
-        const currentTable = tables.find(t => t.isCurrent);
-        const tableName = currentTable ? currentTable.name : (this.currentTableName || 'Tablo Seçin');
-        tableSelectorText.textContent = tableName;
-        
-        // Clear and populate dropdown
-        tableSelectorDropdown.innerHTML = '';
+        const currentTable = tables.find((t) => t.isCurrent);
+        const displayName = this.formatTableDisplayName(this.currentTableName);
+        const cnt = currentTable ? currentTable.productCount || 0 : 0;
+        if (summaryText) {
+            const tag = this.isDailyTableName(this.currentTableName) ? ' (günlük)' : '';
+            summaryText.textContent = `${displayName}${tag} · ${cnt} ürün`;
+        }
 
-        tables.forEach(table => {
-            const option = document.createElement('div');
-            option.className = `table-selector-option ${table.isCurrent ? 'active' : ''}`;
-            option.dataset.tableName = table.name;
-            option.innerHTML = `
-                <span>${this.escapeHtml(table.name)}${table.productCount ? ` <span class="text-gray-500 text-xs">(${table.productCount})</span>` : ''}</span>
-                <svg class="check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-            `;
-            
-            option.addEventListener('click', async () => {
-                if (table.name !== this.currentTableName) {
-                    await this.switchTable(table.name);
-                }
-                this.closeTableSelector();
+        if (renameBtn) {
+            const lock = this.isDailyTableName(this.currentTableName);
+            renameBtn.disabled = lock;
+            renameBtn.setAttribute('aria-disabled', lock ? 'true' : 'false');
+            renameBtn.classList.toggle('opacity-40', lock);
+            renameBtn.classList.toggle('pointer-events-none', lock);
+            renameBtn.title = lock
+                ? 'Günlük sayım tablolarının adı sabittir'
+                : 'Seçili tablonun adını değiştir';
+        }
+
+        if (!generalList || !dailyList) {
+            return;
+        }
+
+        const searchEl = document.getElementById('generalTableSearch');
+        const q = (searchEl && searchEl.value ? searchEl.value : '').trim().toLowerCase();
+
+        const generalTables = tables.filter((t) => !this.isDailyTableName(t.name));
+        const filteredGeneral = q
+            ? generalTables.filter((t) => t.name.toLowerCase().includes(q))
+            : generalTables;
+
+        generalList.innerHTML = '';
+        if (filteredGeneral.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'text-xs text-slate-500 px-2 py-6 text-center';
+            empty.textContent = generalTables.length
+                ? 'Arama ile eşleşen tablo yok.'
+                : 'Henüz genel tablo yok. + ile oluşturun.';
+            generalList.appendChild(empty);
+        } else {
+            filteredGeneral.forEach((table) => {
+                const isActive = table.name === this.currentTableName;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.setAttribute('role', 'listitem');
+                btn.dataset.tableName = table.name;
+                btn.className = [
+                    'sayim-table-item w-full rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
+                    'flex items-center justify-between gap-2 border',
+                    isActive
+                        ? 'border-blue-300 bg-blue-50 text-blue-900 font-semibold shadow-sm'
+                        : 'border-transparent text-slate-700 hover:bg-slate-50 hover:border-slate-200',
+                ].join(' ');
+                btn.innerHTML = `
+                    <span class="min-w-0 truncate">${this.escapeHtml(table.name)}</span>
+                    <span class="shrink-0 text-xs font-medium ${isActive ? 'text-blue-700' : 'text-slate-400'}">${table.productCount ?? 0}</span>
+                `;
+                btn.addEventListener('click', async () => {
+                    if (table.name !== this.currentTableName) {
+                        await this.switchTable(table.name);
+                    }
+                });
+                generalList.appendChild(btn);
             });
-            
-            tableSelectorDropdown.appendChild(option);
-        });
-        
-        // Update table info display
-        const tableInfo = document.getElementById('currentTableInfo');
-        if (tableInfo && currentTable) {
-            tableInfo.textContent = `${currentTable.name} - ${currentTable.productCount || 0} ürün`;
+        }
+
+        const dailyTables = tables
+            .filter((t) => this.isDailyTableName(t.name))
+            .map((t) => ({
+                ...t,
+                iso: this.getIsoFromDailyTableName(t.name),
+            }))
+            .sort((a, b) => (b.iso || '').localeCompare(a.iso || ''));
+
+        dailyList.innerHTML = '';
+        if (dailyTables.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'text-xs text-indigo-700/80 px-2 py-6 text-center';
+            empty.textContent = 'Henüz günlük kayıt yok. «Bugünü ekle» ile başlayın.';
+            dailyList.appendChild(empty);
+        } else {
+            dailyTables.forEach((table) => {
+                const label = this.formatDailyDateLabelFromIso(table.iso);
+                const isActive = table.name === this.currentTableName;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.setAttribute('role', 'listitem');
+                btn.dataset.tableName = table.name;
+                btn.className = [
+                    'sayim-table-item w-full rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
+                    'flex items-center justify-between gap-2 border',
+                    isActive
+                        ? 'border-indigo-400 bg-indigo-50 text-indigo-950 font-semibold shadow-sm'
+                        : 'border-transparent text-indigo-900/90 hover:bg-indigo-50/80 hover:border-indigo-100',
+                ].join(' ');
+                btn.innerHTML = `
+                    <span class="min-w-0 truncate">${this.escapeHtml(label)}</span>
+                    <span class="shrink-0 text-xs font-medium ${isActive ? 'text-indigo-700' : 'text-indigo-400'}">${table.productCount ?? 0}</span>
+                `;
+                btn.addEventListener('click', async () => {
+                    if (table.name !== this.currentTableName) {
+                        await this.switchTable(table.name);
+                    }
+                });
+                dailyList.appendChild(btn);
+            });
         }
     }
     
@@ -902,13 +1095,34 @@ class CountingSystem {
             addProductBtn.addEventListener('click', () => this.handleManualAdd());
         }
 
-        // Manual input enter key
+        // Manual input enter key + temizle (X) butonu
         const manualInput = document.getElementById('manualProductInput');
+        const manualInputClear = document.getElementById('manualProductInputClear');
+        const syncManualInputClear = () => {
+            if (!manualInput) return;
+            const has = manualInput.value.length > 0;
+            if (manualInputClear) {
+                manualInputClear.classList.toggle('hidden', !has);
+                manualInputClear.classList.toggle('inline-flex', has);
+            }
+        };
         if (manualInput) {
+            syncManualInputClear();
+            manualInput.addEventListener('input', syncManualInputClear);
             manualInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     this.handleManualAdd();
                 }
+            });
+        }
+        if (manualInputClear && manualInput) {
+            manualInputClear.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                manualInput.value = '';
+                manualInput.dispatchEvent(new Event('input', { bubbles: true }));
+                syncManualInputClear();
+                manualInput.focus();
             });
         }
 
@@ -1012,33 +1226,25 @@ class CountingSystem {
         }
         
         // Table management event listeners
-        const tableSelectorBtn = document.getElementById('tableSelectorBtn');
+        const generalTableSearch = document.getElementById('generalTableSearch');
+        if (generalTableSearch) {
+            let tableSearchT;
+            generalTableSearch.addEventListener('input', () => {
+                clearTimeout(tableSearchT);
+                tableSearchT = setTimeout(() => this.updateTableSelector(), 120);
+            });
+        }
+
+        const dailyCountImportBtn = document.getElementById('dailyCountImportBtn');
+        if (dailyCountImportBtn) {
+            dailyCountImportBtn.addEventListener('click', () => {
+                this.importDailyCountForToday();
+            });
+        }
+
         const renameTableBtn = document.getElementById('renameTableBtn');
         const createTableBtn = document.getElementById('createTableBtn');
         const deleteTableBtn = document.getElementById('deleteTableBtn');
-        
-        if (tableSelectorBtn) {
-            tableSelectorBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const dropdown = document.getElementById('tableSelectorDropdown');
-                if (dropdown && dropdown.classList.contains('hidden')) {
-                    this.openTableSelector();
-                } else {
-                    this.closeTableSelector();
-                }
-            });
-        }
-        
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            const tableSelectorBtn = document.getElementById('tableSelectorBtn');
-            const tableSelectorDropdown = document.getElementById('tableSelectorDropdown');
-            if (tableSelectorBtn && tableSelectorDropdown && 
-                !tableSelectorBtn.contains(e.target) && 
-                !tableSelectorDropdown.contains(e.target)) {
-                this.closeTableSelector();
-            }
-        });
         
         if (renameTableBtn) {
             renameTableBtn.addEventListener('click', () => {
@@ -1242,6 +1448,7 @@ class CountingSystem {
         
         // Manual input search with dropdown
         const manualInputResults = document.getElementById('manualInputResults');
+        const manualInputWrapper = document.getElementById('manualProductInputWrapper');
         if (manualInput) {
             let searchTimeout;
             manualInput.addEventListener('input', (e) => {
@@ -1263,9 +1470,10 @@ class CountingSystem {
                 manualInputResults.addEventListener('click', (e) => e.stopPropagation());
             }
             
-            // Sadece boş bir alana (input ve dropdown dışına) tıklanınca kapat
+            // Sadece boş bir alana (input, ikonlar ve dropdown dışına) tıklanınca kapat
             document.addEventListener('click', (e) => {
-                if (manualInputResults && !manualInput.contains(e.target) && !manualInputResults.contains(e.target)) {
+                const insideField = manualInputWrapper && manualInputWrapper.contains(e.target);
+                if (manualInputResults && !insideField && !manualInputResults.contains(e.target)) {
                     manualInputResults.classList.add('hidden');
                 }
             });
@@ -1832,7 +2040,7 @@ class CountingSystem {
         return product;
     }
 
-    addProductToCounting(product) {
+    addProductToCounting(product, options = {}) {
         if (!product || !product.id) {
             console.error('Invalid product:', product);
             return;
@@ -1840,6 +2048,7 @@ class CountingSystem {
 
         const productId = product.id;
         const now = new Date();
+        const skipSave = options.skipSave === true;
 
         // If product already exists, update it
         if (this.countingData[productId]) {
@@ -1858,6 +2067,10 @@ class CountingSystem {
                 lastUpdated: now.toISOString(),
                 history: []
             };
+        }
+
+        if (skipSave) {
+            return;
         }
 
         // Save and render
@@ -3968,7 +4181,7 @@ class CountingSystem {
         // Update product info in modal
         const productImage = document.getElementById('countingProductImage');
         const productName = document.getElementById('countingProductName');
-        const productBarcode = document.getElementById('countingProductBarcode');
+        const productBarcodesEl = document.getElementById('countingProductBarcodes');
         const depoInput = document.getElementById('countingDepoInput');
         const stockIndicator = document.getElementById('countingStockIndicator');
         const systemStockElement = document.getElementById('countingSystemStock');
@@ -3980,9 +4193,30 @@ class CountingSystem {
         if (productName) {
             productName.textContent = product.name || 'Bilinmeyen Ürün';
         }
-        if (productBarcode) {
-            const barcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : 'Barkod yok';
-            productBarcode.textContent = `# ${barcode}`;
+        if (productBarcodesEl) {
+            productBarcodesEl.innerHTML = '';
+            const codes = [
+                ...new Set(
+                    (product.barcodes || [])
+                        .map((b) => (b && b.code != null ? String(b.code).trim() : ''))
+                        .filter(Boolean)
+                ),
+            ];
+            if (codes.length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'text-[10px] text-gray-500 font-mono';
+                empty.textContent = 'Barkod yok';
+                productBarcodesEl.appendChild(empty);
+            } else {
+                codes.forEach((code) => {
+                    const chip = document.createElement('span');
+                    chip.setAttribute('role', 'listitem');
+                    chip.className =
+                        'inline-flex flex-shrink-0 snap-start items-center whitespace-nowrap rounded-full border border-slate-200/70 bg-gradient-to-b from-white to-slate-50/90 px-2.5 py-1 text-[10px] font-mono tabular-nums tracking-tight text-slate-600 shadow-sm';
+                    chip.textContent = code;
+                    productBarcodesEl.appendChild(chip);
+                });
+            }
         }
         if (depoInput) {
             depoInput.value = data.warehouseStock !== null && data.warehouseStock !== undefined ? data.warehouseStock : '';
@@ -4835,7 +5069,7 @@ class CountingSystem {
         const deleteTableModal = document.getElementById('deleteTableModal');
         const deleteTableNameDisplay = document.getElementById('deleteTableNameDisplay');
         if (deleteTableModal && deleteTableNameDisplay) {
-            deleteTableNameDisplay.textContent = this.currentTableName;
+            deleteTableNameDisplay.textContent = this.formatTableDisplayName(this.currentTableName);
             deleteTableModal.classList.remove('hidden');
         }
     }
@@ -4980,12 +5214,16 @@ class CountingSystem {
     
     // Show rename table modal
     showRenameTableModal() {
+        if (this.isDailyTableName(this.currentTableName)) {
+            this.showToast('Günlük sayım tablolarının adı tarih olarak sabittir; yeniden adlandırılamaz.', 'info', 4000);
+            return;
+        }
         const renameTableModal = document.getElementById('renameTableModal');
         const currentTableNameDisplay = document.getElementById('currentTableNameDisplay');
         const newTableNameInput = document.getElementById('newTableNameInput');
         
         if (renameTableModal && currentTableNameDisplay && newTableNameInput) {
-            currentTableNameDisplay.textContent = this.currentTableName;
+            currentTableNameDisplay.textContent = this.formatTableDisplayName(this.currentTableName);
             newTableNameInput.value = this.currentTableName;
             renameTableModal.classList.remove('hidden');
             // Focus on input
@@ -4998,10 +5236,20 @@ class CountingSystem {
     
     // Rename table
     async renameTable(oldName, newName) {
+        if (this.isDailyTableName(oldName)) {
+            throw new Error('Günlük sayım tabloları yeniden adlandırılamaz');
+        }
+        const trimmedNew = (newName || '').trim();
+        if (!trimmedNew) {
+            throw new Error('Tablo adı boş olamaz');
+        }
+        if (this.isDailyTableName(trimmedNew)) {
+            throw new Error('Bu isim günlük sayım için ayrılmıştır');
+        }
         const tables = this.getTableList();
         
         // Check if new name already exists
-        if (tables.some(t => t.name === newName)) {
+        if (tables.some(t => t.name === trimmedNew)) {
             throw new Error('Bu isimde bir tablo zaten mevcut');
         }
         
@@ -5062,12 +5310,12 @@ class CountingSystem {
         }
         
         // Rename in _tables
-        fullData._tables[newName] = currentTableData;
+        fullData._tables[trimmedNew] = currentTableData;
         delete fullData._tables[oldName];
         
         // Update current table name if it was the active one
         if (this.currentTableName === oldName) {
-            this.currentTableName = newName;
+            this.currentTableName = trimmedNew;
             this.countingData = currentTableData;
         }
         fullData._currentTable = this.currentTableName;
@@ -5699,7 +5947,9 @@ class CountingSystem {
             financialTableSelectorText.textContent = 'Tüm Tablolar';
         } else {
             const selectedTable = tables.find(t => t.name === this.selectedFinancialTable);
-            financialTableSelectorText.textContent = selectedTable ? selectedTable.name : (this.selectedFinancialTable || 'Tüm Tablolar');
+            financialTableSelectorText.textContent = selectedTable
+                ? this.formatTableDisplayName(selectedTable.name)
+                : (this.selectedFinancialTable || 'Tüm Tablolar');
         }
 
         // Clear and populate dropdown
@@ -5731,8 +5981,9 @@ class CountingSystem {
             const option = document.createElement('div');
             option.className = `table-selector-option ${table.name === this.selectedFinancialTable ? 'active' : ''}`;
             option.dataset.tableName = table.name;
+            const label = this.formatTableDisplayName(table.name);
             option.innerHTML = `
-                <span>${this.escapeHtml(table.name)}${table.productCount ? ` <span class="text-gray-500 text-xs">(${table.productCount})</span>` : ''}</span>
+                <span>${this.escapeHtml(label)}${table.productCount ? ` <span class="text-gray-500 text-xs">(${table.productCount})</span>` : ''}</span>
                 <svg class="check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>

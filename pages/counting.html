@@ -56,6 +56,7 @@
     <script src="../js/test-counting-supabase.js"></script>
     <!-- Html5-Qrcode (Barkod tarama için fallback) -->
     <script src="https://unpkg.com/html5-qrcode@latest/html5-qrcode.min.js"></script>
+    <script src="../js/daily-count-import.js"></script>
     <script src="../js/counting.js"></script>
     <script src="../js/barcode-scanner.js"></script>
     <script src="../js/terminal-scanner.js"></script>
@@ -237,11 +238,14 @@
                 font-size: 0.875rem !important;
             }
             
-            /* Inputs - larger touch targets */
+            /* Inputs - larger touch targets (sol padding yok: ikon ayrı sütunda) */
             #manualProductInput {
                 min-height: 44px !important;
                 font-size: 1rem !important;
-                padding: 0.75rem 1rem !important;
+                padding-top: 0.75rem !important;
+                padding-bottom: 0.75rem !important;
+                padding-left: 0 !important;
+                padding-right: 0.75rem !important;
             }
             
             /* Statistics cards */
@@ -264,7 +268,10 @@
             /* Inputs */
             #manualProductInput {
                 min-height: 44px !important;
-                padding: 0.625rem 1rem !important;
+                padding-top: 0.625rem !important;
+                padding-bottom: 0.625rem !important;
+                padding-left: 0 !important;
+                padding-right: 0.75rem !important;
             }
         }
         
@@ -847,10 +854,11 @@
             }
         }
         
-        /* Product Image Lightbox */
+        /* Product Image Lightbox — bottom sheet (110) ve kamera modalları (100) üzerinde */
         #productImageLightbox {
             opacity: 0;
             transition: opacity 0.3s ease-out;
+            z-index: 130;
         }
         
         #productImageLightbox.show {
@@ -872,6 +880,40 @@
         
         body.lightbox-open {
             overflow: hidden;
+        }
+
+        /* Sayım tablo listeleri — ince scrollbar */
+        .sayim-table-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+        }
+        .sayim-table-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sayim-table-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sayim-table-scroll::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.45);
+            border-radius: 9999px;
+        }
+
+        /* Bottom sheet: barkodlar — yatay scroll, ince scrollbar */
+        #countingProductBarcodes.counting-barcodes-scroll {
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x proximity;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+        }
+        #countingProductBarcodes.counting-barcodes-scroll::-webkit-scrollbar {
+            height: 3px;
+        }
+        #countingProductBarcodes.counting-barcodes-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #countingProductBarcodes.counting-barcodes-scroll::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.45);
+            border-radius: 9999px;
         }
 
         /* Tab System Styles */
@@ -1070,6 +1112,12 @@
                         <span class="hidden sm:inline">Barkod Aramaya Dön</span>
                         <span class="sm:hidden">Arama</span>
                     </button>
+                    <a id="lowStockPageBtn" href="low_stock_products.html" class="hidden flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors text-xs sm:text-sm font-medium flex-shrink-0" title="Stoğu Düşük Ürünler">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                        <span class="hidden sm:inline">Stoğu Düşük</span>
+                    </a>
                     <div class="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
                         <img src="../assets/logo.png" alt="GunduzDev Logo" class="w-full h-full object-contain">
                     </div>
@@ -1326,45 +1374,75 @@
 
         <!-- Sayım Tab Content -->
         <div id="sayimTabContent" class="tab-content">
-            <!-- Table Info Section -->
+            <!-- Table Info: genel listeler + günlük sayım (yan yana) -->
             <div class="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-5 mb-6">
-                <div class="flex items-center justify-between flex-wrap gap-3">
-                    <!-- Table Selector - Mobile Optimized -->
-                    <div class="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-                        <!-- Custom Table Selector Dropdown -->
-                        <div class="relative min-w-[120px] sm:min-w-[150px]">
-                            <button 
-                                id="tableSelectorBtn" 
-                                class="w-full px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white hover:bg-gray-50 flex items-center justify-between transition-colors min-h-[36px] sm:min-h-[40px]"
-                            >
-                                <span id="tableSelectorText" class="text-gray-700 truncate text-sm sm:text-base font-medium">Tablo Seçin</span>
-                                <svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 ml-2 sm:ml-3 flex-shrink-0 transition-transform" id="tableSelectorIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </button>
-                            <div id="tableSelectorDropdown" class="hidden absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto min-w-[200px]">
-                                <!-- Options will be populated by JavaScript -->
+                <p id="activeTableSummary" class="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4 leading-snug">
+                    <span class="font-medium text-gray-800">Aktif tablo:</span>
+                    <span id="activeTableSummaryText" class="text-gray-700">—</span>
+                </p>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+                    <!-- Genel sayım tabloları -->
+                    <section class="rounded-xl border border-slate-200/90 bg-gradient-to-b from-slate-50/90 to-white p-3 sm:p-4 shadow-sm">
+                        <div class="flex items-start justify-between gap-2 mb-3">
+                            <div class="min-w-0">
+                                <h3 class="text-sm font-bold text-slate-800 tracking-tight">Genel sayım tabloları</h3>
+                                <p class="text-[11px] text-slate-500 mt-0.5">İstediğiniz isimle oluşturun; yeniden adlandırılabilir.</p>
+                            </div>
+                            <div class="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+                                <button type="button" id="renameTableBtn" class="p-1.5 sm:p-2 hover:bg-white/80 rounded-lg border border-transparent hover:border-slate-200 transition-colors" title="Seçili tablonun adını değiştir">
+                                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                </button>
+                                <button type="button" id="createTableBtn" class="p-1.5 sm:p-2 hover:bg-white/80 rounded-lg border border-transparent hover:border-slate-200 transition-colors" title="Yeni tablo oluştur">
+                                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                </button>
+                                <button type="button" id="deleteTableBtn" class="p-1.5 sm:p-2 hover:bg-white/80 rounded-lg border border-transparent hover:border-slate-200 transition-colors text-red-600" title="Seçili tabloyu sil" style="display: none;">
+                                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
-                        <!-- Table Action Buttons -->
-                        <div class="flex items-center space-x-0.5 sm:space-x-1 flex-shrink-0">
-                            <button id="renameTableBtn" class="p-1 sm:p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Tablo Adını Değiştir">
-                                <svg class="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        <div class="relative mb-2">
+                            <div class="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-slate-400">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                                 </svg>
-                            </button>
-                            <button id="createTableBtn" class="p-1 sm:p-1.5 hover:bg-gray-100 rounded-lg transition-colors" title="Yeni Tablo Oluştur">
-                                <svg class="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            </div>
+                            <input
+                                type="search"
+                                id="generalTableSearch"
+                                autocomplete="off"
+                                placeholder="Tabloda ara..."
+                                class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                            />
+                        </div>
+                        <div id="generalTableList" class="sayim-table-scroll max-h-64 min-h-[8rem] space-y-1 overflow-y-auto rounded-lg border border-slate-100 bg-white p-1.5" role="list" aria-label="Genel sayım tabloları"></div>
+                    </section>
+                    <!-- Günlük sayım -->
+                    <section class="rounded-xl border border-indigo-200/80 bg-gradient-to-b from-indigo-50/50 to-white p-3 sm:p-4 shadow-sm">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3 mb-3">
+                            <div class="min-w-0">
+                                <h3 class="text-sm font-bold text-indigo-900 tracking-tight">Günlük sayım</h3>
+                                <p class="text-[11px] text-indigo-700/75 mt-0.5">Sadece tarih gösterilir; tablo adları sistem tarafından sabittir.</p>
+                            </div>
+                            <button
+                                type="button"
+                                id="dailyCountImportBtn"
+                                class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 sm:text-sm"
+                                title="Bugünün günlük tablosunu açar ve kontrol panelindeki ürünleri ekler (veri bağlantısı hazır olduğunda)"
+                            >
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                 </svg>
-                            </button>
-                            <button id="deleteTableBtn" class="p-1 sm:p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-red-600" title="Tablo Sil" style="display: none;">
-                                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                </svg>
+                                Bugünü ekle
                             </button>
                         </div>
-                    </div>
+                        <div id="dailyTableList" class="sayim-table-scroll max-h-64 min-h-[8rem] space-y-1 overflow-y-auto rounded-lg border border-indigo-100 bg-white/90 p-1.5" role="list" aria-label="Günlük sayım tarihleri"></div>
+                    </section>
                 </div>
             </div>
         <!-- Add Product Section -->
@@ -1378,16 +1456,36 @@
             <div class="flex flex-col sm:flex-row gap-4">
                 <!-- Manual Input -->
                 <div class="flex-1 relative min-w-0">
-                    <div class="relative w-full">
-                    <input 
-                        type="text" 
-                        id="manualProductInput" 
-                            placeholder="Ürün adı, barkod veya gram değeri girin..."
-                            class="w-full py-3 pl-12 sm:pl-14 md:pl-16 pr-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm sm:text-base font-medium bg-gray-50 focus:bg-white"
+                    <div
+                        id="manualProductInputWrapper"
+                        class="relative flex w-full items-stretch overflow-hidden rounded-xl border-2 border-gray-200 bg-gray-50 transition-all focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500"
+                    >
+                        <span
+                            class="pointer-events-none flex shrink-0 select-none items-center justify-center pl-3.5 pr-2 text-gray-400 sm:pl-4 sm:pr-2.5"
+                            aria-hidden="true"
                         >
-                        <svg class="absolute left-3.5 sm:left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400 pointer-events-none z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
+                            <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </span>
+                        <input
+                            type="text"
+                            id="manualProductInput"
+                            placeholder="Ürün adı, barkod veya gram değeri girin..."
+                            autocomplete="off"
+                            class="min-w-0 flex-1 border-0 bg-transparent py-3 pl-0 pr-3 text-sm font-medium text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-0 sm:text-base"
+                        />
+                        <button
+                            type="button"
+                            id="manualProductInputClear"
+                            class="mr-1.5 hidden h-9 w-9 shrink-0 items-center justify-center self-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 sm:mr-2"
+                            aria-label="Aramayı temizle"
+                            title="Temizle"
+                        >
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
                     </div>
                     <!-- Search Results Dropdown -->
                     <div id="manualInputResults" class="hidden absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
@@ -1910,7 +2008,7 @@
         <div id="countingBottomSheetBackdrop" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"></div>
         
         <!-- Bottom Sheet Content -->
-        <div class="counting-bottom-sheet-content bg-white rounded-t-2xl shadow-2xl max-h-[75vh] overflow-hidden flex flex-col transform">
+        <div class="counting-bottom-sheet-content bg-white rounded-t-2xl shadow-2xl max-h-[75vh] min-h-0 overflow-y-auto overscroll-y-contain flex flex-col transform">
             <!-- Drag Handle -->
             <div class="flex justify-center pt-2 pb-1.5">
                 <div class="w-10 h-1 bg-gray-300 rounded-full"></div>
@@ -1933,8 +2031,13 @@
                     <div class="flex-1 min-w-0">
                         <div class="flex items-start justify-between gap-2">
                             <div class="flex-1 min-w-0">
-                                <h4 id="countingProductName" class="text-sm font-semibold text-gray-900 truncate leading-tight"></h4>
-                                <p id="countingProductBarcode" class="text-[10px] text-gray-500 font-mono mt-0.5"></p>
+                                <h4 id="countingProductName" class="text-sm font-semibold text-gray-900 leading-snug break-words [overflow-wrap:anywhere] text-balance"></h4>
+                                <div
+                                    id="countingProductBarcodes"
+                                    class="counting-barcodes-scroll mt-0.5 flex max-w-full flex-nowrap gap-2 overflow-x-auto overflow-y-hidden pb-1 pt-0.5"
+                                    role="list"
+                                    aria-label="Ürün barkodları"
+                                ></div>
                                 <div class="mt-1.5 flex items-center space-x-2">
                                     <!-- System Stock -->
                                     <div class="flex items-center space-x-1">
@@ -2027,7 +2130,7 @@
     </div>
 
     <!-- Product Image Lightbox -->
-    <div id="productImageLightbox" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm">
+    <div id="productImageLightbox" class="fixed inset-0 z-[130] hidden items-center justify-center bg-black bg-opacity-90 backdrop-blur-sm">
         <div class="relative w-full h-full flex items-center justify-center p-4">
             <img id="lightboxProductImage" src="" alt="" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl">
             <button id="closeLightboxBtn" class="absolute top-4 right-4 w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center text-white transition-all">
@@ -2062,6 +2165,12 @@
             // Initialize user manager
             if (window.userDataManager) {
                 await window.userDataManager.init();
+            }
+
+            // Stoğu Düşük linki: sadece lowStockAlert premium varsa göster
+            const lowStockPageBtn = document.getElementById('lowStockPageBtn');
+            if (lowStockPageBtn && window.premiumFeatures && window.premiumFeatures.checkPremiumFeature('lowStockAlert')) {
+                lowStockPageBtn.classList.remove('hidden');
             }
             
             // Load user info
