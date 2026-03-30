@@ -30,6 +30,8 @@ class CountingSystem {
         this.cameraScanAndCountMode = false; // Kamera: barkod okutunca sayım ekranı açılsın
         /** Seri okuma + sayarak ilerle: sayım sheet'i kamera akışından açıldı (Önceki/Sıradaki yerine Doğru Girdim) */
         this.countingBottomSheetFromCameraSeriSayar = false;
+        /** DEPO yanındaki kamera ile barkod doğrulama devam ediyor mu */
+        this._barcodeVerifyInProgress = false;
         /** Genel tablolardan ayrılmak için günlük tablo adları: `Günlük|YYYY-MM-DD` */
         this.DAILY_TABLE_PREFIX = 'Günlük|';
     }
@@ -1894,6 +1896,13 @@ class CountingSystem {
             correctEntryBtn.addEventListener('click', () => {
                 if (correctEntryBtn.disabled) return;
                 this.closeCountingBottomSheet();
+            });
+        }
+
+        const verifyBarcodeBtn = document.getElementById('countingVerifyBarcodeBtn');
+        if (verifyBarcodeBtn) {
+            verifyBarcodeBtn.addEventListener('click', () => {
+                void this.beginBarcodeVerificationForCurrentProduct();
             });
         }
 
@@ -4341,6 +4350,108 @@ class CountingSystem {
         }
     }
 
+    getExpectedBarcodeStringsForProduct(product) {
+        const set = new Set();
+        if (!product) return set;
+        if (product.barcodes && Array.isArray(product.barcodes)) {
+            for (const b of product.barcodes) {
+                if (b && b.code != null) {
+                    const s = String(b.code).trim();
+                    if (s) set.add(s);
+                }
+            }
+        }
+        if (product.barcode != null) {
+            const s = String(product.barcode).trim();
+            if (s) set.add(s);
+        }
+        return set;
+    }
+
+    updateVerifyBarcodeButtonState() {
+        const btn = document.getElementById('countingVerifyBarcodeBtn');
+        if (!btn) return;
+        if (!this.currentCountingProduct) {
+            btn.disabled = true;
+            return;
+        }
+        const product = this.allProducts.find((p) => p.id === this.currentCountingProduct);
+        const hasCodes = product && this.getExpectedBarcodeStringsForProduct(product).size > 0;
+        btn.disabled = !hasCodes || this._barcodeVerifyInProgress;
+    }
+
+    async beginBarcodeVerificationForCurrentProduct() {
+        if (this._barcodeVerifyInProgress) return;
+        if (!this.currentCountingProduct) {
+            this.showToast('Önce bir ürün seçin', 'warning', 2500);
+            return;
+        }
+        const product = this.allProducts.find((p) => p.id === this.currentCountingProduct);
+        if (!product) {
+            this.showToast('Ürün bulunamadı', 'error', 3000);
+            return;
+        }
+        const expected = this.getExpectedBarcodeStringsForProduct(product);
+        if (expected.size === 0) {
+            this.showToast('Bu ürün için kayıtlı barkod yok; doğrulama yapılamaz.', 'warning', 3500);
+            return;
+        }
+        const bs = window.barcodeScanner;
+        if (!bs || typeof bs.beginVerificationScan !== 'function') {
+            this.showToast('Barkod okuyucu hazır değil', 'error', 3000);
+            return;
+        }
+
+        this._barcodeVerifyInProgress = true;
+        this.updateVerifyBarcodeButtonState();
+
+        const restoreSeriPause = !!(
+            this.countingBottomSheetFromCameraSeriSayar && this.isSeriOkumaVeSayarakIlerle()
+        );
+
+        const cleanup = () => {
+            this._barcodeVerifyInProgress = false;
+            this.updateVerifyBarcodeButtonState();
+        };
+
+        const onRead = (code) => {
+            const norm = String(code).trim();
+            const match = expected.has(norm);
+            if (match) {
+                this.showToast('Eşleşiyor: Okutulan barkod bu ürüne ait.', 'success', 3500);
+                if (typeof bs.playSuccessSound === 'function') bs.playSuccessSound();
+            } else {
+                this.showToast(
+                    'Eşleşmiyor: Okutulan barkod bu ürünün kayıtlı barkodlarıyla uyuşmuyor.',
+                    'error',
+                    4500
+                );
+                if (typeof bs.playWarningSound === 'function') bs.playWarningSound();
+            }
+            if (restoreSeriPause && typeof bs.pauseScanningKeepStream === 'function') {
+                bs.pauseScanningKeepStream();
+            } else {
+                bs.stopScanning();
+            }
+            cleanup();
+        };
+
+        bs.beginVerificationScan(onRead);
+
+        try {
+            if (typeof bs.hasActiveCameraSession === 'function' && bs.hasActiveCameraSession()) {
+                await bs.resumeScanningAfterOverlay();
+            } else {
+                await bs.startScanning();
+            }
+        } catch (e) {
+            console.error(e);
+            if (typeof bs.clearVerificationScan === 'function') bs.clearVerificationScan();
+            this.showToast('Kamera açılamadı', 'error', 4000);
+            cleanup();
+        }
+    }
+
     // Kamera ile barkod okutulduktan sonra sayım ekranını aç (sayarak ilerle modu)
     onCameraScannedProductOpenForCount(productId) {
         const isSeriOkuma = window.barcodeScanner && window.barcodeScanner.continuousMode;
@@ -4457,6 +4568,7 @@ class CountingSystem {
         }
 
         this.updateCountingBottomSheetFooterMode();
+        this.updateVerifyBarcodeButtonState();
 
         // Setup delete product button (re-setup in case modal was recreated)
         const deleteProductBtn = document.getElementById('countingDeleteProductBtn');
@@ -4547,6 +4659,14 @@ class CountingSystem {
 
     closeCountingBottomSheet() {
         const resumeSeriSayarCamera = this.countingBottomSheetFromCameraSeriSayar;
+
+        if (this._barcodeVerifyInProgress && window.barcodeScanner) {
+            this._barcodeVerifyInProgress = false;
+            if (typeof window.barcodeScanner.clearVerificationScan === 'function') {
+                window.barcodeScanner.clearVerificationScan();
+            }
+            window.barcodeScanner.stopScanning();
+        }
 
         // Clear any pending auto-save
         if (this.autoSaveTimeout) {

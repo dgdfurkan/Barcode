@@ -15,6 +15,8 @@ class BarcodeScanner {
         this.html5QrCodeInstance = null; // Html5-Qrcode instance
         this.nativeDetector = null; // Barcode Detection API detector
         this.scannerType = null; // Kullanılan tarayıcı tipi
+        /** Sayım sheet: tek okumada açık ürünle barkod eşleştirme (handleBarcodeDetected önce buna düşer) */
+        this.verificationCallback = null;
     }
 
     detectBestScanner() {
@@ -1092,6 +1094,17 @@ class BarcodeScanner {
     handleBarcodeDetected(code, result = null) {
         if (!code) return;
 
+        if (typeof this.verificationCallback === 'function') {
+            const cb = this.verificationCallback;
+            this.verificationCallback = null;
+            try {
+                cb(code, result);
+            } catch (e) {
+                console.error('Barkod doğrulama callback hatası:', e);
+            }
+            return;
+        }
+
         // Aynı barkodu kısa süre içinde tekrar okumayı önle (1 saniye)
         const now = Date.now();
         if (code === this.lastScannedCode && (now - this.lastScanTime) < 1000) {
@@ -1498,6 +1511,17 @@ class BarcodeScanner {
         console.log('🔄 Seri okuma modu:', enabled ? 'Aktif' : 'Kapalı');
     }
 
+    /** Sonraki tek barkod okuması doğrulama için; normal sayım / seri okuma akışına girmez */
+    beginVerificationScan(callback) {
+        this.verificationCallback = typeof callback === 'function' ? callback : null;
+        this.lastScannedCode = null;
+        this.lastScanTime = 0;
+    }
+
+    clearVerificationScan() {
+        this.verificationCallback = null;
+    }
+
     /**
      * Kamera iznini ve stream'i koruyarak sadece barkod çözümlemesini durdurur, modalı gizler.
      * Seri okuma + sayım sheet için: tam stop/start yerine kullanılır (getUserMedia tekrarından kaçınır).
@@ -1567,6 +1591,7 @@ class BarcodeScanner {
 
     stopScanning() {
         this.scanning = false;
+        this.verificationCallback = null;
 
         // Html5-Qrcode'u durdur
         if (this.html5QrCodeInstance) {
