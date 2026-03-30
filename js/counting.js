@@ -931,7 +931,7 @@ class CountingSystem {
         if (dailyTables.length === 0) {
             const empty = document.createElement('p');
             empty.className = 'text-xs text-indigo-700/80 px-2 py-6 text-center';
-            empty.textContent = 'Henüz günlük kayıt yok. «Bugünü ekle» ile başlayın.';
+            empty.textContent = 'Henüz günlük kayıt yok. «Bugünü Ekle» ile başlayın.';
             dailyList.appendChild(empty);
         } else {
             dailyTables.forEach((table) => {
