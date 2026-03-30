@@ -28,6 +28,8 @@ class CountingSystem {
         this.totalCharts = 6; // Total number of charts
         this.chartCarouselSetup = false; // Chart carousel setup flag
         this.cameraScanAndCountMode = false; // Kamera: barkod okutunca sayım ekranı açılsın
+        /** Seri okuma + sayarak ilerle: sayım sheet'i kamera akışından açıldı (Önceki/Sıradaki yerine Doğru Girdim) */
+        this.countingBottomSheetFromCameraSeriSayar = false;
         /** Genel tablolardan ayrılmak için günlük tablo adları: `Günlük|YYYY-MM-DD` */
         this.DAILY_TABLE_PREFIX = 'Günlük|';
     }
@@ -1737,6 +1739,7 @@ class CountingSystem {
                         }
                     }, 1000); // 1 second debounce
                 }
+                this.updateCorrectEntryButtonState();
             });
         }
 
@@ -1822,6 +1825,7 @@ class CountingSystem {
                 let value = e.target.value.replace(/[^0-9]/g, '');
                 if (value === '') value = '0';
                 e.target.value = value;
+                this.updateCorrectEntryButtonState();
             });
 
             depoInput.addEventListener('keydown', (e) => {
@@ -1880,7 +1884,16 @@ class CountingSystem {
                 } finally {
                     refreshSystemStockBtn.disabled = false;
                     refreshSystemStockBtn.innerHTML = originalHTML;
+                    this.updateCorrectEntryButtonState();
                 }
+            });
+        }
+
+        const correctEntryBtn = document.getElementById('countingCorrectEntryBtn');
+        if (correctEntryBtn) {
+            correctEntryBtn.addEventListener('click', () => {
+                if (correctEntryBtn.disabled) return;
+                this.closeCountingBottomSheet();
             });
         }
 
@@ -2260,6 +2273,10 @@ class CountingSystem {
         
         this.updateStatistics();
         this.updateCountingProgress();
+
+        if (productId === this.currentCountingProduct) {
+            this.updateCorrectEntryButtonState();
+        }
     }
 
     deleteProduct(productId) {
@@ -2649,6 +2666,7 @@ class CountingSystem {
         // Re-render table to show updated states
         this.renderTable();
         this.updateStatistics();
+        this.updateCorrectEntryButtonState();
 
         // Show summary toast (tarayıcı bildirimi yerine)
         const messages = [];
@@ -4286,23 +4304,66 @@ class CountingSystem {
         return !!this.cameraScanAndCountMode;
     }
 
+    isSeriOkumaVeSayarakIlerle() {
+        return !!(window.barcodeScanner && window.barcodeScanner.continuousMode && this.cameraScanAndCountMode);
+    }
+
+    updateCorrectEntryButtonState() {
+        const btn = document.getElementById('countingCorrectEntryBtn');
+        if (!btn || !this.countingBottomSheetFromCameraSeriSayar || !this.currentCountingProduct) return;
+
+        const pid = this.currentCountingProduct;
+        const data = this.countingData[pid] || {};
+        const depoInput = document.getElementById('countingDepoInput');
+        const trimmed = depoInput?.value?.trim() ?? '';
+        const hasWarehouseFromInput = trimmed !== '';
+        const hasWarehouseFromData =
+            data.warehouseStock !== null && data.warehouseStock !== undefined;
+        const warehouseOk = hasWarehouseFromInput || hasWarehouseFromData;
+
+        const systemOk = data.systemStock !== null && data.systemStock !== undefined;
+
+        btn.disabled = !(warehouseOk && systemOk);
+    }
+
+    updateCountingBottomSheetFooterMode() {
+        const navDefault = document.getElementById('countingBottomSheetNavDefault');
+        const navCorrect = document.getElementById('countingBottomSheetNavCorrectEntry');
+        if (!navDefault || !navCorrect) return;
+
+        if (this.countingBottomSheetFromCameraSeriSayar) {
+            navDefault.classList.add('hidden');
+            navCorrect.classList.remove('hidden');
+            this.updateCorrectEntryButtonState();
+        } else {
+            navDefault.classList.remove('hidden');
+            navCorrect.classList.add('hidden');
+        }
+    }
+
     // Kamera ile barkod okutulduktan sonra sayım ekranını aç (sayarak ilerle modu)
     onCameraScannedProductOpenForCount(productId) {
         const isSeriOkuma = window.barcodeScanner && window.barcodeScanner.continuousMode;
-        if (!isSeriOkuma) {
+        const isSeriSayar = this.isSeriOkumaVeSayarakIlerle();
+
+        if (isSeriSayar) {
+            if (window.barcodeScanner) window.barcodeScanner.stopScanning();
+        } else if (!isSeriOkuma) {
             const cameraScannerModal = document.getElementById('cameraScannerModal');
             if (cameraScannerModal) cameraScannerModal.classList.add('hidden');
             if (window.barcodeScanner) window.barcodeScanner.stopScanning();
         }
-        this.openCountingBottomSheet(productId);
+
+        this.openCountingBottomSheet(productId, { fromCameraSeriSayar: isSeriSayar });
     }
 
-    openCountingBottomSheet(productId) {
+    openCountingBottomSheet(productId, options = {}) {
         const product = this.allProducts.find(p => p.id === productId);
         if (!product) return;
 
         const data = this.countingData[productId] || {};
         this.currentCountingProduct = productId;
+        this.countingBottomSheetFromCameraSeriSayar = !!options.fromCameraSeriSayar;
 
         // Update product info in modal
         const productImage = document.getElementById('countingProductImage');
@@ -4363,31 +4424,35 @@ class CountingSystem {
         // Update progress
         this.updateCountingProgress();
 
-        // Update previous button state
-        const prevBtn = document.getElementById('countingPrevBtn');
-        if (prevBtn) {
-            const prevProductId = this.findPreviousUncountedProduct(productId);
-            if (prevProductId) {
-                prevBtn.disabled = false;
-                prevBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            } else {
-                prevBtn.disabled = true;
-                prevBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        if (!this.countingBottomSheetFromCameraSeriSayar) {
+            // Update previous button state
+            const prevBtn = document.getElementById('countingPrevBtn');
+            if (prevBtn) {
+                const prevProductId = this.findPreviousUncountedProduct(productId);
+                if (prevProductId) {
+                    prevBtn.disabled = false;
+                    prevBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                } else {
+                    prevBtn.disabled = true;
+                    prevBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+            }
+
+            // Update next button state
+            const nextBtn = document.getElementById('countingNextBtn');
+            if (nextBtn) {
+                const nextProductId = this.findNextUncountedProduct(productId);
+                if (nextProductId) {
+                    nextBtn.disabled = false;
+                    nextBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                } else {
+                    nextBtn.disabled = true;
+                    nextBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
             }
         }
 
-        // Update next button state
-        const nextBtn = document.getElementById('countingNextBtn');
-        if (nextBtn) {
-            const nextProductId = this.findNextUncountedProduct(productId);
-            if (nextProductId) {
-                nextBtn.disabled = false;
-                nextBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            } else {
-                nextBtn.disabled = true;
-                nextBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            }
-        }
+        this.updateCountingBottomSheetFooterMode();
 
         // Setup delete product button (re-setup in case modal was recreated)
         const deleteProductBtn = document.getElementById('countingDeleteProductBtn');
@@ -4477,6 +4542,8 @@ class CountingSystem {
     }
 
     closeCountingBottomSheet() {
+        const resumeSeriSayarCamera = this.countingBottomSheetFromCameraSeriSayar;
+
         // Clear any pending auto-save
         if (this.autoSaveTimeout) {
             clearTimeout(this.autoSaveTimeout);
@@ -4503,6 +4570,8 @@ class CountingSystem {
             }
         }
         
+        this.countingBottomSheetFromCameraSeriSayar = false;
+
         const bottomSheet = document.getElementById('countingBottomSheet');
         if (bottomSheet) {
             bottomSheet.classList.remove('show');
@@ -4511,7 +4580,12 @@ class CountingSystem {
             // Wait for animation to complete before hiding
             setTimeout(() => {
                 bottomSheet.classList.add('hidden');
+                if (resumeSeriSayarCamera && this.isSeriOkumaVeSayarakIlerle() && window.barcodeScanner) {
+                    window.barcodeScanner.startScanning();
+                }
             }, 400);
+        } else if (resumeSeriSayarCamera && this.isSeriOkumaVeSayarakIlerle() && window.barcodeScanner) {
+            window.barcodeScanner.startScanning();
         }
         
         this.currentCountingProduct = null;
