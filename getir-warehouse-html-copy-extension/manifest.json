@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Getir Warehouse HTML Kopyalayıcı",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Getir warehouse sitesinde ürün listelerindeki HTML'leri tek tıkla kopyalar. Sayfa yenilense bile otomatik çalışır.",
   "author": "GunduzDev",
   "icons": {
@@ -32,6 +32,15 @@
       ],
       "js": [
         "content.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://warehouse.getir.com/*"
+      ],
+      "js": [
+        "content-sayim.js"
       ],
       "run_at": "document_idle"
     },

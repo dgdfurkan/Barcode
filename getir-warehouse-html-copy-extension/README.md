@@ -19,6 +19,14 @@ warehouse.getir.com sayfasında ürün listelerine 📋 butonları ekleyen Chrom
 5. Tüm ürünler: "📋 Tümünü Kopyala" butonuna tıklayın
 6. HTML panoya kopyalanır
 
+## Sayım listesi (kontrol paneli)
+
+Sayım ekranında **Ürün Adı** ve **Ürün Barkodları** sütunlu Ant tablo göründüğünde, tablonun üstünde **«Sayım Listesini Kopyala»** butonu çıkar.
+
+- Panoya `BARCODE_SAYIM_V1` + JSON yazılır (ürün sayısı güne göre değişir).
+- Barcode sayfasında **Sayım** sekmesi → **Günlük Sayım** → **Panodan İçe Aktar** → yapıştır → **Tabloya Ekle**.
+- O günün günlük tablosu açılır ve barkod/isim eşleşen tüm ürünler eklenir.
+
 ## Ayarlar
 
 Eklenti ikonuna tıklayarak "Kopyalama sonrası Barcode sitesine yönlendir" seçeneğini açabilirsiniz.

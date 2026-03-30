@@ -763,14 +763,28 @@ class CountingSystem {
         return name;
     }
 
+    findProductByBarcodeCode(code) {
+        const c = code != null ? String(code).trim() : '';
+        if (!c) return null;
+        return (
+            this.allProducts.find((p) => {
+                if (!p.barcodes || !Array.isArray(p.barcodes)) return false;
+                return p.barcodes.some((b) => b && String(b.code).trim() === c);
+            }) || null
+        );
+    }
+
     matchDailyImportRow(row) {
         if (!row || typeof row !== 'object') return null;
+        if (Array.isArray(row.barcodes)) {
+            for (const bc of row.barcodes) {
+                const p = this.findProductByBarcodeCode(bc);
+                if (p) return p;
+            }
+        }
         const code = row.barcode != null ? String(row.barcode).trim() : '';
         if (code) {
-            const byBarcode = this.allProducts.find((p) => {
-                if (!p.barcodes || !Array.isArray(p.barcodes)) return false;
-                return p.barcodes.some((b) => b && String(b.code).trim() === code);
-            });
+            const byBarcode = this.findProductByBarcodeCode(code);
             if (byBarcode) return byBarcode;
         }
         if (row.name && String(row.name).trim()) {
@@ -779,34 +793,19 @@ class CountingSystem {
         return null;
     }
 
-    async importDailyCountForToday() {
+    async ensureDailyTableForToday() {
         const iso = this.getLocalDateIso();
         const tableName = this.DAILY_TABLE_PREFIX + iso;
         const tables = this.getTableList();
         const exists = tables.some((t) => t.name === tableName);
-        try {
-            if (!exists) {
-                await this.createTable(tableName, { allowDaily: true });
-            } else {
-                await this.switchTable(tableName);
-            }
-        } catch (err) {
-            this.showToast(err?.message || 'Tablo açılamadı', 'error', 4000);
-            return;
+        if (!exists) {
+            await this.createTable(tableName, { allowDaily: true });
+        } else {
+            await this.switchTable(tableName);
         }
+    }
 
-        const fetchFn = window.DailyCountImport?.fetchDailyRowsForDate;
-        const rows = typeof fetchFn === 'function' ? await fetchFn(iso) : [];
-        if (!rows.length) {
-            this.showToast(
-                'Kontrol paneli verisi henüz bağlanmadı veya bugün için satır yok. (Konsolda `window.__DAILY_COUNT_MOCK_ROWS` ile test edebilirsiniz.)',
-                'info',
-                5000
-            );
-            this.updateTableSelector();
-            return;
-        }
-
+    async applyImportedRows(rows) {
         let added = 0;
         let skipped = 0;
         for (const row of rows) {
@@ -843,6 +842,50 @@ class CountingSystem {
             added ? 'success' : 'warning',
             4000
         );
+    }
+
+    async importDailyCountForToday() {
+        try {
+            await this.ensureDailyTableForToday();
+        } catch (err) {
+            this.showToast(err?.message || 'Tablo açılamadı', 'error', 4000);
+            return;
+        }
+
+        const iso = this.getLocalDateIso();
+        const fetchFn = window.DailyCountImport?.fetchDailyRowsForDate;
+        const rows = typeof fetchFn === 'function' ? await fetchFn(iso) : [];
+        if (!rows.length) {
+            this.showToast(
+                'Kontrol paneli verisi henüz bağlanmadı veya bugün için satır yok. Eklentiden kopyalayıp «Panodan içe aktar» kullanın veya `window.__DAILY_COUNT_MOCK_ROWS` ile test edin.',
+                'info',
+                5000
+            );
+            this.updateTableSelector();
+            return;
+        }
+
+        await this.applyImportedRows(rows);
+    }
+
+    async importSayimPasteFromText(rawText) {
+        const parser = window.SayimClipboardImport?.parseClipboardText;
+        if (typeof parser !== 'function') {
+            this.showToast('İçe aktarma modülü yüklenemedi.', 'error', 4000);
+            return;
+        }
+        const parsed = parser(rawText);
+        if (!parsed.ok || !parsed.items || !parsed.items.length) {
+            this.showToast(parsed.error || 'Geçerli satır bulunamadı.', 'error', 5000);
+            return;
+        }
+        try {
+            await this.ensureDailyTableForToday();
+        } catch (err) {
+            this.showToast(err?.message || 'Tablo açılamadı', 'error', 4000);
+            return;
+        }
+        await this.applyImportedRows(parsed.items);
     }
 
     // Update table selector UI (genel liste + günlük liste)
@@ -1239,6 +1282,41 @@ class CountingSystem {
         if (dailyCountImportBtn) {
             dailyCountImportBtn.addEventListener('click', () => {
                 this.importDailyCountForToday();
+            });
+        }
+
+        const sayimPasteModal = document.getElementById('sayimPasteModal');
+        const sayimPasteOpenBtn = document.getElementById('sayimPasteOpenBtn');
+        const sayimPasteTextarea = document.getElementById('sayimPasteTextarea');
+        const sayimPasteCloseBtn = document.getElementById('sayimPasteCloseBtn');
+        const sayimPasteCancelBtn = document.getElementById('sayimPasteCancelBtn');
+        const sayimPasteConfirmBtn = document.getElementById('sayimPasteConfirmBtn');
+        const closeSayimPasteModal = () => {
+            if (sayimPasteModal) sayimPasteModal.classList.add('hidden');
+            if (sayimPasteTextarea) sayimPasteTextarea.value = '';
+        };
+        if (sayimPasteOpenBtn && sayimPasteModal) {
+            sayimPasteOpenBtn.addEventListener('click', () => {
+                sayimPasteModal.classList.remove('hidden');
+                if (sayimPasteTextarea) {
+                    setTimeout(() => sayimPasteTextarea.focus(), 100);
+                }
+            });
+        }
+        [sayimPasteCloseBtn, sayimPasteCancelBtn].forEach((btn) => {
+            if (btn) btn.addEventListener('click', closeSayimPasteModal);
+        });
+        if (sayimPasteModal) {
+            sayimPasteModal.addEventListener('click', (e) => {
+                if (e.target === sayimPasteModal) closeSayimPasteModal();
+            });
+        }
+        if (sayimPasteConfirmBtn) {
+            sayimPasteConfirmBtn.addEventListener('click', async () => {
+                const text = sayimPasteTextarea?.value || '';
+                if (sayimPasteModal) sayimPasteModal.classList.add('hidden');
+                if (sayimPasteTextarea) sayimPasteTextarea.value = '';
+                await this.importSayimPasteFromText(text);
             });
         }
 
