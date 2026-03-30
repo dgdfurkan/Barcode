@@ -52,7 +52,8 @@ class CountingSystem {
             
             // Setup event listeners
             this.setupEventListeners();
-            
+            this.bindSayimSubTabControls();
+
             // Setup tab system
             this.setupTabSystem();
             
@@ -573,6 +574,7 @@ class CountingSystem {
         this.renderTable();
         this.updateStatistics();
         this.updateTableSelector();
+        this.syncSayimSubTabToTable();
     }
 
     // Create a new table
@@ -641,6 +643,7 @@ class CountingSystem {
         this.renderTable();
         this.updateStatistics();
         this.updateTableSelector();
+        this.syncSayimSubTabToTable();
     }
 
     // Delete a table
@@ -696,6 +699,7 @@ class CountingSystem {
         this.renderTable();
         this.updateStatistics();
         this.updateTableSelector();
+        this.syncSayimSubTabToTable();
     }
 
     // Get list of all tables
@@ -837,6 +841,7 @@ class CountingSystem {
         this.updateStatistics();
         this.updateCountingProgress();
         this.updateTableSelector();
+        this.syncSayimSubTabToTable();
         this.showToast(
             `${added} ürün işlendi${skipped ? `, ${skipped} satır eşleşmedi` : ''}`,
             added ? 'success' : 'warning',
@@ -862,6 +867,7 @@ class CountingSystem {
                 5000
             );
             this.updateTableSelector();
+            this.syncSayimSubTabToTable();
             return;
         }
 
@@ -928,9 +934,10 @@ class CountingSystem {
             : generalTables;
 
         generalList.innerHTML = '';
+        generalList.classList.toggle('sayim-chip-scroll--empty', filteredGeneral.length === 0);
         if (filteredGeneral.length === 0) {
             const empty = document.createElement('p');
-            empty.className = 'text-xs text-slate-500 px-2 py-6 text-center';
+            empty.className = 'text-[11px] text-slate-500 px-2 py-1 text-center shrink-0 min-w-[min(100%,18rem)]';
             empty.textContent = generalTables.length
                 ? 'Arama ile eşleşen tablo yok.'
                 : 'Henüz genel tablo yok. + ile oluşturun.';
@@ -943,15 +950,14 @@ class CountingSystem {
                 btn.setAttribute('role', 'listitem');
                 btn.dataset.tableName = table.name;
                 btn.className = [
-                    'sayim-table-item w-full rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
-                    'flex items-center justify-between gap-2 border',
+                    'sayim-table-chip shrink-0 inline-flex max-w-[min(100vw-4rem,14rem)] items-center justify-between gap-2 rounded-full border px-3 py-1.5 text-left text-xs font-medium transition-colors snap-start sm:max-w-[16rem]',
                     isActive
-                        ? 'border-blue-300 bg-blue-50 text-blue-900 font-semibold shadow-sm'
-                        : 'border-transparent text-slate-700 hover:bg-slate-50 hover:border-slate-200',
+                        ? 'border-blue-400 bg-blue-50 text-blue-900 shadow-sm ring-1 ring-blue-200/50'
+                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300',
                 ].join(' ');
                 btn.innerHTML = `
                     <span class="min-w-0 truncate">${this.escapeHtml(table.name)}</span>
-                    <span class="shrink-0 text-xs font-medium ${isActive ? 'text-blue-700' : 'text-slate-400'}">${table.productCount ?? 0}</span>
+                    <span class="shrink-0 tabular-nums text-[10px] font-semibold ${isActive ? 'text-blue-700' : 'text-slate-400'}">${table.productCount ?? 0}</span>
                 `;
                 btn.addEventListener('click', async () => {
                     if (table.name !== this.currentTableName) {
@@ -971,10 +977,11 @@ class CountingSystem {
             .sort((a, b) => (b.iso || '').localeCompare(a.iso || ''));
 
         dailyList.innerHTML = '';
+        dailyList.classList.toggle('sayim-chip-scroll--empty', dailyTables.length === 0);
         if (dailyTables.length === 0) {
             const empty = document.createElement('p');
-            empty.className = 'text-xs text-indigo-700/80 px-2 py-6 text-center';
-            empty.textContent = 'Henüz günlük kayıt yok. «Bugünü Ekle» ile başlayın.';
+            empty.className = 'text-[11px] text-indigo-800/85 px-2 py-1 text-center shrink-0 min-w-[min(100%,18rem)]';
+            empty.textContent = 'Günlük kayıt yok. «Bugün» veya panodan ekleyin.';
             dailyList.appendChild(empty);
         } else {
             dailyTables.forEach((table) => {
@@ -985,15 +992,14 @@ class CountingSystem {
                 btn.setAttribute('role', 'listitem');
                 btn.dataset.tableName = table.name;
                 btn.className = [
-                    'sayim-table-item w-full rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
-                    'flex items-center justify-between gap-2 border',
+                    'sayim-table-chip shrink-0 inline-flex max-w-[min(100vw-4rem,12rem)] items-center justify-between gap-2 rounded-full border px-3 py-1.5 text-left text-xs font-medium transition-colors snap-start sm:max-w-[14rem]',
                     isActive
-                        ? 'border-indigo-400 bg-indigo-50 text-indigo-950 font-semibold shadow-sm'
-                        : 'border-transparent text-indigo-900/90 hover:bg-indigo-50/80 hover:border-indigo-100',
+                        ? 'border-indigo-400 bg-indigo-50 text-indigo-950 shadow-sm ring-1 ring-indigo-200/50'
+                        : 'border-indigo-200/90 bg-white/95 text-indigo-900/90 hover:bg-indigo-50/90 hover:border-indigo-300',
                 ].join(' ');
                 btn.innerHTML = `
                     <span class="min-w-0 truncate">${this.escapeHtml(label)}</span>
-                    <span class="shrink-0 text-xs font-medium ${isActive ? 'text-indigo-700' : 'text-indigo-400'}">${table.productCount ?? 0}</span>
+                    <span class="shrink-0 tabular-nums text-[10px] font-semibold ${isActive ? 'text-indigo-700' : 'text-indigo-400'}">${table.productCount ?? 0}</span>
                 `;
                 btn.addEventListener('click', async () => {
                     if (table.name !== this.currentTableName) {
@@ -1003,6 +1009,48 @@ class CountingSystem {
                 dailyList.appendChild(btn);
             });
         }
+    }
+
+    /** Genel / Günlük sekmesi — aktif tablo türüyle hizala */
+    syncSayimSubTabToTable() {
+        if (typeof this._sayimSubTabGo !== 'function') return;
+        const tab = this.isDailyTableName(this.currentTableName) ? 'daily' : 'general';
+        this._sayimSubTabGo(tab);
+    }
+
+    bindSayimSubTabControls() {
+        const genBtn = document.getElementById('sayimTabGeneralBtn');
+        const dailyBtn = document.getElementById('sayimTabDailyBtn');
+        const genPanel = document.getElementById('sayimPanelGeneral');
+        const dailyPanel = document.getElementById('sayimPanelDaily');
+        if (!genBtn || !dailyBtn || !genPanel || !dailyPanel) return;
+
+        const go = (which) => {
+            const isDaily = which === 'daily';
+            genBtn.setAttribute('aria-selected', isDaily ? 'false' : 'true');
+            dailyBtn.setAttribute('aria-selected', isDaily ? 'true' : 'false');
+            genPanel.classList.toggle('hidden', isDaily);
+            dailyPanel.classList.toggle('hidden', !isDaily);
+            try {
+                sessionStorage.setItem('sayimSubTab', which);
+            } catch (e) {
+                /* ignore */
+            }
+        };
+        this._sayimSubTabGo = go;
+
+        genBtn.addEventListener('click', () => go('general'));
+        dailyBtn.addEventListener('click', () => go('daily'));
+
+        let initial = 'general';
+        try {
+            const saved = sessionStorage.getItem('sayimSubTab');
+            if (saved === 'daily' || saved === 'general') initial = saved;
+        } catch (e) {
+            /* ignore */
+        }
+        go(initial);
+        this.syncSayimSubTabToTable();
     }
     
     // Open table selector dropdown

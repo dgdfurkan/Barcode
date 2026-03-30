@@ -883,20 +883,49 @@
             overflow: hidden;
         }
 
-        /* Sayım tablo listeleri — ince scrollbar */
-        .sayim-table-scroll {
+        /* Sayım: yatay chip şeridi — mobilde dikey yer kaplamaz */
+        .sayim-chip-scroll {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 0.5rem;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scroll-snap-type: x proximity;
+            padding: 0.25rem 0 0.35rem;
+            margin: 0 -0.125rem;
             scrollbar-width: thin;
-            scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+            scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+            min-height: 2.5rem;
+            align-items: center;
         }
-        .sayim-table-scroll::-webkit-scrollbar {
-            width: 6px;
+        .sayim-chip-scroll.sayim-chip-scroll--empty {
+            justify-content: center;
+            min-height: 2.25rem;
         }
-        .sayim-table-scroll::-webkit-scrollbar-track {
+        .sayim-chip-scroll::-webkit-scrollbar {
+            height: 4px;
+        }
+        .sayim-chip-scroll::-webkit-scrollbar-track {
             background: transparent;
         }
-        .sayim-table-scroll::-webkit-scrollbar-thumb {
-            background: rgba(148, 163, 184, 0.45);
+        .sayim-chip-scroll::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.4);
             border-radius: 9999px;
+        }
+        .sayim-seg {
+            transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+        }
+        .sayim-seg[aria-selected="true"] {
+            background: #fff;
+            color: #0f172a;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+        }
+        .sayim-seg[aria-selected="false"] {
+            color: #64748b;
+        }
+        .sayim-seg[aria-selected="false"]:hover {
+            color: #334155;
         }
 
         /* Bottom sheet: barkodlar — yatay scroll, ince scrollbar */
@@ -1375,39 +1404,22 @@
 
         <!-- Sayım Tab Content -->
         <div id="sayimTabContent" class="tab-content">
-            <!-- Table Info: genel listeler + günlük sayım (yan yana) -->
-            <div class="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-5 mb-6">
-                <p id="activeTableSummary" class="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4 leading-snug">
+            <!-- Table picker: sekmeler + tek satır; listeler yatay chip (mobilde dikey blok yok) -->
+            <div class="bg-white rounded-xl shadow-md border border-gray-100 p-3 sm:p-4 mb-4 sm:mb-6">
+                <p id="activeTableSummary" class="text-xs sm:text-sm text-gray-600 mb-2 leading-snug line-clamp-2">
                     <span class="font-medium text-gray-800">Aktif Tablo:</span>
                     <span id="activeTableSummaryText" class="text-gray-700">—</span>
                 </p>
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-                    <!-- Genel Sayım Tabloları -->
-                    <section class="rounded-xl border border-slate-200/90 bg-gradient-to-b from-slate-50/90 to-white p-3 sm:p-4 shadow-sm">
-                        <div class="flex items-start justify-between gap-2 mb-3">
-                            <div class="min-w-0">
-                                <h3 class="text-sm font-bold text-slate-800 tracking-tight">Genel Sayım Tabloları</h3>
-                                <p class="text-[11px] text-slate-500 mt-0.5">İstediğiniz isimle oluşturun; yeniden adlandırılabilir.</p>
-                            </div>
-                            <div class="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
-                                <button type="button" id="renameTableBtn" class="p-1.5 sm:p-2 hover:bg-white/80 rounded-lg border border-transparent hover:border-slate-200 transition-colors" title="Seçili tablonun adını değiştir">
-                                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                    </svg>
-                                </button>
-                                <button type="button" id="createTableBtn" class="p-1.5 sm:p-2 hover:bg-white/80 rounded-lg border border-transparent hover:border-slate-200 transition-colors" title="Yeni tablo oluştur">
-                                    <svg class="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                                    </svg>
-                                </button>
-                                <button type="button" id="deleteTableBtn" class="p-1.5 sm:p-2 hover:bg-white/80 rounded-lg border border-transparent hover:border-slate-200 transition-colors text-red-600" title="Seçili tabloyu sil" style="display: none;">
-                                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="relative mb-2">
+
+                <div class="flex rounded-xl bg-slate-100/90 p-1 border border-slate-200/80 shadow-inner mb-2 sm:mb-3" role="tablist" aria-label="Sayım tablo türü">
+                    <button type="button" id="sayimTabGeneralBtn" role="tab" aria-selected="true" aria-controls="sayimPanelGeneral" class="sayim-seg flex-1 rounded-lg py-2 px-2 text-xs font-semibold sm:text-sm">Genel</button>
+                    <button type="button" id="sayimTabDailyBtn" role="tab" aria-selected="false" aria-controls="sayimPanelDaily" class="sayim-seg flex-1 rounded-lg py-2 px-2 text-xs font-semibold sm:text-sm">Günlük</button>
+                </div>
+
+                <!-- Genel panel -->
+                <div id="sayimPanelGeneral" role="tabpanel" aria-labelledby="sayimTabGeneralBtn" class="sayim-panel">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                        <div class="relative flex-1 min-w-0">
                             <div class="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-slate-400">
                                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -1418,45 +1430,49 @@
                                 id="generalTableSearch"
                                 autocomplete="off"
                                 placeholder="Tabloda ara..."
-                                class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                class="w-full rounded-lg border border-slate-200/90 bg-white py-1.5 sm:py-2 pl-9 pr-3 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
                             />
                         </div>
-                        <div id="generalTableList" class="sayim-table-scroll max-h-64 min-h-[8rem] space-y-1 overflow-y-auto rounded-lg border border-slate-100 bg-white p-1.5" role="list" aria-label="Genel Sayım Tabloları"></div>
-                    </section>
-                    <!-- Günlük Sayım -->
-                    <section class="rounded-xl border border-indigo-200/80 bg-gradient-to-b from-indigo-50/50 to-white p-3 sm:p-4 shadow-sm">
-                        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3 mb-3">
-                            <div class="min-w-0">
-                                <h3 class="text-sm font-bold text-indigo-900 tracking-tight">Günlük Sayım</h3>
-                                <p class="text-[11px] text-indigo-700/75 mt-0.5">Sadece tarih gösterilir; tablo adları sistem tarafından sabittir.</p>
-                            </div>
-                            <div class="flex flex-wrap items-center justify-end gap-2 shrink-0">
-                            <button
-                                type="button"
-                                id="sayimPasteOpenBtn"
-                                class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-2 text-xs font-semibold text-indigo-800 shadow-sm transition hover:bg-indigo-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 sm:text-sm"
-                                title="Depo panelinde eklentiden kopyalanan sayım listesini buraya yapıştırırsınız"
-                            >
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        <div class="flex items-center justify-end gap-0.5 shrink-0 sm:pl-1">
+                            <button type="button" id="renameTableBtn" class="p-2 rounded-lg border border-transparent hover:bg-slate-100 hover:border-slate-200 transition-colors" title="Seçili tablonun adını değiştir">
+                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                 </svg>
-                                Panodan İçe Aktar
                             </button>
-                            <button
-                                type="button"
-                                id="dailyCountImportBtn"
-                                class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 sm:text-sm"
-                                title="Bugünün günlük tablosunu açar (API/ mock satırlar varsa ekler)"
-                            >
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <button type="button" id="createTableBtn" class="p-2 rounded-lg border border-transparent hover:bg-slate-100 hover:border-slate-200 transition-colors" title="Yeni tablo oluştur">
+                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                 </svg>
-                                Bugünü Ekle
                             </button>
-                            </div>
+                            <button type="button" id="deleteTableBtn" class="p-2 rounded-lg border border-transparent hover:bg-slate-100 hover:border-slate-200 transition-colors text-red-600" title="Seçili tabloyu sil" style="display: none;">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
                         </div>
-                        <div id="dailyTableList" class="sayim-table-scroll max-h-64 min-h-[8rem] space-y-1 overflow-y-auto rounded-lg border border-indigo-100 bg-white/90 p-1.5" role="list" aria-label="Günlük Sayım Tarihleri"></div>
-                    </section>
+                    </div>
+                    <p class="text-[10px] sm:text-[11px] text-slate-500 mt-1 mb-1.5 hidden sm:block">Sabit liste; isim verir, yeniden adlandırırsınız.</p>
+                    <div id="generalTableList" class="sayim-chip-scroll rounded-lg border border-slate-100/80 bg-slate-50/50 px-1" role="list" aria-label="Genel Sayım Tabloları"></div>
+                </div>
+
+                <!-- Günlük panel -->
+                <div id="sayimPanelDaily" role="tabpanel" aria-labelledby="sayimTabDailyBtn" class="sayim-panel hidden">
+                    <div class="flex flex-nowrap gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5 sm:flex-wrap sm:overflow-visible sm:justify-end">
+                        <button type="button" id="sayimPasteOpenBtn" class="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-indigo-800 shadow-sm hover:bg-indigo-50 sm:px-3 sm:text-xs" title="Depo panelinden kopyalanan sayımı yapıştırın">
+                            <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                            <span class="sm:hidden">Pano</span><span class="hidden sm:inline">Panodan</span>
+                        </button>
+                        <button type="button" id="dailyCountImportBtn" class="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-indigo-700 sm:px-3 sm:text-xs" title="Bugünün günlük tablosu">
+                            <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            <span class="sm:hidden">Bugün</span><span class="hidden sm:inline">Bugünü Ekle</span>
+                        </button>
+                    </div>
+                    <p class="text-[10px] sm:text-[11px] text-indigo-700/70 mt-1 mb-1.5 hidden sm:block">Tarih adları sabit; içe aktarma veya bugünü ekleyin.</p>
+                    <div id="dailyTableList" class="sayim-chip-scroll rounded-lg border border-indigo-100/90 bg-indigo-50/30 px-1" role="list" aria-label="Günlük Sayım Tarihleri"></div>
                 </div>
             </div>
         <!-- Add Product Section -->
