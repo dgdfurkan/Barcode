@@ -1,10 +1,25 @@
 /**
- * Getir Depo — Sayım tablosu: BARCODE_SAYIM_V1 + JSON pano.
+ * Sayım ekranı (sayim.md benzeri Ant tablolar) — sipariş sayfasındaki
+ * «Tümünü Kopyala» ile aynı yerleşim: getir-copy-all-container + insertBefore(ant-row).
+ * Panoya BARCODE_SAYIM_V1 + JSON (HTML değil).
  */
 (function () {
     'use strict';
 
     var CLIP_HEADER = 'BARCODE_SAYIM_V1';
+    var MARKER_CLASS = 'getir-sayim-copy-marker';
+
+    var styles =
+        '\n        .getir-copy-all-container.' +
+        MARKER_CLASS +
+        ' {\n            display: flex;\n            justify-content: flex-end;\n            padding: 5px;\n            margin-bottom: 10px;\n        }\n        .getir-copy-all-btn.' +
+        MARKER_CLASS +
+        ' {\n            opacity: 0.6;\n            padding: 4px 10px;\n            font-size: 12px;\n            border: 1px solid #4a90e2;\n            background: #e8f4f8;\n            color: #4a90e2;\n            border-radius: 4px;\n            cursor: pointer;\n            margin: 5px;\n            font-weight: 500;\n        }\n        .getir-copy-all-btn.' +
+        MARKER_CLASS +
+        ':hover {\n            opacity: 1;\n            background: #4a90e2;\n            color: white;\n        }\n    ';
+    var styleEl = document.createElement('style');
+    styleEl.textContent = styles;
+    document.head.appendChild(styleEl);
 
     function trimInner(s) {
         return (s || '').replace(/\s+/g, ' ').trim();
@@ -14,31 +29,6 @@
         return trimInner(s).toLocaleLowerCase('tr-TR');
     }
 
-    function copyToClipboard(text) {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            return navigator.clipboard.writeText(text).then(function () { return true; }).catch(function () { return fallbackCopy(text); });
-        }
-        return Promise.resolve(fallbackCopy(text));
-    }
-
-    function fallbackCopy(text) {
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.select();
-        try {
-            document.execCommand('copy');
-            document.body.removeChild(ta);
-            return true;
-        } catch (e) {
-            document.body.removeChild(ta);
-            return false;
-        }
-    }
-
-    /** thead içindeki tüm th metinleri (çok satırlı başlık için) */
     function getColumnHeaders(table) {
         var thead = table.querySelector('thead');
         if (!thead) return [];
@@ -61,15 +51,6 @@
             return x.indexOf('barkod') !== -1;
         });
         return hasName && hasBc;
-    }
-
-    function findSayimTables() {
-        var out = [];
-        var tables = document.querySelectorAll('table');
-        for (var i = 0; i < tables.length; i++) {
-            if (isSayimTable(tables[i])) out.push(tables[i]);
-        }
-        return out;
     }
 
     function columnIndices(table) {
@@ -134,152 +115,123 @@
         );
     }
 
+    function copyToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(text).then(function () { return true; }).catch(function () { return fallbackCopy(text); });
+        }
+        return Promise.resolve(fallbackCopy(text));
+    }
+
+    function fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            return true;
+        } catch (e) {
+            document.body.removeChild(ta);
+            return false;
+        }
+    }
+
     function showToast(msg, ok) {
         var el = document.createElement('div');
         el.style.cssText =
-            'position:fixed;top:20px;right:20px;z-index:2147483647;padding:12px 16px;border-radius:8px;font-size:14px;max-width:340px;box-shadow:0 4px 12px rgba(0,0,0,.15);' +
-            (ok ? 'background:#059669;color:#fff;' : 'background:#b91c1c;color:#fff;');
+            'position:fixed;top:20px;right:20px;z-index:2147483647;padding:10px 15px;border-radius:4px;font-size:14px;max-width:340px;box-shadow:0 2px 5px rgba(0,0,0,0.2);' +
+            (ok ? 'background:#4CAF50;color:white;' : 'background:#b91c1c;color:#fff;');
         el.textContent = msg;
         document.body.appendChild(el);
         setTimeout(function () {
             el.remove();
-        }, 3500);
+        }, 2500);
     }
 
-    var injectedTables = new WeakSet();
-
-    function getTableToolbarHost(table) {
-        var w = table.closest('.ant-table-wrapper');
-        if (w) return w;
-        var c = table.closest('.ant-table');
-        if (c && c.parentElement) return c.parentElement;
-        return table.parentElement;
-    }
-
-    function injectBannerForTable(table) {
-        if (injectedTables.has(table)) return;
-        var host = getTableToolbarHost(table);
-        if (!host) return;
-
-        if (host.querySelector('.getir-sayim-copy-banner')) {
-            injectedTables.add(table);
-            return;
-        }
-
-        var banner = document.createElement('div');
-        banner.className = 'getir-sayim-copy-banner';
-        banner.style.cssText =
-            'display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:0 0 10px 0;padding:4px 0;flex-wrap:wrap;';
-
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = '📋 Sayım Listesini Kopyala';
-        btn.style.cssText =
-            'padding:8px 14px;font-size:13px;font-weight:600;border:1px solid #4f46e5;background:#eef2ff;color:#3730a3;border-radius:8px;cursor:pointer;';
-        btn.onmouseover = function () {
-            btn.style.background = '#4f46e5';
-            btn.style.color = '#fff';
-        };
-        btn.onmouseout = function () {
-            btn.style.background = '#eef2ff';
-            btn.style.color = '#3730a3';
-        };
-        btn.onclick = function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            var items = extractItems(table);
-            if (!items.length) {
-                showToast('Tabloda ürün satırı bulunamadı.', false);
-                return;
+    /** content.js findRowContainer ile aynı: tablonun doğrudan saran ant-row’u */
+    function findRowContainerForTable(table) {
+        var el = table;
+        while (el && el !== document.body) {
+            if (el.classList && el.classList.contains('ant-row')) {
+                return el;
             }
-            var payload = buildPayload(items);
-            copyToClipboard(payload).then(function (ok) {
-                if (ok) {
-                    showToast(items.length + ' ürün panoya kopyalandı. Sayım sayfasında «Panodan İçe Aktar» kullanın.', true);
-                } else {
-                    showToast('Kopyalama başarısız.', false);
-                }
-            });
-        };
-
-        banner.appendChild(btn);
-        host.insertBefore(banner, host.firstChild);
-        injectedTables.add(table);
-    }
-
-    var floatingBtn = null;
-
-    function ensureFloatingFallback() {
-        if (floatingBtn && document.body.contains(floatingBtn)) return;
-        var tables = findSayimTables();
-        if (!tables.length) return;
-
-        floatingBtn = document.createElement('button');
-        floatingBtn.type = 'button';
-        floatingBtn.className = 'getir-sayim-floating-btn';
-        floatingBtn.textContent = '📋 Sayımı kopyala';
-        floatingBtn.title = 'Sayım tablosunu panoya alır (üstteki buton görünmüyorsa bunu kullanın)';
-        floatingBtn.style.cssText =
-            'position:fixed;bottom:24px;right:24px;z-index:2147483646;padding:12px 16px;font-size:13px;font-weight:700;border:2px solid #4f46e5;background:#eef2ff;color:#312e81;border-radius:12px;cursor:pointer;box-shadow:0 4px 14px rgba(79,70,229,.35);';
-        floatingBtn.onmouseover = function () {
-            floatingBtn.style.background = '#4f46e5';
-            floatingBtn.style.color = '#fff';
-        };
-        floatingBtn.onmouseout = function () {
-            floatingBtn.style.background = '#eef2ff';
-            floatingBtn.style.color = '#312e81';
-        };
-        floatingBtn.onclick = function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            var list = findSayimTables();
-            if (!list.length) {
-                showToast('Sayım tablosu bulunamadı.', false);
-                return;
-            }
-            var items = extractItems(list[0]);
-            if (!items.length) {
-                showToast('Ürün satırı yok.', false);
-                return;
-            }
-            copyToClipboard(buildPayload(items)).then(function (ok) {
-                if (ok) {
-                    showToast(items.length + ' ürün kopyalandı.', true);
-                } else {
-                    showToast('Kopyalama başarısız.', false);
-                }
-            });
-        };
-        document.body.appendChild(floatingBtn);
-    }
-
-    function removeFloatingFallback() {
-        if (floatingBtn && floatingBtn.parentNode) {
-            floatingBtn.parentNode.removeChild(floatingBtn);
+            el = el.parentElement;
         }
-        floatingBtn = null;
+        return null;
     }
 
-    function scan() {
-        var tables = findSayimTables();
-        if (!tables.length) {
-            removeFloatingFallback();
-            return;
-        }
+    /**
+     * Sipariş sayfası addCopyAllButton ile aynı: parent.insertBefore(container, row)
+     * Her sayım tablosu için yalnızca en içteki ant-row’a bir buton (iç içe row çiftlemesini önler).
+     */
+    function addSayimCopyAllButton() {
+        var seenRows = {};
+        var tables = document.querySelectorAll('table');
         for (var i = 0; i < tables.length; i++) {
-            injectBannerForTable(tables[i]);
+            var table = tables[i];
+            if (!isSayimTable(table)) continue;
+            if (table.closest('.ant-descriptions')) continue;
+
+            var row = findRowContainerForTable(table);
+            if (!row) continue;
+            if (seenRows[row]) continue;
+            seenRows[row] = true;
+
+            if (row.previousElementSibling && row.previousElementSibling.classList.contains(MARKER_CLASS)) {
+                continue;
+            }
+
+            var parent = row.parentNode;
+            if (!parent) continue;
+
+            var container = document.createElement('div');
+            container.className = 'getir-copy-all-container ' + MARKER_CLASS;
+
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'getir-copy-all-btn ' + MARKER_CLASS;
+            btn.textContent = '📋 Sayım Listesini Kopyala';
+            btn.title = 'Sayım ürünlerini panoya alır (Barcode sayfasında Panodan İçe Aktar)';
+
+            (function (tbl) {
+                btn.onclick = function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var items = extractItems(tbl);
+                    if (!items.length) {
+                        showToast('Tabloda ürün satırı bulunamadı.', false);
+                        return;
+                    }
+                    copyToClipboard(buildPayload(items)).then(function (ok) {
+                        if (ok) {
+                            showToast('✓ ' + items.length + ' ürün kopyalandı! Sayım sayfasında «Panodan İçe Aktar» kullanın.', true);
+                        } else {
+                            showToast('Kopyalama başarısız.', false);
+                        }
+                    });
+                };
+            })(table);
+
+            container.appendChild(btn);
+            parent.insertBefore(container, row);
         }
-        ensureFloatingFallback();
+    }
+
+    function processSayimTables() {
+        addSayimCopyAllButton();
     }
 
     function init() {
-        scan();
-        setTimeout(scan, 500);
-        setTimeout(scan, 2000);
+        processSayimTables();
         var obs = new MutationObserver(function () {
-            scan();
+            processSayimTables();
         });
         obs.observe(document.body, { childList: true, subtree: true });
+        setTimeout(processSayimTables, 400);
+        setTimeout(processSayimTables, 1500);
     }
 
     if (document.readyState === 'loading') {
