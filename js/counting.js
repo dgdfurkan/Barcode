@@ -6447,121 +6447,102 @@ class CountingSystem {
         const sumMissing = missing.reduce((s, p) => s + p.difference, 0);
         const sumSurplus = surplus.reduce((s, p) => s + p.difference, 0);
 
-        const scopeLabel =
+        const scopeShort =
             this.selectedFinancialTable === 'all'
-                ? 'Tüm tablolar (aynı ürün kayıtları birleştirildi)'
+                ? 'Tüm tablolar · aynı ürün satırları birleştirildi'
                 : this.formatTableDisplayName(this.selectedFinancialTable || '');
 
         const now = new Date().toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
-        const MAX_ROWS = 6;
+        const MAX_ROWS = 5;
         const missShow = missing.slice(0, MAX_ROWS);
         const surShow = surplus.slice(0, MAX_ROWS);
         const missExtra = Math.max(0, missing.length - missShow.length);
         const surExtra = Math.max(0, surplus.length - surShow.length);
 
-        const tableRow = (p, diffTone) => {
+        const productCard = (p, kind) => {
             const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
             const name = this.escapeHtml(p.productName || '');
             const bc = p.barcode ? this.escapeHtml(p.barcode) : '—';
             const adetStr = p.stockDiff > 0 ? `+${p.stockDiff}` : `${p.stockDiff}`;
-            const diffClass = diffTone === 'neg' ? 'text-red-600' : 'text-emerald-600';
+            const adetLabel = kind === 'miss' ? `${adetStr} adet eksik` : `${adetStr} adet fazla`;
+            const tone =
+                kind === 'miss'
+                    ? { bar: 'border-l-rose-400 bg-rose-50/35', ad: 'text-rose-700', tl: 'text-rose-800' }
+                    : { bar: 'border-l-emerald-400 bg-emerald-50/35', ad: 'text-emerald-700', tl: 'text-emerald-800' };
             return `
-                <tr class="border-b border-gray-100 last:border-0">
-                    <td class="py-2 pr-2 align-top">
-                        <div class="flex max-w-[min(100%,14rem)] gap-2 sm:max-w-none">
-                            <img src="${img}" alt="" class="h-8 w-8 shrink-0 rounded-md border border-gray-100 object-cover" loading="lazy" />
-                            <div class="min-w-0">
-                                <div class="text-xs font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</div>
-                                <div class="mt-0.5 font-mono text-[10px] text-gray-400">${bc}</div>
-                            </div>
+                <div class="flex gap-2.5 rounded-lg border border-gray-100 ${tone.bar} border-l-[3px] p-2.5 pl-2">
+                    <img src="${img}" alt="" class="h-11 w-11 shrink-0 rounded-lg border border-white object-cover shadow-sm" loading="lazy" />
+                    <div class="min-w-0 flex-1">
+                        <p class="text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</p>
+                        <p class="mt-0.5 font-mono text-[10px] text-gray-400">${bc}</p>
+                        <div class="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 border-t border-gray-100/80 pt-1.5 text-[11px]">
+                            <span class="font-semibold ${tone.ad}">${adetLabel}</span>
+                            <span class="text-gray-500">Birim ${this.formatCurrency(p.price)}</span>
+                            <span class="w-full text-right text-xs font-bold ${tone.tl} sm:w-auto">${p.difference >= 0 ? '+' : ''}${this.formatCurrency(p.difference)}</span>
                         </div>
-                    </td>
-                    <td class="whitespace-nowrap py-2 px-1 text-right align-middle font-mono text-xs tabular-nums text-gray-800">${adetStr}</td>
-                    <td class="whitespace-nowrap py-2 px-1 text-right align-middle text-xs text-gray-600">${this.formatCurrency(p.price)}</td>
-                    <td class="whitespace-nowrap py-2 pl-1 text-right align-middle text-xs font-semibold ${diffClass}">${p.difference >= 0 ? '+' : ''}${this.formatCurrency(p.difference)}</td>
-                </tr>`;
+                    </div>
+                </div>`;
         };
 
-        const emptyTableBody = (msg) =>
-            `<tr><td colspan="4" class="py-6 text-center text-xs text-gray-400">${msg}</td></tr>`;
+        const emptyCol = (msg) => `<p class="py-6 text-center text-xs text-gray-400">${msg}</p>`;
+
+        const netClass = safeSummary.profitLoss >= 0 ? 'text-emerald-700' : 'text-red-600';
+        const netBg = safeSummary.profitLoss >= 0 ? 'border-emerald-200 bg-emerald-50/50' : 'border-red-200 bg-red-50/40';
 
         container.innerHTML = `
             <div class="bg-white rounded-xl shadow-md border border-gray-100 p-3 sm:p-4">
-                <div class="mb-3 flex flex-col gap-1 sm:mb-4 sm:flex-row sm:items-center sm:justify-between">
-                    <h3 class="text-base font-bold text-gray-900 sm:text-lg">Stok uyumsuzluk raporu</h3>
-                    <p class="text-xs text-gray-500">${this.escapeHtml(scopeLabel)} · ${this.escapeHtml(now)}</p>
-                </div>
-                <div class="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
-                    <div class="rounded-lg border border-gray-100 bg-gray-50 px-2 py-2 text-center sm:text-left">
-                        <div class="text-[10px] font-medium uppercase tracking-wide text-gray-500">Eksik (TL)</div>
-                        <div class="mt-0.5 text-sm font-semibold text-red-600">${this.formatCurrency(sumMissing)}</div>
-                    </div>
-                    <div class="rounded-lg border border-gray-100 bg-gray-50 px-2 py-2 text-center sm:text-left">
-                        <div class="text-[10px] font-medium uppercase tracking-wide text-gray-500">Fazla (TL)</div>
-                        <div class="mt-0.5 text-sm font-semibold text-emerald-600">${this.formatCurrency(sumSurplus)}</div>
-                    </div>
-                    <div class="rounded-lg border border-gray-100 bg-gray-50 px-2 py-2 text-center sm:text-left">
-                        <div class="text-[10px] font-medium uppercase tracking-wide text-gray-500">Net</div>
-                        <div class="mt-0.5 text-sm font-semibold ${
-                            safeSummary.profitLoss >= 0 ? 'text-emerald-700' : 'text-red-600'
-                        }">${this.formatCurrency(safeSummary.profitLoss)}</div>
-                    </div>
-                </div>
-                <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-5">
+                <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                        <h4 class="mb-2 text-xs font-semibold text-gray-700">Depoda eksik <span class="font-normal text-gray-400">(${missing.length})</span></h4>
-                        <div class="overflow-x-auto rounded-lg border border-gray-100">
-                            <table class="w-full min-w-[280px] text-left text-xs">
-                                <thead>
-                                    <tr class="border-b border-gray-200 bg-gray-50/80">
-                                        <th class="px-2 py-2 font-medium text-gray-500">Ürün</th>
-                                        <th class="w-12 px-1 py-2 text-right font-medium text-gray-500">Adet</th>
-                                        <th class="w-16 px-1 py-2 text-right font-medium text-gray-500">Birim</th>
-                                        <th class="w-20 pl-1 py-2 text-right font-medium text-gray-500">TL</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 bg-white">
-                                    ${
-                                        missing.length === 0
-                                            ? emptyTableBody('Kayıt yok.')
-                                            : missShow.map((p) => tableRow(p, 'neg')).join('')
-                                    }
-                                </tbody>
-                            </table>
+                        <h3 class="text-base font-bold tracking-tight text-gray-900 sm:text-lg">Stok özeti</h3>
+                        <p class="mt-0.5 text-xs text-gray-500">${this.escapeHtml(scopeShort)}</p>
+                    </div>
+                    <p class="text-[11px] text-gray-400">${this.escapeHtml(now)}</p>
+                </div>
+
+                <div class="mb-5 grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
+                    <div class="rounded-xl border border-rose-100 bg-rose-50/90 px-4 py-3 shadow-sm">
+                        <p class="text-[11px] font-medium uppercase tracking-wide text-rose-600/90">Depoda eksik</p>
+                        <p class="mt-1 flex items-baseline gap-1.5">
+                            <span class="text-3xl font-bold tabular-nums leading-none text-rose-700">${missing.length}</span>
+                            <span class="text-xs font-medium text-rose-800/80">ürün</span>
+                        </p>
+                        <p class="mt-2 text-xs font-semibold text-rose-700">${this.formatCurrency(sumMissing)} <span class="font-normal text-rose-600/80">TL etki</span></p>
+                    </div>
+                    <div class="rounded-xl border border-emerald-100 bg-emerald-50/90 px-4 py-3 shadow-sm">
+                        <p class="text-[11px] font-medium uppercase tracking-wide text-emerald-600/90">Depoda fazla</p>
+                        <p class="mt-1 flex items-baseline gap-1.5">
+                            <span class="text-3xl font-bold tabular-nums leading-none text-emerald-700">${surplus.length}</span>
+                            <span class="text-xs font-medium text-emerald-800/80">ürün</span>
+                        </p>
+                        <p class="mt-2 text-xs font-semibold text-emerald-700">${this.formatCurrency(sumSurplus)} <span class="font-normal text-emerald-600/80">TL etki</span></p>
+                    </div>
+                    <div class="rounded-xl border ${netBg} px-4 py-3 shadow-sm sm:flex sm:flex-col sm:justify-center">
+                        <p class="text-[11px] font-medium uppercase tracking-wide text-gray-500">Net (depo − sistem)</p>
+                        <p class="mt-1 text-2xl font-bold tabular-nums ${netClass}">${this.formatCurrency(safeSummary.profitLoss)}</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
+                    <div>
+                        <div class="mb-2 flex items-center justify-between gap-2">
+                            <span class="text-xs font-semibold text-gray-800">Hangi ürünler eksik?</span>
+                            <span class="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">${missing.length} kalem</span>
                         </div>
-                        ${
-                            missExtra > 0
-                                ? `<p class="mt-1.5 text-[11px] text-gray-400">+${missExtra} ürün daha — tam liste için yukarıdaki «Ürün Detayları» bölümüne bakın.</p>`
-                                : ''
-                        }
+                        <div class="space-y-2">
+                            ${missing.length === 0 ? emptyCol('Eksik ürün yok.') : missShow.map((p) => productCard(p, 'miss')).join('')}
+                        </div>
+                        ${missExtra > 0 ? `<p class="mt-2 text-[11px] leading-relaxed text-gray-400">+${missExtra} ürün daha — tam liste için yukarıdaki «Ürün Detayları».</p>` : ''}
                     </div>
                     <div>
-                        <h4 class="mb-2 text-xs font-semibold text-gray-700">Depoda fazla <span class="font-normal text-gray-400">(${surplus.length})</span></h4>
-                        <div class="overflow-x-auto rounded-lg border border-gray-100">
-                            <table class="w-full min-w-[280px] text-left text-xs">
-                                <thead>
-                                    <tr class="border-b border-gray-200 bg-gray-50/80">
-                                        <th class="px-2 py-2 font-medium text-gray-500">Ürün</th>
-                                        <th class="w-12 px-1 py-2 text-right font-medium text-gray-500">Adet</th>
-                                        <th class="w-16 px-1 py-2 text-right font-medium text-gray-500">Birim</th>
-                                        <th class="w-20 pl-1 py-2 text-right font-medium text-gray-500">TL</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100 bg-white">
-                                    ${
-                                        surplus.length === 0
-                                            ? emptyTableBody('Kayıt yok.')
-                                            : surShow.map((p) => tableRow(p, 'pos')).join('')
-                                    }
-                                </tbody>
-                            </table>
+                        <div class="mb-2 flex items-center justify-between gap-2">
+                            <span class="text-xs font-semibold text-gray-800">Hangi ürünler fazla?</span>
+                            <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">${surplus.length} kalem</span>
                         </div>
-                        ${
-                            surExtra > 0
-                                ? `<p class="mt-1.5 text-[11px] text-gray-400">+${surExtra} ürün daha — tam liste için yukarıdaki «Ürün Detayları» bölümüne bakın.</p>`
-                                : ''
-                        }
+                        <div class="space-y-2">
+                            ${surplus.length === 0 ? emptyCol('Fazla ürün yok.') : surShow.map((p) => productCard(p, 'plus')).join('')}
+                        </div>
+                        ${surExtra > 0 ? `<p class="mt-2 text-[11px] leading-relaxed text-gray-400">+${surExtra} ürün daha — tam liste için yukarıdaki «Ürün Detayları».</p>` : ''}
                     </div>
                 </div>
             </div>
