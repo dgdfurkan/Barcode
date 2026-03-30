@@ -17,6 +17,9 @@ class BarcodeScanner {
         this.scannerType = null; // Kullanılan tarayıcı tipi
         /** Sayım sheet: tek okumada açık ürünle barkod eşleştirme (handleBarcodeDetected önce buna düşer) */
         this.verificationCallback = null;
+        /** Doğrulama: büyük modal yerine minimal üst katman (#barcodeVerifyMiniOverlay) */
+        this.verificationMiniUi = false;
+        this._cameraVideoStageParent = null;
     }
 
     detectBestScanner() {
@@ -35,21 +38,30 @@ class BarcodeScanner {
         return null;
     }
 
-    async startScanning() {
+    async startScanning(options = {}) {
         try {
+            if (options && options.mini === true) {
+                this.verificationMiniUi = true;
+            }
+
             // Check if browser supports getUserMedia
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 alert('Tarayıcınız kamera erişimini desteklemiyor');
                 return;
             }
 
-            // Open modal
+            // Open modal veya minimal doğrulama paneli
             const modal = document.getElementById('cameraScannerModal');
             if (!modal) {
                 console.error('Camera scanner modal not found');
                 return;
             }
-            modal.classList.remove('hidden');
+            if (this.verificationMiniUi) {
+                this.showVerificationMiniOverlay(true);
+                modal.classList.add('hidden');
+            } else {
+                modal.classList.remove('hidden');
+            }
 
             // Get video element
             this.video = document.getElementById('cameraVideo');
@@ -1512,8 +1524,9 @@ class BarcodeScanner {
     }
 
     /** Sonraki tek barkod okuması doğrulama için; normal sayım / seri okuma akışına girmez */
-    beginVerificationScan(callback) {
+    beginVerificationScan(callback, options = {}) {
         this.verificationCallback = typeof callback === 'function' ? callback : null;
+        this.verificationMiniUi = !!options.mini;
         this.lastScannedCode = null;
         this.lastScanTime = 0;
     }
@@ -1523,12 +1536,66 @@ class BarcodeScanner {
     }
 
     /**
+     * Kamera önizlemesini (video + canvas sahnesi) minimal doğrulama paneline taşır veya geri alır.
+     */
+    showVerificationMiniOverlay(show) {
+        const mini = document.getElementById('barcodeVerifyMiniOverlay');
+        const stage = document.getElementById('cameraVideoStageWrap');
+        const miniStage = document.getElementById('barcodeVerifyMiniStage');
+        if (!mini || !stage || !miniStage) {
+            if (mini && !show) mini.classList.add('hidden');
+            return;
+        }
+        if (show) {
+            if (!miniStage.contains(stage)) {
+                this._cameraVideoStageParent = stage.parentNode;
+                miniStage.appendChild(stage);
+            }
+            mini.classList.remove('hidden');
+        } else {
+            if (this._cameraVideoStageParent) {
+                this._cameraVideoStageParent.appendChild(stage);
+            }
+            this._cameraVideoStageParent = null;
+            mini.classList.add('hidden');
+        }
+    }
+
+    /** Mini doğrulama panelinden iptal (sayım sheet açık kalır) */
+    cancelVerificationFromMiniOverlay() {
+        this.clearVerificationScan();
+        this.verificationMiniUi = false;
+        this.showVerificationMiniOverlay(false);
+        const cs = window.countingSystem;
+        if (cs) {
+            cs._barcodeVerifyInProgress = false;
+            if (typeof cs.updateVerifyBarcodeButtonState === 'function') {
+                cs.updateVerifyBarcodeButtonState();
+            }
+            const restoreSeriPause = !!(
+                cs.countingBottomSheetFromCameraSeriSayar &&
+                typeof cs.isSeriOkumaVeSayarakIlerle === 'function' &&
+                cs.isSeriOkumaVeSayarakIlerle()
+            );
+            if (restoreSeriPause && typeof this.pauseScanningKeepStream === 'function') {
+                this.pauseScanningKeepStream();
+            } else {
+                this.stopScanning();
+            }
+        } else {
+            this.stopScanning();
+        }
+    }
+
+    /**
      * Kamera iznini ve stream'i koruyarak sadece barkod çözümlemesini durdurur, modalı gizler.
      * Seri okuma + sayım sheet için: tam stop/start yerine kullanılır (getUserMedia tekrarından kaçınır).
      */
     pauseScanningKeepStream() {
         this.scanning = false;
         this.hideBarcodeFrame();
+        this.verificationMiniUi = false;
+        this.showVerificationMiniOverlay(false);
         const modal = document.getElementById('cameraScannerModal');
         if (modal) modal.classList.add('hidden');
     }
@@ -1552,10 +1619,15 @@ class BarcodeScanner {
      */
     async resumeScanningAfterOverlay() {
         const modal = document.getElementById('cameraScannerModal');
-        if (modal) modal.classList.remove('hidden');
+        if (this.verificationMiniUi) {
+            this.showVerificationMiniOverlay(true);
+            if (modal) modal.classList.add('hidden');
+        } else {
+            if (modal) modal.classList.remove('hidden');
+        }
 
         if (!this.hasActiveCameraSession()) {
-            return this.startScanning();
+            return this.startScanning({ mini: this.verificationMiniUi });
         }
 
         this.scanning = true;
@@ -1586,12 +1658,14 @@ class BarcodeScanner {
             return;
         }
 
-        return this.startScanning();
+        return this.startScanning({ mini: this.verificationMiniUi });
     }
 
     stopScanning() {
         this.scanning = false;
         this.verificationCallback = null;
+        this.verificationMiniUi = false;
+        this.showVerificationMiniOverlay(false);
 
         // Html5-Qrcode'u durdur
         if (this.html5QrCodeInstance) {
@@ -1675,4 +1749,19 @@ class BarcodeScanner {
 
 // Global instance
 window.barcodeScanner = new BarcodeScanner();
+
+(function wireBarcodeVerifyMiniOverlay() {
+    const bind = () => {
+        const closeBtn = document.getElementById('barcodeVerifyMiniClose');
+        const backdrop = document.getElementById('barcodeVerifyMiniBackdrop');
+        const onCancel = () => window.barcodeScanner?.cancelVerificationFromMiniOverlay?.();
+        if (closeBtn) closeBtn.addEventListener('click', onCancel);
+        if (backdrop) backdrop.addEventListener('click', onCancel);
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bind);
+    } else {
+        bind();
+    }
+})();
 

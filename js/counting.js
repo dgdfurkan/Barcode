@@ -4398,7 +4398,7 @@ class CountingSystem {
         }
         const bs = window.barcodeScanner;
         if (!bs || typeof bs.beginVerificationScan !== 'function') {
-            this.showToast('Barkod okuyucu hazır değil', 'error', 3000);
+            this.showToast('Kamera modülü yüklenemedi. Sayfayı yenileyin.', 'error', 4000);
             return;
         }
 
@@ -4436,13 +4436,13 @@ class CountingSystem {
             cleanup();
         };
 
-        bs.beginVerificationScan(onRead);
+        bs.beginVerificationScan(onRead, { mini: true });
 
         try {
             if (typeof bs.hasActiveCameraSession === 'function' && bs.hasActiveCameraSession()) {
                 await bs.resumeScanningAfterOverlay();
             } else {
-                await bs.startScanning();
+                await bs.startScanning({ mini: true });
             }
         } catch (e) {
             console.error(e);

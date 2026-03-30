@@ -58,8 +58,8 @@
     <script src="https://unpkg.com/html5-qrcode@latest/html5-qrcode.min.js"></script>
     <script src="../js/daily-count-import.js"></script>
     <script src="../js/sayim-clipboard-import.js"></script>
-    <script src="../js/counting.js"></script>
     <script src="../js/barcode-scanner.js"></script>
+    <script src="../js/counting.js"></script>
     <script src="../js/terminal-scanner.js"></script>
     
     <style>
@@ -328,6 +328,10 @@
         /* Camera Scanner Styles */
         #cameraScannerModal {
             z-index: 100;
+        }
+        /* Sayım: barkod doğrula — her şeyin üstünde, küçük panel */
+        #barcodeVerifyMiniOverlay {
+            z-index: 220;
         }
         
         /* Terminal Scanner Styles */
@@ -2018,7 +2022,7 @@
                     </div>
                 </div>
                 
-                <div class="relative w-full max-w-md flex-shrink-0">
+                <div id="cameraVideoStageWrap" class="relative w-full max-w-md flex-shrink-0">
                     <video id="cameraVideo" autoplay playsinline class="w-full rounded-lg" style="transform: none !important; -webkit-transform: none !important;"></video>
                     <canvas id="barcodeOverlayCanvas" class="absolute inset-0 pointer-events-none z-10 rounded-lg"></canvas>
                     <!-- HTML/CSS Animasyonlu Çerçeve -->
@@ -2041,6 +2045,23 @@
                 </div>
                 <p class="mt-4 text-sm text-gray-600 text-center flex-shrink-0">Barkodu kameraya gösterin</p>
             </div>
+        </div>
+    </div>
+
+    <!-- Barkod doğrula: minimal, en üst katman; aynı kamera sahnesi (cameraVideoStageWrap) buraya taşınır -->
+    <div id="barcodeVerifyMiniOverlay" class="fixed inset-0 hidden flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-[2px]" aria-modal="true" role="dialog" aria-labelledby="barcodeVerifyMiniTitle">
+        <div id="barcodeVerifyMiniBackdrop" class="absolute inset-0" aria-hidden="true"></div>
+        <div class="relative z-10 w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-200/90 overflow-hidden">
+            <div class="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/40">
+                <div class="min-w-0">
+                    <div id="barcodeVerifyMiniTitle" class="text-sm font-semibold text-slate-800">Barkodu doğrula</div>
+                    <p class="text-[11px] text-slate-500 mt-0.5 leading-tight">Okuttuğun barkod açık ürünle aynı mı?</p>
+                </div>
+                <button type="button" id="barcodeVerifyMiniClose" class="flex-shrink-0 p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors" aria-label="Kapat">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="barcodeVerifyMiniStage" class="bg-black min-h-[min(40vh,280px)] flex items-center justify-center"></div>
         </div>
     </div>
 
