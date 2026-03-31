@@ -1282,18 +1282,22 @@ class CountingSystem {
         this.closeDailyAddModal();
     }
 
-    async deleteDailyTableForSelectedDate() {
-        const iso = this.getDailySelectedIso();
-        const tableName = this.DAILY_TABLE_PREFIX + iso;
+    /** Günlük tablo adı: `Günlük|YYYY-MM-DD` — listeden veya modal «Sil» ile */
+    async deleteDailyTableByName(tableName) {
+        if (!tableName || !this.isDailyTableName(tableName)) {
+            this.showToast('Geçersiz günlük tablo.', 'error', 3000);
+            return;
+        }
         const tables = this.getTableList();
         if (!tables.some((t) => t.name === tableName)) {
-            this.showToast('Bu tarih için günlük tablo yok.', 'info', 3500);
+            this.showToast('Bu gün için tablo yok.', 'info', 3500);
             return;
         }
         if (tables.length <= 1) {
             this.showToast('En az bir tablo bulunmalıdır.', 'error', 4000);
             return;
         }
+        const iso = this.getIsoFromDailyTableName(tableName);
         const label = this.formatDailyDateLabelFromIso(iso);
         const ok = window.confirm(`"${label}" günlük tablosunu silmek istediğinize emin misiniz?`);
         if (!ok) return;
@@ -1305,6 +1309,10 @@ class CountingSystem {
             this.showToast(err?.message || 'Silinemedi', 'error', 4000);
         }
         this.updateDailyDeleteButtonState();
+    }
+
+    async deleteDailyTableForSelectedDate() {
+        await this.deleteDailyTableByName(this.DAILY_TABLE_PREFIX + this.getDailySelectedIso());
     }
 
     async importSayimPasteFromText(rawText) {
@@ -1426,15 +1434,19 @@ class CountingSystem {
             empty.textContent = 'Henüz gün yok. «Gün ekle / veri ekle» ile tarih seçip pano veya içe aktar kullanın.';
             dailyList.appendChild(empty);
         } else {
+            const canDeleteAnyDaily = tables.length > 1;
             dailyTables.forEach((table) => {
                 const label = this.formatDailyDateLabelFromIso(table.iso);
                 const isActive = table.name === this.currentTableName;
+                const row = document.createElement('div');
+                row.className = 'flex w-full min-w-0 items-stretch gap-1';
+                row.setAttribute('role', 'listitem');
+
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.setAttribute('role', 'listitem');
                 btn.dataset.tableName = table.name;
                 btn.className = [
-                    'sayim-table-chip w-full shrink-0 inline-flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-colors sm:px-3.5',
+                    'sayim-table-chip min-w-0 flex-1 inline-flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-colors sm:px-3.5',
                     isActive
                         ? 'border-indigo-500 bg-indigo-50 text-indigo-950 shadow-sm ring-2 ring-indigo-200/60'
                         : 'border-indigo-200/90 bg-white text-indigo-900/95 hover:border-indigo-300 hover:bg-indigo-50/80',
@@ -1448,7 +1460,28 @@ class CountingSystem {
                         await this.switchTable(table.name);
                     }
                 });
-                dailyList.appendChild(btn);
+
+                const delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className =
+                    'sayim-daily-row-del shrink-0 inline-flex items-center justify-center rounded-xl border border-red-100 bg-white p-2 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-white';
+                delBtn.setAttribute('aria-label', `${label} gününü sil`);
+                delBtn.title = canDeleteAnyDaily ? 'Bu günü sil' : 'En az bir tablo kalmalıdır';
+                delBtn.disabled = !canDeleteAnyDaily;
+                delBtn.innerHTML = `
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                `;
+                delBtn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    await this.deleteDailyTableByName(table.name);
+                });
+
+                row.appendChild(btn);
+                row.appendChild(delBtn);
+                dailyList.appendChild(row);
             });
         }
         this.updateDailyDeleteButtonState();
