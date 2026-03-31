@@ -1,10 +1,4 @@
 // Counting System for Stock Management
-/** Sayım stok izleri: console-quiet.js `console.log` susturduğu için warn kullanılır (sessize alınmıyor). */
-function countingStockDebug(...args) {
-    if (typeof console !== 'undefined' && console.warn) {
-        console.warn.apply(console, args);
-    }
-}
 class CountingSystem {
     constructor() {
         this.countingData = {}; // { productId: { warehouseStock, systemStock, lastUpdated, history } }
@@ -2393,26 +2387,19 @@ class CountingSystem {
 
         // Refresh System Stock Button
         const refreshSystemStockBtn = document.getElementById('countingRefreshSystemStockBtn');
-        if (!refreshSystemStockBtn) {
-            console.warn('[Counting] countingRefreshSystemStockBtn DOM’da yok — Stok güncelle listener bağlanmadı.');
-        }
         if (refreshSystemStockBtn) {
             refreshSystemStockBtn.addEventListener('click', async () => {
-                countingStockDebug('[Stok güncelle] Tıklandı (her zaman görünür)');
                 if (!this.currentCountingProduct) {
-                    console.warn('[Stok güncelle] İptal: currentCountingProduct yok (sheet ürün seçili değil?)');
                     return;
                 }
 
                 const product = this.allProducts.find((p) => p.id === this.currentCountingProduct);
                 if (!product) {
-                    console.warn('[Stok güncelle] İptal: allProducts içinde ürün yok, id=', this.currentCountingProduct);
                     return;
                 }
 
                 const barcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : '';
                 if (!barcode) {
-                    console.warn('[Stok güncelle] İptal: üründe barkod yok', product.name || product.id);
                     this.showToast('Bu ürün için barkod bulunamadı', 'error', 3000);
                     return;
                 }
@@ -2423,21 +2410,7 @@ class CountingSystem {
                 refreshSystemStockBtn.innerHTML = '<div class="spinner" style="width: 8px; height: 8px; border: 1.5px solid #e5e7eb; border-top: 1.5px solid #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>';
 
                 try {
-                    countingStockDebug(
-                        '[Stok güncelle · Sayım sheet] Başladı — counting ürün id:',
-                        this.currentCountingProduct,
-                        'barkod:',
-                        barcode
-                    );
-                    const result = await this.requestStockFromExtension(null, barcode, this.currentCountingProduct, {
-                        logVerbose: true,
-                    });
-                    countingStockDebug('[Stok güncelle · Sayım sheet] requestStockFromExtension tam yanıt:', result);
-                    try {
-                        countingStockDebug('[Stok güncelle · Sayım sheet] JSON:', JSON.stringify(result, null, 2));
-                    } catch (stringifyErr) {
-                        console.warn('[Stok güncelle · Sayım sheet] JSON.stringify başarısız:', stringifyErr);
-                    }
+                    const result = await this.requestStockFromExtension(null, barcode, this.currentCountingProduct, {});
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
                     const price = typeof result === 'object' && result !== null ? result?.price : null;
                     const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
@@ -2463,7 +2436,6 @@ class CountingSystem {
                         this.showToast('Ürün stoku bulunamadı', 'info', 3000);
                     }
                 } catch (error) {
-                    console.error('Error refreshing system stock:', error);
                     this.showToast('Stok alınamadı: ' + (error.message || 'Bilinmeyen hata'), 'error', 3000);
                 } finally {
                     refreshSystemStockBtn.disabled = false;
@@ -2879,7 +2851,7 @@ class CountingSystem {
         }
     }
 
-    /** Sayım sheet: Sistem + (isteğe bağlı) Rezerve Stok — sadece rezerve &gt; 0 iken gösterilir */
+    /** Sayım sheet: Sistem + (isteğe bağlı) Rezerve — sadece rezerve ≠ 0 iken gösterilir */
     updateCountingBottomSheetSystemStockDisplay(systemStock, reservedStock) {
         const elSys = document.getElementById('countingSystemStock');
         const elRes = document.getElementById('countingReservedStock');
@@ -2893,8 +2865,8 @@ class CountingSystem {
         if (elRes) {
             const rs =
                 reservedStock !== null && reservedStock !== undefined ? Number(reservedStock) : null;
-            if (rs !== null && !Number.isNaN(rs) && rs > 0) {
-                elRes.textContent = `Rezerve Stok: ${rs}`;
+            if (rs !== null && !Number.isNaN(rs) && rs !== 0) {
+                elRes.textContent = `Rezerve: ${rs}`;
                 elRes.classList.remove('hidden');
             } else {
                 elRes.textContent = '';
@@ -3718,7 +3690,7 @@ class CountingSystem {
      */
     extractReservedStockFromProductItem(item) {
         if (!item || typeof item !== 'object') return null;
-        const directKeys = ['reservedStock', 'reserved', 'reservedQuantity', 'rezerveStock'];
+        const directKeys = ['reserve', 'reservedStock', 'reserved', 'reservedQuantity', 'rezerveStock'];
         for (const k of directKeys) {
             if (Object.prototype.hasOwnProperty.call(item, k) && item[k] !== null && item[k] !== undefined) {
                 const n = Number(item[k]);
@@ -3762,17 +3734,6 @@ class CountingSystem {
 
     async fetchStockFromAPI(apiInfo, barcode, productName, productId = null, options = {}) {
         try {
-            const dbg = options.logVerbose ? countingStockDebug : () => {};
-            dbg('[Stok güncelle · Sayım sheet] fetchStockFromAPI çalışıyor (logVerbose açık)');
-            dbg('🌐 Direkt API çağrısı yapılıyor:', { 
-                barcode, 
-                productName, 
-                productId,
-                endpoint: apiInfo.stockEndpoint,
-                hasToken: !!apiInfo.token,
-                warehouseId: apiInfo.warehouseId
-            });
-            
             // Token geçerliliğini kontrol et
             if (apiInfo.tokenExpiry && Date.now() >= (apiInfo.tokenExpiry - 5 * 60 * 1000)) {
                 throw new Error('Token süresi dolmuş. Lütfen Getir franchise sayfasını yenileyin.');
@@ -3783,9 +3744,7 @@ class CountingSystem {
                 const foundProduct = this.findProductByBarcode(barcode);
                 if (foundProduct && foundProduct.productId) {
                     productId = foundProduct.productId;
-                    dbg('✅ Barkod\'dan product ID bulundu:', { barcode, productId, productName: foundProduct.name });
                 } else {
-                    console.warn('⚠️ Barkod için product ID bulunamadı:', barcode);
                     throw new Error(`Barkod "${barcode}" için product ID bulunamadı. Lütfen products.json'da bu barkodun olduğundan emin olun.`);
                 }
             }
@@ -3795,9 +3754,6 @@ class CountingSystem {
                 const foundProduct = this.findProductByName(productName);
                 if (foundProduct && foundProduct.productId) {
                     productId = foundProduct.productId;
-                    dbg('✅ İsimden product ID bulundu:', { productName, productId });
-                } else {
-                    console.warn('⚠️ İsim için product ID bulunamadı:', productName);
                 }
             }
             
@@ -3828,15 +3784,6 @@ class CountingSystem {
                 authToken = 'Bearer ' + authToken.trim();
             }
             
-            dbg('📤 API isteği gönderiliyor:', { 
-                url: urlWithParams, 
-                method: 'POST',
-                body: requestBody,
-                hasToken: !!authToken,
-                tokenPrefix: authToken.substring(0, 7),
-                warehouseId: warehouseId
-            });
-            
             let response;
             try {
                 // apiInfo.headers içinden User-Agent'ı filtrele (CORS hatası vermemesi için)
@@ -3846,8 +3793,6 @@ class CountingSystem {
                         // User-Agent ve user-agent header'larını atla
                         if (key.toLowerCase() !== 'user-agent') {
                             safeHeaders[key] = apiInfo.headers[key];
-                        } else {
-                            console.warn('⚠️ User-Agent header filtrelendi:', key);
                         }
                     });
                 }
@@ -3868,35 +3813,8 @@ class CountingSystem {
                 if (finalHeaders['User-Agent'] || finalHeaders['user-agent']) {
                     delete finalHeaders['User-Agent'];
                     delete finalHeaders['user-agent'];
-                    console.warn('⚠️ User-Agent header final headers\'dan kaldırıldı');
                 }
 
-                if (options.logVerbose) {
-                    const headersForLog = { ...finalHeaders };
-                    if (headersForLog.Authorization) {
-                        const t = String(headersForLog.Authorization);
-                        headersForLog.Authorization =
-                            t.length > 28
-                                ? `${t.slice(0, 22)}…${t.slice(-10)} (uzunluk: ${t.length})`
-                                : '[Authorization gizli]';
-                    }
-                    dbg('[Stok güncelle · Sayım sheet] — GİDEN istek (aşağıda tam detay)');
-                    dbg('[Stok güncelle · Sayım sheet] URL:', urlWithParams);
-                    dbg('[Stok güncelle · Sayım sheet] Body JSON:', JSON.stringify(requestBody, null, 2));
-                    dbg('[Stok güncelle · Sayım sheet] Headers (token kısaltılmış):', headersForLog);
-                }
-                
-                dbg('📤 Fetch çağrısı başlatılıyor...', {
-                    url: urlWithParams,
-                    method: 'POST',
-                    hasToken: !!authToken,
-                    tokenLength: authToken ? authToken.length : 0,
-                    warehouseId: warehouseId,
-                    productId: productId,
-                    headersCount: Object.keys(finalHeaders).length,
-                    headerKeys: Object.keys(finalHeaders)
-                });
-                
                 response = await fetch(urlWithParams, {
                     method: 'POST',
                     headers: finalHeaders,
@@ -3905,49 +3823,13 @@ class CountingSystem {
                     mode: 'cors',
                     credentials: 'omit'
                 });
-                
-                dbg('✅ Fetch çağrısı tamamlandı, response alındı:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    ok: response.ok,
-                    headers: Object.fromEntries(response.headers.entries())
-                });
             } catch (fetchError) {
-                console.error('❌ Fetch hatası detayları:', {
-                    name: fetchError.name,
-                    message: fetchError.message,
-                    stack: fetchError.stack,
-                    error: fetchError
-                });
-                
                 // CORS hatası kontrolü
                 if (fetchError.message && (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError'))) {
-                    // CORS hatası olabilir - backend proxy gerekebilir
-                    console.error('⚠️ CORS veya Network hatası tespit edildi. Bu, mobil tarayıcılarda yaygın bir sorundur.');
-                    const errorDetails = {
-                        name: fetchError.name,
-                        message: fetchError.message,
-                        stack: fetchError.stack,
-                        url: urlWithParams,
-                        hasToken: !!authToken,
-                        tokenLength: authToken ? authToken.length : 0
-                    };
-                    console.error('📋 Hata detayları:', errorDetails);
                     throw new Error('API\'ye erişilemiyor (CORS/Network hatası). Detaylar: ' + fetchError.message + ' | URL: ' + urlWithParams.substring(0, 50) + '...');
                 } else if (fetchError.name === 'TypeError' && fetchError.message.includes('fetch')) {
-                    console.error('📋 TypeError detayları:', {
-                        name: fetchError.name,
-                        message: fetchError.message,
-                        stack: fetchError.stack
-                    });
                     throw new Error('API çağrısı yapılamadı: ' + fetchError.message + '. Lütfen sayfayı yenileyip tekrar deneyin.');
                 }
-                console.error('📋 Genel hata detayları:', {
-                    name: fetchError.name,
-                    message: fetchError.message,
-                    stack: fetchError.stack,
-                    error: fetchError
-                });
                 throw new Error('API çağrısı başarısız: ' + (fetchError.message || fetchError.name || 'Bilinmeyen hata'));
             }
             
@@ -3958,12 +3840,6 @@ class CountingSystem {
                 } catch (e) {
                     errorText = 'Yanıt okunamadı';
                 }
-                if (options.logVerbose) {
-                    dbg('[Stok güncelle · Sayım sheet] — GELEN HATA', response.status, response.statusText);
-                    dbg('[Stok güncelle · Sayım sheet] Ham gövde:', errorText);
-                }
-                console.error('❌ API hatası:', response.status, response.statusText, errorText);
-                
                 if (response.status === 401) {
                     throw new Error('Yetkilendirme hatası: Token geçersiz veya süresi dolmuş. Lütfen Getir franchise sayfasını yenileyin.');
                 } else if (response.status === 403) {
@@ -3979,25 +3855,12 @@ class CountingSystem {
             let data;
             try {
                 const responseText = await response.text();
-                if (options.logVerbose) {
-                    dbg('[Stok güncelle · Sayım sheet] — GELEN HTTP:', response.status, response.statusText);
-                    dbg('[Stok güncelle · Sayım sheet] Yanıt header:', Object.fromEntries(response.headers.entries()));
-                    dbg('[Stok güncelle · Sayım sheet] Ham gövde (string):', responseText);
-                }
-                dbg('📥 API yanıtı (text, ilk 500 karakter):', responseText.substring(0, 500));
                 try {
                     data = JSON.parse(responseText);
-                    if (options.logVerbose) {
-                        dbg('[Stok güncelle · Sayım sheet] Parse edilmiş data (nesne):', data);
-                        dbg('[Stok güncelle · Sayım sheet] Parse edilmiş JSON:', JSON.stringify(data, null, 2));
-                    }
-                    dbg('📥 API yanıtı (parsed, ilk 1000 karakter):', JSON.stringify(data, null, 2).substring(0, 1000));
                 } catch (parseError) {
-                    console.error('❌ JSON parse hatası:', parseError);
                     throw new Error('API yanıtı geçersiz JSON formatında: ' + responseText.substring(0, 200));
                 }
             } catch (textError) {
-                console.error('❌ Response text okuma hatası:', textError);
                 throw new Error('API yanıtı okunamadı: ' + (textError.message || 'Bilinmeyen hata'));
             }
             
@@ -4147,26 +4010,12 @@ class CountingSystem {
                                 if (!this.allProducts[productIndex].category || 
                                     this.allProducts[productIndex].category === 'Genel') {
                                     this.allProducts[productIndex].category = category;
-                                    console.log(`✅ Kategori güncellendi (eski format): ${productId} -> ${category}${subCategory ? ` (Alt: ${subCategory})` : ''}`);
                                 }
                                 
                                 // Alt kategori bilgisini de ekle (varsa)
                                 if (subCategory && !this.allProducts[productIndex].subCategory) {
                                     this.allProducts[productIndex].subCategory = subCategory;
                                 }
-                            }
-                        } else {
-                            // Debug: Kategori bulunamadıysa logla
-                            const currentProduct = this.allProducts.find(p => p.id === productId);
-                            if (currentProduct && (!currentProduct.category || currentProduct.category === 'Genel')) {
-                                console.log('⚠️ Kategori bulunamadı (eski format):', {
-                                    productId,
-                                    hasCategory: !!foundProduct.category,
-                                    hasCategoryName: !!foundProduct.categoryName,
-                                    hasMasterCategoryV2: !!foundProduct.masterCategoryV2,
-                                    categoryType: foundProduct.category ? typeof foundProduct.category : 'none',
-                                    categoryKeys: foundProduct.category ? Object.keys(foundProduct.category) : []
-                                });
                             }
                         }
                     }
@@ -4250,7 +4099,6 @@ class CountingSystem {
                                 if (!this.allProducts[productIndex].category || 
                                     this.allProducts[productIndex].category === 'Genel') {
                                     this.allProducts[productIndex].category = category;
-                                    console.log(`✅ Kategori güncellendi: ${productId} -> ${category}${subCategory ? ` (Alt: ${subCategory})` : ''}`);
                                 }
                                 
                                 // Alt kategori bilgisini de ekle (varsa)
@@ -4258,60 +4106,18 @@ class CountingSystem {
                                     this.allProducts[productIndex].subCategory = subCategory;
                                 }
                             }
-                        } else {
-                            // Debug: Kategori bulunamadıysa logla
-                            const currentProduct = this.allProducts.find(p => p.id === productId);
-                            if (currentProduct && (!currentProduct.category || currentProduct.category === 'Genel')) {
-                                console.log('⚠️ Kategori bulunamadı:', {
-                                    productId,
-                                    hasCategory: !!foundProduct.category,
-                                    hasCategoryName: !!foundProduct.categoryName,
-                                    hasMasterCategoryV2: !!foundProduct.masterCategoryV2,
-                                    categoryType: foundProduct.category ? typeof foundProduct.category : 'none',
-                                    categoryKeys: foundProduct.category ? Object.keys(foundProduct.category) : []
-                                });
-                            }
                         }
-                    }
-                }
-                
-                if (options.logVerbose) {
-                    countingStockDebug(
-                        '[Stok güncelle · Sayım sheet] ★ Bu sayı ekrana yazılır (Sistem):',
-                        stock,
-                        '| JSON alanı:',
-                        stockSourceField
-                            ? `data içindeki ürün satırı.${stockSourceField} (öncelik: available → stock → quantity)`
-                            : '(ürün satırı yok veya alan yok)'
-                    );
-                }
-                if (options.logVerbose) {
-                    countingStockDebug('✅ Stok değeri bulundu:', stock, foundProduct ? `(Ürün: ${foundProduct.name?.tr || foundProduct.fullName?.tr || 'N/A'})` : '');
-                }
-                if (price !== null && options.logVerbose) {
-                    countingStockDebug('💰 Fiyat bilgisi bulundu:', price, priceText ? `(${priceText})` : '');
-                }
-                if (options.logVerbose && foundProduct && typeof foundProduct === 'object') {
-                    countingStockDebug('[Stok güncelle · Sayım sheet] API ürün satırı (tüm alanlar):', foundProduct);
-                    try {
-                        countingStockDebug('[Stok güncelle · Sayım sheet] API ürün satırı JSON:', JSON.stringify(foundProduct, null, 2));
-                    } catch (e) {
-                        console.warn('[Stok güncelle · Sayım sheet] foundProduct JSON.stringify:', e);
                     }
                 }
 
                 const reservedStock = foundProduct ? this.extractReservedStockFromProductItem(foundProduct) : null;
-                if (options.logVerbose && reservedStock !== null && reservedStock !== undefined) {
-                    countingStockDebug('📌 Rezerve stok (hesaplanan):', reservedStock);
-                }
 
                 /**
                  * Stok güncelle / API yanıt özeti (fetchStockFromAPI):
                  * - stock: available | stock | quantity (öncelik sırasıyla)
                  * - price, priceText: ürün fiyatı
-                 * - reservedStock: tek alan (reservedStock, reserved, …) veya
+                 * - reservedStock: reserve | reservedStock | reserved | … veya
                  *   reservedForCorporateSales + reservedForDisposal + reservedForTransfer toplamı
-                 * Tam ham satır: konsolda "API yanıtı (parsed)" ile foundProduct görülebilir.
                  */
                 return {
                     stock: stock,
@@ -4321,11 +4127,9 @@ class CountingSystem {
                 };
             }
             
-            console.warn('⚠️ API yanıtında stok değeri bulunamadı. Response:', data);
             throw new Error('API yanıtında stok değeri bulunamadı');
             
         } catch (error) {
-            console.error('❌ API çağrısı hatası:', error);
             throw error;
         }
     }
