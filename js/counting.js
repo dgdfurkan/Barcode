@@ -2406,14 +2406,20 @@ class CountingSystem {
                 refreshSystemStockBtn.innerHTML = '<div class="spinner" style="width: 8px; height: 8px; border: 1.5px solid #e5e7eb; border-top: 1.5px solid #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>';
 
                 try {
+                    console.log(
+                        '[Stok güncelle · Sayım sheet] Başladı — counting ürün id:',
+                        this.currentCountingProduct,
+                        'barkod:',
+                        barcode
+                    );
                     const result = await this.requestStockFromExtension(null, barcode, this.currentCountingProduct, {
                         logVerbose: true,
                     });
-                    console.log('[Stok güncelle] requestStockFromExtension tam yanıt:', result);
+                    console.log('[Stok güncelle · Sayım sheet] requestStockFromExtension tam yanıt:', result);
                     try {
-                        console.log('[Stok güncelle] JSON:', JSON.stringify(result, null, 2));
+                        console.log('[Stok güncelle · Sayım sheet] JSON:', JSON.stringify(result, null, 2));
                     } catch (stringifyErr) {
-                        console.warn('[Stok güncelle] JSON.stringify başarısız:', stringifyErr);
+                        console.warn('[Stok güncelle · Sayım sheet] JSON.stringify başarısız:', stringifyErr);
                     }
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
                     const price = typeof result === 'object' && result !== null ? result?.price : null;
@@ -3825,6 +3831,24 @@ class CountingSystem {
                     delete finalHeaders['user-agent'];
                     console.warn('⚠️ User-Agent header final headers\'dan kaldırıldı');
                 }
+
+                if (options.logVerbose) {
+                    const headersForLog = { ...finalHeaders };
+                    if (headersForLog.Authorization) {
+                        const t = String(headersForLog.Authorization);
+                        headersForLog.Authorization =
+                            t.length > 28
+                                ? `${t.slice(0, 22)}…${t.slice(-10)} (uzunluk: ${t.length})`
+                                : '[Authorization gizli]';
+                    }
+                    console.groupCollapsed('[Stok güncelle · Sayım sheet] GİDEN');
+                    console.log('URL:', urlWithParams);
+                    console.log('Method:', 'POST');
+                    console.log('Body (nesne):', requestBody);
+                    console.log('Body JSON:', JSON.stringify(requestBody, null, 2));
+                    console.log('Headers (Authorization kısaltılmış):', headersForLog);
+                    console.groupEnd();
+                }
                 
                 console.log('📤 Fetch çağrısı başlatılıyor...', {
                     url: urlWithParams,
@@ -3898,6 +3922,17 @@ class CountingSystem {
                 } catch (e) {
                     errorText = 'Yanıt okunamadı';
                 }
+                if (options.logVerbose) {
+                    console.groupCollapsed('[Stok güncelle · Sayım sheet] GELEN (HATA)');
+                    console.log('HTTP:', response.status, response.statusText);
+                    console.log('Ham gövde:', errorText);
+                    try {
+                        console.log('Parse denemesi:', JSON.parse(errorText));
+                    } catch (e) {
+                        console.log('JSON değil veya parse edilemedi');
+                    }
+                    console.groupEnd();
+                }
                 console.error('❌ API hatası:', response.status, response.statusText, errorText);
                 
                 if (response.status === 401) {
@@ -3915,9 +3950,22 @@ class CountingSystem {
             let data;
             try {
                 const responseText = await response.text();
+                if (options.logVerbose) {
+                    console.groupCollapsed('[Stok güncelle · Sayım sheet] GELEN (OK)');
+                    console.log('HTTP:', response.status, response.statusText);
+                    console.log('Yanıt header\'ları:', Object.fromEntries(response.headers.entries()));
+                    console.log('Ham gövde (tam string):', responseText);
+                    console.groupEnd();
+                }
                 console.log('📥 API yanıtı (text, ilk 500 karakter):', responseText.substring(0, 500));
                 try {
                     data = JSON.parse(responseText);
+                    if (options.logVerbose) {
+                        console.groupCollapsed('[Stok güncelle · Sayım sheet] GELEN (parse JSON tam)');
+                        console.log('data (nesne):', data);
+                        console.log('JSON:', JSON.stringify(data, null, 2));
+                        console.groupEnd();
+                    }
                     console.log('📥 API yanıtı (parsed, ilk 1000 karakter):', JSON.stringify(data, null, 2).substring(0, 1000));
                 } catch (parseError) {
                     console.error('❌ JSON parse hatası:', parseError);
@@ -4220,11 +4268,11 @@ class CountingSystem {
                     console.log('💰 Fiyat bilgisi bulundu:', price, priceText ? `(${priceText})` : '');
                 }
                 if (options.logVerbose && foundProduct && typeof foundProduct === 'object') {
-                    console.log('[Stok güncelle] API ürün satırı (tüm alanlar):', foundProduct);
+                    console.log('[Stok güncelle · Sayım sheet] API ürün satırı (tüm alanlar):', foundProduct);
                     try {
-                        console.log('[Stok güncelle] API ürün satırı JSON:', JSON.stringify(foundProduct, null, 2));
+                        console.log('[Stok güncelle · Sayım sheet] API ürün satırı JSON:', JSON.stringify(foundProduct, null, 2));
                     } catch (e) {
-                        console.warn('[Stok güncelle] foundProduct JSON.stringify:', e);
+                        console.warn('[Stok güncelle · Sayım sheet] foundProduct JSON.stringify:', e);
                     }
                 }
 
