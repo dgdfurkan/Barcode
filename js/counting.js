@@ -3723,6 +3723,26 @@ class CountingSystem {
         return any ? sum : null;
     }
 
+    /**
+     * /stocks ürün satırından sistem stoku — öncelik: available → stock → quantity
+     * @returns {{ stock: number|null, sourceField: string|null }}
+     */
+    pickSystemStockFromProductRow(item) {
+        if (!item || typeof item !== 'object') {
+            return { stock: null, sourceField: null };
+        }
+        if (item.available !== null && item.available !== undefined) {
+            return { stock: item.available, sourceField: 'available' };
+        }
+        if (item.stock !== null && item.stock !== undefined) {
+            return { stock: item.stock, sourceField: 'stock' };
+        }
+        if (item.quantity !== null && item.quantity !== undefined) {
+            return { stock: item.quantity, sourceField: 'quantity' };
+        }
+        return { stock: null, sourceField: null };
+    }
+
     async fetchStockFromAPI(apiInfo, barcode, productName, productId = null, options = {}) {
         try {
             console.log('🌐 Direkt API çağrısı yapılıyor:', { 
@@ -3841,13 +3861,10 @@ class CountingSystem {
                                 ? `${t.slice(0, 22)}…${t.slice(-10)} (uzunluk: ${t.length})`
                                 : '[Authorization gizli]';
                     }
-                    console.groupCollapsed('[Stok güncelle · Sayım sheet] GİDEN');
-                    console.log('URL:', urlWithParams);
-                    console.log('Method:', 'POST');
-                    console.log('Body (nesne):', requestBody);
-                    console.log('Body JSON:', JSON.stringify(requestBody, null, 2));
-                    console.log('Headers (Authorization kısaltılmış):', headersForLog);
-                    console.groupEnd();
+                    console.log('[Stok güncelle · Sayım sheet] — GİDEN istek (aşağıda tam detay)');
+                    console.log('[Stok güncelle · Sayım sheet] URL:', urlWithParams);
+                    console.log('[Stok güncelle · Sayım sheet] Body JSON:', JSON.stringify(requestBody, null, 2));
+                    console.log('[Stok güncelle · Sayım sheet] Headers (token kısaltılmış):', headersForLog);
                 }
                 
                 console.log('📤 Fetch çağrısı başlatılıyor...', {
@@ -3923,15 +3940,8 @@ class CountingSystem {
                     errorText = 'Yanıt okunamadı';
                 }
                 if (options.logVerbose) {
-                    console.groupCollapsed('[Stok güncelle · Sayım sheet] GELEN (HATA)');
-                    console.log('HTTP:', response.status, response.statusText);
-                    console.log('Ham gövde:', errorText);
-                    try {
-                        console.log('Parse denemesi:', JSON.parse(errorText));
-                    } catch (e) {
-                        console.log('JSON değil veya parse edilemedi');
-                    }
-                    console.groupEnd();
+                    console.log('[Stok güncelle · Sayım sheet] — GELEN HATA', response.status, response.statusText);
+                    console.log('[Stok güncelle · Sayım sheet] Ham gövde:', errorText);
                 }
                 console.error('❌ API hatası:', response.status, response.statusText, errorText);
                 
@@ -3951,20 +3961,16 @@ class CountingSystem {
             try {
                 const responseText = await response.text();
                 if (options.logVerbose) {
-                    console.groupCollapsed('[Stok güncelle · Sayım sheet] GELEN (OK)');
-                    console.log('HTTP:', response.status, response.statusText);
-                    console.log('Yanıt header\'ları:', Object.fromEntries(response.headers.entries()));
-                    console.log('Ham gövde (tam string):', responseText);
-                    console.groupEnd();
+                    console.log('[Stok güncelle · Sayım sheet] — GELEN HTTP:', response.status, response.statusText);
+                    console.log('[Stok güncelle · Sayım sheet] Yanıt header:', Object.fromEntries(response.headers.entries()));
+                    console.log('[Stok güncelle · Sayım sheet] Ham gövde (string):', responseText);
                 }
                 console.log('📥 API yanıtı (text, ilk 500 karakter):', responseText.substring(0, 500));
                 try {
                     data = JSON.parse(responseText);
                     if (options.logVerbose) {
-                        console.groupCollapsed('[Stok güncelle · Sayım sheet] GELEN (parse JSON tam)');
-                        console.log('data (nesne):', data);
-                        console.log('JSON:', JSON.stringify(data, null, 2));
-                        console.groupEnd();
+                        console.log('[Stok güncelle · Sayım sheet] Parse edilmiş data (nesne):', data);
+                        console.log('[Stok güncelle · Sayım sheet] Parse edilmiş JSON:', JSON.stringify(data, null, 2));
                     }
                     console.log('📥 API yanıtı (parsed, ilk 1000 karakter):', JSON.stringify(data, null, 2).substring(0, 1000));
                 } catch (parseError) {
@@ -3979,6 +3985,7 @@ class CountingSystem {
             // Response format'ına göre stok değerini bul
             let stock = null;
             let foundProduct = null;
+            let stockSourceField = null;
             
             // Yeni format: { data: [...], total: ... }
             if (data.data && Array.isArray(data.data)) {
@@ -4020,16 +4027,9 @@ class CountingSystem {
                 }
                 
                 if (foundProduct) {
-                    // 0 değeri de geçerli, bu yüzden || yerine explicit kontrol yap
-                    if (foundProduct.available !== null && foundProduct.available !== undefined) {
-                        stock = foundProduct.available;
-                    } else if (foundProduct.stock !== null && foundProduct.stock !== undefined) {
-                        stock = foundProduct.stock;
-                    } else if (foundProduct.quantity !== null && foundProduct.quantity !== undefined) {
-                        stock = foundProduct.quantity;
-                    } else {
-                        stock = null;
-                    }
+                    const picked = this.pickSystemStockFromProductRow(foundProduct);
+                    stock = picked.stock;
+                    stockSourceField = picked.sourceField;
                 }
             } 
             // Eski format desteği (fallback)
@@ -4058,16 +4058,9 @@ class CountingSystem {
                         return false;
                     });
                 if (foundProduct) {
-                    // 0 değeri de geçerli, bu yüzden || yerine explicit kontrol yap
-                    if (foundProduct.available !== null && foundProduct.available !== undefined) {
-                        stock = foundProduct.available;
-                    } else if (foundProduct.stock !== null && foundProduct.stock !== undefined) {
-                        stock = foundProduct.stock;
-                    } else if (foundProduct.quantity !== null && foundProduct.quantity !== undefined) {
-                        stock = foundProduct.quantity;
-                    } else {
-                        stock = null;
-                    }
+                    const picked = this.pickSystemStockFromProductRow(foundProduct);
+                    stock = picked.stock;
+                    stockSourceField = picked.sourceField;
                     
                     // Kategori bilgisini API'den al ve allProducts array'ini güncelle (eski format için de)
                     if (productId && foundProduct) {
@@ -4263,6 +4256,16 @@ class CountingSystem {
                     }
                 }
                 
+                if (options.logVerbose) {
+                    console.log(
+                        '[Stok güncelle · Sayım sheet] ★ Bu sayı ekrana yazılır (Sistem):',
+                        stock,
+                        '| JSON alanı:',
+                        stockSourceField
+                            ? `data içindeki ürün satırı.${stockSourceField} (öncelik: available → stock → quantity)`
+                            : '(ürün satırı yok veya alan yok)'
+                    );
+                }
                 console.log('✅ Stok değeri bulundu:', stock, foundProduct ? `(Ürün: ${foundProduct.name?.tr || foundProduct.fullName?.tr || 'N/A'})` : '');
                 if (price !== null) {
                     console.log('💰 Fiyat bilgisi bulundu:', price, priceText ? `(${priceText})` : '');
