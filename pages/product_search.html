@@ -8,6 +8,7 @@
     <meta name="apple-mobile-web-app-title" content="FlowCobalt">
     <meta name="theme-color" content="#1e293b">
     <link rel="manifest" href="../manifest.json">
+    <script src="../js/console-quiet.js"></script>
     <title>Ürün Barkod Arama - FlowCobalt</title>
     
     <!-- Favicon -->
@@ -9255,6 +9256,34 @@
                     
                     alert('✅ Varsayılan ürünler başarıyla yeniden yüklendi!');
                 }
+            }
+        }
+
+        /** Kullanıcıya özel (custom) ürünleri JSON olarak indirir */
+        function exportUserProducts() {
+            try {
+                if (!window.userDataManager || !window.userDataManager.currentUser) {
+                    alert('Kullanıcı verisi yok. Önce giriş yapın.');
+                    return;
+                }
+                const custom = window.userDataManager.getProducts();
+                const payload = {
+                    exportedAt: new Date().toISOString(),
+                    username: window.userDataManager.currentUser.username,
+                    products: custom
+                };
+                const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'kullanici_urunleri_' + new Date().toISOString().slice(0, 10) + '.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                console.error('exportUserProducts:', e);
+                alert('Dışa aktarılamadı: ' + (e && e.message ? e.message : String(e)));
             }
         }
         

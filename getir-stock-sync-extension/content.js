@@ -11,14 +11,17 @@
         return; // warehouse.getir.com vb. - eklenti bu sitede çalışmaz
     }
 
-    console.log('✅ Getir Stok Senkronizasyonu extension yüklendi (Franchise Token & Warehouse ID Yakalama)');
-    console.log('🔧 Extension ayarları:');
-    console.log('  - Content Script Timing: document_start');
-    console.log('  - Token yakalama: Aktif');
-    console.log('  - Warehouse ID yakalama: Aktif');
-    console.log('  - Debug logging: Aktif');
-    console.log('  - Sayfa URL:', window.location.href);
-    console.log('  - Extension ID:', typeof chrome !== 'undefined' && chrome.runtime ? chrome.runtime.id : 'N/A (normal sayfa)');
+    /** Açık konsol gürültüsü; geliştirmede geçici olarak jbLog ile değiştirilebilir */
+    const jbLog = function () {};
+
+    jbLog('✅ Getir Stok Senkronizasyonu extension yüklendi (Franchise Token & Warehouse ID Yakalama)');
+    jbLog('🔧 Extension ayarları:');
+    jbLog('  - Content Script Timing: document_start');
+    jbLog('  - Token yakalama: Aktif');
+    jbLog('  - Warehouse ID yakalama: Aktif');
+    jbLog('  - Debug logging: Aktif');
+    jbLog('  - Sayfa URL:', window.location.href);
+    jbLog('  - Extension ID:', typeof chrome !== 'undefined' && chrome.runtime ? chrome.runtime.id : 'N/A (normal sayfa)');
 
     // API endpoint'lerini ve token'ları yakala
     let apiEndpoints = {
@@ -54,9 +57,9 @@
             }
             
             if (data) {
-                console.log(message, data);
+                jbLog(message, data);
             } else {
-                console.log(message);
+                jbLog(message);
             }
         }
     };
@@ -290,9 +293,9 @@
                     warehouseName.length <= 50 &&
                     !warehouseName.match(/^[A-Z][a-z]+[A-Z]/)) { // PascalCase pattern'i filtrele
                     apiEndpoints.warehouseName = warehouseName;
-                    console.log('🏭 ✅ Warehouse name DOM\'dan yakalandı:', warehouseName);
+                    jbLog('🏭 ✅ Warehouse name DOM\'dan yakalandı:', warehouseName);
                 } else {
-                    console.log('⚠️ Warehouse name filtrelendi (geçersiz değer):', warehouseName);
+                    jbLog('⚠️ Warehouse name filtrelendi (geçersiz değer):', warehouseName);
                 }
             }
         }
@@ -386,14 +389,14 @@
             if (isAPIRequest) {
                 // Pasif modda sadece token değişikliklerini yakala, log yazma
                 if (!isPassiveMode) {
-                console.log('🌐 ========== API ÇAĞRISI YAKALANDI ==========');
-                console.log('📍 URL:', url);
-                console.log('📤 Method:', fetchOptions.method || 'GET');
-                    console.log('📋 Headers:', headersToString(fetchOptions.headers));
+                jbLog('🌐 ========== API ÇAĞRISI YAKALANDI ==========');
+                jbLog('📍 URL:', url);
+                jbLog('📤 Method:', fetchOptions.method || 'GET');
+                    jbLog('📋 Headers:', headersToString(fetchOptions.headers));
                 if (fetchOptions.body) {
                     try {
                         const bodyObj = typeof fetchOptions.body === 'string' ? JSON.parse(fetchOptions.body) : fetchOptions.body;
-                        console.log('📦 Request Body:', JSON.stringify(bodyObj, null, 2));
+                        jbLog('📦 Request Body:', JSON.stringify(bodyObj, null, 2));
                         
                             // Request body'den warehouse ID'yi yakala (warehouseIds array'inden veya warehouse field'ından)
                             if (bodyObj) {
@@ -403,7 +406,7 @@
                                     if (newWarehouseId && newWarehouseId !== apiEndpoints.warehouseId) {
                                         apiEndpoints.warehouseId = newWarehouseId;
                                         if (!isPassiveMode) {
-                                            console.log('🏭 Warehouse ID yakalandı (request body - warehouseIds):', apiEndpoints.warehouseId);
+                                            jbLog('🏭 Warehouse ID yakalandı (request body - warehouseIds):', apiEndpoints.warehouseId);
                                         }
                                         sendAPIInfoToCountingPage();
                                     }
@@ -412,7 +415,7 @@
                                 else if (bodyObj.warehouse && bodyObj.warehouse !== apiEndpoints.warehouseId) {
                                     apiEndpoints.warehouseId = bodyObj.warehouse;
                                     if (!isPassiveMode) {
-                                        console.log('🏭 Warehouse ID yakalandı (request body - warehouse):', apiEndpoints.warehouseId);
+                                        jbLog('🏭 Warehouse ID yakalandı (request body - warehouse):', apiEndpoints.warehouseId);
                                     }
                                     sendAPIInfoToCountingPage();
                                 }
@@ -420,14 +423,14 @@
                                 else if (bodyObj.warehouseId && bodyObj.warehouseId !== apiEndpoints.warehouseId) {
                                     apiEndpoints.warehouseId = bodyObj.warehouseId;
                                     if (!isPassiveMode) {
-                                        console.log('🏭 Warehouse ID yakalandı (request body - warehouseId):', apiEndpoints.warehouseId);
+                                        jbLog('🏭 Warehouse ID yakalandı (request body - warehouseId):', apiEndpoints.warehouseId);
                                     }
                                     sendAPIInfoToCountingPage();
                                 }
                             }
                     } catch (e) {
                             if (!isPassiveMode) {
-                        console.log('📦 Request Body:', fetchOptions.body);
+                        jbLog('📦 Request Body:', fetchOptions.body);
                     }
                 }
                     }
@@ -441,14 +444,14 @@
                     // Response'u log'la (async) ve warehouse ID'yi yakala
                     responseClone.json().then(data => {
                         if (!isPassiveMode) {
-                        console.log('📥 Response Status:', response.status, response.statusText);
-                        console.log('📥 Response Headers:', Object.fromEntries(response.headers.entries()));
-                            console.log('📥 Response Body (ilk 500 karakter):', JSON.stringify(data, null, 2).substring(0, 500) + '...');
+                        jbLog('📥 Response Status:', response.status, response.statusText);
+                        jbLog('📥 Response Headers:', Object.fromEntries(response.headers.entries()));
+                            jbLog('📥 Response Body (ilk 500 karakter):', JSON.stringify(data, null, 2).substring(0, 500) + '...');
                             
                             // Token ve warehouse ID durumunu logla
-                            console.log('📊 Mevcut durum:');
-                            console.log('  - Token:', apiEndpoints.token ? '✅ Mevcut (' + apiEndpoints.token.substring(7, 37) + '...)' : '❌ Yok');
-                            console.log('  - Warehouse ID:', apiEndpoints.warehouseId || '❌ Yok');
+                            jbLog('📊 Mevcut durum:');
+                            jbLog('  - Token:', apiEndpoints.token ? '✅ Mevcut (' + apiEndpoints.token.substring(7, 37) + '...)' : '❌ Yok');
+                            jbLog('  - Warehouse ID:', apiEndpoints.warehouseId || '❌ Yok');
                         }
                         
                         // Warehouse ID ve name'i response'dan çıkar (her response'da güncelle)
@@ -486,14 +489,14 @@
                             if (foundWarehouseId && foundWarehouseId !== apiEndpoints.warehouseId) {
                                 apiEndpoints.warehouseId = foundWarehouseId;
                                 if (!isPassiveMode) {
-                                    console.log('🏭 ✅ Warehouse ID güncellendi (response\'dan):', apiEndpoints.warehouseId);
+                                    jbLog('🏭 ✅ Warehouse ID güncellendi (response\'dan):', apiEndpoints.warehouseId);
                                 }
                                 sendAPIInfoToCountingPage();
                             } else if (foundWarehouseId && !apiEndpoints.warehouseId) {
                                 // İlk kez bulunuyorsa
                                 apiEndpoints.warehouseId = foundWarehouseId;
                                 if (!isPassiveMode) {
-                                    console.log('🏭 ✅ Warehouse ID yakalandı (response\'dan):', apiEndpoints.warehouseId);
+                                    jbLog('🏭 ✅ Warehouse ID yakalandı (response\'dan):', apiEndpoints.warehouseId);
                                 }
                                 sendAPIInfoToCountingPage();
                             }
@@ -502,21 +505,21 @@
                             if (foundWarehouseName && foundWarehouseName !== apiEndpoints.warehouseName) {
                                 apiEndpoints.warehouseName = foundWarehouseName;
                                 if (!isPassiveMode) {
-                                    console.log('🏭 ✅ Warehouse name yakalandı (response\'dan):', apiEndpoints.warehouseName);
+                                    jbLog('🏭 ✅ Warehouse name yakalandı (response\'dan):', apiEndpoints.warehouseName);
                                 }
                                 sendAPIInfoToCountingPage();
                             }
                         }
                         
                         if (!isPassiveMode) {
-                        console.log('🌐 ===========================================');
+                        jbLog('🌐 ===========================================');
                         }
                     }).catch((error) => {
                         console.warn('⚠️ Response JSON parse edilemedi:', error);
                         responseClone.text().then(text => {
-                            console.log('📥 Response Status:', response.status, response.statusText);
-                            console.log('📥 Response Body (text, ilk 500 karakter):', text.substring(0, 500) + '...');
-                            console.log('🌐 ===========================================');
+                            jbLog('📥 Response Status:', response.status, response.statusText);
+                            jbLog('📥 Response Body (text, ilk 500 karakter):', text.substring(0, 500) + '...');
+                            jbLog('🌐 ===========================================');
                         }).catch(err => {
                             console.error('❌ Response text okunamadı:', err);
                         });
@@ -557,7 +560,7 @@
                                         if (!apiEndpoints.passiveMode) {
                                             apiEndpoints.passiveMode = true;
                                             if (!isPassiveMode) {
-                                                console.log('ℹ️ Token zaten mevcut, pasif moda geçildi');
+                                                jbLog('ℹ️ Token zaten mevcut, pasif moda geçildi');
                                             }
                                         }
                                     }
@@ -579,7 +582,7 @@
                             apiEndpoints.baseUrl = urlObj.origin;
                             apiEndpoints.captured = true;
                             if (!isPassiveMode) {
-                            console.log('🌐 Base URL kaydedildi:', apiEndpoints.baseUrl);
+                            jbLog('🌐 Base URL kaydedildi:', apiEndpoints.baseUrl);
                             }
                             sendAPIInfoToCountingPage();
                         } catch (e) {
@@ -596,14 +599,14 @@
                             apiEndpoints.stock = 'https://franchise-api-gateway.getirapi.com/stocks';
                             apiEndpoints.captured = true;
                             if (!isPassiveMode) {
-                            console.log('📦 Stock endpoint kaydedildi (API Gateway):', apiEndpoints.stock);
+                            jbLog('📦 Stock endpoint kaydedildi (API Gateway):', apiEndpoints.stock);
                             }
                             sendAPIInfoToCountingPage();
                         } else if (!apiEndpoints.stock) {
                             apiEndpoints.stock = url.split('?')[0]; // Query string'i temizle
                             apiEndpoints.captured = true;
                             if (!isPassiveMode) {
-                            console.log('📦 Stock endpoint kaydedildi:', apiEndpoints.stock);
+                            jbLog('📦 Stock endpoint kaydedildi:', apiEndpoints.stock);
                             }
                             sendAPIInfoToCountingPage();
                         }
@@ -614,7 +617,7 @@
                         apiEndpoints.search = url.split('?')[0];
                         apiEndpoints.captured = true;
                         if (!isPassiveMode) {
-                        console.log('🔍 Search endpoint kaydedildi:', apiEndpoints.search);
+                        jbLog('🔍 Search endpoint kaydedildi:', apiEndpoints.search);
                         }
                         sendAPIInfoToCountingPage();
                     }
@@ -663,16 +666,16 @@
         
         if (isXHRAPIRequest) {
             if (!isPassiveMode) {
-            console.log('🌐 ========== XHR API ÇAĞRISI YAKALANDI ==========');
-            console.log('📍 URL:', url);
-            console.log('📤 Method:', method);
-                console.log('📋 Headers:', headersToString(headers));
+            jbLog('🌐 ========== XHR API ÇAĞRISI YAKALANDI ==========');
+            jbLog('📍 URL:', url);
+            jbLog('📤 Method:', method);
+                jbLog('📋 Headers:', headersToString(headers));
             }
             if (body) {
                 try {
                     const bodyObj = typeof body === 'string' ? JSON.parse(body) : body;
                     if (!isPassiveMode) {
-                    console.log('📦 Request Body:', JSON.stringify(bodyObj, null, 2));
+                    jbLog('📦 Request Body:', JSON.stringify(bodyObj, null, 2));
                     }
                     
                     // Request body'den warehouse ID'yi yakala (XHR için)
@@ -683,7 +686,7 @@
                             if (newWarehouseId && newWarehouseId !== apiEndpoints.warehouseId) {
                                 apiEndpoints.warehouseId = newWarehouseId;
                                 if (!isPassiveMode) {
-                                    console.log('🏭 Warehouse ID yakalandı (XHR request body - warehouseIds):', apiEndpoints.warehouseId);
+                                    jbLog('🏭 Warehouse ID yakalandı (XHR request body - warehouseIds):', apiEndpoints.warehouseId);
                                 }
                                 sendAPIInfoToCountingPage();
                             }
@@ -692,7 +695,7 @@
                         else if (bodyObj.warehouse && bodyObj.warehouse !== apiEndpoints.warehouseId) {
                             apiEndpoints.warehouseId = bodyObj.warehouse;
                             if (!isPassiveMode) {
-                                console.log('🏭 Warehouse ID yakalandı (XHR request body - warehouse):', apiEndpoints.warehouseId);
+                                jbLog('🏭 Warehouse ID yakalandı (XHR request body - warehouse):', apiEndpoints.warehouseId);
                             }
                             sendAPIInfoToCountingPage();
                         }
@@ -700,14 +703,14 @@
                         else if (bodyObj.warehouseId && bodyObj.warehouseId !== apiEndpoints.warehouseId) {
                             apiEndpoints.warehouseId = bodyObj.warehouseId;
                             if (!isPassiveMode) {
-                                console.log('🏭 Warehouse ID yakalandı (XHR request body - warehouseId):', apiEndpoints.warehouseId);
+                                jbLog('🏭 Warehouse ID yakalandı (XHR request body - warehouseId):', apiEndpoints.warehouseId);
                             }
                             sendAPIInfoToCountingPage();
                         }
                     }
                 } catch (e) {
                     if (!isPassiveMode) {
-                    console.log('📦 Request Body:', body);
+                    jbLog('📦 Request Body:', body);
                 }
             }
             }
@@ -723,7 +726,7 @@
                 
                 if (authHeader) {
                     if (!isPassiveMode) {
-                        console.log('🔍 Authorization header bulundu (XHR):', authHeader.substring(0, 30) + '...');
+                        jbLog('🔍 Authorization header bulundu (XHR):', authHeader.substring(0, 30) + '...');
                     }
                     
                     if (authHeader.startsWith('Bearer ')) {
@@ -746,10 +749,10 @@
                         apiEndpoints.passiveMode = true; // Token yakalandı, pasif moda geç
                         
                         if (!isPassiveMode) {
-                        console.log('🔑 ✅ Franchise token yakalandı (XHR):', token.substring(0, 30) + '... (uzunluk: ' + token.length + ')');
-                            console.log('🔇 Pasif moda geçildi - artık sessizce çalışacak');
+                        jbLog('🔑 ✅ Franchise token yakalandı (XHR):', token.substring(0, 30) + '... (uzunluk: ' + token.length + ')');
+                            jbLog('🔇 Pasif moda geçildi - artık sessizce çalışacak');
                             if (apiEndpoints.tokenExpiry) {
-                                console.log('⏰ Token expiry:', new Date(apiEndpoints.tokenExpiry).toLocaleString('tr-TR'));
+                                jbLog('⏰ Token expiry:', new Date(apiEndpoints.tokenExpiry).toLocaleString('tr-TR'));
                             }
                         }
                         sendAPIInfoToCountingPage();
@@ -758,7 +761,7 @@
                                 if (!apiEndpoints.passiveMode) {
                                     apiEndpoints.passiveMode = true;
                                     if (!isPassiveMode) {
-                                        console.log('ℹ️ Token zaten mevcut (XHR), pasif moda geçildi');
+                                        jbLog('ℹ️ Token zaten mevcut (XHR), pasif moda geçildi');
                                     }
                                 }
                             }
@@ -774,7 +777,7 @@
                     }
                 } else {
                     if (!isPassiveMode) {
-                        console.log('ℹ️ Authorization header bulunamadı (XHR)');
+                        jbLog('ℹ️ Authorization header bulunamadı (XHR)');
                     }
                 }
             }
@@ -785,8 +788,8 @@
                     try {
                         const responseText = this.responseText;
                         if (!isPassiveMode) {
-                            console.log('📥 XHR Response Status:', this.status, this.statusText);
-                            console.log('📥 XHR Response Body (ilk 500 karakter):', responseText.substring(0, 500) + '...');
+                            jbLog('📥 XHR Response Status:', this.status, this.statusText);
+                            jbLog('📥 XHR Response Body (ilk 500 karakter):', responseText.substring(0, 500) + '...');
                         }
                         
                         const responseData = JSON.parse(responseText);
@@ -811,25 +814,25 @@
                             if (foundWarehouseId && foundWarehouseId !== apiEndpoints.warehouseId) {
                                 apiEndpoints.warehouseId = foundWarehouseId;
                                 if (!isPassiveMode) {
-                                    console.log('🏭 ✅ Warehouse ID güncellendi (XHR response\'dan):', apiEndpoints.warehouseId);
+                                    jbLog('🏭 ✅ Warehouse ID güncellendi (XHR response\'dan):', apiEndpoints.warehouseId);
                                 }
                                 sendAPIInfoToCountingPage();
                             } else if (foundWarehouseId && !apiEndpoints.warehouseId) {
                                 // İlk kez bulunuyorsa
                                 apiEndpoints.warehouseId = foundWarehouseId;
                                 if (!isPassiveMode) {
-                                    console.log('🏭 ✅ Warehouse ID yakalandı (XHR response\'dan):', apiEndpoints.warehouseId);
+                                    jbLog('🏭 ✅ Warehouse ID yakalandı (XHR response\'dan):', apiEndpoints.warehouseId);
                                 }
                                 sendAPIInfoToCountingPage();
                             } else if (!foundWarehouseId && !isPassiveMode) {
-                                console.log('ℹ️ XHR Response\'da warehouse ID bulunamadı');
+                                jbLog('ℹ️ XHR Response\'da warehouse ID bulunamadı');
                             }
                             
                             // Mevcut durumu logla (sadece pasif mod değilse)
                             if (!isPassiveMode) {
-                                console.log('📊 XHR Mevcut durum:');
-                                console.log('  - Token:', apiEndpoints.token ? '✅ Mevcut' : '❌ Yok');
-                                console.log('  - Warehouse ID:', apiEndpoints.warehouseId || '❌ Yok');
+                                jbLog('📊 XHR Mevcut durum:');
+                                jbLog('  - Token:', apiEndpoints.token ? '✅ Mevcut' : '❌ Yok');
+                                jbLog('  - Warehouse ID:', apiEndpoints.warehouseId || '❌ Yok');
                             }
                         }
                     } catch (e) {
@@ -843,7 +846,7 @@
                     }
                 }
                 if (!isPassiveMode) {
-                    console.log('🌐 ===========================================');
+                    jbLog('🌐 ===========================================');
                 }
             });
             
@@ -854,7 +857,7 @@
                     apiEndpoints.baseUrl = urlObj.origin;
                     apiEndpoints.captured = true;
                     if (!isPassiveMode) {
-                    console.log('🌐 Base URL kaydedildi (XHR):', apiEndpoints.baseUrl);
+                    jbLog('🌐 Base URL kaydedildi (XHR):', apiEndpoints.baseUrl);
                     }
                     sendAPIInfoToCountingPage();
                 } catch (e) {
@@ -869,14 +872,14 @@
                     apiEndpoints.stock = baseUrl;
                     apiEndpoints.captured = true;
                     if (!isPassiveMode) {
-                    console.log('📦 Stock endpoint kaydedildi (XHR - API Gateway):', apiEndpoints.stock);
+                    jbLog('📦 Stock endpoint kaydedildi (XHR - API Gateway):', apiEndpoints.stock);
                     }
                     sendAPIInfoToCountingPage();
                 } else if (url.includes('stock')) {
                     apiEndpoints.stock = url.split('?')[0];
                     apiEndpoints.captured = true;
                     if (!isPassiveMode) {
-                    console.log('📦 Stock endpoint kaydedildi (XHR):', apiEndpoints.stock);
+                    jbLog('📦 Stock endpoint kaydedildi (XHR):', apiEndpoints.stock);
                     }
                     sendAPIInfoToCountingPage();
                 }
@@ -892,7 +895,7 @@
         localStorage.setItem(testKey, 'test');
         const testValue = localStorage.getItem(testKey);
         localStorage.removeItem(testKey);
-        console.log('✅ localStorage erişimi test edildi:', testValue === 'test' ? 'BAŞARILI' : 'BAŞARISIZ');
+        jbLog('✅ localStorage erişimi test edildi:', testValue === 'test' ? 'BAŞARILI' : 'BAŞARISIZ');
     } catch (error) {
         console.error('❌ localStorage erişim hatası:', error);
     }
@@ -1003,9 +1006,9 @@
                             apiEndpoints.initialAttempts = apiEndpoints.maxInitialAttempts; // Deneme sayısını maksimuma çıkar
                             
                             if (apiEndpoints.initialAttempts < apiEndpoints.maxInitialAttempts) {
-                                console.log('🔑 ✅ localStorage\'dan getir_api_info token bulundu:', tokenValue.substring(0, 30) + '... (uzunluk: ' + tokenValue.length + ')');
+                                jbLog('🔑 ✅ localStorage\'dan getir_api_info token bulundu:', tokenValue.substring(0, 30) + '... (uzunluk: ' + tokenValue.length + ')');
                                 if (tokenExpiry) {
-                                    console.log('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
+                                    jbLog('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
                                 }
                             }
                             sendAPIInfoToCountingPage();
@@ -1046,9 +1049,9 @@
                             apiEndpoints.initialAttempts = apiEndpoints.maxInitialAttempts; // Deneme sayısını maksimuma çıkar
                             
                             if (apiEndpoints.initialAttempts < apiEndpoints.maxInitialAttempts) {
-                                console.log('🔑 ✅ localStorage\'dan franchise token bulundu (fallback):', value.substring(0, 30) + '... (uzunluk: ' + value.length + ')');
+                                jbLog('🔑 ✅ localStorage\'dan franchise token bulundu (fallback):', value.substring(0, 30) + '... (uzunluk: ' + value.length + ')');
                                 if (tokenExpiry) {
-                                    console.log('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
+                                    jbLog('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
                                 }
                             }
                             sendAPIInfoToCountingPage();
@@ -1087,9 +1090,9 @@
                         apiEndpoints.initialAttempts = apiEndpoints.maxInitialAttempts; // Deneme sayısını maksimuma çıkar
                         
                         if (apiEndpoints.initialAttempts < apiEndpoints.maxInitialAttempts) {
-                        console.log('🔑 ✅ localStorage\'a franchise token kaydedildi:', value.substring(0, 30) + '... (uzunluk: ' + value.length + ')');
+                        jbLog('🔑 ✅ localStorage\'a franchise token kaydedildi:', value.substring(0, 30) + '... (uzunluk: ' + value.length + ')');
                             if (tokenExpiry) {
-                                console.log('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
+                                jbLog('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
                             }
                         }
                         sendAPIInfoToCountingPage();
@@ -1108,21 +1111,21 @@
         apiEndpoints.initialAttempts++;
         checkLocalStorageForToken();
         if (apiEndpoints.initialAttempts <= apiEndpoints.maxInitialAttempts) {
-            console.log('✅ Sayfa hazır, franchise token yakalama aktif (deneme ' + apiEndpoints.initialAttempts + '/' + apiEndpoints.maxInitialAttempts + ')');
+            jbLog('✅ Sayfa hazır, franchise token yakalama aktif (deneme ' + apiEndpoints.initialAttempts + '/' + apiEndpoints.maxInitialAttempts + ')');
         }
     } else {
         window.addEventListener('load', () => {
             apiEndpoints.initialAttempts++;
             checkLocalStorageForToken();
             if (apiEndpoints.initialAttempts <= apiEndpoints.maxInitialAttempts) {
-                console.log('✅ Sayfa yüklendi, franchise token yakalama aktif (deneme ' + apiEndpoints.initialAttempts + '/' + apiEndpoints.maxInitialAttempts + ')');
+                jbLog('✅ Sayfa yüklendi, franchise token yakalama aktif (deneme ' + apiEndpoints.initialAttempts + '/' + apiEndpoints.maxInitialAttempts + ')');
             }
         });
         document.addEventListener('DOMContentLoaded', () => {
             apiEndpoints.initialAttempts++;
             checkLocalStorageForToken();
             if (apiEndpoints.initialAttempts <= apiEndpoints.maxInitialAttempts) {
-                console.log('✅ DOM hazır, franchise token yakalama aktif (deneme ' + apiEndpoints.initialAttempts + '/' + apiEndpoints.maxInitialAttempts + ')');
+                jbLog('✅ DOM hazır, franchise token yakalama aktif (deneme ' + apiEndpoints.initialAttempts + '/' + apiEndpoints.maxInitialAttempts + ')');
             }
         });
     }
@@ -1162,7 +1165,7 @@
                     if (node.tagName === 'SCRIPT' && node.src) {
                         const src = node.src;
                         if (src.includes('getirapi.com') && window.location.hostname === 'franchise.getir.com') {
-                            console.log('🔍 Yeni franchise API script yüklendi:', src);
+                            jbLog('🔍 Yeni franchise API script yüklendi:', src);
                         }
                     }
                 });
@@ -1175,7 +1178,7 @@
                 childList: true,
                 subtree: true
             });
-            console.log('👁️ MutationObserver aktif (dinamik scriptler için)');
+            jbLog('👁️ MutationObserver aktif (dinamik scriptler için)');
         } else {
             // Body henüz yoksa, DOMContentLoaded'da ekle
             document.addEventListener('DOMContentLoaded', () => {
@@ -1183,7 +1186,7 @@
                     childList: true,
                     subtree: true
                 });
-                console.log('👁️ MutationObserver aktif (DOMContentLoaded sonrası)');
+                jbLog('👁️ MutationObserver aktif (DOMContentLoaded sonrası)');
             });
         }
     } catch (error) {
@@ -1309,11 +1312,11 @@
             },
             extensionId: 'dhgdhdnnpeakmomlgpgmokecmdmeoebn'
         };
-        console.log('✅ Extension helper fonksiyonları window.getirExtensionHelper olarak eklendi');
+        jbLog('✅ Extension helper fonksiyonları window.getirExtensionHelper olarak eklendi');
     }
 
-    console.log('✅ Getir Stok Senkronizasyonu extension hazır (Franchise Token & Warehouse ID Yakalama)');
-    console.log('💡 Token ve Warehouse ID yakalandığında localStorage\'a kaydedilecek ve counting.js tarafından kullanılacak');
-    console.log('🏭 Warehouse ID otomatik olarak request body ve response\'dan yakalanacak');
-    console.log('🔧 Extension helper: window.getirExtensionHelper.getAPIInfo() ile API bilgilerine erişebilirsiniz');
+    jbLog('✅ Getir Stok Senkronizasyonu extension hazır (Franchise Token & Warehouse ID Yakalama)');
+    jbLog('💡 Token ve Warehouse ID yakalandığında localStorage\'a kaydedilecek ve counting.js tarafından kullanılacak');
+    jbLog('🏭 Warehouse ID otomatik olarak request body ve response\'dan yakalanacak');
+    jbLog('🔧 Extension helper: window.getirExtensionHelper.getAPIInfo() ile API bilgilerine erişebilirsiniz');
 })();
