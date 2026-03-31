@@ -37,6 +37,8 @@ class CountingSystem {
         this._countingSheetScrollY = 0;
         /** Genel tablolardan ayrılmak için günlük tablo adları: `Günlük|YYYY-MM-DD` */
         this.DAILY_TABLE_PREFIX = 'Günlük|';
+        /** `deleteDailyTableModal` onayı için */
+        this._pendingDailyDeleteTableName = null;
     }
 
     async init() {
@@ -1282,8 +1284,8 @@ class CountingSystem {
         this.closeDailyAddModal();
     }
 
-    /** Günlük tablo adı: `Günlük|YYYY-MM-DD` — listeden veya modal «Sil» ile */
-    async deleteDailyTableByName(tableName) {
+    /** Günlük tablo adı: `Günlük|YYYY-MM-DD` — listeden veya «Gün ekle» içi Sil; onay `deleteDailyTableModal` */
+    deleteDailyTableByName(tableName) {
         if (!tableName || !this.isDailyTableName(tableName)) {
             this.showToast('Geçersiz günlük tablo.', 'error', 3000);
             return;
@@ -1299,8 +1301,41 @@ class CountingSystem {
         }
         const iso = this.getIsoFromDailyTableName(tableName);
         const label = this.formatDailyDateLabelFromIso(iso);
-        const ok = window.confirm(`"${label}" günlük tablosunu silmek istediğinize emin misiniz?`);
-        if (!ok) return;
+        this._pendingDailyDeleteTableName = tableName;
+        const display = document.getElementById('deleteDailyTableDisplay');
+        if (display) display.textContent = label;
+        const modal = document.getElementById('deleteDailyTableModal');
+        if (modal) modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+
+    closeDeleteDailyTableModal() {
+        this._pendingDailyDeleteTableName = null;
+        const modal = document.getElementById('deleteDailyTableModal');
+        if (modal) modal.classList.add('hidden');
+        const dailyAdd = document.getElementById('sayimDailyAddModal');
+        if (!dailyAdd || dailyAdd.classList.contains('hidden')) {
+            document.body.classList.remove('overflow-hidden');
+        }
+    }
+
+    async confirmPendingDailyDelete() {
+        const tableName = this._pendingDailyDeleteTableName;
+        if (!tableName) {
+            this.closeDeleteDailyTableModal();
+            return;
+        }
+        const tables = this.getTableList();
+        if (!tables.some((t) => t.name === tableName)) {
+            this.showToast('Tablo bulunamadı.', 'info', 3000);
+            this.closeDeleteDailyTableModal();
+            return;
+        }
+        if (tables.length <= 1) {
+            this.showToast('En az bir tablo bulunmalıdır.', 'error', 4000);
+            this.closeDeleteDailyTableModal();
+            return;
+        }
         try {
             await this.deleteTable(tableName);
             this.showToast('Günlük tablo silindi.', 'success', 3000);
@@ -1308,11 +1343,12 @@ class CountingSystem {
         } catch (err) {
             this.showToast(err?.message || 'Silinemedi', 'error', 4000);
         }
+        this.closeDeleteDailyTableModal();
         this.updateDailyDeleteButtonState();
     }
 
-    async deleteDailyTableForSelectedDate() {
-        await this.deleteDailyTableByName(this.DAILY_TABLE_PREFIX + this.getDailySelectedIso());
+    deleteDailyTableForSelectedDate() {
+        this.deleteDailyTableByName(this.DAILY_TABLE_PREFIX + this.getDailySelectedIso());
     }
 
     async importSayimPasteFromText(rawText) {
@@ -1464,19 +1500,19 @@ class CountingSystem {
                 const delBtn = document.createElement('button');
                 delBtn.type = 'button';
                 delBtn.className =
-                    'sayim-daily-row-del shrink-0 inline-flex items-center justify-center rounded-xl border border-red-100 bg-white p-2 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-white';
+                    'sayim-daily-row-del shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-100/90 bg-white p-0 text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-white';
                 delBtn.setAttribute('aria-label', `${label} gününü sil`);
                 delBtn.title = canDeleteAnyDaily ? 'Bu günü sil' : 'En az bir tablo kalmalıdır';
                 delBtn.disabled = !canDeleteAnyDaily;
                 delBtn.innerHTML = `
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                     </svg>
                 `;
-                delBtn.addEventListener('click', async (e) => {
+                delBtn.addEventListener('click', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    await this.deleteDailyTableByName(table.name);
+                    this.deleteDailyTableByName(table.name);
                 });
 
                 row.appendChild(btn);
@@ -1829,6 +1865,22 @@ class CountingSystem {
         if (sayimDailyAddModal) {
             sayimDailyAddModal.addEventListener('click', (e) => {
                 if (e.target === sayimDailyAddModal) this.closeDailyAddModal();
+            });
+        }
+
+        const deleteDailyTableModal = document.getElementById('deleteDailyTableModal');
+        const closeDeleteDailyTableModalBtn = document.getElementById('closeDeleteDailyTableModal');
+        const cancelDeleteDailyTableBtn = document.getElementById('cancelDeleteDailyTableBtn');
+        const confirmDeleteDailyTableBtn = document.getElementById('confirmDeleteDailyTableBtn');
+        [closeDeleteDailyTableModalBtn, cancelDeleteDailyTableBtn].forEach((btn) => {
+            if (btn) btn.addEventListener('click', () => this.closeDeleteDailyTableModal());
+        });
+        if (confirmDeleteDailyTableBtn) {
+            confirmDeleteDailyTableBtn.addEventListener('click', () => this.confirmPendingDailyDelete());
+        }
+        if (deleteDailyTableModal) {
+            deleteDailyTableModal.addEventListener('click', (e) => {
+                if (e.target === deleteDailyTableModal) this.closeDeleteDailyTableModal();
             });
         }
 
