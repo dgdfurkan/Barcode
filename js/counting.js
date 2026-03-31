@@ -1,4 +1,10 @@
 // Counting System for Stock Management
+/** Sayım stok izleri: console-quiet.js `console.log` susturduğu için warn kullanılır (sessize alınmıyor). */
+function countingStockDebug(...args) {
+    if (typeof console !== 'undefined' && console.warn) {
+        console.warn.apply(console, args);
+    }
+}
 class CountingSystem {
     constructor() {
         this.countingData = {}; // { productId: { warehouseStock, systemStock, lastUpdated, history } }
@@ -2392,7 +2398,7 @@ class CountingSystem {
         }
         if (refreshSystemStockBtn) {
             refreshSystemStockBtn.addEventListener('click', async () => {
-                console.log('[Stok güncelle] Tıklandı (her zaman görünür)');
+                countingStockDebug('[Stok güncelle] Tıklandı (her zaman görünür)');
                 if (!this.currentCountingProduct) {
                     console.warn('[Stok güncelle] İptal: currentCountingProduct yok (sheet ürün seçili değil?)');
                     return;
@@ -2417,7 +2423,7 @@ class CountingSystem {
                 refreshSystemStockBtn.innerHTML = '<div class="spinner" style="width: 8px; height: 8px; border: 1.5px solid #e5e7eb; border-top: 1.5px solid #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>';
 
                 try {
-                    console.log(
+                    countingStockDebug(
                         '[Stok güncelle · Sayım sheet] Başladı — counting ürün id:',
                         this.currentCountingProduct,
                         'barkod:',
@@ -2426,9 +2432,9 @@ class CountingSystem {
                     const result = await this.requestStockFromExtension(null, barcode, this.currentCountingProduct, {
                         logVerbose: true,
                     });
-                    console.log('[Stok güncelle · Sayım sheet] requestStockFromExtension tam yanıt:', result);
+                    countingStockDebug('[Stok güncelle · Sayım sheet] requestStockFromExtension tam yanıt:', result);
                     try {
-                        console.log('[Stok güncelle · Sayım sheet] JSON:', JSON.stringify(result, null, 2));
+                        countingStockDebug('[Stok güncelle · Sayım sheet] JSON:', JSON.stringify(result, null, 2));
                     } catch (stringifyErr) {
                         console.warn('[Stok güncelle · Sayım sheet] JSON.stringify başarısız:', stringifyErr);
                     }
@@ -3756,10 +3762,9 @@ class CountingSystem {
 
     async fetchStockFromAPI(apiInfo, barcode, productName, productId = null, options = {}) {
         try {
-            if (options && options.logVerbose) {
-                console.log('[Stok güncelle · Sayım sheet] fetchStockFromAPI çalışıyor (logVerbose açık)');
-            }
-            console.log('🌐 Direkt API çağrısı yapılıyor:', { 
+            const dbg = options.logVerbose ? countingStockDebug : () => {};
+            dbg('[Stok güncelle · Sayım sheet] fetchStockFromAPI çalışıyor (logVerbose açık)');
+            dbg('🌐 Direkt API çağrısı yapılıyor:', { 
                 barcode, 
                 productName, 
                 productId,
@@ -3778,7 +3783,7 @@ class CountingSystem {
                 const foundProduct = this.findProductByBarcode(barcode);
                 if (foundProduct && foundProduct.productId) {
                     productId = foundProduct.productId;
-                    console.log('✅ Barkod\'dan product ID bulundu:', { barcode, productId, productName: foundProduct.name });
+                    dbg('✅ Barkod\'dan product ID bulundu:', { barcode, productId, productName: foundProduct.name });
                 } else {
                     console.warn('⚠️ Barkod için product ID bulunamadı:', barcode);
                     throw new Error(`Barkod "${barcode}" için product ID bulunamadı. Lütfen products.json'da bu barkodun olduğundan emin olun.`);
@@ -3790,7 +3795,7 @@ class CountingSystem {
                 const foundProduct = this.findProductByName(productName);
                 if (foundProduct && foundProduct.productId) {
                     productId = foundProduct.productId;
-                    console.log('✅ İsimden product ID bulundu:', { productName, productId });
+                    dbg('✅ İsimden product ID bulundu:', { productName, productId });
                 } else {
                     console.warn('⚠️ İsim için product ID bulunamadı:', productName);
                 }
@@ -3823,7 +3828,7 @@ class CountingSystem {
                 authToken = 'Bearer ' + authToken.trim();
             }
             
-            console.log('📤 API isteği gönderiliyor:', { 
+            dbg('📤 API isteği gönderiliyor:', { 
                 url: urlWithParams, 
                 method: 'POST',
                 body: requestBody,
@@ -3875,13 +3880,13 @@ class CountingSystem {
                                 ? `${t.slice(0, 22)}…${t.slice(-10)} (uzunluk: ${t.length})`
                                 : '[Authorization gizli]';
                     }
-                    console.log('[Stok güncelle · Sayım sheet] — GİDEN istek (aşağıda tam detay)');
-                    console.log('[Stok güncelle · Sayım sheet] URL:', urlWithParams);
-                    console.log('[Stok güncelle · Sayım sheet] Body JSON:', JSON.stringify(requestBody, null, 2));
-                    console.log('[Stok güncelle · Sayım sheet] Headers (token kısaltılmış):', headersForLog);
+                    dbg('[Stok güncelle · Sayım sheet] — GİDEN istek (aşağıda tam detay)');
+                    dbg('[Stok güncelle · Sayım sheet] URL:', urlWithParams);
+                    dbg('[Stok güncelle · Sayım sheet] Body JSON:', JSON.stringify(requestBody, null, 2));
+                    dbg('[Stok güncelle · Sayım sheet] Headers (token kısaltılmış):', headersForLog);
                 }
                 
-                console.log('📤 Fetch çağrısı başlatılıyor...', {
+                dbg('📤 Fetch çağrısı başlatılıyor...', {
                     url: urlWithParams,
                     method: 'POST',
                     hasToken: !!authToken,
@@ -3901,7 +3906,7 @@ class CountingSystem {
                     credentials: 'omit'
                 });
                 
-                console.log('✅ Fetch çağrısı tamamlandı, response alındı:', {
+                dbg('✅ Fetch çağrısı tamamlandı, response alındı:', {
                     status: response.status,
                     statusText: response.statusText,
                     ok: response.ok,
@@ -3954,8 +3959,8 @@ class CountingSystem {
                     errorText = 'Yanıt okunamadı';
                 }
                 if (options.logVerbose) {
-                    console.log('[Stok güncelle · Sayım sheet] — GELEN HATA', response.status, response.statusText);
-                    console.log('[Stok güncelle · Sayım sheet] Ham gövde:', errorText);
+                    dbg('[Stok güncelle · Sayım sheet] — GELEN HATA', response.status, response.statusText);
+                    dbg('[Stok güncelle · Sayım sheet] Ham gövde:', errorText);
                 }
                 console.error('❌ API hatası:', response.status, response.statusText, errorText);
                 
@@ -3975,18 +3980,18 @@ class CountingSystem {
             try {
                 const responseText = await response.text();
                 if (options.logVerbose) {
-                    console.log('[Stok güncelle · Sayım sheet] — GELEN HTTP:', response.status, response.statusText);
-                    console.log('[Stok güncelle · Sayım sheet] Yanıt header:', Object.fromEntries(response.headers.entries()));
-                    console.log('[Stok güncelle · Sayım sheet] Ham gövde (string):', responseText);
+                    dbg('[Stok güncelle · Sayım sheet] — GELEN HTTP:', response.status, response.statusText);
+                    dbg('[Stok güncelle · Sayım sheet] Yanıt header:', Object.fromEntries(response.headers.entries()));
+                    dbg('[Stok güncelle · Sayım sheet] Ham gövde (string):', responseText);
                 }
-                console.log('📥 API yanıtı (text, ilk 500 karakter):', responseText.substring(0, 500));
+                dbg('📥 API yanıtı (text, ilk 500 karakter):', responseText.substring(0, 500));
                 try {
                     data = JSON.parse(responseText);
                     if (options.logVerbose) {
-                        console.log('[Stok güncelle · Sayım sheet] Parse edilmiş data (nesne):', data);
-                        console.log('[Stok güncelle · Sayım sheet] Parse edilmiş JSON:', JSON.stringify(data, null, 2));
+                        dbg('[Stok güncelle · Sayım sheet] Parse edilmiş data (nesne):', data);
+                        dbg('[Stok güncelle · Sayım sheet] Parse edilmiş JSON:', JSON.stringify(data, null, 2));
                     }
-                    console.log('📥 API yanıtı (parsed, ilk 1000 karakter):', JSON.stringify(data, null, 2).substring(0, 1000));
+                    dbg('📥 API yanıtı (parsed, ilk 1000 karakter):', JSON.stringify(data, null, 2).substring(0, 1000));
                 } catch (parseError) {
                     console.error('❌ JSON parse hatası:', parseError);
                     throw new Error('API yanıtı geçersiz JSON formatında: ' + responseText.substring(0, 200));
@@ -4271,7 +4276,7 @@ class CountingSystem {
                 }
                 
                 if (options.logVerbose) {
-                    console.log(
+                    countingStockDebug(
                         '[Stok güncelle · Sayım sheet] ★ Bu sayı ekrana yazılır (Sistem):',
                         stock,
                         '| JSON alanı:',
@@ -4280,22 +4285,24 @@ class CountingSystem {
                             : '(ürün satırı yok veya alan yok)'
                     );
                 }
-                console.log('✅ Stok değeri bulundu:', stock, foundProduct ? `(Ürün: ${foundProduct.name?.tr || foundProduct.fullName?.tr || 'N/A'})` : '');
-                if (price !== null) {
-                    console.log('💰 Fiyat bilgisi bulundu:', price, priceText ? `(${priceText})` : '');
+                if (options.logVerbose) {
+                    countingStockDebug('✅ Stok değeri bulundu:', stock, foundProduct ? `(Ürün: ${foundProduct.name?.tr || foundProduct.fullName?.tr || 'N/A'})` : '');
+                }
+                if (price !== null && options.logVerbose) {
+                    countingStockDebug('💰 Fiyat bilgisi bulundu:', price, priceText ? `(${priceText})` : '');
                 }
                 if (options.logVerbose && foundProduct && typeof foundProduct === 'object') {
-                    console.log('[Stok güncelle · Sayım sheet] API ürün satırı (tüm alanlar):', foundProduct);
+                    countingStockDebug('[Stok güncelle · Sayım sheet] API ürün satırı (tüm alanlar):', foundProduct);
                     try {
-                        console.log('[Stok güncelle · Sayım sheet] API ürün satırı JSON:', JSON.stringify(foundProduct, null, 2));
+                        countingStockDebug('[Stok güncelle · Sayım sheet] API ürün satırı JSON:', JSON.stringify(foundProduct, null, 2));
                     } catch (e) {
                         console.warn('[Stok güncelle · Sayım sheet] foundProduct JSON.stringify:', e);
                     }
                 }
 
                 const reservedStock = foundProduct ? this.extractReservedStockFromProductItem(foundProduct) : null;
-                if (reservedStock !== null && reservedStock !== undefined) {
-                    console.log('📌 Rezerve stok (hesaplanan):', reservedStock);
+                if (options.logVerbose && reservedStock !== null && reservedStock !== undefined) {
+                    countingStockDebug('📌 Rezerve stok (hesaplanan):', reservedStock);
                 }
 
                 /**
