@@ -997,9 +997,69 @@ class CountingSystem {
         return (
             key === '_api_info' ||
             key === '_tableMeta' ||
+            key === '_productOrder' ||
             key === '_tables' ||
             key === '_currentTable'
         );
+    }
+
+    /**
+     * Sayım tablosunda ürün görüntüleme sırası (ekleme veya pano içe aktarma sırası).
+     * Supabase/localStorage ile birlikte kaydedilir; farklı cihazda aynı sıra.
+     */
+    getOrderedProductIds() {
+        const raw = Object.keys(this.countingData).filter((k) => !this.isReservedCountingKey(k));
+        let order = this.countingData._productOrder;
+        if (!Array.isArray(order)) {
+            this.countingData._productOrder = [...raw];
+            return [...raw];
+        }
+        const rawSet = new Set(raw);
+        const seen = new Set();
+        const next = [];
+        for (const id of order) {
+            if (!rawSet.has(id) || seen.has(id)) continue;
+            seen.add(id);
+            next.push(id);
+        }
+        for (const id of raw) {
+            if (!seen.has(id)) {
+                next.push(id);
+                seen.add(id);
+            }
+        }
+        if (next.length !== order.length || next.some((id, i) => id !== order[i])) {
+            this.countingData._productOrder = next;
+        }
+        return next;
+    }
+
+    appendProductToOrder(productId) {
+        if (this.isReservedCountingKey(productId)) return;
+        const raw = Object.keys(this.countingData).filter((k) => !this.isReservedCountingKey(k));
+        if (!Array.isArray(this.countingData._productOrder)) {
+            this.countingData._productOrder = [...raw];
+            return;
+        }
+        const list = [...this.countingData._productOrder];
+        if (!list.includes(productId)) list.push(productId);
+        this.countingData._productOrder = list;
+    }
+
+    removeProductFromOrder(productId) {
+        if (!Array.isArray(this.countingData._productOrder)) return;
+        this.countingData._productOrder = this.countingData._productOrder.filter((id) => id !== productId);
+    }
+
+    /**
+     * Pano/API içe aktarım: satırların sırası önce gelir; yapıştırmada olmayan mevcut ürünler sonda kalır.
+     */
+    applyImportedProductOrder(idsInPasteOrder) {
+        if (!Array.isArray(idsInPasteOrder) || idsInPasteOrder.length === 0) return;
+        const raw = Object.keys(this.countingData).filter((k) => !this.isReservedCountingKey(k));
+        const pasteSet = new Set(idsInPasteOrder);
+        const rest = raw.filter((id) => !pasteSet.has(id));
+        this.countingData._productOrder = [...idsInPasteOrder, ...rest];
     }
 
     /** Ürün satırlarının lastUpdated min/max (ms) */
@@ -1219,11 +1279,17 @@ class CountingSystem {
     async applyImportedRows(rows) {
         let added = 0;
         let skipped = 0;
+        const idsInPasteOrder = [];
+        const seenPasteIds = new Set();
         for (const row of rows) {
             const product = this.matchDailyImportRow(row);
             if (!product) {
                 skipped++;
                 continue;
+            }
+            if (!seenPasteIds.has(product.id)) {
+                seenPasteIds.add(product.id);
+                idsInPasteOrder.push(product.id);
             }
             this.addProductToCounting(product, { skipSave: true });
             if (
@@ -1240,6 +1306,7 @@ class CountingSystem {
             added++;
         }
 
+        this.applyImportedProductOrder(idsInPasteOrder);
         await this.saveCountingData();
         this.renderTable();
         if (this.currentViewMode === 'rapid') {
@@ -2751,6 +2818,7 @@ class CountingSystem {
         const productId = product.id;
         const now = new Date();
         const skipSave = options.skipSave === true;
+        let isNew = false;
 
         // If product already exists, update it
         if (this.countingData[productId]) {
@@ -2762,6 +2830,7 @@ class CountingSystem {
             }
             existing.lastUpdated = now.toISOString();
         } else {
+            isNew = true;
             // Create new entry
             this.countingData[productId] = {
                 warehouseStock: null,
@@ -2773,6 +2842,10 @@ class CountingSystem {
 
         if (skipSave) {
             return;
+        }
+
+        if (isNew) {
+            this.appendProductToOrder(productId);
         }
 
         // Save and render
@@ -2884,6 +2957,7 @@ class CountingSystem {
     removeProductFromCountingSilent(productId) {
         if (!this.countingData[productId]) return;
         delete this.countingData[productId];
+        this.removeProductFromOrder(productId);
         this.skippedProducts.delete(productId);
         this.saveCountingData();
         const bottomSheet = document.getElementById('countingBottomSheet');
@@ -2959,6 +3033,7 @@ class CountingSystem {
         deleteBtn.addEventListener('click', () => {
             // Ürünü sil
             delete this.countingData[productId];
+            this.removeProductFromOrder(productId);
             this.skippedProducts.delete(productId);
             this.saveCountingData();
             
@@ -4270,10 +4345,9 @@ class CountingSystem {
         const cardView = document.getElementById('countingCardView');
         const emptyState = document.getElementById('emptyState');
         
-        // Metadata anahtarlarını filtrele
-        const productIds = Object.keys(this.countingData).filter((key) => !this.isReservedCountingKey(key));
-        
-        if (productIds.length === 0) {
+        const sortedProductIds = this.getOrderedProductIds();
+
+        if (sortedProductIds.length === 0) {
             if (tableBody) tableBody.innerHTML = '';
             if (cardView) cardView.innerHTML = '';
             if (emptyState) {
@@ -4294,10 +4368,7 @@ class CountingSystem {
             emptyState.style.removeProperty('overflow');
         }
 
-        // Apply sorting
-        const sortedProductIds = this.applySorting(productIds);
-        
-        // Update sort icons
+        // Sıra: yalnızca kayıtlı ekleme / içe aktarma sırası (sütun sıralaması yok)
         this.updateSortIcons();
 
         // Render desktop table
@@ -4679,15 +4750,12 @@ class CountingSystem {
         const gridContainer = document.getElementById('rapidCountingGridContainer');
         if (!gridContainer) return;
 
-        const productIds = Object.keys(this.countingData).filter((key) => !this.isReservedCountingKey(key));
-        
-        if (productIds.length === 0) {
+        const sortedProductIds = this.getOrderedProductIds();
+
+        if (sortedProductIds.length === 0) {
             gridContainer.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">Henüz ürün eklenmedi</div>';
             return;
         }
-
-        // Apply sorting
-        const sortedProductIds = this.applySorting(productIds);
 
         gridContainer.innerHTML = sortedProductIds.map(productId => {
             const data = this.countingData[productId];
@@ -4763,8 +4831,7 @@ class CountingSystem {
     }
 
     findNextUncountedProduct(currentProductId) {
-        // Get all product IDs from countingData (excluding non-product keys)
-        const productIds = Object.keys(this.countingData).filter((key) => !this.isReservedCountingKey(key));
+        const productIds = this.getOrderedProductIds();
         
         // Find current product index
         const currentIndex = productIds.indexOf(currentProductId);
@@ -4794,8 +4861,7 @@ class CountingSystem {
     }
 
     findPreviousUncountedProduct(currentProductId) {
-        // Get all product IDs from countingData (excluding non-product keys)
-        const productIds = Object.keys(this.countingData).filter((key) => !this.isReservedCountingKey(key));
+        const productIds = this.getOrderedProductIds();
         
         // Find current product index
         const currentIndex = productIds.indexOf(currentProductId);
@@ -5692,85 +5758,6 @@ class CountingSystem {
         }
     }
     
-    // Apply sorting to product list
-    applySorting(productIds) {
-        // Use current sort state (set by header clicks)
-        if (!this.currentSort) {
-            return productIds;
-        }
-        
-        const { field, direction } = this.currentSort;
-        
-        // Create array with product data for sorting
-        const productsWithData = productIds.map(productId => {
-            const data = this.countingData[productId];
-            const product = this.allProducts.find(p => p.id === productId);
-            return { productId, data, product };
-        }).filter(item => item.data && item.product);
-        
-        // Apply sorting
-        productsWithData.sort((a, b) => {
-            let comparison = 0;
-            
-            if (field === 'productName') {
-                const nameA = (a.product?.name || '').toLowerCase();
-                const nameB = (b.product?.name || '').toLowerCase();
-                comparison = nameA.localeCompare(nameB, 'tr');
-                if (direction === 'desc') comparison *= -1;
-            } else if (field === 'warehouseStock') {
-                const stockA = a.data.warehouseStock ?? -Infinity;
-                const stockB = b.data.warehouseStock ?? -Infinity;
-                comparison = Number(stockA) - Number(stockB);
-                if (direction === 'desc') comparison *= -1;
-            } else if (field === 'systemStock') {
-                const stockA = a.data.systemStock ?? -Infinity;
-                const stockB = b.data.systemStock ?? -Infinity;
-                comparison = Number(stockA) - Number(stockB);
-                if (direction === 'desc') comparison *= -1;
-            } else if (field === 'difference') {
-                // Gerçek fark değerini hesapla (negatif veya pozitif)
-                // calculateDifference negatif farklar için Math.abs kullanıyor, bu yüzden direkt hesaplama yapıyoruz
-                const warehouseA = a.data.warehouseStock ?? null;
-                const systemA = a.data.systemStock ?? null;
-                const warehouseB = b.data.warehouseStock ?? null;
-                const systemB = b.data.systemStock ?? null;
-                
-                // Her iki değer de varsa farkı hesapla, yoksa null
-                let valueA = null;
-                let valueB = null;
-                
-                if (warehouseA !== null && warehouseA !== undefined && systemA !== null && systemA !== undefined) {
-                    valueA = Number(warehouseA) - Number(systemA);
-                }
-                if (warehouseB !== null && warehouseB !== undefined && systemB !== null && systemB !== undefined) {
-                    valueB = Number(warehouseB) - Number(systemB);
-                }
-                
-                // null değerleri en sona at
-                if (valueA === null && valueB === null) {
-                    comparison = 0;
-                } else if (valueA === null) {
-                    comparison = 1; // A null ise B'den sonra
-                } else if (valueB === null) {
-                    comparison = -1; // B null ise A'dan sonra
-                } else {
-                    comparison = Number(valueA) - Number(valueB);
-                }
-                
-                if (direction === 'desc') comparison *= -1;
-            } else if (field === 'date') {
-                const dateA = a.data.lastUpdated ? new Date(a.data.lastUpdated).getTime() : 0;
-                const dateB = b.data.lastUpdated ? new Date(b.data.lastUpdated).getTime() : 0;
-                comparison = dateA - dateB;
-                if (direction === 'desc') comparison *= -1;
-            }
-            
-            return comparison;
-        });
-        
-        return productsWithData.map(item => item.productId);
-    }
-    
     // Show manual input search results (panel açık kalır; eklenenler tıklanınca çıkar)
     showManualInputResults(query) {
         const resultsContainer = document.getElementById('manualInputResults');
@@ -6213,31 +6200,9 @@ class CountingSystem {
         this.renderTable();
     }
     
-    // Handle header sort click
-    handleHeaderSort(sortField, headerElement) {
-        // Get current sort state
-        const isActive = this.currentSort && this.currentSort.field === sortField;
-        const isAsc = isActive && this.currentSort.direction === 'asc';
-        const isDesc = isActive && this.currentSort.direction === 'desc';
-        
-        // Determine new sort state: none -> asc -> desc -> none
-        let newSort = null;
-        if (!isActive) {
-            // First click: ascending
-            newSort = 'asc';
-        } else if (isAsc) {
-            // Second click: descending
-            newSort = 'desc';
-        } else {
-            // Third click: no sort
-            newSort = null;
-        }
-        
-        // Store current sort
-        this.currentSort = newSort ? { field: sortField, direction: newSort } : null;
-        
-        // Apply sort and re-render
-        this.renderTable();
+    // Handle header sort click — devre dışı (ürün sırası yalnızca ekleme / içe aktarma sırasına bağlı)
+    handleHeaderSort() {
+        /* no-op */
     }
     
     // Update sort icons based on current sort state
