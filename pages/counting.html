@@ -1449,10 +1449,11 @@
         <div id="sayimTabContent" class="tab-content">
             <!-- Table picker: sekmeler + tek satır; listeler yatay chip (mobilde dikey blok yok) -->
             <div class="bg-white rounded-xl shadow-md border border-gray-100 p-3 sm:p-4 mb-4 sm:mb-6">
-                <p id="activeTableSummary" class="text-xs sm:text-sm text-gray-600 mb-2 leading-snug line-clamp-2">
+                <p id="activeTableSummary" class="text-xs sm:text-sm text-gray-600 mb-1 leading-snug line-clamp-2">
                     <span class="font-medium text-gray-800">Aktif Tablo:</span>
                     <span id="activeTableSummaryText" class="text-gray-700">—</span>
                 </p>
+                <p id="activeTableActivityLine" class="text-[10px] sm:text-[11px] text-slate-500 mb-2 leading-relaxed" aria-live="polite"></p>
 
                 <div class="flex rounded-xl bg-slate-100/90 p-1 border border-slate-200/80 shadow-inner mb-2 sm:mb-3" role="tablist" aria-label="Sayım tablo türü">
                     <button type="button" id="sayimTabGeneralBtn" role="tab" aria-selected="true" aria-controls="sayimPanelGeneral" class="sayim-seg flex-1 rounded-lg py-2 px-2 text-xs font-semibold sm:text-sm">Genel</button>
@@ -1664,6 +1665,26 @@
                         </svg>
                 </button>
                     </div>
+            <div id="manualTokenPanel" class="w-full mt-3 pt-3 border-t border-indigo-200/60">
+                <details class="group rounded-lg border border-white/60 bg-white/40 px-3 py-2">
+                    <summary class="cursor-pointer list-none text-xs font-semibold text-indigo-900 flex items-center justify-between gap-2">
+                        <span class="flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-indigo-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/></svg>
+                            Manuel token
+                        </span>
+                        <span class="text-[10px] font-normal text-indigo-600/80">Bearer veya JWT</span>
+                    </summary>
+                    <div class="mt-2 space-y-2">
+                        <label for="manualTokenInput" class="sr-only">Franchise token</label>
+                        <textarea id="manualTokenInput" rows="2" placeholder="Bearer eyJ... veya eyJhbGciOiJ..." autocomplete="off" spellcheck="false" class="w-full rounded-lg border border-slate-200/90 bg-white px-2.5 py-2 text-xs font-mono text-slate-800 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"></textarea>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button" id="manualTokenSaveBtn" class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700">Kaydet</button>
+                            <button type="button" id="manualTokenClearBtn" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">Temizle</button>
+                        </div>
+                        <p id="manualTokenPreview" class="text-[11px] text-slate-600 min-h-[1rem]"></p>
+                    </div>
+                </details>
+            </div>
                 </div>
 
         <!-- Statistics Section -->
@@ -2157,15 +2178,21 @@
                                     role="list"
                                     aria-label="Ürün barkodları"
                                 ></div>
-                                <div class="mt-1.5 flex items-center space-x-2">
-                                    <!-- System Stock -->
-                                    <div class="flex items-center space-x-1">
-                                        <span id="countingSystemStock" class="text-xs text-gray-500 font-medium"></span>
-                                        <!-- Refresh System Stock Button -->
-                                        <button id="countingRefreshSystemStockBtn" class="p-0.5 hover:bg-blue-50 text-blue-600 rounded transition-colors" title="Sistem stokunu yenile">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                                    <!-- System Stock + refresh (belirgin tıklanabilir alan) -->
+                                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+                                        <span id="countingSystemStock" class="text-xs text-gray-600 font-semibold"></span>
+                                        <button
+                                            type="button"
+                                            id="countingRefreshSystemStockBtn"
+                                            class="inline-flex items-center gap-1.5 shrink-0 px-2.5 py-1.5 min-h-[36px] rounded-lg border border-blue-200/90 bg-gradient-to-b from-white to-blue-50/90 text-blue-700 text-[11px] font-semibold shadow-sm hover:border-blue-400 hover:to-blue-50 hover:shadow active:scale-[0.98] transition-all"
+                                            title="Sistem stokunu yenile"
+                                            aria-label="Sistem stokunu yenile"
+                                        >
+                                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                                             </svg>
+                                            <span>Stok güncelle</span>
                                         </button>
                                     </div>
                                     <!-- Stock Difference Indicator -->
