@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Getir Warehouse Sipariş İçi Ürün Arama",
+  "version": "1.0.0",
+  "description": "Kontrol paneli siparişler sayfasında ürün arama çubuğu; hangi siparişte hangi ürün var bulur.",
+  "author": "FlowCobalt",
+  "permissions": ["storage", "cookies"],
+  "host_permissions": ["https://warehouse.getir.com/*", "https://warehouse-panel-api-gateway.getirapi.com/*"],
+  "background": { "service_worker": "background.js" },
+  "web_accessible_resources": [
+    {
+      "resources": ["inject-page.js"],
+      "matches": ["https://warehouse.getir.com/*"]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://warehouse.getir.com/*"],
+      "js": ["inject-api-capture.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://warehouse.getir.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "css": ["content.css"]
+    }
+  ]
+}

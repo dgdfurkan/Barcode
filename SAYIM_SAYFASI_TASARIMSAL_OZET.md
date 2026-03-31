@@ -542,7 +542,7 @@ header.bg-surface.border-b.border-border.shadow-sm.sticky.top-0.z-40
             <!-- Orta: Logo + Başlık (Tablet+) -->
             <div class="hidden md:flex items-center flex-shrink-0 mx-2 sm:mx-4">
                 <img src="../assets/logo.png" alt="Logo" class="w-6 h-6 sm:w-8 sm:h-8">
-                <h1 class="text-lg sm:text-xl md:text-2xl font-bold">GunduzDev</h1>
+                <h1 class="text-lg sm:text-xl md:text-2xl font-bold">FlowCobalt</h1>
             </div>
             
             <!-- Sağ: Kullanıcı Bilgisi + Çıkış -->

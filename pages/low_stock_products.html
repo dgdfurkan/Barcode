@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e293b">
+    <link rel="manifest" href="../manifest.json">
+    <title>Stoğu Düşük Ürünler - FlowCobalt</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/logo.png?v=2">
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
+    <link rel="stylesheet" href="../css/main.css" />
+    <link rel="stylesheet" href="../css/tailwind.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script>
+        (function() {
+            const SUPABASE_URL = 'https://ytekbbxvfdheiexsojpx.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
+            const initSupabaseClient = () => {
+                if (typeof window.supabase !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+                    window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                } else setTimeout(initSupabaseClient, 50);
+            };
+            initSupabaseClient();
+        })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <script src="../js/auth.js"></script>
+    <script src="../js/user-manager.js"></script>
+    <script src="../js/premium-features.js"></script>
+    <script src="../js/notifications.js"></script>
+    <script src="temp_products.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: var(--color-background); color: var(--color-text-primary); }
+        .low-stock-row { transition: all 0.2s ease; }
+        .low-stock-row:hover { background: linear-gradient(to right, rgba(59, 130, 246, 0.05), rgba(16, 185, 129, 0.05)); }
+        .badge-count { font-variant-numeric: tabular-nums; }
+        .sort-header .sort-up, .sort-header .sort-down { opacity: 0.6; }
+        .sort-header.sort-asc .sort-up { opacity: 1; color: var(--color-primary, #3b82f6); }
+        .sort-header.sort-desc .sort-down { opacity: 1; color: var(--color-primary, #3b82f6); }
+    </style>
+</head>
+<body class="min-h-screen bg-background">
+    <header class="bg-surface border-b border-border shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <a href="product_search.html" class="flex items-center space-x-3">
+                    <img src="../assets/logo.png" alt="Logo" class="w-8 h-8 object-contain">
+                    <div>
+                        <h1 class="text-xl sm:text-2xl font-bold text-text-primary">FlowCobalt</h1>
+                        <p class="text-xs sm:text-sm text-text-secondary">Stoğu Düşük Ürünler</p>
+                    </div>
+                </a>
+                <div class="flex items-center space-x-3 sm:space-x-4">
+                    <button type="button" id="openSettingsBtn" class="btn-secondary text-sm inline-flex items-center hidden">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Ayarlar
+                    </button>
+                    <a href="product_search.html" class="btn-secondary text-sm inline-flex items-center">Ürün Arama</a>
+                    <a href="counting.html" class="btn-secondary text-sm inline-flex items-center">Sayım</a>
+                    <span id="headerUserName" class="text-sm font-medium text-text-secondary hidden sm:block"></span>
+                    <a href="../index.html" id="headerLogout" class="btn-secondary text-sm hidden">Çıkış</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div id="noAuth" class="hidden">
+            <div class="bg-surface rounded-xl border border-border shadow-sm p-12 text-center">
+                <p class="text-text-secondary mb-6">Bu sayfayı kullanmak için giriş yapın.</p>
+                <a href="../index.html" class="btn-primary inline-flex items-center">Giriş Yap</a>
+            </div>
+        </div>
+        <div id="noPremium" class="hidden">
+            <div class="bg-surface rounded-xl border border-border shadow-sm p-12 text-center">
+                <h2 class="text-xl font-semibold text-text-primary mb-2">Bu özellik için yetkiniz yok</h2>
+                <p class="text-text-secondary mb-6">Düşük Stok Uyarısı premium özelliğini kullanmak için yöneticinizle görüşün.</p>
+                <a href="product_search.html" class="btn-secondary inline-flex items-center">Ürün Aramaya Dön</a>
+            </div>
+        </div>
+
+        <div id="mainContent" class="hidden relative">
+            <!-- Sadece Düşük stok listesi en üstte; sağda Listeyi yenile -->
+            <section class="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+                <div class="bg-secondary-50 px-6 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="bg-accent-100 rounded-lg p-2">
+                            <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-semibold text-text-primary">Düşük stok listesi</h2>
+                            <p class="text-sm text-text-secondary">Eklenti açıkken ve franchise sayfası açıkken bu liste güncellenir.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button type="button" id="refreshListBtn" class="btn-secondary text-sm inline-flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Listeyi yenile
+                        </button>
+                    </div>
+                </div>
+                <div id="lowStockListContainer" class="overflow-x-auto">
+                    <div id="lowStockEmpty" class="px-6 py-12 text-center">
+                        <div class="bg-secondary-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                            <svg class="w-8 h-8 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                        </div>
+                        <p class="text-text-secondary text-sm mb-2">Liste, Getir franchise sayfası (franchise.getir.com) açıkken periyodik güncellenir.</p>
+                        <p class="text-text-secondary text-xs">Franchise sekmesini açıp giriş yapın; bir süre sonra düşük stoklar burada görünür. <strong>Listeyi yenile</strong> ile eklentideki güncel listeyi alabilirsiniz. Hiçbir şey olmuyorsa sayfayı (F5) yenileyin ve eklentinin yüklü olduğundan emin olun.</p>
+                    </div>
+                    <table id="lowStockTable" class="hidden w-full border-collapse">
+                        <thead class="bg-secondary-50 border-b-2 border-border">
+                            <tr>
+                                <th class="text-left py-3 px-4 text-xs font-semibold text-text-secondary w-12"></th>
+                                <th class="text-left py-3 px-4 text-xs font-semibold text-text-secondary cursor-pointer hover:text-text-primary hover:bg-secondary-100/80 transition-colors sort-header select-none w-24" data-sort="stock"><span class="inline-flex items-center gap-1"><span>Kalan</span><span class="sort-arrows inline-flex flex-col -space-y-1"><svg class="sort-up w-3.5 h-3.5 text-secondary-400" fill="currentColor" viewBox="0 0 24 24"><path d="M7 14l5-5 5 5H7z"/></svg><svg class="sort-down w-3.5 h-3.5 text-secondary-400" fill="currentColor" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></span></span></th>
+                                <th class="text-left py-3 px-4 text-xs font-semibold text-text-secondary w-14">Görsel</th>
+                                <th class="text-left py-3 px-4 text-xs font-semibold text-text-secondary cursor-pointer hover:text-text-primary hover:bg-secondary-100/80 transition-colors sort-header select-none min-w-[8rem]" data-sort="name"><span class="inline-flex items-center gap-1"><span>Ürün adı</span><span class="sort-arrows inline-flex flex-col -space-y-1"><svg class="sort-up w-3.5 h-3.5 text-secondary-400" fill="currentColor" viewBox="0 0 24 24"><path d="M7 14l5-5 5 5H7z"/></svg><svg class="sort-down w-3.5 h-3.5 text-secondary-400" fill="currentColor" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></span></span></th>
+                                <th class="text-left py-3 px-4 text-xs font-semibold text-text-secondary cursor-pointer hover:text-text-primary hover:bg-secondary-100/80 transition-colors sort-header select-none w-32" data-sort="recent"><span class="inline-flex items-center gap-1"><span>Tarih</span><span class="sort-arrows inline-flex flex-col -space-y-1"><svg class="sort-up w-3.5 h-3.5 text-secondary-400" fill="currentColor" viewBox="0 0 24 24"><path d="M7 14l5-5 5 5H7z"/></svg><svg class="sort-down w-3.5 h-3.5 text-secondary-400" fill="currentColor" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5H7z"/></svg></span></span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="lowStockList" class="divide-y divide-border"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Ayarlar popup (sayım sayfası Ürün Ara modalı gibi merkez modal) -->
+            <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden p-4">
+                <div class="bg-surface rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+                    <div class="flex items-center justify-between p-6 border-b border-border">
+                        <h3 class="text-xl font-bold text-text-primary">Ayarlar</h3>
+                        <button type="button" id="closeSettingsBtn" class="p-2 rounded-lg hover:bg-gray-100 text-text-secondary" aria-label="Kapat">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <div class="p-6 flex-1 overflow-y-auto space-y-6">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <p class="font-medium text-text-primary">Düşük stok uyarısını kullan</p>
+                                <p class="text-xs text-text-secondary mt-0.5">Açıkken eşiğin altına düşen ürünlerde bildirim alırsınız.</p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                                <input type="checkbox" id="featureToggle" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
+                        <div>
+                            <label for="defaultThreshold" class="block text-sm font-medium text-text-primary mb-1">Varsayılan eşik (kalan adet)</label>
+                            <input type="number" id="defaultThreshold" min="0" step="1" class="input-field w-28">
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="soundEnabled" class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                            <label for="soundEnabled" class="text-sm font-medium text-text-primary">Sesli uyarı</label>
+                        </div>
+                        <div class="pt-4 border-t border-border">
+                            <h4 class="text-sm font-semibold text-text-primary mb-1">Bearer token (manuel)</h4>
+                            <p class="text-xs text-text-secondary mb-2">Token otomatik yakalanmazsa franchise.getir.com’da F12 → Network’ten bir isteğin <strong>Authorization</strong> header değerini (Bearer ile birlikte) kopyalayıp buraya yapıştırın.</p>
+                            <div class="flex flex-wrap items-end gap-2">
+                                <div class="flex-1 min-w-[200px]">
+                                    <input type="password" id="manualTokenInput" placeholder="Bearer eyJ..." class="input-field w-full font-mono text-sm" autocomplete="off">
+                                </div>
+                                <button type="button" id="saveManualTokenBtn" class="btn-secondary text-sm shrink-0">Token'ı kaydet</button>
+                            </div>
+                            <p id="manualTokenStatus" class="text-xs text-green-600 mt-2 hidden">Token kayıtlı.</p>
+                        </div>
+                        <div class="pt-4 border-t border-border">
+                            <h4 class="text-sm font-semibold text-text-primary mb-2">Özel eşikler</h4>
+                            <p class="text-xs text-text-secondary mb-3">Ürün adı veya barkod ile ara; altta çıkan listeden eşik girip Ekle ile kaydedin. (Sayım sayfası ürün arama mantığı)</p>
+                            <input type="text" id="overrideSearchInput" placeholder="Ürün adı veya barkod ile ara..." class="input-field w-full mb-4" autocomplete="off">
+                            <p class="text-xs font-medium text-text-secondary mb-2">Aranan ürünler</p>
+                            <div id="overrideSearchResults" class="space-y-2 max-h-48 overflow-y-auto border border-border rounded-lg p-2 mb-4 bg-secondary-50/50">
+                                <p class="text-xs text-text-secondary py-4 text-center">Arama yapın, sonuçlar burada listelenir.</p>
+                            </div>
+                            <p class="text-xs font-medium text-text-secondary mb-2">Kayıtlı özel eşikler</p>
+                            <ul id="overridesList" class="space-y-2 text-sm"></ul>
+                        </div>
+                        <div class="pt-4 border-t border-border">
+                            <h4 class="text-sm font-semibold text-text-primary mb-2">Düşük stok listesini temizle</h4>
+                            <p class="text-xs text-text-secondary mb-3">Eklentinin sakladığı mevcut düşük stok listesini ve \"Tamam, kontrol ettim\" işaretlerini sıfırlar. Franchise tarafında stoklara dokunmaz.</p>
+                            <button type="button" id="clearLowStockBtn" class="btn-danger text-xs sm:text-sm inline-flex items-center">
+                                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5-4h4a2 2 0 012 2v1H8V5a2 2 0 012-2z"/></svg>
+                                Listeyi temizle
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        (function() {
+            const noAuth = document.getElementById('noAuth');
+            const noPremium = document.getElementById('noPremium');
+            const mainContent = document.getElementById('mainContent');
+            const featureToggle = document.getElementById('featureToggle');
+            const defaultThreshold = document.getElementById('defaultThreshold');
+            const soundEnabled = document.getElementById('soundEnabled');
+            const overrideSearchInput = document.getElementById('overrideSearchInput');
+            const overrideSearchResults = document.getElementById('overrideSearchResults');
+            const overridesList = document.getElementById('overridesList');
+            const lowStockEmpty = document.getElementById('lowStockEmpty');
+            const lowStockList = document.getElementById('lowStockList');
+            const headerUserName = document.getElementById('headerUserName');
+            const headerLogout = document.getElementById('headerLogout');
+            const settingsModal = document.getElementById('settingsModal');
+            const openSettingsBtn = document.getElementById('openSettingsBtn');
+            const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+            const refreshListBtn = document.getElementById('refreshListBtn');
+            const manualTokenInput = document.getElementById('manualTokenInput');
+            const saveManualTokenBtn = document.getElementById('saveManualTokenBtn');
+            const manualTokenStatus = document.getElementById('manualTokenStatus');
+            const lowStockTable = document.getElementById('lowStockTable');
+            const clearLowStockBtn = document.getElementById('clearLowStockBtn');
+            let currentLowStockList = [];
+            let currentSort = { field: 'recent', direction: 'desc' };
+
+            function showNotification(msg, type) {
+                if (window.showNotification) window.showNotification(msg, type || 'info');
+                else alert(msg);
+            }
+            function escapeHtml(s) {
+                if (!s) return '';
+                const div = document.createElement('div');
+                div.textContent = s;
+                return div.innerHTML;
+            }
+
+            function formatTokenExpiry(exp) {
+                if (typeof exp !== 'number' || exp <= 0) return '';
+                const d = new Date(exp * 1000);
+                const dateStr = d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const now = Date.now() / 1000;
+                const diffSec = Math.max(0, exp - now);
+                const hours = Math.floor(diffSec / 3600);
+                const mins = Math.floor((diffSec % 3600) / 60);
+                let relative = '';
+                if (hours > 24) relative = ' (' + Math.floor(hours / 24) + ' gün sonra dolacak)';
+                else if (hours > 0) relative = ' (yaklaşık ' + hours + ' saat ' + (mins > 0 ? mins + ' dk ' : '') + 'sonra dolacak)';
+                else if (mins > 0) relative = ' (' + mins + ' dk sonra dolacak)';
+                else relative = ' (çok kısa süre içinde dolacak)';
+                return dateStr + relative;
+            }
+
+            function formatDateTime(iso) {
+                if (!iso) return '';
+                const d = new Date(iso);
+                if (Number.isNaN(d.getTime())) return '';
+                return d.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            }
+
+            function sortLowStockList(list) {
+                const arr = Array.isArray(list) ? list.slice() : [];
+                const field = currentSort.field;
+                const dir = currentSort.direction === 'asc' ? 1 : -1;
+                arr.sort((a, b) => {
+                    if (field === 'name') {
+                        const na = (a.name || '').toString();
+                        const nb = (b.name || '').toString();
+                        return na.localeCompare(nb, 'tr-TR') * dir;
+                    }
+                    if (field === 'stock') {
+                        const sa = typeof a.available === 'number' ? a.available : 0;
+                        const sb = typeof b.available === 'number' ? b.available : 0;
+                        return (sa - sb) * dir;
+                    }
+                    if (field === 'price') {
+                        const pa = typeof a.price === 'number' ? a.price : 0;
+                        const pb = typeof b.price === 'number' ? b.price : 0;
+                        return (pa - pb) * dir;
+                    }
+                    // recent (movementTs): desc = en güncel en üstte (büyük timestamp önce)
+                    const ta = typeof a.movementTs === 'number' ? a.movementTs : 0;
+                    const tb = typeof b.movementTs === 'number' ? b.movementTs : 0;
+                    if (ta !== tb) return currentSort.direction === 'desc' ? (tb - ta) : (ta - tb);
+                    const na = (a.name || '').toString();
+                    const nb = (b.name || '').toString();
+                    return na.localeCompare(nb, 'tr-TR');
+                });
+                return arr;
+            }
+
+            function getProductsForSearch() {
+                if (typeof PRODUCTS_DATA !== 'undefined' && PRODUCTS_DATA && Array.isArray(PRODUCTS_DATA.products)) return PRODUCTS_DATA.products;
+                return [];
+            }
+            function searchProductsForOverride(query) {
+                const q = (query || '').trim().toLowerCase();
+                if (!q) return [];
+                const products = getProductsForSearch();
+                const results = [];
+                const seen = new Set();
+                for (let i = 0; i < products.length && results.length < 50; i++) {
+                    const p = products[i];
+                    const name = (p.name || '').toLowerCase();
+                    const firstCode = p.barcodes && p.barcodes[0] ? String(p.barcodes[0].code || '') : '';
+                    const matchName = name.includes(q);
+                    const matchBarcode = firstCode && (firstCode.includes(q) || q.includes(firstCode));
+                    if (!matchName && !matchBarcode) continue;
+                    const key = firstCode || p.id || '';
+                    if (!key || seen.has(key)) continue;
+                    seen.add(key);
+                    results.push({ id: p.id, name: p.name, key: key, barcode: firstCode });
+                }
+                return results;
+            }
+
+            function renderOverrideSearchResults(results) {
+                if (!results.length) {
+                    overrideSearchResults.innerHTML = '<p class="text-xs text-text-secondary py-4 text-center">Sonuç yok. Ürün adı veya barkod girin.</p>';
+                    return;
+                }
+                overrideSearchResults.innerHTML = '';
+                results.forEach(r => {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center gap-3 p-3 bg-surface border border-border rounded-lg';
+                    const key = r.key;
+                    const name = escapeHtml(r.name || '');
+                    const barcode = escapeHtml(r.barcode || key);
+                    row.innerHTML = `
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-text-primary text-sm truncate">${name}</p>
+                            <p class="text-xs text-text-secondary font-mono">${barcode}</p>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <label class="text-xs text-text-secondary">Eşik:</label>
+                            <input type="number" min="0" step="1" placeholder="0" class="override-threshold-input input-field w-16 text-sm">
+                            <button type="button" class="override-add-btn btn-primary text-xs py-1.5 px-2" data-key="${escapeHtml(key)}">Ekle</button>
+                        </div>
+                    `;
+                    const addBtn = row.querySelector('.override-add-btn');
+                    const thInput = row.querySelector('.override-threshold-input');
+                    addBtn.addEventListener('click', async () => {
+                        const th = parseInt(thInput.value, 10);
+                        if (isNaN(th) || th < 0) { showNotification('Geçerli bir eşik sayısı girin.', 'error'); return; }
+                        await window.userDataManager.addLowStockAlertOverride(key, th);
+                        renderOverrides();
+                        sendLowStockInitToExtension();
+                        showNotification('Özel eşik eklendi.', 'success');
+                        thInput.value = '';
+                    });
+                    overrideSearchResults.appendChild(row);
+                });
+            }
+
+            overrideSearchInput.addEventListener('input', () => {
+                const q = overrideSearchInput.value.trim();
+                if (!q) {
+                    overrideSearchResults.innerHTML = '<p class="text-xs text-text-secondary py-4 text-center">Arama yapın, sonuçlar burada listelenir.</p>';
+                    return;
+                }
+                renderOverrideSearchResults(searchProductsForOverride(q));
+            });
+
+            function renderOverrides() {
+                if (!window.userDataManager || !window.userDataManager.currentUser) return;
+                const { overrides } = window.userDataManager.getLowStockAlertSettings();
+                overridesList.innerHTML = '';
+                Object.entries(overrides || {}).forEach(([key, th]) => {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg border border-border';
+                    li.innerHTML = `
+                        <div class="flex-1 min-w-0">
+                            <p class="font-mono text-xs text-text-primary truncate" title="${escapeHtml(key)}">${escapeHtml(key.length > 24 ? key.slice(0, 12) + '…' + key.slice(-8) : key)}</p>
+                            <p class="text-xs text-text-secondary">Eşik: ${th}</p>
+                        </div>
+                        <button type="button" data-key="${escapeHtml(key)}" class="p-2 text-red-600 hover:bg-red-50 rounded-lg shrink-0" title="Kaldır">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    `;
+                    li.querySelector('button').addEventListener('click', () => removeOverride(key));
+                    overridesList.appendChild(li);
+                });
+            }
+            async function removeOverride(key) {
+                if (!window.userDataManager) return;
+                await window.userDataManager.removeLowStockAlertOverride(key);
+                renderOverrides();
+                if (typeof sendLowStockInitToExtension === 'function') sendLowStockInitToExtension();
+                showNotification('Özel eşik kaldırıldı.', 'success');
+            }
+
+            function sendLowStockInitToExtension() {
+                const sess = window.authUtils && window.authUtils.checkAuth && window.authUtils.checkAuth();
+                if (!sess || !window.userDataManager) return;
+                const settings = window.userDataManager.getLowStockAlertSettings();
+                window.postMessage({
+                    type: 'LOW_STOCK_INIT',
+                    payload: {
+                        username: sess.username,
+                        threshold: settings.threshold,
+                        overrides: settings.overrides || {},
+                        soundEnabled: settings.soundEnabled,
+                        featureEnabled: featureToggle.checked
+                    }
+                }, '*');
+            }
+
+            function applyListFromExtension(list, username) {
+                const sess = window.authUtils && window.authUtils.checkAuth && window.authUtils.checkAuth();
+                if (sess && username !== sess.username) return;
+                currentLowStockList = Array.isArray(list) ? list.slice() : [];
+                const sorted = sortLowStockList(currentLowStockList);
+                lowStockEmpty.classList.toggle('hidden', sorted.length > 0);
+                if (lowStockTable) lowStockTable.classList.toggle('hidden', sorted.length === 0);
+                updateSortArrows();
+                const dateText = (item) => item.movementAt ? formatDateTime(item.movementAt) : '—';
+                lowStockList.innerHTML = sorted.map(item => {
+                    const name = escapeHtml(item.name || 'Ürün');
+                    const pid = escapeHtml(item.productId || '');
+                    const placeholderHtml = `<div class="low-stock-img-placeholder w-12 h-12 rounded border border-dashed border-border flex items-center justify-center text-secondary-400 text-xs bg-secondary-50" style="display:none">Yok</div>`;
+                    const imgBlock = item.imageUrl
+                        ? `<img src="${escapeHtml(item.imageUrl)}" alt="${name}" class="w-12 h-12 rounded object-cover border border-border bg-secondary-50" onerror="this.style.display='none';var p=this.nextElementSibling;if(p){p.style.display='flex';}">${placeholderHtml}`
+                        : `<div class="w-12 h-12 rounded border border-dashed border-border flex items-center justify-center text-secondary-400 text-xs bg-secondary-50">Yok</div>`;
+                    return `
+                    <tr class="low-stock-row hover:bg-secondary-50/50">
+                        <td class="py-3 px-4 align-middle w-12">
+                            <button type="button" data-product-id="${pid}" class="mark-done-btn p-1.5 rounded-full border-2 border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-500 transition-colors" title="Kontrol ettim">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            </button>
+                        </td>
+                        <td class="py-3 px-4 align-middle"><span class="badge-count inline-flex items-center justify-center px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 text-sm font-semibold">${escapeHtml(String(item.available))}</span></td>
+                        <td class="py-3 px-4 align-middle w-14"><div class="relative w-12 h-12">${imgBlock}</div></td>
+                        <td class="py-3 px-4 align-middle min-w-0"><p class="font-medium text-text-primary truncate max-w-md">${name}</p></td>
+                        <td class="py-3 px-4 align-middle text-sm text-text-secondary whitespace-nowrap">${escapeHtml(dateText(item))}</td>
+                    </tr>`;
+                }).join('');
+                lowStockList.querySelectorAll('.mark-done-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const productId = this.getAttribute('data-product-id');
+                        if (!productId) return;
+                        window.postMessage({ type: 'LOW_STOCK_MARK_DONE', productId }, '*');
+                        this.classList.remove('border-gray-300', 'text-gray-400');
+                        this.classList.add('border-green-500', 'text-green-600', 'bg-green-50');
+                        currentLowStockList = currentLowStockList.filter(i => String(i.productId) !== productId);
+                        const currentSess = window.authUtils && window.authUtils.checkAuth && window.authUtils.checkAuth();
+                        applyListFromExtension(currentLowStockList, currentSess ? currentSess.username : '');
+                    });
+                });
+            }
+
+            function setSort(field) {
+                if (currentSort.field === field) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort = { field, direction: field === 'name' ? 'asc' : (field === 'stock' ? 'asc' : 'desc') };
+                }
+                updateSortArrows();
+                const sess = window.authUtils && window.authUtils.checkAuth && window.authUtils.checkAuth();
+                if (sess) applyListFromExtension(currentLowStockList, sess.username);
+            }
+
+            function updateSortArrows() {
+                document.querySelectorAll('.sort-header').forEach(th => {
+                    const field = th.getAttribute('data-sort');
+                    th.classList.remove('sort-asc', 'sort-desc');
+                    if (field === currentSort.field) {
+                        th.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+                    }
+                });
+            }
+
+            async function init() {
+                const session = window.authUtils && window.authUtils.checkAuth && window.authUtils.checkAuth();
+                if (!session) { noAuth.classList.remove('hidden'); return; }
+                noAuth.classList.add('hidden');
+                if (headerUserName) { headerUserName.textContent = session.username || ''; headerUserName.classList.remove('hidden'); }
+                if (headerLogout) headerLogout.classList.remove('hidden');
+
+                if (!window.userDataManager || !window.userDataManager.userData) {
+                    try { await window.userDataManager.init(); } catch (e) { console.warn(e); }
+                }
+                if (window.premiumFeatures) {
+                    if (!window.premiumFeatures.currentUser) await window.premiumFeatures.init();
+                    window.premiumFeatures.featurePreferencesCache = null;
+                    window.premiumFeatures.cacheTimestamp = null;
+                }
+                const hasPremium = window.premiumFeatures && window.premiumFeatures.checkPremiumFeature('lowStockAlert');
+                if (!hasPremium) { noPremium.classList.remove('hidden'); return; }
+                noPremium.classList.add('hidden');
+                mainContent.classList.remove('hidden');
+                if (openSettingsBtn) openSettingsBtn.classList.remove('hidden');
+
+                const prefs = await window.premiumFeatures.loadFeaturePreferences();
+                featureToggle.checked = prefs.lowStockAlert === true;
+                const settings = window.userDataManager.getLowStockAlertSettings();
+                defaultThreshold.value = settings.threshold;
+                soundEnabled.checked = settings.soundEnabled;
+                renderOverrides();
+                sendLowStockInitToExtension();
+
+                featureToggle.addEventListener('change', async () => {
+                    await window.premiumFeatures.saveFeaturePreferences('lowStockAlert', featureToggle.checked);
+                    sendLowStockInitToExtension();
+                    showNotification(featureToggle.checked ? 'Düşük stok uyarısı açıldı.' : 'Düşük stok uyarısı kapatıldı.', 'success');
+                });
+                defaultThreshold.addEventListener('change', async () => {
+                    const v = parseInt(defaultThreshold.value, 10);
+                    if (isNaN(v) || v < 0) return;
+                    await window.userDataManager.saveLowStockAlertSettings({ threshold: v });
+                    sendLowStockInitToExtension();
+                    showNotification('Varsayılan eşik kaydedildi.', 'success');
+                });
+                soundEnabled.addEventListener('change', async () => {
+                    await window.userDataManager.saveLowStockAlertSettings({ soundEnabled: soundEnabled.checked });
+                    sendLowStockInitToExtension();
+                });
+
+                if (saveManualTokenBtn && manualTokenInput) {
+                    saveManualTokenBtn.addEventListener('click', () => {
+                        const sess = window.authUtils && window.authUtils.checkAuth && window.authUtils.checkAuth();
+                        if (!sess || !sess.username) {
+                            showNotification('Giriş yapılmış değil.', 'error');
+                            return;
+                        }
+                        const token = (manualTokenInput.value || '').trim();
+                        window.postMessage({ type: 'SAVE_MANUAL_TOKEN', username: sess.username, token }, '*');
+                    });
+                }
+
+                if (clearLowStockBtn) {
+                    clearLowStockBtn.addEventListener('click', () => {
+                        const sess = window.authUtils && window.authUtils.checkAuth && window.authUtils.checkAuth();
+                        if (!sess || !sess.username) {
+                            showNotification('Giriş yapılmış değil.', 'error');
+                            return;
+                        }
+                        if (!confirm('Düşük stok listesini ve \"Tamam, kontrol ettim\" işaretlerini temizlemek istediğinizden emin misiniz?')) return;
+                        window.postMessage({ type: 'CLEAR_LOW_STOCK', username: sess.username }, '*');
+                    });
+                }
+
+                const listContainer = document.getElementById('lowStockListContainer');
+                if (listContainer) {
+                    listContainer.addEventListener('click', (e) => {
+                        const th = e.target.closest('.sort-header');
+                        if (th && th.dataset.sort) setSort(th.dataset.sort);
+                    });
+                }
+
+                refreshListBtn.addEventListener('click', () => {
+                    const sess = window.authUtils && window.authUtils.checkAuth && window.authUtils.checkAuth();
+                    if (!sess || !sess.username) {
+                        showNotification('Giriş yapılmış değil.', 'error');
+                        return;
+                    }
+                    const btn = refreshListBtn;
+                    const origText = btn.innerHTML;
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="inline-flex items-center"><svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Yenileniyor...</span>';
+                    let resolved = false;
+                    const done = () => {
+                        if (resolved) return;
+                        resolved = true;
+                        btn.disabled = false;
+                        btn.innerHTML = origText;
+                    };
+                    const timeout = setTimeout(() => {
+                        done();
+                        showNotification('Eklenti yanıt vermedi. Franchise sekmesini yenileyin (F5), birkaç saniye bekleyin ve tekrar "Listeyi yenile"ye tıklayın.', 'info');
+                    }, 25000);
+                    const onRefreshResult = (e) => {
+                        if (e.data && e.data.type === 'LOW_STOCK_REFRESH_RESULT' && e.data.username === sess.username) {
+                            window.removeEventListener('message', onRefreshResult);
+                            clearTimeout(timeout);
+                            done();
+                            if (e.data.error) {
+                                showNotification(e.data.error, 'error');
+                            } else {
+                                const list = Array.isArray(e.data.list) ? e.data.list : [];
+                                applyListFromExtension(list, e.data.username);
+                                showNotification('Liste güncellendi (son 100 hareket kontrol edildi).', 'success');
+                            }
+                        }
+                    };
+                    window.addEventListener('message', onRefreshResult);
+                    const settings = window.userDataManager.getLowStockAlertSettings();
+                    sendLowStockInitToExtension();
+                    window.postMessage({
+                        type: 'REQUEST_LOW_STOCK_REFRESH',
+                        username: sess.username,
+                        payload: {
+                            username: sess.username,
+                            threshold: settings.threshold,
+                            overrides: settings.overrides || {},
+                            soundEnabled: settings.soundEnabled,
+                            featureEnabled: featureToggle.checked
+                        }
+                    }, '*');
+                });
+
+                openSettingsBtn.addEventListener('click', () => {
+                    settingsModal.classList.remove('hidden');
+                    const sess = window.authUtils && window.authUtils.checkAuth && window.authUtils.checkAuth();
+                    if (sess && sess.username) {
+                        manualTokenInput.value = '';
+                        if (manualTokenStatus) manualTokenStatus.classList.add('hidden');
+                        window.postMessage({ type: 'GET_MANUAL_TOKEN_STATUS', username: sess.username }, '*');
+                    }
+                });
+                closeSettingsBtn.addEventListener('click', () => {
+                    settingsModal.classList.add('hidden');
+                });
+                settingsModal.addEventListener('click', (e) => {
+                    if (e.target === settingsModal) settingsModal.classList.add('hidden');
+                });
+
+                window.addEventListener('message', (e) => {
+                    if (e.data && e.data.type === 'LOW_STOCK_LIST_UPDATE') {
+                        const list = Array.isArray(e.data.list) ? e.data.list : [];
+                        applyListFromExtension(list, e.data.username);
+                    }
+                    if (e.data && e.data.type === 'MANUAL_TOKEN_STATUS') {
+                        if (manualTokenStatus) {
+                            manualTokenStatus.classList.toggle('hidden', !e.data.hasToken);
+                            const expiryText = e.data.expiry ? formatTokenExpiry(e.data.expiry) : '';
+                            manualTokenStatus.textContent = e.data.hasToken
+                                ? (expiryText ? 'Token kayıtlı. Geçerlilik: ' + expiryText : 'Token kayıtlı.')
+                                : '';
+                        }
+                    }
+                    if (e.data && e.data.type === 'MANUAL_TOKEN_SAVED') {
+                        if (manualTokenStatus) {
+                            manualTokenStatus.classList.remove('hidden');
+                            const expiryText = e.data.expiry ? formatTokenExpiry(e.data.expiry) : '';
+                            manualTokenStatus.textContent = e.data.ok
+                                ? (expiryText ? 'Token kaydedildi. Geçerlilik: ' + expiryText : 'Token kaydedildi.')
+                                : 'Kaydedilemedi.';
+                        }
+                        if (e.data.ok) {
+                            showNotification('Bearer token kaydedildi.', 'success');
+                            if (manualTokenInput) manualTokenInput.value = '';
+                        }
+                    }
+                    if (e.data && e.data.type === 'LOW_STOCK_CLEAR_RESULT') {
+                        if (!e.data.ok) {
+                            showNotification(e.data.error || 'Liste temizlenemedi.', 'error');
+                        } else {
+                            currentLowStockList = [];
+                            applyListFromExtension([], e.data.username);
+                            showNotification('Düşük stok listesi temizlendi.', 'success');
+                        }
+                    }
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => setTimeout(init, 300));
+            } else {
+                setTimeout(init, 300);
+            }
+        })();
+    </script>
+</body>
+</html>

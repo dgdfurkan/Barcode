@@ -13,7 +13,7 @@
     window.getirBookmarkletLoaded = true;
     
     // Configuration
-    const BARCODE_SITE_URL = 'https://dgdfurkan.github.io/Barcode/pages/product_search.html';
+    const BARCODE_SITE_URL = 'https://jetbarkod.com.tr/pages/product_search.html';
     const STORAGE_KEY = 'getirAutoRedirect';
     
     // Styles

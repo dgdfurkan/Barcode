@@ -92,8 +92,8 @@
                 if (text && text.length > 0 && text.length < 100 && 
                     !text.includes('Getir') && !text.includes('Franchise') &&
                     !text.includes('Stok') && !text.includes('Stock') &&
-                    !text.includes('GunduzDev') && // Özel filtre - yanlış yakalanan değerler
-                    !text.match(/^[A-Z][a-z]+[A-Z]/) && // PascalCase pattern'i filtrele (GunduzDev gibi)
+                    !text.includes('FlowCobalt') && // Özel filtre - yanlış yakalanan değerler
+                    !text.match(/^[A-Z][a-z]+[A-Z]/) && // PascalCase pattern'i filtrele (FlowCobalt gibi)
                     !text.match(/^[A-Z]+$/) && // Tümü büyük harf filtrele
                     !text.match(/^[a-z]+$/) && // Tümü küçük harf filtrele
                     text.match(/^[A-Za-z\s]+$/) && // Sadece harf ve boşluk içermeli
@@ -284,7 +284,7 @@
             const warehouseName = extractWarehouseNameFromDOM();
             if (warehouseName) {
                 // Yanlış yakalanan değerleri filtrele
-                const invalidNames = ['GunduzDev', 'Getir', 'Franchise', 'Stok', 'Stock', 'Dashboard', 'Admin'];
+                const invalidNames = ['FlowCobalt', 'Getir', 'Franchise', 'Stok', 'Stock', 'Dashboard', 'Admin'];
                 if (!invalidNames.includes(warehouseName) && 
                     warehouseName.length >= 3 && 
                     warehouseName.length <= 50 &&

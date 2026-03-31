@@ -158,30 +158,28 @@ class PremiumFeatures {
     // Load feature preferences from user_data (cached)
     async loadFeaturePreferences() {
         try {
-            // Check cache first
             const now = Date.now();
             if (this.featurePreferencesCache && this.cacheTimestamp && (now - this.cacheTimestamp) < this.CACHE_DURATION) {
                 return this.featurePreferencesCache;
             }
-            
-            // Load from database
             if (!window.supabase || !this.currentUser) {
                 return {};
             }
-            
+            // user_data'da aynı kullanıcı için birden fazla satır olabilir; en günceli al (user-manager ile uyumlu)
             const { data, error } = await window.supabase
                 .from('user_data')
                 .select('settings')
                 .eq('username', this.currentUser.username)
-                .single();
-            
-            if (!error && data && data.settings && data.settings.featurePreferences) {
-                this.featurePreferencesCache = data.settings.featurePreferences;
+                .order('updated_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            if (!error && data && data.settings) {
+                this.featurePreferencesCache = data.settings.featurePreferences && typeof data.settings.featurePreferences === 'object'
+                    ? data.settings.featurePreferences
+                    : {};
                 this.cacheTimestamp = now;
                 return this.featurePreferencesCache;
             }
-            
-            // Default to empty
             this.featurePreferencesCache = {};
             this.cacheTimestamp = now;
             return {};

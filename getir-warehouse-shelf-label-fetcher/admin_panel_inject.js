@@ -50,9 +50,11 @@
           message: '✅ Extension\'a bağlandı'
         }, '*');
         
-        // Extension'a mesaj gönder
+        // Extension'a mesaj gönder (slowMode / slowModeDelay admin panelden gelir)
         chrome.runtime.sendMessage({
-          type: 'EXPORT_SHELF_LABELS'
+          type: 'EXPORT_SHELF_LABELS',
+          slowMode: !!event.data.slowMode,
+          slowModeDelay: typeof event.data.slowModeDelay === 'number' ? event.data.slowModeDelay : 2000
         }, (response) => {
           if (chrome.runtime.lastError) {
             console.error('❌ Extension hatası:', chrome.runtime.lastError);

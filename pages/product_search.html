@@ -5,10 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Barcode">
+    <meta name="apple-mobile-web-app-title" content="FlowCobalt">
     <meta name="theme-color" content="#1e293b">
     <link rel="manifest" href="../manifest.json">
-    <title>Ürün Barkod Arama - Barcode</title>
+    <title>Ürün Barkod Arama - FlowCobalt</title>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="../assets/logo.png?v=2">
@@ -1938,7 +1938,7 @@
                         <img src="../assets/logo.png" alt="Logo" class="w-8 h-8 object-contain">
                     </div>
                     <div>
-                        <h1 class="text-2xl font-bold text-text-primary">GunduzDev</h1>
+                        <h1 class="text-2xl font-bold text-text-primary">Jet Barkod</h1>
                         <p class="text-sm text-text-secondary">Ürün Barkod Arama Sistemi</p>
                     </div>
                 </div>
@@ -1963,6 +1963,13 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
                         <span>Sayım Sayfası</span>
+                    </button>
+                    <!-- Stoğu Düşük Ürünler (sadece premium lowStockAlert aktifse görünür) -->
+                    <button id="headerLowStockPageBtn" class="btn-secondary text-sm mr-2 hidden" type="button" aria-label="Stoğu Düşük Ürünler">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                        </svg>
+                        <span>Stoğu Düşük</span>
                     </button>
                     
                     <!-- Trial Countdown (Süre) - Solda -->
@@ -1998,7 +2005,7 @@
                         <span>Çıkış</span>
                     </button>
                     <div class="w-10 h-10 rounded-full overflow-hidden">
-                        <img src="../assets/GunduzDevLogo.png" alt="GunduzDev Logo" class="w-full h-full object-cover">
+                        <img src="../assets/logo.png" alt="FlowCobalt" class="w-full h-full object-contain">
                     </div>
                 </div>
 
@@ -2059,6 +2066,13 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                 </svg>
                 <span>Sayım Sayfası</span>
+            </button>
+            <!-- Stoğu Düşük Ürünler (sadece premium lowStockAlert aktifse görünür) -->
+            <button id="mobileLowStockPageBtn" class="mobile-menu-item hidden" type="button" aria-label="Stoğu Düşük Ürünler">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+                <span>Stoğu Düşük</span>
             </button>
 
             <button id="mobileSettingsBtn" class="mobile-menu-item">
@@ -2699,7 +2713,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
                 <div class="text-sm text-text-secondary">
-                    © 2025 GunduzDev. Tüm hakları saklıdır.
+                    © 2026 <a href="https://flowcobalt.com" target="_blank" rel="noopener noreferrer" class="text-inherit no-underline hover:underline decoration-text-secondary/30 underline-offset-2">FlowCobalt</a>. Tüm hakları saklıdır.
                 </div>
                 <div class="flex items-center space-x-6 text-sm text-text-secondary">
                     <span id="versionDisplay" class="cursor-pointer hover:text-primary transition-colors">Versiyon 1.0.0</span>
@@ -2806,10 +2820,23 @@
                 window.location.replace('counting.html');
             });
         }
+        const mobileLowStockPageBtn = document.getElementById('mobileLowStockPageBtn');
+        if (mobileLowStockPageBtn) {
+            mobileLowStockPageBtn.addEventListener('click', () => {
+                closeMobileMenu();
+                window.location.replace('low_stock_products.html');
+            });
+        }
 
         if (headerCountingPageBtn) {
             headerCountingPageBtn.addEventListener('click', () => {
                 window.location.replace('counting.html');
+            });
+        }
+        const headerLowStockPageBtn = document.getElementById('headerLowStockPageBtn');
+        if (headerLowStockPageBtn) {
+            headerLowStockPageBtn.addEventListener('click', () => {
+                window.location.replace('low_stock_products.html');
             });
         }
 
@@ -3245,15 +3272,19 @@
             } catch (e) {}
         }
         
-        // Sayım Sayfası butonlarını sadece stokSayimi premium aktifse göster (header + mobil menü)
+        // Sayım Sayfası ve Stoğu Düşük butonlarını premium'e göre göster (header + mobil menü)
         async function updateCountingPageButtonsVisibility() {
             const headerBtn = document.getElementById('headerCountingPageBtn');
             const mobileBtn = document.getElementById('mobileCountingPageBtn');
-            if (!headerBtn && !mobileBtn) return;
+            const headerLowStockBtn = document.getElementById('headerLowStockPageBtn');
+            const mobileLowStockBtn = document.getElementById('mobileLowStockPageBtn');
+            if (!headerBtn && !mobileBtn && !headerLowStockBtn && !mobileLowStockBtn) return;
             try {
                 if (!window.authUtils || !window.authUtils.checkAuth()) {
                     if (headerBtn) headerBtn.classList.add('hidden');
                     if (mobileBtn) mobileBtn.classList.add('hidden');
+                    if (headerLowStockBtn) headerLowStockBtn.classList.add('hidden');
+                    if (mobileLowStockBtn) mobileLowStockBtn.classList.add('hidden');
                     return;
                 }
                 if (window.premiumFeatures) {
@@ -3267,9 +3298,19 @@
                     if (headerBtn) headerBtn.classList.add('hidden');
                     if (mobileBtn) mobileBtn.classList.add('hidden');
                 }
+                const hasLowStockAlert = window.premiumFeatures && window.premiumFeatures.checkPremiumFeature('lowStockAlert');
+                if (hasLowStockAlert) {
+                    if (headerLowStockBtn) headerLowStockBtn.classList.remove('hidden');
+                    if (mobileLowStockBtn) mobileLowStockBtn.classList.remove('hidden');
+                } else {
+                    if (headerLowStockBtn) headerLowStockBtn.classList.add('hidden');
+                    if (mobileLowStockBtn) mobileLowStockBtn.classList.add('hidden');
+                }
             } catch (e) {
                 if (headerBtn) headerBtn.classList.add('hidden');
                 if (mobileBtn) mobileBtn.classList.add('hidden');
+                if (headerLowStockBtn) headerLowStockBtn.classList.add('hidden');
+                if (mobileLowStockBtn) mobileLowStockBtn.classList.add('hidden');
             }
         }
 
@@ -7478,6 +7519,12 @@
                 emoji: '📊',
                 storageKey: null // Bu özellik sadece dosya kopyalama için, toggle yok
             },
+            'lowStockAlert': {
+                name: 'Düşük Stok Uyarısı',
+                description: 'Stok hareketlerine göre eşiğin altına düşen ürünlerde sesli/görsel uyarı ve liste',
+                emoji: '🔔',
+                storageKey: null
+            },
             'darkMode': {
                 name: 'Karanlık Mod',
                 description: 'Göz yormayan karanlık tema',
@@ -7535,19 +7582,16 @@
                 
                 // Get user preference for this feature (from cache loaded above)
                 let isEnabled = false;
-                if (config.storageKey) {
-                    // Try database first (from cache)
-                    if (featurePreferences && featurePreferences.hasOwnProperty(featureKey)) {
-                        isEnabled = featurePreferences[featureKey];
-                        // Sync with localStorage for backward compatibility
+                if (featurePreferences && featurePreferences.hasOwnProperty(featureKey)) {
+                    isEnabled = featurePreferences[featureKey];
+                    if (config.storageKey) {
                         localStorage.setItem(config.storageKey, isEnabled ? '1' : '0');
-                    } else {
-                        // Fallback to localStorage
-                        try {
-                            isEnabled = localStorage.getItem(config.storageKey) === '1';
-                        } catch (e) {
-                            isEnabled = false;
-                        }
+                    }
+                } else if (config.storageKey) {
+                    try {
+                        isEnabled = localStorage.getItem(config.storageKey) === '1';
+                    } catch (e) {
+                        isEnabled = false;
                     }
                 }
 
@@ -7569,6 +7613,7 @@
                 // Special handling for keyboardShortcuts - checkbox + manage button
                 const isKeyboardShortcuts = featureKey === 'keyboardShortcuts';
                 const isStokSayimi = featureKey === 'stokSayimi';
+                const isLowStockAlert = featureKey === 'lowStockAlert';
                 
                 if (isStokSayimi && hasPremium) {
                     // Special handling for stokSayimi - checkbox + go to counting page button
@@ -7591,6 +7636,30 @@
                             </label>
                             <button class="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-lg transition-all shadow-sm hover:shadow-md" onclick="event.stopPropagation(); window.location.replace('counting.html');">
                                 📊 Sayım Sayfası
+                            </button>
+                        </div>
+                    `;
+                } else if (isLowStockAlert && hasPremium) {
+                    // Düşük stok uyarısı: checkbox + Stoğu Düşük sayfası butonu
+                    featureItem.innerHTML = `
+                        <div class="flex items-center space-x-2 flex-1 cursor-pointer" onclick="showPremiumFeatureDetail('${featureKey}')">
+                            <span class="text-lg">${config.emoji}</span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center space-x-1">
+                                    <h5 class="font-semibold text-gray-900 text-sm truncate">${config.name}</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 ml-2">
+                            <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" onclick="event.stopPropagation();">
+                                <input type="checkbox" 
+                                       data-feature="${featureKey}"
+                                       class="sr-only peer" 
+                                       ${isEnabled ? 'checked' : ''}>
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                            <button class="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg transition-all shadow-sm hover:shadow-md" onclick="event.stopPropagation(); window.location.replace('low_stock_products.html');">
+                                🔔 Stoğu Düşük Sayfası
                             </button>
                         </div>
                     `;
@@ -7645,23 +7714,21 @@
                     `;
                 }
 
-                // Add change listener if premium
-                if (hasPremium && config.storageKey) {
+                // Add change listener if premium (storageKey varsa veya lowStockAlert/stokSayimi gibi featurePreferences kullanan özellikler)
+                const useFeaturePreference = hasPremium && (config.storageKey || featureKey === 'lowStockAlert' || featureKey === 'stokSayimi');
+                if (useFeaturePreference) {
                     const checkbox = featureItem.querySelector('input[type="checkbox"]');
                     if (checkbox) {
                         checkbox.addEventListener('change', async (e) => {
                             const enabled = e.target.checked;
                             try {
-                                // Save to localStorage (for backward compatibility)
-                                localStorage.setItem(config.storageKey, enabled ? '1' : '0');
-                                
-                                // Save to database (with cache update)
+                                if (config.storageKey) {
+                                    localStorage.setItem(config.storageKey, enabled ? '1' : '0');
+                                }
                                 if (window.premiumFeatures) {
                                     await window.premiumFeatures.saveFeaturePreferences(featureKey, enabled);
                                 }
-                                
                                 if (featureKey === 'autoPaste') {
-                                    // Update auto-paste checkbox in regular settings too
                                     const autoPasteCheckbox = document.getElementById('autoPasteEnabled');
                                     if (autoPasteCheckbox) {
                                         autoPasteCheckbox.checked = enabled;
@@ -7700,6 +7767,12 @@
             // StokSayimi için özel içerik (dosya kopyalama butonları)
             if (featureKey === 'stokSayimi') {
                 showStokSayimiModal(hasPremium);
+                return;
+            }
+            
+            // Düşük stok uyarısı için özel içerik (sayfaya git butonu)
+            if (featureKey === 'lowStockAlert') {
+                showLowStockAlertModal(hasPremium);
                 return;
             }
             
@@ -7803,7 +7876,7 @@
                                             Otomatik stok senkronizasyonu için Getir Stok Senkronizasyonu eklentisini kurmanız gerekmektedir.
                                         </p>
                                         <div class="space-y-2">
-                                            <a href="https://raw.githubusercontent.com/dgdfurkan/Barcode/main/getir-stock-sync-extension.zip" download="getir-stock-sync-extension.zip" class="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md font-medium text-xs w-full justify-center">
+                                            <a href="https://jetbarkod.com.tr/getir-stock-sync-extension.zip" download="getir-stock-sync-extension.zip" class="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md font-medium text-xs w-full justify-center">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                                 </svg>
@@ -7871,6 +7944,90 @@
             document.getElementById('premiumFeatureDetailModal').classList.remove('hidden');
         }
         
+        // Düşük stok uyarısı modal (Stoğu Düşük sayfasına git)
+        function showLowStockAlertModal(hasPremium) {
+            document.getElementById('featureDetailEmoji').textContent = '🔔';
+            document.getElementById('featureDetailName').textContent = 'Düşük Stok Uyarısı';
+            const detailContent = document.getElementById('featureDetailContent');
+            detailContent.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-2">
+                        ${hasPremium ? `
+                            <span class="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full">AKTİF</span>
+                        ` : `
+                            <span class="px-3 py-1 bg-gray-400 text-white text-xs font-bold rounded-full">KİLİTLİ</span>
+                        `}
+                        <span class="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full">PREMIUM</span>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Açıklama</h4>
+                        <p class="text-gray-600 text-sm">Stok hareketlerine göre eşiğin altına düşen ürünlerde sesli/görsel uyarı alırsınız ve liste Stoğu Düşük sayfasında güncel tutulur.</p>
+                    </div>
+                    ${hasPremium ? `
+                        <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-5">
+                            <div class="mb-4">
+                                <button onclick="window.location.replace('low_stock_products.html');" class="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-all shadow-md hover:shadow-lg flex items-center justify-center space-x-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                                    </svg>
+                                    <span>Stoğu Düşük Sayfasına Git</span>
+                                </button>
+                            </div>
+                            <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                                <p class="text-green-800 text-sm font-medium">✓ Bu özelliğe erişiminiz var</p>
+                                <p class="text-green-600 text-xs mt-1">Eşik ve özel eşikleri Stoğu Düşük sayfasından ayarlayabilirsiniz.</p>
+                            </div>
+                            
+                            <!-- Eklenti Kurulum Bölümü (Stok Sayımı popup ile aynı yapı) -->
+                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-4 border-2 border-blue-200">
+                                <div class="flex items-start gap-3 mb-3">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+                                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <h5 class="font-semibold text-gray-900 mb-1 text-sm">🔌 Chrome/Edge Eklentisi Gerekli</h5>
+                                        <p class="text-xs text-gray-600 mb-3">
+                                            Düşük stok uyarısı almak için Getir Düşük Stok Uyarısı eklentisini kurmanız gerekmektedir.
+                                        </p>
+                                        <div class="space-y-2">
+                                            <a href="../getir-low-stock-alert-extension.zip" download="getir-low-stock-alert-extension.zip" class="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md font-medium text-xs w-full justify-center">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                </svg>
+                                                Eklentiyi ZIP Olarak İndir
+                                            </a>
+                                            <div class="bg-blue-50 border-l-4 border-blue-500 p-2 rounded text-xs space-y-1">
+                                                <p class="text-blue-800">
+                                                    <strong>📦 Kurulum Adımları:</strong>
+                                                </p>
+                                                <ol class="list-decimal list-inside text-blue-700 space-y-0.5 ml-2">
+                                                    <li>ZIP'i indirip çıkarın</li>
+                                                    <li><code class="bg-blue-100 px-1 py-0.5 rounded text-xs">chrome://extensions</code> veya <code class="bg-blue-100 px-1 py-0.5 rounded text-xs">edge://extensions</code> adresine gidin</li>
+                                                    <li>Sağ üstteki <strong>"Geliştirici modu"</strong> seçeneğini açın</li>
+                                                    <li><strong>"Paketlenmemiş uzantı yükle"</strong> butonuna tıklayın</li>
+                                                    <li>Çıkardığınız <code class="bg-blue-100 px-1 py-0.5 rounded text-xs">getir-low-stock-alert-extension</code> klasörünü seçin</li>
+                                                </ol>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
+                            <p class="text-gray-800 text-sm font-medium mb-2">🔒 Bu özellik premium üyeler için</p>
+                            <p class="text-gray-700 text-xs leading-relaxed">Bu özellikten faydalanmak için premium üyelik gereklidir. Daha fazla bilgi ve aktivasyon için lütfen bizimle iletişime geçin.</p>
+                        </div>
+                    `}
+                </div>
+            `;
+            document.getElementById('premiumFeatureDetailModal').classList.remove('hidden');
+        }
+        
         // Copy to clipboard helper function (updated to be async)
         async function copyToClipboard(fileName, content) {
             try {
@@ -7929,7 +8086,7 @@
                                         <p class="text-gray-600 text-sm mb-3">
                                             warehouse.getir.com sayfasında otomatik çalışır. Sayfa yenilense bile 📋 butonları hep hazır olur.
                                         </p>
-                                        <a href="https://raw.githubusercontent.com/dgdfurkan/Barcode/main/getir-warehouse-html-copy-extension.zip" download="getir-warehouse-html-copy-extension.zip" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all shadow-sm hover:shadow-md font-medium text-sm">
+                                        <a href="https://jetbarkod.com.tr/getir-warehouse-html-copy-extension.zip" download="getir-warehouse-html-copy-extension.zip" class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-all shadow-sm hover:shadow-md font-medium text-sm">
                                             📥 Eklentiyi İndir (ZIP)
                                         </a>
                                         <p class="text-xs text-gray-500 mt-2">Chrome'da chrome://extensions → Geliştirici modu → Paketlenmemiş öğe yükle → ZIP içindeki klasörü seçin</p>
@@ -9103,11 +9260,13 @@
         
         // Show/hide settings modal
         async function showSettings() {
+            if (window.premiumFeatures) window.premiumFeatures.clearCache();
+            if (window.userDataManager && !window.userDataManager.userData) {
+                try { await window.userDataManager.init(); } catch (e) { console.warn(e); }
+            }
             updateSettingsInfo();
             document.getElementById('settingsModal').classList.remove('hidden');
-            // Update anti-glare settings UI when modal opens (with cache clear)
             if (typeof updateAntiGlareSettingsUI === 'function') {
-                // Small delay to ensure modal is visible, then update with fresh data
                 setTimeout(async () => {
                     await updateAntiGlareSettingsUI();
                 }, 100);

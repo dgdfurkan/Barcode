@@ -288,17 +288,16 @@ class UserDataManager {
     
     // Save feature preferences to database
     async saveFeaturePreferences(featureKey, enabled) {
+        if (!this.userData) {
+            await this.loadUserData();
+        }
         if (!this.userData.settings) {
             this.userData.settings = {};
         }
         if (!this.userData.settings.featurePreferences) {
             this.userData.settings.featurePreferences = {};
         }
-        
-        // Update local data
         this.userData.settings.featurePreferences[featureKey] = enabled;
-        
-        // Save to database
         await this.saveUserData();
     }
     
@@ -308,9 +307,71 @@ class UserDataManager {
             this.userData.settings = {};
         }
         this.userData.settings.featurePreferences = preferences;
-        
+
         // Save to database
         await this.saveUserData();
+    }
+
+    /**
+     * Düşük stok uyarısı ayarları (Supabase user_data.settings.lowStockAlert)
+     * threshold: Varsayılan eşik (kalan stok bu değerin altına düşünce uyarı)
+     * soundEnabled: Sesli uyarı açık mı
+     * overrides: Ürün/barkod bazlı özel eşikler { barcodeOrProductId: number }
+     */
+    getLowStockAlertSettings() {
+        const defaults = { threshold: 5, soundEnabled: true, overrides: {} };
+        const stored = this.userData?.settings?.lowStockAlert;
+        if (!stored || typeof stored !== 'object') {
+            return { ...defaults };
+        }
+        const overrides = stored.overrides && typeof stored.overrides === 'object' ? stored.overrides : {};
+        return {
+            threshold: typeof stored.threshold === 'number' && stored.threshold >= 0 ? stored.threshold : defaults.threshold,
+            soundEnabled: typeof stored.soundEnabled === 'boolean' ? stored.soundEnabled : defaults.soundEnabled,
+            overrides
+        };
+    }
+
+    /**
+     * Düşük stok uyarısı ayarlarını kaydeder (mevcut ayarlarla merge eder).
+     * @param {{ threshold?: number, soundEnabled?: boolean, overrides?: Record<string, number> }} opts
+     */
+    async saveLowStockAlertSettings(opts) {
+        if (!this.userData.settings) {
+            this.userData.settings = {};
+        }
+        const current = this.getLowStockAlertSettings();
+        const next = {
+            threshold: typeof opts.threshold === 'number' && opts.threshold >= 0 ? opts.threshold : current.threshold,
+            soundEnabled: typeof opts.soundEnabled === 'boolean' ? opts.soundEnabled : current.soundEnabled,
+            overrides: opts.overrides !== undefined ? (opts.overrides && typeof opts.overrides === 'object' ? opts.overrides : current.overrides) : current.overrides
+        };
+        this.userData.settings.lowStockAlert = next;
+        await this.saveUserData();
+    }
+
+    /**
+     * Belirli bir ürün/barkod için özel eşik ekler veya günceller.
+     * @param {string} key - Barkod (örn. "8690504009603") veya Getir productId (24 karakter)
+     * @param {number} threshold - Eşik değeri
+     */
+    async addLowStockAlertOverride(key, threshold) {
+        if (!key || typeof key !== 'string' || typeof threshold !== 'number' || threshold < 0) return;
+        const current = this.getLowStockAlertSettings();
+        const overrides = { ...current.overrides, [key.trim()]: threshold };
+        await this.saveLowStockAlertSettings({ overrides });
+    }
+
+    /**
+     * Ürün/barkod bazlı özel eşiği kaldırır.
+     * @param {string} key - Barkod veya productId
+     */
+    async removeLowStockAlertOverride(key) {
+        if (!key) return;
+        const current = this.getLowStockAlertSettings();
+        const overrides = { ...current.overrides };
+        delete overrides[key];
+        await this.saveLowStockAlertSettings({ overrides });
     }
 
     // Search history and statistics removed as per requirements (will be added later if needed)

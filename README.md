@@ -1,9 +1,8 @@
-# 🔍 Barcode SaaS System
+# 🔍 FlowCobalt – Barkod SaaS
 
 Profesyonel barkod arama sistemi - Kullanıcı kimlik doğrulama, IP kontrolü ve test süresi yönetimi ile.
 
-**GitHub:** [dgdfurkan/Barcode](https://github.com/dgdfurkan/Barcode)  
-**Email:** furkangunduz.dev@gmail.com
+**Web:** [flowcobalt.com](https://flowcobalt.com)
 
 ## 🚀 Özellikler
 
@@ -160,7 +159,7 @@ const LOCAL_USERS = {
 1. Repository'yi GitHub'a yükleyin
 2. Settings > Pages > Source: Deploy from branch
 3. Branch: main seçin
-4. `https://username.github.io/repository-name` adresinden erişin
+4. Hosting sağlayıcınızın verdiği public URL veya özel domain üzerinden erişin
 
 ### Vercel
 1. [Vercel](https://vercel.com) hesabı oluşturun

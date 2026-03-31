@@ -7,7 +7,7 @@
 Terminal'de proje klasörüne gidin ve bot'u çalıştırın:
 
 ```bash
-cd /Users/furkangunduz/CursorProjects/TelgramGetirStock
+cd /path/to/TelgramGetirStock
 source venv/bin/activate
 python main.py
 ```
@@ -41,7 +41,7 @@ Bot başladığında şu mesajları göreceksiniz:
 
 1. Sol üstte **"Paketlenmemiş uzantı yükle"** (Load unpacked) butonuna tıklayın
 2. Finder penceresi açılacak
-3. Şu klasöre gidin: `/Users/furkangunduz/CursorProjects/TelgramGetirStock/extension`
+3. Şu klasöre gidin: `<path/to/TelgramGetirStock>/extension`
 4. Klasörü seçin ve **"Seç"** (Select) butonuna tıklayın
 
 #### 2.4 Extension'ı Aktif Edin

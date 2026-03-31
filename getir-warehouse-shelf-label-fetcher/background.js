@@ -81,7 +81,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const slowModeDelay = message.slowModeDelay || 2000;
     console.log('🐌 Yavaş çek modu:', slowMode ? `Aktif (${slowModeDelay}ms bekleme)` : 'Pasif');
     
-    handleExportShelfLabels(sendResponse, slowMode, slowModeDelay);
+    handleExportShelfLabels(sendResponse, slowMode, slowModeDelay, sender);
     return true; // Async response için
   } else if (message.type === 'GET_EXTENSION_ID') {
     // Admin panelden gelen extension ID isteği
@@ -440,19 +440,25 @@ function generateObjectId() {
 }
 
 // Admin panelden gelen raf etiketi çekme isteğini işle
-async function handleExportShelfLabels(sendResponse, slowMode = false, slowModeDelay = 2000) {
+async function handleExportShelfLabels(sendResponse, slowMode = false, slowModeDelay = 2000, sender = null) {
   sendResponse({ success: true, message: 'İşlem başlatıldı' });
   
   try {
     console.log('📋 Raf etiketlerini çekme işlemi başlatılıyor...');
     console.log('🐌 Yavaş çek modu:', slowMode ? `Aktif (${slowModeDelay}ms bekleme)` : 'Pasif (100ms bekleme)');
     
-    // Admin panel tab'ını bul
+    // Admin panel tab'ını bul: mesajı gönderen tab'ı kullan (kesin ulaşır), yoksa query ile
     let adminTabs = [];
-    try {
-      adminTabs = await chrome.tabs.query({ url: ['http://localhost/*', 'http://127.0.0.1/*', 'https://*/*'] });
-    } catch (e) {
-      console.error('Admin tab bulunamadı:', e);
+    if (sender?.tab?.id) {
+      adminTabs = [sender.tab];
+      console.log('✅ Admin tab sender üzerinden tespit edildi:', sender.tab.id, sender.tab.url);
+    }
+    if (adminTabs.length === 0) {
+      try {
+        adminTabs = await chrome.tabs.query({ url: ['http://localhost/*', 'http://127.0.0.1/*', 'https://*/*'] });
+      } catch (e) {
+        console.error('Admin tab bulunamadı:', e);
+      }
     }
     
     const sendProgressToAdmin = (message) => {
@@ -461,26 +467,39 @@ async function handleExportShelfLabels(sendResponse, slowMode = false, slowModeD
           type: 'WAREHOUSE_SHELF_LABEL_PROGRESS',
           step: 'fetching',
           message: message
-        }).catch(() => {});
+        }).catch((err) => {
+          console.warn('Progress mesajı gönderilemedi (tab:', adminTab.id, '):', err?.message);
+        });
       }
     };
     
     sendProgressToAdmin('🔍 Warehouse sitesi kontrol ediliyor...');
     
-    // Warehouse sitesinde açık tab'ı bul
-    const warehouseTabs = await chrome.tabs.query({ url: 'https://warehouse.getir.com/*' });
+    // Warehouse sitesinde açık tab'ı bul (önce standart URL, yoksa esnek arama)
+    let warehouseTabs = await chrome.tabs.query({ url: 'https://warehouse.getir.com/*' });
     
     if (!warehouseTabs || warehouseTabs.length === 0) {
-      console.error('❌ Warehouse sitesi açık değil!');
-      sendProgressToAdmin('❌ Warehouse sitesi açık değil. Lütfen https://warehouse.getir.com adresini açın.');
+      // Getir URL yapısı değişmiş olabilir: tüm tab'larda warehouse/getir/shelf-label ara
+      const allTabs = await chrome.tabs.query({});
+      warehouseTabs = (allTabs || []).filter((t) => {
+        const u = (t.url || '').toLowerCase();
+        return (u.includes('warehouse') && u.includes('getir')) || (u.includes('getir') && u.includes('shelf-label'));
+      });
+      if (warehouseTabs.length > 0) {
+        console.log('✅ Warehouse tab alternatif URL ile bulundu:', warehouseTabs.map((t) => t.url));
+      }
+    }
+    
+    if (!warehouseTabs || warehouseTabs.length === 0) {
+      console.error('❌ Warehouse sitesi açık değil! Açık tab URL örnekleri:', (await chrome.tabs.query({})).slice(0, 5).map((t) => t.url));
+      sendProgressToAdmin('❌ Warehouse sitesi açık değil. Raf etiketleri sayfasını (warehouse.getir.com) aynı tarayıcıda bir sekmede açın.');
       
-      // Hata mesajını admin panele gönder
       for (const adminTab of adminTabs) {
         chrome.tabs.sendMessage(adminTab.id, {
           type: 'WAREHOUSE_SHELF_LABEL_RESPONSE',
           success: false,
           data: null,
-          error: 'Warehouse sitesi açık değil. Lütfen https://warehouse.getir.com adresini açın.',
+          error: 'Warehouse sitesi açık değil. Raf etiketleri sayfasını (warehouse.getir.com) aynı tarayıcıda bir sekmede açın.',
           total: 0
         }).catch(() => {});
       }

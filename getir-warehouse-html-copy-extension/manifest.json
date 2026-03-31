@@ -3,7 +3,7 @@
   "name": "Getir Warehouse HTML Kopyalayıcı",
   "version": "1.2.3",
   "description": "Getir warehouse sitesinde ürün listelerindeki HTML'leri tek tıkla kopyalar. Sayfa yenilense bile otomatik çalışır.",
-  "author": "GunduzDev",
+  "author": "FlowCobalt",
   "icons": {
     "16": "icon128.png",
     "48": "icon128.png",
@@ -14,7 +14,8 @@
   ],
   "host_permissions": [
     "https://warehouse.getir.com/*",
-    "https://dgdfurkan.github.io/*",
+    "https://jetbarkod.com.tr/*",
+    "https://www.jetbarkod.com.tr/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
     "https://localhost/*",
@@ -46,8 +47,8 @@
     },
     {
       "matches": [
-        "https://dgdfurkan.github.io/Barcode/*",
-        "https://dgdfurkan.github.io/*",
+        "https://jetbarkod.com.tr/*",
+        "https://www.jetbarkod.com.tr/*",
         "http://localhost/*",
         "http://127.0.0.1/*",
         "https://localhost/*",

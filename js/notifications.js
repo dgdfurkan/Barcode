@@ -256,57 +256,28 @@ class NotificationSystem {
 
         // Show notification for enabled features (new premium features)
         if (enabledFeatures.length > 0) {
-            // Check if we've already shown notification for these features
             const shouldShow = this.shouldShowNotification(enabledFeatures);
             if (!shouldShow) {
                 console.log('⏭️ Notification already shown for these features, skipping');
                 return;
             }
-            
-            // Mark as shown
             this.markNotificationAsShown(enabledFeatures);
-            
             const featureNames = enabledFeatures.map(f => this.getFeatureName(f.name)).join(', ');
-            
-            // Show browser notification if permission granted
-            if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('✨ Yeni Premium Özellikler', {
-                    body: `${featureNames} özelliklerine erişebilirsiniz!`,
-                    icon: '../assets/logo.png',
-                    tag: 'premium-features-update'
-                });
-            }
-
-            // Show in-page notification with click handler (will reload page when clicked)
+            // Sadece sitede bildirim; tarayıcı popup bildirimi yok
             this.showInPageNotificationWithModal(enabledFeatures);
         }
         
         // Show notification for disabled features (premium features removed)
         if (disabledFeatures.length > 0) {
-            // Check if we've already shown notification for these disabled features
             const shouldShowDisabled = this.shouldShowDisabledNotification(disabledFeatures);
             if (!shouldShowDisabled) {
                 console.log('⏭️ Disabled notification already shown for these features, skipping');
-                // Still reload page even if notification was shown before
                 this.reloadCurrentPage();
                 return;
             }
-            
-            // Mark as shown
             this.markDisabledNotificationAsShown(disabledFeatures);
-            
             const featureNames = disabledFeatures.map(f => this.getFeatureName(f.name)).join(', ');
-            
-            // Show browser notification if permission granted
-            if ('Notification' in window && Notification.permission === 'granted') {
-                new Notification('⚠️ Premium Özellikler Güncellendi', {
-                    body: `${featureNames} özelliklerine artık erişemeyeceksiniz.`,
-                    icon: '../assets/logo.png',
-                    tag: 'premium-features-removed'
-                });
-            }
-
-            // Show in-page notification (will reload page when clicked)
+            // Sadece sitede bildirim; tarayıcı popup bildirimi yok
             this.showDisabledFeaturesNotification(disabledFeatures);
         }
     }
@@ -378,7 +349,9 @@ class NotificationSystem {
             'offlineMode': 'Çevrimdışı Mod',
             'advancedFilters': 'Gelişmiş Filtreler',
             'unlimitedHistory': 'Sınırsız Geçmiş',
-            'favorites': 'Favoriler'
+            'favorites': 'Favoriler',
+            'stokSayimi': 'Stok Sayımı',
+            'lowStockAlert': 'Düşük Stok Uyarısı'
         };
         return featureNames[featureName] || featureName;
     }
@@ -394,7 +367,9 @@ class NotificationSystem {
             'offlineMode': '📡',
             'advancedFilters': '🔍',
             'unlimitedHistory': '📜',
-            'favorites': '⭐'
+            'favorites': '⭐',
+            'stokSayimi': '📊',
+            'lowStockAlert': '🔔'
         };
         return emojis[featureName] || '✨';
     }
@@ -411,7 +386,8 @@ class NotificationSystem {
             'advancedFilters': 'Gelişmiş filtreleme seçenekleri ile ürünleri kategori, marka, stok durumu gibi kriterlere göre filtreleyebilirsiniz.',
             'unlimitedHistory': 'Arama geçmişiniz sınırsız saklanır. Daha önce aradığınız ürünleri kolayca tekrar bulabilirsiniz.',
             'favorites': 'Sık kullandığınız ürünleri favorilere ekleyip hızlı erişim sağlayabilirsiniz. Zaman kazandıran pratik bir özellik.',
-            'stokSayimi': 'Getir franchise depolarında fiziksel stok sayımını dijitalleştirin. Depo stoklarınızı girin, sistem Getir API\'den otomatik olarak mevcut stok bilgisini çeker ve farkları gösterir. Mobil, tablet ve PC\'de çalışır, birden fazla sayım tablosu oluşturabilirsiniz.'
+            'stokSayimi': 'Getir franchise depolarında fiziksel stok sayımını dijitalleştirin. Depo stoklarınızı girin, sistem Getir API\'den otomatik olarak mevcut stok bilgisini çeker ve farkları gösterir. Mobil, tablet ve PC\'de çalışır, birden fazla sayım tablosu oluşturabilirsiniz.',
+            'lowStockAlert': 'Stok hareketlerine göre eşiğin altına düşen ürünlerde sesli/görsel uyarı alırsınız. Liste Stoğu Düşük sayfasında güncel tutulur; Chrome eklentisi ile franchise sayfasında anlık bildirim alabilirsiniz.'
         };
         return descriptions[featureName] || 'Bu özellik çalışma verimliliğinizi artırır.';
     }

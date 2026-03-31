@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      1.0.0
 // @description  Getir franchise stok sayfasından stok verilerini senkronize eder
-// @author       GunduzDev
+// @author       FlowCobalt
 // @match        https://franchise.getir.com/stock/current
 // @grant        none
 // @run-at       document-idle

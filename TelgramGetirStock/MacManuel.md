@@ -4,7 +4,7 @@
    python3 --version (3.9+ olmalı)
 
 2️⃣ Proje dizinine gir  
-   cd /Users/furkangunduz/CursorProjects/TelgramGetirStock
+   cd /path/to/TelgramGetirStock
 
 3️⃣ Sanal ortamı kur  
    python3 -m venv venv
@@ -45,8 +45,7 @@
    py --version  (veya python --version) (3.9+ olmalı)
 
 2️⃣ Proje dizinine gir  
-   cd C:\Users\furkangunduz\CursorProjects\TelgramGetirStock
-   cd C:\Users\furkangunduz\TelgramGetirStock
+   cd C:\path\to\TelgramGetirStock
 
 3️⃣ Sanal ortamı kur  
    py -m venv venv

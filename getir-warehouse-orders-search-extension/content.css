@@ -1,0 +1,193 @@
+/* Sipariş içi ürün arama - breadcrumb ile aynı satır, minimal (üst panel konumu korunur) */
+
+.gws-order-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 37px;
+}
+
+.gws-order-search-bar-wrap {
+  position: relative;
+  display: inline-flex;
+  margin-left: auto;
+}
+
+.gws-order-search-root {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  height: 28px;
+}
+
+.gws-order-search-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+
+.gws-order-search-input {
+  width: 180px;
+  height: 28px;
+  padding: 0 8px 0 28px;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+  background: #fafafa url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23bfbfbf' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 8px 50%;
+  background-size: 12px;
+  color: #262626;
+}
+
+.gws-order-search-input::placeholder {
+  color: #bfbfbf;
+}
+
+.gws-order-search-input:hover {
+  border-color: #d9d9d9;
+  background-color: #fff;
+}
+
+.gws-order-search-input:focus {
+  border-color: #1890ff;
+  background-color: #fff;
+  box-shadow: 0 0 0 1px rgba(24, 144, 255, 0.2);
+}
+
+.gws-order-search-btn {
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.gws-order-search-btn:active {
+  opacity: 0.9;
+}
+
+.gws-order-search-btn--scan {
+  background: #1890ff;
+  color: #fff;
+}
+
+.gws-order-search-btn--scan:hover:not(:disabled) {
+  background: #40a9ff;
+}
+
+.gws-order-search-btn--scan:disabled {
+  background: #d9d9d9;
+  color: #fff;
+  cursor: not-allowed;
+}
+
+.gws-order-search-btn--clear {
+  background: transparent;
+  color: #8c8c8c;
+  border: 1px solid #e8e8e8;
+}
+
+.gws-order-search-btn--clear:hover {
+  color: #262626;
+  border-color: #d9d9d9;
+}
+
+.gws-order-search-status {
+  font-size: 11px;
+  color: #8c8c8c;
+  margin-left: 4px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sonuç paneli - barın altında, minimal */
+.gws-order-search-results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  max-height: 320px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 9999;
+}
+
+.gws-order-search-results--empty {
+  padding: 16px;
+  text-align: center;
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+.gws-order-search-results-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.gws-order-search-result-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  border: none;
+  border-bottom: 1px solid #f5f5f5;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.1s;
+}
+
+.gws-order-search-result-item:hover {
+  background: #f5f9ff;
+}
+
+.gws-order-search-result-item:last-child {
+  border-bottom: none;
+}
+
+.gws-order-search-result-order-id {
+  font-weight: 600;
+  color: #1890ff;
+  margin-bottom: 2px;
+}
+
+.gws-order-search-result-products {
+  color: #595959;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.gws-order-search-results-header {
+  padding: 6px 12px;
+  background: #fafafa;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.gws-order-search-progress {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #1890ff;
+}
+
+.gws-order-search-root .gws-order-search-results[hidden] {
+  display: none !important;
+}

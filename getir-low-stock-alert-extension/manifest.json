@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Getir Düşük Stok Uyarısı",
+  "version": "1.0.0",
+  "description": "Eşiğin altına düşen ürünlerde sesli/görsel uyarı ve liste",
+  "author": "FlowCobalt",
+  "icons": {
+    "16": "icon128.png",
+    "48": "icon128.png",
+    "128": "icon128.png"
+  },
+  "permissions": ["storage", "alarms", "notifications","scripting"],
+  "host_permissions": [
+    "https://franchise.getir.com/*",
+    "https://franchise-api-gateway.getirapi.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://jetbarkod.com.tr/*",
+    "https://www.jetbarkod.com.tr/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://franchise.getir.com/*"],
+      "js": ["content-franchise.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://jetbarkod.com.tr/*", "https://www.jetbarkod.com.tr/*"],
+      "js": ["content-barcode.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [{"resources": ["icon128.png", "notification.mp3"], "matches": ["<all_urls>"]}]
+}
