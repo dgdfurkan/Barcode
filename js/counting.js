@@ -60,6 +60,7 @@ class CountingSystem {
             // Setup event listeners
             this.setupEventListeners();
             this.bindSayimSubTabControls();
+            this.initDailyDateControls();
 
             // Setup tab system
             this.setupTabSystem();
@@ -111,11 +112,22 @@ class CountingSystem {
                     setTimeout(() => this.updateAPIStatusCard(), 1000);
                 });
             }
-            
-            // Set up periodic API status updates (every 30 seconds)
-            setInterval(() => {
-                this.updateAPIStatusCard();
-            }, 30000);
+
+            const manualTokenSaveBtn = document.getElementById('manualTokenSaveBtn');
+            const manualTokenClearBtn = document.getElementById('manualTokenClearBtn');
+            const manualTokenInput = document.getElementById('manualTokenInput');
+            if (manualTokenSaveBtn) {
+                manualTokenSaveBtn.addEventListener('click', () => this.applyManualTokenFromInput());
+            }
+            if (manualTokenClearBtn && manualTokenInput) {
+                manualTokenClearBtn.addEventListener('click', () => {
+                    manualTokenInput.value = '';
+                    this.updateManualTokenPreview();
+                });
+            }
+            if (manualTokenInput) {
+                manualTokenInput.addEventListener('input', () => this.updateManualTokenPreview());
+            }
             
             console.log('✅ Counting system initialized');
         } catch (error) {
@@ -132,10 +144,11 @@ class CountingSystem {
                 return;
             }
             
-            // 1) Önce Supabase'deki mevcut durumu al (öncelik Supabase)
+            // 1) Önce Supabase'deki mevcut durumu al (manuel token dahil)
             let existingToken = null;
             let existingTimestamp = 0;
             let existingExpiry = null;
+            let existingApiInfo = null;
             if (window.supabase && this.currentUser) {
                 try {
                     const { data: userData } = await window.supabase
@@ -147,6 +160,7 @@ class CountingSystem {
                         const countingData = typeof userData.counting_data === 'string'
                             ? JSON.parse(userData.counting_data)
                             : userData.counting_data;
+                        existingApiInfo = countingData._api_info || null;
                         existingToken = countingData._api_info?.token;
                         existingTimestamp = countingData._api_info?.timestamp || 0;
                         existingExpiry = countingData._api_info?.tokenExpiry;
@@ -155,8 +169,6 @@ class CountingSystem {
                     // Silent
                 }
             }
-            
-            const supabaseExpired = existingExpiry && (Date.now() >= (this.normalizeExpiry(existingExpiry) - 5 * 60 * 1000));
             
             // 2) Eklentiden token al. getirExtensionHelper content script ile gelir; bazen gecikmeli yüklenir.
             let apiInfo = null;
@@ -214,30 +226,20 @@ class CountingSystem {
                 }
             }
             
-            // 3) Eklentiden token geldiyse: Supabase'de yoksa, süresi geçmişse veya eklenti daha güncel/uzun süreliyse Supabase'e yaz
+            // 3) Eklenti + Supabase: en geç bitecek token kazanır (ör. manuel 2 saat, eklenti 19 saat → 19 saat)
             if (apiInfo && apiInfo.token) {
-                const newToken = apiInfo.token;
-                const newTimestamp = apiInfo.timestamp || Date.now();
-                const newExpiry = apiInfo.tokenExpiry ? this.normalizeExpiry(apiInfo.tokenExpiry) : null;
-                
-                let shouldUpdate = false;
-                if (!existingToken || supabaseExpired) {
-                    shouldUpdate = true;
-                    if (supabaseExpired) console.log('🔄 Supabase token süresi dolmuş/az kaldı, eklentiden güncel token Supabase\'e yazılıyor');
-                } else if (newToken !== existingToken) {
-                    shouldUpdate = true;
-                    console.log('🔄 Token değeri değişti, Supabase güncelleniyor');
-                } else if (newTimestamp > existingTimestamp) {
-                    shouldUpdate = true;
-                    console.log('🔄 Eklentiden daha yeni timestamp, Supabase güncelleniyor');
-                } else if (newExpiry && existingExpiry && newExpiry > this.normalizeExpiry(existingExpiry)) {
-                    shouldUpdate = true;
-                    console.log('🔄 Eklentiden daha uzun süreli token, Supabase güncelleniyor');
-                }
-                
-                if (shouldUpdate) {
-                    await this.saveAPIInfoToSupabase(apiInfo);
-                    if (apiInfo.tokenExpiry) this.lastTokenExpiry = apiInfo.tokenExpiry;
+                const prevCandidate = existingApiInfo && existingToken
+                    ? { ...existingApiInfo, token: existingToken, tokenExpiry: existingExpiry }
+                    : existingToken
+                        ? { token: existingToken, tokenExpiry: existingExpiry, timestamp: existingTimestamp }
+                        : null;
+                const best = this.pickBestApiInfo([prevCandidate, apiInfo].filter(Boolean));
+                if (best && best.token) {
+                    const merged = this.mergeApiInfoForSave(best, prevCandidate || {});
+                    if (this.apiInfoSignature(merged) !== this.apiInfoSignature(prevCandidate)) {
+                        await this.saveAPIInfoToSupabase(merged);
+                        if (merged.tokenExpiry) this.lastTokenExpiry = merged.tokenExpiry;
+                    }
                 }
             }
         } catch (error) {
@@ -256,6 +258,203 @@ class CountingSystem {
             return isNaN(p) ? 0 : p;
         }
         return 0;
+    }
+
+    /** JWT payload `exp` (saniye) -> ms */
+    parseJwtExpiryMsFromToken(tokenString) {
+        if (!tokenString || typeof tokenString !== 'string') return null;
+        try {
+            const bare = tokenString.replace(/^Bearer\s+/i, '').trim();
+            const parts = bare.split('.');
+            if (parts.length !== 3) return null;
+            const payload = parts[1];
+            const padded = payload + '='.repeat((4 - payload.length % 4) % 4);
+            const decoded = JSON.parse(atob(padded));
+            if (decoded.exp) {
+                return decoded.exp * 1000;
+            }
+        } catch (e) {
+            /* geçersiz JWT */
+        }
+        return null;
+    }
+
+    /** tokenExpiry alanı veya JWT exp — en geç bitiş (ms) */
+    getEffectiveExpiryMs(apiInfo) {
+        if (!apiInfo || !apiInfo.token) return null;
+        let fromField = 0;
+        if (apiInfo.tokenExpiry) {
+            fromField = this.normalizeExpiry(apiInfo.tokenExpiry);
+        }
+        const fromJwt = this.parseJwtExpiryMsFromToken(apiInfo.token);
+        const mx = Math.max(fromField || 0, fromJwt || 0);
+        return mx > 0 ? mx : null;
+    }
+
+    /**
+     * Birden fazla kaynak arasında en geç bitecek token'ı seçer (manuel / Supabase / eklenti).
+     * Aynı bitişte: daha yeni timestamp öncelikli.
+     */
+    pickBestApiInfo(candidates) {
+        const valid = (candidates || []).filter((c) => c && c.token && String(c.token).trim());
+        if (valid.length === 0) return null;
+        return valid.reduce((best, cur) => {
+            const expB = this.getEffectiveExpiryMs(best) || 0;
+            const expC = this.getEffectiveExpiryMs(cur) || 0;
+            if (expC > expB) return cur;
+            if (expC < expB) return best;
+            const tsB = best.timestamp || 0;
+            const tsC = cur.timestamp || 0;
+            return tsC >= tsB ? cur : best;
+        });
+    }
+
+    mergeApiInfoForSave(winner, prev) {
+        if (!winner) return prev;
+        const bare = String(winner.token).replace(/^Bearer\s+/i, '').trim();
+        const token = bare ? `Bearer ${bare}` : winner.token;
+        const jwtExp = this.parseJwtExpiryMsFromToken(winner.token);
+        let tokenExpiry = winner.tokenExpiry || jwtExp || prev?.tokenExpiry;
+        if (tokenExpiry) {
+            const n = this.normalizeExpiry(tokenExpiry);
+            if (n) tokenExpiry = n;
+        } else if (jwtExp) {
+            tokenExpiry = jwtExp;
+        }
+        return {
+            token,
+            warehouseId: winner.warehouseId || prev?.warehouseId,
+            warehouseName: winner.warehouseName || prev?.warehouseName,
+            tokenExpiry: tokenExpiry || null,
+            baseUrl: winner.baseUrl || prev?.baseUrl || 'https://franchise-api-gateway.getirapi.com',
+            stockEndpoint: winner.stockEndpoint || prev?.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks',
+            timestamp: winner.timestamp || Date.now()
+        };
+    }
+
+    apiInfoSignature(info) {
+        if (!info || !info.token) return '';
+        const exp = this.getEffectiveExpiryMs(info) || 0;
+        const tok = String(info.token).replace(/^Bearer\s+/i, '').trim().slice(0, 48);
+        return `${tok}|${exp}`;
+    }
+
+    async fetchSupabaseApiInfo() {
+        if (!window.supabase || !this.currentUser) return null;
+        try {
+            const { data: userData } = await window.supabase
+                .from('users')
+                .select('counting_data')
+                .eq('username', this.currentUser.username)
+                .maybeSingle();
+            if (userData && userData.counting_data) {
+                const countingData =
+                    typeof userData.counting_data === 'string'
+                        ? JSON.parse(userData.counting_data)
+                        : userData.counting_data;
+                return countingData._api_info || null;
+            }
+        } catch (e) {
+            /* ignore */
+        }
+        return null;
+    }
+
+    async fetchExtensionApiInfo() {
+        let extensionApiInfo = null;
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+            try {
+                const extensionId =
+                    window.getirExtensionHelper?.extensionId || 'dhgdhdnnpeakmomlgpgmokecmdmeoebn';
+                const response = await new Promise((resolve) => {
+                    chrome.runtime.sendMessage(
+                        extensionId,
+                        { type: 'GET_API_INFO' },
+                        (response) => {
+                            if (chrome.runtime.lastError) resolve(null);
+                            else resolve(response);
+                        }
+                    );
+                });
+                if (response && response.success && response.apiInfo) {
+                    extensionApiInfo = response.apiInfo;
+                }
+            } catch (error) {
+                /* ignore */
+            }
+        }
+        if (!extensionApiInfo && typeof window !== 'undefined' && window.getirExtensionHelper) {
+            try {
+                extensionApiInfo = await window.getirExtensionHelper.getAPIInfo();
+            } catch (error) {
+                /* ignore */
+            }
+        }
+        if (!extensionApiInfo) {
+            const apiInfoStr = localStorage.getItem('getir_api_info');
+            if (apiInfoStr) {
+                try {
+                    extensionApiInfo = JSON.parse(apiInfoStr);
+                } catch (e) {
+                    /* ignore */
+                }
+            }
+        }
+        return extensionApiInfo && extensionApiInfo.token ? extensionApiInfo : null;
+    }
+
+    updateManualTokenPreview() {
+        const input = document.getElementById('manualTokenInput');
+        const preview = document.getElementById('manualTokenPreview');
+        if (!input || !preview) return;
+        const raw = input.value.trim();
+        if (!raw) {
+            preview.textContent = '';
+            return;
+        }
+        const exp = this.parseJwtExpiryMsFromToken(raw);
+        if (exp) {
+            preview.textContent = `JWT bitiş: ${new Date(exp).toLocaleString('tr-TR')}`;
+        } else {
+            preview.textContent =
+                'JWT algılanamadı; yine de kaydedebilirsiniz (varsa mevcut süre alanı kullanılır).';
+        }
+    }
+
+    async applyManualTokenFromInput() {
+        const input = document.getElementById('manualTokenInput');
+        const raw = input?.value?.trim();
+        if (!raw) {
+            this.showToast('Token girin', 'warning', 3000);
+            return;
+        }
+        if (!window.supabase || !this.currentUser) {
+            this.showToast('Oturum gerekli', 'error', 3000);
+            return;
+        }
+        const bearer = raw.startsWith('Bearer ') ? raw.trim() : `Bearer ${raw.trim()}`;
+        const jwtExp = this.parseJwtExpiryMsFromToken(raw);
+        const manualCandidate = {
+            token: bearer,
+            tokenExpiry: jwtExp || null,
+            timestamp: Date.now()
+        };
+        const supabaseSnap = await this.fetchSupabaseApiInfo();
+        const extensionApiInfo = await this.fetchExtensionApiInfo();
+        const best = this.pickBestApiInfo(
+            [supabaseSnap, extensionApiInfo, manualCandidate].filter(Boolean)
+        );
+        if (!best || !best.token) {
+            this.showToast('Geçerli token oluşturulamadı', 'error', 3000);
+            return;
+        }
+        const merged = this.mergeApiInfoForSave(best, supabaseSnap || {});
+        await this.saveAPIInfoToSupabase(merged);
+        if (input) input.value = '';
+        const pv = document.getElementById('manualTokenPreview');
+        if (pv) pv.textContent = '';
+        await this.updateAPIStatusCard();
+        this.showToast('Token kaydedildi (en uzun süreli seçildi)', 'success', 3500);
     }
 
     async loadProducts() {
@@ -503,6 +702,7 @@ class CountingSystem {
                 fullData._tables = {};
             }
 
+            this.ensureTableMeta(this.countingData);
             // Update current table with current countingData
             fullData._tables[this.currentTableName] = this.countingData;
             fullData._currentTable = this.currentTableName;
@@ -569,13 +769,27 @@ class CountingSystem {
         if (fullData._tables[tableName]) {
             this.countingData = fullData._tables[tableName];
         } else {
-            // Create new table if it doesn't exist
-            fullData._tables[tableName] = {};
-            this.countingData = {};
+            fullData._tables[tableName] = {
+                _tableMeta: { createdAt: new Date().toISOString() }
+            };
+            this.countingData = fullData._tables[tableName];
         }
 
         fullData._currentTable = tableName;
         await this.saveFullCountingData(fullData);
+
+        if (this.isDailyTableName(tableName)) {
+            const iso = this.getIsoFromDailyTableName(tableName);
+            if (iso) {
+                const el = document.getElementById('sayimDailyDateInput');
+                if (el) el.value = iso;
+                try {
+                    sessionStorage.setItem('sayimDailySelectedIso', iso);
+                } catch (e) {
+                    /* ignore */
+                }
+            }
+        }
 
         // Re-render UI
         this.renderTable();
@@ -636,12 +850,14 @@ class CountingSystem {
             throw new Error('Bu isimde bir tablo zaten mevcut');
         }
 
-        // Create new table
-        fullData._tables[trimmed] = {};
+        // Create new table (oluşturulma zamanı metadata)
+        fullData._tables[trimmed] = {
+            _tableMeta: { createdAt: new Date().toISOString() }
+        };
         
         // Switch to new table
         this.currentTableName = trimmed;
-        this.countingData = {};
+        this.countingData = fullData._tables[trimmed];
         fullData._currentTable = trimmed;
 
         await this.saveFullCountingData(fullData);
@@ -737,7 +953,7 @@ class CountingSystem {
         return tableNames.map(name => ({
             name,
             isCurrent: name === this.currentTableName,
-            productCount: Object.keys(fullData._tables[name] || {}).filter(k => k !== '_api_info').length
+            productCount: Object.keys(fullData._tables[name] || {}).filter((k) => !this.isReservedCountingKey(k)).length
         }));
     }
 
@@ -774,6 +990,115 @@ class CountingSystem {
         return name;
     }
 
+    /** Tablo nesnesinde ürün dışı anahtarlar (metadata) */
+    isReservedCountingKey(key) {
+        return (
+            key === '_api_info' ||
+            key === '_tableMeta' ||
+            key === '_tables' ||
+            key === '_currentTable'
+        );
+    }
+
+    /** Ürün satırlarının lastUpdated min/max (ms) */
+    getProductLastUpdatedBounds(tableData) {
+        let minMs = Infinity;
+        let maxMs = 0;
+        if (!tableData || typeof tableData !== 'object') {
+            return { minMs: null, maxMs: null };
+        }
+        Object.keys(tableData).forEach((key) => {
+            if (this.isReservedCountingKey(key)) return;
+            const row = tableData[key];
+            if (!row || typeof row !== 'object' || !row.lastUpdated) return;
+            const t = new Date(row.lastUpdated).getTime();
+            if (Number.isNaN(t)) return;
+            if (t < minMs) minMs = t;
+            if (t > maxMs) maxMs = t;
+        });
+        return {
+            minMs: minMs !== Infinity ? minMs : null,
+            maxMs: maxMs > 0 ? maxMs : null
+        };
+    }
+
+    /** Tablo oluşturulma zamanı: önce _tableMeta.createdAt, yoksa en eski sayım zamanı */
+    resolveTableCreatedMs(tableData) {
+        if (!tableData || typeof tableData !== 'object') return null;
+        const meta = tableData._tableMeta;
+        if (meta && meta.createdAt) {
+            const t = new Date(meta.createdAt).getTime();
+            if (!Number.isNaN(t)) return t;
+        }
+        const { minMs } = this.getProductLastUpdatedBounds(tableData);
+        return minMs;
+    }
+
+    /** Son sayım = ürünlerden en güncel lastUpdated */
+    resolveLastCountActivityMs(tableData) {
+        const { maxMs } = this.getProductLastUpdatedBounds(tableData);
+        return maxMs;
+    }
+
+    /** Eski tablolara createdAt yazar (bir sonraki kayıtta kalıcı) */
+    ensureTableMeta(tableData) {
+        if (!tableData || typeof tableData !== 'object') return;
+        if (tableData._tableMeta && tableData._tableMeta.createdAt) return;
+        const { minMs } = this.getProductLastUpdatedBounds(tableData);
+        const createdAt =
+            minMs != null ? new Date(minMs).toISOString() : new Date().toISOString();
+        tableData._tableMeta = { ...(tableData._tableMeta || {}), createdAt };
+    }
+
+    formatAbsoluteDateTimeTr(ms) {
+        if (ms == null || Number.isNaN(ms)) return '—';
+        try {
+            return new Date(ms).toLocaleString('tr-TR', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            return '—';
+        }
+    }
+
+    /** "2 saat önce" vb. */
+    formatRelativeAgoTr(ms) {
+        if (ms == null || Number.isNaN(ms)) return '';
+        const diffSec = Math.floor((Date.now() - ms) / 1000);
+        if (diffSec < 45) return 'az önce';
+        if (diffSec < 3600) return `${Math.floor(diffSec / 60)} dk önce`;
+        if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} saat önce`;
+        if (diffSec < 604800) return `${Math.floor(diffSec / 86400)} gün önce`;
+        const weeks = Math.floor(diffSec / 604800);
+        return `${weeks} hafta önce`;
+    }
+
+    updateActiveTableActivityLine() {
+        const el = document.getElementById('activeTableActivityLine');
+        if (!el) return;
+
+        const tableData = this.countingData;
+        const createdMs = this.resolveTableCreatedMs(tableData);
+        const lastMs = this.resolveLastCountActivityMs(tableData);
+
+        const createdStr = this.formatAbsoluteDateTimeTr(createdMs);
+        let lastBlock = 'Henüz sayım yok';
+        if (lastMs != null) {
+            const abs = this.formatAbsoluteDateTimeTr(lastMs);
+            const rel = this.formatRelativeAgoTr(lastMs);
+            lastBlock = rel ? `${abs} · ${rel}` : abs;
+        }
+
+        el.innerHTML = `
+            <span class="block"><span class="text-slate-600 font-medium">Oluşturulma:</span> ${createdStr}</span>
+            <span class="block mt-0.5"><span class="text-slate-600 font-medium">Son sayım:</span> ${lastBlock}</span>
+        `;
+    }
+
     findProductByBarcodeCode(code) {
         const c = code != null ? String(code).trim() : '';
         if (!c) return null;
@@ -804,8 +1129,57 @@ class CountingSystem {
         return null;
     }
 
-    async ensureDailyTableForToday() {
-        const iso = this.getLocalDateIso();
+    /** Günlük paneldeki `sayimDailyDateInput` değeri; yoksa bugün (YYYY-MM-DD) */
+    getDailySelectedIso() {
+        const el = document.getElementById('sayimDailyDateInput');
+        const v = el && el.value ? String(el.value).trim() : '';
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+        return this.getLocalDateIso();
+    }
+
+    initDailyDateControls() {
+        const dateInput = document.getElementById('sayimDailyDateInput');
+        if (!dateInput) return;
+        let initial = this.getLocalDateIso();
+        try {
+            const saved = sessionStorage.getItem('sayimDailySelectedIso');
+            if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) initial = saved;
+        } catch (e) {
+            /* ignore */
+        }
+        dateInput.value = initial;
+        dateInput.addEventListener('change', () => {
+            try {
+                sessionStorage.setItem('sayimDailySelectedIso', dateInput.value);
+            } catch (e) {
+                /* ignore */
+            }
+            this.updateDailyDeleteButtonState();
+        });
+        this.updateDailyDeleteButtonState();
+    }
+
+    updateDailyDeleteButtonState() {
+        const btn = document.getElementById('dailyTableDeleteDateBtn');
+        if (!btn) return;
+        const iso = this.getDailySelectedIso();
+        const tableName = this.DAILY_TABLE_PREFIX + iso;
+        const tables = this.getTableList();
+        const exists = tables.some((t) => t.name === tableName);
+        const canDelete = exists && tables.length > 1;
+        btn.disabled = !canDelete;
+        btn.setAttribute('aria-disabled', canDelete ? 'false' : 'true');
+        btn.title = canDelete
+            ? 'Seçili tarihin günlük tablosunu sil'
+            : !exists
+              ? 'Bu tarih için günlük tablo yok'
+              : 'En az bir tablo kalmalıdır';
+    }
+
+    async ensureDailyTableForDate(iso) {
+        if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+            throw new Error('Geçersiz tarih');
+        }
         const tableName = this.DAILY_TABLE_PREFIX + iso;
         const tables = this.getTableList();
         const exists = tables.some((t) => t.name === tableName);
@@ -856,29 +1230,55 @@ class CountingSystem {
         );
     }
 
-    async importDailyCountForToday() {
+    async importDailyCountForDate(iso) {
         try {
-            await this.ensureDailyTableForToday();
+            await this.ensureDailyTableForDate(iso);
         } catch (err) {
             this.showToast(err?.message || 'Tablo açılamadı', 'error', 4000);
             return;
         }
 
-        const iso = this.getLocalDateIso();
         const fetchFn = window.DailyCountImport?.fetchDailyRowsForDate;
         const rows = typeof fetchFn === 'function' ? await fetchFn(iso) : [];
+        const label = this.formatDailyDateLabelFromIso(iso);
         if (!rows.length) {
             this.showToast(
-                'Kontrol paneli verisi henüz bağlanmadı veya bugün için satır yok. Eklentiden kopyalayıp «Panodan içe aktar» kullanın veya `window.__DAILY_COUNT_MOCK_ROWS` ile test edin.',
+                `Kontrol paneli verisi henüz bağlanmadı veya ${label} için satır yok. Eklentiden kopyalayıp «Panodan içe aktar» kullanın veya \`window.__DAILY_COUNT_MOCK_ROWS\` ile test edin.`,
                 'info',
                 5000
             );
             this.updateTableSelector();
             this.syncSayimSubTabToTable();
+            this.updateDailyDeleteButtonState();
             return;
         }
 
         await this.applyImportedRows(rows);
+        this.updateDailyDeleteButtonState();
+    }
+
+    async deleteDailyTableForSelectedDate() {
+        const iso = this.getDailySelectedIso();
+        const tableName = this.DAILY_TABLE_PREFIX + iso;
+        const tables = this.getTableList();
+        if (!tables.some((t) => t.name === tableName)) {
+            this.showToast('Bu tarih için günlük tablo yok.', 'info', 3500);
+            return;
+        }
+        if (tables.length <= 1) {
+            this.showToast('En az bir tablo bulunmalıdır.', 'error', 4000);
+            return;
+        }
+        const label = this.formatDailyDateLabelFromIso(iso);
+        const ok = window.confirm(`"${label}" günlük tablosunu silmek istediğinize emin misiniz?`);
+        if (!ok) return;
+        try {
+            await this.deleteTable(tableName);
+            this.showToast('Günlük tablo silindi.', 'success', 3000);
+        } catch (err) {
+            this.showToast(err?.message || 'Silinemedi', 'error', 4000);
+        }
+        this.updateDailyDeleteButtonState();
     }
 
     async importSayimPasteFromText(rawText) {
@@ -893,7 +1293,7 @@ class CountingSystem {
             return;
         }
         try {
-            await this.ensureDailyTableForToday();
+            await this.ensureDailyTableForDate(this.getDailySelectedIso());
         } catch (err) {
             this.showToast(err?.message || 'Tablo açılamadı', 'error', 4000);
             return;
@@ -917,6 +1317,8 @@ class CountingSystem {
             summaryText.textContent = `${displayName}${tag} · ${cnt} ürün`;
         }
 
+        this.updateActiveTableActivityLine();
+
         if (renameBtn) {
             const lock = this.isDailyTableName(this.currentTableName);
             renameBtn.disabled = lock;
@@ -929,6 +1331,7 @@ class CountingSystem {
         }
 
         if (!generalList || !dailyList) {
+            this.updateDailyDeleteButtonState();
             return;
         }
 
@@ -988,7 +1391,7 @@ class CountingSystem {
         if (dailyTables.length === 0) {
             const empty = document.createElement('p');
             empty.className = 'text-[11px] text-indigo-800/85 px-2 py-1 text-center shrink-0 min-w-[min(100%,18rem)]';
-            empty.textContent = 'Günlük kayıt yok. «Bugün» veya panodan ekleyin.';
+            empty.textContent = 'Günlük kayıt yok. Tarih seçip içe aktarın veya panodan ekleyin.';
             dailyList.appendChild(empty);
         } else {
             dailyTables.forEach((table) => {
@@ -1016,6 +1419,7 @@ class CountingSystem {
                 dailyList.appendChild(btn);
             });
         }
+        this.updateDailyDeleteButtonState();
     }
 
     /** Genel / Günlük sekmesi — aktif tablo türüyle hizala */
@@ -1150,6 +1554,7 @@ class CountingSystem {
             countingData._api_info = {
                 token: apiInfo.token,
                 warehouseId: apiInfo.warehouseId,
+                warehouseName: apiInfo.warehouseName,
                 tokenExpiry: apiInfo.tokenExpiry,
                 baseUrl: apiInfo.baseUrl,
                 stockEndpoint: apiInfo.stockEndpoint,
@@ -1336,7 +1741,13 @@ class CountingSystem {
         const dailyCountImportBtn = document.getElementById('dailyCountImportBtn');
         if (dailyCountImportBtn) {
             dailyCountImportBtn.addEventListener('click', () => {
-                this.importDailyCountForToday();
+                this.importDailyCountForDate(this.getDailySelectedIso());
+            });
+        }
+        const dailyTableDeleteDateBtn = document.getElementById('dailyTableDeleteDateBtn');
+        if (dailyTableDeleteDateBtn) {
+            dailyTableDeleteDateBtn.addEventListener('click', () => {
+                this.deleteDailyTableForSelectedDate();
             });
         }
 
@@ -2571,7 +2982,7 @@ class CountingSystem {
         // Get products that have no system stock (warehouse stock doesn't matter)
         // _api_info'yu filtrele (sistem bilgisi, ürün değil)
             const productsToSync = Object.keys(this.countingData).filter(productId => {
-            if (productId === '_api_info' || productId === '_tables' || productId === '_currentTable') return false;
+            if (this.isReservedCountingKey(productId)) return false;
                 const data = this.countingData[productId];
             // Sistem stoku yoksa sync yap (depo stoku olsun ya da olmasın)
             return data.systemStock === null || data.systemStock === undefined;
@@ -3751,10 +4162,8 @@ class CountingSystem {
         const cardView = document.getElementById('countingCardView');
         const emptyState = document.getElementById('emptyState');
         
-        // _api_info, _tables, _currentTable'u filtrele (sistem bilgisi, ürün değil)
-        const productIds = Object.keys(this.countingData).filter(key => 
-            key !== '_api_info' && key !== '_tables' && key !== '_currentTable'
-        );
+        // Metadata anahtarlarını filtrele
+        const productIds = Object.keys(this.countingData).filter((key) => !this.isReservedCountingKey(key));
         
         if (productIds.length === 0) {
             if (tableBody) tableBody.innerHTML = '';
@@ -4154,16 +4563,15 @@ class CountingSystem {
         if (this.currentViewMode === 'rapid') {
             this.renderRapidCountingMode();
         }
+
+        this.updateActiveTableActivityLine();
     }
 
     renderRapidCountingMode() {
         const gridContainer = document.getElementById('rapidCountingGridContainer');
         if (!gridContainer) return;
 
-        // _api_info, _tables, _currentTable'u filtrele (sistem bilgisi, ürün değil)
-        const productIds = Object.keys(this.countingData).filter(key => 
-            key !== '_api_info' && key !== '_tables' && key !== '_currentTable'
-        );
+        const productIds = Object.keys(this.countingData).filter((key) => !this.isReservedCountingKey(key));
         
         if (productIds.length === 0) {
             gridContainer.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">Henüz ürün eklenmedi</div>';
@@ -4248,9 +4656,7 @@ class CountingSystem {
 
     findNextUncountedProduct(currentProductId) {
         // Get all product IDs from countingData (excluding non-product keys)
-        const productIds = Object.keys(this.countingData).filter(
-            key => key !== '_api_info' && key !== '_tables' && key !== '_currentTable'
-        );
+        const productIds = Object.keys(this.countingData).filter((key) => !this.isReservedCountingKey(key));
         
         // Find current product index
         const currentIndex = productIds.indexOf(currentProductId);
@@ -4281,9 +4687,7 @@ class CountingSystem {
 
     findPreviousUncountedProduct(currentProductId) {
         // Get all product IDs from countingData (excluding non-product keys)
-        const productIds = Object.keys(this.countingData).filter(
-            key => key !== '_api_info' && key !== '_tables' && key !== '_currentTable'
-        );
+        const productIds = Object.keys(this.countingData).filter((key) => !this.isReservedCountingKey(key));
         
         // Find current product index
         const currentIndex = productIds.indexOf(currentProductId);
@@ -4767,10 +5171,16 @@ class CountingSystem {
     }
 
     updateCountingProgress() {
-        const totalProducts = Object.keys(this.countingData).length;
-        const countedProducts = Object.values(this.countingData).filter(
-            data => data.warehouseStock !== null && data.warehouseStock !== undefined
-        ).length;
+        const productIds = Object.keys(this.countingData).filter((k) => !this.isReservedCountingKey(k));
+        const totalProducts = productIds.length;
+        const countedProducts = productIds.filter((pid) => {
+            const data = this.countingData[pid];
+            return (
+                data &&
+                data.warehouseStock !== null &&
+                data.warehouseStock !== undefined
+            );
+        }).length;
         const skippedCount = this.skippedProducts.size;
 
         const progressText = document.getElementById('countingProgressText');
@@ -5015,11 +5425,7 @@ class CountingSystem {
 
     updateStatistics() {
         // _api_info ve _tables metadata'sını filtrele (sistem bilgisi, ürün değil)
-        const productIds = Object.keys(this.countingData).filter(key => 
-            key !== '_api_info' && 
-            key !== '_tables' && 
-            key !== '_currentTable'
-        );
+        const productIds = Object.keys(this.countingData).filter((key) => !this.isReservedCountingKey(key));
         let positiveCount = 0;
         let negativeCount = 0;
 
@@ -5535,9 +5941,7 @@ class CountingSystem {
     // Execute reset warehouse stocks
     executeResetWarehouseStocks() {
         let resetCount = 0;
-        const productIds = Object.keys(this.countingData).filter(id => 
-            id !== '_api_info' && id !== '_tables' && id !== '_currentTable'
-        );
+        const productIds = Object.keys(this.countingData).filter((id) => !this.isReservedCountingKey(id));
         
         productIds.forEach(productId => {
             if (this.countingData[productId]) {
@@ -5562,9 +5966,7 @@ class CountingSystem {
     // Execute reset system stocks
     executeResetSystemStocks() {
         let resetCount = 0;
-        const productIds = Object.keys(this.countingData).filter(id => 
-            id !== '_api_info' && id !== '_tables' && id !== '_currentTable'
-        );
+        const productIds = Object.keys(this.countingData).filter((id) => !this.isReservedCountingKey(id));
         
         productIds.forEach(productId => {
             if (this.countingData[productId]) {
@@ -5771,156 +6173,20 @@ class CountingSystem {
                 return;
             }
             
-            // Get API info from Supabase and extension (karşılaştırma için)
-            let apiInfo = null;
-            let extensionApiInfo = null;
+            let apiInfo = await this.fetchSupabaseApiInfo();
+            const extensionApiInfo = await this.fetchExtensionApiInfo();
             
-            // Try to get from Supabase first
-            if (window.supabase && this.currentUser) {
-                const { data: userData } = await window.supabase
-                    .from('users')
-                    .select('counting_data')
-                    .eq('username', this.currentUser.username)
-                    .maybeSingle();
-                
-                if (userData && userData.counting_data) {
-                    const countingData = typeof userData.counting_data === 'string' 
-                        ? JSON.parse(userData.counting_data) 
-                        : userData.counting_data;
-                    apiInfo = countingData._api_info || null;
+            // Supabase (manuel + önceki kayıt) + eklenti: en geç bitecek token kazanır
+            const supabaseSnapshot = apiInfo && apiInfo.token ? { ...apiInfo } : null;
+            const best = this.pickBestApiInfo([supabaseSnapshot, extensionApiInfo].filter(Boolean));
+            if (best && best.token) {
+                const mergedForSave = this.mergeApiInfoForSave(best, supabaseSnapshot || {});
+                if (this.apiInfoSignature(mergedForSave) !== this.apiInfoSignature(supabaseSnapshot)) {
+                    await this.saveAPIInfoToSupabase(mergedForSave);
                 }
-            }
-            
-            // Try extension (karşılaştırma için)
-            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                try {
-                    // Extension ID'yi al (extension helper'dan veya hardcoded)
-                    const extensionId = window.getirExtensionHelper?.extensionId || 'dhgdhdnnpeakmomlgpgmokecmdmeoebn';
-                    
-                    const response = await new Promise((resolve) => {
-                        chrome.runtime.sendMessage(
-                            extensionId,
-                            { type: 'GET_API_INFO' },
-                            (response) => {
-                                if (chrome.runtime.lastError) {
-                                    resolve(null);
-                                } else {
-                                    resolve(response);
-                                }
-                            }
-                        );
-                    });
-                    
-                    if (response && response.success && response.apiInfo) {
-                        extensionApiInfo = response.apiInfo;
-                    }
-                } catch (error) {
-                    // Silent fail
-                }
-            }
-            
-            // Fallback: window.getirExtensionHelper
-            if (!extensionApiInfo && typeof window !== 'undefined' && window.getirExtensionHelper) {
-                try {
-                    extensionApiInfo = await window.getirExtensionHelper.getAPIInfo();
-                } catch (error) {
-                    // Silent fail
-                }
-            }
-            
-            // Fallback: localStorage
-            if (!extensionApiInfo) {
-                const apiInfoKey = 'getir_api_info';
-                const apiInfoStr = localStorage.getItem(apiInfoKey);
-                if (apiInfoStr) {
-                    try {
-                        extensionApiInfo = JSON.parse(apiInfoStr);
-                    } catch (e) {
-                        // Silent fail
-                    }
-                }
-            }
-            
-            // Extension'dan gelen token'ı Supabase'dekiyle karşılaştır
-            // Eğer extension'daki token daha geçerliyse (daha uzun süre kaldıysa), güncelle
-            if (extensionApiInfo && extensionApiInfo.token) {
-                // Eğer Supabase'de token yoksa, extension'dan gelen token'ı kullan
-                if (!apiInfo || !apiInfo.token) {
-                    console.log('🔄 Supabase\'de token yok, extension\'dan gelen token kullanılıyor');
-                    apiInfo = extensionApiInfo;
-                    // Supabase'e kaydet
-                    await this.checkAndSaveAPIInfoFromExtension();
-                } else {
-                    // Her iki token'ın expiry'sini karşılaştır
-                    let supabaseExpiryTime = null;
-                    let extensionExpiryTime = null;
-                    
-                    if (apiInfo.tokenExpiry) {
-                        if (typeof apiInfo.tokenExpiry === 'number') {
-                            supabaseExpiryTime = apiInfo.tokenExpiry;
-                        } else if (typeof apiInfo.tokenExpiry === 'string') {
-                            supabaseExpiryTime = new Date(apiInfo.tokenExpiry).getTime();
-                            if (isNaN(supabaseExpiryTime)) {
-                                supabaseExpiryTime = parseInt(apiInfo.tokenExpiry, 10);
-                            }
-                        }
-                    }
-                    
-                    if (extensionApiInfo.tokenExpiry) {
-                        if (typeof extensionApiInfo.tokenExpiry === 'number') {
-                            extensionExpiryTime = extensionApiInfo.tokenExpiry;
-                        } else if (typeof extensionApiInfo.tokenExpiry === 'string') {
-                            extensionExpiryTime = new Date(extensionApiInfo.tokenExpiry).getTime();
-                            if (isNaN(extensionExpiryTime)) {
-                                extensionExpiryTime = parseInt(extensionApiInfo.tokenExpiry, 10);
-                            }
-                        }
-                    }
-                    
-                    // Eğer extension'daki token daha geçerliyse (daha uzun süre kaldıysa), güncelle
-                    // Extension'dan gelen token'ı öncelikli olarak kabul et
-                    // Çünkü extension daha güncel token yakalıyor
-                    const supabaseToken = apiInfo?.token?.substring(7)?.trim() || '';
-                    const extensionToken = extensionApiInfo?.token?.substring(7)?.trim() || '';
-                    
-                    // Token değeri farklıysa veya extension'dan gelen token daha güncelse, güncelle
-                    if (extensionToken && extensionToken !== supabaseToken) {
-                        // Token değeri farklı, extension'dan gelen token'ı kullan
-                        console.log('🔄 Extension\'dan yeni token geldi, güncelleniyor');
-                        apiInfo = extensionApiInfo;
-                        await this.checkAndSaveAPIInfoFromExtension();
-                    } else if (supabaseExpiryTime && extensionExpiryTime && !isNaN(supabaseExpiryTime) && !isNaN(extensionExpiryTime)) {
-                        const supabaseTimeRemaining = supabaseExpiryTime - Date.now();
-                        const extensionTimeRemaining = extensionExpiryTime - Date.now();
-                        
-                        // Extension'daki token daha geçerliyse (daha uzun süre kaldıysa) veya her ikisi de süresi dolmuşsa extension'ı kullan
-                        if (extensionTimeRemaining > supabaseTimeRemaining || (extensionTimeRemaining < 0 && supabaseTimeRemaining < 0)) {
-                            // Extension'daki token daha geçerli veya her ikisi de süresi dolmuş, extension'ı kullan
-                            console.log('🔄 Extension\'dan gelen token kullanılıyor:', {
-                                supabaseTimeRemaining: Math.floor(supabaseTimeRemaining / (1000 * 60)) + ' dakika',
-                                extensionTimeRemaining: Math.floor(extensionTimeRemaining / (1000 * 60)) + ' dakika'
-                            });
-                            apiInfo = extensionApiInfo;
-                            // Supabase'e kaydet
-                            await this.checkAndSaveAPIInfoFromExtension();
-                        } else {
-                            console.log('ℹ️ Supabase\'deki token daha geçerli, güncelleme yapılmıyor');
-                        }
-                    } else if (extensionExpiryTime && !isNaN(extensionExpiryTime)) {
-                        // Supabase'de expiry yok ama extension'da var, güncelle
-                        console.log('🔄 Extension\'da expiry var, Supabase\'e güncelleniyor');
-                        apiInfo = extensionApiInfo;
-                        await this.checkAndSaveAPIInfoFromExtension();
-                    } else if (extensionToken && !supabaseToken) {
-                        // Extension'da token var ama Supabase'de yok, güncelle
-                        console.log('🔄 Extension\'da token var, Supabase\'e güncelleniyor');
-                        apiInfo = extensionApiInfo;
-                        await this.checkAndSaveAPIInfoFromExtension();
-                    }
-                }
-            } else if (!apiInfo && extensionApiInfo) {
-                // Fallback: extension'dan gelen token'ı kullan
-                apiInfo = extensionApiInfo;
+                apiInfo = mergedForSave;
+            } else {
+                apiInfo = supabaseSnapshot;
             }
             
             // Update card based on API info
@@ -6123,7 +6389,7 @@ class CountingSystem {
 
             // Process each product in the table
             for (const [productId, data] of Object.entries(tableData)) {
-                if (productId === '_api_info' || productId === '_tables' || productId === '_currentTable') {
+                if (this.isReservedCountingKey(productId)) {
                     continue;
                 }
 

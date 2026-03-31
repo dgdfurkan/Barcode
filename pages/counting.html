@@ -1501,21 +1501,38 @@
 
                 <!-- Günlük panel -->
                 <div id="sayimPanelDaily" role="tabpanel" aria-labelledby="sayimTabDailyBtn" class="sayim-panel hidden">
-                    <div class="flex flex-nowrap gap-2 overflow-x-auto pb-1 -mx-0.5 px-0.5 sm:flex-wrap sm:overflow-visible sm:justify-end">
-                        <button type="button" id="sayimPasteOpenBtn" class="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-indigo-800 shadow-sm hover:bg-indigo-50 sm:px-3 sm:text-xs" title="Depo panelinden kopyalanan sayımı yapıştırın">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end sm:gap-x-2 sm:gap-y-2">
+                        <div class="flex flex-wrap items-center gap-2 min-w-0">
+                            <label for="sayimDailyDateInput" class="text-[11px] font-semibold text-indigo-900/90 shrink-0">Tarih</label>
+                            <input
+                                type="date"
+                                id="sayimDailyDateInput"
+                                class="min-h-[38px] max-w-[11.5rem] rounded-lg border border-indigo-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-900 shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                                autocomplete="off"
+                            />
+                        </div>
+                        <div class="flex flex-nowrap gap-2 overflow-x-auto pb-0.5 -mx-0.5 px-0.5 sm:flex-wrap sm:overflow-visible sm:pb-0">
+                        <button type="button" id="sayimPasteOpenBtn" class="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-indigo-800 shadow-sm hover:bg-indigo-50 sm:px-3 sm:text-xs" title="Seçili tarihin günlük tablosuna: depo panelinden kopyalanan sayımı yapıştırın">
                             <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                             </svg>
                             <span class="sm:hidden">Pano</span><span class="hidden sm:inline">Panodan</span>
                         </button>
-                        <button type="button" id="dailyCountImportBtn" class="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-indigo-700 sm:px-3 sm:text-xs" title="Bugünün günlük tablosu">
+                        <button type="button" id="dailyCountImportBtn" class="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-indigo-700 sm:px-3 sm:text-xs" title="Seçili tarih için kontrol panelinden günlük sayımı içe aktar">
                             <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                             </svg>
-                            <span class="sm:hidden">Bugün</span><span class="hidden sm:inline">Bugünü Ekle</span>
+                            <span>İçe aktar</span>
                         </button>
+                        <button type="button" id="dailyTableDeleteDateBtn" class="inline-flex shrink-0 items-center justify-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-40 disabled:pointer-events-none sm:px-3 sm:text-xs" title="Seçili tarihin günlük tablosunu sil" aria-label="Seçili tarihin günlük tablosunu sil">
+                            <svg class="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            <span>Sil</span>
+                        </button>
+                        </div>
                     </div>
-                    <p class="text-[10px] sm:text-[11px] text-indigo-700/70 mt-1 mb-1.5 hidden sm:block">Tarih adları sabit; içe aktarma veya bugünü ekleyin.</p>
+                    <p class="text-[10px] sm:text-[11px] text-indigo-700/70 mt-1 mb-1.5 hidden sm:block">Tarih seçin (varsayılan bugün); içe aktarma ve pano bu tarihe yazılır. Gerekirse tabloyu silebilirsiniz.</p>
                     <div id="dailyTableList" class="sayim-chip-scroll rounded-lg border border-indigo-100/90 bg-indigo-50/30 px-1" role="list" aria-label="Günlük Sayım Tarihleri"></div>
                 </div>
             </div>

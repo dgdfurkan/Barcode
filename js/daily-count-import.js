@@ -1,6 +1,6 @@
 /**
  * Günlük sayım — kontrol paneli verisi (format netleşince genişletilecek).
- * counting.js, bugünün tablosuna ürün eklerken bu modülü kullanır.
+ * counting.js, seçilen günlük tarih tablosuna satır çekerken bu modülü kullanır.
  */
 (function () {
     'use strict';
