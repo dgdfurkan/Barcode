@@ -1159,6 +1159,30 @@ class CountingSystem {
         this.updateDailyDeleteButtonState();
     }
 
+    openDailyAddModal() {
+        const modal = document.getElementById('sayimDailyAddModal');
+        const dateInput = document.getElementById('sayimDailyDateInput');
+        if (!modal) return;
+        let initial = this.getLocalDateIso();
+        try {
+            const saved = sessionStorage.getItem('sayimDailySelectedIso');
+            if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) initial = saved;
+        } catch (e) {
+            /* ignore */
+        }
+        if (dateInput) dateInput.value = initial;
+        modal.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+        this.updateDailyDeleteButtonState();
+        setTimeout(() => dateInput?.focus(), 150);
+    }
+
+    closeDailyAddModal() {
+        const modal = document.getElementById('sayimDailyAddModal');
+        if (modal) modal.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
     updateDailyDeleteButtonState() {
         const btn = document.getElementById('dailyTableDeleteDateBtn');
         if (!btn) return;
@@ -1255,6 +1279,7 @@ class CountingSystem {
 
         await this.applyImportedRows(rows);
         this.updateDailyDeleteButtonState();
+        this.closeDailyAddModal();
     }
 
     async deleteDailyTableForSelectedDate() {
@@ -1275,6 +1300,7 @@ class CountingSystem {
         try {
             await this.deleteTable(tableName);
             this.showToast('Günlük tablo silindi.', 'success', 3000);
+            this.closeDailyAddModal();
         } catch (err) {
             this.showToast(err?.message || 'Silinemedi', 'error', 4000);
         }
@@ -1299,6 +1325,7 @@ class CountingSystem {
             return;
         }
         await this.applyImportedRows(parsed.items);
+        this.closeDailyAddModal();
     }
 
     // Update table selector UI (genel liste + günlük liste)
@@ -1386,12 +1413,17 @@ class CountingSystem {
             }))
             .sort((a, b) => (b.iso || '').localeCompare(a.iso || ''));
 
+        const dailyBadge = document.getElementById('dailyTableCountBadge');
+        if (dailyBadge) {
+            dailyBadge.textContent = `${dailyTables.length} gün`;
+        }
+
         dailyList.innerHTML = '';
         dailyList.classList.toggle('sayim-chip-scroll--empty', dailyTables.length === 0);
         if (dailyTables.length === 0) {
             const empty = document.createElement('p');
-            empty.className = 'text-[11px] text-indigo-800/85 px-2 py-1 text-center shrink-0 min-w-[min(100%,18rem)]';
-            empty.textContent = 'Günlük kayıt yok. Tarih seçip içe aktarın veya panodan ekleyin.';
+            empty.className = 'text-[11px] text-indigo-800/85 px-2 py-2 text-center leading-relaxed';
+            empty.textContent = 'Henüz gün yok. «Gün ekle / veri ekle» ile tarih seçip pano veya içe aktar kullanın.';
             dailyList.appendChild(empty);
         } else {
             dailyTables.forEach((table) => {
@@ -1402,14 +1434,14 @@ class CountingSystem {
                 btn.setAttribute('role', 'listitem');
                 btn.dataset.tableName = table.name;
                 btn.className = [
-                    'sayim-table-chip shrink-0 inline-flex max-w-[min(100vw-4rem,12rem)] items-center justify-between gap-2 rounded-full border px-3 py-1.5 text-left text-xs font-medium transition-colors snap-start sm:max-w-[14rem]',
+                    'sayim-table-chip w-full shrink-0 inline-flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-colors sm:px-3.5',
                     isActive
-                        ? 'border-indigo-400 bg-indigo-50 text-indigo-950 shadow-sm ring-1 ring-indigo-200/50'
-                        : 'border-indigo-200/90 bg-white/95 text-indigo-900/90 hover:bg-indigo-50/90 hover:border-indigo-300',
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-950 shadow-sm ring-2 ring-indigo-200/60'
+                        : 'border-indigo-200/90 bg-white text-indigo-900/95 hover:border-indigo-300 hover:bg-indigo-50/80',
                 ].join(' ');
                 btn.innerHTML = `
-                    <span class="min-w-0 truncate">${this.escapeHtml(label)}</span>
-                    <span class="shrink-0 tabular-nums text-[10px] font-semibold ${isActive ? 'text-indigo-700' : 'text-indigo-400'}">${table.productCount ?? 0}</span>
+                    <span class="min-w-0 flex-1 truncate">${this.escapeHtml(label)}</span>
+                    <span class="shrink-0 rounded-md bg-indigo-600/10 px-2 py-0.5 tabular-nums text-[11px] font-bold ${isActive ? 'text-indigo-800' : 'text-indigo-600'}">${table.productCount ?? 0}</span>
                 `;
                 btn.addEventListener('click', async () => {
                     if (table.name !== this.currentTableName) {
@@ -1748,6 +1780,22 @@ class CountingSystem {
         if (dailyTableDeleteDateBtn) {
             dailyTableDeleteDateBtn.addEventListener('click', () => {
                 this.deleteDailyTableForSelectedDate();
+            });
+        }
+
+        const sayimDailyAddModal = document.getElementById('sayimDailyAddModal');
+        const sayimDailyAddOpenBtn = document.getElementById('sayimDailyAddOpenBtn');
+        const sayimDailyAddCloseBtn = document.getElementById('sayimDailyAddCloseBtn');
+        const sayimDailyAddDoneBtn = document.getElementById('sayimDailyAddDoneBtn');
+        if (sayimDailyAddOpenBtn) {
+            sayimDailyAddOpenBtn.addEventListener('click', () => this.openDailyAddModal());
+        }
+        [sayimDailyAddCloseBtn, sayimDailyAddDoneBtn].forEach((btn) => {
+            if (btn) btn.addEventListener('click', () => this.closeDailyAddModal());
+        });
+        if (sayimDailyAddModal) {
+            sayimDailyAddModal.addEventListener('click', (e) => {
+                if (e.target === sayimDailyAddModal) this.closeDailyAddModal();
             });
         }
 
