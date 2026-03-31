@@ -2408,20 +2408,24 @@ class CountingSystem {
                 try {
                     const result = await this.requestStockFromExtension(null, barcode, this.currentCountingProduct);
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
-                    const price = typeof result === 'object' ? result?.price : null;
-                    const priceText = typeof result === 'object' ? result?.priceText : null;
-                    
+                    const price = typeof result === 'object' && result !== null ? result?.price : null;
+                    const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
+                    const reserved =
+                        typeof result === 'object' && result !== null && 'reservedStock' in result
+                            ? result.reservedStock
+                            : undefined;
+
                     if (stock !== null && stock !== undefined) {
-                        this.updateProductStock(this.currentCountingProduct, null, stock, price, priceText);
+                        this.updateProductStock(
+                            this.currentCountingProduct,
+                            null,
+                            stock,
+                            price,
+                            priceText,
+                            reserved
+                        );
                         this.showToast('Sistem stoku yenilendi', 'success', 2000);
-                        
-                        // Update system stock display
-                        const systemStockElement = document.getElementById('countingSystemStock');
-                        if (systemStockElement) {
-                            systemStockElement.textContent = `Sistem: ${stock}`;
-                        }
-                        
-                        // Update stock indicator
+
                         const stockIndicator = document.getElementById('countingStockIndicator');
                         this.updateStockIndicator(this.currentCountingProduct, stockIndicator);
                     } else {
@@ -2781,7 +2785,7 @@ class CountingSystem {
         this.updateCountingProgress();
     }
 
-    updateProductStock(productId, warehouseStock, systemStock = null, price = null, priceText = null) {
+    updateProductStock(productId, warehouseStock, systemStock = null, price = null, priceText = null, reservedStock = undefined) {
         if (!this.countingData[productId]) {
             console.error('Product not found in counting data:', productId);
             return;
@@ -2816,6 +2820,13 @@ class CountingSystem {
         if (priceText !== null && priceText !== undefined) {
             this.countingData[productId].priceText = priceText;
         }
+        if (reservedStock !== undefined) {
+            if (reservedStock === null) {
+                delete this.countingData[productId].reservedStock;
+            } else {
+                this.countingData[productId].reservedStock = Number(reservedStock);
+            }
+        }
         this.countingData[productId].lastUpdated = now.toISOString();
 
         // Save and render
@@ -2831,7 +2842,33 @@ class CountingSystem {
         this.updateCountingProgress();
 
         if (productId === this.currentCountingProduct) {
+            const d = this.countingData[productId];
+            this.updateCountingBottomSheetSystemStockDisplay(d.systemStock, d.reservedStock);
             this.updateCorrectEntryButtonState();
+        }
+    }
+
+    /** Sayım sheet: Sistem + (isteğe bağlı) Rezerve Stok — sadece rezerve &gt; 0 iken gösterilir */
+    updateCountingBottomSheetSystemStockDisplay(systemStock, reservedStock) {
+        const elSys = document.getElementById('countingSystemStock');
+        const elRes = document.getElementById('countingReservedStock');
+        if (elSys) {
+            if (systemStock !== null && systemStock !== undefined) {
+                elSys.textContent = `Sistem: ${systemStock}`;
+            } else {
+                elSys.textContent = '';
+            }
+        }
+        if (elRes) {
+            const rs =
+                reservedStock !== null && reservedStock !== undefined ? Number(reservedStock) : null;
+            if (rs !== null && !Number.isNaN(rs) && rs > 0) {
+                elRes.textContent = `Rezerve Stok: ${rs}`;
+                elRes.classList.remove('hidden');
+            } else {
+                elRes.textContent = '';
+                elRes.classList.add('hidden');
+            }
         }
     }
 
@@ -3174,15 +3211,19 @@ class CountingSystem {
                 try {
                     const result = await this.requestStockFromExtension(product.name, barcode, productId);
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
-                    const price = typeof result === 'object' ? result?.price : null;
-                    const priceText = typeof result === 'object' ? result?.priceText : null;
-                    
+                    const price = typeof result === 'object' && result !== null ? result?.price : null;
+                    const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
+                    const reserved =
+                        typeof result === 'object' && result !== null && 'reservedStock' in result
+                            ? result.reservedStock
+                            : undefined;
+
                     if (stock !== null && stock !== undefined) {
                         // Success - update stock and clear failed flag
                         if (this.countingData[productId]) {
                             this.countingData[productId].apiFetchFailed = false;
                         }
-                        this.updateProductStock(productId, null, stock, price, priceText);
+                        this.updateProductStock(productId, null, stock, price, priceText, reserved);
                     updatedCount++;
                         console.log(`✅ ${product.name || productId}: ${stock}${price ? ` (Fiyat: ${priceText || price})` : ''}`);
                     } else {
@@ -3637,6 +3678,35 @@ class CountingSystem {
             console.error('❌ Test API Error:', error);
             return null;
         }
+    }
+
+    /**
+     * Getir /stocks API ürün satırından rezerve miktarı.
+     * Tek alan (reservedStock, reserved, …) veya kurumsal + imha + transfer rezerv toplamı.
+     * @returns {number|null} null = yanıtta rezerve alanı yok veya okunamadı
+     */
+    extractReservedStockFromProductItem(item) {
+        if (!item || typeof item !== 'object') return null;
+        const directKeys = ['reservedStock', 'reserved', 'reservedQuantity', 'rezerveStock'];
+        for (const k of directKeys) {
+            if (Object.prototype.hasOwnProperty.call(item, k) && item[k] !== null && item[k] !== undefined) {
+                const n = Number(item[k]);
+                if (!Number.isNaN(n)) return n;
+            }
+        }
+        const sumKeys = ['reservedForCorporateSales', 'reservedForDisposal', 'reservedForTransfer'];
+        let sum = 0;
+        let any = false;
+        for (const k of sumKeys) {
+            if (Object.prototype.hasOwnProperty.call(item, k) && item[k] !== null && item[k] !== undefined) {
+                const n = Number(item[k]);
+                if (!Number.isNaN(n)) {
+                    sum += n;
+                    any = true;
+                }
+            }
+        }
+        return any ? sum : null;
     }
 
     async fetchStockFromAPI(apiInfo, barcode, productName, productId = null) {
@@ -4141,12 +4211,25 @@ class CountingSystem {
                 if (price !== null) {
                     console.log('💰 Fiyat bilgisi bulundu:', price, priceText ? `(${priceText})` : '');
                 }
-                
-                // Return object with stock and price
+
+                const reservedStock = foundProduct ? this.extractReservedStockFromProductItem(foundProduct) : null;
+                if (reservedStock !== null && reservedStock !== undefined) {
+                    console.log('📌 Rezerve stok (hesaplanan):', reservedStock);
+                }
+
+                /**
+                 * Stok güncelle / API yanıt özeti (fetchStockFromAPI):
+                 * - stock: available | stock | quantity (öncelik sırasıyla)
+                 * - price, priceText: ürün fiyatı
+                 * - reservedStock: tek alan (reservedStock, reserved, …) veya
+                 *   reservedForCorporateSales + reservedForDisposal + reservedForTransfer toplamı
+                 * Tam ham satır: konsolda "API yanıtı (parsed)" ile foundProduct görülebilir.
+                 */
                 return {
                     stock: stock,
                     price: price,
-                    priceText: priceText
+                    priceText: priceText,
+                    reservedStock
                 };
             }
             
@@ -5061,7 +5144,6 @@ class CountingSystem {
         const productBarcodesEl = document.getElementById('countingProductBarcodes');
         const depoInput = document.getElementById('countingDepoInput');
         const stockIndicator = document.getElementById('countingStockIndicator');
-        const systemStockElement = document.getElementById('countingSystemStock');
 
         if (productImage) {
             productImage.src = product.image || '../assets/logo.png';
@@ -5099,14 +5181,7 @@ class CountingSystem {
             depoInput.value = data.warehouseStock !== null && data.warehouseStock !== undefined ? data.warehouseStock : '';
         }
         
-        // Update system stock display
-        if (systemStockElement) {
-            if (data.systemStock !== null && data.systemStock !== undefined) {
-                systemStockElement.textContent = `Sistem: ${data.systemStock}`;
-            } else {
-                systemStockElement.textContent = '';
-            }
-        }
+        this.updateCountingBottomSheetSystemStockDisplay(data.systemStock, data.reservedStock);
 
         // Update stock indicator
         this.updateStockIndicator(productId, stockIndicator);
@@ -5464,15 +5539,19 @@ class CountingSystem {
                 try {
                     const result = await this.requestStockFromExtension(null, barcode, productId);
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
-                    const price = typeof result === 'object' ? result?.price : null;
-                    const priceText = typeof result === 'object' ? result?.priceText : null;
-                    
+                    const price = typeof result === 'object' && result !== null ? result?.price : null;
+                    const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
+                    const reserved =
+                        typeof result === 'object' && result !== null && 'reservedStock' in result
+                            ? result.reservedStock
+                            : undefined;
+
                     if (stock !== null && stock !== undefined) {
                         // Başarılı - apiFetchFailed flag'ini temizle
                         if (this.countingData[productId]) {
                             this.countingData[productId].apiFetchFailed = false;
                         }
-                        this.updateProductStock(productId, null, stock, price, priceText);
+                        this.updateProductStock(productId, null, stock, price, priceText, reserved);
                         // Toast bildirimi göster
                         this.showToast('Stok güncellendi', 'success', 3000);
                     } else {
@@ -5520,15 +5599,19 @@ class CountingSystem {
                 try {
                     const result = await this.requestStockFromExtension(null, barcode, productId);
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
-                    const price = typeof result === 'object' ? result?.price : null;
-                    const priceText = typeof result === 'object' ? result?.priceText : null;
-                    
+                    const price = typeof result === 'object' && result !== null ? result?.price : null;
+                    const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
+                    const reserved =
+                        typeof result === 'object' && result !== null && 'reservedStock' in result
+                            ? result.reservedStock
+                            : undefined;
+
                     if (stock !== null && stock !== undefined) {
                         // Başarılı - apiFetchFailed flag'ini temizle
                         if (this.countingData[productId]) {
                             this.countingData[productId].apiFetchFailed = false;
                         }
-                        this.updateProductStock(productId, null, stock, price, priceText);
+                        this.updateProductStock(productId, null, stock, price, priceText, reserved);
                         // Bildirim kaldırıldı - stok sessizce güncelleniyor
                     } else {
                         // Bulunamadı - apiFetchFailed flag'ini set et
