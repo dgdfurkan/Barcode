@@ -2387,15 +2387,26 @@ class CountingSystem {
 
         // Refresh System Stock Button
         const refreshSystemStockBtn = document.getElementById('countingRefreshSystemStockBtn');
+        if (!refreshSystemStockBtn) {
+            console.warn('[Counting] countingRefreshSystemStockBtn DOM’da yok — Stok güncelle listener bağlanmadı.');
+        }
         if (refreshSystemStockBtn) {
             refreshSystemStockBtn.addEventListener('click', async () => {
-                if (!this.currentCountingProduct) return;
-                
-                const product = this.allProducts.find(p => p.id === this.currentCountingProduct);
-                if (!product) return;
-                
+                console.log('[Stok güncelle] Tıklandı (her zaman görünür)');
+                if (!this.currentCountingProduct) {
+                    console.warn('[Stok güncelle] İptal: currentCountingProduct yok (sheet ürün seçili değil?)');
+                    return;
+                }
+
+                const product = this.allProducts.find((p) => p.id === this.currentCountingProduct);
+                if (!product) {
+                    console.warn('[Stok güncelle] İptal: allProducts içinde ürün yok, id=', this.currentCountingProduct);
+                    return;
+                }
+
                 const barcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : '';
                 if (!barcode) {
+                    console.warn('[Stok güncelle] İptal: üründe barkod yok', product.name || product.id);
                     this.showToast('Bu ürün için barkod bulunamadı', 'error', 3000);
                     return;
                 }
@@ -3745,6 +3756,9 @@ class CountingSystem {
 
     async fetchStockFromAPI(apiInfo, barcode, productName, productId = null, options = {}) {
         try {
+            if (options && options.logVerbose) {
+                console.log('[Stok güncelle · Sayım sheet] fetchStockFromAPI çalışıyor (logVerbose açık)');
+            }
             console.log('🌐 Direkt API çağrısı yapılıyor:', { 
                 barcode, 
                 productName, 
