@@ -3528,9 +3528,6 @@ class CountingSystem {
             }
         }
         this._farkTableNamesSnapshot = [...names];
-        if (names.length && this._farkTableSelection.size === 0) {
-            this._farkTableSelection = new Set(names);
-        }
     }
 
     populateFarkTableCheckboxes() {
