@@ -1311,21 +1311,37 @@
 
         <!-- İşlem kayıtları popup: Sayım sekmesi (ikon+metin) üst üste 7 kez tıklayınca -->
         <div id="sayimAuditLogOverlay" class="hidden fixed inset-0 z-[140] flex items-center justify-center p-3 sm:p-8 bg-slate-900/55 backdrop-blur-[3px]" role="dialog" aria-modal="true" aria-labelledby="sayimAuditLogTitle">
-            <div id="sayimAuditLogPanel" class="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/20 max-h-[min(88vh,940px)] min-h-[min(58vh,560px)]">
-                <div class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/40 px-4 sm:px-6 py-3 sm:py-4">
-                    <div class="min-w-0">
-                        <span id="sayimAuditLogTitle" class="text-base sm:text-lg font-bold text-slate-800">İşlem kayıtları</span>
-                        <p class="mt-0.5 text-xs text-slate-500">Depo aktivitesi (son kayıtlar)</p>
+            <div id="sayimAuditLogPanel" class="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/20 max-h-[min(90vh,960px)] min-h-[min(62vh,600px)]">
+                <div class="flex shrink-0 flex-col gap-3 border-b border-slate-100 bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 px-4 pb-3 pt-4 sm:px-6 sm:pb-4 sm:pt-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <span id="sayimAuditLogTitle" class="text-lg font-bold tracking-tight text-slate-900 sm:text-xl">İşlem kayıtları</span>
+                            <p class="mt-1 text-xs text-slate-500 sm:text-sm">Filtreleyin, arayın; her satır zaman damgası, işlem türü ve tablo ile birlikte kaydedilir.</p>
+                        </div>
+                        <div class="flex shrink-0 items-center gap-2">
+                            <button type="button" id="sayimAuditLogClear" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-800">Kayıtları sil</button>
+                            <button type="button" id="sayimAuditLogClose" class="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900" aria-label="Kapat">
+                                <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
                     </div>
-                    <div class="flex shrink-0 items-center gap-2">
-                        <button type="button" id="sayimAuditLogClear" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50">Temizle</button>
-                        <button type="button" id="sayimAuditLogClose" class="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800" aria-label="Kapat">
-                            <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
+                    <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                        <div class="relative min-w-0 flex-1 sm:min-w-[200px] sm:max-w-md">
+                            <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            </span>
+                            <input type="search" id="sayimAuditLogSearch" autocomplete="off" placeholder="Mesaj, tablo veya işlem türünde ara…" class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-800 shadow-inner placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30" />
+                        </div>
+                        <div class="flex flex-wrap gap-2 sm:justify-end">
+                            <select id="sayimAuditLogFilterTable" class="min-w-[10rem] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 sm:flex-none" title="Tablo"></select>
+                            <select id="sayimAuditLogFilterCat" class="min-w-[10.5rem] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/30 sm:flex-none" title="İşlem türü"></select>
+                            <button type="button" id="sayimAuditLogFilterReset" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100">Filtreleri sıfırla</button>
+                        </div>
                     </div>
+                    <p id="sayimAuditLogCount" class="text-xs font-medium text-slate-500"></p>
                 </div>
-                <pre id="sayimAuditLogBody" class="m-0 min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words px-4 py-4 sm:px-6 sm:py-5 font-mono text-sm leading-relaxed text-slate-800"></pre>
-                <p class="shrink-0 border-t border-slate-100 bg-slate-50/80 px-4 py-2.5 text-center text-xs text-slate-500 sm:px-6">Gizli: Sayım sekmesindeki ikon ve «Sayım» yazısına üst üste <span class="font-semibold text-slate-600">7 kez</span> tıklayın.</p>
+                <div id="sayimAuditLogBody" class="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50/40 px-3 py-3 sm:px-5 sm:py-4"></div>
+                <p class="shrink-0 border-t border-slate-100 bg-slate-50/90 px-4 py-2.5 text-center text-[11px] text-slate-500 sm:px-6">Gizli erişim: Sayım sekmesindeki ikon ve «Sayım» yazısına üst üste <span class="font-semibold text-slate-600">7 kez</span> tıklayın.</p>
             </div>
         </div>
 

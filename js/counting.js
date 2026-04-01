@@ -30,6 +30,9 @@ class CountingSystem {
         /** Depo takibi: kısa işlem kayıtları (Supabase counting_data._auditLog) */
         this.auditLog = [];
         this.AUDIT_LOG_MAX = 200;
+        /** İşlem kaydı paneli filtreleri (arama / tablo / işlem türü) */
+        this._auditUiFilter = { search: '', table: '', category: '' };
+        this._auditSearchDebounce = null;
         /** syncSystemStocks içinde tekil stok satırlarını denetim günlüğüne yazma */
         this._auditSyncBatch = false; // Chart carousel setup flag
         this.cameraScanAndCountMode = false; // Kamera: barkod okutunca sayım ekranı açılsın
@@ -688,16 +691,137 @@ class CountingSystem {
         }
     }
 
-    pushAuditEntry(message) {
+    pushAuditEntry(message, meta = {}) {
         if (!message || !this.currentUser) return;
         if (!this.auditLog) this.auditLog = [];
-        this.auditLog.push({ t: Date.now(), m: String(message).slice(0, 500) });
+        const m = String(message).slice(0, 500);
+        const cat = meta.cat || this.inferAuditCategoryFromMessage(m);
+        const tbl =
+            meta.tbl !== undefined && meta.tbl !== null
+                ? String(meta.tbl).slice(0, 120)
+                : this.currentTableName || '';
+        this.auditLog.push({ t: Date.now(), m, cat, tbl });
         while (this.auditLog.length > this.AUDIT_LOG_MAX) this.auditLog.shift();
         const overlay = document.getElementById('sayimAuditLogOverlay');
         const body = document.getElementById('sayimAuditLogBody');
         if (overlay && body && !overlay.classList.contains('hidden')) {
             this.renderSayimAuditLogPanel();
         }
+    }
+
+    /** Eski {t,m} kayıtları ve meta eksik girdiler için */
+    normalizeAuditEntry(raw) {
+        if (typeof raw === 'string') {
+            const m = String(raw);
+            return {
+                t: Date.now(),
+                m,
+                cat: this.inferAuditCategoryFromMessage(m),
+                tbl: this.inferAuditTableFromMessage(m),
+            };
+        }
+        const t = raw && raw.t != null ? Number(raw.t) : Date.now();
+        const m = raw && raw.m != null ? String(raw.m) : '';
+        const cat = (raw && raw.cat) || this.inferAuditCategoryFromMessage(m);
+        let tbl = raw && raw.tbl != null ? String(raw.tbl) : '';
+        if (!tbl) tbl = this.inferAuditTableFromMessage(m);
+        return { t, m, cat, tbl };
+    }
+
+    inferAuditCategoryFromMessage(m) {
+        const s = String(m);
+        if (/^Barkod doğrula/i.test(s)) return 'verify';
+        if (/^İçe aktarma/i.test(s)) return 'import';
+        if (/^Günlük tablo oluşturuldu|^Tablo oluşturuldu|^Tablo silindi|^Tablo yeniden adlandırıldı/i.test(s)) return 'table';
+        if (/^Sayım güncellendi/i.test(s)) return 'stock';
+        if (/Sistem stoku senkron/i.test(s)) return 'sync';
+        if (/sıfırlandı/i.test(s)) return 'reset';
+        if (/^Ürün eklendi|^Listeden çıkarıldı|^Ürün silindi/i.test(s)) return 'product';
+        return 'other';
+    }
+
+    /** Eski kayıtlarda mesajdan tablo adı çıkarmayı dene */
+    inferAuditTableFromMessage(m) {
+        const s = String(m);
+        let x = s.match(/^İçe aktarma · (.+?) ·/);
+        if (x) return x[1].trim();
+        x = s.match(/^(?:Günlük tablo oluşturuldu|Tablo oluşturuldu|Tablo silindi) · (.+)$/);
+        if (x) return x[1].trim();
+        return '';
+    }
+
+    getAuditCategoryMeta(cat) {
+        const map = {
+            table: { label: 'Tablo', class: 'bg-indigo-50 text-indigo-800 ring-indigo-200/80' },
+            import: { label: 'İçe aktarma', class: 'bg-emerald-50 text-emerald-900 ring-emerald-200/80' },
+            product: { label: 'Ürün', class: 'bg-sky-50 text-sky-900 ring-sky-200/80' },
+            stock: { label: 'Stok', class: 'bg-amber-50 text-amber-900 ring-amber-200/80' },
+            sync: { label: 'Senkron', class: 'bg-violet-50 text-violet-900 ring-violet-200/80' },
+            reset: { label: 'Sıfırlama', class: 'bg-rose-50 text-rose-900 ring-rose-200/80' },
+            verify: { label: 'Barkod doğrula', class: 'bg-teal-50 text-teal-900 ring-teal-200/80' },
+            other: { label: 'Diğer', class: 'bg-slate-100 text-slate-700 ring-slate-200/80' },
+        };
+        return map[cat] || map.other;
+    }
+
+    getFilteredAuditEntries() {
+        const q = (this._auditUiFilter?.search || '').trim().toLowerCase();
+        const ft = this._auditUiFilter?.table || '';
+        const fc = this._auditUiFilter?.category || '';
+        let list = (Array.isArray(this.auditLog) ? this.auditLog : []).map((r) => this.normalizeAuditEntry(r));
+        list.sort((a, b) => b.t - a.t);
+        if (fc) list = list.filter((e) => e.cat === fc);
+        if (ft) list = list.filter((e) => e.tbl === ft);
+        if (q) {
+            list = list.filter((e) => {
+                const blob = `${e.m} ${e.tbl} ${this.getAuditCategoryMeta(e.cat).label}`.toLowerCase();
+                return blob.includes(q);
+            });
+        }
+        return list;
+    }
+
+    populateAuditLogTableFilterOptions() {
+        const sel = document.getElementById('sayimAuditLogFilterTable');
+        if (!sel) return;
+        const names = new Set();
+        try {
+            this.getTableList().forEach((row) => {
+                if (row && row.name) names.add(row.name);
+            });
+        } catch {
+            /* ignore */
+        }
+        (this.auditLog || []).forEach((raw) => {
+            const e = this.normalizeAuditEntry(raw);
+            if (e.tbl) names.add(e.tbl);
+        });
+        const sorted = Array.from(names).sort((a, b) => String(a).localeCompare(String(b), 'tr'));
+        const cur = this._auditUiFilter?.table ?? '';
+        sel.innerHTML = '<option value="">Tüm tablolar</option>';
+        sorted.forEach((name) => {
+            const o = document.createElement('option');
+            o.value = name;
+            o.textContent = this.formatTableDisplayName(name);
+            if (name === cur) o.selected = true;
+            sel.appendChild(o);
+        });
+        sel.value = cur;
+    }
+
+    populateAuditLogCategoryFilterOptions() {
+        const sel = document.getElementById('sayimAuditLogFilterCat');
+        if (!sel) return;
+        const cur = this._auditUiFilter?.category ?? '';
+        const cats = ['', 'table', 'import', 'product', 'stock', 'sync', 'reset', 'verify', 'other'];
+        sel.innerHTML = '';
+        cats.forEach((c) => {
+            const o = document.createElement('option');
+            o.value = c;
+            o.textContent = c ? this.getAuditCategoryMeta(c).label : 'Tüm işlemler';
+            sel.appendChild(o);
+        });
+        sel.value = cur;
     }
 
     formatSayimAuditTime(ts) {
@@ -733,6 +857,9 @@ class CountingSystem {
         if (!overlay) return;
         const nowHidden = overlay.classList.toggle('hidden');
         if (!nowHidden) {
+            this._auditUiFilter = { search: '', table: '', category: '' };
+            const si = document.getElementById('sayimAuditLogSearch');
+            if (si) si.value = '';
             this.renderSayimAuditLogPanel();
             document.body.classList.add('overflow-hidden');
         } else {
@@ -741,15 +868,66 @@ class CountingSystem {
     }
 
     renderSayimAuditLogPanel() {
-        const pre = document.getElementById('sayimAuditLogBody');
-        if (!pre) return;
-        const rows = Array.isArray(this.auditLog) ? this.auditLog.slice() : [];
-        const lines = rows.reverse().map((row) => {
-            const t = typeof row === 'object' && row && row.t != null ? row.t : Date.now();
-            const m = typeof row === 'object' && row && row.m != null ? row.m : String(row);
-            return `${this.formatSayimAuditTime(t)}  ${m}`;
+        if (!this._auditUiFilter) this._auditUiFilter = { search: '', table: '', category: '' };
+        this.populateAuditLogTableFilterOptions();
+        this.populateAuditLogCategoryFilterOptions();
+
+        const container = document.getElementById('sayimAuditLogBody');
+        const countEl = document.getElementById('sayimAuditLogCount');
+        const total = (this.auditLog || []).length;
+        const filtered = this.getFilteredAuditEntries();
+
+        if (countEl) {
+            countEl.textContent =
+                total === 0
+                    ? 'Henüz kayıt yok'
+                    : total === filtered.length
+                      ? `${total} kayıt`
+                      : `${filtered.length} kayıt · toplam ${total}`;
+        }
+
+        if (!container) return;
+
+        if (total === 0) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center gap-3 py-16 px-4 text-center">
+                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                        <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </div>
+                    <p class="text-sm font-medium text-slate-600">Henüz işlem kaydı yok</p>
+                    <p class="text-xs text-slate-400 max-w-xs">Sayım, içe aktarma ve barkod doğrulama gibi işlemler burada listelenir.</p>
+                </div>`;
+            return;
+        }
+
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center gap-2 py-14 px-4 text-center">
+                    <p class="text-sm font-medium text-slate-600">Filtreye uygun kayıt yok</p>
+                    <p class="text-xs text-slate-400">Aramayı veya filtreleri sıfırlamayı deneyin.</p>
+                </div>`;
+            return;
+        }
+
+        const blocks = filtered.map((e) => {
+            const meta = this.getAuditCategoryMeta(e.cat);
+            const time = this.escapeHtml(this.formatSayimAuditTime(e.t));
+            const msg = this.escapeHtml(e.m);
+            const tblRaw = e.tbl ? this.formatTableDisplayName(e.tbl) : '';
+            const tbl = tblRaw
+                ? `<span class="inline-flex max-w-[10rem] truncate rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200/80" title="${this.escapeHtml(tblRaw)}">${this.escapeHtml(tblRaw)}</span>`
+                : `<span class="text-[11px] text-slate-400">Tablo bilinmiyor</span>`;
+            return `
+                <article class="rounded-xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/40 p-3.5 shadow-sm transition hover:border-indigo-200/80 hover:shadow-md sm:p-4">
+                    <div class="flex flex-wrap items-center gap-2 border-b border-slate-100/90 pb-2.5 mb-2.5">
+                        <time class="text-xs font-mono font-semibold text-indigo-600 tabular-nums">${time}</time>
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${meta.class}">${this.escapeHtml(meta.label)}</span>
+                        ${tbl}
+                    </div>
+                    <p class="text-sm leading-relaxed text-slate-800 [overflow-wrap:anywhere]">${msg}</p>
+                </article>`;
         });
-        pre.textContent = lines.length ? lines.join('\n') : 'Henüz kayıt yok.';
+        container.innerHTML = `<div class="flex flex-col gap-3">${blocks.join('')}</div>`;
     }
 
     bindSayimAuditLogPanel() {
@@ -757,6 +935,11 @@ class CountingSystem {
         const card = document.getElementById('sayimAuditLogPanel');
         const closeBtn = document.getElementById('sayimAuditLogClose');
         const clearBtn = document.getElementById('sayimAuditLogClear');
+        const resetFiltersBtn = document.getElementById('sayimAuditLogFilterReset');
+        const searchInput = document.getElementById('sayimAuditLogSearch');
+        const tableSel = document.getElementById('sayimAuditLogFilterTable');
+        const catSel = document.getElementById('sayimAuditLogFilterCat');
+
         const closeOverlay = () => {
             if (overlay) overlay.classList.add('hidden');
             document.body.classList.remove('overflow-hidden');
@@ -787,6 +970,42 @@ class CountingSystem {
                 this.renderSayimAuditLogPanel();
             });
         }
+
+        if (!this._auditLogFilterBound) {
+            this._auditLogFilterBound = true;
+            if (searchInput) {
+                searchInput.addEventListener('input', () => {
+                    clearTimeout(this._auditSearchDebounce);
+                    this._auditSearchDebounce = setTimeout(() => {
+                        if (!this._auditUiFilter) this._auditUiFilter = { search: '', table: '', category: '' };
+                        this._auditUiFilter.search = searchInput.value;
+                        this.renderSayimAuditLogPanel();
+                    }, 160);
+                });
+            }
+            if (tableSel) {
+                tableSel.addEventListener('change', () => {
+                    if (!this._auditUiFilter) this._auditUiFilter = { search: '', table: '', category: '' };
+                    this._auditUiFilter.table = tableSel.value;
+                    this.renderSayimAuditLogPanel();
+                });
+            }
+            if (catSel) {
+                catSel.addEventListener('change', () => {
+                    if (!this._auditUiFilter) this._auditUiFilter = { search: '', table: '', category: '' };
+                    this._auditUiFilter.category = catSel.value;
+                    this.renderSayimAuditLogPanel();
+                });
+            }
+            if (resetFiltersBtn) {
+                resetFiltersBtn.addEventListener('click', () => {
+                    this._auditUiFilter = { search: '', table: '', category: '' };
+                    if (searchInput) searchInput.value = '';
+                    this.renderSayimAuditLogPanel();
+                });
+            }
+        }
+
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
             const o = document.getElementById('sayimAuditLogOverlay');
@@ -995,7 +1214,8 @@ class CountingSystem {
         this.pushAuditEntry(
             options.allowDaily
                 ? `Günlük tablo oluşturuldu · ${this.formatTableDisplayName(trimmed)}`
-                : `Tablo oluşturuldu · ${this.formatTableDisplayName(trimmed)}`
+                : `Tablo oluşturuldu · ${this.formatTableDisplayName(trimmed)}`,
+            { cat: 'table', tbl: trimmed }
         );
 
         await this.saveFullCountingData(fullData);
@@ -1046,7 +1266,7 @@ class CountingSystem {
         // Delete table
         delete fullData._tables[tableName];
 
-        this.pushAuditEntry(`Tablo silindi · ${this.formatTableDisplayName(tableName)}`);
+        this.pushAuditEntry(`Tablo silindi · ${this.formatTableDisplayName(tableName)}`, { cat: 'table', tbl: tableName });
 
         // If deleted table was current, switch to first available table
         if (tableName === this.currentTableName) {
@@ -1491,7 +1711,8 @@ class CountingSystem {
             this.pushAuditEntry(
                 `İçe aktarma · ${this.formatTableDisplayName(this.currentTableName)} · ${added} satır${
                     skipped ? ` · ${skipped} eşleşmedi` : ''
-                }`
+                }`,
+                { cat: 'import', tbl: this.currentTableName }
             );
         }
         await this.saveCountingData();
@@ -3271,7 +3492,7 @@ class CountingSystem {
 
         if (isNew) {
             this.appendProductToOrder(productId);
-            this.pushAuditEntry(`Ürün eklendi · ${this.auditProductLabel(productId)}`);
+            this.pushAuditEntry(`Ürün eklendi · ${this.auditProductLabel(productId)}`, { cat: 'product' });
         }
 
         // Save and render
@@ -3353,7 +3574,8 @@ class CountingSystem {
                 const d = normStock(this.countingData[productId].warehouseStock);
                 const s = normStock(this.countingData[productId].systemStock);
                 this.pushAuditEntry(
-                    `Sayım güncellendi · ${this.auditProductLabel(productId)} · depo ${d ?? '—'} · sistem ${s ?? '—'}`
+                    `Sayım güncellendi · ${this.auditProductLabel(productId)} · depo ${d ?? '—'} · sistem ${s ?? '—'}`,
+                    { cat: 'stock' }
                 );
             }
         }
@@ -3409,7 +3631,7 @@ class CountingSystem {
     // Sayım listesinden onay penceresi olmadan çıkar (manuel arama panelinden toggle için)
     removeProductFromCountingSilent(productId) {
         if (!this.countingData[productId]) return;
-        this.pushAuditEntry(`Listeden çıkarıldı · ${this.auditProductLabel(productId)}`);
+        this.pushAuditEntry(`Listeden çıkarıldı · ${this.auditProductLabel(productId)}`, { cat: 'product' });
         delete this.countingData[productId];
         this.removeProductFromOrder(productId);
         this.skippedProducts.delete(productId);
@@ -3486,7 +3708,7 @@ class CountingSystem {
         cancelBtn.addEventListener('click', closeModal);
         deleteBtn.addEventListener('click', () => {
             // Ürünü sil
-            this.pushAuditEntry(`Ürün silindi · ${this.auditProductLabel(productId)}`);
+            this.pushAuditEntry(`Ürün silindi · ${this.auditProductLabel(productId)}`, { cat: 'product' });
             delete this.countingData[productId];
             this.removeProductFromOrder(productId);
             this.skippedProducts.delete(productId);
@@ -3790,7 +4012,7 @@ class CountingSystem {
         }
 
         if (updatedCount > 0) {
-            this.pushAuditEntry(`Sistem stoku senkron · ${updatedCount} ürün`);
+            this.pushAuditEntry(`Sistem stoku senkron · ${updatedCount} ürün`, { cat: 'sync' });
             await this.saveCountingData();
         }
         
@@ -5452,7 +5674,7 @@ class CountingSystem {
         }
         const bs = window.barcodeScanner;
         if (!bs || typeof bs.beginVerificationScan !== 'function') {
-            this.pushAuditEntry(`Barkod doğrula · ${this.auditProductLabel(product.id)} · kamera modülü yok`);
+            this.pushAuditEntry(`Barkod doğrula · ${this.auditProductLabel(product.id)} · kamera modülü yok`, { cat: 'verify' });
             void this.saveCountingData();
             this.showToast('Kamera modülü yüklenemedi. Sayfayı yenileyin.', 'error', 4000);
             return;
@@ -5476,7 +5698,7 @@ class CountingSystem {
             const pname = this.auditProductLabel(product.id);
             const scanned = this.shortAuditBarcodeText(norm);
             if (match) {
-                this.pushAuditEntry(`Barkod doğrula · ${pname} · okutulan: ${scanned} · eşleşti`);
+                this.pushAuditEntry(`Barkod doğrula · ${pname} · okutulan: ${scanned} · eşleşti`, { cat: 'verify' });
                 this.showToast('Eşleşiyor: Okutulan barkod bu ürüne ait.', 'success', 3500);
                 if (typeof bs.playVerificationMatchSound === 'function') {
                     bs.playVerificationMatchSound();
@@ -5484,7 +5706,7 @@ class CountingSystem {
                     bs.playSuccessSound();
                 }
             } else {
-                this.pushAuditEntry(`Barkod doğrula · ${pname} · okutulan: ${scanned} · eşleşmedi`);
+                this.pushAuditEntry(`Barkod doğrula · ${pname} · okutulan: ${scanned} · eşleşmedi`, { cat: 'verify' });
                 this.showToast(
                     'Eşleşmiyor: Okutulan barkod bu ürünün kayıtlı barkodlarıyla uyuşmuyor.',
                     'error',
@@ -5516,7 +5738,7 @@ class CountingSystem {
         } catch (e) {
             console.error(e);
             if (typeof bs.clearVerificationScan === 'function') bs.clearVerificationScan();
-            this.pushAuditEntry(`Barkod doğrula · ${this.auditProductLabel(product.id)} · kamera açılamadı`);
+            this.pushAuditEntry(`Barkod doğrula · ${this.auditProductLabel(product.id)} · kamera açılamadı`, { cat: 'verify' });
             void this.saveCountingData();
             this.showToast('Kamera açılamadı', 'error', 4000);
             cleanup();
@@ -6533,7 +6755,7 @@ class CountingSystem {
         });
         
         if (resetCount > 0) {
-            this.pushAuditEntry(`Depo stoku sıfırlandı · ${resetCount} satır`);
+            this.pushAuditEntry(`Depo stoku sıfırlandı · ${resetCount} satır`, { cat: 'reset' });
             this.saveCountingData();
             this.renderTable();
             this.updateStatistics();
@@ -6562,7 +6784,7 @@ class CountingSystem {
         });
         
         if (resetCount > 0) {
-            this.pushAuditEntry(`Sistem stoku sıfırlandı · ${resetCount} satır`);
+            this.pushAuditEntry(`Sistem stoku sıfırlandı · ${resetCount} satır`, { cat: 'reset' });
             this.saveCountingData();
             this.renderTable();
             this.updateStatistics();
@@ -6681,7 +6903,8 @@ class CountingSystem {
         fullData._currentTable = this.currentTableName;
         
         this.pushAuditEntry(
-            `Tablo yeniden adlandırıldı · ${this.formatTableDisplayName(oldName)} → ${this.formatTableDisplayName(trimmedNew)}`
+            `Tablo yeniden adlandırıldı · ${this.formatTableDisplayName(oldName)} → ${this.formatTableDisplayName(trimmedNew)}`,
+            { cat: 'table', tbl: trimmedNew }
         );
 
         // Save changes
