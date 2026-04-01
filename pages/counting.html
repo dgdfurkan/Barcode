@@ -1306,6 +1306,14 @@
                         <span>Finans</span>
                     </div>
                 </button>
+                <button id="tabStokfark" type="button" class="tab-button flex-1 px-3 sm:px-5 py-3 sm:py-4 text-sm sm:text-base font-semibold text-gray-600 hover:text-gray-900 transition-colors border-b-2 border-transparent hover:border-gray-300" data-tab="stokfark" title="Seçili tablolarda depo − sistem farkı">
+                    <div class="flex items-center justify-center space-x-1.5 sm:space-x-2">
+                        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        <span class="leading-tight">Stok farkı</span>
+                    </div>
+                </button>
             </div>
         </div>
 
@@ -1547,6 +1555,22 @@
 
             <!-- Stok uyumsuzluk özeti: ekran görüntüsü / rapor (JS doldurur) -->
             <section id="financialExecutiveReport" class="mb-6" aria-label="Stok Özeti"></section>
+        </div>
+
+        <!-- Stok farkı: seçili tablolar · minimalist özet -->
+        <div id="stokfarkTabContent" class="tab-content hidden">
+            <div class="bg-white rounded-xl border border-gray-100 shadow-sm mb-4 p-3 sm:p-4">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <h3 class="text-sm font-semibold text-gray-900">Hangi tablolar?</h3>
+                    <div class="flex flex-wrap gap-1.5">
+                        <button type="button" id="farkSelectAllBtn" class="text-xs font-medium px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">Tümünü seç</button>
+                        <button type="button" id="farkSelectNoneBtn" class="text-xs font-medium px-2.5 py-1 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">Hiçbirini seçme</button>
+                    </div>
+                </div>
+                <p class="text-[11px] text-gray-500 mb-2">Varsayılan: tüm tablolar. Birden fazla seçiliyken aynı ürün satırları birleştirilir.</p>
+                <div id="farkTableCheckboxes" class="flex flex-wrap gap-x-3 gap-y-2 max-h-36 overflow-y-auto overscroll-contain pr-1 text-sm"></div>
+            </div>
+            <section id="farkOzetiSection" class="mb-6" aria-label="Seçili tablolar stok özeti"></section>
         </div>
 
         <!-- Sayım Tab Content -->

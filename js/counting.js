@@ -14,7 +14,10 @@ class CountingSystem {
         this.currentCountingProduct = null; // Açık modal'daki ürün ID
         this.skippedProducts = new Set(); // Atlanan ürün ID'leri
         this.autoSaveTimeout = null; // Otomatik kaydetme için timeout
-        this.currentTab = localStorage.getItem('counting_active_tab') || 'sayim'; // 'sayim' | 'finans'
+        const _savedTab = localStorage.getItem('counting_active_tab') || 'sayim';
+        this.currentTab = ['sayim', 'finans', 'stokfark'].includes(_savedTab) ? _savedTab : 'sayim'; // 'sayim' | 'finans' | 'stokfark'
+        /** Stok farkı sekmesi: seçili tablo adları (varsayılan tümü, ilk açılışta doldurulur) */
+        this._farkTableSelection = null;
         this.selectedFinancialTable = 'all'; // Seçili finans tablosu ('all' veya table name)
         this.productSortOrder = 'desc'; // 'asc' | 'desc' - Finans tabındaki ürün sıralaması
         this.financialProducts = []; // Finans tabındaki ürünler (sıralama için)
@@ -86,6 +89,8 @@ class CountingSystem {
             // Render based on current tab
             if (this.currentTab === 'finans') {
                 this.renderFinancialTab();
+            } else if (this.currentTab === 'stokfark') {
+                void this.renderFarkTab();
             } else {
                 // Render table (will render grid if mode is rapid)
             this.renderTable();
@@ -3372,6 +3377,7 @@ class CountingSystem {
     setupTabSystem() {
         const tabFinans = document.getElementById('tabFinans');
         const tabSayim = document.getElementById('tabSayim');
+        const tabStokfark = document.getElementById('tabStokfark');
         const finansTabContent = document.getElementById('finansTabContent');
         const sayimTabContent = document.getElementById('sayimTabContent');
 
@@ -3387,6 +3393,14 @@ class CountingSystem {
                 this.switchTab('sayim');
             });
         }
+
+        if (tabStokfark) {
+            tabStokfark.addEventListener('click', () => {
+                this.switchTab('stokfark');
+            });
+        }
+
+        this.setupFarkTabControls();
 
         const sayimTripleZone = document.getElementById('sayimTripleClickZone');
         if (sayimTripleZone) {
@@ -3418,6 +3432,8 @@ class CountingSystem {
 
         if (tab === 'finans') {
             this.renderFinancialTab();
+        } else if (tab === 'stokfark') {
+            void this.renderFarkTab();
         } else {
             this.renderTable();
             this.updateViewMode();
@@ -3428,30 +3444,279 @@ class CountingSystem {
     updateTabDisplay() {
         const tabFinans = document.getElementById('tabFinans');
         const tabSayim = document.getElementById('tabSayim');
+        const tabStokfark = document.getElementById('tabStokfark');
         const finansTabContent = document.getElementById('finansTabContent');
         const sayimTabContent = document.getElementById('sayimTabContent');
+        const stokfarkTabContent = document.getElementById('stokfarkTabContent');
 
-        // Update tab buttons
+        const setActive = (el, on) => {
+            if (!el) return;
+            if (on) el.classList.add('active');
+            else el.classList.remove('active');
+        };
+
         if (tabFinans && tabSayim) {
-            if (this.currentTab === 'finans') {
-                tabFinans.classList.add('active');
-                tabSayim.classList.remove('active');
-            } else {
-                tabFinans.classList.remove('active');
-                tabSayim.classList.add('active');
-            }
+            setActive(tabSayim, this.currentTab === 'sayim');
+            setActive(tabFinans, this.currentTab === 'finans');
+            setActive(tabStokfark, this.currentTab === 'stokfark');
         }
 
-        // Update content visibility
-        if (finansTabContent && sayimTabContent) {
-            if (this.currentTab === 'finans') {
-                finansTabContent.classList.remove('hidden');
-                sayimTabContent.classList.add('hidden');
-            } else {
-                finansTabContent.classList.add('hidden');
-                sayimTabContent.classList.remove('hidden');
-            }
+        if (finansTabContent && sayimTabContent && stokfarkTabContent) {
+            finansTabContent.classList.toggle('hidden', this.currentTab !== 'finans');
+            sayimTabContent.classList.toggle('hidden', this.currentTab !== 'sayim');
+            stokfarkTabContent.classList.toggle('hidden', this.currentTab !== 'stokfark');
         }
+    }
+
+    setupFarkTabControls() {
+        const allBtn = document.getElementById('farkSelectAllBtn');
+        const noneBtn = document.getElementById('farkSelectNoneBtn');
+        const wrap = document.getElementById('farkTableCheckboxes');
+        if (allBtn && !allBtn.dataset.bound) {
+            allBtn.dataset.bound = '1';
+            allBtn.addEventListener('click', () => {
+                const names = this.getTableList().map((t) => t.name);
+                this._farkTableSelection = new Set(names);
+                this.populateFarkTableCheckboxes();
+                void this.renderFarkOzeti();
+            });
+        }
+        if (noneBtn && !noneBtn.dataset.bound) {
+            noneBtn.dataset.bound = '1';
+            noneBtn.addEventListener('click', () => {
+                this._farkTableSelection = new Set();
+                this.populateFarkTableCheckboxes();
+                void this.renderFarkOzeti();
+            });
+        }
+        if (wrap && !wrap.dataset.changeBound) {
+            wrap.dataset.changeBound = '1';
+            wrap.addEventListener('change', (e) => {
+                const t = e.target;
+                if (!t || !t.classList.contains('fark-table-cb')) return;
+                const raw = t.getAttribute('data-fark-table');
+                const name = raw ? decodeURIComponent(raw) : '';
+                if (!name) return;
+                if (t.checked) this._farkTableSelection.add(name);
+                else this._farkTableSelection.delete(name);
+                void this.renderFarkOzeti();
+            });
+        }
+    }
+
+    /** Stok farkı sekmesi: tablo kutuları + özet */
+    ensureFarkTableSelection() {
+        const names = this.getTableList().map((t) => t.name);
+        if (!this._farkTableSelection || !(this._farkTableSelection instanceof Set)) {
+            this._farkTableSelection = new Set(names);
+            return;
+        }
+        for (const n of names) {
+            if (!this._farkTableSelection.has(n)) this._farkTableSelection.add(n);
+        }
+        for (const n of [...this._farkTableSelection]) {
+            if (!names.includes(n)) this._farkTableSelection.delete(n);
+        }
+        if (names.length && this._farkTableSelection.size === 0) {
+            this._farkTableSelection = new Set(names);
+        }
+    }
+
+    populateFarkTableCheckboxes() {
+        const wrap = document.getElementById('farkTableCheckboxes');
+        if (!wrap) return;
+        this.ensureFarkTableSelection();
+        const tables = this.getTableList();
+        wrap.innerHTML = tables
+            .map((row) => {
+                const name = row.name;
+                const enc = encodeURIComponent(name);
+                const checked = this._farkTableSelection.has(name);
+                const label = this.formatTableDisplayName(name);
+                const cnt =
+                    typeof row.productCount === 'number'
+                        ? `<span class="text-gray-400 font-normal">(${row.productCount})</span>`
+                        : '';
+                return `
+                    <label class="inline-flex items-center gap-2 cursor-pointer select-none rounded-lg border border-gray-100 bg-gray-50/80 px-2.5 py-1.5 hover:bg-gray-100/90 transition-colors">
+                        <input type="checkbox" class="fark-table-cb rounded border-gray-300 text-teal-600 focus:ring-teal-500" data-fark-table="${enc}" ${checked ? 'checked' : ''}/>
+                        <span class="text-xs sm:text-sm text-gray-800">${this.escapeHtml(label)} ${cnt}</span>
+                    </label>`;
+            })
+            .join('');
+    }
+
+    async renderFarkTab() {
+        this.populateFarkTableCheckboxes();
+        await this.renderFarkOzeti();
+    }
+
+    /** Seçili tablolar için depo−sistem özeti (Finans Stok Özeti ile aynı mantık, daha sade görünüm) */
+    async renderFarkOzeti() {
+        const container = document.getElementById('farkOzetiSection');
+        if (!container) return;
+        this.ensureFarkTableSelection();
+        const selected = [...this._farkTableSelection].filter(Boolean);
+        const allNames = this.getTableList().map((t) => t.name);
+
+        if (selected.length === 0) {
+            container.innerHTML = `
+                <div class="rounded-xl border border-dashed border-gray-200 bg-gray-50/80 px-4 py-8 text-center text-sm text-gray-500">
+                    En az bir tablo seçin.
+                </div>`;
+            return;
+        }
+
+        const mergedProducts = [];
+        const summary = {
+            totalWarehouseValue: 0,
+            totalSystemValue: 0,
+            profitLoss: 0,
+            productCount: 0,
+            countedProducts: 0,
+        };
+
+        for (const tableName of selected) {
+            const data = await this.calculateFinancialData(tableName);
+            if (!data) continue;
+            summary.totalWarehouseValue += data.summary.totalWarehouseValue;
+            summary.totalSystemValue += data.summary.totalSystemValue;
+            summary.profitLoss += data.summary.profitLoss;
+            summary.productCount += data.summary.productCount;
+            summary.countedProducts += data.summary.countedProducts;
+            mergedProducts.push(...data.products);
+        }
+
+        let list = mergedProducts;
+        if (selected.length > 1) {
+            list = this.dedupeFinancialProductsByProductId(list);
+        }
+
+        const allSelected =
+            allNames.length > 0 &&
+            selected.length === allNames.length &&
+            allNames.every((n) => selected.includes(n));
+        let scopeShort;
+        if (allSelected && allNames.length > 1) {
+            scopeShort = 'Tüm tablolar · aynı ürün satırları birleştirildi';
+        } else if (selected.length > 1) {
+            scopeShort = `${selected.length} tablo · aynı ürün satırları birleştirildi`;
+        } else {
+            scopeShort = this.formatTableDisplayName(selected[0]);
+        }
+
+        this.renderMinimalFarkExecutiveReport(list, summary, scopeShort);
+    }
+
+    /**
+     * Finans «Stok Özeti» ile aynı veri; daha küçük tipografi ve sıkı liste (çok tablo için).
+     */
+    renderMinimalFarkExecutiveReport(products, summary, scopeShort) {
+        const container = document.getElementById('farkOzetiSection');
+        if (!container) return;
+
+        const safeSummary = summary || {
+            totalWarehouseValue: 0,
+            totalSystemValue: 0,
+            profitLoss: 0,
+            productCount: 0,
+            countedProducts: 0,
+        };
+
+        let list = Array.isArray(products) ? [...products] : [];
+        const missing = list.filter((p) => p.stockDiff < 0).sort((a, b) => a.difference - b.difference);
+        const surplus = list.filter((p) => p.stockDiff > 0).sort((a, b) => b.difference - a.difference);
+
+        const sumMissing = missing.reduce((s, p) => s + p.difference, 0);
+        const sumSurplus = surplus.reduce((s, p) => s + p.difference, 0);
+
+        const now = new Date().toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
+
+        const rowMini = (p, kind) => {
+            const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
+            const name = this.escapeHtml(p.productName || '');
+            const bc = p.barcode ? this.escapeHtml(p.barcode) : '—';
+            const stockDiff = p.warehouseStock - p.systemStock;
+            const adetStr = stockDiff > 0 ? `+${stockDiff}` : `${stockDiff}`;
+            const tone =
+                kind === 'miss'
+                    ? 'border-l-rose-400/90 bg-rose-50/40'
+                    : 'border-l-emerald-400/90 bg-emerald-50/40';
+            const adCol = kind === 'miss' ? 'text-rose-700' : 'text-emerald-700';
+            return `
+                <div class="flex gap-2 rounded-md border border-gray-100/90 ${tone} border-l-[3px] py-1.5 pl-1.5 pr-2">
+                    <img src="${img}" alt="" class="h-9 w-9 shrink-0 rounded-md border border-white object-cover" loading="lazy"/>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-medium leading-snug text-gray-900 line-clamp-2 [overflow-wrap:anywhere]">${name}</p>
+                        <p class="font-mono text-[10px] text-gray-400 truncate">${bc}</p>
+                        <div class="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0 text-[11px]">
+                            <span class="font-semibold ${adCol}">${adetStr} adet</span>
+                            <span class="text-gray-500">${this.formatCurrency(p.price)}</span>
+                            <span class="w-full text-right font-semibold text-gray-800 sm:w-auto">${p.difference >= 0 ? '+' : ''}${this.formatCurrency(p.difference)}</span>
+                        </div>
+                    </div>
+                </div>`;
+        };
+
+        const emptyCol = (msg) => `<p class="py-4 text-center text-[11px] text-gray-400">${msg}</p>`;
+        const netClass = safeSummary.profitLoss >= 0 ? 'text-emerald-700' : 'text-red-600';
+        const netBg = safeSummary.profitLoss >= 0 ? 'border-emerald-100 bg-emerald-50/40' : 'border-red-100 bg-red-50/40';
+
+        container.innerHTML = `
+            <div class="rounded-xl border border-gray-100 bg-white p-3 sm:p-4 shadow-sm">
+                <div class="mb-3 flex flex-col gap-0.5 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold tracking-tight text-gray-900">Stok Özeti</h3>
+                        <p class="text-[11px] text-gray-500">${this.escapeHtml(scopeShort || '')}</p>
+                    </div>
+                    <p class="text-[10px] text-gray-400">${this.escapeHtml(now)}</p>
+                </div>
+
+                <div class="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div class="rounded-lg border border-rose-100/90 bg-rose-50/40 px-3 py-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-rose-600/90">Depoda eksik</p>
+                        <p class="mt-0.5 flex items-baseline gap-1">
+                            <span class="text-xl font-bold tabular-nums text-rose-700">${missing.length}</span>
+                            <span class="text-[10px] text-rose-800/80">ürün</span>
+                        </p>
+                        <p class="mt-1 text-[11px] font-medium text-rose-700">${this.formatCurrency(sumMissing)} <span class="font-normal text-rose-600/70">TL</span></p>
+                    </div>
+                    <div class="rounded-lg border border-emerald-100/90 bg-emerald-50/40 px-3 py-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-emerald-600/90">Depoda fazla</p>
+                        <p class="mt-0.5 flex items-baseline gap-1">
+                            <span class="text-xl font-bold tabular-nums text-emerald-700">${surplus.length}</span>
+                            <span class="text-[10px] text-emerald-800/80">ürün</span>
+                        </p>
+                        <p class="mt-1 text-[11px] font-medium text-emerald-700">${this.formatCurrency(sumSurplus)} <span class="font-normal text-emerald-600/70">TL</span></p>
+                    </div>
+                    <div class="rounded-lg border ${netBg} px-3 py-2 sm:flex sm:flex-col sm:justify-center">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Net (depo − sistem)</p>
+                        <p class="mt-0.5 text-lg font-bold tabular-nums ${netClass}">${this.formatCurrency(safeSummary.profitLoss)}</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">
+                    <div>
+                        <div class="mb-1.5 flex items-center justify-between gap-2">
+                            <span class="text-[11px] font-semibold text-gray-700">Eksik</span>
+                            <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-800">${missing.length}</span>
+                        </div>
+                        <div class="space-y-1.5 max-h-[min(52vh,420px)] overflow-y-auto pr-0.5">
+                            ${missing.length === 0 ? emptyCol('Eksik yok.') : missing.map((p) => rowMini(p, 'miss')).join('')}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="mb-1.5 flex items-center justify-between gap-2">
+                            <span class="text-[11px] font-semibold text-gray-700">Fazla</span>
+                            <span class="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800">${surplus.length}</span>
+                        </div>
+                        <div class="space-y-1.5 max-h-[min(52vh,420px)] overflow-y-auto pr-0.5">
+                            ${surplus.length === 0 ? emptyCol('Fazla yok.') : surplus.map((p) => rowMini(p, 'plus')).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     setupProductImageLightbox() {
