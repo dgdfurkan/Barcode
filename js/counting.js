@@ -693,9 +693,9 @@ class CountingSystem {
         if (!this.auditLog) this.auditLog = [];
         this.auditLog.push({ t: Date.now(), m: String(message).slice(0, 500) });
         while (this.auditLog.length > this.AUDIT_LOG_MAX) this.auditLog.shift();
-        const panel = document.getElementById('sayimAuditLogPanel');
+        const overlay = document.getElementById('sayimAuditLogOverlay');
         const body = document.getElementById('sayimAuditLogBody');
-        if (panel && body && !panel.classList.contains('hidden')) {
+        if (overlay && body && !overlay.classList.contains('hidden')) {
             this.renderSayimAuditLogPanel();
         }
     }
@@ -721,11 +721,14 @@ class CountingSystem {
     }
 
     toggleSayimAuditLogPanel() {
-        const panel = document.getElementById('sayimAuditLogPanel');
-        if (!panel) return;
-        const nowHidden = panel.classList.toggle('hidden');
+        const overlay = document.getElementById('sayimAuditLogOverlay');
+        if (!overlay) return;
+        const nowHidden = overlay.classList.toggle('hidden');
         if (!nowHidden) {
             this.renderSayimAuditLogPanel();
+            document.body.classList.add('overflow-hidden');
+        } else {
+            document.body.classList.remove('overflow-hidden');
         }
     }
 
@@ -742,13 +745,24 @@ class CountingSystem {
     }
 
     bindSayimAuditLogPanel() {
-        const panel = document.getElementById('sayimAuditLogPanel');
+        const overlay = document.getElementById('sayimAuditLogOverlay');
+        const card = document.getElementById('sayimAuditLogPanel');
         const closeBtn = document.getElementById('sayimAuditLogClose');
         const clearBtn = document.getElementById('sayimAuditLogClear');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => {
-                if (panel) panel.classList.add('hidden');
+        const closeOverlay = () => {
+            if (overlay) overlay.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+        };
+        if (overlay) {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) closeOverlay();
             });
+        }
+        if (card) {
+            card.addEventListener('click', (e) => e.stopPropagation());
+        }
+        if (closeBtn) {
+            closeBtn.addEventListener('click', closeOverlay);
         }
         if (clearBtn) {
             clearBtn.addEventListener('click', async () => {
@@ -765,6 +779,13 @@ class CountingSystem {
                 this.renderSayimAuditLogPanel();
             });
         }
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            const o = document.getElementById('sayimAuditLogOverlay');
+            if (o && !o.classList.contains('hidden')) {
+                closeOverlay();
+            }
+        });
     }
 
     async saveCountingData() {
@@ -2936,8 +2957,8 @@ class CountingSystem {
                 clearTimeout(this._sayimTripleTapTimer);
                 this._sayimTripleTapTimer = setTimeout(() => {
                     this._sayimTripleTapCount = 0;
-                }, 450);
-                if (this._sayimTripleTapCount >= 3) {
+                }, 1100);
+                if (this._sayimTripleTapCount >= 7) {
                     this._sayimTripleTapCount = 0;
                     e.preventDefault();
                     e.stopPropagation();
