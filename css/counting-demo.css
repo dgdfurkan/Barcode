@@ -1,0 +1,107 @@
+/**
+ * Sayım arayüzü — SADECE counting_demo.html için deneysel stiller.
+ * Beğenilen kuralları counting.html içindeki eşdeğer #rapidCountingGridContainer
+ * seçicilerine kopyalayarak üretime alın (bu dosyayı import etmeyin).
+ */
+
+#countingDemoGridContainer .rapid-product-card {
+    position: relative;
+    background: white;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    cursor: default;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border-width: 3px;
+    border-style: solid;
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="blue"] {
+    border-color: #2563eb;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+}
+
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="orange"] {
+    border-color: #ea580c;
+    box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35);
+}
+
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="green"] {
+    border-color: #16a34a;
+    box-shadow: 0 2px 8px rgba(22, 163, 74, 0.35);
+}
+
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="red"] {
+    border-color: #dc2626;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35);
+}
+
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="gray"] {
+    border-color: #6b7280;
+    box-shadow: 0 2px 8px rgba(107, 114, 128, 0.35);
+}
+
+#countingDemoGridContainer .rapid-product-card:active {
+    transform: scale(0.98);
+}
+
+#countingDemoGridContainer .rapid-product-card .product-status-icon {
+    position: absolute;
+    top: 0.2rem;
+    right: 0.2rem;
+    width: 1.125rem;
+    height: 1.125rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="green"] .product-status-icon,
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="red"] .product-status-icon,
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="gray"] .product-status-icon,
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="orange"] .product-status-icon {
+    background: transparent;
+    color: white;
+}
+
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="green"] .product-status-icon svg,
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="red"] .product-status-icon svg,
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="gray"] .product-status-icon svg,
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="orange"] .product-status-icon svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="green"] .product-status-icon div,
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="red"] .product-status-icon div,
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="gray"] .product-status-icon div,
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="orange"] .product-status-icon div,
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="blue"] .product-status-icon div {
+    width: 1rem;
+    height: 1rem;
+}
+
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="blue"] .product-status-icon,
+#countingDemoGridContainer .rapid-product-card[data-rapid-state="orange"] .product-status-icon {
+    background: transparent;
+    border: none;
+}
+
+#countingDemoGridContainer .rapid-product-card .stock-indicator {
+    position: absolute;
+    bottom: 0.2rem;
+    left: 0.2rem;
+    right: 0.2rem;
+    height: 0.2rem;
+    border-radius: 0.25rem;
+    opacity: 0.65;
+    transition: opacity 0.2s;
+}
+
+#countingDemoGridContainer .rapid-product-card:hover .stock-indicator {
+    opacity: 0.9;
+}
