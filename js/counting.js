@@ -4763,37 +4763,45 @@ class CountingSystem {
             if (!product) return '';
 
             const isCounted = data.warehouseStock !== null && data.warehouseStock !== undefined;
-            const isSkipped = this.skippedProducts.has(productId);
-            
-            // Calculate stock difference for border color and icon
+            const hasWarehouse = isCounted;
+            const hasSystem = data.systemStock !== null && data.systemStock !== undefined;
+
             const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
             let stockIndicator = '';
-            let borderClass = '';
             let statusIcon = '';
-            
-            if (isCounted && data.systemStock !== null && data.systemStock !== undefined) {
+            /** @type {'green'|'red'|'gray'|'orange'|'blue'} */
+            let rapidState = 'blue';
+
+            if (hasWarehouse && hasSystem) {
                 if (diff.type === 'positive') {
-                    // Fazla stok - yeşil çerçeve ve yeşil yuvarlak + yukarı ok
+                    rapidState = 'green';
                     stockIndicator = '<div class="stock-indicator bg-emerald-400"></div>';
-                    borderClass = 'border-2 border-green-500';
-                    statusIcon = '<div class="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg></div>';
+                    statusIcon = '<div class="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg></div>';
                 } else if (diff.type === 'negative') {
-                    // Eksik stok - kırmızı çerçeve ve kırmızı yuvarlak + aşağı ok
+                    rapidState = 'red';
                     stockIndicator = '<div class="stock-indicator bg-rose-400"></div>';
-                    borderClass = 'border-2 border-red-500';
-                    statusIcon = '<div class="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg></div>';
+                    statusIcon = '<div class="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg></div>';
                 } else {
-                    // Eşit - gri çerçeve ve gri yuvarlak + eşittir işareti
+                    rapidState = 'gray';
                     stockIndicator = '<div class="stock-indicator bg-gray-300"></div>';
-                    borderClass = 'border-2 border-gray-400';
-                    statusIcon = '<div class="w-4 h-4 bg-gray-400 rounded-full flex items-center justify-center"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 9h14M5 15h14"/></svg></div>';
+                    statusIcon = '<div class="w-4 h-4 bg-gray-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 9h14M5 15h14"/></svg></div>';
                 }
+            } else if (hasSystem && !hasWarehouse) {
+                // Sistem çekildi, depo henüz girilmedi
+                rapidState = 'orange';
+                stockIndicator = '<div class="stock-indicator bg-orange-400"></div>';
+                statusIcon = '<div class="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l2 2m6-2a8 8 0 11-16 0 8 8 0 0116 0z"/></svg></div>';
+            } else if (hasWarehouse && !hasSystem) {
+                // Depo yazıldı, sistem stoku henüz yok / bekleniyor
+                rapidState = 'orange';
+                stockIndicator = '<div class="stock-indicator bg-orange-400"></div>';
+                statusIcon = '<div class="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></div>';
             } else {
-                // Sayılmamış - mavi yuvarlak
-                borderClass = '';
-                statusIcon = '<div class="w-3 h-3 border-2 border-blue-500 rounded-full"></div>';
+                // Hiçbiri — henüz işlem yok
+                rapidState = 'blue';
+                statusIcon = '<div class="w-4 h-4 border-[3px] border-blue-600 bg-white rounded-full flex items-center justify-center shadow-sm"></div>';
             }
-            
+
             const cardClass = isCounted ? 'counted' : 'not-counted';
             
             // Always show product name, not Qty
@@ -4802,7 +4810,7 @@ class CountingSystem {
             const barcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : '';
 
             return `
-                <div class="rapid-product-card ${cardClass} ${borderClass}" data-product-id="${productId}">
+                <div class="rapid-product-card ${cardClass}" data-rapid-state="${rapidState}" data-product-id="${productId}">
                     <div class="product-status-icon">
                         ${statusIcon}
                     </div>
