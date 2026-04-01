@@ -694,13 +694,15 @@ class CountingSystem {
     pushAuditEntry(message, meta = {}) {
         if (!message || !this.currentUser) return;
         if (!this.auditLog) this.auditLog = [];
-        const m = String(message).slice(0, 500);
+        const m = String(message).slice(0, 900);
         const cat = meta.cat || this.inferAuditCategoryFromMessage(m);
         const tbl =
             meta.tbl !== undefined && meta.tbl !== null
                 ? String(meta.tbl).slice(0, 120)
                 : this.currentTableName || '';
-        this.auditLog.push({ t: Date.now(), m, cat, tbl });
+        const row = { t: Date.now(), m, cat, tbl };
+        if (meta.productId != null && meta.productId !== '') row.productId = meta.productId;
+        this.auditLog.push(row);
         while (this.auditLog.length > this.AUDIT_LOG_MAX) this.auditLog.shift();
         const overlay = document.getElementById('sayimAuditLogOverlay');
         const body = document.getElementById('sayimAuditLogBody');
@@ -725,7 +727,9 @@ class CountingSystem {
         const cat = (raw && raw.cat) || this.inferAuditCategoryFromMessage(m);
         let tbl = raw && raw.tbl != null ? String(raw.tbl) : '';
         if (!tbl) tbl = this.inferAuditTableFromMessage(m);
-        return { t, m, cat, tbl };
+        const out = { t, m, cat, tbl };
+        if (raw && raw.productId != null && raw.productId !== '') out.productId = raw.productId;
+        return out;
     }
 
     inferAuditCategoryFromMessage(m) {
@@ -840,16 +844,16 @@ class CountingSystem {
 
     auditProductLabel(productId) {
         const p = this.allProducts?.find((x) => x.id === productId);
-        const name = (p && p.name) || String(productId);
-        return name.length > 42 ? `${name.slice(0, 40)}…` : name;
+        return (p && p.name) || String(productId);
     }
 
-    /** İşlem kaydı için uzun barkodu kısalt */
-    shortAuditBarcodeText(s) {
-        const t = String(s == null ? '' : s).trim();
-        if (!t) return '—';
-        if (t.length <= 28) return t;
-        return `${t.slice(0, 12)}…${t.slice(-10)}`;
+    /** İşlem kaydı kartında ürün görseli (barkod doğrulama vb.) */
+    getAuditLogProductThumbnailHtml(productId) {
+        if (productId == null || productId === '') return '';
+        const p = this.allProducts?.find((x) => x.id === productId);
+        const src = this.escapeHtml((p && p.image) || '../assets/logo.png');
+        const alt = this.escapeHtml((p && p.name) || 'Ürün');
+        return `<div class="flex-shrink-0 pt-0.5"><img src="${src}" alt="${alt}" class="h-14 w-14 rounded-xl object-cover border border-slate-200/80 bg-white shadow-sm" loading="lazy" width="56" height="56" decoding="async" onerror="this.onerror=null;this.src='../assets/logo.png'"/></div>`;
     }
 
     toggleSayimAuditLogPanel() {
@@ -915,8 +919,9 @@ class CountingSystem {
             const msg = this.escapeHtml(e.m);
             const tblRaw = e.tbl ? this.formatTableDisplayName(e.tbl) : '';
             const tbl = tblRaw
-                ? `<span class="inline-flex max-w-[10rem] truncate rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200/80" title="${this.escapeHtml(tblRaw)}">${this.escapeHtml(tblRaw)}</span>`
+                ? `<span class="inline-flex max-w-[min(100%,14rem)] rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200/80 [overflow-wrap:anywhere] break-words text-left" title="${this.escapeHtml(tblRaw)}">${this.escapeHtml(tblRaw)}</span>`
                 : `<span class="text-[11px] text-slate-400">Tablo bilinmiyor</span>`;
+            const thumb = e.productId ? this.getAuditLogProductThumbnailHtml(e.productId) : '';
             return `
                 <article class="rounded-xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/40 p-3.5 shadow-sm transition hover:border-indigo-200/80 hover:shadow-md sm:p-4">
                     <div class="flex flex-wrap items-center gap-2 border-b border-slate-100/90 pb-2.5 mb-2.5">
@@ -924,7 +929,10 @@ class CountingSystem {
                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${meta.class}">${this.escapeHtml(meta.label)}</span>
                         ${tbl}
                     </div>
-                    <p class="text-sm leading-relaxed text-slate-800 [overflow-wrap:anywhere]">${msg}</p>
+                    <div class="flex gap-3 items-start min-w-0">
+                        ${thumb}
+                        <p class="min-w-0 flex-1 text-sm leading-relaxed text-slate-800 [overflow-wrap:anywhere] break-words">${msg}</p>
+                    </div>
                 </article>`;
         });
         container.innerHTML = `<div class="flex flex-col gap-3">${blocks.join('')}</div>`;
@@ -5674,7 +5682,10 @@ class CountingSystem {
         }
         const bs = window.barcodeScanner;
         if (!bs || typeof bs.beginVerificationScan !== 'function') {
-            this.pushAuditEntry(`Barkod doğrula · ${this.auditProductLabel(product.id)} · kamera modülü yok`, { cat: 'verify' });
+            this.pushAuditEntry(
+                `Barkod doğrula · Ürün: ${this.auditProductLabel(product.id)} · Durum: kamera modülü yok`,
+                { cat: 'verify', productId: product.id }
+            );
             void this.saveCountingData();
             this.showToast('Kamera modülü yüklenemedi. Sayfayı yenileyin.', 'error', 4000);
             return;
@@ -5696,9 +5707,12 @@ class CountingSystem {
             const norm = String(code).trim();
             const match = expected.has(norm);
             const pname = this.auditProductLabel(product.id);
-            const scanned = this.shortAuditBarcodeText(norm);
+            const scanned = norm || '—';
             if (match) {
-                this.pushAuditEntry(`Barkod doğrula · ${pname} · okutulan: ${scanned} · eşleşti`, { cat: 'verify' });
+                this.pushAuditEntry(
+                    `Barkod doğrula · Ürün: ${pname} · Okutulan barkod: ${scanned} · Sonuç: eşleşti`,
+                    { cat: 'verify', productId: product.id }
+                );
                 this.showToast('Eşleşiyor: Okutulan barkod bu ürüne ait.', 'success', 3500);
                 if (typeof bs.playVerificationMatchSound === 'function') {
                     bs.playVerificationMatchSound();
@@ -5706,7 +5720,10 @@ class CountingSystem {
                     bs.playSuccessSound();
                 }
             } else {
-                this.pushAuditEntry(`Barkod doğrula · ${pname} · okutulan: ${scanned} · eşleşmedi`, { cat: 'verify' });
+                this.pushAuditEntry(
+                    `Barkod doğrula · Ürün: ${pname} · Okutulan barkod: ${scanned} · Sonuç: eşleşmedi`,
+                    { cat: 'verify', productId: product.id }
+                );
                 this.showToast(
                     'Eşleşmiyor: Okutulan barkod bu ürünün kayıtlı barkodlarıyla uyuşmuyor.',
                     'error',
@@ -5738,7 +5755,10 @@ class CountingSystem {
         } catch (e) {
             console.error(e);
             if (typeof bs.clearVerificationScan === 'function') bs.clearVerificationScan();
-            this.pushAuditEntry(`Barkod doğrula · ${this.auditProductLabel(product.id)} · kamera açılamadı`, { cat: 'verify' });
+            this.pushAuditEntry(
+                `Barkod doğrula · Ürün: ${this.auditProductLabel(product.id)} · Durum: kamera açılamadı`,
+                { cat: 'verify', productId: product.id }
+            );
             void this.saveCountingData();
             this.showToast('Kamera açılamadı', 'error', 4000);
             cleanup();
