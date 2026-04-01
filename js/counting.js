@@ -3187,7 +3187,7 @@ class CountingSystem {
                 this._sayimTripleTapTimer = setTimeout(() => {
                     this._sayimTripleTapCount = 0;
                 }, 1100);
-                if (this._sayimTripleTapCount >= 7) {
+                if (this._sayimTripleTapCount >= 4) {
                     this._sayimTripleTapCount = 0;
                     e.preventDefault();
                     e.stopPropagation();
