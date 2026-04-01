@@ -41,6 +41,8 @@ class CountingSystem {
         this._pendingDailyDeleteTableName = null;
         /** Genel tablo dropdown — üst arama sonrası liste (dropdown içi filtre için) */
         this._lastFilteredGeneral = [];
+        /** scheduleScrollActiveGeneralTableChip zamanlayıcıları */
+        this._scrollGeneralChipTimers = null;
     }
 
     async init() {
@@ -66,6 +68,7 @@ class CountingSystem {
             this.bindSayimSubTabControls();
             this.bindSayimTableCardMenu();
             this.bindSayimGeneralTableDropdown();
+            this.bindSayimGeneralTableScrollRestore();
             this.initDailyDateControls();
 
             // Setup tab system
@@ -86,6 +89,7 @@ class CountingSystem {
             
             // Update table selector
             this.updateTableSelector();
+            this.scheduleScrollActiveGeneralTableChip();
             
             this.syncDeleteTableButtonsVisibility();
             
@@ -1752,7 +1756,8 @@ class CountingSystem {
     }
 
     /** Genel tablo pill şeridinde seçili chip görünür alana kayar (dropdown / arama sonrası dahil) */
-    scrollActiveGeneralTableChipIntoView() {
+    scrollActiveGeneralTableChipIntoView(options = {}) {
+        const behavior = options.behavior !== undefined ? options.behavior : 'smooth';
         const list = document.getElementById('generalTableList');
         if (!list || list.classList.contains('sayim-general-table-list--empty')) return;
         if (this.isDailyTableName(this.currentTableName)) return;
@@ -1761,15 +1766,47 @@ class CountingSystem {
             (el) => el.dataset.tableName === targetName
         );
         if (!btn) return;
+        const run = () => {
+            try {
+                btn.scrollIntoView({ behavior, inline: 'center', block: 'nearest' });
+            } catch (e) {
+                btn.scrollIntoView({ inline: 'center', block: 'nearest' });
+            }
+        };
+        if (behavior === 'auto') {
+            requestAnimationFrame(run);
+            return;
+        }
         requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                try {
-                    btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                } catch (e) {
-                    btn.scrollIntoView({ inline: 'center', block: 'nearest' });
-                }
-            });
+            requestAnimationFrame(run);
         });
+    }
+
+    /**
+     * Sayfa yükü / sekme dönüşü / bfcache sonrası layout oturunca tekrar hizala
+     */
+    scheduleScrollActiveGeneralTableChip() {
+        if (this.currentTab !== 'sayim') return;
+        if (this._scrollGeneralChipTimers) {
+            this._scrollGeneralChipTimers.forEach((id) => clearTimeout(id));
+        }
+        this._scrollGeneralChipTimers = [];
+        const push = (fn, ms) => {
+            this._scrollGeneralChipTimers.push(setTimeout(fn, ms));
+        };
+        push(() => this.scrollActiveGeneralTableChipIntoView({ behavior: 'smooth' }), 0);
+        push(() => this.scrollActiveGeneralTableChipIntoView({ behavior: 'auto' }), 180);
+        push(() => this.scrollActiveGeneralTableChipIntoView({ behavior: 'auto' }), 450);
+    }
+
+    /** Sekme / başka sayfa dönüşünde pill hizası */
+    bindSayimGeneralTableScrollRestore() {
+        const onReturn = () => {
+            if (document.visibilityState !== 'visible') return;
+            this.scheduleScrollActiveGeneralTableChip();
+        };
+        window.addEventListener('pageshow', () => this.scheduleScrollActiveGeneralTableChip());
+        document.addEventListener('visibilitychange', onReturn);
     }
 
     /** Genel tablolar — liste dropdown içeriği (üst arama + liste içi arama) */
@@ -2794,6 +2831,7 @@ class CountingSystem {
         } else {
             this.renderTable();
             this.updateViewMode();
+            this.scheduleScrollActiveGeneralTableChip();
         }
     }
 
