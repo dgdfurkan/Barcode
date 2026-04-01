@@ -951,11 +951,21 @@ class CountingSystem {
         }
 
         const tableNames = Object.keys(fullData._tables);
-        return tableNames.map(name => ({
-            name,
-            isCurrent: name === this.currentTableName,
-            productCount: Object.keys(fullData._tables[name] || {}).filter((k) => !this.isReservedCountingKey(k)).length
-        }));
+        const rows = tableNames.map((name) => {
+            const tableData = fullData._tables[name] || {};
+            const createdAtMs = this.resolveTableCreatedMs(tableData) ?? 0;
+            return {
+                name,
+                isCurrent: name === this.currentTableName,
+                productCount: Object.keys(tableData).filter((k) => !this.isReservedCountingKey(k)).length,
+                _sortMs: createdAtMs,
+            };
+        });
+        rows.sort((a, b) => {
+            if (b._sortMs !== a._sortMs) return b._sortMs - a._sortMs;
+            return String(a.name).localeCompare(String(b.name), 'tr');
+        });
+        return rows.map(({ _sortMs, ...rest }) => rest);
     }
 
     isDailyTableName(name) {
