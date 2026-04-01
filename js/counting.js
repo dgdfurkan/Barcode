@@ -18,6 +18,8 @@ class CountingSystem {
         this.currentTab = ['sayim', 'finans', 'stokfark'].includes(_savedTab) ? _savedTab : 'sayim'; // 'sayim' | 'finans' | 'stokfark'
         /** Stok farkı sekmesi: seçili tablo adları (varsayılan tümü, ilk açılışta doldurulur) */
         this._farkTableSelection = null;
+        /** Önceki tablo listesi — yalnızca yeni eklenen tablolar otomatik seçilir (kullanıcı iptalini ezmez) */
+        this._farkTableNamesSnapshot = null;
         this.selectedFinancialTable = 'all'; // Seçili finans tablosu ('all' veya table name)
         this.productSortOrder = 'desc'; // 'asc' | 'desc' - Finans tabındaki ürün sıralaması
         this.financialProducts = []; // Finans tabındaki ürünler (sıralama için)
@@ -3509,14 +3511,23 @@ class CountingSystem {
         const names = this.getTableList().map((t) => t.name);
         if (!this._farkTableSelection || !(this._farkTableSelection instanceof Set)) {
             this._farkTableSelection = new Set(names);
+            this._farkTableNamesSnapshot = [...names];
             return;
-        }
-        for (const n of names) {
-            if (!this._farkTableSelection.has(n)) this._farkTableSelection.add(n);
         }
         for (const n of [...this._farkTableSelection]) {
             if (!names.includes(n)) this._farkTableSelection.delete(n);
         }
+        if (this._farkTableNamesSnapshot == null) {
+            this._farkTableNamesSnapshot = [...names];
+            return;
+        }
+        const prevSnap = Array.isArray(this._farkTableNamesSnapshot) ? this._farkTableNamesSnapshot : [];
+        for (const n of names) {
+            if (!prevSnap.includes(n)) {
+                this._farkTableSelection.add(n);
+            }
+        }
+        this._farkTableNamesSnapshot = [...names];
         if (names.length && this._farkTableSelection.size === 0) {
             this._farkTableSelection = new Set(names);
         }
@@ -3535,12 +3546,16 @@ class CountingSystem {
                 const label = this.formatTableDisplayName(name);
                 const cnt =
                     typeof row.productCount === 'number'
-                        ? `<span class="text-gray-400 font-normal">(${row.productCount})</span>`
+                        ? `<span class="text-slate-400 font-normal tabular-nums">(${row.productCount})</span>`
                         : '';
+                const aria = String(label).replace(/"/g, '&quot;');
                 return `
-                    <label class="inline-flex items-center gap-2 cursor-pointer select-none rounded-lg border border-gray-100 bg-gray-50/80 px-2.5 py-1.5 hover:bg-gray-100/90 transition-colors">
-                        <input type="checkbox" class="fark-table-cb rounded border-gray-300 text-teal-600 focus:ring-teal-500" data-fark-table="${enc}" ${checked ? 'checked' : ''}/>
-                        <span class="text-xs sm:text-sm text-gray-800">${this.escapeHtml(label)} ${cnt}</span>
+                    <label class="inline-flex cursor-pointer select-none items-center gap-2.5 rounded-xl border border-slate-200/90 bg-white px-3 py-2 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50/90 has-[:checked]:border-indigo-300 has-[:checked]:bg-indigo-50/35 has-[:checked]:shadow-md has-[:checked]:shadow-indigo-100/40">
+                        <input type="checkbox" class="peer sr-only fark-table-cb" data-fark-table="${enc}" ${checked ? 'checked' : ''} aria-label="${aria}"/>
+                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-slate-300 bg-white transition peer-checked:border-indigo-600 peer-checked:bg-indigo-600 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-400/50 peer-checked:[&_svg]:opacity-100">
+                            <svg class="h-3 w-3 text-white opacity-0 transition-opacity" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6l2.5 2.5L9.5 3"/></svg>
+                        </span>
+                        <span class="text-xs sm:text-sm font-medium text-slate-800">${this.escapeHtml(label)} ${cnt}</span>
                     </label>`;
             })
             .join('');
