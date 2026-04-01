@@ -966,6 +966,34 @@
             border-radius: 9999px;
         }
 
+        /* Genel tablolar — web: grid; dar ekran: 2 sütun */
+        .sayim-general-table-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.5rem;
+        }
+        @media (min-width: 768px) {
+            .sayim-general-table-list {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 0.625rem;
+            }
+        }
+        @media (min-width: 1024px) {
+            .sayim-general-table-list {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+        @media (min-width: 1280px) {
+            .sayim-general-table-list {
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+            }
+        }
+        .sayim-general-table-list.sayim-general-table-list--empty {
+            grid-template-columns: 1fr;
+            min-height: 5rem;
+            place-items: center;
+        }
+
         .sayim-seg {
             transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
         }
@@ -1493,16 +1521,16 @@
 
         <!-- Sayım Tab Content -->
         <div id="sayimTabContent" class="tab-content">
-            <div class="max-w-xl mx-auto w-full px-4 sm:px-6">
+            <div class="w-full max-w-full px-4 sm:px-6 lg:px-2">
                 <!-- Aktif tablo + tablo türü (mock hizalı) -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 sm:p-5 mb-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 sm:p-5 lg:p-6 mb-6">
                     <div class="flex justify-between items-start gap-2 mb-3">
                         <div class="space-y-1 min-w-0 flex-1">
-                            <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true"></span>
                                 Aktif Tablo
                             </div>
-                            <h2 class="text-lg font-bold text-slate-800 leading-tight">
+                            <h2 class="text-lg sm:text-xl font-bold text-slate-800 leading-tight">
                                 <span id="sayimActiveTableTitle" class="break-words">—</span>
                                 <span id="sayimActiveTableProductCount" class="text-slate-400 font-normal text-sm ml-1">· 0 ürün</span>
                             </h2>
@@ -1570,7 +1598,7 @@
                         </div>
                     </div>
                     <p class="text-[10px] text-slate-500 hidden sm:block -mt-1">Sabit liste; isim verir, yeniden adlandırırsınız.</p>
-                    <div id="generalTableList" class="sayim-chip-scroll sayim-chip-wrap flex gap-2 overflow-x-auto pb-2 no-scrollbar rounded-xl border border-slate-100/80 bg-slate-50/50 px-1 py-1" role="list" aria-label="Genel Sayım Tabloları"></div>
+                    <div id="generalTableList" class="sayim-general-table-list rounded-xl border border-slate-100/80 bg-slate-50/50 p-2 sm:p-3" role="list" aria-label="Genel Sayım Tabloları"></div>
                 </div>
 
                 <!-- Günlük panel: liste önde; gün ekleme tarih+aksiyon modalda -->

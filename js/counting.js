@@ -1532,10 +1532,10 @@ class CountingSystem {
             : generalTables;
 
         generalList.innerHTML = '';
-        generalList.classList.toggle('sayim-chip-scroll--empty', filteredGeneral.length === 0);
+        generalList.classList.toggle('sayim-general-table-list--empty', filteredGeneral.length === 0);
         if (filteredGeneral.length === 0) {
             const empty = document.createElement('p');
-            empty.className = 'text-[11px] text-slate-500 px-2 py-1 text-center shrink-0 min-w-[min(100%,18rem)]';
+            empty.className = 'col-span-full text-[11px] text-slate-500 px-2 py-3 text-center';
             empty.textContent = generalTables.length
                 ? 'Arama ile eşleşen tablo yok.'
                 : 'Henüz genel tablo yok. + ile oluşturun.';
@@ -1547,15 +1547,16 @@ class CountingSystem {
                 btn.type = 'button';
                 btn.setAttribute('role', 'listitem');
                 btn.dataset.tableName = table.name;
+                btn.title = table.name;
                 btn.className = [
-                    'sayim-table-chip shrink-0 inline-flex max-w-[min(100vw-4rem,14rem)] items-center justify-between gap-2 rounded-full border px-3 py-1.5 text-left text-xs font-medium transition-colors snap-start sm:max-w-[16rem]',
+                    'sayim-table-chip w-full min-w-0 inline-flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm font-medium transition-colors',
                     isActive
                         ? 'border-indigo-200 bg-indigo-50 text-indigo-900 shadow-sm ring-1 ring-indigo-200/50'
-                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300',
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-white hover:border-slate-300 hover:shadow-sm',
                 ].join(' ');
                 btn.innerHTML = `
-                    <span class="min-w-0 truncate">${this.escapeHtml(table.name)}</span>
-                    <span class="shrink-0 tabular-nums text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}">${table.productCount ?? 0}</span>
+                    <span class="min-w-0 truncate text-left">${this.escapeHtml(table.name)}</span>
+                    <span class="shrink-0 tabular-nums text-[11px] px-2 py-0.5 rounded-md font-semibold ${isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}">${table.productCount ?? 0}</span>
                 `;
                 btn.addEventListener('click', async () => {
                     if (table.name !== this.currentTableName) {
