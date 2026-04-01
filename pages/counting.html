@@ -2366,14 +2366,16 @@
                 <input 
                     type="text" 
                     id="terminalBarcodeInput" 
-                    class="absolute opacity-0 pointer-events-none" 
+                    class="fixed m-0 p-0 border-0 opacity-0 overflow-hidden"
+                    tabindex="0"
                     autocomplete="off"
                     autocorrect="off"
                     autocapitalize="off"
                     spellcheck="false"
                     inputmode="none"
                     placeholder=""
-                    style="position: absolute; left: -9999px; width: 1px; height: 1px;"
+                    aria-label="Barkod terminal girişi"
+                    style="left: 0; top: 0; width: 1px; height: 1px; z-index: 2147483647;"
                 />
                 
                 <!-- Flash Overlay -->
