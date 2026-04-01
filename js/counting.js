@@ -720,6 +720,14 @@ class CountingSystem {
         return name.length > 42 ? `${name.slice(0, 40)}…` : name;
     }
 
+    /** İşlem kaydı için uzun barkodu kısalt */
+    shortAuditBarcodeText(s) {
+        const t = String(s == null ? '' : s).trim();
+        if (!t) return '—';
+        if (t.length <= 28) return t;
+        return `${t.slice(0, 12)}…${t.slice(-10)}`;
+    }
+
     toggleSayimAuditLogPanel() {
         const overlay = document.getElementById('sayimAuditLogOverlay');
         if (!overlay) return;
@@ -5444,6 +5452,8 @@ class CountingSystem {
         }
         const bs = window.barcodeScanner;
         if (!bs || typeof bs.beginVerificationScan !== 'function') {
+            this.pushAuditEntry(`Barkod doğrula · ${this.auditProductLabel(product.id)} · kamera modülü yok`);
+            void this.saveCountingData();
             this.showToast('Kamera modülü yüklenemedi. Sayfayı yenileyin.', 'error', 4000);
             return;
         }
@@ -5463,7 +5473,10 @@ class CountingSystem {
         const onRead = (code) => {
             const norm = String(code).trim();
             const match = expected.has(norm);
+            const pname = this.auditProductLabel(product.id);
+            const scanned = this.shortAuditBarcodeText(norm);
             if (match) {
+                this.pushAuditEntry(`Barkod doğrula · ${pname} · okutulan: ${scanned} · eşleşti`);
                 this.showToast('Eşleşiyor: Okutulan barkod bu ürüne ait.', 'success', 3500);
                 if (typeof bs.playVerificationMatchSound === 'function') {
                     bs.playVerificationMatchSound();
@@ -5471,6 +5484,7 @@ class CountingSystem {
                     bs.playSuccessSound();
                 }
             } else {
+                this.pushAuditEntry(`Barkod doğrula · ${pname} · okutulan: ${scanned} · eşleşmedi`);
                 this.showToast(
                     'Eşleşmiyor: Okutulan barkod bu ürünün kayıtlı barkodlarıyla uyuşmuyor.',
                     'error',
@@ -5482,6 +5496,7 @@ class CountingSystem {
                     bs.playWarningSound();
                 }
             }
+            void this.saveCountingData();
             if (restoreSeriPause && typeof bs.pauseScanningKeepStream === 'function') {
                 bs.pauseScanningKeepStream();
             } else {
@@ -5501,6 +5516,8 @@ class CountingSystem {
         } catch (e) {
             console.error(e);
             if (typeof bs.clearVerificationScan === 'function') bs.clearVerificationScan();
+            this.pushAuditEntry(`Barkod doğrula · ${this.auditProductLabel(product.id)} · kamera açılamadı`);
+            void this.saveCountingData();
             this.showToast('Kamera açılamadı', 'error', 4000);
             cleanup();
         }
