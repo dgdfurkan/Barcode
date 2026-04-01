@@ -966,90 +966,26 @@
             border-radius: 9999px;
         }
 
-        /* Genel tablolar — tablet/mobil: tek satır yatay kaydır */
-        .sayim-general-table-scroll-outer {
-            position: relative;
-        }
-        .sayim-general-table-list:not(.sayim-general-table-list--empty) {
-            display: flex;
-            flex-direction: row;
-            flex-wrap: nowrap;
-            gap: 0.5rem;
-            overflow-x: auto;
-            overflow-y: hidden;
+        /* Genel tablolar — yatay pill şerit + dropdown */
+        .sayim-general-table-pill-row {
             -webkit-overflow-scrolling: touch;
             touch-action: pan-x;
-            scroll-snap-type: x proximity;
-            scroll-padding-inline: 6px;
-            padding-bottom: 4px;
             scrollbar-width: thin;
-            scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+            scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
         }
-        .sayim-general-table-scroll-outer:has(.sayim-general-table-list--empty) .sayim-general-table-scroll-fade {
-            display: none;
+        .sayim-general-table-pill-row::-webkit-scrollbar {
+            height: 5px;
         }
-        .sayim-general-table-scroll-outer:has(.sayim-general-table-list--empty) ~ p {
-            display: none !important;
-        }
-        .sayim-general-table-list:not(.sayim-general-table-list--empty)::-webkit-scrollbar {
-            height: 6px;
-        }
-        .sayim-general-table-list:not(.sayim-general-table-list--empty)::-webkit-scrollbar-track {
-            background: rgba(241, 245, 249, 0.8);
+        .sayim-general-table-pill-row::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.55);
             border-radius: 9999px;
-        }
-        .sayim-general-table-list:not(.sayim-general-table-list--empty)::-webkit-scrollbar-thumb {
-            background: rgba(148, 163, 184, 0.7);
-            border-radius: 9999px;
-        }
-        .sayim-general-table-list:not(.sayim-general-table-list--empty) .sayim-general-table-chip {
-            flex: 0 0 auto;
-            min-width: min(14rem, 78vw);
-            max-width: 16rem;
-            scroll-snap-align: start;
-        }
-        /* Web (lg+): en fazla 3 satır, fazlası yatay sütunlar */
-        @media (min-width: 1024px) {
-            .sayim-general-table-list:not(.sayim-general-table-list--empty) {
-                display: grid;
-                grid-template-rows: repeat(3, auto);
-                grid-auto-flow: column;
-                grid-auto-columns: minmax(12rem, 13.5rem);
-                flex-wrap: unset;
-                overflow-x: auto;
-                overflow-y: hidden;
-                touch-action: pan-x;
-                scroll-snap-type: x proximity;
-                align-content: start;
-            }
-            .sayim-general-table-list:not(.sayim-general-table-list--empty) .sayim-general-table-chip {
-                min-width: 0;
-                max-width: none;
-                width: 100%;
-            }
         }
         .sayim-general-table-list.sayim-general-table-list--empty {
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: visible;
-            min-height: 5rem;
-        }
-        /* Sağ kenar: daha fazla içerik ipucu (scroll edilebilir alan) */
-        .sayim-general-table-scroll-fade {
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            width: 2.25rem;
-            pointer-events: none;
-            background: linear-gradient(to left, rgba(248, 250, 252, 0.97), rgba(248, 250, 252, 0));
-            border-radius: 0 0.75rem 0.75rem 0;
-        }
-        @media (min-width: 1024px) {
-            .sayim-general-table-scroll-fade {
-                width: 2.5rem;
-            }
+            min-height: 3.5rem;
         }
 
         .sayim-seg {
@@ -1657,21 +1593,56 @@
                         </div>
                     </div>
                     <p class="text-[10px] text-slate-500 hidden sm:block -mt-1">Sabit liste; isim verir, yeniden adlandırırsınız.</p>
-                    <div class="sayim-general-table-scroll-outer">
-                        <div id="generalTableList" class="sayim-general-table-list rounded-xl border border-slate-100 bg-slate-50/70 p-2 sm:p-3 shadow-inner" role="list" aria-label="Genel Sayım Tabloları"></div>
-                        <div class="sayim-general-table-scroll-fade" aria-hidden="true"></div>
+                    <div class="flex items-stretch gap-2 min-w-0">
+                        <div id="generalTableList" class="sayim-general-table-list sayim-general-table-pill-row flex flex-1 min-w-0 gap-2 overflow-x-auto pb-1 -mx-1 px-1 rounded-xl border border-slate-100 bg-slate-50/70 py-2 shadow-inner" role="list" aria-label="Genel Sayım Tabloları"></div>
+                        <div class="relative shrink-0 self-center">
+                            <button
+                                type="button"
+                                id="sayimGeneralTableDropdownBtn"
+                                class="inline-flex h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white px-2 sm:px-2.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                                aria-expanded="false"
+                                aria-haspopup="listbox"
+                                aria-controls="sayimGeneralTableDropdown"
+                                title="Tüm tabloları listeden seç"
+                            >
+                                <svg class="h-4 w-4 text-slate-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                                </svg>
+                                <span class="hidden sm:inline max-w-[5rem] truncate sm:max-w-[7rem]">Liste</span>
+                                <svg class="h-3.5 w-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            <div
+                                id="sayimGeneralTableDropdown"
+                                class="hidden absolute right-0 top-[calc(100%+6px)] z-[90] w-[min(calc(100vw-2rem),20rem)] rounded-xl border border-slate-200 bg-white py-2 shadow-xl ring-1 ring-slate-900/5"
+                                role="listbox"
+                                aria-label="Genel tablolar listesi"
+                            >
+                                <div class="border-b border-slate-100 px-2 pb-2">
+                                    <label class="sr-only" for="sayimGeneralTableDropdownSearch">Tabloda ara</label>
+                                    <div class="relative">
+                                        <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                        </svg>
+                                        <input
+                                            type="search"
+                                            id="sayimGeneralTableDropdownSearch"
+                                            autocomplete="off"
+                                            placeholder="Listede ara..."
+                                            class="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-8 pr-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                                        />
+                                    </div>
+                                </div>
+                                <div id="sayimGeneralTableDropdownList" class="max-h-[min(50vh,14rem)] overflow-y-auto overscroll-contain px-1"></div>
+                            </div>
+                        </div>
                     </div>
-                    <p class="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1.5 lg:hidden" id="sayimGeneralTableScrollHint">
-                        <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                    <p class="text-[10px] text-slate-400 mt-1 flex items-center gap-1.5">
+                        <svg class="h-3 w-3 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        <span>Tablolar yatay kaydırılarak seçilir</span>
-                    </p>
-                    <p class="hidden lg:flex text-[10px] text-slate-400 mt-1.5 items-center gap-1.5" id="sayimGeneralTableScrollHintDesktop">
-                        <svg class="h-3.5 w-3.5 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-                        </svg>
-                        <span>En fazla 3 satır; çok tabloda sağa kaydırın</span>
+                        <span>Şeritte kaydırın veya <strong class="font-medium text-slate-500">Liste</strong> ile arayıp seçin.</span>
                     </p>
                     </div>
                 </div>

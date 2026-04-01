@@ -39,6 +39,8 @@ class CountingSystem {
         this.DAILY_TABLE_PREFIX = 'Günlük|';
         /** `deleteDailyTableModal` onayı için */
         this._pendingDailyDeleteTableName = null;
+        /** Genel tablo dropdown — üst arama sonrası liste (dropdown içi filtre için) */
+        this._lastFilteredGeneral = [];
     }
 
     async init() {
@@ -63,6 +65,7 @@ class CountingSystem {
             this.setupEventListeners();
             this.bindSayimSubTabControls();
             this.bindSayimTableCardMenu();
+            this.bindSayimGeneralTableDropdown();
             this.initDailyDateControls();
 
             // Setup tab system
@@ -1549,14 +1552,14 @@ class CountingSystem {
                 btn.dataset.tableName = table.name;
                 btn.title = table.name;
                 btn.className = [
-                    'sayim-table-chip sayim-general-table-chip w-full min-w-0 inline-flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm font-medium transition-colors',
+                    'sayim-general-table-chip shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all',
                     isActive
-                        ? 'border-indigo-200 bg-indigo-50 text-indigo-900 shadow-sm ring-1 ring-indigo-200/50'
-                        : 'border-slate-200 bg-white text-slate-600 hover:bg-white hover:border-slate-300 hover:shadow-sm',
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300',
                 ].join(' ');
                 btn.innerHTML = `
-                    <span class="min-w-0 truncate text-left">${this.escapeHtml(table.name)}</span>
-                    <span class="shrink-0 tabular-nums text-[11px] px-2 py-0.5 rounded-md font-semibold ${isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}">${table.productCount ?? 0}</span>
+                    <span class="truncate max-w-[10rem]">${this.escapeHtml(table.name)}</span>
+                    <span class="text-[10px] font-semibold ${isActive ? 'text-blue-600' : 'text-slate-400'}">${table.productCount ?? 0}</span>
                 `;
                 btn.addEventListener('click', async () => {
                     if (table.name !== this.currentTableName) {
@@ -1566,6 +1569,9 @@ class CountingSystem {
                 generalList.appendChild(btn);
             });
         }
+
+        this._lastFilteredGeneral = filteredGeneral;
+        this.renderGeneralDropdownList(filteredGeneral);
 
         const dailyTables = tables
             .filter((t) => this.isDailyTableName(t.name))
@@ -1732,6 +1738,94 @@ class CountingSystem {
                 }
             });
         });
+    }
+
+    /** Genel tablolar — liste dropdown içeriği (üst arama + liste içi arama) */
+    renderGeneralDropdownList(generalTablesFiltered) {
+        const dropdownList = document.getElementById('sayimGeneralTableDropdownList');
+        const btn = document.getElementById('sayimGeneralTableDropdownBtn');
+        if (!dropdownList) return;
+        const base = Array.isArray(generalTablesFiltered) ? generalTablesFiltered : [];
+        const qDrop = (document.getElementById('sayimGeneralTableDropdownSearch')?.value || '').trim().toLowerCase();
+        const list = qDrop ? base.filter((t) => t.name.toLowerCase().includes(qDrop)) : base;
+        dropdownList.innerHTML = '';
+        if (list.length === 0) {
+            const empty = document.createElement('p');
+            empty.className = 'px-3 py-4 text-center text-[11px] text-slate-500';
+            empty.textContent = base.length ? 'Arama ile eşleşen tablo yok.' : 'Henüz genel tablo yok.';
+            dropdownList.appendChild(empty);
+        } else {
+            list.forEach((table) => {
+                const isActive = table.name === this.currentTableName;
+                const row = document.createElement('button');
+                row.type = 'button';
+                row.setAttribute('role', 'option');
+                row.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                row.dataset.tableName = table.name;
+                row.className = [
+                    'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors',
+                    isActive ? 'bg-blue-50 text-blue-900' : 'text-slate-700 hover:bg-slate-50',
+                ].join(' ');
+                row.innerHTML = `
+                    <span class="min-w-0 truncate font-medium">${this.escapeHtml(table.name)}</span>
+                    <span class="shrink-0 tabular-nums text-[10px] font-semibold ${isActive ? 'text-blue-600' : 'text-slate-400'}">${table.productCount ?? 0}</span>
+                `;
+                row.addEventListener('click', async () => {
+                    document.getElementById('sayimGeneralTableDropdown')?.classList.add('hidden');
+                    document.getElementById('sayimGeneralTableDropdownBtn')?.setAttribute('aria-expanded', 'false');
+                    const searchIn = document.getElementById('sayimGeneralTableDropdownSearch');
+                    if (searchIn) searchIn.value = '';
+                    if (table.name !== this.currentTableName) {
+                        await this.switchTable(table.name);
+                    }
+                });
+                dropdownList.appendChild(row);
+            });
+        }
+        if (btn) btn.disabled = base.length === 0;
+    }
+
+    bindSayimGeneralTableDropdown() {
+        const btn = document.getElementById('sayimGeneralTableDropdownBtn');
+        const drop = document.getElementById('sayimGeneralTableDropdown');
+        const searchEl = document.getElementById('sayimGeneralTableDropdownSearch');
+        if (!btn || !drop) return;
+
+        const close = () => {
+            drop.classList.add('hidden');
+            btn.setAttribute('aria-expanded', 'false');
+            if (searchEl) searchEl.value = '';
+            this.renderGeneralDropdownList(this._lastFilteredGeneral);
+        };
+
+        const open = () => {
+            drop.classList.remove('hidden');
+            btn.setAttribute('aria-expanded', 'true');
+            this.renderGeneralDropdownList(this._lastFilteredGeneral);
+            setTimeout(() => searchEl?.focus(), 30);
+        };
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (drop.classList.contains('hidden')) open();
+            else close();
+        });
+
+        document.addEventListener('click', (e) => {
+            if (drop.classList.contains('hidden')) return;
+            if (btn.contains(e.target) || drop.contains(e.target)) return;
+            close();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') close();
+        });
+
+        if (searchEl) {
+            searchEl.addEventListener('input', () => {
+                this.renderGeneralDropdownList(this._lastFilteredGeneral);
+            });
+        }
     }
 
     // Open table selector dropdown
