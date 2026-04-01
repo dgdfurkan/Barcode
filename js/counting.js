@@ -1535,7 +1535,7 @@ class CountingSystem {
         generalList.classList.toggle('sayim-general-table-list--empty', filteredGeneral.length === 0);
         if (filteredGeneral.length === 0) {
             const empty = document.createElement('p');
-            empty.className = 'col-span-full text-[11px] text-slate-500 px-2 py-3 text-center';
+            empty.className = 'w-full text-[11px] text-slate-500 px-2 py-3 text-center';
             empty.textContent = generalTables.length
                 ? 'Arama ile eşleşen tablo yok.'
                 : 'Henüz genel tablo yok. + ile oluşturun.';
@@ -1549,7 +1549,7 @@ class CountingSystem {
                 btn.dataset.tableName = table.name;
                 btn.title = table.name;
                 btn.className = [
-                    'sayim-table-chip w-full min-w-0 inline-flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm font-medium transition-colors',
+                    'sayim-table-chip sayim-general-table-chip w-full min-w-0 inline-flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm font-medium transition-colors',
                     isActive
                         ? 'border-indigo-200 bg-indigo-50 text-indigo-900 shadow-sm ring-1 ring-indigo-200/50'
                         : 'border-slate-200 bg-white text-slate-600 hover:bg-white hover:border-slate-300 hover:shadow-sm',
