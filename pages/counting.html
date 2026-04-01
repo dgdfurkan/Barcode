@@ -1706,36 +1706,52 @@
         </div>
 
         <!-- Sync Section -->
-        <div class="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6 w-full">
-            <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 sm:gap-4">
-                <div class="flex-1 min-w-0 w-full lg:w-auto">
-                    <h3 class="text-base sm:text-lg font-semibold text-text-primary">Sistem Stokları</h3>
-                    <p class="text-xs sm:text-sm text-text-secondary">Depo stoku girilen ürünler için sistem stoklarını getir</p>
+        <div class="bg-white rounded-xl border border-slate-200 p-4 sm:p-5 mb-5 w-full">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                        <span class="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600">
+                                <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"></path>
+                                <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"></path>
+                                <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"></path>
+                            </svg>
+                        </span>
+                        Sistem Stokları
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-1 ml-9">Depo stoku girilen ürünler için sistem stoklarını getir</p>
                 </div>
-                <div class="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full lg:w-auto lg:flex-nowrap">
-                    <button id="resetWarehouseStocksBtn" class="modern-action-btn reset-btn group flex-1 lg:flex-initial px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 text-orange-700 border border-orange-200 hover:border-orange-300 rounded-xl transition-all duration-200 flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm font-semibold shadow-sm hover:shadow-md" title="Tüm depo stoklarını sıfırla">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5 transform group-hover:rotate-90 transition-transform duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
-                        <span class="hidden md:inline">Depo Stoklarını Sıfırla</span>
-                        <span class="md:hidden">Depo Sıfırla</span>
-                    </button>
-                    <button id="resetSystemStocksBtn" class="modern-action-btn reset-btn group flex-1 lg:flex-initial px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 text-purple-700 border border-purple-200 hover:border-purple-300 rounded-xl transition-all duration-200 flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm font-semibold shadow-sm hover:shadow-md" title="Tüm sistem stoklarını sıfırla">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5 transform group-hover:rotate-90 transition-transform duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                <div class="flex gap-2 flex-wrap sm:flex-nowrap sm:justify-end sm:shrink-0">
+                    <button type="button" id="resetWarehouseStocksBtn" class="flex items-center gap-1.5 px-3 py-2 bg-orange-50 text-orange-700 border border-orange-200 rounded-lg text-xs font-semibold hover:bg-orange-100 hover:border-orange-300 transition-all active:scale-[0.97]" title="Tüm depo stoklarını sıfırla">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                            <path d="M21 3v5h-5"></path>
+                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                            <path d="M8 16H3v5"></path>
                         </svg>
-                        <span class="hidden md:inline">Sistem Stoklarını Sıfırla</span>
-                        <span class="md:hidden">Sistem Sıfırla</span>
+                        <span>Depo Sıfırla</span>
                     </button>
-                    <button id="syncStocksBtn" class="modern-action-btn sync-btn group flex-1 lg:flex-initial px-4 sm:px-5 lg:px-6 py-2 sm:py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl transition-all duration-200 flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm font-semibold shadow-lg hover:shadow-xl transform hover:scale-105" title="Sistem stoklarını senkronize et">
-                        <svg class="w-4 h-4 sm:w-5 sm:h-5 transform group-hover:rotate-180 transition-transform duration-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    <button type="button" id="resetSystemStocksBtn" class="flex items-center gap-1.5 px-3 py-2 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-xs font-semibold hover:bg-purple-100 hover:border-purple-300 transition-all active:scale-[0.97]" title="Tüm sistem stoklarını sıfırla">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                            <path d="M21 3v5h-5"></path>
+                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                            <path d="M8 16H3v5"></path>
                         </svg>
-                        <span class="font-bold whitespace-nowrap">Senkronize Et</span>
-                </button>
+                        <span>Sistem Sıfırla</span>
+                    </button>
+                    <button type="button" id="syncStocksBtn" class="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition-all active:scale-[0.97] shadow-sm" title="Sistem stoklarını senkronize et">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true">
+                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                            <path d="M21 3v5h-5"></path>
+                            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                            <path d="M8 16H3v5"></path>
+                        </svg>
+                        <span>Senkronize Et</span>
+                    </button>
+                </div>
             </div>
         </div>
-                    </div>
 
         <!-- API Status Card -->
         <div id="apiStatusCard" class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm p-3 sm:p-4 lg:p-5 mb-4 sm:mb-6 w-full hidden">
