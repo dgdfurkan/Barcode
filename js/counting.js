@@ -871,43 +871,179 @@ class CountingSystem {
     }
 
     /**
-     * Barkod doğrulama kaydı: tam ürün adı + detay metni (eski kayıtlar «Ürün: … ·» içeriyorsa ayırır).
+     * Mesajdan «Barkod doğrula · …» parçalarını ayırır (eski: ürün adı ikinci segment; yeni: Ürün:/Okutulan/Durum).
      */
-    getVerifyAuditNameAndDetail(e) {
-        const m = String(e.m || '');
-        const snap = e.productName && String(e.productName).trim();
-        if (snap) {
-            return { name: snap, detail: m };
+    parseVerifyAuditMessageParts(raw) {
+        const m = String(raw || '').trim();
+        const parts = m.split(/\s*[\u00B7•]\s*/).map((s) => s.trim());
+        if (parts[0] !== 'Barkod doğrula') {
+            return { nameFromMessage: null, tailSegments: [], raw: m };
         }
-        const legacy = m.match(/^Barkod doğrula · Ürün:\s*(.+?) · (.+)$/s);
-        if (legacy) {
-            return { name: legacy[1].trim(), detail: `Barkod doğrula · ${legacy[2].trim()}` };
+        const rest = parts.slice(1);
+        if (rest.length === 0) {
+            return { nameFromMessage: null, tailSegments: [], raw: m };
         }
-        const p = this.findProductByIdLoose(e.productId);
-        const name = (p && p.name) || (e.productId != null ? String(e.productId) : 'Ürün');
-        return { name, detail: m };
+        const first = rest[0];
+        const isMetaStart = (s) => {
+            const t = String(s);
+            return (
+                /^Ürün:/i.test(t) ||
+                /^Okutulan barkod:/i.test(t) ||
+                /^okutulan:/i.test(t) ||
+                /^Durum:/i.test(t) ||
+                /^Sonuç:/i.test(t)
+            );
+        };
+        let nameFromMessage = null;
+        let tailStart = 0;
+        if (/^Ürün:/i.test(first)) {
+            nameFromMessage = first.replace(/^Ürün:\s*/i, '').trim();
+            tailStart = 1;
+        } else if (isMetaStart(first)) {
+            tailStart = 0;
+        } else {
+            nameFromMessage = first;
+            tailStart = 1;
+        }
+        const tailSegments = rest.slice(tailStart);
+        return { nameFromMessage, tailSegments, raw: m };
     }
 
-    /** Barkod doğrulama kartı: büyük görsel + kalın ürün adı + detay (snapshot görsel/ad öncelikli) */
-    buildVerifyAuditRichBodyHtml(e) {
-        const { name, detail } = this.getVerifyAuditNameAndDetail(e);
+    /** Kesik/legacy ürün adından katalogda ürün bul (tam ad + görsel için) */
+    tryFindProductByNameHint(nameHint) {
+        const raw = String(nameHint || '').trim();
+        if (raw.length < 3) return null;
+        const clean = raw.replace(/[\u2026…]+$/g, '').replace(/\.\.\.$/, '').trim();
+        const list = this.allProducts || [];
+        for (const x of list) {
+            if (!x || !x.name) continue;
+            if (x.name === raw || x.name === clean) return x;
+        }
+        if (clean.length >= 4) {
+            let best = null;
+            for (const x of list) {
+                if (!x || !x.name) continue;
+                if (x.name.startsWith(clean) && (!best || x.name.length > best.name.length)) best = x;
+            }
+            if (best) return best;
+        }
+        const words = clean.split(/\s+/).filter(Boolean);
+        for (let n = Math.min(words.length, 12); n >= 2; n--) {
+            const prefix = words.slice(0, n).join(' ');
+            if (prefix.length < 6) continue;
+            let best = null;
+            for (const x of list) {
+                if (!x || !x.name) continue;
+                if (x.name.startsWith(prefix) && (!best || x.name.length > best.name.length)) best = x;
+            }
+            if (best) return best;
+        }
+        return null;
+    }
+
+    /** Barkod doğrulama: snapshot + id + isim ipucu ile ürün çöz */
+    resolveProductForVerifyAudit(e) {
+        const pId = this.findProductByIdLoose(e.productId);
+        if (pId) return pId;
+        const snap = e.productName && String(e.productName).trim();
+        if (snap) {
+            const bySnap = this.tryFindProductByNameHint(snap);
+            if (bySnap) return bySnap;
+        }
+        const { nameFromMessage } = this.parseVerifyAuditMessageParts(e.m);
+        if (nameFromMessage) {
+            const byMsg = this.tryFindProductByNameHint(nameFromMessage);
+            if (byMsg) return byMsg;
+        }
+        return null;
+    }
+
+    /** Tail segmentlerini Türkçe etiket + değer satırlarına */
+    verifyAuditTailToRows(tailSegments) {
+        const rows = [];
+        const segs = Array.isArray(tailSegments) ? tailSegments : [];
+        for (const seg of segs) {
+            const idx = seg.indexOf(':');
+            if (idx === -1) {
+                if (!seg) continue;
+                if (/^eşleşti$/i.test(seg)) rows.push({ label: 'Sonuç', value: 'eşleşti' });
+                else if (/^eşleşmedi$/i.test(seg)) rows.push({ label: 'Sonuç', value: 'eşleşmedi' });
+                else rows.push({ label: '', value: seg });
+                continue;
+            }
+            let label = seg.slice(0, idx).trim();
+            const value = seg.slice(idx + 1).trim();
+            if (/^okutulan$/i.test(label)) label = 'Okutulan barkod';
+            else if (/^Ürün$/i.test(label)) label = 'Ürün';
+            else if (/^Sonuç$/i.test(label)) label = 'Sonuç';
+            rows.push({ label, value });
+        }
+        return rows;
+    }
+
+    /** Tek bir işlem kaydı kartı — barkod doğrulama (üstte ürün şablonu) */
+    buildVerifyAuditArticleHtml(e, time, catMeta, tblHtml) {
+        const p = this.resolveProductForVerifyAudit(e);
         const snapImg = e.productImage && String(e.productImage).trim();
-        const p = this.findProductByIdLoose(e.productId);
+        const parsed = this.parseVerifyAuditMessageParts(e.m);
+        let displayName =
+            (p && p.name) ||
+            (e.productName && String(e.productName).trim()) ||
+            parsed.nameFromMessage ||
+            this.auditProductLabel(e.productId) ||
+            'Ürün';
+        if (p && p.name) displayName = p.name;
+
         const rawSrc = snapImg || (p && p.image) || '../assets/logo.png';
         const src = this.escapeHtml(rawSrc);
-        const alt = this.escapeHtml(name);
-        const nameHtml = this.escapeHtml(name);
-        const detailHtml = this.escapeHtml(detail);
+        const alt = this.escapeHtml(displayName);
+        const nameHtml = this.escapeHtml(displayName);
+
+        const rows = this.verifyAuditTailToRows(parsed.tailSegments);
+        const rowsHtml =
+            rows.length > 0
+                ? `<dl class="space-y-2.5 text-sm">
+                    ${rows
+                        .map((r) => {
+                            const v = this.escapeHtml(r.value);
+                            if (!r.label) {
+                                return `<div class="text-slate-600 break-words">${v}</div>`;
+                            }
+                            const lab = this.escapeHtml(r.label);
+                            return `<div class="grid gap-0.5 sm:grid-cols-[minmax(0,11rem)_1fr] sm:gap-x-3 sm:items-baseline">
+                                <dt class="text-slate-500 font-medium">${lab}</dt>
+                                <dd class="text-slate-800 font-medium [overflow-wrap:anywhere] break-words">${v}</dd>
+                            </div>`;
+                        })
+                        .join('')}
+                </dl>`
+                : `<p class="text-sm text-slate-600 break-words [overflow-wrap:anywhere]">${this.escapeHtml(parsed.raw)}</p>`;
+
         return `
-            <div class="flex gap-4 items-start min-w-0">
-                <div class="flex-shrink-0 w-[5.5rem] h-[5.5rem] sm:w-28 sm:h-28 rounded-2xl overflow-hidden border-2 border-slate-200/90 bg-white shadow-md ring-1 ring-slate-900/5">
-                    <img src="${src}" alt="${alt}" class="h-full w-full object-cover" width="112" height="112" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='../assets/logo.png'"/>
+            <article class="rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-900/5 overflow-hidden transition hover:border-teal-300/80 hover:shadow-lg">
+                <div class="sayim-verify-audit-hero bg-gradient-to-br from-teal-50/95 via-white to-slate-50 border-b border-teal-100/80 px-4 py-4 sm:px-5 sm:py-5">
+                    <div class="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:text-left sm:gap-5">
+                        <div class="relative flex-shrink-0">
+                            <div class="absolute -inset-1 rounded-[1.15rem] bg-gradient-to-br from-teal-200/60 to-indigo-200/40 blur-sm opacity-90"></div>
+                            <div class="relative h-28 w-28 sm:h-32 sm:w-32 overflow-hidden rounded-2xl border-2 border-white bg-white shadow-lg ring-2 ring-teal-100">
+                                <img src="${src}" alt="${alt}" class="h-full w-full object-cover" width="128" height="128" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='../assets/logo.png'"/>
+                            </div>
+                        </div>
+                        <div class="min-w-0 flex-1 space-y-1.5 text-center sm:text-left w-full">
+                            <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-700/90">Ürün</p>
+                            <h3 class="text-lg sm:text-xl font-bold text-slate-900 leading-snug break-words">${nameHtml}</h3>
+                        </div>
+                    </div>
                 </div>
-                <div class="min-w-0 flex-1 space-y-2">
-                    <p class="text-[15px] sm:text-base font-semibold text-slate-900 leading-snug break-words">${nameHtml}</p>
-                    <p class="text-sm leading-relaxed text-slate-600 break-words [overflow-wrap:anywhere]">${detailHtml}</p>
+                <div class="px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+                    <div class="flex flex-wrap items-center gap-2 border-b border-slate-100/90 pb-3 mb-3">
+                        <time class="text-xs font-mono font-semibold text-indigo-600 tabular-nums">${time}</time>
+                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${catMeta.class}">${this.escapeHtml(catMeta.label)}</span>
+                        ${tblHtml}
+                    </div>
+                    ${rowsHtml}
                 </div>
-            </div>`;
+            </article>`;
     }
 
     /** Diğer işlem türleri: küçük görsel (yalnızca productId varsa) */
@@ -984,13 +1120,9 @@ class CountingSystem {
             const tbl = tblRaw
                 ? `<span class="inline-flex max-w-[min(100%,14rem)] rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200/80 [overflow-wrap:anywhere] break-words text-left" title="${this.escapeHtml(tblRaw)}">${this.escapeHtml(tblRaw)}</span>`
                 : `<span class="text-[11px] text-slate-400">Tablo bilinmiyor</span>`;
-            const bodyInner =
-                e.cat === 'verify'
-                    ? this.buildVerifyAuditRichBodyHtml(e)
-                    : `<div class="flex gap-3 items-start min-w-0">
-                        ${e.productId ? this.getAuditLogProductThumbnailHtml(e.productId) : ''}
-                        <p class="min-w-0 flex-1 text-sm leading-relaxed text-slate-800 [overflow-wrap:anywhere] break-words">${msg}</p>
-                    </div>`;
+            if (e.cat === 'verify') {
+                return this.buildVerifyAuditArticleHtml(e, time, meta, tbl);
+            }
             return `
                 <article class="rounded-xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/40 p-3.5 shadow-sm transition hover:border-indigo-200/80 hover:shadow-md sm:p-4">
                     <div class="flex flex-wrap items-center gap-2 border-b border-slate-100/90 pb-2.5 mb-2.5">
@@ -998,7 +1130,10 @@ class CountingSystem {
                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${meta.class}">${this.escapeHtml(meta.label)}</span>
                         ${tbl}
                     </div>
-                    ${bodyInner}
+                    <div class="flex gap-3 items-start min-w-0">
+                        ${e.productId ? this.getAuditLogProductThumbnailHtml(e.productId) : ''}
+                        <p class="min-w-0 flex-1 text-sm leading-relaxed text-slate-800 [overflow-wrap:anywhere] break-words">${msg}</p>
+                    </div>
                 </article>`;
         });
         container.innerHTML = `<div class="flex flex-col gap-3">${blocks.join('')}</div>`;
