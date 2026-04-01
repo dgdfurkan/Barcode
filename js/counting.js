@@ -62,6 +62,7 @@ class CountingSystem {
             // Setup event listeners
             this.setupEventListeners();
             this.bindSayimSubTabControls();
+            this.bindSayimTableCardMenu();
             this.initDailyDateControls();
 
             // Setup tab system
@@ -83,12 +84,7 @@ class CountingSystem {
             // Update table selector
             this.updateTableSelector();
             
-            // Show/hide delete button based on table count
-            const deleteTableBtn = document.getElementById('deleteTableBtn');
-            if (deleteTableBtn) {
-                const tables = this.getTableList();
-                deleteTableBtn.style.display = tables.length > 1 ? 'block' : 'none';
-            }
+            this.syncDeleteTableButtonsVisibility();
             
             // Setup scroll listener for toast positioning
             this.setupToastScrollListener();
@@ -1127,6 +1123,20 @@ class CountingSystem {
         }
     }
 
+    /** Sadece tarih (aktif tablo kartı — Oluşturulma) */
+    formatDateOnlyTr(ms) {
+        if (ms == null || Number.isNaN(ms)) return '—';
+        try {
+            return new Date(ms).toLocaleDateString('tr-TR', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+            });
+        } catch (e) {
+            return '—';
+        }
+    }
+
     /** "2 saat önce" vb. */
     formatRelativeAgoTr(ms) {
         if (ms == null || Number.isNaN(ms)) return '';
@@ -1140,25 +1150,42 @@ class CountingSystem {
     }
 
     updateActiveTableActivityLine() {
-        const el = document.getElementById('activeTableActivityLine');
-        if (!el) return;
+        const createdEl = document.getElementById('activeTableCreatedAt');
+        const lastEl = document.getElementById('activeTableLastCount');
+        const legacy = document.getElementById('activeTableActivityLine');
 
         const tableData = this.countingData;
         const createdMs = this.resolveTableCreatedMs(tableData);
         const lastMs = this.resolveLastCountActivityMs(tableData);
 
-        const createdStr = this.formatAbsoluteDateTimeTr(createdMs);
-        let lastBlock = 'Henüz sayım yok';
-        if (lastMs != null) {
-            const abs = this.formatAbsoluteDateTimeTr(lastMs);
-            const rel = this.formatRelativeAgoTr(lastMs);
-            lastBlock = rel ? `${abs} · ${rel}` : abs;
+        const clockSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-slate-400" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>`;
+        const checkSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-indigo-500" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>`;
+
+        if (createdEl) {
+            createdEl.innerHTML = `${clockSvg}<span class="truncate">${this.formatDateOnlyTr(createdMs)}</span>`;
+        }
+        if (lastEl) {
+            if (lastMs == null) {
+                lastEl.innerHTML = `${checkSvg}<span>Henüz sayım yok</span>`;
+            } else {
+                const rel = this.formatRelativeAgoTr(lastMs) || '—';
+                lastEl.innerHTML = `${checkSvg}<span class="truncate">${this.escapeHtml(rel)}</span>`;
+            }
         }
 
-        el.innerHTML = `
-            <span class="block"><span class="text-slate-600 font-medium">Oluşturulma:</span> ${createdStr}</span>
-            <span class="block mt-0.5"><span class="text-slate-600 font-medium">Son sayım:</span> ${lastBlock}</span>
-        `;
+        if (legacy && !createdEl && !lastEl) {
+            const createdStr = this.formatAbsoluteDateTimeTr(createdMs);
+            let lastBlock = 'Henüz sayım yok';
+            if (lastMs != null) {
+                const abs = this.formatAbsoluteDateTimeTr(lastMs);
+                const rel = this.formatRelativeAgoTr(lastMs);
+                lastBlock = rel ? `${abs} · ${rel}` : abs;
+            }
+            legacy.innerHTML = `
+                <span class="block"><span class="text-slate-600 font-medium">Oluşturulma:</span> ${createdStr}</span>
+                <span class="block mt-0.5"><span class="text-slate-600 font-medium">Son sayım:</span> ${lastBlock}</span>
+            `;
+        }
     }
 
     findProductByBarcodeCode(code) {
@@ -1439,23 +1466,39 @@ class CountingSystem {
         this.closeDailyAddModal();
     }
 
+    syncDeleteTableButtonsVisibility() {
+        const tables = this.getTableList();
+        const show = tables.length > 1;
+        const deleteTableBtn = document.getElementById('deleteTableBtn');
+        const menuDelete = document.getElementById('sayimTableMenuDeleteBtn');
+        if (deleteTableBtn) deleteTableBtn.style.display = show ? 'block' : 'none';
+        if (menuDelete) {
+            menuDelete.classList.toggle('hidden', !show);
+            menuDelete.setAttribute('aria-hidden', show ? 'false' : 'true');
+        }
+    }
+
     // Update table selector UI (genel liste + günlük liste)
     updateTableSelector() {
         const generalList = document.getElementById('generalTableList');
         const dailyList = document.getElementById('dailyTableList');
         const summaryText = document.getElementById('activeTableSummaryText');
+        const titleEl = document.getElementById('sayimActiveTableTitle');
+        const countEl = document.getElementById('sayimActiveTableProductCount');
         const renameBtn = document.getElementById('renameTableBtn');
 
         const tables = this.getTableList();
         const currentTable = tables.find((t) => t.isCurrent);
         const displayName = this.formatTableDisplayName(this.currentTableName);
         const cnt = currentTable ? currentTable.productCount || 0 : 0;
-        if (summaryText) {
-            const tag = this.isDailyTableName(this.currentTableName) ? ' (günlük)' : '';
-            summaryText.textContent = `${displayName}${tag} · ${cnt} ürün`;
-        }
+        const tag = this.isDailyTableName(this.currentTableName) ? ' (günlük)' : '';
+        const line = `${displayName}${tag} · ${cnt} ürün`;
+        if (summaryText) summaryText.textContent = line;
+        if (titleEl) titleEl.textContent = `${displayName}${tag}`;
+        if (countEl) countEl.textContent = `· ${cnt} ürün`;
 
         this.updateActiveTableActivityLine();
+        this.syncDeleteTableButtonsVisibility();
 
         if (renameBtn) {
             const lock = this.isDailyTableName(this.currentTableName);
@@ -1466,6 +1509,13 @@ class CountingSystem {
             renameBtn.title = lock
                 ? 'Günlük sayım tablolarının adı sabittir'
                 : 'Seçili tablonun adını değiştir';
+            const menuRename = document.querySelector('[data-sayim-menu-action="rename"]');
+            if (menuRename) {
+                menuRename.disabled = lock;
+                menuRename.setAttribute('aria-disabled', lock ? 'true' : 'false');
+                menuRename.classList.toggle('opacity-40', lock);
+                menuRename.classList.toggle('pointer-events-none', lock);
+            }
         }
 
         if (!generalList || !dailyList) {
@@ -1500,12 +1550,12 @@ class CountingSystem {
                 btn.className = [
                     'sayim-table-chip shrink-0 inline-flex max-w-[min(100vw-4rem,14rem)] items-center justify-between gap-2 rounded-full border px-3 py-1.5 text-left text-xs font-medium transition-colors snap-start sm:max-w-[16rem]',
                     isActive
-                        ? 'border-blue-400 bg-blue-50 text-blue-900 shadow-sm ring-1 ring-blue-200/50'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300',
+                        ? 'border-indigo-200 bg-indigo-50 text-indigo-900 shadow-sm ring-1 ring-indigo-200/50'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300',
                 ].join(' ');
                 btn.innerHTML = `
                     <span class="min-w-0 truncate">${this.escapeHtml(table.name)}</span>
-                    <span class="shrink-0 tabular-nums text-[10px] font-semibold ${isActive ? 'text-blue-700' : 'text-slate-400'}">${table.productCount ?? 0}</span>
+                    <span class="shrink-0 tabular-nums text-[10px] px-1.5 py-0.5 rounded-md font-semibold ${isActive ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}">${table.productCount ?? 0}</span>
                 `;
                 btn.addEventListener('click', async () => {
                     if (table.name !== this.currentTableName) {
@@ -1631,7 +1681,58 @@ class CountingSystem {
         go(initial);
         this.syncSayimSubTabToTable();
     }
-    
+
+    /** Aktif tablo kartı — üç nokta menü (yeniden adlandır / yeni / sil) */
+    bindSayimTableCardMenu() {
+        const btn = document.getElementById('sayimTableMenuBtn');
+        const dropdown = document.getElementById('sayimTableMenuDropdown');
+        if (!btn || !dropdown) return;
+
+        const close = () => {
+            dropdown.classList.add('hidden');
+            btn.setAttribute('aria-expanded', 'false');
+        };
+        const open = () => {
+            dropdown.classList.remove('hidden');
+            btn.setAttribute('aria-expanded', 'true');
+        };
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (dropdown.classList.contains('hidden')) open();
+            else close();
+        });
+
+        document.addEventListener('click', (e) => {
+            if (dropdown.classList.contains('hidden')) return;
+            if (btn.contains(e.target) || dropdown.contains(e.target)) return;
+            close();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') close();
+        });
+
+        dropdown.querySelectorAll('[data-sayim-menu-action]').forEach((item) => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const action = item.dataset.sayimMenuAction;
+                close();
+                const renameTableBtn = document.getElementById('renameTableBtn');
+                const createTableBtn = document.getElementById('createTableBtn');
+                const deleteTableBtn = document.getElementById('deleteTableBtn');
+                if (action === 'rename' && renameTableBtn && !renameTableBtn.disabled) {
+                    renameTableBtn.click();
+                }
+                if (action === 'create' && createTableBtn) createTableBtn.click();
+                if (action === 'delete' && deleteTableBtn && deleteTableBtn.style.display !== 'none') {
+                    deleteTableBtn.click();
+                }
+            });
+        });
+    }
+
     // Open table selector dropdown
     openTableSelector() {
         const tableSelectorBtn = document.getElementById('tableSelectorBtn');

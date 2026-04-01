@@ -979,6 +979,14 @@
             color: #334155;
         }
 
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
         /* Günlük gün listesi — çok gün birikince dikey kaydırma */
         .sayim-daily-scroll {
             display: flex;
@@ -1483,56 +1491,84 @@
 
         <!-- Sayım Tab Content -->
         <div id="sayimTabContent" class="tab-content">
-            <!-- Table picker: sekmeler + tek satır; listeler yatay chip (mobilde dikey blok yok) -->
-            <div class="bg-white rounded-xl shadow-md border border-gray-100 p-3 sm:p-4 mb-4 sm:mb-6">
-                <p id="activeTableSummary" class="text-xs sm:text-sm text-gray-600 mb-1 leading-snug line-clamp-2">
-                    <span class="font-medium text-gray-800">Aktif Tablo:</span>
-                    <span id="activeTableSummaryText" class="text-gray-700">—</span>
-                </p>
-                <p id="activeTableActivityLine" class="text-[10px] sm:text-[11px] text-slate-500 mb-2 leading-relaxed" aria-live="polite"></p>
-
-                <div class="flex rounded-xl bg-slate-100/90 p-1 border border-slate-200/80 shadow-inner mb-2 sm:mb-3" role="tablist" aria-label="Sayım tablo türü">
-                    <button type="button" id="sayimTabGeneralBtn" role="tab" aria-selected="true" aria-controls="sayimPanelGeneral" class="sayim-seg flex-1 rounded-lg py-2 px-2 text-xs font-semibold sm:text-sm">Genel</button>
-                    <button type="button" id="sayimTabDailyBtn" role="tab" aria-selected="false" aria-controls="sayimPanelDaily" class="sayim-seg flex-1 rounded-lg py-2 px-2 text-xs font-semibold sm:text-sm">Günlük</button>
+            <div class="max-w-xl mx-auto w-full px-4 sm:px-6">
+                <!-- Aktif tablo + tablo türü (mock hizalı) -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 sm:p-5 mb-6">
+                    <div class="flex justify-between items-start gap-2 mb-3">
+                        <div class="space-y-1 min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true"></span>
+                                Aktif Tablo
+                            </div>
+                            <h2 class="text-lg font-bold text-slate-800 leading-tight">
+                                <span id="sayimActiveTableTitle" class="break-words">—</span>
+                                <span id="sayimActiveTableProductCount" class="text-slate-400 font-normal text-sm ml-1">· 0 ürün</span>
+                            </h2>
+                        </div>
+                        <div class="relative shrink-0">
+                            <button type="button" id="sayimTableMenuBtn" class="p-2 text-slate-400 hover:bg-slate-50 rounded-lg transition-colors" aria-label="Tablo işlemleri" aria-haspopup="true" aria-expanded="false" title="İşlemler">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                            </button>
+                            <div id="sayimTableMenuDropdown" class="hidden absolute right-0 top-full z-[100] mt-1 min-w-[12rem] rounded-xl border border-slate-200/60 bg-white py-1 shadow-lg" role="menu">
+                                <button type="button" role="menuitem" data-sayim-menu-action="rename" class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">Yeniden adlandır</button>
+                                <button type="button" role="menuitem" data-sayim-menu-action="create" class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50">Yeni tablo</button>
+                                <button type="button" role="menuitem" data-sayim-menu-action="delete" id="sayimTableMenuDeleteBtn" class="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-red-600 hover:bg-red-50">Tabloyu sil</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 sm:gap-3 pt-3 border-t border-slate-50" aria-live="polite">
+                        <div class="flex flex-col gap-0.5 min-w-0">
+                            <span class="text-[10px] text-slate-400 font-medium uppercase">Oluşturulma</span>
+                            <span id="activeTableCreatedAt" class="text-xs font-medium text-slate-600 flex items-center gap-1 min-w-0"></span>
+                        </div>
+                        <div class="flex flex-col gap-0.5 min-w-0">
+                            <span class="text-[10px] text-slate-400 font-medium uppercase">Son Sayım</span>
+                            <span id="activeTableLastCount" class="text-xs font-medium text-slate-600 flex items-center gap-1 min-w-0"></span>
+                        </div>
+                    </div>
                 </div>
 
+                <div class="bg-slate-200/50 p-1 rounded-xl flex mb-6 shadow-inner" role="tablist" aria-label="Sayım tablo türü">
+                    <button type="button" id="sayimTabGeneralBtn" role="tab" aria-selected="true" aria-controls="sayimPanelGeneral" class="sayim-seg flex-1 rounded-lg py-2 px-2 text-sm font-semibold sm:text-sm">Genel</button>
+                    <button type="button" id="sayimTabDailyBtn" role="tab" aria-selected="false" aria-controls="sayimPanelDaily" class="sayim-seg flex-1 rounded-lg py-2 px-2 text-sm font-semibold sm:text-sm">Günlük</button>
+                </div>
+
+                <div class="min-h-[300px] mb-6">
                 <!-- Genel panel -->
-                <div id="sayimPanelGeneral" role="tabpanel" aria-labelledby="sayimTabGeneralBtn" class="sayim-panel">
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                <div id="sayimPanelGeneral" role="tabpanel" aria-labelledby="sayimTabGeneralBtn" class="sayim-panel space-y-4">
+                    <div class="flex items-center gap-2">
                         <div class="relative flex-1 min-w-0">
-                            <div class="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-slate-400">
-                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                </svg>
-                            </div>
+                            <svg class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
                             <input
                                 type="search"
                                 id="generalTableSearch"
                                 autocomplete="off"
                                 placeholder="Tabloda ara..."
-                                class="w-full rounded-lg border border-slate-200/90 bg-white py-1.5 sm:py-2 pl-9 pr-3 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                class="w-full pl-9 pr-4 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                             />
                         </div>
-                        <div class="flex items-center justify-end gap-0.5 shrink-0 sm:pl-1">
-                            <button type="button" id="renameTableBtn" class="p-2 rounded-lg border border-transparent hover:bg-slate-100 hover:border-slate-200 transition-colors" title="Seçili tablonun adını değiştir">
-                                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="flex gap-1 shrink-0">
+                            <button type="button" id="renameTableBtn" class="p-2 text-slate-600 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 rounded-xl transition-all" title="Seçili tablonun adını değiştir">
+                                <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                 </svg>
                             </button>
-                            <button type="button" id="createTableBtn" class="p-2 rounded-lg border border-transparent hover:bg-slate-100 hover:border-slate-200 transition-colors" title="Yeni tablo oluştur">
-                                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <button type="button" id="createTableBtn" class="p-2 text-blue-600 hover:bg-blue-50 rounded-xl transition-all" title="Yeni tablo oluştur">
+                                <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                                 </svg>
                             </button>
-                            <button type="button" id="deleteTableBtn" class="p-2 rounded-lg border border-transparent hover:bg-slate-100 hover:border-slate-200 transition-colors text-red-600" title="Seçili tabloyu sil" style="display: none;">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            <button type="button" id="deleteTableBtn" class="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Seçili tabloyu sil" style="display: none;">
+                                <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 11v6M14 11v6M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                                 </svg>
                             </button>
                         </div>
                     </div>
-                    <p class="text-[10px] sm:text-[11px] text-slate-500 mt-1 mb-1.5 hidden sm:block">Sabit liste; isim verir, yeniden adlandırırsınız.</p>
-                    <div id="generalTableList" class="sayim-chip-scroll sayim-chip-wrap rounded-lg border border-slate-100/80 bg-slate-50/50 px-1" role="list" aria-label="Genel Sayım Tabloları"></div>
+                    <p class="text-[10px] text-slate-500 hidden sm:block -mt-1">Sabit liste; isim verir, yeniden adlandırırsınız.</p>
+                    <div id="generalTableList" class="sayim-chip-scroll sayim-chip-wrap flex gap-2 overflow-x-auto pb-2 no-scrollbar rounded-xl border border-slate-100/80 bg-slate-50/50 px-1 py-1" role="list" aria-label="Genel Sayım Tabloları"></div>
                 </div>
 
                 <!-- Günlük panel: liste önde; gün ekleme tarih+aksiyon modalda -->
@@ -1560,6 +1596,13 @@
                         </div>
                     </div>
                 </div>
+                </div>
+                <footer class="mt-8 mb-2 text-center">
+                    <div class="inline-flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100/50 px-4 py-2 rounded-full border border-slate-200/40">
+                        <span class="w-1 h-1 rounded-full bg-slate-300 shrink-0" aria-hidden="true"></span>
+                        Sistem Aktif · <span id="sayimFooterVersion">v2.1.0</span>
+                    </div>
+                </footer>
             </div>
         <!-- Add Product Section -->
         <div class="bg-white rounded-xl shadow-md border border-gray-100 p-5 sm:p-6 mb-6">
