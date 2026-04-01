@@ -3089,13 +3089,12 @@ class CountingSystem {
 
         // If product already exists, update it
         if (this.countingData[productId]) {
-            // Update existing entry
+            // Update existing entry (son sayım zamanı sadece yeni satır / stok değişimiyle güncellenir)
             const existing = this.countingData[productId];
             // Keep warehouse stock if it exists, otherwise reset
             if (!existing.warehouseStock) {
                 existing.warehouseStock = null;
             }
-            existing.lastUpdated = now.toISOString();
         } else {
             isNew = true;
             // Create new entry
@@ -3135,11 +3134,29 @@ class CountingSystem {
         }
 
         const now = new Date();
+        const normStock = (v) => {
+            if (v === null || v === undefined) return null;
+            const n = Number(v);
+            return Number.isNaN(n) ? null : n;
+        };
+
         const oldWarehouseStock = this.countingData[productId].warehouseStock;
         const oldSystemStock = this.countingData[productId].systemStock;
 
-        // Add to history if value changed
-        if (oldWarehouseStock !== warehouseStock || oldSystemStock !== systemStock) {
+        let nextWarehouseStock = oldWarehouseStock;
+        let nextSystemStock = oldSystemStock;
+        if (warehouseStock !== null && warehouseStock !== undefined) {
+            nextWarehouseStock = Number(warehouseStock);
+        }
+        if (systemStock !== null && systemStock !== undefined) {
+            nextSystemStock = Number(systemStock);
+        }
+
+        const countingChanged =
+            normStock(oldWarehouseStock) !== normStock(nextWarehouseStock) ||
+            normStock(oldSystemStock) !== normStock(nextSystemStock);
+
+        if (countingChanged) {
             this.countingData[productId].history.push({
                 warehouseStock: oldWarehouseStock,
                 systemStock: oldSystemStock,
@@ -3170,7 +3187,9 @@ class CountingSystem {
                 this.countingData[productId].reservedStock = Number(reservedStock);
             }
         }
-        this.countingData[productId].lastUpdated = now.toISOString();
+        if (countingChanged) {
+            this.countingData[productId].lastUpdated = now.toISOString();
+        }
 
         // Save and render
         this.saveCountingData();
@@ -6313,11 +6332,13 @@ class CountingSystem {
         let resetCount = 0;
         const productIds = Object.keys(this.countingData).filter((id) => !this.isReservedCountingKey(id));
         
+        const nowIso = new Date().toISOString();
         productIds.forEach(productId => {
             if (this.countingData[productId]) {
                 const data = this.countingData[productId];
                 if (data.warehouseStock !== null && data.warehouseStock !== undefined) {
                     this.countingData[productId].warehouseStock = null;
+                    this.countingData[productId].lastUpdated = nowIso;
                     resetCount++;
                 }
             }
@@ -6338,12 +6359,14 @@ class CountingSystem {
         let resetCount = 0;
         const productIds = Object.keys(this.countingData).filter((id) => !this.isReservedCountingKey(id));
         
+        const nowIso = new Date().toISOString();
         productIds.forEach(productId => {
             if (this.countingData[productId]) {
                 const data = this.countingData[productId];
                 if (data.systemStock !== null && data.systemStock !== undefined) {
                     this.countingData[productId].systemStock = null;
                     this.countingData[productId].apiFetchFailed = false; // Reset failed flag too
+                    this.countingData[productId].lastUpdated = nowIso;
                     resetCount++;
                 }
             }
