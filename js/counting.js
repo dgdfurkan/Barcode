@@ -1582,6 +1582,7 @@ class CountingSystem {
 
         this._lastFilteredGeneral = filteredGeneral;
         this.renderGeneralDropdownList(filteredGeneral);
+        this.scrollActiveGeneralTableChipIntoView();
 
         const dailyTables = tables
             .filter((t) => this.isDailyTableName(t.name))
@@ -1745,6 +1746,27 @@ class CountingSystem {
                 if (action === 'create' && createTableBtn) createTableBtn.click();
                 if (action === 'delete' && deleteTableBtn && deleteTableBtn.style.display !== 'none') {
                     deleteTableBtn.click();
+                }
+            });
+        });
+    }
+
+    /** Genel tablo pill şeridinde seçili chip görünür alana kayar (dropdown / arama sonrası dahil) */
+    scrollActiveGeneralTableChipIntoView() {
+        const list = document.getElementById('generalTableList');
+        if (!list || list.classList.contains('sayim-general-table-list--empty')) return;
+        if (this.isDailyTableName(this.currentTableName)) return;
+        const targetName = this.currentTableName;
+        const btn = Array.from(list.querySelectorAll('[data-table-name]')).find(
+            (el) => el.dataset.tableName === targetName
+        );
+        if (!btn) return;
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                try {
+                    btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                } catch (e) {
+                    btn.scrollIntoView({ inline: 'center', block: 'nearest' });
                 }
             });
         });
