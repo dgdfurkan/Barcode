@@ -1179,7 +1179,8 @@ class CountingSystem {
         const checkSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-indigo-500" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>`;
 
         if (createdEl) {
-            createdEl.innerHTML = `${clockSvg}<span class="truncate">${this.formatDateOnlyTr(createdMs)}</span>`;
+            const createdFull = this.formatAbsoluteDateTimeTr(createdMs);
+            createdEl.innerHTML = `${clockSvg}<span class="truncate">${this.escapeHtml(createdFull)}</span>`;
         }
         if (lastEl) {
             if (lastMs == null) {
