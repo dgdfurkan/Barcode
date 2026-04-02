@@ -948,6 +948,44 @@ class CountingSystem {
         return null;
     }
 
+    /**
+     * Stok / ürün audit mesajından ürün adı parçasını çıkar (productId olmayan eski kayıtlar için).
+     * Örn: "Sayım güncellendi · Eti Nero … · depo 25 · …" → ikinci segment
+     */
+    parseAuditMessageEmbeddedProductName(m, cat) {
+        const s = String(m || '').trim();
+        if (!s) return null;
+        const parts = s.split(/\s*·\s*/).map((x) => x.trim()).filter(Boolean);
+        if (parts.length < 2) return null;
+        const head = parts[0];
+        if (cat === 'stock' && /^Sayım güncellendi$/i.test(head)) {
+            return parts[1] || null;
+        }
+        if (cat === 'product') {
+            if (/^Ürün eklendi$/i.test(head)) return parts[1] || null;
+            if (/^Listeden çıkarıldı$/i.test(head)) return parts[1] || null;
+            if (/^Ürün silindi$/i.test(head)) return parts[1] || null;
+        }
+        return null;
+    }
+
+    /** İşlem kaydı kartı (verify dışı): id veya mesajdan ürün bul — logo için */
+    resolveProductForGenericAuditThumbnail(e) {
+        if (e.productId != null && e.productId !== '') {
+            const byId = this.findProductByIdLoose(e.productId);
+            if (byId) return byId;
+        }
+        const fromMsg = this.parseAuditMessageEmbeddedProductName(e.m, e.cat);
+        if (fromMsg) {
+            const byName = this.tryFindProductByNameHint(fromMsg);
+            if (byName) return byName;
+        }
+        if (e.productName != null && String(e.productName).trim() !== '') {
+            return this.tryFindProductByNameHint(String(e.productName).trim());
+        }
+        return null;
+    }
+
     /** Barkod doğrulama: snapshot + id + isim ipucu ile ürün çöz */
     resolveProductForVerifyAudit(e) {
         const pId = this.findProductByIdLoose(e.productId);
@@ -1053,12 +1091,12 @@ class CountingSystem {
             </article>`;
     }
 
-    /** Diğer işlem türleri: küçük görsel (yalnızca productId varsa) */
-    getAuditLogProductThumbnailHtml(productId) {
-        if (productId == null || productId === '') return '';
-        const p = this.findProductByIdLoose(productId);
-        const src = this.escapeHtml((p && p.image) || '../assets/logo.png');
-        const alt = this.escapeHtml((p && p.name) || 'Ürün');
+    /** Diğer işlem türleri: küçük görsel (id, yoksa mesajdaki ürün adından katalog eşlemesi) */
+    getAuditLogThumbnailHtmlForAuditEntry(e) {
+        const p = this.resolveProductForGenericAuditThumbnail(e);
+        if (!p) return '';
+        const src = this.escapeHtml((p.image) || '../assets/logo.png');
+        const alt = this.escapeHtml(p.name || 'Ürün');
         return `<div class="flex-shrink-0 pt-0.5"><img src="${src}" alt="${alt}" class="h-11 w-11 sm:h-12 sm:w-12 rounded-lg object-cover border border-slate-200/80 bg-white shadow-sm" loading="lazy" width="48" height="48" decoding="async" onerror="this.onerror=null;this.src='../assets/logo.png'"/></div>`;
     }
 
@@ -1138,7 +1176,7 @@ class CountingSystem {
                         ${tbl}
                     </div>
                     <div class="flex gap-3 items-start min-w-0">
-                        ${e.productId ? this.getAuditLogProductThumbnailHtml(e.productId) : ''}
+                        ${this.getAuditLogThumbnailHtmlForAuditEntry(e)}
                         <p class="min-w-0 flex-1 text-sm leading-relaxed text-slate-800 [overflow-wrap:anywhere] break-words">${msg}</p>
                     </div>
                 </article>`;
