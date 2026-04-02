@@ -40,6 +40,9 @@ class CountingSystem {
         this._auditSearchDebounce = null;
         /** syncSystemStocks içinde tekil stok satırlarını denetim günlüğüne yazma */
         this._auditSyncBatch = false; // Chart carousel setup flag
+        /** Sayım bottom sheet açıkken stok audit tek satırda birleştirilir (kapanınca / ürün değişince flush) */
+        this._deferStockAuditWhileSheetOpen = false;
+        this._stockAuditDirty = false;
         this.cameraScanAndCountMode = false; // Kamera: barkod okutunca sayım ekranı açılsın
         /** Seri okuma + sayarak ilerle: sayım sheet'i kamera akışından açıldı (Önceki/Sıradaki yerine Doğru Girdim) */
         this.countingBottomSheetFromCameraSeriSayar = false;
@@ -756,7 +759,7 @@ class CountingSystem {
         if (/^Barkod doğrula/i.test(s)) return 'verify';
         if (/^İçe aktarma/i.test(s)) return 'import';
         if (/^Günlük tablo oluşturuldu|^Tablo oluşturuldu|^Tablo silindi|^Tablo yeniden adlandırıldı/i.test(s)) return 'table';
-        if (/^Sayım güncellendi/i.test(s)) return 'stock';
+        if (/^📦\s*Depo:|^Sayım güncellendi/i.test(s)) return 'stock';
         if (/Sistem stoku senkron/i.test(s)) return 'sync';
         if (/sıfırlandı/i.test(s)) return 'reset';
         if (/^Ürün eklendi|^Listeden çıkarıldı|^Ürün silindi/i.test(s)) return 'product';
@@ -969,6 +972,41 @@ class CountingSystem {
         return null;
     }
 
+    /** İşlem kaydı tek satır: ürün kartta göründüğü için kısa stok özeti */
+    formatStockAuditMessageLine(warehouseNorm, systemNorm) {
+        const dep =
+            warehouseNorm === null || warehouseNorm === undefined ? '—' : String(warehouseNorm);
+        const sys =
+            systemNorm === null || systemNorm === undefined ? '—' : String(systemNorm);
+        return `📦 Depo: ${dep} · 💻 Sistem: ${sys}`;
+    }
+
+    shouldDeferStockAuditLog(productId) {
+        return (
+            this._deferStockAuditWhileSheetOpen &&
+            productId != null &&
+            productId === this.currentCountingProduct
+        );
+    }
+
+    flushDeferredStockAuditForProduct(productId) {
+        if (!productId || !this._stockAuditDirty) return;
+        const data = this.countingData[productId];
+        if (!data) {
+            this._stockAuditDirty = false;
+            return;
+        }
+        const normStock = (v) => {
+            if (v === null || v === undefined) return null;
+            const n = Number(v);
+            return Number.isNaN(n) ? null : n;
+        };
+        const d = normStock(data.warehouseStock);
+        const s = normStock(data.systemStock);
+        this.pushAuditEntry(this.formatStockAuditMessageLine(d, s), { cat: 'stock', productId });
+        this._stockAuditDirty = false;
+    }
+
     /** İşlem kaydı kartı (verify dışı): id veya mesajdan ürün bul — logo için */
     resolveProductForGenericAuditThumbnail(e) {
         if (e.productId != null && e.productId !== '') {
@@ -1026,73 +1064,38 @@ class CountingSystem {
         return rows;
     }
 
-    /** Tek bir işlem kaydı kartı — barkod doğrulama (üstte ürün şablonu) */
-    buildVerifyAuditArticleHtml(e, time, catMeta, tblHtml) {
-        const p = this.resolveProductForVerifyAudit(e);
-        const snapImg = e.productImage && String(e.productImage).trim();
-        const parsed = this.parseVerifyAuditMessageParts(e.m);
-        let displayName =
-            (p && p.name) ||
-            (e.productName && String(e.productName).trim()) ||
-            parsed.nameFromMessage ||
-            this.auditProductLabel(e.productId) ||
-            'Ürün';
-        if (p && p.name) displayName = p.name;
-
-        const rawSrc = snapImg || (p && p.image) || '../assets/logo.png';
-        const src = this.escapeHtml(rawSrc);
-        const alt = this.escapeHtml(displayName);
-        const nameHtml = this.escapeHtml(displayName);
-
-        const rows = this.verifyAuditTailToRows(parsed.tailSegments);
-        const rowsHtml =
-            rows.length > 0
-                ? `<dl class="space-y-2.5 text-sm">
-                    ${rows
-                        .map((r) => {
-                            const v = this.escapeHtml(r.value);
-                            if (!r.label) {
-                                return `<div class="text-slate-600 break-words">${v}</div>`;
-                            }
-                            const lab = this.escapeHtml(r.label);
-                            return `<div class="grid gap-0.5 sm:grid-cols-[minmax(0,11rem)_1fr] sm:gap-x-3 sm:items-baseline">
-                                <dt class="text-slate-500 font-medium">${lab}</dt>
-                                <dd class="text-slate-800 font-medium [overflow-wrap:anywhere] break-words">${v}</dd>
-                            </div>`;
-                        })
-                        .join('')}
-                </dl>`
-                : `<p class="text-sm text-slate-600 break-words [overflow-wrap:anywhere]">${this.escapeHtml(parsed.raw)}</p>`;
-
-        return `
-            <article class="rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-900/5 overflow-hidden transition hover:border-teal-300/80 hover:shadow-lg">
-                <div class="sayim-verify-audit-hero bg-gradient-to-br from-teal-50/95 via-white to-slate-50 border-b border-teal-100/80 px-4 py-3 sm:px-5 sm:py-4">
-                    <div class="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:text-left sm:gap-4">
-                        <div class="relative flex-shrink-0">
-                            <div class="absolute -inset-0.5 rounded-xl bg-gradient-to-br from-teal-200/60 to-indigo-200/40 blur-sm opacity-90"></div>
-                            <div class="relative h-16 w-16 sm:h-[4.25rem] sm:w-[4.25rem] overflow-hidden rounded-xl border-2 border-white bg-white shadow-md ring-2 ring-teal-100">
-                                <img src="${src}" alt="${alt}" class="h-full w-full object-cover" width="68" height="68" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='../assets/logo.png'"/>
-                            </div>
-                        </div>
-                        <div class="min-w-0 flex-1 space-y-1.5 text-center sm:text-left w-full">
-                            <p class="text-[11px] font-bold uppercase tracking-[0.12em] text-teal-700/90">Ürün</p>
-                            <h3 class="text-lg sm:text-xl font-bold text-slate-900 leading-snug break-words">${nameHtml}</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
-                    <div class="flex flex-wrap items-center gap-2 border-b border-slate-100/90 pb-3 mb-3">
-                        <time class="text-xs font-mono font-semibold text-indigo-600 tabular-nums">${time}</time>
-                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ${catMeta.class}">${this.escapeHtml(catMeta.label)}</span>
-                        ${tblHtml}
-                    </div>
-                    ${rowsHtml}
-                </div>
-            </article>`;
+    /** Barkod doğrulama: kartta tek satır, emoji ile okunaklı */
+    formatVerifyAuditCompactMessage(e) {
+        const m = String(e.m || '').trim();
+        const okutulanM = m.match(/Okutulan barkod:\s*([^\s·]+)/i) || m.match(/okutulan:\s*([^\s·]+)/i);
+        const okutulan = okutulanM ? okutulanM[1] : '';
+        const sonucM = m.match(/Sonuç:\s*(eşleşti|eşleşmedi)/i);
+        const sonuc = sonucM ? sonucM[1].toLowerCase() : '';
+        if (okutulan && sonuc) {
+            const icon = sonuc === 'eşleşti' ? '✅' : '❌';
+            return `📷 ${okutulan} · ${icon} ${sonuc}`;
+        }
+        if (/Durum:\s*kamera/i.test(m)) {
+            return m.replace(/^Barkod doğrula\s*·\s*/i, '🔔 ');
+        }
+        return m;
     }
 
-    /** Diğer işlem türleri: küçük görsel (id, yoksa mesajdaki ürün adından katalog eşlemesi) */
-    getAuditLogThumbnailHtmlForAuditEntry(e) {
+    /** İşlem kaydı: ürün görseli (verify: anlık görsel + katalog) */
+    getAuditThumbnailHtmlForEntry(e) {
+        if (e.cat === 'verify') {
+            const p = this.resolveProductForVerifyAudit(e);
+            const snap = e.productImage && String(e.productImage).trim();
+            const rawSrc = snap || (p && p.image) || '../assets/logo.png';
+            const alt =
+                (p && p.name) ||
+                (e.productName && String(e.productName).trim()) ||
+                this.auditProductLabel(e.productId) ||
+                'Ürün';
+            const src = this.escapeHtml(rawSrc);
+            const altE = this.escapeHtml(alt);
+            return `<div class="flex-shrink-0 pt-0.5"><img src="${src}" alt="${altE}" class="h-11 w-11 sm:h-12 sm:w-12 rounded-lg object-cover border border-slate-200/80 bg-white shadow-sm" loading="lazy" width="48" height="48" decoding="async" onerror="this.onerror=null;this.src='../assets/logo.png'"/></div>`;
+        }
         const p = this.resolveProductForGenericAuditThumbnail(e);
         if (!p) return '';
         const src = this.escapeHtml((p.image) || '../assets/logo.png');
@@ -1160,14 +1163,13 @@ class CountingSystem {
         const blocks = filtered.map((e) => {
             const meta = this.getAuditCategoryMeta(e.cat);
             const time = this.escapeHtml(this.formatSayimAuditTime(e.t));
-            const msg = this.escapeHtml(e.m);
+            const bodyRaw =
+                e.cat === 'verify' ? this.formatVerifyAuditCompactMessage(e) : String(e.m || '');
+            const msg = this.escapeHtml(bodyRaw);
             const tblRaw = e.tbl ? this.formatTableDisplayName(e.tbl) : '';
             const tbl = tblRaw
                 ? `<span class="inline-flex max-w-[min(100%,14rem)] rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700 ring-1 ring-slate-200/80 [overflow-wrap:anywhere] break-words text-left" title="${this.escapeHtml(tblRaw)}">${this.escapeHtml(tblRaw)}</span>`
                 : `<span class="text-[11px] text-slate-400">Tablo bilinmiyor</span>`;
-            if (e.cat === 'verify') {
-                return this.buildVerifyAuditArticleHtml(e, time, meta, tbl);
-            }
             return `
                 <article class="rounded-xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/40 p-3.5 shadow-sm transition hover:border-indigo-200/80 hover:shadow-md sm:p-4">
                     <div class="flex flex-wrap items-center gap-2 border-b border-slate-100/90 pb-2.5 mb-2.5">
@@ -1176,7 +1178,7 @@ class CountingSystem {
                         ${tbl}
                     </div>
                     <div class="flex gap-3 items-start min-w-0">
-                        ${this.getAuditLogThumbnailHtmlForAuditEntry(e)}
+                        ${this.getAuditThumbnailHtmlForEntry(e)}
                         <p class="min-w-0 flex-1 text-sm leading-relaxed text-slate-800 [overflow-wrap:anywhere] break-words">${msg}</p>
                     </div>
                 </article>`;
@@ -4100,10 +4102,12 @@ class CountingSystem {
             if (!this._auditSyncBatch) {
                 const d = normStock(this.countingData[productId].warehouseStock);
                 const s = normStock(this.countingData[productId].systemStock);
-                this.pushAuditEntry(
-                    `Sayım güncellendi · ${this.auditProductLabel(productId)} · depo ${d ?? '—'} · sistem ${s ?? '—'}`,
-                    { cat: 'stock', productId }
-                );
+                const line = this.formatStockAuditMessageLine(d, s);
+                if (this.shouldDeferStockAuditLog(productId)) {
+                    this._stockAuditDirty = true;
+                } else {
+                    this.pushAuditEntry(line, { cat: 'stock', productId });
+                }
             }
         }
 
@@ -4238,10 +4242,11 @@ class CountingSystem {
         cancelBtn.addEventListener('click', closeModal);
         deleteBtn.addEventListener('click', () => {
             // Ürünü sil
-            this.pushAuditEntry(`Ürün silindi · ${this.auditProductLabel(productId)}`, {
-                cat: 'product',
-                productId,
-            });
+            const tn = this.currentTableName || '';
+            this.pushAuditEntry(
+                `Ürün silindi · ${this.auditProductLabel(productId)} · 📋 ${this.formatTableDisplayName(tn)}`,
+                { cat: 'product', productId, tbl: tn }
+            );
             delete this.countingData[productId];
             this.removeProductFromOrder(productId);
             this.skippedProducts.delete(productId);
@@ -6347,6 +6352,10 @@ class CountingSystem {
     }
 
     openCountingBottomSheet(productId, options = {}) {
+        if (this.currentCountingProduct && this.currentCountingProduct !== productId) {
+            this.flushDeferredStockAuditForProduct(this.currentCountingProduct);
+        }
+
         const product = this.allProducts.find(p => p.id === productId);
         if (!product) return;
 
@@ -6475,6 +6484,8 @@ class CountingSystem {
                 }
             }, 450);
         }
+
+        this._deferStockAuditWhileSheetOpen = true;
     }
 
     updateStockIndicator(productId, indicatorElement) {
@@ -6559,6 +6570,12 @@ class CountingSystem {
                 this.updateCountingProgress();
             }
         }
+
+        if (this.currentCountingProduct) {
+            this.flushDeferredStockAuditForProduct(this.currentCountingProduct);
+        }
+        this._deferStockAuditWhileSheetOpen = false;
+        this._stockAuditDirty = false;
         
         this.countingBottomSheetFromCameraSeriSayar = false;
 
@@ -7309,7 +7326,11 @@ class CountingSystem {
         });
         
         if (resetCount > 0) {
-            this.pushAuditEntry(`Depo stoku sıfırlandı · ${resetCount} satır`, { cat: 'reset' });
+            const tn = this.currentTableName || '';
+            this.pushAuditEntry(
+                `📋 ${this.formatTableDisplayName(tn)} · Depo stoku sıfırlandı · ${resetCount} satır`,
+                { cat: 'reset', tbl: tn }
+            );
             this.saveCountingData();
             this.renderTable();
             this.updateStatistics();
@@ -7338,7 +7359,11 @@ class CountingSystem {
         });
         
         if (resetCount > 0) {
-            this.pushAuditEntry(`Sistem stoku sıfırlandı · ${resetCount} satır`, { cat: 'reset' });
+            const tn = this.currentTableName || '';
+            this.pushAuditEntry(
+                `📋 ${this.formatTableDisplayName(tn)} · Sistem stoku sıfırlandı · ${resetCount} satır`,
+                { cat: 'reset', tbl: tn }
+            );
             this.saveCountingData();
             this.renderTable();
             this.updateStatistics();
