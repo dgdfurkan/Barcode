@@ -2068,7 +2068,7 @@ class CountingSystem {
         const show = tables.length > 1;
         const deleteTableBtn = document.getElementById('deleteTableBtn');
         const menuDelete = document.getElementById('sayimTableMenuDeleteBtn');
-        if (deleteTableBtn) deleteTableBtn.style.display = show ? 'block' : 'none';
+        if (deleteTableBtn) deleteTableBtn.style.display = show ? 'inline-flex' : 'none';
         if (menuDelete) {
             menuDelete.classList.toggle('hidden', !show);
             menuDelete.setAttribute('aria-hidden', show ? 'false' : 'true');
