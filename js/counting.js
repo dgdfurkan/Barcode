@@ -1028,12 +1028,12 @@ class CountingSystem {
 
         return `
             <article class="rounded-2xl border border-slate-200/90 bg-white shadow-md shadow-slate-900/5 overflow-hidden transition hover:border-teal-300/80 hover:shadow-lg">
-                <div class="sayim-verify-audit-hero bg-gradient-to-br from-teal-50/95 via-white to-slate-50 border-b border-teal-100/80 px-4 py-4 sm:px-5 sm:py-5">
-                    <div class="flex flex-col items-center gap-4 sm:flex-row sm:items-center sm:text-left sm:gap-5">
+                <div class="sayim-verify-audit-hero bg-gradient-to-br from-teal-50/95 via-white to-slate-50 border-b border-teal-100/80 px-4 py-3 sm:px-5 sm:py-4">
+                    <div class="flex flex-col items-center gap-3 sm:flex-row sm:items-center sm:text-left sm:gap-4">
                         <div class="relative flex-shrink-0">
-                            <div class="absolute -inset-1 rounded-[1.15rem] bg-gradient-to-br from-teal-200/60 to-indigo-200/40 blur-sm opacity-90"></div>
-                            <div class="relative h-28 w-28 sm:h-32 sm:w-32 overflow-hidden rounded-2xl border-2 border-white bg-white shadow-lg ring-2 ring-teal-100">
-                                <img src="${src}" alt="${alt}" class="h-full w-full object-cover" width="128" height="128" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='../assets/logo.png'"/>
+                            <div class="absolute -inset-0.5 rounded-xl bg-gradient-to-br from-teal-200/60 to-indigo-200/40 blur-sm opacity-90"></div>
+                            <div class="relative h-16 w-16 sm:h-[4.25rem] sm:w-[4.25rem] overflow-hidden rounded-xl border-2 border-white bg-white shadow-md ring-2 ring-teal-100">
+                                <img src="${src}" alt="${alt}" class="h-full w-full object-cover" width="68" height="68" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='../assets/logo.png'"/>
                             </div>
                         </div>
                         <div class="min-w-0 flex-1 space-y-1.5 text-center sm:text-left w-full">
@@ -1059,7 +1059,7 @@ class CountingSystem {
         const p = this.findProductByIdLoose(productId);
         const src = this.escapeHtml((p && p.image) || '../assets/logo.png');
         const alt = this.escapeHtml((p && p.name) || 'Ürün');
-        return `<div class="flex-shrink-0 pt-0.5"><img src="${src}" alt="${alt}" class="h-14 w-14 rounded-xl object-cover border border-slate-200/80 bg-white shadow-sm" loading="lazy" width="56" height="56" decoding="async" onerror="this.onerror=null;this.src='../assets/logo.png'"/></div>`;
+        return `<div class="flex-shrink-0 pt-0.5"><img src="${src}" alt="${alt}" class="h-11 w-11 sm:h-12 sm:w-12 rounded-lg object-cover border border-slate-200/80 bg-white shadow-sm" loading="lazy" width="48" height="48" decoding="async" onerror="this.onerror=null;this.src='../assets/logo.png'"/></div>`;
     }
 
     toggleSayimAuditLogPanel() {
@@ -3978,7 +3978,10 @@ class CountingSystem {
 
         if (isNew) {
             this.appendProductToOrder(productId);
-            this.pushAuditEntry(`Ürün eklendi · ${this.auditProductLabel(productId)}`, { cat: 'product' });
+            this.pushAuditEntry(`Ürün eklendi · ${this.auditProductLabel(productId)}`, {
+                cat: 'product',
+                productId,
+            });
         }
 
         // Save and render
@@ -4061,7 +4064,7 @@ class CountingSystem {
                 const s = normStock(this.countingData[productId].systemStock);
                 this.pushAuditEntry(
                     `Sayım güncellendi · ${this.auditProductLabel(productId)} · depo ${d ?? '—'} · sistem ${s ?? '—'}`,
-                    { cat: 'stock' }
+                    { cat: 'stock', productId }
                 );
             }
         }
@@ -4117,7 +4120,10 @@ class CountingSystem {
     // Sayım listesinden onay penceresi olmadan çıkar (manuel arama panelinden toggle için)
     removeProductFromCountingSilent(productId) {
         if (!this.countingData[productId]) return;
-        this.pushAuditEntry(`Listeden çıkarıldı · ${this.auditProductLabel(productId)}`, { cat: 'product' });
+        this.pushAuditEntry(`Listeden çıkarıldı · ${this.auditProductLabel(productId)}`, {
+            cat: 'product',
+            productId,
+        });
         delete this.countingData[productId];
         this.removeProductFromOrder(productId);
         this.skippedProducts.delete(productId);
@@ -4194,7 +4200,10 @@ class CountingSystem {
         cancelBtn.addEventListener('click', closeModal);
         deleteBtn.addEventListener('click', () => {
             // Ürünü sil
-            this.pushAuditEntry(`Ürün silindi · ${this.auditProductLabel(productId)}`, { cat: 'product' });
+            this.pushAuditEntry(`Ürün silindi · ${this.auditProductLabel(productId)}`, {
+                cat: 'product',
+                productId,
+            });
             delete this.countingData[productId];
             this.removeProductFromOrder(productId);
             this.skippedProducts.delete(productId);
