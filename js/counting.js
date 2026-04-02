@@ -740,7 +740,12 @@ class CountingSystem {
         }
         const t = raw && raw.t != null ? Number(raw.t) : Date.now();
         const m = raw && raw.m != null ? String(raw.m) : '';
-        const cat = (raw && raw.cat) || this.inferAuditCategoryFromMessage(m);
+        let cat = (raw && raw.cat) || this.inferAuditCategoryFromMessage(m);
+        if (cat === 'product') {
+            if (/^Ürün eklendi/i.test(m)) cat = 'product_new';
+            else if (/^Listeden çıkarıldı/i.test(m)) cat = 'product_removed';
+            else if (/^Ürün silindi/i.test(m)) cat = 'product_deleted';
+        }
         let tbl = raw && raw.tbl != null ? String(raw.tbl) : '';
         if (!tbl) tbl = this.inferAuditTableFromMessage(m);
         const out = { t, m, cat, tbl };
@@ -762,7 +767,9 @@ class CountingSystem {
         if (/^📦\s*Depo:|^Sayım güncellendi/i.test(s)) return 'stock';
         if (/Sistem stoku senkron/i.test(s)) return 'sync';
         if (/sıfırlandı/i.test(s)) return 'reset';
-        if (/^Ürün eklendi|^Listeden çıkarıldı|^Ürün silindi/i.test(s)) return 'product';
+        if (/^Ürün silindi/i.test(s)) return 'product_deleted';
+        if (/^Listeden çıkarıldı/i.test(s)) return 'product_removed';
+        if (/^Ürün eklendi/i.test(s)) return 'product_new';
         return 'other';
     }
 
@@ -781,6 +788,18 @@ class CountingSystem {
             table: { label: 'Tablo', class: 'bg-indigo-50 text-indigo-800 ring-indigo-200/80' },
             import: { label: 'İçe aktarma', class: 'bg-emerald-50 text-emerald-900 ring-emerald-200/80' },
             product: { label: 'Ürün', class: 'bg-sky-50 text-sky-900 ring-sky-200/80' },
+            product_new: {
+                label: 'YENİ ÜRÜN',
+                class: 'bg-emerald-50 text-emerald-900 ring-emerald-300/90',
+            },
+            product_removed: {
+                label: 'ÜRÜN SİLİNDİ',
+                class: 'bg-red-50 text-red-900 ring-red-300/90',
+            },
+            product_deleted: {
+                label: 'ÜRÜN SİLİNDİ',
+                class: 'bg-red-50 text-red-900 ring-red-300/90',
+            },
             stock: { label: 'Stok', class: 'bg-amber-50 text-amber-900 ring-amber-200/80' },
             sync: { label: 'Senkron', class: 'bg-violet-50 text-violet-900 ring-violet-200/80' },
             reset: { label: 'Sıfırlama', class: 'bg-rose-50 text-rose-900 ring-rose-200/80' },
@@ -796,7 +815,15 @@ class CountingSystem {
         const fc = this._auditUiFilter?.category || '';
         let list = (Array.isArray(this.auditLog) ? this.auditLog : []).map((r) => this.normalizeAuditEntry(r));
         list.sort((a, b) => b.t - a.t);
-        if (fc) list = list.filter((e) => e.cat === fc);
+        if (fc) {
+            if (fc === 'product') {
+                list = list.filter((e) =>
+                    ['product_new', 'product_removed', 'product_deleted', 'product'].includes(e.cat)
+                );
+            } else {
+                list = list.filter((e) => e.cat === fc);
+            }
+        }
         if (ft) list = list.filter((e) => e.tbl === ft);
         if (q) {
             list = list.filter((e) => {
@@ -839,7 +866,19 @@ class CountingSystem {
         const sel = document.getElementById('sayimAuditLogFilterCat');
         if (!sel) return;
         const cur = this._auditUiFilter?.category ?? '';
-        const cats = ['', 'table', 'import', 'product', 'stock', 'sync', 'reset', 'verify', 'other'];
+        const cats = [
+            '',
+            'table',
+            'import',
+            'product_new',
+            'product_removed',
+            'product_deleted',
+            'stock',
+            'sync',
+            'reset',
+            'verify',
+            'other',
+        ];
         sel.innerHTML = '';
         cats.forEach((c) => {
             const o = document.createElement('option');
@@ -958,13 +997,29 @@ class CountingSystem {
     parseAuditMessageEmbeddedProductName(m, cat) {
         const s = String(m || '').trim();
         if (!s) return null;
+        const tabSep = ' · 📋 ';
+        if (s.includes(tabSep)) {
+            const name = s.split(tabSep)[0].trim();
+            if (name) return name;
+        }
         const parts = s.split(/\s*·\s*/).map((x) => x.trim()).filter(Boolean);
+        if (
+            parts.length === 1 &&
+            /^(product_new|product_removed|product_deleted)$/.test(String(cat))
+        ) {
+            return parts[0] || null;
+        }
         if (parts.length < 2) return null;
         const head = parts[0];
         if (cat === 'stock' && /^Sayım güncellendi$/i.test(head)) {
             return parts[1] || null;
         }
-        if (cat === 'product') {
+        const legacyProduct =
+            cat === 'product' ||
+            cat === 'product_new' ||
+            cat === 'product_removed' ||
+            cat === 'product_deleted';
+        if (legacyProduct) {
             if (/^Ürün eklendi$/i.test(head)) return parts[1] || null;
             if (/^Listeden çıkarıldı$/i.test(head)) return parts[1] || null;
             if (/^Ürün silindi$/i.test(head)) return parts[1] || null;
@@ -4018,9 +4073,11 @@ class CountingSystem {
 
         if (isNew) {
             this.appendProductToOrder(productId);
-            this.pushAuditEntry(`Ürün eklendi · ${this.auditProductLabel(productId)}`, {
-                cat: 'product',
+            const tn = this.currentTableName || '';
+            this.pushAuditEntry(this.auditProductLabel(productId), {
+                cat: 'product_new',
                 productId,
+                tbl: tn,
             });
         }
 
@@ -4162,9 +4219,11 @@ class CountingSystem {
     // Sayım listesinden onay penceresi olmadan çıkar (manuel arama panelinden toggle için)
     removeProductFromCountingSilent(productId) {
         if (!this.countingData[productId]) return;
-        this.pushAuditEntry(`Listeden çıkarıldı · ${this.auditProductLabel(productId)}`, {
-            cat: 'product',
+        const tn = this.currentTableName || '';
+        this.pushAuditEntry(this.auditProductLabel(productId), {
+            cat: 'product_removed',
             productId,
+            tbl: tn,
         });
         delete this.countingData[productId];
         this.removeProductFromOrder(productId);
@@ -4243,10 +4302,11 @@ class CountingSystem {
         deleteBtn.addEventListener('click', () => {
             // Ürünü sil
             const tn = this.currentTableName || '';
-            this.pushAuditEntry(
-                `Ürün silindi · ${this.auditProductLabel(productId)} · 📋 ${this.formatTableDisplayName(tn)}`,
-                { cat: 'product', productId, tbl: tn }
-            );
+            this.pushAuditEntry(this.auditProductLabel(productId), {
+                cat: 'product_deleted',
+                productId,
+                tbl: tn,
+            });
             delete this.countingData[productId];
             this.removeProductFromOrder(productId);
             this.skippedProducts.delete(productId);
