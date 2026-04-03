@@ -43,6 +43,10 @@ class CountingSystem {
         /** Sayım bottom sheet açıkken stok audit tek satırda birleştirilir (kapanınca / ürün değişince flush) */
         this._deferStockAuditWhileSheetOpen = false;
         this._stockAuditDirty = false;
+        /** Tüm tabloları içeren JSON — saveCountingData her seferinde DB'den SELECT atmamak için */
+        this._fullCountingDataCache = null;
+        /** renderTable çağrılarını birleştir (seri okumada UI kilitlenmesin) */
+        this._renderTableDebounceTimer = null;
         this.cameraScanAndCountMode = false; // Kamera: barkod okutunca sayım ekranı açılsın
         /** Seri okuma + sayarak ilerle: sayım sheet'i kamera akışından açıldı (Önceki/Sıradaki yerine Doğru Girdim) */
         this.countingBottomSheetFromCameraSeriSayar = false;
@@ -662,10 +666,8 @@ class CountingSystem {
     // Save full counting data structure (including all tables)
     async saveFullCountingData(fullData) {
         try {
-            // Update current table in full data
-            if (fullData._tables && fullData._tables[this.currentTableName]) {
-                fullData._tables[this.currentTableName] = this.countingData;
-            }
+            if (!fullData._tables) fullData._tables = {};
+            fullData._tables[this.currentTableName] = this.countingData;
             fullData._currentTable = this.currentTableName;
 
             if (!this.auditLog) this.auditLog = [];
@@ -688,6 +690,7 @@ class CountingSystem {
             const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
             localStorage.setItem(storageKey, JSON.stringify(fullData));
             console.log('💾 Saved full counting data to localStorage (backup)');
+            this._fullCountingDataCache = fullData;
         } catch (error) {
             console.error('Error saving full counting data:', error);
             // Fallback to localStorage only
@@ -695,6 +698,7 @@ class CountingSystem {
                 const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
                 localStorage.setItem(storageKey, JSON.stringify(fullData));
                 console.log('💾 Saved full counting data to localStorage (fallback)');
+                this._fullCountingDataCache = fullData;
             } catch (e) {
                 console.error('Error saving to localStorage:', e);
             }
@@ -1328,46 +1332,42 @@ class CountingSystem {
 
     async saveCountingData() {
         try {
-            // Load full structure first
-            let fullData = null;
-            if (window.supabase && this.currentUser) {
-                const { data } = await window.supabase
-                    .from('users')
-                    .select('counting_data')
-                    .eq('username', this.currentUser.username)
-                    .maybeSingle();
-                if (data && data.counting_data) {
-                    fullData = data.counting_data;
-                }
-            }
-
-            // Fallback to localStorage
+            let fullData = this._fullCountingDataCache;
             if (!fullData) {
-                const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-                const stored = localStorage.getItem(storageKey);
-                if (stored) {
-                    fullData = JSON.parse(stored);
+                if (window.supabase && this.currentUser) {
+                    const { data } = await window.supabase
+                        .from('users')
+                        .select('counting_data')
+                        .eq('username', this.currentUser.username)
+                        .maybeSingle();
+                    if (data && data.counting_data) {
+                        fullData = this.migrateToNestedStructure(data.counting_data);
+                    }
                 }
-            }
 
-            // Initialize if needed
-            if (!fullData) {
-                fullData = {
-                    _api_info: {},
-                    _tables: {},
-                    _currentTable: this.currentTableName
-                };
-            }
+                if (!fullData) {
+                    const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
+                    const stored = localStorage.getItem(storageKey);
+                    if (stored) {
+                        fullData = this.migrateToNestedStructure(JSON.parse(stored));
+                    }
+                }
 
-            // Ensure _tables exists
-            if (!fullData._tables) {
-                fullData._tables = {};
+                if (!fullData) {
+                    fullData = {
+                        _api_info: {},
+                        _tables: {},
+                        _currentTable: this.currentTableName,
+                    };
+                }
+
+                if (!fullData._tables) {
+                    fullData._tables = {};
+                }
+                this._fullCountingDataCache = fullData;
             }
 
             this.ensureTableMeta(this.countingData);
-            // Update current table with current countingData
-            fullData._tables[this.currentTableName] = this.countingData;
-            fullData._currentTable = this.currentTableName;
 
             // Save full structure
             await this.saveFullCountingData(fullData);
@@ -1438,6 +1438,7 @@ class CountingSystem {
         }
 
         fullData._currentTable = tableName;
+        this._fullCountingDataCache = fullData;
         await this.saveFullCountingData(fullData);
 
         if (this.isDailyTableName(tableName)) {
@@ -4049,21 +4050,13 @@ class CountingSystem {
         let isNew = false;
 
         // If product already exists, update it
-        if (this.countingData[productId]) {
-            // Update existing entry (son sayım zamanı sadece yeni satır / stok değişimiyle güncellenir)
-            const existing = this.countingData[productId];
-            // Keep warehouse stock if it exists, otherwise reset
-            if (!existing.warehouseStock) {
-                existing.warehouseStock = null;
-            }
-        } else {
+        if (!this.countingData[productId]) {
             isNew = true;
-            // Create new entry
             this.countingData[productId] = {
                 warehouseStock: null,
                 systemStock: null,
                 lastUpdated: now.toISOString(),
-                history: []
+                history: [],
             };
         }
 
@@ -4082,16 +4075,22 @@ class CountingSystem {
         }
 
         // Save and render
-        this.saveCountingData();
-        this.renderTable();
-        
-        // Update rapid mode if active
-        if (this.currentViewMode === 'rapid') {
-            this.renderRapidCountingMode();
-        }
-        
+        void this.saveCountingData();
+        this.scheduleRenderTable();
+
         this.updateStatistics();
         this.updateCountingProgress();
+    }
+
+    /** Tabloyu tek frame'de birleştir (seri okuma + çok satırda UI donmasını azaltır) */
+    scheduleRenderTable() {
+        if (this._renderTableDebounceTimer != null) {
+            clearTimeout(this._renderTableDebounceTimer);
+        }
+        this._renderTableDebounceTimer = setTimeout(() => {
+            this._renderTableDebounceTimer = null;
+            this.renderTable();
+        }, 32);
     }
 
     updateProductStock(productId, warehouseStock, systemStock = null, price = null, priceText = null, reservedStock = undefined) {
@@ -4169,14 +4168,9 @@ class CountingSystem {
         }
 
         // Save and render
-        this.saveCountingData();
-        this.renderTable();
-        
-        // Update rapid mode if active
-        if (this.currentViewMode === 'rapid') {
-            this.renderRapidCountingMode();
-        }
-        
+        void this.saveCountingData();
+        this.scheduleRenderTable();
+
         this.updateStatistics();
         this.updateCountingProgress();
 
