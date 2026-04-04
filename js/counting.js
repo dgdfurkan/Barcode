@@ -43,10 +43,6 @@ class CountingSystem {
         /** Sayım bottom sheet açıkken stok audit tek satırda birleştirilir (kapanınca / ürün değişince flush) */
         this._deferStockAuditWhileSheetOpen = false;
         this._stockAuditDirty = false;
-        /** Tüm tabloları içeren JSON — saveCountingData her seferinde DB'den SELECT atmamak için */
-        this._fullCountingDataCache = null;
-        /** renderTable çağrılarını birleştir (seri okumada UI kilitlenmesin) */
-        this._renderTableDebounceTimer = null;
         this.cameraScanAndCountMode = false; // Kamera: barkod okutunca sayım ekranı açılsın
         /** Seri okuma + sayarak ilerle: sayım sheet'i kamera akışından açıldı (Önceki/Sıradaki yerine Doğru Girdim) */
         this.countingBottomSheetFromCameraSeriSayar = false;
@@ -690,7 +686,6 @@ class CountingSystem {
             const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
             localStorage.setItem(storageKey, JSON.stringify(fullData));
             console.log('💾 Saved full counting data to localStorage (backup)');
-            this._fullCountingDataCache = fullData;
         } catch (error) {
             console.error('Error saving full counting data:', error);
             // Fallback to localStorage only
@@ -698,7 +693,6 @@ class CountingSystem {
                 const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
                 localStorage.setItem(storageKey, JSON.stringify(fullData));
                 console.log('💾 Saved full counting data to localStorage (fallback)');
-                this._fullCountingDataCache = fullData;
             } catch (e) {
                 console.error('Error saving to localStorage:', e);
             }
@@ -1332,44 +1326,45 @@ class CountingSystem {
 
     async saveCountingData() {
         try {
-            let fullData = this._fullCountingDataCache;
-            if (!fullData) {
-                if (window.supabase && this.currentUser) {
-                    const { data } = await window.supabase
-                        .from('users')
-                        .select('counting_data')
-                        .eq('username', this.currentUser.username)
-                        .maybeSingle();
-                    if (data && data.counting_data) {
-                        fullData = this.migrateToNestedStructure(data.counting_data);
-                    }
+            // Her kayıtta sunucudan güncel JSON al (çok cihaz / başka sekme ile uyum)
+            let fullData = null;
+            if (window.supabase && this.currentUser) {
+                const { data } = await window.supabase
+                    .from('users')
+                    .select('counting_data')
+                    .eq('username', this.currentUser.username)
+                    .maybeSingle();
+                if (data && data.counting_data) {
+                    fullData = data.counting_data;
                 }
-
-                if (!fullData) {
-                    const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-                    const stored = localStorage.getItem(storageKey);
-                    if (stored) {
-                        fullData = this.migrateToNestedStructure(JSON.parse(stored));
-                    }
-                }
-
-                if (!fullData) {
-                    fullData = {
-                        _api_info: {},
-                        _tables: {},
-                        _currentTable: this.currentTableName,
-                    };
-                }
-
-                if (!fullData._tables) {
-                    fullData._tables = {};
-                }
-                this._fullCountingDataCache = fullData;
             }
 
-            this.ensureTableMeta(this.countingData);
+            if (!fullData) {
+                const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
+                const stored = localStorage.getItem(storageKey);
+                if (stored) {
+                    fullData = JSON.parse(stored);
+                }
+            }
 
-            // Save full structure
+            if (!fullData) {
+                fullData = {
+                    _api_info: {},
+                    _tables: {},
+                    _currentTable: this.currentTableName,
+                };
+            }
+
+            if (!fullData._tables) {
+                fullData._tables = {};
+            }
+
+            fullData = this.migrateToNestedStructure(fullData);
+
+            this.ensureTableMeta(this.countingData);
+            fullData._tables[this.currentTableName] = this.countingData;
+            fullData._currentTable = this.currentTableName;
+
             await this.saveFullCountingData(fullData);
         } catch (error) {
             console.error('Error saving counting data:', error);
@@ -1438,7 +1433,6 @@ class CountingSystem {
         }
 
         fullData._currentTable = tableName;
-        this._fullCountingDataCache = fullData;
         await this.saveFullCountingData(fullData);
 
         if (this.isDailyTableName(tableName)) {
@@ -2704,7 +2698,9 @@ class CountingSystem {
         // Manual add button
         const addProductBtn = document.getElementById('addProductBtn');
         if (addProductBtn) {
-            addProductBtn.addEventListener('click', () => this.handleManualAdd());
+            addProductBtn.addEventListener('click', () =>
+                void this.handleManualAdd().catch((err) => console.error('handleManualAdd:', err))
+            );
         }
 
         // Manual input enter key + temizle (X) butonu
@@ -2723,7 +2719,7 @@ class CountingSystem {
             manualInput.addEventListener('input', syncManualInputClear);
             manualInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
-                    this.handleManualAdd();
+                    void this.handleManualAdd().catch((err) => console.error('handleManualAdd:', err));
                 }
             });
         }
@@ -3281,16 +3277,18 @@ class CountingSystem {
                     this.autoSaveTimeout = setTimeout(() => {
                         if (this.currentCountingProduct) {
                             const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
-                            this.updateProductStock(this.currentCountingProduct, value, null);
-                            
+                            void this.updateProductStock(this.currentCountingProduct, value, null).catch(
+                                (err) => console.error('Depo otomatik kayıt:', err)
+                            );
+
                             // Remove from skipped if was skipped
                             this.skippedProducts.delete(this.currentCountingProduct);
-                            
+
                             // Update rapid mode if active
                             if (this.currentViewMode === 'rapid') {
                                 this.renderRapidCountingMode();
                             }
-                            
+
                             this.updateStatistics();
                             this.updateCountingProgress();
                         }
@@ -3302,20 +3300,18 @@ class CountingSystem {
 
         // Previous button (go to previous uncounted product)
         if (prevBtn) {
-            prevBtn.addEventListener('click', () => {
+            prevBtn.addEventListener('click', async () => {
                 if (!this.currentCountingProduct) return;
-                
+
                 const prevProductId = this.findPreviousUncountedProduct(this.currentCountingProduct);
                 if (prevProductId) {
-                    // Save current product first
                     const depoInput = document.getElementById('countingDepoInput');
                     if (depoInput) {
                         const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
-                        this.updateProductStock(this.currentCountingProduct, value, null);
+                        await this.updateProductStock(this.currentCountingProduct, value, null);
                         this.skippedProducts.delete(this.currentCountingProduct);
                     }
-                    
-                    // Open previous product
+
                     this.openCountingBottomSheet(prevProductId);
                     
                     // Update rapid mode if active
@@ -3332,20 +3328,18 @@ class CountingSystem {
         // Next button (go to next uncounted product)
         const nextBtn = document.getElementById('countingNextBtn');
         if (nextBtn) {
-            nextBtn.addEventListener('click', () => {
+            nextBtn.addEventListener('click', async () => {
                 if (!this.currentCountingProduct) return;
-                
+
                 const nextProductId = this.findNextUncountedProduct(this.currentCountingProduct);
                 if (nextProductId) {
-                    // Save current product first
                     const depoInput = document.getElementById('countingDepoInput');
                     if (depoInput) {
                         const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
-                        this.updateProductStock(this.currentCountingProduct, value, null);
+                        await this.updateProductStock(this.currentCountingProduct, value, null);
                         this.skippedProducts.delete(this.currentCountingProduct);
                     }
-                    
-                    // Open next product
+
                     this.openCountingBottomSheet(nextProductId);
                     
                     // Update rapid mode if active
@@ -3362,7 +3356,9 @@ class CountingSystem {
         // Backdrop click to close
         if (backdrop) {
             backdrop.addEventListener('click', () => {
-                this.closeCountingBottomSheet();
+                void this.closeCountingBottomSheet().catch((err) =>
+                    console.error('closeCountingBottomSheet:', err)
+                );
             });
         }
 
@@ -3371,7 +3367,9 @@ class CountingSystem {
             if (e.key === 'Escape') {
                 const bottomSheet = document.getElementById('countingBottomSheet');
                 if (bottomSheet && !bottomSheet.classList.contains('hidden')) {
-                    this.closeCountingBottomSheet();
+                    void this.closeCountingBottomSheet().catch((err) =>
+                        console.error('closeCountingBottomSheet:', err)
+                    );
                 }
             }
         });
@@ -3428,7 +3426,7 @@ class CountingSystem {
                             : undefined;
 
                     if (stock !== null && stock !== undefined) {
-                        this.updateProductStock(
+                        await this.updateProductStock(
                             this.currentCountingProduct,
                             null,
                             stock,
@@ -3457,7 +3455,9 @@ class CountingSystem {
         if (correctEntryBtn) {
             correctEntryBtn.addEventListener('click', () => {
                 if (correctEntryBtn.disabled) return;
-                this.closeCountingBottomSheet();
+                void this.closeCountingBottomSheet().catch((err) =>
+                    console.error('closeCountingBottomSheet:', err)
+                );
             });
         }
 
@@ -3987,7 +3987,7 @@ class CountingSystem {
         }
     }
 
-    handleManualAdd() {
+    async handleManualAdd() {
         const input = document.getElementById('manualProductInput');
         const value = input?.value.trim();
         if (!value) {
@@ -3995,17 +3995,14 @@ class CountingSystem {
             return;
         }
 
-        // Search for product
         const product = this.findProduct(value);
         if (!product) {
             this.showNotification('Ürün bulunamadı', 'error');
             return;
         }
 
-        // Add to counting table
-        this.addProductToCounting(product);
+        await this.addProductToCounting(product);
         input.value = '';
-        // Bildirim kaldırıldı - ürün sessizce ekleniyor
     }
 
     findProduct(searchTerm) {
@@ -4038,7 +4035,7 @@ class CountingSystem {
         return product;
     }
 
-    addProductToCounting(product, options = {}) {
+    async addProductToCounting(product, options = {}) {
         if (!product || !product.id) {
             console.error('Invalid product:', product);
             return;
@@ -4074,26 +4071,14 @@ class CountingSystem {
             });
         }
 
-        // Save and render
-        void this.saveCountingData();
-        this.scheduleRenderTable();
+        await this.saveCountingData();
+        this.renderTable();
 
         this.updateStatistics();
         this.updateCountingProgress();
     }
 
-    /** Tabloyu tek frame'de birleştir (seri okuma + çok satırda UI donmasını azaltır) */
-    scheduleRenderTable() {
-        if (this._renderTableDebounceTimer != null) {
-            clearTimeout(this._renderTableDebounceTimer);
-        }
-        this._renderTableDebounceTimer = setTimeout(() => {
-            this._renderTableDebounceTimer = null;
-            this.renderTable();
-        }, 32);
-    }
-
-    updateProductStock(productId, warehouseStock, systemStock = null, price = null, priceText = null, reservedStock = undefined) {
+    async updateProductStock(productId, warehouseStock, systemStock = null, price = null, priceText = null, reservedStock = undefined) {
         if (!this.countingData[productId]) {
             console.error('Product not found in counting data:', productId);
             return;
@@ -4167,9 +4152,8 @@ class CountingSystem {
             }
         }
 
-        // Save and render
-        void this.saveCountingData();
-        this.scheduleRenderTable();
+        await this.saveCountingData();
+        this.renderTable();
 
         this.updateStatistics();
         this.updateCountingProgress();
@@ -4225,7 +4209,7 @@ class CountingSystem {
         this.saveCountingData();
         const bottomSheet = document.getElementById('countingBottomSheet');
         if (bottomSheet && !bottomSheet.classList.contains('hidden') && this.currentCountingProduct === productId) {
-            this.closeCountingBottomSheet();
+            void this.closeCountingBottomSheet().catch((err) => console.error(err));
         }
         this.renderTable();
         if (this.currentViewMode === 'rapid') {
@@ -4309,11 +4293,11 @@ class CountingSystem {
             // Close bottom sheet if it's open
             const bottomSheet = document.getElementById('countingBottomSheet');
             if (bottomSheet && !bottomSheet.classList.contains('hidden')) {
-                this.closeCountingBottomSheet();
+                void this.closeCountingBottomSheet().catch((err) => console.error(err));
             }
-            
+
             this.renderTable();
-            
+
             // Update rapid mode if active
             if (this.currentViewMode === 'rapid') {
                 this.renderRapidCountingMode();
@@ -4572,7 +4556,7 @@ class CountingSystem {
                         if (this.countingData[productId]) {
                             this.countingData[productId].apiFetchFailed = false;
                         }
-                        this.updateProductStock(productId, null, stock, price, priceText, reserved);
+                        await this.updateProductStock(productId, null, stock, price, priceText, reserved);
                     updatedCount++;
                         console.log(`✅ ${product.name || productId}: ${stock}${price ? ` (Fiyat: ${priceText || price})` : ''}`);
                     } else {
@@ -6588,7 +6572,7 @@ class CountingSystem {
         }
     }
 
-    closeCountingBottomSheet() {
+    async closeCountingBottomSheet() {
         const resumeSeriSayarCamera = this.countingBottomSheetFromCameraSeriSayar;
 
         if (this._barcodeVerifyInProgress && window.barcodeScanner) {
@@ -6610,16 +6594,16 @@ class CountingSystem {
             const depoInput = document.getElementById('countingDepoInput');
             if (depoInput) {
                 const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
-                this.updateProductStock(this.currentCountingProduct, value, null);
-                
+                await this.updateProductStock(this.currentCountingProduct, value, null);
+
                 // Remove from skipped if was skipped
                 this.skippedProducts.delete(this.currentCountingProduct);
-                
+
                 // Update rapid mode if active
                 if (this.currentViewMode === 'rapid') {
                     this.renderRapidCountingMode();
                 }
-                
+
                 this.updateStatistics();
                 this.updateCountingProgress();
             }
@@ -6740,23 +6724,20 @@ class CountingSystem {
                 }
             });
             
-            input.addEventListener('change', (e) => {
+            input.addEventListener('change', async (e) => {
                 const productId = e.target.dataset.productId;
                 let value = e.target.value.trim();
-                
-                // Boşsa null, değilse sayıya çevir
+
                 if (value === '') {
                     value = null;
-                    e.target.value = ''; // Boş bırak
+                    e.target.value = '';
                 } else {
-                    // Sadece pozitif tam sayıları kabul et
                     const numValue = Math.max(0, Math.floor(Number(value)));
                     value = numValue;
-                    // Input değerini güncelle (0'ı da göster)
                     e.target.value = String(value);
                 }
-                
-                this.updateProductStock(productId, value, null);
+
+                await this.updateProductStock(productId, value, null);
             });
         });
 
@@ -6838,7 +6819,7 @@ class CountingSystem {
                         if (this.countingData[productId]) {
                             this.countingData[productId].apiFetchFailed = false;
                         }
-                        this.updateProductStock(productId, null, stock, price, priceText, reserved);
+                        await this.updateProductStock(productId, null, stock, price, priceText, reserved);
                         // Toast bildirimi göster
                         this.showToast('Stok güncellendi', 'success', 3000);
                     } else {
@@ -6898,7 +6879,7 @@ class CountingSystem {
                         if (this.countingData[productId]) {
                             this.countingData[productId].apiFetchFailed = false;
                         }
-                        this.updateProductStock(productId, null, stock, price, priceText, reserved);
+                        await this.updateProductStock(productId, null, stock, price, priceText, reserved);
                         // Bildirim kaldırıldı - stok sessizce güncelleniyor
                     } else {
                         // Bulunamadı - apiFetchFailed flag'ini set et
@@ -7049,8 +7030,9 @@ class CountingSystem {
                     const isAlreadyAdded = this.countingData[productId] !== undefined;
                     
                     if (!isAlreadyAdded) {
-                        // Add product
-                    this.addProductToCounting(product);
+                        void this.addProductToCounting(product).catch((err) =>
+                            console.error('addProductToCounting:', err)
+                        );
                         
                         // Find and update the button (could be clicked directly or via card)
                         // Try multiple ways to find the button
@@ -7130,7 +7112,7 @@ class CountingSystem {
     }
     
     // Add product from manual input dropdown (toggle: ekliyse çıkar, değilse ekle; panel açık kalır)
-    addProductFromManualInput(productId) {
+    async addProductFromManualInput(productId) {
         const product = this.allProducts.find(p => p.id === productId);
         if (!product) return;
 
@@ -7141,7 +7123,7 @@ class CountingSystem {
         if (this.countingData[productId]) {
             this.removeProductFromCountingSilent(productId);
         } else {
-            this.addProductToCounting(product);
+            await this.addProductToCounting(product);
         }
 
         // Paneli kapatma, input'u silme; aynı arama ile listeyi anlık güncelle (Eklendi durumları)

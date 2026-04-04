@@ -1156,27 +1156,30 @@ class BarcodeScanner {
                     return;
                 }
 
-                // Ürünü ekle (addProductToCounting id bekliyor)
-                window.countingSystem.addProductToCounting({
-                    id: product.productId,
-                    name: product.name,
-                    barcode: product.barcode || code
-                });
-                
-                // Başarı sesi çal
-                this.playSuccessSound();
-                
-                // Toast bildirimi göster (browser notification değil)
-                if (window.countingSystem.showToast) {
-                    window.countingSystem.showToast(`${product.name || 'Ürün'} eklendi`, 'success', 2000);
-                }
-
-                // Sayarak ilerle modu: sayım ekranını aç (depo stok gir + sistem stok al)
-                if (typeof window.countingSystem.isCameraScanAndCountMode === 'function' && window.countingSystem.isCameraScanAndCountMode()) {
-                    if (typeof window.countingSystem.onCameraScannedProductOpenForCount === 'function') {
-                        window.countingSystem.onCameraScannedProductOpenForCount(product.productId);
+                // Ürünü ekle — Supabase kaydı bitene kadar bekle, sonra sayım ekranını aç
+                void (async () => {
+                    try {
+                        await window.countingSystem.addProductToCounting({
+                            id: product.productId,
+                            name: product.name,
+                            barcode: product.barcode || code,
+                        });
+                        this.playSuccessSound();
+                        if (window.countingSystem.showToast) {
+                            window.countingSystem.showToast(`${product.name || 'Ürün'} eklendi`, 'success', 2000);
+                        }
+                        if (
+                            typeof window.countingSystem.isCameraScanAndCountMode === 'function' &&
+                            window.countingSystem.isCameraScanAndCountMode()
+                        ) {
+                            if (typeof window.countingSystem.onCameraScannedProductOpenForCount === 'function') {
+                                window.countingSystem.onCameraScannedProductOpenForCount(product.productId);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('addProductToCounting:', err);
                     }
-                }
+                })();
             } else {
                 // Ürün bulunamadı
                 if (window.countingSystem.showToast) {

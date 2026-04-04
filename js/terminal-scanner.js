@@ -258,19 +258,23 @@ class TerminalScanner {
                 return;
             }
 
-            cs.addProductToCounting({
-                id: product.productId,
-                name: product.name,
-                barcode: product.barcode || barcode
-            });
-
-            console.log('✅ Ürün eklendi:', product.name);
-            this.playSuccessSound();
-            this.showSuccessFlash();
-
-            if (cs.showToast) {
-                cs.showToast(`${product.name || 'Ürün'} eklendi`, 'success', 2000);
-            }
+            void (async () => {
+                try {
+                    await cs.addProductToCounting({
+                        id: product.productId,
+                        name: product.name,
+                        barcode: product.barcode || barcode,
+                    });
+                    console.log('✅ Ürün eklendi:', product.name);
+                    this.playSuccessSound();
+                    this.showSuccessFlash();
+                    if (cs.showToast) {
+                        cs.showToast(`${product.name || 'Ürün'} eklendi`, 'success', 2000);
+                    }
+                } catch (err) {
+                    console.error('addProductToCounting:', err);
+                }
+            })();
         } else {
             console.log('❌ Ürün bulunamadı:', barcode);
             if (cs.showToast) {
