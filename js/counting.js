@@ -43,6 +43,8 @@ class CountingSystem {
         /** Sayım bottom sheet açıkken stok audit tek satırda birleştirilir (kapanınca / ürün değişince flush) */
         this._deferStockAuditWhileSheetOpen = false;
         this._stockAuditDirty = false;
+        /** Sadece UI: renderTable çağrılarını birleştir (Supabase kaydına dokunmaz) */
+        this._renderTableDebounceTimer = null;
         this.cameraScanAndCountMode = false; // Kamera: barkod okutunca sayım ekranı açılsın
         /** Seri okuma + sayarak ilerle: sayım sheet'i kamera akışından açıldı (Önceki/Sıradaki yerine Doğru Girdim) */
         this.countingBottomSheetFromCameraSeriSayar = false;
@@ -4072,10 +4074,21 @@ class CountingSystem {
         }
 
         await this.saveCountingData();
-        this.renderTable();
+        this.scheduleRenderTable();
 
         this.updateStatistics();
         this.updateCountingProgress();
+    }
+
+    /** Tam tablo yeniden çizimini kısa gecikmeyle birleştirir; saveCountingData ile karıştırma — kayıt her zaman anında. */
+    scheduleRenderTable() {
+        if (this._renderTableDebounceTimer != null) {
+            clearTimeout(this._renderTableDebounceTimer);
+        }
+        this._renderTableDebounceTimer = setTimeout(() => {
+            this._renderTableDebounceTimer = null;
+            this.renderTable();
+        }, 24);
     }
 
     async updateProductStock(productId, warehouseStock, systemStock = null, price = null, priceText = null, reservedStock = undefined) {
@@ -4153,7 +4166,7 @@ class CountingSystem {
         }
 
         await this.saveCountingData();
-        this.renderTable();
+        this.scheduleRenderTable();
 
         this.updateStatistics();
         this.updateCountingProgress();
