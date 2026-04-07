@@ -1907,6 +1907,18 @@ class CountingSystem {
         return this.getLocalDateIso();
     }
 
+    resetSayimDailyPasteUi() {
+        const btn = document.getElementById('sayimDailyPasteBtn');
+        const status = document.getElementById('sayimDailyPasteStatus');
+        if (btn) {
+            btn.disabled = false;
+        }
+        if (status) {
+            status.textContent = '';
+            status.className = 'text-xs text-gray-500 min-h-[1rem]';
+        }
+    }
+
     initDailyDateControls() {
         const dateInput = document.getElementById('sayimDailyDateInput');
         if (!dateInput) return;
@@ -1925,6 +1937,7 @@ class CountingSystem {
                 /* ignore */
             }
             this.updateDailyDeleteButtonState();
+            this.resetSayimDailyPasteUi();
         });
         this.updateDailyDeleteButtonState();
     }
@@ -1933,6 +1946,7 @@ class CountingSystem {
         const modal = document.getElementById('sayimDailyAddModal');
         const dateInput = document.getElementById('sayimDailyDateInput');
         if (!modal) return;
+        this.resetSayimDailyPasteUi();
         let initial = this.getLocalDateIso();
         try {
             const saved = sessionStorage.getItem('sayimDailySelectedIso');
@@ -2037,6 +2051,7 @@ class CountingSystem {
             added ? 'success' : 'warning',
             4000
         );
+        return { added, skipped };
     }
 
     async importDailyCountForDate(iso) {
@@ -2845,12 +2860,6 @@ class CountingSystem {
             });
         }
 
-        const dailyCountImportBtn = document.getElementById('dailyCountImportBtn');
-        if (dailyCountImportBtn) {
-            dailyCountImportBtn.addEventListener('click', () => {
-                this.importDailyCountForDate(this.getDailySelectedIso());
-            });
-        }
         const dailyTableDeleteDateBtn = document.getElementById('dailyTableDeleteDateBtn');
         if (dailyTableDeleteDateBtn) {
             dailyTableDeleteDateBtn.addEventListener('click', () => {
@@ -2890,38 +2899,60 @@ class CountingSystem {
             });
         }
 
-        const sayimPasteModal = document.getElementById('sayimPasteModal');
-        const sayimPasteOpenBtn = document.getElementById('sayimPasteOpenBtn');
-        const sayimPasteTextarea = document.getElementById('sayimPasteTextarea');
-        const sayimPasteCloseBtn = document.getElementById('sayimPasteCloseBtn');
-        const sayimPasteCancelBtn = document.getElementById('sayimPasteCancelBtn');
-        const sayimPasteConfirmBtn = document.getElementById('sayimPasteConfirmBtn');
-        const closeSayimPasteModal = () => {
-            if (sayimPasteModal) sayimPasteModal.classList.add('hidden');
-            if (sayimPasteTextarea) sayimPasteTextarea.value = '';
-        };
-        if (sayimPasteOpenBtn && sayimPasteModal) {
-            sayimPasteOpenBtn.addEventListener('click', () => {
-                sayimPasteModal.classList.remove('hidden');
-                if (sayimPasteTextarea) {
-                    setTimeout(() => sayimPasteTextarea.focus(), 100);
+        const sayimDailyPasteBtn = document.getElementById('sayimDailyPasteBtn');
+        const sayimDailyPasteStatus = document.getElementById('sayimDailyPasteStatus');
+        if (sayimDailyPasteBtn) {
+            sayimDailyPasteBtn.addEventListener('click', async () => {
+                const parser = window.SayimClipboardImport?.parseClipboardText;
+                if (typeof parser !== 'function') {
+                    if (sayimDailyPasteStatus) {
+                        sayimDailyPasteStatus.textContent = 'Modül yok';
+                        sayimDailyPasteStatus.className = 'text-xs text-red-600 min-h-[1rem]';
+                    }
+                    sayimDailyPasteBtn.disabled = true;
+                    return;
                 }
-            });
-        }
-        [sayimPasteCloseBtn, sayimPasteCancelBtn].forEach((btn) => {
-            if (btn) btn.addEventListener('click', closeSayimPasteModal);
-        });
-        if (sayimPasteModal) {
-            sayimPasteModal.addEventListener('click', (e) => {
-                if (e.target === sayimPasteModal) closeSayimPasteModal();
-            });
-        }
-        if (sayimPasteConfirmBtn) {
-            sayimPasteConfirmBtn.addEventListener('click', async () => {
-                const text = sayimPasteTextarea?.value || '';
-                if (sayimPasteModal) sayimPasteModal.classList.add('hidden');
-                if (sayimPasteTextarea) sayimPasteTextarea.value = '';
-                await this.importSayimPasteFromText(text);
+                let text = '';
+                try {
+                    text = await navigator.clipboard.readText();
+                } catch (err) {
+                    if (sayimDailyPasteStatus) {
+                        sayimDailyPasteStatus.textContent = 'Panoya erişilemedi';
+                        sayimDailyPasteStatus.className = 'text-xs text-red-600 min-h-[1rem]';
+                    }
+                    sayimDailyPasteBtn.disabled = true;
+                    return;
+                }
+                const parsed = parser(text);
+                if (!parsed.ok || !parsed.items || !parsed.items.length) {
+                    if (sayimDailyPasteStatus) {
+                        sayimDailyPasteStatus.textContent = 'Hatalı veri';
+                        sayimDailyPasteStatus.className = 'text-xs text-red-600 min-h-[1rem]';
+                    }
+                    sayimDailyPasteBtn.disabled = true;
+                    return;
+                }
+                try {
+                    await this.ensureDailyTableForDate(this.getDailySelectedIso());
+                } catch (err) {
+                    if (sayimDailyPasteStatus) {
+                        sayimDailyPasteStatus.textContent = err?.message || 'Tablo açılamadı';
+                        sayimDailyPasteStatus.className = 'text-xs text-red-600 min-h-[1rem]';
+                    }
+                    sayimDailyPasteBtn.disabled = true;
+                    return;
+                }
+                const result = await this.applyImportedRows(parsed.items);
+                sayimDailyPasteBtn.disabled = false;
+                if (sayimDailyPasteStatus) {
+                    sayimDailyPasteStatus.className = 'text-xs text-emerald-700 min-h-[1rem]';
+                    if (result.skipped > 0) {
+                        sayimDailyPasteStatus.textContent = `${result.added} ürün · ${result.skipped} eşleşmedi`;
+                    } else {
+                        sayimDailyPasteStatus.textContent = `${result.added} ürün`;
+                    }
+                }
+                this.closeDailyAddModal();
             });
         }
 

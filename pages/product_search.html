@@ -1273,7 +1273,6 @@
             }
 
             .header-user-info,
-            #addProductBtn,
             #headerCountingPageBtn,
             #settingsBtn,
             #logoutBtn,
@@ -1318,10 +1317,6 @@
                 display: none !important;
             }
 
-            #addProductBtn {
-                display: none !important;
-            }
-
             #settingsBtn,
             #logoutBtn {
                 padding: 0.5rem !important;
@@ -1361,7 +1356,6 @@
                 transform: scale(0.8);
             }
 
-            #addProductBtn,
             #settingsBtn,
             #logoutBtn,
             #headerCountingPageBtn {
@@ -1369,7 +1363,6 @@
                 font-size: 0.875rem !important;
             }
 
-            #addProductBtn svg,
             #settingsBtn svg,
             #logoutBtn svg,
             #headerCountingPageBtn svg {
@@ -1951,13 +1944,6 @@
                 
                 <!-- User Info -->
                 <div class="flex items-center space-x-4 header-user-info">
-                    <button id="addProductBtn" class="btn-primary text-sm mr-2">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-                        </svg>
-                        <span>Ürün Ekle</span>
-                    </button>
-
                     <!-- Sayım Sayfası (sadece premium stokSayimi aktifse görünür) -->
                     <button id="headerCountingPageBtn" class="btn-secondary text-sm mr-2 hidden" type="button" aria-label="Sayım Sayfası">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2758,7 +2744,6 @@
         const mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
         const mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
         const mobileCountingPageBtn = document.getElementById('mobileCountingPageBtn');
-        const addProductBtn = document.getElementById('addProductBtn');
         const headerCountingPageBtn = document.getElementById('headerCountingPageBtn');
         const settingsBtn = document.getElementById('settingsBtn');
         const logoutBtn = document.getElementById('logoutBtn');
@@ -2794,9 +2779,9 @@
         }
 
         // Mobile menu buttons - connect to desktop buttons
-        if (mobileAddProductBtn && addProductBtn) {
+        if (mobileAddProductBtn) {
             mobileAddProductBtn.addEventListener('click', () => {
-                addProductBtn.click();
+                if (typeof showAddProductModal === 'function') showAddProductModal();
                 closeMobileMenu();
             });
         }
@@ -9408,8 +9393,6 @@
         });
         
         document.addEventListener('DOMContentLoaded', () => {
-            // Add Product button
-            document.getElementById('addProductBtn').addEventListener('click', showAddProductModal);
             document.getElementById('closeAddProduct').addEventListener('click', hideAddProductModal);
             
             // HTML Table parsing
