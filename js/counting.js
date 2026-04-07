@@ -1907,7 +1907,24 @@ class CountingSystem {
         return this.getLocalDateIso();
     }
 
+    /** Seçili ISO için `Günlük|YYYY-MM-DD` tablosu zaten var mı? */
+    hasDailyTableForIso(iso) {
+        if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+        const tableName = this.DAILY_TABLE_PREFIX + iso;
+        return this.getTableList().some((t) => t.name === tableName);
+    }
+
+    countMatchedDailyPasteRows(items) {
+        if (!Array.isArray(items)) return 0;
+        let n = 0;
+        for (const row of items) {
+            if (this.matchDailyImportRow(row)) n++;
+        }
+        return n;
+    }
+
     resetSayimDailyPasteUi() {
+        this._pendingSayimDailyPaste = null;
         const btn = document.getElementById('sayimDailyPasteBtn');
         const status = document.getElementById('sayimDailyPasteStatus');
         if (btn) {
@@ -1917,6 +1934,32 @@ class CountingSystem {
             status.textContent = '';
             status.className = 'text-xs text-gray-500 min-h-[1rem]';
         }
+        this.updateDailyAddModalControls();
+    }
+
+    /** Gün ekle modalı: çakışma uyarısı + Tamam (yalnızca geçerli pano + tablo yokken). */
+    updateDailyAddModalControls() {
+        const iso = this.getDailySelectedIso();
+        const conflictEl = document.getElementById('sayimDailyAddConflictMsg');
+        const exists = this.hasDailyTableForIso(iso);
+        if (conflictEl) {
+            const msg = exists
+                ? 'Bu güne ait tablo zaten var. Önce tablolar listesinden bu günü silin; ardından yeniden ekleyebilirsiniz.'
+                : '';
+            conflictEl.textContent = msg;
+            conflictEl.classList.toggle('hidden', !exists);
+        }
+        const done = document.getElementById('sayimDailyAddDoneBtn');
+        if (!done) return;
+        let canConfirm = false;
+        if (!exists && this._pendingSayimDailyPaste) {
+            const p = this._pendingSayimDailyPaste;
+            if (p.iso === iso && Array.isArray(p.items) && p.items.length > 0) {
+                canConfirm = true;
+            }
+        }
+        done.disabled = !canConfirm;
+        done.setAttribute('aria-disabled', canConfirm ? 'false' : 'true');
     }
 
     initDailyDateControls() {
@@ -1936,17 +1979,15 @@ class CountingSystem {
             } catch (e) {
                 /* ignore */
             }
-            this.updateDailyDeleteButtonState();
             this.resetSayimDailyPasteUi();
         });
-        this.updateDailyDeleteButtonState();
+        this.updateDailyAddModalControls();
     }
 
     openDailyAddModal() {
         const modal = document.getElementById('sayimDailyAddModal');
         const dateInput = document.getElementById('sayimDailyDateInput');
         if (!modal) return;
-        this.resetSayimDailyPasteUi();
         let initial = this.getLocalDateIso();
         try {
             const saved = sessionStorage.getItem('sayimDailySelectedIso');
@@ -1955,9 +1996,10 @@ class CountingSystem {
             /* ignore */
         }
         if (dateInput) dateInput.value = initial;
+        this.resetSayimDailyPasteUi();
         modal.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
-        this.updateDailyDeleteButtonState();
+        this.updateDailyAddModalControls();
         setTimeout(() => dateInput?.focus(), 150);
     }
 
@@ -1965,23 +2007,41 @@ class CountingSystem {
         const modal = document.getElementById('sayimDailyAddModal');
         if (modal) modal.classList.add('hidden');
         document.body.classList.remove('overflow-hidden');
+        this._pendingSayimDailyPaste = null;
+        const pasteBtn = document.getElementById('sayimDailyPasteBtn');
+        if (pasteBtn) pasteBtn.disabled = false;
+        const status = document.getElementById('sayimDailyPasteStatus');
+        if (status) {
+            status.textContent = '';
+            status.className = 'text-xs text-gray-500 min-h-[1rem]';
+        }
+        const done = document.getElementById('sayimDailyAddDoneBtn');
+        if (done) {
+            done.disabled = true;
+            done.setAttribute('aria-disabled', 'true');
+        }
     }
 
-    updateDailyDeleteButtonState() {
-        const btn = document.getElementById('dailyTableDeleteDateBtn');
-        if (!btn) return;
+    async confirmSayimDailyAddFromModal() {
+        const done = document.getElementById('sayimDailyAddDoneBtn');
+        if (!done || done.disabled) return;
         const iso = this.getDailySelectedIso();
-        const tableName = this.DAILY_TABLE_PREFIX + iso;
-        const tables = this.getTableList();
-        const exists = tables.some((t) => t.name === tableName);
-        const canDelete = exists && tables.length > 1;
-        btn.disabled = !canDelete;
-        btn.setAttribute('aria-disabled', canDelete ? 'false' : 'true');
-        btn.title = canDelete
-            ? 'Seçili tarihin günlük tablosunu sil'
-            : !exists
-              ? 'Bu tarih için günlük tablo yok'
-              : 'En az bir tablo kalmalıdır';
+        if (this.hasDailyTableForIso(iso)) {
+            this.showToast('Bu güne ait tablo zaten var. Önce tablolar listesinden silin.', 'warning', 4500);
+            this.updateDailyAddModalControls();
+            return;
+        }
+        const pending = this._pendingSayimDailyPaste;
+        if (!pending || pending.iso !== iso || !pending.items?.length) return;
+        try {
+            await this.ensureDailyTableForDate(iso);
+        } catch (err) {
+            this.showToast(err?.message || 'Tablo açılamadı', 'error', 4000);
+            return;
+        }
+        await this.applyImportedRows(pending.items);
+        this._pendingSayimDailyPaste = null;
+        this.closeDailyAddModal();
     }
 
     async ensureDailyTableForDate(iso) {
@@ -2073,12 +2133,12 @@ class CountingSystem {
             );
             this.updateTableSelector();
             this.syncSayimSubTabToTable();
-            this.updateDailyDeleteButtonState();
+            this.updateDailyAddModalControls();
             return;
         }
 
         await this.applyImportedRows(rows);
-        this.updateDailyDeleteButtonState();
+        this.updateDailyAddModalControls();
         this.closeDailyAddModal();
     }
 
@@ -2142,7 +2202,7 @@ class CountingSystem {
             this.showToast(err?.message || 'Silinemedi', 'error', 4000);
         }
         this.closeDeleteDailyTableModal();
-        this.updateDailyDeleteButtonState();
+        this.updateDailyAddModalControls();
     }
 
     deleteDailyTableForSelectedDate() {
@@ -2223,7 +2283,7 @@ class CountingSystem {
         }
 
         if (!generalList || !dailyList) {
-            this.updateDailyDeleteButtonState();
+            this.updateDailyAddModalControls();
             return;
         }
 
@@ -2346,7 +2406,7 @@ class CountingSystem {
                 dailyList.appendChild(row);
             });
         }
-        this.updateDailyDeleteButtonState();
+        this.updateDailyAddModalControls();
     }
 
     /** Genel / Günlük sekmesi — aktif tablo türüyle hizala */
@@ -2860,13 +2920,6 @@ class CountingSystem {
             });
         }
 
-        const dailyTableDeleteDateBtn = document.getElementById('dailyTableDeleteDateBtn');
-        if (dailyTableDeleteDateBtn) {
-            dailyTableDeleteDateBtn.addEventListener('click', () => {
-                this.deleteDailyTableForSelectedDate();
-            });
-        }
-
         const sayimDailyAddModal = document.getElementById('sayimDailyAddModal');
         const sayimDailyAddOpenBtn = document.getElementById('sayimDailyAddOpenBtn');
         const sayimDailyAddCloseBtn = document.getElementById('sayimDailyAddCloseBtn');
@@ -2874,9 +2927,12 @@ class CountingSystem {
         if (sayimDailyAddOpenBtn) {
             sayimDailyAddOpenBtn.addEventListener('click', () => this.openDailyAddModal());
         }
-        [sayimDailyAddCloseBtn, sayimDailyAddDoneBtn].forEach((btn) => {
-            if (btn) btn.addEventListener('click', () => this.closeDailyAddModal());
-        });
+        if (sayimDailyAddCloseBtn) {
+            sayimDailyAddCloseBtn.addEventListener('click', () => this.closeDailyAddModal());
+        }
+        if (sayimDailyAddDoneBtn) {
+            sayimDailyAddDoneBtn.addEventListener('click', () => this.confirmSayimDailyAddFromModal());
+        }
         if (sayimDailyAddModal) {
             sayimDailyAddModal.addEventListener('click', (e) => {
                 if (e.target === sayimDailyAddModal) this.closeDailyAddModal();
@@ -2903,13 +2959,23 @@ class CountingSystem {
         const sayimDailyPasteStatus = document.getElementById('sayimDailyPasteStatus');
         if (sayimDailyPasteBtn) {
             sayimDailyPasteBtn.addEventListener('click', async () => {
+                const iso = this.getDailySelectedIso();
+                this._pendingSayimDailyPaste = null;
+                if (this.hasDailyTableForIso(iso)) {
+                    if (sayimDailyPasteStatus) {
+                        sayimDailyPasteStatus.textContent = 'Bu gün zaten tabloda. Önce listeden silin.';
+                        sayimDailyPasteStatus.className = 'text-xs text-red-600 min-h-[1rem]';
+                    }
+                    this.updateDailyAddModalControls();
+                    return;
+                }
                 const parser = window.SayimClipboardImport?.parseClipboardText;
                 if (typeof parser !== 'function') {
                     if (sayimDailyPasteStatus) {
                         sayimDailyPasteStatus.textContent = 'Modül yok';
                         sayimDailyPasteStatus.className = 'text-xs text-red-600 min-h-[1rem]';
                     }
-                    sayimDailyPasteBtn.disabled = true;
+                    this.updateDailyAddModalControls();
                     return;
                 }
                 let text = '';
@@ -2920,7 +2986,7 @@ class CountingSystem {
                         sayimDailyPasteStatus.textContent = 'Panoya erişilemedi';
                         sayimDailyPasteStatus.className = 'text-xs text-red-600 min-h-[1rem]';
                     }
-                    sayimDailyPasteBtn.disabled = true;
+                    this.updateDailyAddModalControls();
                     return;
                 }
                 const parsed = parser(text);
@@ -2929,30 +2995,19 @@ class CountingSystem {
                         sayimDailyPasteStatus.textContent = 'Hatalı veri';
                         sayimDailyPasteStatus.className = 'text-xs text-red-600 min-h-[1rem]';
                     }
-                    sayimDailyPasteBtn.disabled = true;
+                    this.updateDailyAddModalControls();
                     return;
                 }
-                try {
-                    await this.ensureDailyTableForDate(this.getDailySelectedIso());
-                } catch (err) {
-                    if (sayimDailyPasteStatus) {
-                        sayimDailyPasteStatus.textContent = err?.message || 'Tablo açılamadı';
-                        sayimDailyPasteStatus.className = 'text-xs text-red-600 min-h-[1rem]';
-                    }
-                    sayimDailyPasteBtn.disabled = true;
-                    return;
-                }
-                const result = await this.applyImportedRows(parsed.items);
-                sayimDailyPasteBtn.disabled = false;
+                const matched = this.countMatchedDailyPasteRows(parsed.items);
+                this._pendingSayimDailyPaste = { items: parsed.items, iso };
                 if (sayimDailyPasteStatus) {
                     sayimDailyPasteStatus.className = 'text-xs text-emerald-700 min-h-[1rem]';
-                    if (result.skipped > 0) {
-                        sayimDailyPasteStatus.textContent = `${result.added} ürün · ${result.skipped} eşleşmedi`;
-                    } else {
-                        sayimDailyPasteStatus.textContent = `${result.added} ürün`;
-                    }
+                    sayimDailyPasteStatus.textContent =
+                        matched !== parsed.items.length
+                            ? `${matched} ürün · Tamam ile onaylayın (${parsed.items.length} satır)`
+                            : `${matched} ürün · Tamam ile onaylayın`;
                 }
-                this.closeDailyAddModal();
+                this.updateDailyAddModalControls();
             });
         }
 
