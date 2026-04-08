@@ -3626,12 +3626,12 @@
         // Global function for onclick handlers
         window.copyProductText = copyProductText;
 
-        /** Arama sonuçları: ürün adı en fazla 2 satır; sığmazsa puntoyu küçültür (ellipsis yok, tam metin). */
+        /** Arama sonuçları: önce max 2 satır (taban puntodan gerekirse küçült); ancak min puntoda bile 2 satıra sığmayanlarda 3 satıra geçilir — 2 satıra sığanların görünümü değişmez. */
         const PRODUCT_TITLE_LH = 1.375;
         const PRODUCT_TITLE_MIN_PX = 10;
         const PRODUCT_TITLE_STEP = 0.25;
 
-        function fitProductTitleTwoLines(el) {
+        function fitProductSearchTitle(el) {
             if (!el || !el.isConnected) return;
             el.style.fontSize = '';
             el.style.maxHeight = '';
@@ -3641,15 +3641,26 @@
             el.style.lineHeight = String(PRODUCT_TITLE_LH);
 
             const baseFs = parseFloat(window.getComputedStyle(el).fontSize) || 16;
-            let fs = baseFs;
-            for (; fs >= PRODUCT_TITLE_MIN_PX; fs -= PRODUCT_TITLE_STEP) {
+
+            function applyMaxLines(lines, fs) {
                 el.style.fontSize = fs + 'px';
-                const maxH = 2 * fs * PRODUCT_TITLE_LH;
+                const maxH = lines * fs * PRODUCT_TITLE_LH;
                 el.style.maxHeight = maxH + 'px';
-                if (el.scrollHeight <= maxH + 1) return;
+                return el.scrollHeight <= maxH + 1;
+            }
+
+            for (let fs = baseFs; fs >= PRODUCT_TITLE_MIN_PX; fs -= PRODUCT_TITLE_STEP) {
+                if (applyMaxLines(2, fs)) {
+                    return;
+                }
+            }
+            for (let fs = baseFs; fs >= PRODUCT_TITLE_MIN_PX; fs -= PRODUCT_TITLE_STEP) {
+                if (applyMaxLines(3, fs)) {
+                    return;
+                }
             }
             el.style.fontSize = PRODUCT_TITLE_MIN_PX + 'px';
-            el.style.maxHeight = 2 * PRODUCT_TITLE_MIN_PX * PRODUCT_TITLE_LH + 'px';
+            el.style.maxHeight = 3 * PRODUCT_TITLE_MIN_PX * PRODUCT_TITLE_LH + 'px';
         }
 
         function scheduleProductSearchTitleFit(root) {
@@ -3657,12 +3668,13 @@
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
                     scope.querySelectorAll('[data-product-search-title]').forEach((node) => {
-                        fitProductTitleTwoLines(node);
+                        fitProductSearchTitle(node);
                     });
                 });
             });
         }
-        window.fitProductTitleTwoLines = fitProductTitleTwoLines;
+        window.fitProductSearchTitle = fitProductSearchTitle;
+        window.fitProductTitleTwoLines = fitProductSearchTitle;
         window.scheduleProductSearchTitleFit = scheduleProductSearchTitleFit;
 
         if (!window.__productTitleFitResizeBound) {
