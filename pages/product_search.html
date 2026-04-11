@@ -3385,7 +3385,7 @@
             try {
                 const text = await getClipboardRawForProductImport();
                 if (!text) return;
-                if (!shouldImportClipboardToSearch(text)) {
+                if (!(await shouldAllowClipboardIntoSearch(text))) {
                     showClipboardImportRejectedNotification();
                     return;
                 }
@@ -3428,7 +3428,7 @@
             try {
                 const text = await getClipboardRawForProductImport();
                 if (!text || !text.trim()) return;
-                if (!shouldImportClipboardToSearch(text)) return;
+                if (!(await shouldAllowClipboardIntoSearch(text))) return;
                 await waitForProductCatalogIfNeededForParse(text);
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
                 if (!parsed || !parsed.trim()) return;
@@ -5321,6 +5321,21 @@
             return false;
         }
 
+        /** Katalog eşlemesi için: tek satır, makul uzunlukta ürün adı / arama metni. */
+        function isPlausiblePlainProductNamePaste(s) {
+            if (!s || typeof s !== 'string') return false;
+            if (isLikelyEmail(s)) return false;
+            const firstLine = String(s).split(/\r?\n/)[0].trim();
+            const t = cleanUiNoiseFromProductName(firstLine);
+            if (!t || t.length < 3 || t.length > 200) return false;
+            if (/<[^>]+>/.test(t)) return false;
+            if (/^https?:\/\//i.test(t)) return false;
+            const compact = t.replace(/\s/g, '');
+            if (/^\d{8,}$/.test(compact)) return false;
+            if (!/\p{L}/u.test(t)) return false;
+            return true;
+        }
+
         /**
          * readText() sadece düz metin verir; Getir satırı HTML'i kaybolunca parse bozuluyordu.
          * Mümkünse Clipboard API read() ile text/html alınır (otomatik yapıştır / buton).
@@ -6522,6 +6537,34 @@
             return { active: activeResults, outOfStock: outOfStockResults };
         }
 
+        /** Panodan düz metin: arama algoritması en az bir sonuç döndürüyorsa yapıştırmaya izin ver. */
+        function catalogYieldsSearchResultsForPlainLine(queryLine) {
+            if (!queryLine || typeof queryLine !== 'string') return false;
+            if (!Array.isArray(products) || products.length === 0) return false;
+            const terms = joinCleanCommaTerms(queryLine.split(','));
+            if (terms.length === 0) return false;
+            const hasHits = (res) => {
+                const a = (res && res.active) ? res.active.length : 0;
+                const o = (res && res.outOfStock) ? res.outOfStock.length : 0;
+                return a + o > 0;
+            };
+            if (terms.length === 1) {
+                return hasHits(performOptimizedSearch(products, terms, false));
+            }
+            return terms.every((t) => hasHits(performOptimizedSearch(products, [t], false)));
+        }
+
+        async function shouldAllowClipboardIntoSearch(raw) {
+            if (shouldImportClipboardToSearch(raw)) return true;
+            if (!isPlausiblePlainProductNamePaste(raw)) return false;
+            await Promise.race([
+                whenProductsHydratedForClipboard,
+                new Promise((r) => setTimeout(r, 25000))
+            ]);
+            const line = cleanUiNoiseFromProductName(String(raw).split(/\r?\n/)[0].trim());
+            return catalogYieldsSearchResultsForPlainLine(line);
+        }
+
         // Optimized grouped search for comma-separated terms
         function performGroupedSearch(products, searchTerms, isTableData = false) {
             const groupedResults = [];
@@ -7464,7 +7507,7 @@
                     pastedText = html;
                 }
                 
-                if (!shouldImportClipboardToSearch(pastedText)) {
+                if (!(await shouldAllowClipboardIntoSearch(pastedText))) {
                     showClipboardImportRejectedNotification();
                     return;
                 }
