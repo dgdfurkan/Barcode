@@ -3361,12 +3361,16 @@
 
         async function pasteFromClipboardAndSearch() {
             try {
-                if (!navigator.clipboard || !navigator.clipboard.readText) return;
-                const text = await navigator.clipboard.readText();
+                const text = await getClipboardRawForProductImport();
                 if (!text) return;
+                if (!shouldImportClipboardToSearch(text)) {
+                    showClipboardImportRejectedNotification();
+                    return;
+                }
                 // Varsa tablo verisini isimlere indirgeme
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
                 searchInput.value = parsed;
+                await copyResolvedTableQueryToClipboard(text, parsed);
                 
                 // Set flag to scroll after search completes
                 shouldScrollAfterSearch = true;
@@ -3399,9 +3403,9 @@
             if (!hasPremium) return;
             if (!isAutoPasteEnabled()) return;
             try {
-                if (!navigator.clipboard?.readText) return;
-                const text = await navigator.clipboard.readText();
+                const text = await getClipboardRawForProductImport();
                 if (!text || !text.trim()) return;
+                if (!shouldImportClipboardToSearch(text)) return;
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
                 if (!parsed || !parsed.trim()) return;
                 if (searchInput && searchInput.value.trim() === parsed.trim()) {
@@ -3411,6 +3415,7 @@
                 if (text === lastClipboardText) return;
                 if (searchInput) {
                     searchInput.value = parsed;
+                    await copyResolvedTableQueryToClipboard(text, parsed);
                     shouldScrollAfterSearch = true;
                     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
                     lastClipboardText = text;
@@ -3818,7 +3823,12 @@
 
         // Create barcode navigation component (sync version for template literals)
         function createBarcodeNavigation(product) {
-            const barcodes = product.barcodes;
+            const barcodes = product.barcodes || [];
+            if (product.isPendingProduct) {
+                const note = product.pendingProductNote || 'Henüz sistemde barkod yok; ürün eklendiğinde görünür.';
+                const safe = String(note).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                return `<div class="text-xs text-amber-800 bg-amber-50 rounded-lg p-3 border border-amber-100 leading-relaxed">${safe}</div>`;
+            }
             // Check both feature flag and user preference
             const featureEnabled = getAntiGlareSetting();
             const userPreference = typeof getUserAntiGlarePreference === 'function' ? getUserAntiGlarePreference() : false;
@@ -4305,6 +4315,24 @@
             const useAntiGlare = featureEnabled && userPreference;
             
             gridContainer.innerHTML = allProducts.map(product => {
+                if (product.isPendingProduct) {
+                    const productName = String(product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const productImage = (product.image || '').replace(/'/g, "\\'");
+                    const note = String(product.pendingProductNote || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    return `
+                    <div class="group bg-white rounded-xl border border-amber-200 shadow-sm flex flex-col overflow-hidden" data-product-id="${product.id}">
+                        <div class="h-48 p-2 bg-amber-50/40 flex items-center justify-center relative cursor-pointer" onclick="showImageModal('${productImage}', '${productName}')">
+                            <img src="${product.image || ''}" 
+                                 alt="${product.name}" 
+                                 class="w-auto h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-300"
+                                 onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                        </div>
+                        <div class="px-5 pt-5 pb-3 flex-1 flex flex-col">
+                            <h3 class="font-semibold text-slate-800 leading-snug break-words w-full mb-2" data-product-search-title>${product.name}</h3>
+                            <p class="text-xs text-amber-800 leading-relaxed mt-auto border-t border-amber-100 pt-3">${note}</p>
+                        </div>
+                    </div>`;
+                }
                 const barcodes = product.barcodes || [];
                 const currentBarcodeIndex = getGridBarcodeIndex(product.id, barcodes.length);
                 const currentBarcode = barcodes.length > 0 ? barcodes[currentBarcodeIndex] : null;
@@ -5207,6 +5235,190 @@
             return matrix[str2.length][str1.length];
         }
 
+        /** Ham Getir/HTML tablosu panodan geldiyse, çözümlenen metni (barkod/isim listesi) tekrar panoya yazar. */
+        function shouldReplaceClipboardWithResolvedQuery(original, resolved) {
+            if (!original || typeof original !== 'string' || !resolved || typeof resolved !== 'string') return false;
+            if (original.trim() === resolved.trim()) return false;
+            if (/<[^>]+>/.test(original)) return true;
+            if (original.includes('Ürün Adı') && original.includes('Adet')) return true;
+            return false;
+        }
+
+        function copyResolvedTableQueryToClipboard(original, resolved) {
+            if (!shouldReplaceClipboardWithResolvedQuery(original, resolved)) return Promise.resolve();
+            return copyProductText(resolved, false);
+        }
+
+        function isLikelyEmail(s) {
+            return typeof s === 'string' && /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/.test(s);
+        }
+
+        /** Sadece Getir / Ant Design sipariş satırı veya tam tablo yapıştırmalarını kabul et; rastgele HTML veya metin değil. */
+        function isGetirStyleProductHtml(s) {
+            if (!s || typeof s !== 'string') return false;
+            const lower = s.toLowerCase();
+            const hasTr = /<tr\b/i.test(s);
+            if (!hasTr) return false;
+            const getirRow = /ant-table-row|getir-copy-btn|getir-copy-all/i.test(s);
+            const getirImg = /<img[^>]+src=["'][^"']*getir\.com/i.test(s);
+            const fullTableMarkers = lower.includes('ürün adı') && lower.includes('adet') && (lower.includes('önizleme') || getirImg);
+            return getirRow || getirImg || fullTableMarkers;
+        }
+
+        function isPlainBarcodeOrSkuList(s) {
+            if (!s || typeof s !== 'string' || isLikelyEmail(s)) return false;
+            const t = s.trim();
+            if (t.length > 8000) return false;
+            if (/<[^>]+>/.test(t)) return false;
+            const parts = t.split(/[\s]*,[\s]*/).map(p => p.trim()).filter(Boolean);
+            if (parts.length === 0) return false;
+            const tokenOk = (p) => {
+                if (p.length < 2 || p.length > 40) return false;
+                if (/^https?:\/\//i.test(p)) return false;
+                if (/[\s@]/.test(p)) return false;
+                return /^[A-Za-z0-9\-]+$/.test(p);
+            };
+            return parts.every(tokenOk);
+        }
+
+        function isStandaloneProductImageUrl(s) {
+            const t = (s || '').trim();
+            return /^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i.test(t);
+        }
+
+        function shouldImportClipboardToSearch(raw) {
+            if (!raw || typeof raw !== 'string' || !raw.trim()) return false;
+            if (isLikelyEmail(raw)) return false;
+            if (isGetirStyleProductHtml(raw)) return true;
+            if (isPlainBarcodeOrSkuList(raw)) return true;
+            if (isStandaloneProductImageUrl(raw)) return true;
+            return false;
+        }
+
+        /**
+         * readText() sadece düz metin verir; Getir satırı HTML'i kaybolunca parse bozuluyordu.
+         * Mümkünse Clipboard API read() ile text/html alınır (otomatik yapıştır / buton).
+         */
+        async function getClipboardRawForProductImport() {
+            let plain = '';
+            try {
+                if (navigator.clipboard && typeof navigator.clipboard.read === 'function') {
+                    const items = await navigator.clipboard.read();
+                    for (const item of items) {
+                        const types = item.types || [];
+                        if (!types.includes('text/html')) continue;
+                        const html = await (await item.getType('text/html')).text();
+                        if (html && typeof html === 'string' && isGetirStyleProductHtml(html.trim())) {
+                            return html.trim();
+                        }
+                    }
+                    for (const item of items) {
+                        const types = item.types || [];
+                        if (!types.includes('text/plain')) continue;
+                        plain = await (await item.getType('text/plain')).text();
+                        if (plain) break;
+                    }
+                }
+            } catch (e) {
+                /* izin yok veya tarayıcı read() desteklemiyor */
+            }
+            if (plain) return plain;
+            try {
+                if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+                    const t = await navigator.clipboard.readText();
+                    if (t) return t;
+                }
+            } catch (e) {}
+            return '';
+        }
+
+        function simpleHashForPendingId(str) {
+            let h = 0;
+            for (let i = 0; i < str.length; i++) {
+                h = ((h << 5) - h) + str.charCodeAt(i);
+                h |= 0;
+            }
+            return Math.abs(h);
+        }
+
+        function lookupImageUrlForTableTerm(searchTerm) {
+            if (!searchTerm || typeof productImageMap === 'undefined' || !productImageMap || productImageMap.size === 0) return '';
+            const norm = searchTerm.toLowerCase().trim();
+            return productImageMap.get(norm) || '';
+        }
+
+        function buildPendingPlaceholderProduct(searchTerm, termIndex) {
+            const img = lookupImageUrlForTableTerm(searchTerm);
+            const id = `__pending__${termIndex}_${simpleHashForPendingId(searchTerm)}`;
+            const fallbackImg = 'https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D';
+            return {
+                id,
+                name: searchTerm.trim(),
+                image: img || fallbackImg,
+                brand: '',
+                category: '',
+                barcodes: [],
+                shelf: '—',
+                isPendingProduct: true,
+                pendingProductNote: 'Henüz sistemde barkod yok; ürün eklendiğinde görünür.'
+            };
+        }
+
+        /** Getir satırındaki kopyala butonu ve emoji kalıntılarını ürün adından ayıklar. */
+        function cleanUiNoiseFromProductName(text) {
+            if (!text || typeof text !== 'string') return '';
+            let s = text.replace(/\u200B/g, '').replace(/\s*\u{1F4CB}\s*/gu, ' ').trim();
+            s = s.replace(/[\uFE0F\u200D]/g, '');
+            s = s.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, '').trim();
+            return s.replace(/\s+/g, ' ').trim();
+        }
+
+        /**
+         * Getir ürün satırları: thead hariç, ilk hücrede img + ikinci hücrede ürün adı.
+         * Sadece tbody tr aramak tek başına <tr> yapıştırmalarında satırı kaçırabiliyordu.
+         */
+        function collectGetirDataRowsFromDoc(doc) {
+            if (!doc) return [];
+            return Array.from(doc.querySelectorAll('tr')).filter(tr => {
+                if (tr.closest('thead')) return false;
+                const cells = tr.querySelectorAll('td');
+                if (cells.length < 2) return false;
+                if (!cells[0].querySelector('img')) return false;
+                const name = cleanUiNoiseFromProductName((cells[1].textContent || '').trim());
+                if (!name || name.replace(/\s/g, '').length < 2) return false;
+                if (/^[\d\s]+$/u.test(name)) return false;
+                if (/^[\p{Extended_Pictographic}\s]+$/u.test(name)) return false;
+                return true;
+            });
+        }
+
+        function extractGetirRowProductNamesFromHtml(html) {
+            try {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                const seen = new Set();
+                const names = [];
+                collectGetirDataRowsFromDoc(doc).forEach(tr => {
+                    const cells = tr.querySelectorAll('td');
+                    const name = cleanUiNoiseFromProductName((cells[1].textContent || '').trim());
+                    const key = name.toLowerCase();
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    names.push(name);
+                });
+                return names;
+            } catch (e) {
+                return [];
+            }
+        }
+
+        /** Virgülle birleştirmeden önce boş / sadece emoji kalan parçaları atar. */
+        function joinCleanCommaTerms(parts) {
+            if (!parts || !parts.length) return [];
+            return parts
+                .map(p => cleanUiNoiseFromProductName(String(p == null ? '' : p).trim()))
+                .filter(t => t.length > 0);
+        }
+
         // Parse table format data and extract product names (and image URLs if premium)
         function parseTableData(input) {
             if (!input || typeof input !== 'string') return input;
@@ -5311,7 +5523,7 @@
                 // This handles cases like "Söke Un	2" or "Solo Kağıt Havlu	1"
                 const match = line.match(/^(.+?)\s+\d+\s*$/);
                 if (match) {
-                    const productName = match[1].trim();
+                    const productName = cleanUiNoiseFromProductName(match[1].trim());
                     if (productName && productName !== 'Önizleme') {
                         productNames.push(productName);
                     }
@@ -5319,13 +5531,17 @@
                     // If no number at the end, treat the whole line as product name
                     // but skip if it's just a number
                     if (line !== 'Önizleme') {
-                        productNames.push(line);
+                        const cleanedLine = cleanUiNoiseFromProductName(line);
+                        if (!cleanedLine || cleanedLine.length < 2) continue;
+                        if (/^[\d\s]+$/u.test(cleanedLine)) continue;
+                        if (/^[\p{Extended_Pictographic}\s]+$/u.test(cleanedLine)) continue;
+                        productNames.push(cleanedLine);
                     }
                 }
             }
             
-            // Return comma-separated product names
-            return productNames.join(', ');
+            // Boş / sadece emoji kalan satırları at (ör. kopyala ikonu ayrı satır veya terim)
+            return joinCleanCommaTerms(productNames).join(', ');
         }
         
         // Global map to store product names -> image URLs (for premium image search)
@@ -5397,14 +5613,14 @@
                 const imageUrls = [];
                 
                 // Also extract product names and their corresponding image URLs for productImageMap
-                const rows = doc.querySelectorAll('tbody tr, tr');
+                const rows = collectGetirDataRowsFromDoc(doc);
                 rows.forEach(row => {
                     const cells = row.querySelectorAll('td');
                     if (cells.length >= 2) {
                         const img = cells[0].querySelector('img');
                         const nameCell = cells[1];
                         if (img && img.src && nameCell) {
-                            const productName = nameCell.textContent.trim();
+                            const productName = cleanUiNoiseFromProductName(nameCell.textContent.trim());
                             const imageUrl = img.src.trim();
                             if (productName && imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
                                 // Map product name to image URL for later use in grouped search
@@ -5420,15 +5636,15 @@
                 
                 // If no images found in table rows, try to get all img tags
                 if (imageUrls.length === 0) {
-                imgTags.forEach(img => {
-                    if (img.src && img.src.trim()) {
-                        const imageUrl = img.src.trim();
-                        // Filter out data URIs and invalid URLs
-                        if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-                            imageUrls.push(imageUrl);
+                    imgTags.forEach(img => {
+                        if (img.src && img.src.trim()) {
+                            const imageUrl = img.src.trim();
+                            // Filter out data URIs and invalid URLs
+                            if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+                                imageUrls.push(imageUrl);
+                            }
                         }
-                    }
-                });
+                    });
                 }
                 
                 // If no images found, fall back to text parsing
@@ -5451,7 +5667,7 @@
                         const img = cells[0].querySelector('img');
                         const nameCell = cells[1];
                         if (img && img.src && nameCell) {
-                            const productName = nameCell.textContent.trim();
+                            const productName = cleanUiNoiseFromProductName(nameCell.textContent.trim());
                             const imageUrl = img.src.trim();
                             if (productName && imageUrl) {
                                 imageToNameMap.set(imageUrl, productName);
@@ -5580,27 +5796,29 @@
                 
                 if (barcodeArray.length === 0) {
                     // No matches found, fall back to text parsing with image URL assistance
+                    const domNames = extractGetirRowProductNamesFromHtml(htmlContent);
                     const textContent = htmlContent.replace(/<[^>]*>/g, '\n');
-                    const productNamesResult = parseTableData(textContent);
+                    const fromDom = joinCleanCommaTerms(domNames);
+                    const productNamesResult = fromDom.length > 0 ? fromDom.join(', ') : parseTableData(textContent);
                     
                     // Try to convert product names to barcodes using both name and image URL
                     if (productNamesResult && productNamesResult !== textContent) {
-                        const productNames = productNamesResult.split(',').map(name => name.trim()).filter(name => name.length > 0);
+                        const productNames = joinCleanCommaTerms(productNamesResult.split(','));
                         const foundBarcodesFromNames = new Set();
                         
                         // Create a map of product names to their image URLs from HTML
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(htmlContent, 'text/html');
-                        const rows = doc.querySelectorAll('tbody tr, tr');
+                        const rowsForNameMap = collectGetirDataRowsFromDoc(doc);
                         const nameToImageMap = new Map();
                         
-                        rows.forEach(row => {
+                        rowsForNameMap.forEach(row => {
                             const cells = row.querySelectorAll('td');
                             if (cells.length >= 2) {
                                 const img = cells[0].querySelector('img');
                                 const nameCell = cells[1];
                                 if (img && img.src && nameCell) {
-                                    const productName = nameCell.textContent.trim();
+                                    const productName = cleanUiNoiseFromProductName(nameCell.textContent.trim());
                                     if (productName) {
                                         nameToImageMap.set(productName.toLowerCase(), img.src);
                                     }
@@ -5610,7 +5828,7 @@
                         
                         // For each product name, try to find matching product using both name and image
                         productNames.forEach(productName => {
-                            const normalizedName = productName.toLowerCase().trim();
+                            const normalizedName = cleanUiNoiseFromProductName(productName).toLowerCase().trim();
                             // Remove parentheses and content inside (e.g., "(38 g)" or "(134 g)")
                             const normalizedNameClean = normalizedName.replace(/\s*\([^)]*\)\s*/g, '').trim();
                             const htmlImageUrl = nameToImageMap.get(normalizedName);
@@ -5736,19 +5954,21 @@
             } catch (error) {
                 console.error('Error parsing HTML table:', error);
                 // Fallback to text parsing with image URL assistance
+                const domNamesCatch = extractGetirRowProductNamesFromHtml(htmlContent);
                 const textContent = htmlContent.replace(/<[^>]*>/g, '\n');
-                const productNamesResult = parseTableData(textContent);
+                const fromDomCatch = joinCleanCommaTerms(domNamesCatch);
+                const productNamesResult = fromDomCatch.length > 0 ? fromDomCatch.join(', ') : parseTableData(textContent);
                 
                 // Try to convert product names to barcodes using both name and image URL
                 if (productNamesResult && productNamesResult !== textContent) {
-                    const productNames = productNamesResult.split(',').map(name => name.trim()).filter(name => name.length > 0);
+                    const productNames = joinCleanCommaTerms(productNamesResult.split(','));
                     const foundBarcodesFromNames = new Set();
                     
                     // Create a map of product names to their image URLs from HTML
                     try {
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(htmlContent, 'text/html');
-                        const rows = doc.querySelectorAll('tbody tr, tr');
+                        const rows = collectGetirDataRowsFromDoc(doc);
                         const nameToImageMap = new Map();
                         
                         rows.forEach(row => {
@@ -5757,7 +5977,7 @@
                                 const img = cells[0].querySelector('img');
                                 const nameCell = cells[1];
                                 if (img && img.src && nameCell) {
-                                    const productName = nameCell.textContent.trim();
+                                    const productName = cleanUiNoiseFromProductName(nameCell.textContent.trim());
                                     if (productName) {
                                         nameToImageMap.set(productName.toLowerCase(), img.src);
                                     }
@@ -5767,7 +5987,7 @@
                         
                         // For each product name, try to find matching product using both name and image
                         productNames.forEach(productName => {
-                            const normalizedName = productName.toLowerCase().trim();
+                            const normalizedName = cleanUiNoiseFromProductName(productName).toLowerCase().trim();
                             // Remove parentheses and content inside (e.g., "(38 g)" or "(134 g)")
                             const normalizedNameClean = normalizedName.replace(/\s*\([^)]*\)\s*/g, '').trim();
                             const htmlImageUrl = nameToImageMap.get(normalizedName);
@@ -5934,17 +6154,11 @@
             let isTableData = false;
             if (parsedQuery !== query) {
                 // Table data was parsed, split by comma to get individual product names or barcodes
-                searchTerms = parsedQuery
-                    .split(',')
-                    .map(term => term.trim())
-                    .filter(term => term.length > 0);
+                searchTerms = joinCleanCommaTerms(parsedQuery.split(','));
                 isTableData = true;
             } else {
                 // Normal comma-separated search
-                searchTerms = parsedQuery
-                    .split(',')
-                    .map(term => term.trim())
-                    .filter(term => term.length > 0);
+                searchTerms = joinCleanCommaTerms(parsedQuery.split(','));
             }
             
             // Store image URLs for premium search (if available)
@@ -6149,8 +6363,9 @@
                             }
                             
                             // Check image URL match using productImageMap (premium feature, hidden from UI) - using normalized matching
-                            if (hasImageSearch && productImageMap.has(searchTerm) && product.image) {
-                                const mappedImageUrl = productImageMap.get(searchTerm);
+                            const singleTermMapKey = searchTerm.toLowerCase().trim();
+                            if (hasImageSearch && productImageMap.has(singleTermMapKey) && product.image) {
+                                const mappedImageUrl = productImageMap.get(singleTermMapKey);
                                 const normalizedProductUrl = normalizeImageUrl(product.image);
                                 const normalizedSearchUrl = normalizeImageUrl(mappedImageUrl);
                                 
@@ -6261,6 +6476,13 @@
             }
             
             // Search history removed as per requirements (will be added later if needed)
+            
+            if (isTableData && searchTerms.length === 1 && activeResults.length === 0 && outOfStockResults.length === 0) {
+                const hasImgFeatSingle = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                if (hasImgFeatSingle && productImageMap && productImageMap.size > 0) {
+                    activeResults.push(buildPendingPlaceholderProduct(searchTerms[0], 0));
+                }
+            }
             
             return { active: activeResults, outOfStock: outOfStockResults };
         }
@@ -6429,9 +6651,10 @@
                             // First, try to find image URL from productImageMap using searchTerm (could be product name or barcode)
                             let mappedImageUrl = null;
                             
-                            // Try direct lookup (if searchTerm is a product name)
-                            if (hasImageSearch && productImageMap.has(searchTerm)) {
-                                mappedImageUrl = productImageMap.get(searchTerm);
+                            // Try direct lookup (if searchTerm is a product name; map keys are lowercased)
+                            const termMapKey = searchTerm.toLowerCase().trim();
+                            if (hasImageSearch && productImageMap.has(termMapKey)) {
+                                mappedImageUrl = productImageMap.get(termMapKey);
                             } else if (hasImageSearch && isBarcodeSearch) {
                                 // If searchTerm is a barcode, find the product first, then get its name and lookup in map
                                 const productByBarcode = products.find(p => 
@@ -6575,6 +6798,13 @@
                     }
                 }
                 
+                if (isTableData && foundCount === 0) {
+                    const hasImgFeat = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                    if (hasImgFeat && productImageMap && productImageMap.size > 0) {
+                        termResults.active.push(buildPendingPlaceholderProduct(searchTerm, termIndex));
+                    }
+                }
+                
                 groupedResults.push(termResults);
             }
             
@@ -6672,12 +6902,14 @@
                         </span>
                     </td>
                     <td class="px-6 py-4 text-center">
+                        ${product.isPendingProduct ? '<span class="text-xs text-gray-400">—</span>' : `
                         <label class="flex items-center justify-center cursor-pointer">
                             <input type="checkbox" 
                                    class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
                                    onchange="toggleStockStatus('${product.id}')">
                             <span class="ml-2 text-xs text-gray-600">Stok Yok</span>
                         </label>
+                        `}
                     </td>
                 </tr>
             `).join('');
@@ -6746,6 +6978,7 @@
                             </h4>
                             <p class="text-sm text-text-secondary mb-2">${product.brand || 'Marka Belirtilmemiş'} • Raf: ${product.shelf}</p>
                         </div>
+                        ${product.isPendingProduct ? '' : `
                         <div class="flex-shrink-0">
                             <label class="flex items-center cursor-pointer">
                                 <input type="checkbox" 
@@ -6754,6 +6987,7 @@
                                 <span class="ml-2 text-xs text-gray-600">Stok Yok</span>
                             </label>
                         </div>
+                        `}
                     </div>
                     <div class="w-full">
                         ${createBarcodeNavigation(product)}
@@ -6931,12 +7165,14 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 text-center">
+                            ${product.isPendingProduct ? '<span class="text-xs text-gray-400">—</span>' : `
                             <label class="flex items-center justify-center cursor-pointer">
                                 <input type="checkbox" 
                                        class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
                                        onchange="toggleStockStatus('${product.id}')">
                                 <span class="ml-2 text-xs text-gray-600">Stok Yok</span>
                             </label>
+                            `}
                         </td>
                     `;
                     resultsTableBody.appendChild(row);
@@ -6974,6 +7210,7 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 text-center">
+                            ${product.isPendingProduct ? '<span class="text-xs text-gray-400">—</span>' : `
                             <label class="flex items-center justify-center cursor-pointer">
                                 <input type="checkbox" 
                                        class="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 focus:ring-2"
@@ -6981,6 +7218,7 @@
                                        onchange="toggleStockStatus('${product.id}')">
                                 <span class="ml-2 text-xs text-gray-600">Stok Yok</span>
                             </label>
+                            `}
                         </td>
                     `;
                     resultsTableBody.appendChild(row);
@@ -7140,6 +7378,27 @@
             }, 3000);
         }
 
+        function showClipboardImportRejectedNotification() {
+            const notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 bg-amber-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-all duration-300 max-w-sm';
+            notification.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <span class="text-sm">Panodaki metin ürün tablosu / barkod listesi gibi görünmüyor; arama kutusuna eklenmedi.</span>
+                </div>
+            `;
+            document.body.appendChild(notification);
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) notification.parentNode.removeChild(notification);
+                }, 300);
+            }, 4000);
+        }
+
         // Event listeners
         searchInput.addEventListener('input', (e) => {
             const query = e.target.value;
@@ -7163,8 +7422,18 @@
             // Prevent default paste behavior temporarily
             e.preventDefault();
             
-            // Get pasted text from clipboard
-            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            const clip = e.clipboardData || window.clipboardData;
+            const html = (clip.getData('text/html') || '').trim();
+            const textPlain = (clip.getData('text/plain') || clip.getData('text') || '').trim();
+            let pastedText = textPlain;
+            if (html && isGetirStyleProductHtml(html)) {
+                pastedText = html;
+            }
+            
+            if (!shouldImportClipboardToSearch(pastedText)) {
+                showClipboardImportRejectedNotification();
+                return;
+            }
             
             // Parse the pasted data
             const parsedQuery = parseTableData(pastedText);
@@ -7187,6 +7456,9 @@
             // Set flag to scroll after search completes
             shouldScrollAfterSearch = true;
             
+            // Panoda HTML yerine çözümlenen barkod/isim listesi olsun
+            copyResolvedTableQueryToClipboard(pastedText, parsedQuery).catch(() => {});
+
             // Trigger search
             performSearch(parsedQuery);
         });
