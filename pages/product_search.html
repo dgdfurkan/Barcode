@@ -5474,9 +5474,10 @@
                 }
             }
             
-            // If HTML table, parse it with image support (premium feature)
+            // Getir depo satırı: barkod çözümü premium'a bağlı olmamalı (görsel URL DB ile eşleşir).
+            // Diğer HTML tablolar: imageSearch premium + kullanıcı tercihi.
             if (hasHtmlTags) {
-                // Check both premium feature and user preference
+                const isGetirRow = typeof isGetirStyleProductHtml === 'function' && isGetirStyleProductHtml(input);
                 const hasPremium = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
                 let isEnabled = true;
                 try {
@@ -5485,7 +5486,7 @@
                     isEnabled = true;
                 }
                 
-                if (hasPremium && isEnabled) {
+                if (isGetirRow || (hasPremium && isEnabled)) {
                     return parseHtmlTableWithImages(input);
                 }
             }
@@ -6124,11 +6125,19 @@
 
             // Check if input contains HTML tags
             const hasHtmlTags = /<[^>]+>/.test(query);
-            const hasImageSearch = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+            const hasPremiumImage = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+            let imageSearchUserOn = true;
+            try {
+                imageSearchUserOn = localStorage.getItem('imageSearchEnabled') !== '0';
+            } catch (e) {
+                imageSearchUserOn = true;
+            }
+            const isGetirHtml = typeof isGetirStyleProductHtml === 'function' && isGetirStyleProductHtml(query);
+            const shouldParseHtmlToBarcodes = hasHtmlTags && (isGetirHtml || (hasPremiumImage && imageSearchUserOn));
             
-            // If HTML content and premium feature is active, try to parse HTML with images first
+            // Getir satırı veya premium görsel arama: HTML → barkod/isim çözümü
             let parsedQuery = query;
-            if (hasHtmlTags && hasImageSearch) {
+            if (shouldParseHtmlToBarcodes) {
                 const htmlParsedResult = parseHtmlTableWithImages(query);
                 // If parseHtmlTableWithImages found barcodes, use them
                 // Otherwise, it will fallback to parseTableData which returns product names
