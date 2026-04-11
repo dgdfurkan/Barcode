@@ -2712,6 +2712,28 @@
     <script>
         // Global variables
         let products = [];
+        /** Otomatik yapıştırma pageshow ile init'ten önce çalışınca products=[] kalıyordu; HTML→barkod bu yüzden isme düşüyordu. */
+        let _resolveProductsHydratedForClipboard = null;
+        const whenProductsHydratedForClipboard = new Promise((resolve) => {
+            _resolveProductsHydratedForClipboard = resolve;
+        });
+        function markProductsHydratedForClipboard() {
+            if (typeof _resolveProductsHydratedForClipboard === 'function') {
+                _resolveProductsHydratedForClipboard();
+                _resolveProductsHydratedForClipboard = null;
+            }
+        }
+        async function waitForProductCatalogIfNeededForParse(raw) {
+            if (!raw || typeof raw !== 'string') return;
+            const needsCatalog =
+                (typeof isGetirStyleProductHtml === 'function' && isGetirStyleProductHtml(raw)) ||
+                (typeof isStandaloneProductImageUrl === 'function' && isStandaloneProductImageUrl(raw));
+            if (!needsCatalog) return;
+            await Promise.race([
+                whenProductsHydratedForClipboard,
+                new Promise((r) => setTimeout(r, 25000))
+            ]);
+        }
         let currentResults = [];
         let randomProductsInterval;
         let outOfStockProducts = new Set(); // Track out of stock product IDs
@@ -3367,6 +3389,7 @@
                     showClipboardImportRejectedNotification();
                     return;
                 }
+                await waitForProductCatalogIfNeededForParse(text);
                 // Varsa tablo verisini isimlere indirgeme
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
                 searchInput.value = parsed;
@@ -3406,6 +3429,7 @@
                 const text = await getClipboardRawForProductImport();
                 if (!text || !text.trim()) return;
                 if (!shouldImportClipboardToSearch(text)) return;
+                await waitForProductCatalogIfNeededForParse(text);
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
                 if (!parsed || !parsed.trim()) return;
                 if (searchInput && searchInput.value.trim() === parsed.trim()) {
@@ -5122,6 +5146,8 @@
                 console.error('Initialization error:', error);
                 hideLoading();
                 showInitialState();
+            } finally {
+                markProductsHydratedForClipboard();
             }
         }
 
@@ -7428,48 +7454,40 @@
 
         // Handle paste events for table data
         searchInput.addEventListener('paste', (e) => {
-            // Prevent default paste behavior temporarily
             e.preventDefault();
-            
-            const clip = e.clipboardData || window.clipboardData;
-            const html = (clip.getData('text/html') || '').trim();
-            const textPlain = (clip.getData('text/plain') || clip.getData('text') || '').trim();
-            let pastedText = textPlain;
-            if (html && isGetirStyleProductHtml(html)) {
-                pastedText = html;
-            }
-            
-            if (!shouldImportClipboardToSearch(pastedText)) {
-                showClipboardImportRejectedNotification();
-                return;
-            }
-            
-            // Parse the pasted data
-            const parsedQuery = parseTableData(pastedText);
-            
-            // Update the input with parsed data
-            searchInput.value = parsedQuery;
-            
-            // Show/hide clear button
-            if (parsedQuery.length > 0) {
-                clearSearch.classList.remove('hidden');
-            } else {
-                clearSearch.classList.add('hidden');
-            }
-            
-            // Show notification if data was parsed
-            if (parsedQuery !== pastedText) {
-                showTableParseNotification();
-            }
-            
-            // Set flag to scroll after search completes
-            shouldScrollAfterSearch = true;
-            
-            // Panoda HTML yerine çözümlenen barkod/isim listesi olsun
-            copyResolvedTableQueryToClipboard(pastedText, parsedQuery).catch(() => {});
-
-            // Trigger search
-            performSearch(parsedQuery);
+            (async () => {
+                const clip = e.clipboardData || window.clipboardData;
+                const html = (clip.getData('text/html') || '').trim();
+                const textPlain = (clip.getData('text/plain') || clip.getData('text') || '').trim();
+                let pastedText = textPlain;
+                if (html && isGetirStyleProductHtml(html)) {
+                    pastedText = html;
+                }
+                
+                if (!shouldImportClipboardToSearch(pastedText)) {
+                    showClipboardImportRejectedNotification();
+                    return;
+                }
+                
+                await waitForProductCatalogIfNeededForParse(pastedText);
+                const parsedQuery = parseTableData(pastedText);
+                
+                searchInput.value = parsedQuery;
+                
+                if (parsedQuery.length > 0) {
+                    clearSearch.classList.remove('hidden');
+                } else {
+                    clearSearch.classList.add('hidden');
+                }
+                
+                if (parsedQuery !== pastedText) {
+                    showTableParseNotification();
+                }
+                
+                shouldScrollAfterSearch = true;
+                copyResolvedTableQueryToClipboard(pastedText, parsedQuery).catch(() => {});
+                performSearch(parsedQuery);
+            })();
         });
 
         clearSearch.addEventListener('click', () => {
