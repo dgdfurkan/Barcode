@@ -2119,13 +2119,13 @@
                     </div>
                     <!-- View Toggle Buttons -->
                     <div class="flex items-center space-x-2 bg-gray-100 rounded-lg p-1 view-toggle-container">
-                        <button id="viewListBtn" class="view-toggle-btn active flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all duration-200 bg-blue-50 border border-blue-200 text-black hover:bg-gray-100" title="Liste Görünümü">
+                        <button id="viewListBtn" class="view-toggle-btn flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all duration-200 text-black hover:bg-gray-100" title="Liste Görünümü">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
                             </svg>
                             <span class="text-xs font-medium">Liste</span>
                         </button>
-                        <button id="viewGridBtn" class="view-toggle-btn flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all duration-200 text-black hover:bg-gray-100" title="Grid Görünümü">
+                        <button id="viewGridBtn" class="view-toggle-btn active flex items-center space-x-2 px-3 py-1.5 rounded-md transition-all duration-200 bg-blue-50 border border-blue-200 text-black hover:bg-gray-100" title="Grid Görünümü">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
                             </svg>
@@ -3083,8 +3083,17 @@
             }, 250);
         });
         
-        // View Mode State Management
-        let currentViewMode = localStorage.getItem('productViewMode') || 'list';
+        // View Mode State Management — varsayılan Grid (liste artık ikincil)
+        (function migrateDefaultProductViewToGridOnce() {
+            try {
+                const k = 'productViewMode_defaultGrid_v1';
+                if (!localStorage.getItem(k)) {
+                    localStorage.setItem('productViewMode', 'grid');
+                    localStorage.setItem(k, '1');
+                }
+            } catch (e) { /* private mode vb. */ }
+        })();
+        let currentViewMode = localStorage.getItem('productViewMode') || 'grid';
         let lastSearchResults = null;
         let shouldScrollAfterSearch = false; // Flag to trigger scroll after search completes
         
