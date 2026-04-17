@@ -61,6 +61,20 @@ class CountingSystem {
         this._lastFilteredGeneral = [];
         /** scheduleScrollActiveGeneralTableChip zamanlayıcıları */
         this._scrollGeneralChipTimers = null;
+        /** Cihaza özgü aktif tablo anahtarı — Supabase'e yazılmaz */
+        this.DEVICE_TABLE_KEY = 'counting_current_table';
+        /** Tüm sayım blob'unun bellek kopyası — her Supabase SELECT'i ortadan kaldırır */
+        this.cachedFullData = null;
+        /** Ürün ID → ürün nesnesi eşlemesi (O(1) arama için) */
+        this.productIndex = new Map();
+        /** scheduleSave debounce timer */
+        this._saveDebounceTimer = null;
+        /** Incremental grid render: son çizilen ürün ID sırası */
+        this._rapidRenderedIds = [];
+        /** Incremental grid render: son çizilen her kartın durum anahtarı */
+        this._rapidRenderedStates = new Map();
+        /** Delegated event listeners kuruldu mu (tek seferlik) */
+        this._delegatedListenersSetup = false;
     }
 
     async init() {
@@ -155,6 +169,25 @@ class CountingSystem {
                 manualTokenInput.addEventListener('input', () => this.updateManualTokenPreview());
             }
             
+            // Realtime listener: başka cihazdan gelen sayım değişikliklerini cache'e merge et
+            this._setupRealtimeSync();
+
+            // beforeunload: pending save'i flush et
+            window.addEventListener('beforeunload', () => {
+                if (this._saveDebounceTimer) {
+                    clearTimeout(this._saveDebounceTimer);
+                    this._saveDebounceTimer = null;
+                    // Sync save mümkün değil (async); en azından localStorage'a yaz
+                    try {
+                        if (this.cachedFullData && this.currentUser) {
+                            this.cachedFullData._tables[this.currentTableName] = this.countingData;
+                            const key = `${this.STORAGE_KEY}_${this.currentUser.username}`;
+                            localStorage.setItem(key, JSON.stringify(this.cachedFullData));
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+            });
+
             console.log('✅ Counting system initialized');
         } catch (error) {
             console.error('Error initializing counting system:', error);
@@ -490,18 +523,21 @@ class CountingSystem {
             } else if (typeof PRODUCTS_DATA !== 'undefined' && PRODUCTS_DATA.products) {
                 this.allProducts = PRODUCTS_DATA.products || [];
             }
+            this.productIndex = new Map(this.allProducts.map(p => [p.id, p]));
             console.log(`📦 Loaded ${this.allProducts.length} products`);
         } catch (error) {
             console.error('Error loading products:', error);
             this.allProducts = [];
+            this.productIndex = new Map();
         }
     }
 
     async loadFullCountingData() {
         try {
+            if (this.cachedFullData) return this.cachedFullData;
+
             let fullData = null;
             
-            // Try to load from Supabase first (users.counting_data column)
             if (window.supabase && this.currentUser) {
                 const { data, error } = await window.supabase
                     .from('users')
@@ -514,39 +550,33 @@ class CountingSystem {
                 }
             }
 
-            // Fallback to localStorage
             if (!fullData) {
                 const storageKey = `${this.STORAGE_KEY}_${this.currentUser?.username || 'default'}`;
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
+                const stored = localStorage.getItem(storageKey);
+                if (stored) {
                     fullData = JSON.parse(stored);
                 }
             }
                 
-            // Migrate old structure if needed
             if (fullData) {
                 fullData = this.migrateToNestedStructure(fullData);
             } else {
-                // Initialize new structure
                 fullData = {
                     _api_info: {},
-                    _tables: {
-                        'Ana Sayım': {}
-                    },
-                    _currentTable: 'Ana Sayım'
+                    _tables: { 'Ana Sayım': {} },
                 };
             }
 
+            this.cachedFullData = fullData;
             return fullData;
         } catch (error) {
             console.error('Error loading full counting data:', error);
-            return {
+            const fallback = {
                 _api_info: {},
-                _tables: {
-                    'Ana Sayım': {}
-                },
-                _currentTable: 'Ana Sayım'
+                _tables: { 'Ana Sayım': {} },
             };
+            this.cachedFullData = fallback;
+            return fallback;
         }
     }
 
@@ -554,7 +584,6 @@ class CountingSystem {
         try {
             let fullData = null;
             
-            // Try to load from Supabase first (users.counting_data column)
             if (window.supabase && this.currentUser) {
                 const { data, error } = await window.supabase
                     .from('users')
@@ -568,63 +597,56 @@ class CountingSystem {
                 }
             }
 
-            // Fallback to localStorage
             if (!fullData) {
                 const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
                 const stored = localStorage.getItem(storageKey);
                 if (stored) {
                     fullData = JSON.parse(stored);
-                console.log('📦 Loaded counting data from localStorage');
+                    console.log('📦 Loaded counting data from localStorage');
                 }
             }
 
-            // Migrate old structure to new nested structure if needed
             if (fullData) {
                 fullData = this.migrateToNestedStructure(fullData);
-                
-                // Set current table name
-                if (fullData._currentTable) {
-                    this.currentTableName = fullData._currentTable;
-                } else {
-                    this.currentTableName = 'Ana Sayım';
-                    fullData._currentTable = this.currentTableName;
+                this.cachedFullData = fullData;
+
+                // Aktif tablo: önce bu cihaza özgü localStorage değeri, yoksa sunucu değeri (migration)
+                const deviceTable = this._loadDeviceCurrentTable();
+                const serverTable = fullData._currentTable;
+                let resolvedTable = deviceTable || serverTable || 'Ana Sayım';
+
+                // Sunucuda bu tablo yoksa Ana Sayım'a düş
+                if (!fullData._tables || !fullData._tables[resolvedTable]) {
+                    resolvedTable = Object.keys(fullData._tables || {})[0] || 'Ana Sayım';
                 }
-                
-                // Load active table data
-                if (fullData._tables && fullData._tables[this.currentTableName]) {
-                    this.countingData = fullData._tables[this.currentTableName];
-                } else {
-                    // Create default table if it doesn't exist
-                    if (!fullData._tables) {
-                        fullData._tables = {};
-                    }
+                this.currentTableName = resolvedTable;
+                this._saveDeviceCurrentTable(resolvedTable);
+
+                if (!fullData._tables) fullData._tables = {};
+                if (!fullData._tables[this.currentTableName]) {
                     fullData._tables[this.currentTableName] = {};
-                    this.countingData = {};
                 }
+                this.countingData = fullData._tables[this.currentTableName];
                 
                 this.auditLog = Array.isArray(fullData._auditLog)
                     ? fullData._auditLog.slice(-this.AUDIT_LOG_MAX)
                     : [];
 
-                // Save full structure back
                 await this.saveFullCountingData(fullData);
-                } else {
-                // Initialize new structure
+            } else {
                 this.currentTableName = 'Ana Sayım';
+                this._saveDeviceCurrentTable(this.currentTableName);
                 this.countingData = {};
                 this.auditLog = [];
                 const newStructure = {
                     _api_info: {},
-                    _tables: {
-                        [this.currentTableName]: {}
-                    },
-                    _currentTable: this.currentTableName
+                    _tables: { [this.currentTableName]: {} },
                 };
+                this.cachedFullData = newStructure;
                 await this.saveFullCountingData(newStructure);
             }
         } catch (error) {
             console.error('Error loading counting data:', error);
-            // Fallback to empty structure
             this.currentTableName = 'Ana Sayım';
             this.countingData = {};
             this.auditLog = [];
@@ -666,31 +688,27 @@ class CountingSystem {
         try {
             if (!fullData._tables) fullData._tables = {};
             fullData._tables[this.currentTableName] = this.countingData;
-            fullData._currentTable = this.currentTableName;
+            // _currentTable Supabase blob'una yazılmaz — her cihaz kendi localStorage'ını kullanır
 
             if (!this.auditLog) this.auditLog = [];
             fullData._auditLog = this.auditLog.slice(-this.AUDIT_LOG_MAX);
 
-            // Save to Supabase
+            this.cachedFullData = fullData;
+
             if (window.supabase && this.currentUser) {
                 const { error } = await window.supabase
                     .from('users')
                     .update({ counting_data: fullData })
                     .eq('username', this.currentUser.username);
 
-                if (error) {
-                    throw error;
-                }
+                if (error) throw error;
                 console.log('💾 Saved full counting data to Supabase');
             }
 
-            // Also save to localStorage as backup
             const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
             localStorage.setItem(storageKey, JSON.stringify(fullData));
-            console.log('💾 Saved full counting data to localStorage (backup)');
         } catch (error) {
             console.error('Error saving full counting data:', error);
-            // Fallback to localStorage only
             try {
                 const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
                 localStorage.setItem(storageKey, JSON.stringify(fullData));
@@ -1328,59 +1346,26 @@ class CountingSystem {
 
     async saveCountingData() {
         try {
-            // Her kayıtta sunucudan güncel JSON al (çok cihaz / başka sekme ile uyum)
-            let fullData = null;
-            if (window.supabase && this.currentUser) {
-                const { data } = await window.supabase
-                    .from('users')
-                    .select('counting_data')
-                    .eq('username', this.currentUser.username)
-                    .maybeSingle();
-                if (data && data.counting_data) {
-                    fullData = data.counting_data;
-                }
+            // cachedFullData üzerinde çalış — SELECT isteği gerekmez
+            if (!this.cachedFullData) {
+                this.cachedFullData = { _api_info: {}, _tables: {} };
             }
-
-            if (!fullData) {
-                const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-                const stored = localStorage.getItem(storageKey);
-                if (stored) {
-                    fullData = JSON.parse(stored);
-                }
-            }
-
-            if (!fullData) {
-                fullData = {
-                    _api_info: {},
-                    _tables: {},
-                    _currentTable: this.currentTableName,
-                };
-            }
-
-            if (!fullData._tables) {
-                fullData._tables = {};
-            }
-
-            fullData = this.migrateToNestedStructure(fullData);
+            if (!this.cachedFullData._tables) this.cachedFullData._tables = {};
+            this.cachedFullData = this.migrateToNestedStructure(this.cachedFullData);
 
             this.ensureTableMeta(this.countingData);
-            fullData._tables[this.currentTableName] = this.countingData;
-            fullData._currentTable = this.currentTableName;
+            this.cachedFullData._tables[this.currentTableName] = this.countingData;
 
-            await this.saveFullCountingData(fullData);
+            await this.saveFullCountingData(this.cachedFullData);
         } catch (error) {
             console.error('Error saving counting data:', error);
-            // Fallback to localStorage only
             try {
                 const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-                const fullData = {
+                const fallback = {
                     _api_info: {},
-                    _tables: {
-                        [this.currentTableName]: this.countingData
-                    },
-                    _currentTable: this.currentTableName
+                    _tables: { [this.currentTableName]: this.countingData },
                 };
-                localStorage.setItem(storageKey, JSON.stringify(fullData));
+                localStorage.setItem(storageKey, JSON.stringify(fallback));
                 console.log('💾 Saved counting data to localStorage (fallback)');
             } catch (e) {
                 console.error('Error saving to localStorage:', e);
@@ -1388,43 +1373,116 @@ class CountingSystem {
         }
     }
 
-    // Switch to a different table
-    async switchTable(tableName) {
-        if (!tableName || tableName === this.currentTableName) {
-            return; // Already on this table
+    /** scheduleSave: sık güncelleme senaryolarında birden fazla kayıt isteğini tek bir isteğe indirger */
+    scheduleSave(delay = 500) {
+        if (this._saveDebounceTimer) clearTimeout(this._saveDebounceTimer);
+        this._saveDebounceTimer = setTimeout(() => {
+            this._saveDebounceTimer = null;
+            this.saveCountingData().catch(e => console.error('scheduleSave error:', e));
+        }, delay);
+    }
+
+    /** Cihaza özgü aktif tablo adını localStorage'a kaydeder */
+    _saveDeviceCurrentTable(tableName) {
+        try {
+            const key = `${this.DEVICE_TABLE_KEY}_${this.currentUser?.username || 'default'}`;
+            localStorage.setItem(key, tableName);
+        } catch (e) { /* ignore */ }
+    }
+
+    /** Cihaza özgü aktif tablo adını localStorage'dan okur */
+    _loadDeviceCurrentTable() {
+        try {
+            const key = `${this.DEVICE_TABLE_KEY}_${this.currentUser?.username || 'default'}`;
+            return localStorage.getItem(key) || null;
+        } catch (e) { return null; }
+    }
+
+    /**
+     * Supabase Realtime listener: başka cihazdan gelen counting_data güncellemelerini
+     * cachedFullData'ya merge eder. Aktif tablomuz korunur, diğer tablolar güncellenir.
+     */
+    _setupRealtimeSync() {
+        if (!window.supabase || !this.currentUser) return;
+        try {
+            this._realtimeChannel = window.supabase
+                .channel(`counting-sync-${this.currentUser.username}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'users',
+                        filter: `username=eq.${this.currentUser.username}`,
+                    },
+                    (payload) => this._handleRealtimeCountingUpdate(payload)
+                )
+                .subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        console.log('🔴 Realtime counting sync bağlandı');
+                    }
+                });
+        } catch (e) {
+            console.error('Realtime sync kurulum hatası:', e);
         }
+    }
 
-        // Save current table first
-        await this.saveCountingData();
+    /** Realtime güncellemesini işle: _tables merge, aktif tablo korunur */
+    _handleRealtimeCountingUpdate(payload) {
+        const incoming = payload?.new?.counting_data;
+        if (!incoming || !incoming._tables) return;
 
-        // Load full structure
-        let fullData = null;
-        if (window.supabase && this.currentUser) {
-            const { data } = await window.supabase
-                .from('users')
-                .select('counting_data')
-                .eq('username', this.currentUser.username)
-                .maybeSingle();
-            if (data && data.counting_data) {
-                fullData = data.counting_data;
-            }
-        }
-
-        if (!fullData) {
-            const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                fullData = JSON.parse(stored);
-            }
-        }
-
-        if (!fullData || !fullData._tables) {
-            console.error('Cannot switch table: data structure not found');
+        if (!this.cachedFullData) {
+            this.cachedFullData = incoming;
             return;
         }
 
-        // Switch to new table
+        // Başka tablolardaki değişiklikleri al; bizim tablomuz yerel kalır
+        const mergedTables = { ...incoming._tables };
+        mergedTables[this.currentTableName] = this.countingData;
+
+        this.cachedFullData._tables = mergedTables;
+        if (incoming._api_info) this.cachedFullData._api_info = incoming._api_info;
+        if (Array.isArray(incoming._auditLog)) {
+            // Merge: daha uzun olan auditLog korunur
+            if (incoming._auditLog.length > (this.auditLog?.length || 0)) {
+                this.auditLog = incoming._auditLog.slice(-this.AUDIT_LOG_MAX);
+                this.cachedFullData._auditLog = this.auditLog;
+            }
+        }
+
+        // localStorage yedek güncelle
+        try {
+            const key = `${this.STORAGE_KEY}_${this.currentUser.username}`;
+            localStorage.setItem(key, JSON.stringify(this.cachedFullData));
+        } catch (e) { /* ignore */ }
+
+        // Yeni tablo eklenmiş olabilir — UI'ı güncelle
+        this.updateTableSelector();
+        console.log('🔄 Realtime counting sync: tablolar güncellendi');
+    }
+
+    // Switch to a different table
+    async switchTable(tableName) {
+        if (!tableName || tableName === this.currentTableName) {
+            return;
+        }
+
+        // Pending save'i hemen flush et
+        if (this._saveDebounceTimer) {
+            clearTimeout(this._saveDebounceTimer);
+            this._saveDebounceTimer = null;
+            await this.saveCountingData();
+        } else {
+            await this.saveCountingData();
+        }
+
+        const fullData = this.cachedFullData || { _api_info: {}, _tables: {} };
+        if (!fullData._tables) fullData._tables = {};
+
         this.currentTableName = tableName;
+        this._saveDeviceCurrentTable(tableName);
+
         if (fullData._tables[tableName]) {
             this.countingData = fullData._tables[tableName];
         } else {
@@ -1434,7 +1492,7 @@ class CountingSystem {
             this.countingData = fullData._tables[tableName];
         }
 
-        fullData._currentTable = tableName;
+        this.cachedFullData = fullData;
         await this.saveFullCountingData(fullData);
 
         if (this.isDailyTableName(tableName)) {
@@ -1468,56 +1526,23 @@ class CountingSystem {
             throw new Error('Bu isim günlük sayım için ayrılmıştır; genel tabloda kullanılamaz');
         }
 
-        // Save current table first
         await this.saveCountingData();
 
-        // Load full structure
-        let fullData = null;
-        if (window.supabase && this.currentUser) {
-            const { data } = await window.supabase
-                .from('users')
-                .select('counting_data')
-                .eq('username', this.currentUser.username)
-                .maybeSingle();
-            if (data && data.counting_data) {
-                fullData = data.counting_data;
-            }
-        }
+        const fullData = this.cachedFullData || { _api_info: {}, _tables: {} };
+        if (!fullData._tables) fullData._tables = {};
 
-        if (!fullData) {
-            const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                fullData = JSON.parse(stored);
-            }
-        }
-
-        if (!fullData) {
-            fullData = {
-                _api_info: {},
-                _tables: {},
-                _currentTable: this.currentTableName
-            };
-        }
-
-        if (!fullData._tables) {
-            fullData._tables = {};
-        }
-
-        // Check if table already exists
         if (fullData._tables[trimmed]) {
             throw new Error('Bu isimde bir tablo zaten mevcut');
         }
 
-        // Create new table (oluşturulma zamanı metadata)
         fullData._tables[trimmed] = {
             _tableMeta: { createdAt: new Date().toISOString() }
         };
         
-        // Switch to new table
         this.currentTableName = trimmed;
+        this._saveDeviceCurrentTable(trimmed);
         this.countingData = fullData._tables[trimmed];
-        fullData._currentTable = trimmed;
+        this.cachedFullData = fullData;
 
         this.pushAuditEntry(
             options.allowDaily
@@ -1537,53 +1562,28 @@ class CountingSystem {
 
     // Delete a table
     async deleteTable(tableName) {
-        if (!tableName) {
-            return;
-        }
+        if (!tableName) return;
 
-        // Cannot delete current table if it's the only one
-        let fullData = null;
-        if (window.supabase && this.currentUser) {
-            const { data } = await window.supabase
-                .from('users')
-                .select('counting_data')
-                .eq('username', this.currentUser.username)
-                .maybeSingle();
-            if (data && data.counting_data) {
-                fullData = data.counting_data;
-            }
-        }
-
-        if (!fullData) {
-            const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                fullData = JSON.parse(stored);
-            }
-        }
-
-        if (!fullData || !fullData._tables) {
-            return;
-        }
+        const fullData = this.cachedFullData || { _api_info: {}, _tables: {} };
+        if (!fullData._tables) return;
 
         const tableNames = Object.keys(fullData._tables);
         if (tableNames.length <= 1) {
             throw new Error('En az bir tablo bulunmalıdır');
         }
 
-        // Delete table
         delete fullData._tables[tableName];
 
         this.pushAuditEntry(`Tablo silindi · ${this.formatTableDisplayName(tableName)}`, { cat: 'table', tbl: tableName });
 
-        // If deleted table was current, switch to first available table
         if (tableName === this.currentTableName) {
             const newTableName = Object.keys(fullData._tables)[0];
             this.currentTableName = newTableName;
+            this._saveDeviceCurrentTable(newTableName);
             this.countingData = fullData._tables[newTableName] || {};
-            fullData._currentTable = newTableName;
         }
 
+        this.cachedFullData = fullData;
         await this.saveFullCountingData(fullData);
 
         // Re-render UI
@@ -1595,23 +1595,7 @@ class CountingSystem {
 
     // Get list of all tables
     getTableList() {
-        let fullData = null;
-        if (window.supabase && this.currentUser) {
-            // Try to get from localStorage first (faster)
-            const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                fullData = JSON.parse(stored);
-            }
-        }
-
-        if (!fullData) {
-            const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                fullData = JSON.parse(stored);
-            }
-        }
+        const fullData = this.cachedFullData;
 
         if (!fullData || !fullData._tables) {
             return [{ name: 'Ana Sayım', isCurrent: true }];
@@ -3487,7 +3471,7 @@ class CountingSystem {
                     return;
                 }
 
-                const product = this.allProducts.find((p) => p.id === this.currentCountingProduct);
+                const product = this.productIndex.get(this.currentCountingProduct);
                 if (!product) {
                     return;
                 }
@@ -3558,6 +3542,9 @@ class CountingSystem {
 
         // Setup product image lightbox
         this.setupProductImageLightbox();
+
+        // Delegation tabanlı event listener'ları kur (tek seferlik)
+        this.setupTableEventListeners();
     }
 
     setupTabSystem() {
@@ -4251,7 +4238,7 @@ class CountingSystem {
             }
         }
 
-        await this.saveCountingData();
+        this.scheduleSave(400);
         this.scheduleRenderTable();
 
         this.updateStatistics();
@@ -4320,7 +4307,7 @@ class CountingSystem {
 
     showDeleteConfirmModal(productId) {
         // Ürün bilgisini al
-        const product = this.allProducts.find(p => p.id === productId);
+        const product = this.productIndex.get(productId);
         const productName = product ? product.name : 'Bu ürün';
         
         // Mevcut modal varsa kaldır
@@ -4614,7 +4601,7 @@ class CountingSystem {
             const currentIndex = i + 1;
             
             try {
-                const product = this.allProducts.find(p => p.id === productId);
+                const product = this.productIndex.get(productId);
                 if (!product) {
                     console.warn(`⚠️ Ürün bulunamadı (ID: ${productId})`);
                     failedCount++;
@@ -4732,7 +4719,7 @@ class CountingSystem {
     async fetchSystemStocks(productIds) {
         // Get products that need sync
         const productsToSync = productIds.map(id => {
-            const product = this.allProducts.find(p => p.id === id);
+            const product = this.productIndex.get(id);
             return {
                 id,
                 name: product?.name || '',
@@ -5737,7 +5724,7 @@ class CountingSystem {
         if (tableBody) {
             tableBody.innerHTML = sortedProductIds.map(productId => {
                 const data = this.countingData[productId];
-                const product = this.allProducts.find(p => p.id === productId);
+                const product = this.productIndex.get(productId);
                 if (!product) return '';
 
                 const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
@@ -5921,7 +5908,7 @@ class CountingSystem {
         if (cardView) {
             cardView.innerHTML = sortedProductIds.map(productId => {
                 const data = this.countingData[productId];
-                const product = this.allProducts.find(p => p.id === productId);
+                const product = this.productIndex.get(productId);
                 if (!product) return '';
 
                 const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
@@ -6097,8 +6084,7 @@ class CountingSystem {
             }).join('');
         }
 
-        // Setup event listeners for inputs and delete buttons
-        this.setupTableEventListeners();
+        // Event listeners tek seferlik delegation ile kurulur — her render'da yeniden ekleme gerekmez
         
         // Render rapid counting mode if active
         if (this.currentViewMode === 'rapid') {
@@ -6106,6 +6092,55 @@ class CountingSystem {
         }
 
         this.updateActiveTableActivityLine();
+    }
+
+    /** Rapid kart için durum anahtarı — değişim tespitinde kullanılır */
+    _getRapidCardStateKey(data) {
+        const hasWarehouse = data.warehouseStock !== null && data.warehouseStock !== undefined;
+        const hasSystem = data.systemStock !== null && data.systemStock !== undefined;
+        if (!hasWarehouse && !hasSystem) return 'blue';
+        if (hasWarehouse && hasSystem) {
+            const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
+            return diff.type; // 'positive' | 'negative' | 'zero'
+        }
+        return 'orange';
+    }
+
+    /** Tek bir rapid kart için innerHTML string'i */
+    _buildRapidCardInner(product, data) {
+        const isCounted = data.warehouseStock !== null && data.warehouseStock !== undefined;
+        const hasWarehouse = isCounted;
+        const hasSystem = data.systemStock !== null && data.systemStock !== undefined;
+
+        const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
+        let stockIndicator = '';
+        let statusIcon = '';
+
+        if (hasWarehouse && hasSystem) {
+            if (diff.type === 'positive') {
+                stockIndicator = '<div class="stock-indicator bg-emerald-400"></div>';
+                statusIcon = '<div class="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg></div>';
+            } else if (diff.type === 'negative') {
+                stockIndicator = '<div class="stock-indicator bg-rose-400"></div>';
+                statusIcon = '<div class="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg></div>';
+            } else {
+                stockIndicator = '<div class="stock-indicator bg-gray-300"></div>';
+                statusIcon = '<div class="w-4 h-4 bg-gray-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 9h14M5 15h14"/></svg></div>';
+            }
+        } else if (hasSystem && !hasWarehouse) {
+            stockIndicator = '<div class="stock-indicator bg-orange-400"></div>';
+            statusIcon = '<div class="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l2 2m6-2a8 8 0 11-16 0 8 8 0 0116 0z"/></svg></div>';
+        } else if (hasWarehouse && !hasSystem) {
+            stockIndicator = '<div class="stock-indicator bg-orange-400"></div>';
+            statusIcon = '<div class="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></div>';
+        } else {
+            statusIcon = '<div class="w-4 h-4 border-[3px] border-blue-600 bg-white rounded-full flex items-center justify-center shadow-sm"></div>';
+        }
+
+        const productName = product.name || 'Ürün';
+        const productImage = product.image || '../assets/logo.png';
+
+        return `<div class="product-status-icon">${statusIcon}</div>${stockIndicator}<div class="flex-1 flex flex-col p-1 sm:p-1.5 overflow-hidden"><div class="flex-1 flex items-center justify-center mb-0.5 sm:mb-1 min-h-0 overflow-hidden"><img src="${productImage}" alt="${product.name || ''}" class="max-w-full max-h-full w-auto h-auto object-contain" onerror="this.src='../assets/logo.png'"></div><div class="text-center flex-shrink-0 px-0.5"><p class="text-[9px] sm:text-[10px] font-semibold text-gray-900 line-clamp-1 leading-tight truncate">${productName}</p></div></div>`;
     }
 
     renderRapidCountingMode() {
@@ -6116,88 +6151,82 @@ class CountingSystem {
 
         if (sortedProductIds.length === 0) {
             gridContainer.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">Henüz ürün eklenmedi</div>';
+            this._rapidRenderedIds = [];
+            this._rapidRenderedStates.clear();
             return;
         }
 
-        gridContainer.innerHTML = sortedProductIds.map(productId => {
-            const data = this.countingData[productId];
-            const product = this.allProducts.find(p => p.id === productId);
-            if (!product) return '';
+        const newIds = new Set(sortedProductIds);
+        const prevIds = new Set(this._rapidRenderedIds);
 
-            const isCounted = data.warehouseStock !== null && data.warehouseStock !== undefined;
-            const hasWarehouse = isCounted;
-            const hasSystem = data.systemStock !== null && data.systemStock !== undefined;
-
-            const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
-            let stockIndicator = '';
-            let statusIcon = '';
-            /** @type {'green'|'red'|'gray'|'orange'|'blue'} */
-            let rapidState = 'blue';
-
-            if (hasWarehouse && hasSystem) {
-                if (diff.type === 'positive') {
-                    rapidState = 'green';
-                    stockIndicator = '<div class="stock-indicator bg-emerald-400"></div>';
-                    statusIcon = '<div class="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg></div>';
-                } else if (diff.type === 'negative') {
-                    rapidState = 'red';
-                    stockIndicator = '<div class="stock-indicator bg-rose-400"></div>';
-                    statusIcon = '<div class="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg></div>';
-                } else {
-                    rapidState = 'gray';
-                    stockIndicator = '<div class="stock-indicator bg-gray-300"></div>';
-                    statusIcon = '<div class="w-4 h-4 bg-gray-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 9h14M5 15h14"/></svg></div>';
-                }
-            } else if (hasSystem && !hasWarehouse) {
-                // Sistem çekildi, depo henüz girilmedi
-                rapidState = 'orange';
-                stockIndicator = '<div class="stock-indicator bg-orange-400"></div>';
-                statusIcon = '<div class="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l2 2m6-2a8 8 0 11-16 0 8 8 0 0116 0z"/></svg></div>';
-            } else if (hasWarehouse && !hasSystem) {
-                // Depo yazıldı, sistem stoku henüz yok / bekleniyor
-                rapidState = 'orange';
-                stockIndicator = '<div class="stock-indicator bg-orange-400"></div>';
-                statusIcon = '<div class="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></div>';
-            } else {
-                // Hiçbiri — henüz işlem yok
-                rapidState = 'blue';
-                statusIcon = '<div class="w-4 h-4 border-[3px] border-blue-600 bg-white rounded-full flex items-center justify-center shadow-sm"></div>';
+        // Silinen ürünlerin kartlarını DOM'dan kaldır
+        for (const oldId of prevIds) {
+            if (!newIds.has(oldId)) {
+                const el = gridContainer.querySelector(`[data-product-id="${CSS.escape(oldId)}"]`);
+                if (el) el.remove();
+                this._rapidRenderedStates.delete(oldId);
             }
+        }
 
-            const cardClass = isCounted ? 'counted' : 'not-counted';
-            
-            // Always show product name, not Qty
-            const productName = product.name || 'Ürün';
-            const productImage = product.image || '../assets/logo.png';
-            const barcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : '';
+        // Yeni / değişen kartları işle
+        const newElements = [];
+        for (const productId of sortedProductIds) {
+            const data = this.countingData[productId];
+            const product = this.productIndex.get(productId);
+            if (!product) continue;
 
-            return `
-                <div class="rapid-product-card ${cardClass}" data-rapid-state="${rapidState}" data-product-id="${productId}">
-                    <div class="product-status-icon">
-                        ${statusIcon}
-                    </div>
-                    ${stockIndicator}
-                    <div class="flex-1 flex flex-col p-1 sm:p-1.5 overflow-hidden">
-                        <div class="flex-1 flex items-center justify-center mb-0.5 sm:mb-1 min-h-0 overflow-hidden">
-                            <img src="${productImage}" alt="${product.name || ''}" class="max-w-full max-h-full w-auto h-auto object-contain" onerror="this.src='../assets/logo.png'">
-                        </div>
-                        <div class="text-center flex-shrink-0 px-0.5">
-                            <p class="text-[9px] sm:text-[10px] font-semibold text-gray-900 line-clamp-1 leading-tight truncate">${productName}</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+            const stateKey = this._getRapidCardStateKey(data);
+            const cardClass = (data.warehouseStock !== null && data.warehouseStock !== undefined) ? 'counted' : 'not-counted';
+            const existing = prevIds.has(productId)
+                ? gridContainer.querySelector(`[data-product-id="${CSS.escape(productId)}"]`)
+                : null;
 
-        // Setup click event listeners for cards
-        gridContainer.querySelectorAll('.rapid-product-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                const productId = card.dataset.productId;
-                if (productId) {
-                    this.openCountingBottomSheet(productId);
+            if (existing) {
+                // Sadece durum değiştiyse güncelle
+                if (this._rapidRenderedStates.get(productId) !== stateKey) {
+                    existing.innerHTML = this._buildRapidCardInner(product, data);
+                    existing.dataset.rapidState = stateKey;
+                    existing.className = `rapid-product-card ${cardClass}`;
+                    this._rapidRenderedStates.set(productId, stateKey);
                 }
-            });
-        });
+            } else {
+                const div = document.createElement('div');
+                div.className = `rapid-product-card ${cardClass}`;
+                div.dataset.rapidState = stateKey;
+                div.dataset.productId = productId;
+                div.innerHTML = this._buildRapidCardInner(product, data);
+                newElements.push(div);
+                this._rapidRenderedStates.set(productId, stateKey);
+            }
+        }
+
+        // Yeni kartları ekle
+        if (newElements.length > 0) {
+            const frag = document.createDocumentFragment();
+            newElements.forEach(el => frag.appendChild(el));
+            gridContainer.appendChild(frag);
+        }
+
+        // Sıra değişikliği kontrolü ve düzeltme
+        const children = Array.from(gridContainer.children);
+        let needsReorder = false;
+        for (let i = 0; i < sortedProductIds.length; i++) {
+            if (children[i]?.dataset?.productId !== sortedProductIds[i]) {
+                needsReorder = true;
+                break;
+            }
+        }
+        if (needsReorder) {
+            for (let i = 0; i < sortedProductIds.length; i++) {
+                const el = gridContainer.querySelector(`[data-product-id="${CSS.escape(sortedProductIds[i])}"]`);
+                if (el && gridContainer.children[i] !== el) {
+                    gridContainer.insertBefore(el, gridContainer.children[i] || null);
+                }
+            }
+        }
+
+        this._rapidRenderedIds = [...sortedProductIds];
+        // Click delegation rapidGrid üzerinde kurulur — burada listener ekleme
     }
 
     findNextUncountedProduct(currentProductId) {
@@ -6326,7 +6355,7 @@ class CountingSystem {
             btn.disabled = true;
             return;
         }
-        const product = this.allProducts.find((p) => p.id === this.currentCountingProduct);
+        const product = this.productIndex.get(this.currentCountingProduct);
         const hasCodes = product && this.getExpectedBarcodeStringsForProduct(product).size > 0;
         btn.disabled = !hasCodes || this._barcodeVerifyInProgress;
     }
@@ -6337,7 +6366,7 @@ class CountingSystem {
             this.showToast('Önce bir ürün seçin', 'warning', 2500);
             return;
         }
-        const product = this.allProducts.find((p) => p.id === this.currentCountingProduct);
+        const product = this.productIndex.get(this.currentCountingProduct);
         if (!product) {
             this.showToast('Ürün bulunamadı', 'error', 3000);
             return;
@@ -6493,7 +6522,7 @@ class CountingSystem {
             this.flushDeferredStockAuditForProduct(this.currentCountingProduct);
         }
 
-        const product = this.allProducts.find(p => p.id === productId);
+        const product = this.productIndex.get(productId);
         if (!product) return;
 
         const data = this.countingData[productId] || {};
@@ -6774,236 +6803,178 @@ class CountingSystem {
         }
     }
 
+    /**
+     * Tablo/grid için tüm event listener'larını delegation ile kurar.
+     * Render'dan bağımsız olarak yalnızca bir kez çağrılır.
+     */
     setupTableEventListeners() {
-        // Warehouse stock inputs
-        const warehouseInputs = document.querySelectorAll('.warehouse-stock-input');
-        warehouseInputs.forEach(input => {
-            // Klavye ile sadece sayı girişine izin ver (harfler, özel karakterler engelle)
-            input.addEventListener('keydown', (e) => {
-                // İzin verilen tuşlar: sayılar (0-9), Backspace, Delete, Tab, Arrow keys, Home, End
-                const allowedKeys = [
-                    'Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
-                    'Home', 'End', 'Enter'
-                ];
-                
-                // Sayı tuşları (0-9) veya izin verilen tuşlar
-                const isNumber = e.key >= '0' && e.key <= '9';
-                const isAllowedKey = allowedKeys.includes(e.key);
-                
-                // Ctrl/Cmd + A, C, V, X gibi kısayolları izin ver
-                const isCtrlKey = e.ctrlKey || e.metaKey;
-                const isCopyPaste = isCtrlKey && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase());
-                
-                if (!isNumber && !isAllowedKey && !isCopyPaste) {
-                    e.preventDefault();
+        if (this._delegatedListenersSetup) return;
+        this._delegatedListenersSetup = true;
+
+        const ALLOWED_KEYS = new Set([
+            'Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+            'Home', 'End', 'Enter',
+        ]);
+
+        // --- Rapid grid: click delegation ---
+        const rapidGrid = document.getElementById('rapidCountingGridContainer');
+        if (rapidGrid) {
+            rapidGrid.addEventListener('click', (e) => {
+                const card = e.target.closest('.rapid-product-card');
+                if (card) {
+                    const productId = card.dataset.productId;
+                    if (productId) this.openCountingBottomSheet(productId);
                 }
             });
-            
-            // Input event'inde sadece sayıları kabul et (harfler, özel karakterler kaldır)
-            input.addEventListener('input', (e) => {
-                let value = e.target.value;
-                // Sadece sayıları bırak, diğer her şeyi kaldır
-                value = value.replace(/[^0-9]/g, '');
-                // Eğer değer değiştiyse güncelle
-                if (e.target.value !== value) {
-                    e.target.value = value;
-                }
-            });
-            
-            // Paste event'inde de sadece sayıları kabul et
-            input.addEventListener('paste', (e) => {
+        }
+
+        // --- Tablo/Kart: keydown delegation (sayı filtresi) ---
+        document.addEventListener('keydown', (e) => {
+            if (!e.target.classList.contains('warehouse-stock-input')) return;
+            const isNumber = e.key >= '0' && e.key <= '9';
+            const isCtrl = e.ctrlKey || e.metaKey;
+            const isCopyPaste = isCtrl && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase());
+            if (!isNumber && !ALLOWED_KEYS.has(e.key) && !isCopyPaste) {
                 e.preventDefault();
-                const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-                // Sadece sayıları al
-                const numbersOnly = pastedText.replace(/[^0-9]/g, '');
-                if (numbersOnly) {
-                    e.target.value = numbersOnly;
-                    // Change event'ini tetikle
-                    e.target.dispatchEvent(new Event('change'));
-                }
-            });
-            
-            input.addEventListener('change', async (e) => {
-                const productId = e.target.dataset.productId;
-                let value = e.target.value.trim();
+            }
+        }, true);
 
-                if (value === '') {
-                    value = null;
-                    e.target.value = '';
-                } else {
-                    const numValue = Math.max(0, Math.floor(Number(value)));
-                    value = numValue;
-                    e.target.value = String(value);
-                }
+        // --- input delegation (sanitize) ---
+        document.addEventListener('input', (e) => {
+            if (!e.target.classList.contains('warehouse-stock-input')) return;
+            const clean = e.target.value.replace(/[^0-9]/g, '');
+            if (e.target.value !== clean) e.target.value = clean;
+        }, true);
 
-                await this.updateProductStock(productId, value, null);
-            });
-        });
+        // --- paste delegation ---
+        document.addEventListener('paste', (e) => {
+            if (!e.target.classList.contains('warehouse-stock-input')) return;
+            e.preventDefault();
+            const pasted = (e.clipboardData || window.clipboardData).getData('text');
+            const nums = pasted.replace(/[^0-9]/g, '');
+            if (nums) {
+                e.target.value = nums;
+                e.target.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }, true);
 
-        // Warehouse stock increase/decrease buttons
-        const increaseButtons = document.querySelectorAll('.warehouse-stock-increase-btn');
-        increaseButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const productId = btn.dataset.productId;
-                const input = document.querySelector(`.warehouse-stock-input[data-product-id="${productId}"]`);
-                if (input) {
-                    let currentValue = parseInt(input.value) || 0;
-                    currentValue += 1;
-                    input.value = currentValue;
-                    // Change event'ini tetikle
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            });
-        });
+        // --- change delegation (warehouse-stock-input) ---
+        document.addEventListener('change', (e) => {
+            if (!e.target.classList.contains('warehouse-stock-input')) return;
+            const productId = e.target.dataset.productId;
+            let value = e.target.value.trim();
+            if (value === '') {
+                value = null;
+                e.target.value = '';
+            } else {
+                const num = Math.max(0, Math.floor(Number(value)));
+                value = num;
+                e.target.value = String(value);
+            }
+            this.updateProductStock(productId, value, null).catch(err => console.error('updateProductStock:', err));
+        }, true);
 
-        const decreaseButtons = document.querySelectorAll('.warehouse-stock-decrease-btn');
-        decreaseButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
+        // --- click delegation (buttons) ---
+        document.addEventListener('click', async (e) => {
+            // Artır
+            const incrBtn = e.target.closest('.warehouse-stock-increase-btn');
+            if (incrBtn) {
                 e.preventDefault();
                 e.stopPropagation();
-                const productId = btn.dataset.productId;
-                const input = document.querySelector(`.warehouse-stock-input[data-product-id="${productId}"]`);
-                if (input) {
-                    // Boş string veya NaN ise 0 olarak kabul et
-                    let currentValue = input.value === '' || isNaN(parseInt(input.value)) ? 0 : parseInt(input.value);
-                    currentValue = Math.max(0, currentValue - 1); // Minimum 0
-                    input.value = String(currentValue); // 0'ı da göster
-                    // Change event'ini tetikle
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                const productId = incrBtn.dataset.productId;
+                const inp = document.querySelector(`.warehouse-stock-input[data-product-id="${CSS.escape(productId)}"]`);
+                if (inp) {
+                    inp.value = String((parseInt(inp.value) || 0) + 1);
+                    inp.dispatchEvent(new Event('change', { bubbles: true }));
                 }
-            });
-        });
+                return;
+            }
 
-        // Delete buttons
-        const deleteButtons = document.querySelectorAll('.delete-product-btn');
-        deleteButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const productId = e.target.closest('[data-product-id]').dataset.productId;
-                this.deleteProduct(productId);
-            });
-        });
-
-        // Refresh system stock buttons (when system stock exists)
-        const refreshButtons = document.querySelectorAll('.refresh-system-stock-btn');
-        refreshButtons.forEach(btn => {
-            btn.addEventListener('click', async (e) => {
+            // Azalt
+            const decrBtn = e.target.closest('.warehouse-stock-decrease-btn');
+            if (decrBtn) {
+                e.preventDefault();
                 e.stopPropagation();
-                const productId = btn.dataset.productId;
-                const barcode = btn.dataset.barcode;
-                
-                if (!barcode) {
-                    this.showNotification('Bu ürün için barkod bulunamadı', 'error');
-                    return;
+                const productId = decrBtn.dataset.productId;
+                const inp = document.querySelector(`.warehouse-stock-input[data-product-id="${CSS.escape(productId)}"]`);
+                if (inp) {
+                    const cur = inp.value === '' || isNaN(parseInt(inp.value)) ? 0 : parseInt(inp.value);
+                    inp.value = String(Math.max(0, cur - 1));
+                    inp.dispatchEvent(new Event('change', { bubbles: true }));
                 }
+                return;
+            }
 
-                // Disable button and show loading
-                const originalContent = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerHTML = '<div class="spinner" style="width: 10px; height: 10px; border: 2px solid #f3f4f4; border-top: 2px solid #6b7280; border-radius: 50%; animation: spin 1s linear infinite;"></div>';
+            // Sil
+            const delBtn = e.target.closest('.delete-product-btn');
+            if (delBtn) {
+                const productId = delBtn.closest('[data-product-id]')?.dataset?.productId;
+                if (productId) this.deleteProduct(productId);
+                return;
+            }
 
+            // Sistem stoku yenile
+            const refreshBtn = e.target.closest('.refresh-system-stock-btn');
+            if (refreshBtn) {
+                e.stopPropagation();
+                const productId = refreshBtn.dataset.productId;
+                const barcode = refreshBtn.dataset.barcode;
+                if (!barcode) { this.showNotification('Bu ürün için barkod bulunamadı', 'error'); return; }
+                const orig = refreshBtn.innerHTML;
+                refreshBtn.disabled = true;
+                refreshBtn.innerHTML = '<div class="spinner" style="width:10px;height:10px;border:2px solid #f3f4f4;border-top:2px solid #6b7280;border-radius:50%;animation:spin 1s linear infinite;"></div>';
                 try {
                     const result = await this.requestStockFromExtension(null, barcode, productId);
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
                     const price = typeof result === 'object' && result !== null ? result?.price : null;
                     const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
-                    const reserved =
-                        typeof result === 'object' && result !== null && 'reservedStock' in result
-                            ? result.reservedStock
-                            : undefined;
-
+                    const reserved = typeof result === 'object' && result !== null && 'reservedStock' in result ? result.reservedStock : undefined;
                     if (stock !== null && stock !== undefined) {
-                        // Başarılı - apiFetchFailed flag'ini temizle
-                        if (this.countingData[productId]) {
-                            this.countingData[productId].apiFetchFailed = false;
-                        }
+                        if (this.countingData[productId]) this.countingData[productId].apiFetchFailed = false;
                         await this.updateProductStock(productId, null, stock, price, priceText, reserved);
-                        // Toast bildirimi göster
                         this.showToast('Stok güncellendi', 'success', 3000);
                     } else {
-                        // Bulunamadı - apiFetchFailed flag'ini set et
-                        if (this.countingData[productId]) {
-                            this.countingData[productId].apiFetchFailed = true;
-                            this.saveCountingData();
-                            this.renderTable();
-                        }
+                        if (this.countingData[productId]) { this.countingData[productId].apiFetchFailed = true; this.scheduleSave(200); this.renderTable(); }
                         this.showToast('Ürün stoku bulunamadı', 'info', 3000);
                     }
-                } catch (error) {
-                    console.error('Error refreshing system stock:', error);
-                    // Başarısız - apiFetchFailed flag'ini set et
-                    if (this.countingData[productId]) {
-                        this.countingData[productId].apiFetchFailed = true;
-                        this.saveCountingData();
-                        this.renderTable();
-                    }
-                    this.showToast('Stok alınamadı: ' + (error.message || 'Bilinmeyen hata'), 'error', 4000);
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = originalContent;
-                }
-            });
-        });
+                } catch (err) {
+                    console.error('Error refreshing system stock:', err);
+                    if (this.countingData[productId]) { this.countingData[productId].apiFetchFailed = true; this.scheduleSave(200); this.renderTable(); }
+                    this.showToast('Stok alınamadı: ' + (err.message || 'Bilinmeyen hata'), 'error', 4000);
+                } finally { refreshBtn.disabled = false; refreshBtn.innerHTML = orig; }
+                return;
+            }
 
-        // Single product sync buttons
-        const syncButtons = document.querySelectorAll('.sync-single-product-btn');
-        syncButtons.forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const productId = btn.dataset.productId;
-                const barcode = btn.dataset.barcode;
-                
-                if (!barcode) {
-                    this.showNotification('Bu ürün için barkod bulunamadı', 'error');
-                    return;
-                }
-
-                // Disable button and show loading
-                const originalContent = btn.innerHTML;
-                btn.disabled = true;
-                btn.innerHTML = '<div class="spinner" style="width: 12px; height: 12px; border: 2px solid #f3f4f6; border-top: 2px solid white; border-radius: 50%; animation: spin 1s linear infinite;"></div>';
-
+            // Tek ürün stok sync
+            const syncBtn = e.target.closest('.sync-single-product-btn');
+            if (syncBtn) {
+                const productId = syncBtn.dataset.productId;
+                const barcode = syncBtn.dataset.barcode;
+                if (!barcode) { this.showNotification('Bu ürün için barkod bulunamadı', 'error'); return; }
+                const orig = syncBtn.innerHTML;
+                syncBtn.disabled = true;
+                syncBtn.innerHTML = '<div class="spinner" style="width:12px;height:12px;border:2px solid #f3f4f6;border-top:2px solid white;border-radius:50%;animation:spin 1s linear infinite;"></div>';
                 try {
                     const result = await this.requestStockFromExtension(null, barcode, productId);
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
                     const price = typeof result === 'object' && result !== null ? result?.price : null;
                     const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
-                    const reserved =
-                        typeof result === 'object' && result !== null && 'reservedStock' in result
-                            ? result.reservedStock
-                            : undefined;
-
+                    const reserved = typeof result === 'object' && result !== null && 'reservedStock' in result ? result.reservedStock : undefined;
                     if (stock !== null && stock !== undefined) {
-                        // Başarılı - apiFetchFailed flag'ini temizle
-                        if (this.countingData[productId]) {
-                            this.countingData[productId].apiFetchFailed = false;
-                        }
+                        if (this.countingData[productId]) this.countingData[productId].apiFetchFailed = false;
                         await this.updateProductStock(productId, null, stock, price, priceText, reserved);
-                        // Bildirim kaldırıldı - stok sessizce güncelleniyor
                     } else {
-                        // Bulunamadı - apiFetchFailed flag'ini set et
-                        if (this.countingData[productId]) {
-                            this.countingData[productId].apiFetchFailed = true;
-                            this.saveCountingData();
-                            this.renderTable();
-                        }
+                        if (this.countingData[productId]) { this.countingData[productId].apiFetchFailed = true; this.scheduleSave(200); this.renderTable(); }
                         this.showNotification('Ürün stoku bulunamadı', 'info');
                     }
-                } catch (error) {
-                    console.error('Error syncing single product:', error);
-                    // Başarısız - apiFetchFailed flag'ini set et
-                    if (this.countingData[productId]) {
-                        this.countingData[productId].apiFetchFailed = true;
-                        this.saveCountingData();
-                        this.renderTable();
-                    }
-                    this.showNotification('Stok alınamadı: ' + (error.message || 'Bilinmeyen hata'), 'error');
-                } finally {
-                    btn.disabled = false;
-                    btn.innerHTML = originalContent;
-                }
-            });
-        });
+                } catch (err) {
+                    console.error('Error syncing single product:', err);
+                    if (this.countingData[productId]) { this.countingData[productId].apiFetchFailed = true; this.scheduleSave(200); this.renderTable(); }
+                    this.showNotification('Stok alınamadı: ' + (err.message || 'Bilinmeyen hata'), 'error');
+                } finally { syncBtn.disabled = false; syncBtn.innerHTML = orig; }
+                return;
+            }
+        }, false);
     }
 
     updateStatistics() {
@@ -7123,7 +7094,7 @@ class CountingSystem {
                 e.stopPropagation(); // Prevent event bubbling
                 
                 const productId = e.target.closest('[data-product-id]').dataset.productId;
-                const product = this.allProducts.find(p => p.id === productId);
+                const product = this.productIndex.get(productId);
                 if (product) {
                     // Check if product is already added
                     const isAlreadyAdded = this.countingData[productId] !== undefined;
@@ -7212,7 +7183,7 @@ class CountingSystem {
     
     // Add product from manual input dropdown (toggle: ekliyse çıkar, değilse ekle; panel açık kalır)
     async addProductFromManualInput(productId) {
-        const product = this.allProducts.find(p => p.id === productId);
+        const product = this.productIndex.get(productId);
         if (!product) return;
 
         const manualInput = document.getElementById('manualProductInput');
@@ -7543,78 +7514,29 @@ class CountingSystem {
             throw new Error('Bu isim günlük sayım için ayrılmıştır');
         }
         const tables = this.getTableList();
-        
-        // Check if new name already exists
         if (tables.some(t => t.name === trimmedNew)) {
             throw new Error('Bu isimde bir tablo zaten mevcut');
         }
         
-        // Get full data structure
-        let fullData = null;
-        if (window.supabase && this.currentUser) {
-            // Try to get from localStorage first (faster)
-            const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                try {
-                    fullData = JSON.parse(stored);
-                } catch (e) {
-                    console.error('Error parsing localStorage data:', e);
-                }
-            }
-            
-            // If not in localStorage, get from Supabase
-            if (!fullData) {
-                const { data, error } = await window.supabase
-                    .from('users')
-                    .select('counting_data')
-                    .eq('username', this.currentUser.username)
-                    .single();
-                
-                if (error) {
-                    console.error('Error loading counting data:', error);
-                    throw new Error('Veri yüklenemedi');
-                }
-                
-                fullData = this.migrateCountingData(data.counting_data || {});
-            }
-        } else {
-            // Fallback to localStorage only
-            const storageKey = this.STORAGE_KEY;
-            const stored = localStorage.getItem(storageKey);
-            if (stored) {
-                try {
-                    fullData = JSON.parse(stored);
-                    fullData = this.migrateCountingData(fullData);
-                } catch (e) {
-                    console.error('Error parsing localStorage data:', e);
-                    throw new Error('Veri yüklenemedi');
-                }
-            } else {
-                throw new Error('Veri bulunamadı');
-            }
-        }
-        
+        const fullData = this.cachedFullData;
         if (!fullData || !fullData._tables) {
             throw new Error('Tablo yapısı bulunamadı');
         }
         
-        // Get current table data
         const currentTableData = fullData._tables[oldName];
         if (!currentTableData) {
             throw new Error('Tablo bulunamadı');
         }
         
-        // Rename in _tables
         fullData._tables[trimmedNew] = currentTableData;
         delete fullData._tables[oldName];
         
-        // Update current table name if it was the active one
         if (this.currentTableName === oldName) {
             this.currentTableName = trimmedNew;
+            this._saveDeviceCurrentTable(trimmedNew);
             this.countingData = currentTableData;
         }
-        fullData._currentTable = this.currentTableName;
+        this.cachedFullData = fullData;
         
         this.pushAuditEntry(
             `Tablo yeniden adlandırıldı · ${this.formatTableDisplayName(oldName)} → ${this.formatTableDisplayName(trimmedNew)}`,
@@ -7895,7 +7817,7 @@ class CountingSystem {
                     continue;
                 }
 
-                const product = this.allProducts.find(p => p.id === productId);
+                const product = this.productIndex.get(productId);
                 if (!product) continue;
 
                 const warehouseStock = data.warehouseStock ?? 0;
