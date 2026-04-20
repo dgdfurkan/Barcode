@@ -2452,6 +2452,15 @@
                     <div id="premiumFeaturesSettings" class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <!-- Premium features will be loaded here -->
                     </div>
+                    <details class="mt-3 rounded-lg border border-purple-200/90 bg-white/70 p-3 text-sm shadow-sm">
+                        <summary class="cursor-pointer font-semibold text-purple-900 list-none flex items-center justify-between gap-2 select-none">
+                            <span class="flex items-center gap-2"><span aria-hidden="true">🧩</span> Getir franchise — Chrome eklentisi (ZIP)</span>
+                            <span class="text-purple-500 text-xs shrink-0">▼</span>
+                        </summary>
+                        <div class="mt-2 text-xs text-gray-600 space-y-2 pt-2 border-t border-purple-100">
+                            <p><strong>Getir Stok Barkodları</strong> eklentisi <code class="bg-purple-50 px-1 rounded text-[11px]">franchise.getir.com</code> üzerinde çalışır; görsel URL’lerini panoya alırsınız. ZIP indirme ve kurulum için yukarıdaki listede bu özelliğe tıklayın (premium gerekir).</p>
+                        </div>
+                    </details>
                 </div>
                 
                 <!-- Other Settings - Compact -->
@@ -7957,6 +7966,12 @@
                 emoji: '🔔',
                 storageKey: null
             },
+            'getirStockBarcodesExtension': {
+                name: 'Getir Stok Barkodları',
+                description: 'Franchise stok sayfasında görsel URL’lerini satır sırasıyla kopyalamak için Chrome eklentisi (ZIP)',
+                emoji: '🧩',
+                storageKey: null
+            },
             'darkMode': {
                 name: 'Karanlık Mod',
                 description: 'Göz yormayan karanlık tema',
@@ -8046,6 +8061,7 @@
                 const isKeyboardShortcuts = featureKey === 'keyboardShortcuts';
                 const isStokSayimi = featureKey === 'stokSayimi';
                 const isLowStockAlert = featureKey === 'lowStockAlert';
+                const isGetirStockBarcodes = featureKey === 'getirStockBarcodesExtension';
                 
                 if (isStokSayimi && hasPremium) {
                     // Special handling for stokSayimi - checkbox + go to counting page button
@@ -8092,6 +8108,29 @@
                             </label>
                             <button class="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg transition-all shadow-sm hover:shadow-md" onclick="event.stopPropagation(); window.location.replace('low_stock_products.html');">
                                 🔔 Stoğu Düşük Sayfası
+                            </button>
+                        </div>
+                    `;
+                } else if (isGetirStockBarcodes && hasPremium) {
+                    featureItem.innerHTML = `
+                        <div class="flex items-center space-x-2 flex-1 cursor-pointer" onclick="showPremiumFeatureDetail('${featureKey}')">
+                            <span class="text-lg">${config.emoji}</span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center space-x-1">
+                                    <h5 class="font-semibold text-gray-900 text-sm truncate">${config.name}</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2 ml-2">
+                            <label class="relative inline-flex items-center cursor-pointer flex-shrink-0" onclick="event.stopPropagation();">
+                                <input type="checkbox" 
+                                       data-feature="${featureKey}"
+                                       class="sr-only peer" 
+                                       ${isEnabled ? 'checked' : ''}>
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                            </label>
+                            <button type="button" class="px-3 py-1.5 text-xs font-semibold bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white rounded-lg transition-all shadow-sm hover:shadow-md" onclick="event.stopPropagation(); showPremiumFeatureDetail('${featureKey}');">
+                                📥 ZIP
                             </button>
                         </div>
                     `;
@@ -8147,7 +8186,7 @@
                 }
 
                 // Add change listener if premium (storageKey varsa veya lowStockAlert/stokSayimi gibi featurePreferences kullanan özellikler)
-                const useFeaturePreference = hasPremium && (config.storageKey || featureKey === 'lowStockAlert' || featureKey === 'stokSayimi');
+                const useFeaturePreference = hasPremium && (config.storageKey || featureKey === 'lowStockAlert' || featureKey === 'stokSayimi' || featureKey === 'getirStockBarcodesExtension');
                 if (useFeaturePreference) {
                     const checkbox = featureItem.querySelector('input[type="checkbox"]');
                     if (checkbox) {
@@ -8205,6 +8244,11 @@
             // Düşük stok uyarısı için özel içerik (sayfaya git butonu)
             if (featureKey === 'lowStockAlert') {
                 showLowStockAlertModal(hasPremium);
+                return;
+            }
+            
+            if (featureKey === 'getirStockBarcodesExtension') {
+                showGetirStockBarcodesModal(hasPremium);
                 return;
             }
             
@@ -8453,6 +8497,74 @@
                         <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
                             <p class="text-gray-800 text-sm font-medium mb-2">🔒 Bu özellik premium üyeler için</p>
                             <p class="text-gray-700 text-xs leading-relaxed">Bu özellikten faydalanmak için premium üyelik gereklidir. Daha fazla bilgi ve aktivasyon için lütfen bizimle iletişime geçin.</p>
+                        </div>
+                    `}
+                </div>
+            `;
+            document.getElementById('premiumFeatureDetailModal').classList.remove('hidden');
+        }
+        
+        function showGetirStockBarcodesModal(hasPremium) {
+            document.getElementById('featureDetailEmoji').textContent = '🧩';
+            document.getElementById('featureDetailName').textContent = 'Getir Stok Barkodları';
+            const detailContent = document.getElementById('featureDetailContent');
+            detailContent.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-2">
+                        ${hasPremium ? `
+                            <span class="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full">AKTİF</span>
+                        ` : `
+                            <span class="px-3 py-1 bg-gray-400 text-white text-xs font-bold rounded-full">KİLİTLİ</span>
+                        `}
+                        <span class="px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full">PREMIUM</span>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-900 mb-2">Açıklama</h4>
+                        <p class="text-gray-600 text-sm">Franchise stok tablosunda ürün görsel URL’lerini satır sırasıyla panoya kopyalamak için Chrome/Edge eklentisi. Sayfadaki “Görsel URL'leri kopyala” akışıyla birlikte kullanılır.</p>
+                    </div>
+                    ${hasPremium ? `
+                        <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-5">
+                            <div class="bg-gradient-to-br from-teal-50 to-emerald-50 rounded-lg p-4 border-2 border-teal-200">
+                                <div class="flex items-start gap-3">
+                                    <div class="flex-shrink-0">
+                                        <div class="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md">
+                                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <h5 class="font-semibold text-gray-900 mb-1 text-sm">🔌 Chrome / Edge — ZIP kurulum</h5>
+                                        <p class="text-xs text-gray-600 mb-3">
+                                            Eklentiyi indirip paketlenmemiş olarak yükleyin. Yalnızca <code class="bg-teal-100 px-1 py-0.5 rounded text-xs">https://franchise.getir.com/*</code> sayfalarında çalışır.
+                                        </p>
+                                        <div class="space-y-2">
+                                            <a href="../getir-stock-barcodes-extension.zip" download="getir-stock-barcodes-extension.zip" class="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-lg hover:from-teal-700 hover:to-emerald-700 transition-all shadow-sm hover:shadow-md font-medium text-xs w-full justify-center">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                                </svg>
+                                                Eklentiyi ZIP Olarak İndir
+                                            </a>
+                                            <div class="bg-teal-50 border-l-4 border-teal-500 p-2 rounded text-xs space-y-1">
+                                                <p class="text-teal-900">
+                                                    <strong>📦 Kurulum adımları</strong>
+                                                </p>
+                                                <ol class="list-decimal list-inside text-teal-800 space-y-0.5 ml-2">
+                                                    <li>ZIP’i indirip bir klasöre çıkarın</li>
+                                                    <li><code class="bg-teal-100 px-1 py-0.5 rounded text-xs">chrome://extensions</code> veya <code class="bg-teal-100 px-1 py-0.5 rounded text-xs">edge://extensions</code> adresine gidin</li>
+                                                    <li>Sağ üstte <strong>Geliştirici modu</strong>nu açın</li>
+                                                    <li><strong>Paketlenmemiş uzantı yükle</strong> ile <code class="bg-teal-100 px-1 py-0.5 rounded text-xs">getir-stock-barcodes-extension</code> klasörünü seçin</li>
+                                                </ol>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg p-4">
+                            <p class="text-gray-800 text-sm font-medium mb-2">🔒 Bu özellik premium üyeler için</p>
+                            <p class="text-gray-700 text-xs leading-relaxed">ZIP indirme ve kurulum bu özellik premium olarak açıldığında kullanılabilir. Aktivasyon için lütfen yönetici ile iletişime geçin.</p>
                         </div>
                     `}
                 </div>
