@@ -9,13 +9,15 @@
   let lastBarcodeCsv = '';
   let lastCount = 0;
   let copyButtonInserted = false;
+  /** Service Worker’da localStorage yok; bu bayrak sadece content script içinde / klavye ile. */
+  let debugSession = false;
 
   function isDebug() {
+    if (debugSession) return true;
     try {
-      return window.localStorage.getItem('getirBarcodeDebug') === '1';
-    } catch (_) {
-      return false;
-    }
+      if (window.localStorage && window.localStorage.getItem('getirBarcodeDebug') === '1') return true;
+    } catch (_) {}
+    return false;
   }
 
   function dbg() {
@@ -25,6 +27,30 @@
     } catch (_) {}
   }
 
+  function toast(msg) {
+    var el = document.createElement('div');
+    el.textContent = msg;
+    el.style.cssText =
+      'position:fixed;bottom:24px;right:24px;z-index:2147483647;background:#222;color:#fff;padding:10px 14px;border-radius:8px;font:13px system-ui;max-width:320px;box-shadow:0 4px 16px rgba(0,0,0,.25)';
+    document.body.appendChild(el);
+    setTimeout(function () {
+      el.remove();
+    }, 2800);
+  }
+
+  document.addEventListener(
+    'keydown',
+    function (ev) {
+      if (ev.altKey && ev.shiftKey && (ev.key === 'b' || ev.key === 'B')) {
+        ev.preventDefault();
+        debugSession = !debugSession;
+        toast(debugSession ? 'Debug: AÇIK (konsol)' : 'Debug: KAPALI');
+        dbg('debugSession =', debugSession);
+      }
+    },
+    true
+  );
+
   function normalizeBarcodeEntry(b) {
     if (b == null) return '';
     if (typeof b === 'object') {
@@ -33,7 +59,6 @@
     return String(b).trim();
   }
 
-  /** packagingInfo anahtarları: önce "1" (perakende), pickingType atlanır. */
   function sortedPackagingKeys(packagingInfo) {
     const keys = Object.keys(packagingInfo).filter(function (k) {
       if (k === 'pickingType') return false;
@@ -51,7 +76,6 @@
     return keys;
   }
 
-  /** Her ürün satırı için tek barkod (çoğulda ilk). */
   function firstBarcodeFromProduct(p) {
     if (!p || typeof p !== 'object') return '';
 
@@ -179,19 +203,10 @@
     if (json) ingestStocksPayload(json);
   }
 
-  /**
-   * Pano yazımı kullanıcı hareketiyle AYNI TUR içinde senkron olmalı.
-   * Promise ile clipboard API kullanmak çoğu sitede sessizce başarısız olur.
-   */
-  function syncCopyWithExecCommand(text) {
+  function syncCopyExecCommandNoReadonly(text) {
     const ta = document.createElement('textarea');
     ta.value = text;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.left = '0';
-    ta.style.top = '0';
-    ta.style.opacity = '0';
-    ta.style.pointerEvents = 'none';
+    ta.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;';
     document.body.appendChild(ta);
     ta.focus();
     ta.select();
@@ -205,13 +220,59 @@
     return ok;
   }
 
+  function showManualCopyModal(text) {
+    var old = document.getElementById('getir-barcode-fallback-modal');
+    if (old) old.remove();
+    var wrap = document.createElement('div');
+    wrap.id = 'getir-barcode-fallback-modal';
+    wrap.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:16px;';
+    var box = document.createElement('div');
+    box.style.cssText =
+      'background:#fff;color:#111;border-radius:10px;max-width:92vw;width:560px;box-shadow:0 8px 32px rgba(0,0,0,.25);padding:16px;font:14px system-ui,sans-serif;';
+    var p = document.createElement('p');
+    p.style.margin = '0 0 10px';
+    p.innerHTML =
+      'Otomatik pano engellendi. Metin seçili — <b>Cmd+C</b> (Mac) veya <b>Ctrl+C</b> (Windows) ile kopyala.';
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'width:100%;height:140px;font-size:12px;box-sizing:border-box;padding:8px;margin:0 0 12px;';
+    var row = document.createElement('div');
+    row.style.textAlign = 'right';
+    var closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.textContent = 'Kapat';
+    closeBtn.style.cssText = 'padding:8px 18px;cursor:pointer;border-radius:6px;border:1px solid #ccc;background:#f5f5f5;';
+    closeBtn.onclick = function () {
+      wrap.remove();
+    };
+    row.appendChild(closeBtn);
+    box.appendChild(p);
+    box.appendChild(ta);
+    box.appendChild(row);
+    wrap.appendChild(box);
+    wrap.addEventListener('click', function (ev) {
+      if (ev.target === wrap) wrap.remove();
+    });
+    document.body.appendChild(wrap);
+    setTimeout(function () {
+      ta.focus();
+      ta.select();
+    }, 0);
+  }
+
   function syncButtonState() {
     const btn = document.getElementById('getir-stock-barcodes-copy-btn');
-    if (!btn) return;
-    btn.style.opacity = lastBarcodeCsv ? '0.85' : '0.45';
-    btn.title = lastBarcodeCsv
-      ? lastCount + ' barkod (stocks API) — tıkla, panoya kopyala'
-      : 'Önce POST /stocks yanıtı gerekli — tıklayınca teşhis mesajı';
+    const st = document.getElementById('getir-stock-barcodes-status');
+    if (btn) {
+      btn.style.opacity = lastBarcodeCsv ? '0.9' : '0.45';
+      btn.title = lastBarcodeCsv
+        ? lastCount + ' barkod — tıkla (veya otomatik olmazsa açılan kutudan Cmd+C)'
+        : 'Önce POST /stocks yanıtı gerekli';
+    }
+    if (st) {
+      st.textContent = lastBarcodeCsv ? lastCount + ' barkod hazır' : '';
+    }
   }
 
   function insertCopyButton() {
@@ -221,18 +282,23 @@
       document.querySelector('[class^="flexContainer-"] button.ant-btn-primary');
     if (!anchor || !anchor.parentNode) return;
 
+    const wrap = document.createElement('span');
+    wrap.style.cssText = 'display:inline-flex;align-items:center;gap:6px;vertical-align:middle;';
+
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'getir-stock-barcodes-copy-btn';
     btn.textContent = 'Barkodları kopyala';
     btn.setAttribute('aria-label', 'Listedeki barkodları virgülle panoya kopyala');
 
+    const status = document.createElement('span');
+    status.id = 'getir-stock-barcodes-status';
+    status.style.cssText = 'font-size:11px;opacity:.65;white-space:nowrap;';
+
     Object.assign(btn.style, {
-      marginLeft: '8px',
       fontSize: '12px',
       lineHeight: '1.2',
       padding: '4px 10px',
-      opacity: '0.72',
       cursor: 'pointer',
       border: '1px solid rgba(0,0,0,0.12)',
       borderRadius: '6px',
@@ -241,49 +307,55 @@
       verticalAlign: 'middle'
     });
 
-    btn.addEventListener('click', function (e) {
+    btn.addEventListener('click', async function (e) {
       e.preventDefault();
       e.stopPropagation();
       if (!lastBarcodeCsv) {
         window.alert(
           'Henüz barkod yakalanmadı.\n\n' +
-            '1) Ağ sekmesinde POST isteğini bul: franchise-api-gateway … /stocks\n' +
-            '2) Sayfayı yenileyip listeyi tekrar yükle.\n' +
-            '3) Teşhis için konsola: localStorage.setItem("getirBarcodeDebug","1") sonra F5.'
+            '• Ağ sekmesinde POST …/stocks isteğini kontrol et.\n' +
+            '• Debug log için franchise sekmesinde Alt+Shift+B (konsola bak).\n\n' +
+            'Not: Eklenti Service Worker konsolunda localStorage çalışmaz; komutu franchise.getir.com sekmesinin konsolunda çalıştır.'
         );
         return;
       }
+
       const label = btn.textContent;
-      var ok = syncCopyWithExecCommand(lastBarcodeCsv);
-      if (ok) {
+      var text = lastBarcodeCsv;
+
+      try {
+        if (navigator.clipboard && window.isSecureContext && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          dbg('navigator.clipboard.writeText OK');
+          btn.textContent = 'Kopyalandı';
+          toast('Panoya kopyalandı');
+          setTimeout(function () {
+            btn.textContent = label;
+          }, 1600);
+          return;
+        }
+      } catch (err) {
+        dbg('clipboard.writeText hata:', err);
+      }
+
+      if (syncCopyExecCommandNoReadonly(text)) {
+        dbg('execCommand (content script) OK');
         btn.textContent = 'Kopyalandı';
+        toast('Panoya kopyalandı');
         setTimeout(function () {
           btn.textContent = label;
         }, 1600);
         return;
       }
-      try {
-        if (navigator.clipboard && window.isSecureContext) {
-          navigator.clipboard.writeText(lastBarcodeCsv).then(
-            function () {
-              btn.textContent = 'Kopyalandı';
-              setTimeout(function () {
-                btn.textContent = label;
-              }, 1600);
-            },
-            function () {
-              window.alert('Panoya yazılamadı. Sayfayı tam ekran / odakta dene veya tarayıcı pano iznini kontrol et.');
-            }
-          );
-          return;
-        }
-      } catch (err) {
-        dbg('clipboard yedek hata', err);
-      }
-      window.alert('Panoya yazılamadı (execCommand: false). Konsolda getirBarcodeDebug=1 ile ayrıntı bak.');
+
+      dbg('otomatik kopya yok — manuel kutu');
+      toast('Aşağıdaki kutudan Cmd+C / Ctrl+C');
+      showManualCopyModal(text);
     });
 
-    anchor.parentNode.insertBefore(btn, anchor.nextSibling);
+    wrap.appendChild(btn);
+    wrap.appendChild(status);
+    anchor.parentNode.insertBefore(wrap, anchor.nextSibling);
     copyButtonInserted = true;
     syncButtonState();
   }
@@ -320,6 +392,11 @@
     return '';
   }
 
+  function resolveXhrUrl(url) {
+    if (typeof url !== 'string') return '';
+    return url.indexOf('http') === 0 ? url : new URL(url, window.location.href).href;
+  }
+
   const origFetch = window.fetch;
   window.fetch = function () {
     const out = origFetch.apply(this, arguments);
@@ -351,7 +428,7 @@
     let reqUrl = '';
     const oOpen = xhr.open;
     xhr.open = function (method, url) {
-      reqUrl = typeof url === 'string' ? url : '';
+      reqUrl = resolveXhrUrl(typeof url === 'string' ? url : '');
       return oOpen.apply(this, arguments);
     };
     const oSend = xhr.send;

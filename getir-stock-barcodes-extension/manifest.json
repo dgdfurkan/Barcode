@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Getir Stok Barkodları",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Mevcut stok POST /stocks yanıtındaki packagingInfo.barcodes verilerini toplar; sayfada ince butonla panoya kopyalar.",
   "icons": {
     "16": "icon128.png",
