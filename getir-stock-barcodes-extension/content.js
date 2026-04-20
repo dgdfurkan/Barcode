@@ -187,17 +187,17 @@
 
     var hint = document.createElement('p');
     hint.textContent =
-      'Aşağıdakileri işaretlersen ilgili satırlar panoya alınmaz. Varsayılan: tüm satırlar kopyalanır. Üstteki ürün sayısı tüm listeyi gösterebilir; kopyalama yalnızca şu an tabloda görünen sayfadaki satırlar içindir (diğer sayfalar için sayfa değiştirip tekrar kopyala).';
+      'İşaretli seçeneklerde ilgili satırlar panoya alınmaz (varsayılan: ikisi de açık). Kutuları kaldırırsan inaktif veya stoksuz satırlar da kopyalanır. Üstteki ürün sayısı tüm listeyi gösterebilir; kopyalama yalnızca bu sayfadaki satırlar içindir (diğer sayfa için sayfa değiştirip tekrar kopyala).';
     hint.style.cssText = 'margin:0 0 14px;font-size:12px;line-height:1.45;opacity:.85;';
 
-    function rowCheckbox(id, label) {
+    function rowCheckbox(id, label, defaultChecked) {
       var lab = document.createElement('label');
       lab.style.cssText =
         'display:flex;align-items:flex-start;gap:10px;margin:0 0 10px;cursor:pointer;font-size:13px;line-height:1.4;';
       var cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.id = id;
-      cb.checked = false;
+      cb.checked = defaultChecked === true;
       cb.style.marginTop = '2px';
       var span = document.createElement('span');
       span.textContent = label;
@@ -206,8 +206,16 @@
       return { wrap: lab, input: cb };
     }
 
-    var inactiveRow = rowCheckbox('getir-copy-opt-inactive', 'İnaktifleri kopyalama (Statü: İnaktif satırlar çıkarılır)');
-    var stockRow = rowCheckbox('getir-copy-opt-zerostock', 'Stokta olmayanları kopyalama (Stok = 0 satırlar çıkarılır)');
+    var inactiveRow = rowCheckbox(
+      'getir-copy-opt-inactive',
+      'İnaktifleri kopyalama (Statü: İnaktif satırlar çıkarılır)',
+      true
+    );
+    var stockRow = rowCheckbox(
+      'getir-copy-opt-zerostock',
+      'Stokta olmayanları kopyalama (Stok = 0 satırlar çıkarılır)',
+      true
+    );
 
     var btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;margin-top:16px;';
