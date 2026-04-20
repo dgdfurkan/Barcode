@@ -4070,7 +4070,25 @@ class CountingSystem {
             return;
         }
 
-        const product = this.findProduct(value);
+        const G = typeof window !== 'undefined' ? window.GetirCdnPaste : null;
+        if (G && typeof G.extractGetirCdnProductImageUrlsFromText === 'function') {
+            const urls = G.extractGetirCdnProductImageUrlsFromText(value);
+            if (urls.length > 0) {
+                await this.bulkAddProductsFromGetirCdnPaste(urls);
+                if (input) input.value = '';
+                return;
+            }
+        }
+
+        let product = this.findProduct(value);
+        if (
+            !product &&
+            G &&
+            typeof G.findProductByGetirImageUrl === 'function' &&
+            /^https?:\/\//i.test(value)
+        ) {
+            product = G.findProductByGetirImageUrl(this.allProducts, value);
+        }
         if (!product) {
             this.showNotification('Ürün bulunamadı', 'error');
             return;
@@ -4078,6 +4096,85 @@ class CountingSystem {
 
         await this.addProductToCounting(product);
         input.value = '';
+    }
+
+    /**
+     * Getir CDN ürün görsel URL listesi: eşleşen ürünleri tabloya ekler; tabloda olanları atlar;
+     * yeni eklenenler mevcut sıranın sonuna (yapıştırma sırasıyla) yazılır.
+     * @param {string[]} urls
+     */
+    async bulkAddProductsFromGetirCdnPaste(urls) {
+        const G = typeof window !== 'undefined' ? window.GetirCdnPaste : null;
+        const findFn = G && typeof G.findProductByGetirImageUrl === 'function' ? G.findProductByGetirImageUrl : null;
+        if (!findFn || !Array.isArray(urls) || urls.length === 0) {
+            return { added: 0, skippedInTable: 0, noMatch: 0 };
+        }
+
+        const priorOrder = this.getOrderedProductIds().filter((id) => this.countingData[id]);
+        const alreadyInTable = new Set(priorOrder);
+        const addedIds = [];
+        const seenNew = new Set();
+        let skippedInTable = 0;
+        let noMatch = 0;
+
+        for (let i = 0; i < urls.length; i++) {
+            const product = findFn(this.allProducts, urls[i]);
+            if (!product) {
+                noMatch++;
+                continue;
+            }
+            if (alreadyInTable.has(product.id)) {
+                skippedInTable++;
+                continue;
+            }
+            if (seenNew.has(product.id)) continue;
+            seenNew.add(product.id);
+            this.addProductToCounting(product, { skipSave: true });
+            addedIds.push(product.id);
+        }
+
+        if (addedIds.length === 0) {
+            if (noMatch > 0 && skippedInTable === 0) {
+                this.showToast('Bu görsel adresleriyle eşleşen ürün bulunamadı', 'warning', 4000);
+            } else if (skippedInTable > 0) {
+                const allDup = skippedInTable === urls.length && noMatch === 0;
+                this.showToast(
+                    allDup
+                        ? 'Yapıştırılan ürünler zaten tabloda'
+                        : `${skippedInTable} ürün zaten tablodaydı${noMatch ? ` · ${noMatch} eşleşmedi` : ''}`,
+                    'info',
+                    4500
+                );
+            }
+            return { added: 0, skippedInTable, noMatch };
+        }
+
+        this.countingData._productOrder = [...priorOrder.filter((id) => this.countingData[id]), ...addedIds];
+
+        const tn = this.currentTableName || '';
+        this.pushAuditEntry(
+            `Getir görselleri · ${addedIds.length} ürün${skippedInTable ? ` · ${skippedInTable} zaten vardı` : ''}${
+                noMatch ? ` · ${noMatch} eşleşmedi` : ''
+            }`,
+            { cat: 'import', tbl: tn }
+        );
+
+        await this.saveCountingData();
+        this.scheduleRenderTable();
+        if (this.currentViewMode === 'rapid') {
+            this.renderRapidCountingMode();
+        }
+        this.updateStatistics();
+        this.updateCountingProgress();
+        this.updateTableSelector();
+        this.syncSayimSubTabToTable();
+
+        let msg = `${addedIds.length} ürün eklendi`;
+        if (skippedInTable) msg += `, ${skippedInTable} zaten tablodaydı`;
+        if (noMatch) msg += `, ${noMatch} adres eşleşmedi`;
+        this.showToast(msg, 'success', 4500);
+
+        return { added: addedIds.length, skippedInTable, noMatch };
     }
 
     findProduct(searchTerm) {
@@ -4106,7 +4203,20 @@ class CountingSystem {
         
         // Fallback: search by ID
         product = this.allProducts.find(p => p.id && p.id.toLowerCase() === term);
-        
+
+        if (product) return product;
+
+        const Gc = typeof window !== 'undefined' ? window.GetirCdnPaste : null;
+        if (
+            Gc &&
+            typeof Gc.findProductByGetirImageUrl === 'function' &&
+            typeof searchTerm === 'string' &&
+            /cdn-image\.getir\.com\/market\/product\//i.test(searchTerm)
+        ) {
+            const byImg = Gc.findProductByGetirImageUrl(this.allProducts, searchTerm);
+            if (byImg) return byImg;
+        }
+
         return product;
     }
 
