@@ -107,10 +107,9 @@
     return ok;
   }
 
-  function updateBtnMeta(btn) {
-    var n = collectCdnImageUrls().length;
+  function updateBtnMeta(btn, n) {
     btn.title = n
-      ? n + ' satır — tablo gövdesi sırası (cdn görsel URL)'
+      ? n + ' satır — tablo gövdesi (cdn görsel URL)'
       : 'Tabloda satır/görsel yok';
   }
 
@@ -143,8 +142,7 @@
     var wrap = document.createElement('span');
     wrap.id = 'getir-franchise-cdn-wrap';
     wrap.style.cssText =
-      'display:inline-flex;align-items:center;gap:4px;margin-left:6px;vertical-align:middle;' +
-      'position:relative;z-index:50;pointer-events:auto;';
+      'display:inline-flex;align-items:center;gap:4px;margin-left:6px;vertical-align:middle;';
 
     var btn = document.createElement('button');
     btn.type = 'button';
@@ -165,61 +163,61 @@
       cursor: 'pointer',
       border: '1px solid rgba(0,0,0,0.14)',
       borderRadius: '4px',
-      background: 'rgba(255,255,255,0.85)',
+      background: 'rgba(255,255,255,0.9)',
       color: 'inherit',
       verticalAlign: 'middle',
       boxSizing: 'border-box',
-      pointerEvents: 'auto',
       WebkitAppearance: 'none',
       appearance: 'none',
-      position: 'relative',
-      zIndex: '51',
       whiteSpace: 'nowrap'
     });
 
-    function refreshMeta() {
+    function refreshMetaLight() {
       var urls = collectCdnImageUrls();
       meta.textContent = urls.length ? urls.length + ' URL' : '';
-      updateBtnMeta(btn);
+      updateBtnMeta(btn, urls.length);
     }
+
+    btn.addEventListener('mouseenter', refreshMetaLight, { passive: true });
 
     btn.addEventListener(
       'click',
       function (e) {
         e.preventDefault();
+        refreshMetaLight();
         var urls = collectCdnImageUrls();
-      if (!urls.length) {
-        window.alert(
-          'Tabloda görsel URL bulunamadı.\n\n' +
-            'Beklenen: sayfada .ant-table-tbody içinde ürün görseli (cdn-image.getir.com).\n' +
-            'Liste yüklenene kadar bekle; çok sayfalı listede her sayfa için ayrı kopyala.'
-        );
-        return;
-      }
-      var csv = urls.join(', ');
-      var label = btn.textContent;
+        if (!urls.length) {
+          window.alert(
+            'Tabloda görsel URL bulunamadı.\n\n' +
+              'Beklenen: .ant-table-tbody içinde ürün görseli (cdn-image.getir.com).\n' +
+              'Liste yüklenene kadar bekle; çok sayfalı listede her sayfa için ayrı kopyala.'
+          );
+          return;
+        }
+        var csv = urls.join(', ');
+        var label = btn.textContent;
 
-      copyText(csv).then(
-        function () {
-          btn.textContent = 'Kopyalandı';
-          toast(urls.length + ' URL panoda');
-          setTimeout(function () {
-            btn.textContent = label;
-          }, 1600);
-        },
-        function () {
-          if (copyExec(csv)) {
+        copyText(csv).then(
+          function () {
             btn.textContent = 'Kopyalandı';
             toast(urls.length + ' URL panoda');
             setTimeout(function () {
               btn.textContent = label;
             }, 1600);
-          } else {
-            showModal(csv);
-            toast('Pano engelli — kutudan Cmd+C');
+          },
+          function () {
+            if (copyExec(csv)) {
+              btn.textContent = 'Kopyalandı';
+              toast(urls.length + ' URL panoda');
+              setTimeout(function () {
+                btn.textContent = label;
+              }, 1600);
+            } else {
+              showModal(csv);
+              toast('Pano engelli — kutudan Cmd+C');
+            }
           }
-        }
-      );
+        );
       },
       false
     );
@@ -232,39 +230,28 @@
       place.parent.appendChild(wrap);
     }
 
-    refreshMeta();
-    var obs = new MutationObserver(function () {
-      if (!document.getElementById(BTN_ID)) {
-        insertButton();
-        return;
+    refreshMetaLight();
+  }
+
+  /** Ağır MutationObserver yok — sadece seyrek deneme (SPA geç yüklenirse). */
+  function tryInsertUntilFound() {
+    var n = 0;
+    var id = setInterval(function () {
+      n++;
+      insertButton();
+      if (document.getElementById(BTN_ID) || n >= 40) {
+        clearInterval(id);
       }
-      refreshMeta();
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
+    }, 1500);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function tryIns() {
+    document.addEventListener('DOMContentLoaded', function () {
       insertButton();
-      if (!document.getElementById(BTN_ID)) {
-        var o = new MutationObserver(function () {
-          insertButton();
-          if (document.getElementById(BTN_ID)) o.disconnect();
-        });
-        o.observe(document.documentElement, { childList: true, subtree: true });
-        setTimeout(function () {
-          o.disconnect();
-        }, 60000);
-      }
+      if (!document.getElementById(BTN_ID)) tryInsertUntilFound();
     });
   } else {
     insertButton();
-    if (!document.getElementById(BTN_ID)) {
-      var o2 = new MutationObserver(function () {
-        insertButton();
-        if (document.getElementById(BTN_ID)) o2.disconnect();
-      });
-      o2.observe(document.documentElement, { childList: true, subtree: true });
-    }
+    if (!document.getElementById(BTN_ID)) tryInsertUntilFound();
   }
 })();
