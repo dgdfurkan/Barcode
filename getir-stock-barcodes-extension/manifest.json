@@ -11,6 +11,7 @@
   "action": {
     "default_title": "Barkodlar: Getir butonunun yanındaki “Barkodları kopyala”yı kullanın"
   },
+  "permissions": ["clipboardWrite"],
   "host_permissions": ["https://franchise.getir.com/*"],
   "content_scripts": [
     {
