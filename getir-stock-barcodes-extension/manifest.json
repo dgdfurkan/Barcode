@@ -1,29 +1,23 @@
 {
   "manifest_version": 3,
   "name": "Getir Stok Barkodları",
-  "version": "1.2.0",
-  "description": "POST /stocks API ile barkodları çeker (token sayfadan); virgülle listeler.",
+  "version": "2.0.0",
+  "description": "Franchise stok listesindeki ürün avatar görsellerinin CDN URL’lerini DOM’dan toplayıp virgülle kopyalar.",
   "icons": {
     "16": "icon128.png",
     "48": "icon128.png",
     "128": "icon128.png"
   },
   "action": {
-    "default_title": "Sayfada “Barkodları kopyala” — önce stok listesi yüklensin"
+    "default_title": "Sayfadaki “Görsel URL'leri kopyala” butonunu kullan"
   },
   "permissions": ["clipboardWrite"],
-  "host_permissions": [
-    "https://franchise.getir.com/*",
-    "https://franchise-api-gateway.getirapi.com/*"
-  ],
-  "background": {
-    "service_worker": "background.js"
-  },
+  "host_permissions": ["https://franchise.getir.com/*"],
   "content_scripts": [
     {
       "matches": ["https://franchise.getir.com/*"],
       "js": ["content.js"],
-      "run_at": "document_start"
+      "run_at": "document_idle"
     }
   ]
 }
