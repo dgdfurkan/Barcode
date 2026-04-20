@@ -6,14 +6,30 @@
   var BTN_ID = 'getir-franchise-cdn-url-copy-btn';
   var CDN_MARK = 'cdn-image.getir.com';
 
-  /** Avatar sırası = liste sırası; aynı URL tekrar ederse de korunur. */
+  /**
+   * .ant-table-tbody içindeki her veri satırı (tr) için bir ürün görseli — liste sırası = satır sırası.
+   */
   function collectCdnImageUrls() {
     var out = [];
-    var nodes = document.querySelectorAll('.ant-avatar-image img[src]');
-    for (var i = 0; i < nodes.length; i++) {
-      var src = (nodes[i].getAttribute('src') || '').trim();
-      if (src.indexOf(CDN_MARK) !== -1) out.push(src);
+    var tbodies = document.querySelectorAll('.ant-table-tbody');
+    var t;
+    var r;
+    var rows;
+    var img;
+    var src;
+
+    for (t = 0; t < tbodies.length; t++) {
+      rows = tbodies[t].querySelectorAll(':scope > tr');
+      for (r = 0; r < rows.length; r++) {
+        img =
+          rows[r].querySelector('.ant-avatar-image img[src*="' + CDN_MARK + '"]') ||
+          rows[r].querySelector('img[src*="' + CDN_MARK + '"]');
+        if (!img) continue;
+        src = (img.getAttribute('src') || '').trim();
+        if (src) out.push(src);
+      }
     }
+
     return out;
   }
 
@@ -93,7 +109,9 @@
 
   function updateBtnMeta(btn) {
     var n = collectCdnImageUrls().length;
-    btn.title = n ? n + ' adet ' + CDN_MARK + ' görsel URL (DOM sırası)' : 'Sayfada liste/avatar yok veya henüz yüklenmedi';
+    btn.title = n
+      ? n + ' adet (ant-table-tbody içi, satır sırası)'
+      : '.ant-table-tbody yok veya liste henüz yüklenmedi';
   }
 
   function insertButton() {
@@ -111,7 +129,7 @@
     btn.type = 'button';
     btn.id = BTN_ID;
     btn.textContent = "Görsel URL'leri kopyala";
-    btn.setAttribute('aria-label', 'Ürün avatar görsellerinin CDN adreslerini virgülle kopyala');
+    btn.setAttribute('aria-label', 'Tablo listesindeki tüm ürün görsel URL’lerini virgülle kopyala');
 
     var meta = document.createElement('span');
     meta.id = 'getir-franchise-cdn-meta';
@@ -142,9 +160,9 @@
       var urls = collectCdnImageUrls();
       if (!urls.length) {
         window.alert(
-          'Hiç görsel URL bulunamadı.\n\n' +
-            'Beklenen: .ant-avatar-image img[src*="cdn-image.getir.com"]\n' +
-            'Liste yüklenene kadar bekle veya sayfayı kaydır.'
+          'Tabloda görsel URL bulunamadı.\n\n' +
+            'Beklenen: sayfada .ant-table-tbody içinde ürün görseli (cdn-image.getir.com).\n' +
+            'Liste yüklenene kadar bekle; çok sayfalı listede her sayfa için ayrı kopyala.'
         );
         return;
       }
