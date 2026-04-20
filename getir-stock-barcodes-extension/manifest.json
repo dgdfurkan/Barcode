@@ -1,18 +1,24 @@
 {
   "manifest_version": 3,
   "name": "Getir Stok Barkodları",
-  "version": "1.0.2",
-  "description": "Mevcut stok POST /stocks yanıtındaki packagingInfo.barcodes verilerini toplar; sayfada ince butonla panoya kopyalar.",
+  "version": "1.2.0",
+  "description": "POST /stocks API ile barkodları çeker (token sayfadan); virgülle listeler.",
   "icons": {
     "16": "icon128.png",
     "48": "icon128.png",
     "128": "icon128.png"
   },
   "action": {
-    "default_title": "Barkodlar: Getir butonunun yanındaki “Barkodları kopyala”yı kullanın"
+    "default_title": "Sayfada “Barkodları kopyala” — önce stok listesi yüklensin"
   },
   "permissions": ["clipboardWrite"],
-  "host_permissions": ["https://franchise.getir.com/*"],
+  "host_permissions": [
+    "https://franchise.getir.com/*",
+    "https://franchise-api-gateway.getirapi.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": ["https://franchise.getir.com/*"],
