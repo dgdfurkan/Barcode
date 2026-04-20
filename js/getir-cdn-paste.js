@@ -12,6 +12,9 @@
     /** Eski görseller: cdn.getir.com/product/{id}_tr_{ts}.jpeg */
     var RE_CDN_LEGACY = /https?:\/\/cdn\.getir\.com\/product\/[^\s,?#"']+\.(?:jpe?g|png|gif|webp)/gi;
 
+    /** Placeholder: cdn.getir.com/misc/product_placeholder_….jpeg */
+    var RE_CDN_MISC = /https?:\/\/cdn\.getir\.com\/misc\/[^\s,?#"']+\.(?:jpe?g|png|gif|webp)/gi;
+
     /** Franchise ERP yüklemeleri: vsrm-cdn.erp.getirapi.com/docs/… */
     var RE_ERP_DOCS =
         /https?:\/\/vsrm-cdn\.erp\.getirapi\.com\/docs\/[^\s,?#"']+\.(?:jpe?g|png|gif|webp)/gi;
@@ -42,7 +45,7 @@
         if (!text || typeof text !== 'string') return [];
         var seen = new Set();
         var out = [];
-        var patterns = [RE_CDN_IMAGE, RE_CDN_LEGACY, RE_ERP_DOCS];
+        var patterns = [RE_CDN_IMAGE, RE_CDN_LEGACY, RE_CDN_MISC, RE_ERP_DOCS];
         var pi;
         var m;
         for (pi = 0; pi < patterns.length; pi++) {

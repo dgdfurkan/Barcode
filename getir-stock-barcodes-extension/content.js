@@ -10,13 +10,20 @@
     if (!src || src.indexOf('http') !== 0) return false;
     if (src.indexOf('cdn-image.getir.com/market/product') !== -1) return true;
     if (src.indexOf('cdn.getir.com/product') !== -1) return true;
+    // Görseli olmayan ürünlerde placeholder (örn. product_placeholder_getir_logo.jpeg)
+    if (
+      src.indexOf('cdn.getir.com/misc/') !== -1 &&
+      /\.(jpe?g|png|gif|webp)(\?|$)/i.test(src)
+    ) {
+      return true;
+    }
     // Franchise tablosunda sık: depo/ERP’den yüklenen ürün görselleri (uuid’li dosya adı)
     if (src.indexOf('vsrm-cdn.erp.getirapi.com/docs/') !== -1) return true;
     return false;
   }
 
   /**
-   * Satırdaki ürün görseli: market CDN, eski product CDN ve ERP (vsrm-cdn…) host’ları desteklenir.
+   * Satırdaki ürün görseli: market CDN, product/misc CDN ve ERP (vsrm-cdn…) host’ları desteklenir.
    */
   function pickProductImgFromRow(tr) {
     if (!tr || tr.classList.contains('ant-table-measure-row')) return null;
