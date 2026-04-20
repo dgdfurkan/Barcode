@@ -110,42 +110,71 @@
   function updateBtnMeta(btn) {
     var n = collectCdnImageUrls().length;
     btn.title = n
-      ? n + ' adet (ant-table-tbody içi, satır sırası)'
-      : '.ant-table-tbody yok veya liste henüz yüklenmedi';
+      ? n + ' satır — tablo gövdesi sırası (cdn görsel URL)'
+      : 'Tabloda satır/görsel yok';
+  }
+
+  function findToolbarAnchor() {
+    var badge = document.querySelector('[class*="totalBadge"]');
+    if (badge && badge.parentNode) {
+      return { parent: badge.parentNode, before: badge.nextSibling };
+    }
+    var left = document.querySelector('[class*="leftContainer"]');
+    if (left) {
+      return { parent: left, before: null };
+    }
+    var bring = document.getElementById('BRING_BUTTON');
+    if (bring && bring.parentNode) {
+      return { parent: bring.parentNode, before: bring.nextSibling };
+    }
+    var flex = document.querySelector('[class*="flexContainer-"] button.ant-btn-primary');
+    if (flex && flex.parentNode) {
+      return { parent: flex.parentNode, before: flex.nextSibling };
+    }
+    return null;
   }
 
   function insertButton() {
     if (document.getElementById(BTN_ID)) return;
 
-    var anchor =
-      document.getElementById('BRING_BUTTON') ||
-      document.querySelector('[class^="flexContainer-"] button.ant-btn-primary');
-    if (!anchor || !anchor.parentNode) return;
+    var place = findToolbarAnchor();
+    if (!place) return;
 
     var wrap = document.createElement('span');
-    wrap.style.cssText = 'display:inline-flex;align-items:center;gap:8px;vertical-align:middle;';
+    wrap.id = 'getir-franchise-cdn-wrap';
+    wrap.style.cssText =
+      'display:inline-flex;align-items:center;gap:4px;margin-left:6px;vertical-align:middle;' +
+      'position:relative;z-index:50;pointer-events:auto;';
 
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.id = BTN_ID;
-    btn.textContent = "Görsel URL'leri kopyala";
-    btn.setAttribute('aria-label', 'Tablo listesindeki tüm ürün görsel URL’lerini virgülle kopyala');
+    btn.textContent = 'Barkodları kopyala';
+    btn.setAttribute('aria-label', 'Tablodaki ürün görsel CDN adreslerini virgülle kopyala');
 
     var meta = document.createElement('span');
     meta.id = 'getir-franchise-cdn-meta';
-    meta.style.cssText = 'font-size:11px;opacity:.75;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    meta.style.cssText =
+      'font-size:10px;opacity:.55;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 
     Object.assign(btn.style, {
-      marginLeft: '8px',
-      fontSize: '12px',
-      lineHeight: '1.2',
-      padding: '4px 10px',
+      margin: '0',
+      padding: '1px 6px',
+      fontSize: '10px',
+      lineHeight: '1.35',
       cursor: 'pointer',
-      border: '1px solid rgba(0,0,0,0.12)',
-      borderRadius: '6px',
-      background: 'rgba(0,0,0,0.04)',
+      border: '1px solid rgba(0,0,0,0.14)',
+      borderRadius: '4px',
+      background: 'rgba(255,255,255,0.85)',
       color: 'inherit',
-      verticalAlign: 'middle'
+      verticalAlign: 'middle',
+      boxSizing: 'border-box',
+      pointerEvents: 'auto',
+      WebkitAppearance: 'none',
+      appearance: 'none',
+      position: 'relative',
+      zIndex: '51',
+      whiteSpace: 'nowrap'
     });
 
     function refreshMeta() {
@@ -154,10 +183,11 @@
       updateBtnMeta(btn);
     }
 
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      var urls = collectCdnImageUrls();
+    btn.addEventListener(
+      'click',
+      function (e) {
+        e.preventDefault();
+        var urls = collectCdnImageUrls();
       if (!urls.length) {
         window.alert(
           'Tabloda görsel URL bulunamadı.\n\n' +
@@ -190,14 +220,24 @@
           }
         }
       );
-    });
+      },
+      false
+    );
 
     wrap.appendChild(btn);
     wrap.appendChild(meta);
-    anchor.parentNode.insertBefore(wrap, anchor.nextSibling);
+    if (place.before) {
+      place.parent.insertBefore(wrap, place.before);
+    } else {
+      place.parent.appendChild(wrap);
+    }
 
     refreshMeta();
     var obs = new MutationObserver(function () {
+      if (!document.getElementById(BTN_ID)) {
+        insertButton();
+        return;
+      }
       refreshMeta();
     });
     obs.observe(document.body, { childList: true, subtree: true });
