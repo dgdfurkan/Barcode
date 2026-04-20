@@ -12,12 +12,25 @@
     /** Eski görseller: cdn.getir.com/product/{id}_tr_{ts}.jpeg */
     var RE_CDN_LEGACY = /https?:\/\/cdn\.getir\.com\/product\/[^\s,?#"']+\.(?:jpe?g|png|gif|webp)/gi;
 
+    /** Franchise ERP yüklemeleri: vsrm-cdn.erp.getirapi.com/docs/… */
+    var RE_ERP_DOCS =
+        /https?:\/\/vsrm-cdn\.erp\.getirapi\.com\/docs\/[^\s,?#"']+\.(?:jpe?g|png|gif|webp)/gi;
+
     function normalizeGetirImageFileKey(filename) {
         if (!filename) return '';
         var base = filename.split('?')[0].split('#')[0];
         base = base.replace(/\.(jpe?g|png|gif|webp)$/i, '');
         base = base.replace(/_[a-z]{2}_\d+$/i, '');
         return base.toLowerCase();
+    }
+
+    /** ERP dosya adı veya URL içindeki ürün UUID’si (market görseli ile köprü). */
+    function extractEmbeddedProductUuid(s) {
+        if (!s) return null;
+        var m = String(s).match(
+            /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+        );
+        return m ? m[0].toLowerCase() : null;
     }
 
     /**
@@ -29,7 +42,7 @@
         if (!text || typeof text !== 'string') return [];
         var seen = new Set();
         var out = [];
-        var patterns = [RE_CDN_IMAGE, RE_CDN_LEGACY];
+        var patterns = [RE_CDN_IMAGE, RE_CDN_LEGACY, RE_ERP_DOCS];
         var pi;
         var m;
         for (pi = 0; pi < patterns.length; pi++) {
@@ -56,11 +69,13 @@
         var searchLower = imageUrl.toLowerCase().trim();
         var searchFile = searchLower.split('/').pop().split('?')[0];
         var searchKey = normalizeGetirImageFileKey(searchFile);
+        var searchUuid = extractEmbeddedProductUuid(searchFile + ' ' + imageUrl);
         var i;
         var product;
         var pi;
         var pf;
         var pfKey;
+        var prodUuid;
         for (i = 0; i < products.length; i++) {
             product = products[i];
             if (!product || !product.image) continue;
@@ -70,6 +85,10 @@
             if (pf && pf === searchFile) return product;
             pfKey = normalizeGetirImageFileKey(pf);
             if (searchKey && pfKey && searchKey === pfKey) return product;
+            if (searchUuid) {
+                prodUuid = extractEmbeddedProductUuid(pf + ' ' + pi);
+                if (prodUuid && prodUuid === searchUuid) return product;
+            }
         }
         return null;
     }

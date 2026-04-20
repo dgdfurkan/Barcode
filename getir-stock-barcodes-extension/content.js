@@ -10,11 +10,13 @@
     if (!src || src.indexOf('http') !== 0) return false;
     if (src.indexOf('cdn-image.getir.com/market/product') !== -1) return true;
     if (src.indexOf('cdn.getir.com/product') !== -1) return true;
+    // Franchise tablosunda sık: depo/ERP’den yüklenen ürün görselleri (uuid’li dosya adı)
+    if (src.indexOf('vsrm-cdn.erp.getirapi.com/docs/') !== -1) return true;
     return false;
   }
 
   /**
-   * Satırdaki ürün görseli: yeni (cdn-image…/market/product) ve eski (cdn.getir.com/product) host’ları destekler.
+   * Satırdaki ürün görseli: market CDN, eski product CDN ve ERP (vsrm-cdn…) host’ları desteklenir.
    */
   function pickProductImgFromRow(tr) {
     if (!tr || tr.classList.contains('ant-table-measure-row')) return null;
@@ -185,7 +187,7 @@
 
     var hint = document.createElement('p');
     hint.textContent =
-      'Aşağıdakileri işaretlersen ilgili satırlar panoya alınmaz. Varsayılan: tüm satırlar kopyalanır.';
+      'Aşağıdakileri işaretlersen ilgili satırlar panoya alınmaz. Varsayılan: tüm satırlar kopyalanır. Üstteki ürün sayısı tüm listeyi gösterebilir; kopyalama yalnızca şu an tabloda görünen sayfadaki satırlar içindir (diğer sayfalar için sayfa değiştirip tekrar kopyala).';
     hint.style.cssText = 'margin:0 0 14px;font-size:12px;line-height:1.45;opacity:.85;';
 
     function rowCheckbox(id, label) {
@@ -309,7 +311,8 @@
 
   function updateBtnMeta(btn, n) {
     btn.title = n
-      ? n + ' satır — tablo gövdesi (ürün görsel URL)'
+      ? n +
+          ' URL — yalnızca şu an ekrandaki sayfa satırları (rozet “toplam ürün” tüm liste olabilir; sayfa 2 vb. için ayrı kopyala)'
       : 'Tabloda satır/görsel yok';
   }
 
@@ -353,7 +356,7 @@
     var meta = document.createElement('span');
     meta.id = 'getir-franchise-cdn-meta';
     meta.style.cssText =
-      'font-size:10px;opacity:.55;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      'font-size:10px;opacity:.55;max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 
     Object.assign(btn.style, {
       margin: '0',
@@ -374,7 +377,7 @@
 
     function refreshMetaLight() {
       var urls = collectCdnImageUrls({});
-      meta.textContent = urls.length ? urls.length + ' URL' : '';
+      meta.textContent = urls.length ? urls.length + ' URL (sayfa)' : '';
       updateBtnMeta(btn, urls.length);
     }
 
@@ -397,7 +400,7 @@
             } else {
               window.alert(
                 'Tabloda ürün görsel URL bulunamadı.\n\n' +
-                  'Yeni: cdn-image.getir.com/market/product — eski: cdn.getir.com/product.\n' +
+                  'Desteklenen host’lar: cdn-image.getir.com/market/product, cdn.getir.com/product, vsrm-cdn.erp.getirapi.com/docs.\n' +
                   'Liste yüklenene kadar bekle; çok sayfalı listede her sayfa için ayrı kopyala.'
               );
             }
