@@ -4,12 +4,82 @@
   if ((window.location.hostname || '') !== 'franchise.getir.com') return;
 
   var BTN_ID = 'getir-franchise-cdn-url-copy-btn';
-  var CDN_MARK = 'cdn-image.getir.com';
+  var BTN_LABEL_DEFAULT = 'Barkodları kopyala';
+
+  function isGetirProductImageSrc(src) {
+    if (!src || src.indexOf('http') !== 0) return false;
+    if (src.indexOf('cdn-image.getir.com/market/product') !== -1) return true;
+    if (src.indexOf('cdn.getir.com/product') !== -1) return true;
+    return false;
+  }
 
   /**
-   * .ant-table-tbody içindeki her veri satırı (tr) için bir ürün görseli — liste sırası = satır sırası.
+   * Satırdaki ürün görseli: yeni (cdn-image…/market/product) ve eski (cdn.getir.com/product) host’ları destekler.
    */
-  function collectCdnImageUrls() {
+  function pickProductImgFromRow(tr) {
+    if (!tr || tr.classList.contains('ant-table-measure-row')) return null;
+    var imgs = tr.querySelectorAll('img[src]');
+    var i;
+    var src;
+    for (i = 0; i < imgs.length; i++) {
+      src = (imgs[i].getAttribute('src') || '').trim();
+      if (isGetirProductImageSrc(src)) return imgs[i];
+    }
+    return null;
+  }
+
+  /** thead’den “Stok” ve “Statü” sütun indeksleri (satır filtreleri için). */
+  function resolveStockAndStatusColumnIndexes() {
+    var ths = document.querySelectorAll('.ant-table-thead th.ant-table-cell');
+    var stockIdx = -1;
+    var statIdx = -1;
+    var i;
+    var t;
+    for (i = 0; i < ths.length; i++) {
+      t = (ths[i].textContent || '').replace(/\s+/g, ' ').trim();
+      if (t === 'Stok') stockIdx = i;
+      if (t === 'Statü' || t === 'Statu') statIdx = i;
+    }
+    return { stockIdx: stockIdx, statIdx: statIdx };
+  }
+
+  function shouldSkipRowForFilters(tr, opts, colIdx) {
+    if (!tr || tr.classList.contains('ant-table-measure-row')) return true;
+    var cells = tr.querySelectorAll('td');
+    if (!cells.length) return true;
+
+    if (opts.skipInactive && colIdx.statIdx >= 0 && cells[colIdx.statIdx]) {
+      var stText = (cells[colIdx.statIdx].textContent || '').trim();
+      if (stText.indexOf('İnaktif') !== -1 || stText.indexOf('Inaktif') !== -1) {
+        return true;
+      }
+    }
+
+    if (opts.skipZeroStock && colIdx.stockIdx >= 0 && cells[colIdx.stockIdx]) {
+      var raw = (cells[colIdx.stockIdx].textContent || '').trim();
+      var numPart = raw.replace(/[^\d.,-]/g, '').replace(',', '.');
+      var n = parseFloat(numPart);
+      if (raw === '' || raw === '-' || (numPart !== '' && !isNaN(n) && n === 0)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * @param {{ skipInactive?: boolean, skipZeroStock?: boolean }} opts
+   */
+  function collectCdnImageUrls(opts) {
+    opts = opts || {};
+    var skipInactive = opts.skipInactive === true;
+    var skipZeroStock = opts.skipZeroStock === true;
+
+    var colIdx = { stockIdx: -1, statIdx: -1 };
+    if (skipInactive || skipZeroStock) {
+      colIdx = resolveStockAndStatusColumnIndexes();
+    }
+
     var out = [];
     var tbodies = document.querySelectorAll('.ant-table-tbody');
     var t;
@@ -21,9 +91,20 @@
     for (t = 0; t < tbodies.length; t++) {
       rows = tbodies[t].querySelectorAll(':scope > tr');
       for (r = 0; r < rows.length; r++) {
-        img =
-          rows[r].querySelector('.ant-avatar-image img[src*="' + CDN_MARK + '"]') ||
-          rows[r].querySelector('img[src*="' + CDN_MARK + '"]');
+        if (
+          skipInactive ||
+          skipZeroStock
+        ) {
+          if (
+            shouldSkipRowForFilters(rows[r], { skipInactive: skipInactive, skipZeroStock: skipZeroStock }, colIdx)
+          ) {
+            continue;
+          }
+        } else if (rows[r].classList.contains('ant-table-measure-row')) {
+          continue;
+        }
+
+        img = pickProductImgFromRow(rows[r]);
         if (!img) continue;
         src = (img.getAttribute('src') || '').trim();
         if (src) out.push(src);
@@ -84,6 +165,92 @@
     }, 0);
   }
 
+  /** Kopyalamadan önce: inaktif / sıfır stok satırlarını isteğe bağlı ele. */
+  function showCopyOptionsModal(onConfirm) {
+    var old = document.getElementById('getir-franchise-copy-options-modal');
+    if (old) old.remove();
+
+    var wrap = document.createElement('div');
+    wrap.id = 'getir-franchise-copy-options-modal';
+    wrap.style.cssText =
+      'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2147483646;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+    var box = document.createElement('div');
+    box.style.cssText =
+      'background:#fff;color:#111;border-radius:10px;max-width:92vw;width:380px;box-shadow:0 8px 28px rgba(0,0,0,.22);padding:16px 18px;font:14px system-ui,-apple-system,sans-serif;';
+
+    var h = document.createElement('div');
+    h.textContent = 'Kopyalama seçenekleri';
+    h.style.cssText = 'font-weight:600;margin:0 0 12px;font-size:15px;';
+
+    var hint = document.createElement('p');
+    hint.textContent =
+      'Aşağıdakileri işaretlersen ilgili satırlar panoya alınmaz. Varsayılan: tüm satırlar kopyalanır.';
+    hint.style.cssText = 'margin:0 0 14px;font-size:12px;line-height:1.45;opacity:.85;';
+
+    function rowCheckbox(id, label) {
+      var lab = document.createElement('label');
+      lab.style.cssText =
+        'display:flex;align-items:flex-start;gap:10px;margin:0 0 10px;cursor:pointer;font-size:13px;line-height:1.4;';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = id;
+      cb.checked = false;
+      cb.style.marginTop = '2px';
+      var span = document.createElement('span');
+      span.textContent = label;
+      lab.appendChild(cb);
+      lab.appendChild(span);
+      return { wrap: lab, input: cb };
+    }
+
+    var inactiveRow = rowCheckbox('getir-copy-opt-inactive', 'İnaktifleri kopyalama (Statü: İnaktif satırlar çıkarılır)');
+    var stockRow = rowCheckbox('getir-copy-opt-zerostock', 'Stokta olmayanları kopyalama (Stok = 0 satırlar çıkarılır)');
+
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;margin-top:16px;';
+
+    var btnCancel = document.createElement('button');
+    btnCancel.type = 'button';
+    btnCancel.textContent = 'İptal';
+    btnCancel.style.cssText =
+      'padding:8px 16px;cursor:pointer;border-radius:6px;border:1px solid #ccc;background:#f5f5f5;font-size:13px;';
+
+    var btnOk = document.createElement('button');
+    btnOk.type = 'button';
+    btnOk.textContent = 'Kopyala';
+    btnOk.style.cssText =
+      'padding:8px 18px;cursor:pointer;border-radius:6px;border:none;background:#1677ff;color:#fff;font-size:13px;';
+
+    function close() {
+      wrap.remove();
+    }
+
+    btnCancel.onclick = close;
+    wrap.addEventListener('click', function (ev) {
+      if (ev.target === wrap) close();
+    });
+
+    btnOk.onclick = function () {
+      onConfirm({
+        skipInactive: inactiveRow.input.checked === true,
+        skipZeroStock: stockRow.input.checked === true,
+      });
+      close();
+    };
+
+    btnRow.appendChild(btnCancel);
+    btnRow.appendChild(btnOk);
+
+    box.appendChild(h);
+    box.appendChild(hint);
+    box.appendChild(inactiveRow.wrap);
+    box.appendChild(stockRow.wrap);
+    box.appendChild(btnRow);
+    wrap.appendChild(box);
+    document.body.appendChild(wrap);
+  }
+
   function copyText(text) {
     if (navigator.clipboard && window.isSecureContext) {
       return navigator.clipboard.writeText(text);
@@ -107,9 +274,42 @@
     return ok;
   }
 
+  function runCopyWithUrls(btn, urls) {
+    if (!urls.length) {
+      window.alert(
+        'Seçeneklere göre kopyalanacak satır kalmadı veya tabloda ürün görseli yok.\n\n' +
+          'Tablo yüklenene kadar bekle; çok sayfalı listede her sayfa için ayrı kopyala.'
+      );
+      return;
+    }
+    var csv = urls.join(', ');
+
+    copyText(csv).then(
+      function () {
+        btn.textContent = 'Kopyalandı';
+        toast(urls.length + ' URL panoda');
+        setTimeout(function () {
+          btn.textContent = BTN_LABEL_DEFAULT;
+        }, 1600);
+      },
+      function () {
+        if (copyExec(csv)) {
+          btn.textContent = 'Kopyalandı';
+          toast(urls.length + ' URL panoda');
+          setTimeout(function () {
+            btn.textContent = BTN_LABEL_DEFAULT;
+          }, 1600);
+        } else {
+          showModal(csv);
+          toast('Pano engelli — kutudan Cmd+C');
+        }
+      }
+    );
+  }
+
   function updateBtnMeta(btn, n) {
     btn.title = n
-      ? n + ' satır — tablo gövdesi (cdn görsel URL)'
+      ? n + ' satır — tablo gövdesi (ürün görsel URL)'
       : 'Tabloda satır/görsel yok';
   }
 
@@ -147,8 +347,8 @@
     var btn = document.createElement('button');
     btn.type = 'button';
     btn.id = BTN_ID;
-    btn.textContent = 'Barkodları kopyala';
-    btn.setAttribute('aria-label', 'Tablodaki ürün görsel CDN adreslerini virgülle kopyala');
+    btn.textContent = BTN_LABEL_DEFAULT;
+    btn.setAttribute('aria-label', 'Tablodaki ürün görsel adreslerini virgülle kopyala');
 
     var meta = document.createElement('span');
     meta.id = 'getir-franchise-cdn-meta';
@@ -169,11 +369,11 @@
       boxSizing: 'border-box',
       WebkitAppearance: 'none',
       appearance: 'none',
-      whiteSpace: 'nowrap'
+      whiteSpace: 'nowrap',
     });
 
     function refreshMetaLight() {
-      var urls = collectCdnImageUrls();
+      var urls = collectCdnImageUrls({});
       meta.textContent = urls.length ? urls.length + ' URL' : '';
       updateBtnMeta(btn, urls.length);
     }
@@ -185,39 +385,26 @@
       function (e) {
         e.preventDefault();
         refreshMetaLight();
-        var urls = collectCdnImageUrls();
-        if (!urls.length) {
-          window.alert(
-            'Tabloda görsel URL bulunamadı.\n\n' +
-              'Beklenen: .ant-table-tbody içinde ürün görseli (cdn-image.getir.com).\n' +
-              'Liste yüklenene kadar bekle; çok sayfalı listede her sayfa için ayrı kopyala.'
-          );
-          return;
-        }
-        var csv = urls.join(', ');
-        var label = btn.textContent;
-
-        copyText(csv).then(
-          function () {
-            btn.textContent = 'Kopyalandı';
-            toast(urls.length + ' URL panoda');
-            setTimeout(function () {
-              btn.textContent = label;
-            }, 1600);
-          },
-          function () {
-            if (copyExec(csv)) {
-              btn.textContent = 'Kopyalandı';
-              toast(urls.length + ' URL panoda');
-              setTimeout(function () {
-                btn.textContent = label;
-              }, 1600);
+        showCopyOptionsModal(function (opts) {
+          var urls = collectCdnImageUrls(opts);
+          if (!urls.length) {
+            var totalAny = collectCdnImageUrls({}).length;
+            if (totalAny > 0) {
+              window.alert(
+                'Seçeneklere göre kopyalanacak satır kalmadı (tüm satırlar filtrelendi).\n\n' +
+                  'Filtreleri kapatıp tekrar dene.'
+              );
             } else {
-              showModal(csv);
-              toast('Pano engelli — kutudan Cmd+C');
+              window.alert(
+                'Tabloda ürün görsel URL bulunamadı.\n\n' +
+                  'Yeni: cdn-image.getir.com/market/product — eski: cdn.getir.com/product.\n' +
+                  'Liste yüklenene kadar bekle; çok sayfalı listede her sayfa için ayrı kopyala.'
+              );
             }
+            return;
           }
-        );
+          runCopyWithUrls(btn, urls);
+        });
       },
       false
     );

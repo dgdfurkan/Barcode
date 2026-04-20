@@ -4211,7 +4211,9 @@ class CountingSystem {
             Gc &&
             typeof Gc.findProductByGetirImageUrl === 'function' &&
             typeof searchTerm === 'string' &&
-            /cdn-image\.getir\.com\/market\/product\//i.test(searchTerm)
+            /(?:cdn-image\.getir\.com\/market\/product\/|cdn\.getir\.com\/product\/)/i.test(
+                searchTerm
+            )
         ) {
             const byImg = Gc.findProductByGetirImageUrl(this.allProducts, searchTerm);
             if (byImg) return byImg;
