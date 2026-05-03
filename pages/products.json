@@ -2623,7 +2623,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Browni Gold Mini Çikolatalı Kek (180 g)",
-      "image": "https://cdn-image.getir.com/market/product/e14f13e8-e1bc-491b-9db9-7db505eaa5b0.jpeg",
+      "image": "https://cdn-image.getir.com/market/product/3af0e06c-521d-4f38-afd1-03df64f79a68.jpg",
       "barcodes": [
         {
           "code": "8690526073736",
@@ -6858,7 +6858,7 @@
       "category": "Süt Ürünleri",
       "brand": "Cakes",
       "description": "Cakes & Bakes Peynirli Su Böreği (400 g)",
-      "image": "https://cdn.getir.com/product/57ed40de0b3f230003e67327_1546860165378.jpeg?v=1546860169363",
+      "image": "https://cdn-image.getir.com/market/product/14c6d5d2-7780-4d03-a37e-cc0fcb707a30.jpeg",
       "barcodes": [
         {
           "code": "8680050303904",
@@ -8613,7 +8613,7 @@
       "category": "Genel",
       "brand": "Apple",
       "description": "Apple USB Güç Adaptörü (5 W)",
-      "image": "https://cdn.getir.com/product/588f5e03274aea00046a1e89.jpeg?v=1523100493519",
+      "image": "https://cdn-image.getir.com/market/product/6f317110-a7ba-4443-bfa2-b89f45def7c9.jpeg",
       "barcodes": [
         {
           "code": "194252025130",
@@ -8977,13 +8977,19 @@
       "category": "İçecek",
       "brand": "Knorr",
       "description": "Knorr Tavuk Suyu Bulyon (12 x 10 g)",
-      "image": "https://cdn-image.getir.com/market/product/79e9789c-44a8-4bc9-9abf-a7cf03f0456f.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260503044924562_8683130143902.01.png",
       "barcodes": [
         {
-          "code": "8690701002353",
+          "code": "8683130143902",
           "size": "12 x 10 g",
           "type": "CUSTOM",
           "variant": "Bulyon"
+        },
+        {
+          "code": "8690701002353",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -9966,7 +9972,7 @@
       "category": "Genel",
       "brand": "Altınbaşak",
       "description": "Altınbaşak Yulaflı Kepekli Bisküvi (46 g)",
-      "image": "https://cdn.getir.com/product/590357fbed47f600049abbf5_tr_1609404068804.png",
+      "image": "https://cdn-image.getir.com/market/product/be74aff4-10b1-48bd-b782-3e278ba6be26.png",
       "barcodes": [
         {
           "code": "8690504011606",
@@ -9985,7 +9991,7 @@
       "category": "Genel",
       "brand": "Altınbaşak",
       "description": "Altınbaşak Kepekli Grissini (125 g)",
-      "image": "https://cdn.getir.com/product/59035d6b4ad6a10004d4a7fe_tr_1603571058616.jpeg",
+      "image": "https://cdn-image.getir.com/market/product/c7c51fac-e9ab-4889-a898-ba9f287780b7.png",
       "barcodes": [
         {
           "code": "8690504074397",
@@ -12106,7 +12112,7 @@
       "category": "Genel",
       "brand": "Osram",
       "description": "Osram Ledvance Spiral Ampul Beyaz Işık (23W)",
-      "image": "https://cdn.getir.com/product/59e4a21292ef220004f02921.jpeg?v=1508831327286",
+      "image": "https://cdn-image.getir.com/market/product/9f4b582a-7b62-45c3-a7fe-ed1f80ef436e.jpeg",
       "barcodes": [
         {
           "code": "4052899915916",
@@ -13325,7 +13331,7 @@
       "category": "Genel",
       "brand": "Metaltex",
       "description": "Metaltex Tirbuşon (Krom)",
-      "image": "https://cdn.getir.com/product/5a42611d9aca730004a5e986.jpeg?v=1514554123564",
+      "image": "https://cdn-image.getir.com/market/product/3c30978c-7a6e-46de-a2e0-3bb831c50709.jpeg",
       "barcodes": [
         {
           "code": "8002522505003",
@@ -14583,7 +14589,7 @@
       "category": "İçecek",
       "brand": "Apple",
       "description": "Apple Lightning 3,5 mm Kulaklık Jak Kablosu (3,5 mm)",
-      "image": "https://cdn.getir.com/product/5a945dff5140970004e3d643.jpeg?v=1523100566150",
+      "image": "https://cdn-image.getir.com/market/product/05f52670-97a1-4dfa-9efa-98f20e077f05.jpeg",
       "barcodes": [
         {
           "code": "190198001795",
@@ -15201,7 +15207,7 @@
       "category": "Genel",
       "brand": "Osram",
       "description": "Osram Led Ampul Sarı Işık (8,5W)",
-      "image": "https://cdn.getir.com/product/5aba404939eca30004755e8a.jpeg?v=1525861034005",
+      "image": "https://cdn-image.getir.com/market/product/a69f7779-3aa1-4f48-8f29-972647e2f0e2.jpeg",
       "barcodes": [
         {
           "code": "4052899326842",
@@ -16416,13 +16422,19 @@
       "category": "İçecek",
       "brand": "Knorr",
       "description": "Knorr Et Suyu Bulyon (12 x 10 g)",
-      "image": "https://cdn-image.getir.com/market/product/6f776c96-d898-4e59-92ad-fa18231ad266.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260503045226672_8683130144176.01.png",
       "barcodes": [
         {
-          "code": "8690701002308",
+          "code": "8683130144176",
           "size": "12 x 10 g",
           "type": "CUSTOM",
           "variant": "Bulyon"
+        },
+        {
+          "code": "8690701002308",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -16510,7 +16522,7 @@
       "category": "Genel",
       "brand": "Apple",
       "description": "Apple USB Güç Adaptörü (12 W)",
-      "image": "https://cdn.getir.com/product/5aeab50dec34790004341814.jpeg?v=1528356710555",
+      "image": "https://cdn-image.getir.com/market/product/f9aee7a3-d2cc-4c63-85e4-83073ab8a2df.jpeg",
       "barcodes": [
         {
           "code": "194252025062",
@@ -16535,7 +16547,7 @@
       "category": "Genel",
       "brand": "Apple",
       "description": "Apple Lightning Konnektörlü EarPods (Beyaz)",
-      "image": "https://cdn.getir.com/product/5aeab60b64d44100046bb5ec.jpeg?v=1528357431611",
+      "image": "https://cdn-image.getir.com/market/product/e7317bb9-e904-41f2-9bf0-569955b23ef8.jpeg",
       "barcodes": [
         {
           "code": "190198117687",
@@ -16849,7 +16861,7 @@
       "category": "Genel",
       "brand": "Saffet",
       "description": "Saffet Abdullah Şekerpare (250 g)",
-      "image": "https://cdn.getir.com/product/5afd95c02ba2a90004a70bc4.jpeg?v=1526978207793",
+      "image": "https://cdn-image.getir.com/market/product/1eb460fd-8636-402c-b892-0a1cbd73d242.jpeg",
       "barcodes": [
         {
           "code": "8692473000032",
@@ -17933,7 +17945,7 @@
       "category": "İçecek",
       "brand": "Caffeo",
       "description": "Caffeo Kahve Filtre Kağıdı 1x4 (80'li)",
-      "image": "https://cdn.getir.com/product/5b43475a2cbd6e0004c66235.jpeg?v=1531738824711",
+      "image": "https://cdn-image.getir.com/market/product/8fc6e5d8-67de-4e20-8124-93e8c1783e71.jpeg",
       "barcodes": [
         {
           "code": "8697980350489",
@@ -19737,6 +19749,12 @@
           "variant": ""
         },
         {
+          "code": "8684278082542",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8684779940976",
           "size": "",
           "type": "CUSTOM",
@@ -21401,7 +21419,7 @@
       "category": "Genel",
       "brand": "Toffifee",
       "description": "Toffifee Bütün Fındıklı & Karamelli Çikolata (125 g)",
-      "image": "https://cdn.getir.com/product/5bdab1179bed0600317b2df5.jpeg?v=1542109680596",
+      "image": "https://cdn-image.getir.com/market/product/2928edd5-fc72-4f5f-829f-787f4eb0c5d9.jpeg",
       "barcodes": [
         {
           "code": "4014400400007",
@@ -23560,7 +23578,7 @@
       "category": "Süt Ürünleri",
       "brand": "Sütaş",
       "description": "Sütaş Çikolatalı Süt (6 x 180 ml)",
-      "image": "https://cdn.getir.com/product/5c1a3a7805a22b000198ab5b_1545399307274.jpeg?v=1545399309483",
+      "image": "https://cdn-image.getir.com/market/product/d8c75302-be1a-4ee3-86c2-7af6caf88897.jpeg",
       "barcodes": [
         {
           "code": "8690767675416",
@@ -23655,7 +23673,7 @@
       "category": "Genel",
       "brand": "Cook",
       "description": "Cook Ekonomik Plastik Çatal (10'lu)",
-      "image": "https://cdn.getir.com/product/5c29e4fa38ade400012c6e32_1546500537198.jpeg?v=1546500539216",
+      "image": "https://cdn-image.getir.com/market/product/75a09c7e-d28b-4798-bfde-9b0ad7c1953d.jpeg",
       "barcodes": [
         {
           "code": "8690709071009",
@@ -23674,7 +23692,7 @@
       "category": "Genel",
       "brand": "Cook",
       "description": "Cook Lüks Plastik Kaşık (10'lu)",
-      "image": "https://cdn.getir.com/product/5c29e62f38ade400012c6f5b_1557846218854.jpeg?v=1557846222292",
+      "image": "https://cdn-image.getir.com/market/product/edcb228e-472f-4034-9fad-0598ea16cc0e.jpeg",
       "barcodes": [
         {
           "code": "8690709071023",
@@ -23775,7 +23793,7 @@
       "category": "Genel",
       "brand": "Cook",
       "description": "Cook Körüklü Jelatinli Pipet (25'li)",
-      "image": "https://cdn.getir.com/product/5c29e97278654c00014ed1f6_1557846151436.jpeg?v=1557846155476",
+      "image": "https://cdn-image.getir.com/market/product/24b53e25-5f6d-45a0-91d9-2f19237eeaba.jpeg",
       "barcodes": [
         {
           "code": "8690709079012",
@@ -23857,7 +23875,7 @@
       "category": "Genel",
       "brand": "Cook",
       "description": "Cook Karton Bardak (10'lu)",
-      "image": "https://cdn.getir.com/product/5c29eba978654c00014ed3af_1557846013639.jpeg?v=1557846017664",
+      "image": "https://cdn-image.getir.com/market/product/e60857fb-dcda-4e75-86d7-d7a6db44d5f6.jpeg",
       "barcodes": [
         {
           "code": "8690709072044",
@@ -24457,7 +24475,7 @@
       "category": "Genel",
       "brand": "Dixi",
       "description": "Dixi Yüzey Temizleyici Yaban Gülü (900 ml)",
-      "image": "https://cdn.getir.com/product/5c3f2821f9ba5f0001e78cbd_1547927939777.jpeg?v=1547927942807",
+      "image": "https://cdn-image.getir.com/market/product/f06432bd-4ac2-4639-b1ac-01ce00224ae8.jpeg",
       "barcodes": [
         {
           "code": "86912334",
@@ -25801,7 +25819,7 @@
       "category": "Süt Ürünleri",
       "brand": "Nestlé",
       "description": "Nestlé Nesquik Sütlü Çikolatalı Gofret (26,7 g)",
-      "image": "https://cdn.getir.com/product/5c608da1851b990001834ec7_1549974291553.jpeg?v=1549974294740",
+      "image": "https://cdn-image.getir.com/market/product/1675d327-33b2-4fe0-8a46-7014a523070e.jpg",
       "barcodes": [
         {
           "code": "8690632049168",
@@ -26519,7 +26537,7 @@
       "category": "Genel",
       "brand": "Solingen",
       "description": "Solingen Cımbız",
-      "image": "https://cdn.getir.com/product/5c74da900f1b010001a17555_1551708288792.jpeg?v=1551708292478",
+      "image": "https://cdn-image.getir.com/market/product/73680162-36e1-439d-8d7d-b5418102bb15.jpeg",
       "barcodes": [
         {
           "code": "8697888001605",
@@ -26538,7 +26556,7 @@
       "category": "Genel",
       "brand": "Solingen",
       "description": "Solingen Tırnak Makası",
-      "image": "https://cdn.getir.com/product/5c74db30bb1967000103b0b2_1551711518794.jpeg?v=1551711520337",
+      "image": "https://cdn-image.getir.com/market/product/911f6c21-ce86-47f1-b719-b9a055399576.jpeg",
       "barcodes": [
         {
           "code": "8697888005825",
@@ -26557,7 +26575,7 @@
       "category": "Genel",
       "brand": "Solingen",
       "description": "Solingen Tırnak Törpüsü",
-      "image": "https://cdn.getir.com/product/5c74db92bb1967000103b128_1551711957864.jpeg?v=1551711960637",
+      "image": "https://cdn-image.getir.com/market/product/06485f96-3cef-4098-91a2-bbbea4af9d1f.jpeg",
       "barcodes": [
         {
           "code": "8697888001803",
@@ -26576,7 +26594,7 @@
       "category": "Genel",
       "brand": "Lionesse",
       "description": "Lionesse Banyo Lifi (1 Adet)",
-      "image": "https://cdn.getir.com/product/5c74dc710f1b010001a177f1_1551712296433.jpeg?v=1551712300559",
+      "image": "https://cdn-image.getir.com/market/product/c9473fe1-841a-4ef3-af5f-b4db4254595a.jpeg",
       "barcodes": [
         {
           "code": "2000000171166",
@@ -26639,7 +26657,7 @@
       "category": "İçecek",
       "brand": "Kahve",
       "description": "Kahve Dünyası Guatemala Filtre Kahve (200 g)",
-      "image": "https://cdn.getir.com/product/5c756020bb1967000104bd94_1551254256092.jpeg?v=1551254260445",
+      "image": "https://cdn-image.getir.com/market/product/4283a82b-a916-436a-a1a1-7b8afc2da2e9.jpeg",
       "barcodes": [
         {
           "code": "8680562123670",
@@ -26658,7 +26676,7 @@
       "category": "İçecek",
       "brand": "Kahve",
       "description": "Kahve Dünyası Kolombiya Filtre Kahve (200 g)",
-      "image": "https://cdn.getir.com/product/5c7560c80f1b010001a280c0_1551253015353.jpeg?v=1551253019730",
+      "image": "https://cdn-image.getir.com/market/product/c14f35b1-bba4-4004-870a-9df54617b965.jpeg",
       "barcodes": [
         {
           "code": "8680562123700",
@@ -26677,7 +26695,7 @@
       "category": "Genel",
       "brand": "Tukaş",
       "description": "Tukaş Domates Salçası (700 g)",
-      "image": "https://cdn.getir.com/product/5c7d0e1bce95f20001626199_1552385768363.jpeg?v=1552385770188",
+      "image": "https://cdn-image.getir.com/market/product/be75db9a-0006-4268-a0ae-ce9ca1b18c43.jpeg",
       "barcodes": [
         {
           "code": "8690508101419",
@@ -27074,7 +27092,7 @@
       "category": "Fırın",
       "brand": "Uno",
       "description": "Uno Denge Tam Buğdaylı & Çiya Tohumlu Ekmek (400 g)",
-      "image": "https://cdn-image.getir.com/market/product/fd305f4b-16d8-42fe-b959-f3ea51be0599.webp",
+      "image": "https://cdn-image.getir.com/market/product/cc783312-f3aa-4f38-ba56-e7b943705120.jpg",
       "barcodes": [
         {
           "code": "8690698511692",
@@ -27628,7 +27646,7 @@
       "category": "Genel",
       "brand": "UNO",
       "description": "UNO Çikolata Kremalı Kruvasan (50 g)",
-      "image": "https://cdn.getir.com/product/5c91127e912940000180e421_1553511018133.jpeg?v=1553511021172",
+      "image": "https://cdn-image.getir.com/market/product/571cff30-bd7f-440d-949c-eca0b8e9b4f8.jpeg",
       "barcodes": [
         {
           "code": "8690698504779",
@@ -29756,7 +29774,7 @@
       "category": "Genel",
       "brand": "Kahvaltılık",
       "description": "Kahvaltılık Domates Paket (250 g)",
-      "image": "https://cdn-image.getir.com/market/product/219bc3b9-2b5d-45f8-aee1-d64e17cd33c6.jpg",
+      "image": "https://cdn-image.getir.com/market/product/511fce39-f3db-48ec-8ed0-52420744990d.jpg",
       "barcodes": [
         {
           "code": "2112345678917",
@@ -30489,10 +30507,10 @@
     },
     {
       "id": "5cb729e732ea10000156a7bc",
-      "name": "Domestos Klozet Bloğu 5'li Güç Çam Ferahlığı (2'li)",
+      "name": "Domestos Klozet Bloğu Güç Çam Ferahlığı (2'li)",
       "category": "Genel",
       "brand": "Domestos",
-      "description": "Domestos Klozet Bloğu 5'li Güç Çam Ferahlığı (2'li)",
+      "description": "Domestos Klozet Bloğu Güç Çam Ferahlığı (2'li)",
       "image": "https://cdn-image.getir.com/market/product/4e93554b-6b07-4ca9-afdf-e5f3b18931ae.jpg",
       "barcodes": [
         {
@@ -30606,7 +30624,7 @@
       "category": "Genel",
       "brand": "Sarelle",
       "description": "Sarelle Kakaolu Fındık Ezmesi (350 g)",
-      "image": "https://cdn-image.getir.com/market/product/b62702f5-1ca7-4fbe-bd40-b335ecba7547.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260427061858618_sarelle-kakaolu-findik-ezmesi-on.jpg",
       "barcodes": [
         {
           "code": "8683417000027",
@@ -30631,7 +30649,7 @@
       "category": "Genel",
       "brand": "Sarelle",
       "description": "Sarelle Fındık Ezmesi (350 g)",
-      "image": "https://cdn-image.getir.com/market/product/dbb94646-0052-4d52-940f-b77430ba68d2.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260427074930558_sarelle-findik-ezmesi-on.jpg",
       "barcodes": [
         {
           "code": "8683417000102",
@@ -30706,7 +30724,7 @@
       "category": "Süt Ürünleri",
       "brand": "Sarelle",
       "description": "Sarelle Duo Sütlü Kakaolu Fındık Kreması (350 g)",
-      "image": "https://cdn-image.getir.com/market/product/0daefba0-293e-4e36-863f-8bbb24bbc883.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260427075200183_sarelle-duo-on.jpg",
       "barcodes": [
         {
           "code": "8683417000041",
@@ -48702,6 +48720,25 @@
       "stock": null
     },
     {
+      "id": "5ced482e4a8a2a000137da77",
+      "name": "Ozmo Fun Meslekler Serisi Çikolata (23 g)",
+      "category": "Genel",
+      "brand": "Ozmo",
+      "description": "Ozmo Fun Meslekler Serisi Çikolata (23 g)",
+      "image": "https://cdn.getir.com/product/5ced482e4a8a2a000137da77_tr_1563722630132.jpeg",
+      "barcodes": [
+        {
+          "code": "8691707060200",
+          "size": "23 g",
+          "type": "CUSTOM",
+          "variant": "Serisi"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "5ced482e4a8a2a000137da7a",
       "name": "Yayla Kinoalı Mercimek Çorbası (250 g)",
       "category": "Genel",
@@ -49685,6 +49722,25 @@
           "size": "250 g",
           "type": "CUSTOM",
           "variant": "Kaşar"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "5ced48304a8a2a000137daaa",
+      "name": "Ozmo Popsy 3'lü (24 g)",
+      "category": "Genel",
+      "brand": "Ozmo",
+      "description": "Ozmo Popsy 3'lü (24 g)",
+      "image": "https://cdn-image.getir.com/market/product/2add1297-1557-4234-9e50-93f0b52ad879.jpg",
+      "barcodes": [
+        {
+          "code": "8691707079677",
+          "size": "24 g",
+          "type": "CUSTOM",
+          "variant": "Popsy"
         }
       ],
       "shelf": "-",
@@ -51351,7 +51407,19 @@
           "variant": ""
         },
         {
+          "code": "8684278082535",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8684779940785",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "868511524909",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -54233,7 +54301,7 @@
       "category": "Genel",
       "brand": "Sana",
       "description": "Sana Klasik Paket Margarin (250 g)",
-      "image": "https://cdn-image.getir.com/market/product/3baa1b84-d4b6-407a-83cb-40850a501dd5.jpg",
+      "image": "https://cdn-image.getir.com/market/product/824cfa1b-6201-4b7d-9fa0-3e4ee0dbe638.png",
       "barcodes": [
         {
           "code": "8719200751613",
@@ -60441,7 +60509,7 @@
       "category": "Genel",
       "brand": "Altınbaşak",
       "description": "Altınbaşak Çörekotlu ve Kinoalı Light Bisküvi (40 g)",
-      "image": "https://cdn-image.getir.com/market/product/207286fc-ede2-46d5-b713-fa45eaacd48f.jpg",
+      "image": "https://cdn-image.getir.com/market/product/b0fedf9e-95aa-4013-ac83-f4f1348adbb4.png",
       "barcodes": [
         {
           "code": "8690504011699",
@@ -65475,6 +65543,12 @@
         },
         {
           "code": "8683454680404",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8683941466214",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -85953,7 +86027,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Karam %70 Kakaolu Bitter Çikolata (60 g)",
-      "image": "https://cdn-image.getir.com/market/product/ca749082-9dbd-46ff-9a64-860d602398cb.jpg",
+      "image": "https://cdn-image.getir.com/market/product/80986e31-449c-40a8-ae24-09b8c389f883.jpg",
       "barcodes": [
         {
           "code": "8690526028040",
@@ -86124,7 +86198,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Balık Kraker (85 g)",
-      "image": "https://cdn-image.getir.com/market/product/ca72706a-6947-4089-a113-f7b2d6f88c5d.jpeg",
+      "image": "https://cdn-image.getir.com/market/product/60b91925-2955-442f-b917-f6e4fe1a7952.jpg",
       "barcodes": [
         {
           "code": "8690526094038",
@@ -88627,7 +88701,7 @@
       "category": "Genel",
       "brand": "Pernigotti",
       "description": "Pernigotti IL Gelato Mini Klasik & Fıstık & Çikolata (6'lı)",
-      "image": "https://cdn.getir.com/product/5f55f2a587ced996466c74a9_tr_1599722130837.octet-stream",
+      "image": "https://cdn-image.getir.com/market/product/6e88af5e-fcda-44fa-9d04-6d8bda35560a.jpg",
       "barcodes": [
         {
           "code": "8690550917112",
@@ -88684,7 +88758,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Puf Kakaolu Bisküvi (18 g)",
-      "image": "https://cdn.getir.com/product/5f560a90871f777708349c14_tr_1600097725918.jpeg",
+      "image": "https://cdn-image.getir.com/market/product/9a3a17df-3fd6-49f2-bc51-b9a7febba150.jpg",
       "barcodes": [
         {
           "code": "86920124",
@@ -88703,7 +88777,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Puf Hindistan Cevizli Bisküvi (16 g)",
-      "image": "https://cdn-image.getir.com/market/product/b56c5d72-f5c4-48d8-984a-8369c6f6429d.jpg",
+      "image": "https://cdn-image.getir.com/market/product/434d07d3-6eb9-4b6c-8838-e20b64162e02.jpg",
       "barcodes": [
         {
           "code": "86920117",
@@ -89089,7 +89163,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Browni Gold Vişneli Çikolatalı Kek (45 g)",
-      "image": "https://cdn-image.getir.com/market/product/d19eaa10-e986-47b2-a4b4-ffc93dfd377d.webp",
+      "image": "https://cdn-image.getir.com/market/product/253d39c8-e406-4604-ae85-3bfba050f71c.jpg",
       "barcodes": [
         {
           "code": "8690526063744",
@@ -92285,7 +92359,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Browni Classic Çikolatalı Fındıklı Kek (200 g)",
-      "image": "https://cdn-image.getir.com/market/product/fccfe34e-ee36-44a3-858a-4aacf8522b3e.jpg",
+      "image": "https://cdn-image.getir.com/market/product/ba1192e4-bdb9-412d-a04a-6a34b0ca9bec.jpg",
       "barcodes": [
         {
           "code": "8690526086040",
@@ -93194,7 +93268,7 @@
       "category": "Genel",
       "brand": "Altınbaşak",
       "description": "Altınbaşak Sade Grissini (125 g)",
-      "image": "https://cdn.getir.com/product/5f9304b2b36716130038b41f_tr_1604420259100.jpeg",
+      "image": "https://cdn-image.getir.com/market/product/874877ef-b157-4d5b-9a99-950510e6d964.png",
       "barcodes": [
         {
           "code": "8690504074380",
@@ -108941,7 +109015,7 @@
       "category": "Genel",
       "brand": "Altınbaşak",
       "description": "Altınbaşak Labne Sandviç (55 g)",
-      "image": "https://cdn-image.getir.com/market/product/b745ae4e-3128-4220-8959-93e322dcadf5.jpg",
+      "image": "https://cdn-image.getir.com/market/product/f6218faa-9b63-4555-98be-5b94757f965c.png",
       "barcodes": [
         {
           "code": "8690504116257",
@@ -117662,7 +117736,7 @@
       "category": "Genel",
       "brand": "Sana",
       "description": "Sana Paket Bitkisel Margarin Tereyağı Lezzeti (250 g)",
-      "image": "https://cdn-image.getir.com/market/product/798d7a23-7ed3-4307-8ae3-76d1e58495bb.jpg",
+      "image": "https://cdn-image.getir.com/market/product/f59802a1-a0b0-4aa3-9e58-95c788004530.png",
       "barcodes": [
         {
           "code": "8719200751569",
@@ -122594,7 +122668,7 @@
       "category": "Genel",
       "brand": "Sinangil",
       "description": "Sinangil Gluten Yok Hindistan Cevizli Kurabiye (45 g)",
-      "image": "https://cdn-image.getir.com/market/product/10ae48e3-2b54-49d6-90e6-b5c9e551b987.png",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260427065205833__-Sinangil-Glutensiz-Hind-Ceviz-Krbiye-45g-.jpg",
       "barcodes": [
         {
           "code": "8697702983186",
@@ -122665,6 +122739,12 @@
           "variant": ""
         },
         {
+          "code": "8684278082504",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8745265871102",
           "size": "",
           "type": "CUSTOM",
@@ -122681,7 +122761,7 @@
       "category": "Genel",
       "brand": "Nektarin",
       "description": "Nektarin Paket (225 g)",
-      "image": "https://cdn-image.getir.com/market/product/40dc0e83-f467-47de-8e13-63d02595b103.jpg",
+      "image": "https://cdn-image.getir.com/market/product/7ac575ec-60ae-4a35-b3b2-fa22389dc880.jpg",
       "barcodes": [
         {
           "code": "8546568514211",
@@ -122691,6 +122771,12 @@
         },
         {
           "code": "8569864852214",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8684278082511",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -123347,6 +123433,12 @@
         },
         {
           "code": "8684278082498",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8684779941874",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -132695,8 +132787,14 @@
       "image": "https://cdn-image.getir.com/market/product/ca3ff162-5354-4306-810e-b4c5d82004d5.jpg",
       "barcodes": [
         {
-          "code": "8682655004248",
+          "code": "8372118520087",
           "size": "2 kg",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8682655004248",
+          "size": "",
           "type": "CUSTOM",
           "variant": ""
         },
@@ -140485,7 +140583,7 @@
       "category": "Süt Ürünleri",
       "brand": "Altınbaşak",
       "description": "Altınbaşak Tahıl Cipsi Yoğurt & Mevsim Yeşillikleri (50 g)",
-      "image": "https://cdn-image.getir.com/market/product/fd21bbe2-f1ab-48f4-87bd-5d4223169748.jpg",
+      "image": "https://cdn-image.getir.com/market/product/7f2b55a1-bd08-4ca7-b3fb-55166c09ac0d.png",
       "barcodes": [
         {
           "code": "8690504011521",
@@ -142625,7 +142723,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Browni Intense Fındıklı & Çikolatalı Kek (48 g)",
-      "image": "https://cdn-image.getir.com/market/product/fa957b96-6df7-46e4-a6ab-17533edda997.webp",
+      "image": "https://cdn-image.getir.com/market/product/63037bf5-074a-4e86-b7a6-ec6a07db49e4.jpg",
       "barcodes": [
         {
           "code": "8690526829487",
@@ -143929,7 +144027,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Puf Renkli Granül Kaplamalı Bisküvi (18 g)",
-      "image": "https://cdn-image.getir.com/market/product/3bea20c8-2981-4bd4-8005-78427a91e89c.jpg",
+      "image": "https://cdn-image.getir.com/market/product/86128ee2-049d-4112-83aa-5abbdf83b750.jpg",
       "barcodes": [
         {
           "code": "86920131",
@@ -143948,7 +144046,7 @@
       "category": "Meyve & Sebze",
       "brand": "Eti",
       "description": "Eti Puf Dolgulu Bisküvi Kırmızı Meyveli (20 g)",
-      "image": "https://cdn-image.getir.com/market/product/c767c5b9-7b11-42b3-8047-128c435258f1.jpg",
+      "image": "https://cdn-image.getir.com/market/product/91e77b3a-7800-4635-9e44-bd37c86bddaa.jpg",
       "barcodes": [
         {
           "code": "8690526073446",
@@ -148038,6 +148136,25 @@
       "stock": null
     },
     {
+      "id": "6540f89c623cc5a611554dc2",
+      "name": "Master Farm Aronya 150 g",
+      "category": "Genel",
+      "brand": "Master",
+      "description": "Master Farm Aronya 150 g",
+      "image": "https://cdn-image.getir.com/market/product/a6d0720b-6bc4-4c20-aca7-6a20c839dfb5.jpg",
+      "barcodes": [
+        {
+          "code": "8683717471695",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": "Aronya"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "6540f8adc57d947e2323aedc",
       "name": "Kara Sevda Klasik Ayçekirdeği 135g",
       "category": "Genel",
@@ -150745,7 +150862,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Tartini Frambuazlı Turta (114 g)",
-      "image": "https://cdn-image.getir.com/market/product/338bf0f7-b0b1-4a5a-a2c4-f79177ce6f11.jpg",
+      "image": "https://cdn-image.getir.com/market/product/16c5408b-ed18-4b67-b729-2ca46d2c398a.jpg",
       "barcodes": [
         {
           "code": "8690526288758",
@@ -154007,10 +154124,10 @@
     },
     {
       "id": "659bae299278a07a047c5f03",
-      "name": "Erşan Çemeni Sıyrılmış Seçme Pastırma (110 g)",
+      "name": "Erşan Çemeni Sıyrılmış Pastırma (110 g)",
       "category": "Genel",
       "brand": "Erşan",
-      "description": "Erşan Çemeni Sıyrılmış Seçme Pastırma (110 g)",
+      "description": "Erşan Çemeni Sıyrılmış Pastırma (110 g)",
       "image": "https://cdn-image.getir.com/market/product/a34d5566-e37e-4db0-afec-cc9a15921756.jpg",
       "barcodes": [
         {
@@ -155416,7 +155533,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Canga Cookie Bar (45 g)",
-      "image": "https://cdn-image.getir.com/market/product/0a70d99e-4efe-4f50-a47e-babe9fd93618.jpg",
+      "image": "https://cdn-image.getir.com/market/product/9a00fa6e-652a-4e06-8136-bc451efc42dd.jpg",
       "barcodes": [
         {
           "code": "8690526940649",
@@ -159270,7 +159387,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Petit Beurre Kakaolu Fındıklı Kremalı Bisküvi (270 g)",
-      "image": "https://cdn-image.getir.com/market/product/b4d0b1f7-5601-4bac-b599-72901a84bd35.jpg",
+      "image": "https://cdn-image.getir.com/market/product/6bc520d7-a187-46e0-9fbe-f7144da7e31f.jpg",
       "barcodes": [
         {
           "code": "8690526740744",
@@ -164956,7 +165073,7 @@
       "category": "Genel",
       "brand": "Dovido",
       "description": "Dovido Multi Furito Böğürtlen  Çilek Aromalı Üzüm (112 g)",
-      "image": "https://cdn-image.getir.com/market/product/01067b18-5863-4b46-8b1f-7aa7e6cccaf9.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260430123110395_dovido.png",
       "barcodes": [
         {
           "code": "8697742721830",
@@ -166987,7 +167104,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Maximus Loading (50 g)",
-      "image": "https://cdn-image.getir.com/market/product/7fc63747-8280-43e3-9fc9-06d84a1f8738.webp",
+      "image": "https://cdn-image.getir.com/market/product/554b78a2-9252-46e7-8326-df2f87c4f924.jpg",
       "barcodes": [
         {
           "code": "8690526067438",
@@ -169498,7 +169615,7 @@
       "category": "Genel",
       "brand": "Nutella",
       "description": "Nutella Kakaolu Fındık Kreması (1 kg)",
-      "image": "https://cdn-image.getir.com/market/product/33ba094b-50d5-4387-bb33-2694be018fbd.jpeg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260427103421800_nutella-on.jpg",
       "barcodes": [
         {
           "code": "8000500082379",
@@ -172113,7 +172230,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Puf Gold Tuzlu Karamel Dolgulu (20 g)",
-      "image": "https://cdn-image.getir.com/market/product/204ed23c-940a-4d7c-a57a-85a5c382991a.jpg",
+      "image": "https://cdn-image.getir.com/market/product/d5258f0d-ef2a-49e1-818a-7935a82fdc84.jpg",
       "barcodes": [
         {
           "code": "8690526615684",
@@ -174674,7 +174791,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Çikolata Fıstık İşi (50 g)",
-      "image": "https://cdn-image.getir.com/market/product/5313a290-b280-42c4-999e-129577ee3a9b.jpg",
+      "image": "https://cdn-image.getir.com/market/product/69d38091-192d-446d-b0d0-d71509555731.jpg",
       "barcodes": [
         {
           "code": "8690526182278",
@@ -174693,7 +174810,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Gong Pops Ballı Hardallı  (80 g)",
-      "image": "https://cdn-image.getir.com/market/product/e6aa4187-4344-4bdd-9bc6-6840d9244598.jpg",
+      "image": "https://cdn-image.getir.com/market/product/770623d3-a310-47f8-a196-cd5699671cf6.jpg",
       "barcodes": [
         {
           "code": "8690526482354",
@@ -176782,7 +176899,7 @@
       "category": "Genel",
       "brand": "Sana",
       "description": "Sana Bitkisel Yağlı Kremsos (200 ml)",
-      "image": "https://cdn-image.getir.com/market/product/20b48ff7-cb59-4003-8223-5194c95d4f97.jpg",
+      "image": "https://cdn-image.getir.com/market/product/20083503-bf74-46a9-99f2-e44179e48fd7.png",
       "barcodes": [
         {
           "code": "8719200307377",
@@ -177414,7 +177531,7 @@
       "category": "Genel",
       "brand": "A4",
       "description": "A4 Kağıt (80 g 500 Adet)",
-      "image": "https://cdn-image.getir.com/market/product/03010d9b-785d-4c37-9fdb-b8f6d0950fa2.jpg",
+      "image": "https://cdn-image.getir.com/market/product/8e87072a-dbe6-48c7-a134-ed3f9faa18ff.jpg",
       "barcodes": [
         {
           "code": "8690345708246",
@@ -178629,7 +178746,7 @@
       "category": "Süt Ürünleri",
       "brand": "Eti",
       "description": "Eti Sütlü Kare Çikolata (60 g)",
-      "image": "https://cdn-image.getir.com/market/product/f50bc1c7-2edc-4695-97c6-7d248c7984a8.jpg",
+      "image": "https://cdn-image.getir.com/market/product/de5d0483-9700-40d8-ac13-1af04db5b87e.jpg",
       "barcodes": [
         {
           "code": "8690526716589",
@@ -178648,7 +178765,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Gofret Çilekli Beyaz Çikolatalı (29 g)",
-      "image": "https://cdn-image.getir.com/market/product/2499f713-4525-4ba2-a094-59b726a1103d.webp",
+      "image": "https://cdn-image.getir.com/market/product/ce1aebf7-f4a6-4905-8b81-d7111b1feb76.jpg",
       "barcodes": [
         {
           "code": "8690526356457",
@@ -178990,7 +179107,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Çıtır Balık Kraker (70 g)",
-      "image": "https://cdn-image.getir.com/market/product/26977c0f-9044-432f-9749-655d39971206.jpg",
+      "image": "https://cdn-image.getir.com/market/product/78860799-3fbb-4ea9-83c3-c825912ac4d9.jpg",
       "barcodes": [
         {
           "code": "8690526358543",
@@ -179028,7 +179145,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Pronot Hindistan Cevizli (85 g)",
-      "image": "https://cdn-image.getir.com/market/product/7af121dc-3616-4b15-a8ab-2451b212e9f4.jpg",
+      "image": "https://cdn-image.getir.com/market/product/178f318b-ecf4-4e3b-8324-2c2a133fbd42.jpg",
       "barcodes": [
         {
           "code": "8690526692302",
@@ -179104,7 +179221,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Crax Patlamış Mısırlı Kraker (50 g)",
-      "image": "https://cdn-image.getir.com/market/product/d245ef97-45bd-49a7-aa2b-fbe338b0f387.webp",
+      "image": "https://cdn-image.getir.com/market/product/0bc40b9d-a04b-4fd2-bce3-00a84c3201ef.jpg",
       "barcodes": [
         {
           "code": "8690526024363",
@@ -179123,7 +179240,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Lifalif Antep Fıstıklı Yulaf Bar (35 g)",
-      "image": "https://cdn-image.getir.com/market/product/65dd0755-f902-4aa5-bea8-ca40d7ffc987.jpg",
+      "image": "https://cdn-image.getir.com/market/product/de4ed57b-4f22-46a7-bf0a-86048bb59154.jpg",
       "barcodes": [
         {
           "code": "8690526681702",
@@ -179142,7 +179259,7 @@
       "category": "Süt Ürünleri",
       "brand": "Eti",
       "description": "Eti Bol Sütlü Çikolata (60 g)",
-      "image": "https://cdn-image.getir.com/market/product/21159bb6-e1c7-4d12-ace2-41791ee012ad.jpg",
+      "image": "https://cdn-image.getir.com/market/product/cc08199c-cd47-4d51-90de-18127923b7ea.jpg",
       "barcodes": [
         {
           "code": "8690526459400",
@@ -179161,7 +179278,7 @@
       "category": "Genel",
       "brand": "Crax",
       "description": "Crax Thins Mexican Chili Kraker (70 g)",
-      "image": "https://cdn-image.getir.com/market/product/7b07aed8-6470-4038-a43f-7e9ece1e0e59.jpg",
+      "image": "https://cdn-image.getir.com/market/product/637a859a-6d30-4ee4-8df9-221880504ac9.jpg",
       "barcodes": [
         {
           "code": "8690526297743",
@@ -179180,7 +179297,7 @@
       "category": "Genel",
       "brand": "Crax",
       "description": "Crax Thins Tatlı Biber Ekşi Krema (70 g)",
-      "image": "https://cdn-image.getir.com/market/product/82c7d475-467e-4e64-9006-467bd722b956.jpg",
+      "image": "https://cdn-image.getir.com/market/product/92438058-da9b-4795-a469-aafbddcd1e86.jpg",
       "barcodes": [
         {
           "code": "8690526364605",
@@ -179256,7 +179373,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Pronot Glutensiz Fındıklı ve Kakaolu (144 g)",
-      "image": "https://cdn-image.getir.com/market/product/7e0e440a-3cce-44a9-80a4-5df3a01809c2.jpg",
+      "image": "https://cdn-image.getir.com/market/product/ab20e715-5eb7-4f50-8908-b595b5558bbe.jpg",
       "barcodes": [
         {
           "code": "8690526238012",
@@ -179845,7 +179962,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Tutku Tart (45 g)",
-      "image": "https://cdn-image.getir.com/market/product/b69a4a86-eafd-4916-8035-f33e2d299718.jpg",
+      "image": "https://cdn-image.getir.com/market/product/15d9a9a3-b8e3-45f9-8dcc-3bd9857a55b5.jpg",
       "barcodes": [
         {
           "code": "8690526164267",
@@ -179883,7 +180000,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Karam Gurme Antep Fıstıklı Kremalı Gofret (36 g)",
-      "image": "https://cdn-image.getir.com/market/product/aaf20174-ebc0-45f5-b720-7c457b6f9960.webp",
+      "image": "https://cdn-image.getir.com/market/product/c6a157eb-d9bb-4e69-a49d-55260e6810cf.jpg",
       "barcodes": [
         {
           "code": "8690526209951",
@@ -181251,7 +181368,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Browni Intense Antep Fıstıklı (35 g)",
-      "image": "https://cdn-image.getir.com/market/product/f3460fbd-59d4-4971-acc2-396a02c99499.webp",
+      "image": "https://cdn-image.getir.com/market/product/8c60fedb-72f2-4173-84bb-446f8e3cfb7e.jpg",
       "barcodes": [
         {
           "code": "8690526954127",
@@ -181941,7 +182058,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Burçak Fesleğenli Tahıl Cipsi (40 g)",
-      "image": "https://cdn-image.getir.com/market/product/e84488f2-ec90-49df-933f-92e2e0e31df5.jpg",
+      "image": "https://cdn-image.getir.com/market/product/813610f0-0c31-4b63-b92a-a0a76bfa705e.jpg",
       "barcodes": [
         {
           "code": "8690526292694",
@@ -183448,7 +183565,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Crax Çubuk Kraker (40 g)",
-      "image": "https://cdn-image.getir.com/market/product/04749457-de39-416e-bed2-0be38f4b96f4.jpg",
+      "image": "https://cdn-image.getir.com/market/product/b45b2f4c-e2f2-4596-9e8d-da1a83ec6bf7.jpg",
       "barcodes": [
         {
           "code": "8690533034010",
@@ -183467,7 +183584,7 @@
       "category": "Süt Ürünleri",
       "brand": "Eti",
       "description": "Eti Crax Peynirli Çubuk Kraker (80 g)",
-      "image": "https://cdn-image.getir.com/market/product/ccfa12fa-da4a-4165-b907-3a4918863f83.jpg",
+      "image": "https://cdn-image.getir.com/market/product/c45d9eec-788d-4fe7-be00-c9971b97633e.jpg",
       "barcodes": [
         {
           "code": "8690533714141",
@@ -183790,7 +183907,7 @@
       "category": "Süt Ürünleri",
       "brand": "Eti",
       "description": "Eti Gong Çilekli Yoğurtlu Pirinç Patlağı (30 g)",
-      "image": "https://cdn-image.getir.com/market/product/fc9d81da-0297-4b6a-ac1b-3b60bc6c2189.jpeg",
+      "image": "https://cdn-image.getir.com/market/product/5dcf2b1d-17ec-4ee9-b443-789ba78ba2e5.jpg",
       "barcodes": [
         {
           "code": "8690526588452",
@@ -183809,7 +183926,7 @@
       "category": "Süt Ürünleri",
       "brand": "Eti",
       "description": "Eti Gong Sütlü Çikolata Kaplamalı Pirinç Patlağı (30 g)",
-      "image": "https://cdn-image.getir.com/market/product/5fdd2125-a878-4f50-8e02-01791e635294.jpeg",
+      "image": "https://cdn-image.getir.com/market/product/e6ab0fdc-70c3-4506-a1d8-051debed6dc4.jpg",
       "barcodes": [
         {
           "code": "8690526344102",
@@ -184507,6 +184624,25 @@
       "stock": null
     },
     {
+      "id": "695d207116b32aeaa65d802c",
+      "name": "Dondurma Çantası Mentalist (TR Ekipman)",
+      "category": "Genel",
+      "brand": "Dondurma",
+      "description": "Dondurma Çantası Mentalist (TR Ekipman)",
+      "image": "https://cdn-image.getir.com/market/product/2f04dfcc-6873-45ce-ac54-46c2c0758773.webp",
+      "barcodes": [
+        {
+          "code": "1234567811131",
+          "size": "TR Ekipman",
+          "type": "CUSTOM",
+          "variant": "Mentalist"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "695e404b507ccdfa26227a06",
       "name": "Dovido Kuru Üzüm (500g)",
       "category": "Genel",
@@ -184588,7 +184724,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Benim'O Kombo Hindistan Cevizi ve Çikolata Kaplamalı Bisküvi (56 g)",
-      "image": "https://cdn-image.getir.com/market/product/d68f9ba0-f6e4-4ad3-860c-5c2dd1655783.jpg",
+      "image": "https://cdn-image.getir.com/market/product/f4731554-4045-4969-8e67-7e78efb3acae.jpg",
       "barcodes": [
         {
           "code": "8690526962115",
@@ -184698,17 +184834,17 @@
     },
     {
       "id": "69618504d4205b0df7dbf3c7",
-      "name": "Yumoş Extra Manolya (1440 ml)",
+      "name": "Yumoş Extra Konsantre Çamaşır Yumuşatıcı Manolya 60 Yıkama (1440 ml)",
       "category": "Genel",
       "brand": "Yumoş",
-      "description": "Yumoş Extra Manolya (1440 ml)",
-      "image": "https://cdn-image.getir.com/market/product/080992fd-c64f-467c-91d5-72d7138960b8.jpg",
+      "description": "Yumoş Extra Konsantre Çamaşır Yumuşatıcı Manolya 60 Yıkama (1440 ml)",
+      "image": "https://cdn-image.getir.com/market/product/7cc66374-dcb4-4e13-895f-9001ff092d97.jpg",
       "barcodes": [
         {
           "code": "8683130125052",
           "size": "1440 ml",
           "type": "CUSTOM",
-          "variant": "Manolya"
+          "variant": "Yıkama"
         }
       ],
       "shelf": "-",
@@ -185615,6 +185751,44 @@
       "stock": null
     },
     {
+      "id": "69763853203f0c4e54d0ef17",
+      "name": "Dovido Gurme Mango (70 g)",
+      "category": "Genel",
+      "brand": "Dovido",
+      "description": "Dovido Gurme Mango (70 g)",
+      "image": "https://cdn-image.getir.com/market/product/f994df96-094d-428d-9647-221249ed93ff.jpg",
+      "barcodes": [
+        {
+          "code": "8697742722141",
+          "size": "70 g",
+          "type": "CUSTOM",
+          "variant": "Mango"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6976385d8863b7a1826238d0",
+      "name": "Dovido Gurme Papaya (70 g)",
+      "category": "Genel",
+      "brand": "Dovido",
+      "description": "Dovido Gurme Papaya (70 g)",
+      "image": "https://cdn-image.getir.com/market/product/1704181d-6464-40fc-85db-ef47314d19f0.jpg",
+      "barcodes": [
+        {
+          "code": "8697742721007",
+          "size": "70 g",
+          "type": "CUSTOM",
+          "variant": "Papaya"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "6978ba5d24d7cba3f2b3ead6",
       "name": "Aysan Salatalık Turşu (670 g) (670 g)",
       "category": "Genel",
@@ -186177,7 +186351,7 @@
       "category": "Süt Ürünleri",
       "brand": "Eti",
       "description": "Eti Sütlü Çikolata Kaplı Fındık Kremalı Gofret (29 g)",
-      "image": "https://cdn-image.getir.com/market/product/b0a3622c-910c-4832-8aec-612b57a23153.jpg",
+      "image": "https://cdn-image.getir.com/market/product/f2ec5186-8384-4fa5-aaf5-76f906c13bd9.jpg",
       "barcodes": [
         {
           "code": "8690526953625",
@@ -186800,15 +186974,15 @@
     },
     {
       "id": "6995c732dffc689961b2f105",
-      "name": "ABC Ultra Çamaşır Suyu Bembeyaz (750 ml)",
+      "name": "ABC Ultra Çamaşır Suyu Bembeyaz (780 ml)",
       "category": "İçecek",
       "brand": "ABC",
-      "description": "ABC Ultra Çamaşır Suyu Bembeyaz (750 ml)",
-      "image": "https://cdn-image.getir.com/market/product/df74ce42-5d06-4c78-b602-8a25c820aea4.jpg",
+      "description": "ABC Ultra Çamaşır Suyu Bembeyaz (780 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260427151937951_ABC-UCS-Pure-White-750_1-1.jpg",
       "barcodes": [
         {
           "code": "8690511110446",
-          "size": "750 ml",
+          "size": "780 ml",
           "type": "CUSTOM",
           "variant": "Bembeyaz"
         }
@@ -186971,15 +187145,15 @@
     },
     {
       "id": "699719c0aee8ccd1b4e8c272",
-      "name": "ABC Parfumia Konsantre Yumuşatıcı Tutkulu (1435 ml)",
+      "name": "ABC Parfumia Konsantre Yumuşatıcı Tutkulu (1440 ml)",
       "category": "Genel",
       "brand": "ABC",
-      "description": "ABC Parfumia Konsantre Yumuşatıcı Tutkulu (1435 ml)",
+      "description": "ABC Parfumia Konsantre Yumuşatıcı Tutkulu (1440 ml)",
       "image": "https://cdn-image.getir.com/market/product/5d61a034-485c-42a9-a817-556d5ff306c9.jpg",
       "barcodes": [
         {
           "code": "8690511125938",
-          "size": "1435 ml",
+          "size": "1440 ml",
           "type": "CUSTOM",
           "variant": "Tutkulu"
         }
@@ -187286,6 +187460,25 @@
           "size": "10'lu",
           "type": "CUSTOM",
           "variant": "Yoğun"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "699ede6c1d1f76729692313d",
+      "name": "Sleepy Natural 3 No Midi Süper (56'lı)",
+      "category": "Genel",
+      "brand": "Sleepy",
+      "description": "Sleepy Natural 3 No Midi Süper (56'lı)",
+      "image": "https://cdn-image.getir.com/market/product/46b9a024-9ab1-4e6d-b3cf-6c5c340e71f4.jpg",
+      "barcodes": [
+        {
+          "code": "8682241224258",
+          "size": "56'lı",
+          "type": "CUSTOM",
+          "variant": "Süper"
         }
       ],
       "shelf": "-",
@@ -188155,11 +188348,11 @@
     },
     {
       "id": "69c30737ffd2204e6d76a9a3",
-      "name": "Vernel Max Lilyum (1440 ml)",
+      "name": "Vernel Max Konsantre Çamaşır Yumuşatıcı Lilyum (1440 ml)",
       "category": "Genel",
       "brand": "Vernel",
-      "description": "Vernel Max Lilyum (1440 ml)",
-      "image": "https://cdn-image.getir.com/market/product/c158b065-1d98-4776-ab36-22b7c831b99f.jpg",
+      "description": "Vernel Max Konsantre Çamaşır Yumuşatıcı Lilyum (1440 ml)",
+      "image": "https://cdn-image.getir.com/market/product/07f05a4f-8295-4853-9a4b-6092b03ee81b.jpg",
       "barcodes": [
         {
           "code": "9000101842685",
@@ -188193,11 +188386,11 @@
     },
     {
       "id": "69c3d1cd9542759c94684fba",
-      "name": "Vernel Max Orkide (1440 ml)",
+      "name": "Vernel Max Konsantre Çamaşır Yumuşatıcı Orkide (1440 ml)",
       "category": "Genel",
       "brand": "Vernel",
-      "description": "Vernel Max Orkide (1440 ml)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260325121512035_Vernel_Relansman_tasarim_Orkide_1500x1500_02.jpg",
+      "description": "Vernel Max Konsantre Çamaşır Yumuşatıcı Orkide (1440 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260325121513661_Vernel_Relansman_tasarim_Orkide_1500x1500_01.jpg",
       "barcodes": [
         {
           "code": "9000101844115",
@@ -188235,7 +188428,7 @@
       "category": "Genel",
       "brand": "Pepsi",
       "description": "Pepsi Max Çilek Krema Aromalı Kola (330 ml)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260327110020795_pepsi-cilek-krema-on.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260427152128416_pepsi-cilek-krema-on.jpg",
       "barcodes": [
         {
           "code": "8690574118830",
@@ -188250,17 +188443,17 @@
     },
     {
       "id": "69c667ea89b0e743d7df295c",
-      "name": "Pepsi Vanilya ve Krema Aromalı Şekersiz Kola Pet  (330 ml)",
+      "name": "Pepsi Max Vanilya Krema Aromalı Kola (330 ml)",
       "category": "Genel",
       "brand": "Pepsi",
-      "description": "Pepsi Vanilya ve Krema Aromalı Şekersiz Kola Pet  (330 ml)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260327112015283_Pepsi_Vanilya_Krema_Can_330__1_.png",
+      "description": "Pepsi Max Vanilya Krema Aromalı Kola (330 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260427152213280_Pepsi-Vanilya-Krema-Can-330-_1_-_1_.jpg",
       "barcodes": [
         {
           "code": "8690574118847",
           "size": "330 ml",
           "type": "CUSTOM",
-          "variant": "Pet"
+          "variant": "Aromalı"
         }
       ],
       "shelf": "-",
@@ -188269,17 +188462,17 @@
     },
     {
       "id": "69c678588058f96531c8f895",
-      "name": "Pepsi Çilek ve Krema Aromalı Şekersiz Kola Pet  (1 L)",
+      "name": "Pepsi Max Çilek Krema Aromalı (1 L)",
       "category": "Genel",
       "brand": "Pepsi",
-      "description": "Pepsi Çilek ve Krema Aromalı Şekersiz Kola Pet  (1 L)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260327123018370_pepsi-cilek-krema-on.jpg",
+      "description": "Pepsi Max Çilek Krema Aromalı (1 L)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260427152340869_Pepsi-Cilek-Krema-Pet-1L-_1_-_1_.jpg",
       "barcodes": [
         {
           "code": "8690574118854",
           "size": "1 L",
           "type": "CUSTOM",
-          "variant": "Pet"
+          "variant": "Aromalı"
         }
       ],
       "shelf": "-",
@@ -188288,17 +188481,17 @@
     },
     {
       "id": "69c67ab70f7b32a680abca15",
-      "name": "Pepsi Vanilya ve Krema Aromalı Şekersiz Kola Pet (1 L)",
+      "name": "Pepsi Max Vanilya Krema Aromalı (1 L)",
       "category": "Genel",
       "brand": "Pepsi",
-      "description": "Pepsi Vanilya ve Krema Aromalı Şekersiz Kola Pet (1 L)",
+      "description": "Pepsi Max Vanilya Krema Aromalı (1 L)",
       "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260327124025251_pepsi-vanilya-krema-on.jpg",
       "barcodes": [
         {
           "code": "8690574118861",
           "size": "1 L",
           "type": "CUSTOM",
-          "variant": "Pet"
+          "variant": "Aromalı"
         }
       ],
       "shelf": "-",
@@ -188420,6 +188613,25 @@
       "stock": null
     },
     {
+      "id": "69d637b8e10429d49fc03d6d",
+      "name": "Tat Domates Salçası (400 g)",
+      "category": "Genel",
+      "brand": "Tat",
+      "description": "Tat Domates Salçası (400 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260408111056181_DomatesTeneke400g.jpg",
+      "barcodes": [
+        {
+          "code": "8690635030972",
+          "size": "400 g",
+          "type": "CUSTOM",
+          "variant": "Salçası"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "69d660b564f4810bf7628a90",
       "name": "Air Wick Elektrikli Yedek Beyaz Orkide (19 ml)",
       "category": "Genel",
@@ -188534,6 +188746,139 @@
       "stock": null
     },
     {
+      "id": "69de173552ddafbcd8698c8f",
+      "name": "bahs. Kremalı Körili Protein Noodle (100 g)",
+      "category": "Genel",
+      "brand": "",
+      "description": "bahs. Kremalı Körili Protein Noodle (100 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260414103015709_BAHS-KREMALI-KORILI-CUP.jpg",
+      "barcodes": [
+        {
+          "code": "8684834428173",
+          "size": "100 g",
+          "type": "CUSTOM",
+          "variant": "Noodle"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "69dfe19cb5b1cf05af3a31e3",
+      "name": "Vernel Max Konsantre Çamaşır Yumuşatıcı Amber (1,44 L)",
+      "category": "Genel",
+      "brand": "Vernel",
+      "description": "Vernel Max Konsantre Çamaşır Yumuşatıcı Amber (1,44 L)",
+      "image": "https://cdn-image.getir.com/market/product/e91a043b-5b04-4c75-9a2a-ea8ebdacc80b.jpg",
+      "barcodes": [
+        {
+          "code": "9000101844146",
+          "size": "1,44 L",
+          "type": "CUSTOM",
+          "variant": "Amber"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "69dff1fdcfe98411f8816531",
+      "name": "Ozmo Ogopogo Çilekli Kek (30 g)",
+      "category": "Genel",
+      "brand": "Ozmo",
+      "description": "Ozmo Ogopogo Çilekli Kek (30 g)",
+      "image": "https://cdn-image.getir.com/market/product/d53063a4-9bb3-4c16-ada0-cae823be0d4d.jpg",
+      "barcodes": [
+        {
+          "code": "8691707059839",
+          "size": "30 g",
+          "type": "CUSTOM",
+          "variant": "Çilekli"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "69dff207f9397f2aadd68cdd",
+      "name": "Ozmo Burger (36 g)",
+      "category": "Genel",
+      "brand": "Ozmo",
+      "description": "Ozmo Burger (36 g)",
+      "image": "https://cdn-image.getir.com/market/product/ec68728e-8583-4bff-86dc-0e2fb6e8b27f.jpg",
+      "barcodes": [
+        {
+          "code": "8691707057293",
+          "size": "36 g",
+          "type": "CUSTOM",
+          "variant": "Burger"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "69dff3006982cdeae074c9b6",
+      "name": "Ozmo Cornet Çilekli (25 g)",
+      "category": "Genel",
+      "brand": "Ozmo",
+      "description": "Ozmo Cornet Çilekli (25 g)",
+      "image": "https://cdn-image.getir.com/market/product/dbf1afca-5e3a-4f83-b491-3ef5b496eead.jpg",
+      "barcodes": [
+        {
+          "code": "8691707090344",
+          "size": "25 g",
+          "type": "CUSTOM",
+          "variant": "Çilekli"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "69dff30acfe98411f88167be",
+      "name": "Ozmo Hoppo Çikolatalı (90 g)",
+      "category": "Genel",
+      "brand": "Ozmo",
+      "description": "Ozmo Hoppo Çikolatalı (90 g)",
+      "image": "https://cdn-image.getir.com/market/product/581903c7-85a2-4bcc-8506-48880dfa2279.jpg",
+      "barcodes": [
+        {
+          "code": "8699141057138",
+          "size": "90 g",
+          "type": "CUSTOM",
+          "variant": "Çikolatalı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "69dff31bf9397f2aadd68e22",
+      "name": "Ozmo Fun Hayvanlar Serisi Çikolata (23 g)",
+      "category": "Genel",
+      "brand": "Ozmo",
+      "description": "Ozmo Fun Hayvanlar Serisi Çikolata (23 g)",
+      "image": "https://cdn-image.getir.com/market/product/fe1c9836-6dad-4d79-b068-01a2fabe8f5b.jpg",
+      "barcodes": [
+        {
+          "code": "8691707087962",
+          "size": "23 g",
+          "type": "CUSTOM",
+          "variant": "Serisi"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "69e0c016e93775b5afb59b20",
       "name": "Eker Öbek Tereyağı (200 g)",
       "category": "Genel",
@@ -188544,6 +188889,25 @@
         {
           "code": "8691316521291",
           "size": "200 g",
+          "type": "CUSTOM",
+          "variant": "Tereyağı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "69e0d8b7ed63056eaceef1cf",
+      "name": "Tahsildaroğlu Geleneksel Tereyağı (300 g)",
+      "category": "Genel",
+      "brand": "Tahsildaroğlu",
+      "description": "Tahsildaroğlu Geleneksel Tereyağı (300 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260416123607084_Tah_Geleneksel-Tereyagi_-300-g..jpg",
+      "barcodes": [
+        {
+          "code": "8691225157918",
+          "size": "300 g",
           "type": "CUSTOM",
           "variant": "Tereyağı"
         }
@@ -188565,6 +188929,25 @@
           "size": "150 g",
           "type": "CUSTOM",
           "variant": "Tereyağı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "69e1f69f75920ceb932c0b48",
+      "name": "Asperox Sparx Bulaşık Deterjanı Limon (650 ml)",
+      "category": "Genel",
+      "brand": "Asperox",
+      "description": "Asperox Sparx Bulaşık Deterjanı Limon (650 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260417090017669_asperox-sparx-limon-650ml-on.jpg",
+      "barcodes": [
+        {
+          "code": "8697713823181",
+          "size": "650 ml",
+          "type": "CUSTOM",
+          "variant": "Limon"
         }
       ],
       "shelf": "-",
