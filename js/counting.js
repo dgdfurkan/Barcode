@@ -1997,19 +1997,17 @@ class CountingSystem {
             if (chevron) chevron.style.transform = 'rotate(180deg)';
 
             const val = input.value.trim();
-            const isValid = COUNTING_SUBCATEGORIES.includes(val);
-            if (confirmBtn) confirmBtn.disabled = !isValid;
+            if (confirmBtn) confirmBtn.disabled = !val;
             if (hint) {
                 if (!val) {
-                    hint.textContent = 'Listedeki kategorilerden seçin';
+                    hint.textContent = 'Listeden seçin veya özel isim yazın';
                     hint.className = 'mt-1.5 text-xs text-gray-400';
-                } else if (isValid) {
-                    const already = this.getTableList().find(t => t.name === val);
-                    hint.textContent = already ? `✓ "${val}" zaten mevcut — seçince o tabloya geçilir` : `✓ "${val}" oluşturulabilir`;
-                    hint.className = `mt-1.5 text-xs ${already ? 'text-amber-500' : 'text-green-600'}`;
                 } else {
-                    hint.textContent = 'Listede bu kategori yok';
-                    hint.className = 'mt-1.5 text-xs text-red-500';
+                    const already = this.getTableList().find(t => t.name === val);
+                    hint.textContent = already
+                        ? `"${val}" zaten mevcut — seçince o tabloya geçilir`
+                        : `"${val}" oluşturulabilir`;
+                    hint.className = `mt-1.5 text-xs ${already ? 'text-amber-500' : 'text-green-600'}`;
                 }
             }
         });
@@ -2104,7 +2102,7 @@ class CountingSystem {
         if (chevron) chevron.style.transform = '';
         if (confirmBtn) confirmBtn.disabled = true;
         if (hint) {
-            hint.textContent = 'Listedeki kategorilerden seçin';
+            hint.textContent = 'Listeden seçin veya özel isim yazın';
             hint.className = 'mt-1.5 text-xs text-gray-400';
         }
     }
@@ -3658,10 +3656,6 @@ class CountingSystem {
                 const tableName = newTableNameInput?.value.trim();
                 if (!tableName) {
                     this.showToast('Lütfen bir kategori seçin', 'error', 3000);
-                    return;
-                }
-                if (!COUNTING_SUBCATEGORIES.includes(tableName)) {
-                    this.showToast('Lütfen listeden bir kategori seçin', 'error', 3000);
                     return;
                 }
                 // Zaten mevcut ise: o tabloya geç
