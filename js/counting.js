@@ -2083,9 +2083,9 @@ class CountingSystem {
                     type="button"
                     data-cat="${cat.replace(/"/g, '&quot;')}"
                     tabindex="-1"
-                    class="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors"
+                    class="w-full flex items-start gap-2 text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors"
                 >
-                    <span class="flex-1 truncate">${cat}</span>${badge}
+                    <span class="flex-1 min-w-0 break-words leading-snug">${cat}</span>${badge}
                 </button>`;
         }).join('');
     }
