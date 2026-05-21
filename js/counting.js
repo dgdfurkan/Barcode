@@ -637,7 +637,7 @@ class CountingSystem {
                     metaBlob = data.counting_data;
                 }
             }
-            // localStorage yedek
+            // localStorage yedek — hem meta hem tam blob olabilir
             if (!metaBlob) {
                 const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
                 const stored = localStorage.getItem(storageKey);
@@ -877,12 +877,13 @@ class CountingSystem {
         }
     }
 
-    /** Yalnızca meta verileri (api_info, auditLog, tableMeta) Supabase'e yazar — ürün verisi yazmaz.
-     *  counting_items tablosu yoksa ürünleri korumak için tam blob yazar. */
+    /** Meta + ürün verisi güvenlik yedeklemesi.
+     *  - counting_items HAZIR: Supabase'e sadece meta yazar (hafif), localStorage'a TAM blob yazar (ürünler güvende).
+     *  - counting_items HAZIR DEĞİL: Her iki hedefe de tam blob yazar. */
     async _saveMetaOnly() {
         if (!this.currentUser) return;
 
-        // counting_items hazır değil → ürün verisi bu blob'da duruyor, sadece meta yazmak veri kaybına yol açar
+        // counting_items hazır değil → tam blob her iki yere de
         if (this._countingItemsTableReady !== true) {
             await this._saveFullBlobLegacy(this.cachedFullData);
             return;
@@ -892,6 +893,7 @@ class CountingSystem {
             const meta = this._buildMetaBlob();
             this.cachedFullData._tableMeta = meta._tableMeta;
 
+            // Supabase: sadece meta (küçük, hızlı)
             if (window.supabase) {
                 const { error } = await window.supabase
                     .from('users')
@@ -900,11 +902,70 @@ class CountingSystem {
                 if (error) throw error;
             }
 
-            const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-            localStorage.setItem(storageKey, JSON.stringify(meta));
+            // localStorage: TAM blob (ürünler dahil) — acil kurtarma yedeği
+            this._saveFullBlobToLocalStorage();
         } catch (error) {
             console.error('Error saving meta:', error);
+            // Supabase başarısız olursa bile localStorage'a tam blob yaz
+            this._saveFullBlobToLocalStorage();
         }
+    }
+
+    /** Tüm ürünleri localStorage'a yazar — sessiz, hızlı, senkron. */
+    _saveFullBlobToLocalStorage() {
+        try {
+            if (!this.currentUser || !this.cachedFullData) return;
+            const fullBlob = this._buildFullBlob();
+            const key = `${this.STORAGE_KEY}_${this.currentUser.username}`;
+            localStorage.setItem(key, JSON.stringify(fullBlob));
+        } catch (e) { /* ignore — storage dolu olabilir */ }
+    }
+
+    /** Tüm tablo + ürün verisini içeren tam blob oluşturur (localStorage yedeği için). */
+    _buildFullBlob() {
+        if (!this.auditLog) this.auditLog = [];
+        const tables = this.cachedFullData?._tables || {};
+        // Aktif tablonun en güncel halini yaz
+        if (this.currentTableName && this.countingData) {
+            tables[this.currentTableName] = this.countingData;
+        }
+        const tableMeta = {};
+        for (const [tName, tData] of Object.entries(tables)) {
+            tableMeta[tName] = {
+                createdAt: tData._tableMeta?.createdAt || null,
+                _productOrder: Array.isArray(tData._productOrder) ? [...tData._productOrder] : [],
+            };
+        }
+        return {
+            _api_info: this.cachedFullData?._api_info || {},
+            _auditLog: this.auditLog.slice(-this.AUDIT_LOG_MAX),
+            _tableMeta: tableMeta,
+            _tables: tables,
+        };
+    }
+
+    /**
+     * Periyodik Supabase tam blob yedeği — counting_items başarısız olursa çapraz-cihaz kurtarma için.
+     * Her üründen sonra değil, 8 saniyelik debounce ile yazar.
+     */
+    _scheduleFullBackup() {
+        if (this._countingItemsTableReady !== true) return; // legacy zaten tam yazar
+        if (this._fullBackupTimer) clearTimeout(this._fullBackupTimer);
+        this._fullBackupTimer = setTimeout(() => {
+            this._fullBackupTimer = null;
+            this._writeFullBlobToSupabase().catch(() => {});
+        }, 8000);
+    }
+
+    async _writeFullBlobToSupabase() {
+        if (!window.supabase || !this.currentUser) return;
+        try {
+            const fullBlob = this._buildFullBlob();
+            await window.supabase
+                .from('users')
+                .update({ counting_data: fullBlob })
+                .eq('username', this.currentUser.username);
+        } catch (e) { /* ignore */ }
     }
 
     /** Tüm tablolardan meta bilgisini (createdAt, _productOrder) çıkarır */
@@ -1640,8 +1701,13 @@ class CountingSystem {
                 last_updated: entry.lastUpdated || new Date().toISOString(),
             }, { onConflict: 'username,table_name,product_id' });
             if (error) throw error;
+            // Başarılı: localStorage'ı tam blob ile güncelle + gecikmeli Supabase tam yedek
+            this._saveFullBlobToLocalStorage();
+            this._scheduleFullBackup();
         } catch (e) {
             console.error('saveProductEntry hatası:', e);
+            // Başarısız: localStorage'a tam blob yaz (acil yedek), blob yoluna düş
+            this._saveFullBlobToLocalStorage();
             this.scheduleSave(400);
         }
     }
@@ -6976,64 +7042,53 @@ class CountingSystem {
         // Click delegation rapidGrid üzerinde kurulur — burada listener ekleme
     }
 
+    /**
+     * Listedeki bir sonraki ürünü döner.
+     * Önce sayılmamış (warehouseStock yok) ürünleri arar; hiç yoksa sıradaki herhangi ürünü döner.
+     * Bu sayede sayı girilmiş olsun ya da olmasın ilerleme her zaman mümkündür.
+     */
     findNextUncountedProduct(currentProductId) {
         const productIds = this.getOrderedProductIds();
-        
-        // Find current product index
         const currentIndex = productIds.indexOf(currentProductId);
         if (currentIndex === -1) return null;
-        
-        // Start searching from next product
+        if (productIds.length <= 1) return null;
+
+        // 1. Önce gerçekten sayılmamışları dene (orijinal davranış)
         for (let i = currentIndex + 1; i < productIds.length; i++) {
-            const productId = productIds[i];
-            const data = this.countingData[productId] || {};
-            // Check if product is not counted (warehouseStock is null/undefined)
-            if (data.warehouseStock === null || data.warehouseStock === undefined) {
-                return productId;
-            }
+            const d = this.countingData[productIds[i]] || {};
+            if (d.warehouseStock === null || d.warehouseStock === undefined) return productIds[i];
         }
-        
-        // If not found after current, search from beginning
         for (let i = 0; i < currentIndex; i++) {
-            const productId = productIds[i];
-            const data = this.countingData[productId] || {};
-            // Check if product is not counted (warehouseStock is null/undefined)
-            if (data.warehouseStock === null || data.warehouseStock === undefined) {
-                return productId;
-            }
+            const d = this.countingData[productIds[i]] || {};
+            if (d.warehouseStock === null || d.warehouseStock === undefined) return productIds[i];
         }
-        
-        return null; // No uncounted product found
+
+        // 2. Hepsi sayılmışsa — sıradaki ürüne git (listenin sonunda sarma)
+        return productIds[(currentIndex + 1) % productIds.length];
     }
 
+    /**
+     * Listedeki bir önceki ürünü döner.
+     * Önce sayılmamış ürünleri arar; hiç yoksa bir önceki herhangi ürünü döner.
+     */
     findPreviousUncountedProduct(currentProductId) {
         const productIds = this.getOrderedProductIds();
-        
-        // Find current product index
         const currentIndex = productIds.indexOf(currentProductId);
         if (currentIndex === -1) return null;
-        
-        // Start searching backwards from previous product
+        if (productIds.length <= 1) return null;
+
+        // 1. Önce gerçekten sayılmamışları dene (orijinal davranış)
         for (let i = currentIndex - 1; i >= 0; i--) {
-            const productId = productIds[i];
-            const data = this.countingData[productId] || {};
-            // Check if product is not counted (warehouseStock is null/undefined)
-            if (data.warehouseStock === null || data.warehouseStock === undefined) {
-                return productId;
-            }
+            const d = this.countingData[productIds[i]] || {};
+            if (d.warehouseStock === null || d.warehouseStock === undefined) return productIds[i];
         }
-        
-        // If not found before current, search from end
         for (let i = productIds.length - 1; i > currentIndex; i--) {
-            const productId = productIds[i];
-            const data = this.countingData[productId] || {};
-            // Check if product is not counted (warehouseStock is null/undefined)
-            if (data.warehouseStock === null || data.warehouseStock === undefined) {
-                return productId;
-            }
+            const d = this.countingData[productIds[i]] || {};
+            if (d.warehouseStock === null || d.warehouseStock === undefined) return productIds[i];
         }
-        
-        return null; // No uncounted product found
+
+        // 2. Hepsi sayılmışsa — bir önceki ürüne git (listenin başında sarma)
+        return productIds[(currentIndex - 1 + productIds.length) % productIds.length];
     }
 
     isCameraScanAndCountMode() {
