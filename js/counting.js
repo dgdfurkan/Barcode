@@ -2316,6 +2316,7 @@ class CountingSystem {
         this.renderTable();
         this.updateStatistics();
         this.updateTableSelector();
+        this.scrollActiveGeneralTableChipIntoView({ behavior: 'auto' });
         this.syncSayimSubTabToTable();
     }
 
@@ -3449,7 +3450,8 @@ class CountingSystem {
 
         this._lastFilteredGeneral = filteredGeneral;
         this.renderGeneralDropdownList(filteredGeneral);
-        this.scrollActiveGeneralTableChipIntoView();
+        // NOT: scrollActiveGeneralTableChipIntoView burada çağrılmaz —
+        // scrollIntoView sayfa scroll'unu yukarı zıplatıyordu (sayım sheet kapanınca tetikleniyordu).
 
         const dailyTables = tables
             .filter((t) => this.isDailyTableName(t.name))
@@ -3618,9 +3620,9 @@ class CountingSystem {
         });
     }
 
-    /** Genel tablo pill şeridinde seçili chip görünür alana kayar (dropdown / arama sonrası dahil) */
+    /** Genel tablo pill şeridinde seçili chip görünür alana kayar — yalnızca yatay şerit, sayfa scroll etmez. */
     scrollActiveGeneralTableChipIntoView(options = {}) {
-        const behavior = options.behavior !== undefined ? options.behavior : 'smooth';
+        const behavior = options.behavior !== undefined ? options.behavior : 'auto';
         const list = document.getElementById('generalTableList');
         if (!list || list.classList.contains('sayim-general-table-list--empty')) return;
         if (this.isDailyTableName(this.currentTableName)) return;
@@ -3631,18 +3633,13 @@ class CountingSystem {
         if (!btn) return;
         const run = () => {
             try {
-                btn.scrollIntoView({ behavior, inline: 'center', block: 'nearest' });
+                const targetLeft = btn.offsetLeft - (list.clientWidth - btn.offsetWidth) / 2;
+                list.scrollTo({ left: Math.max(0, targetLeft), behavior });
             } catch (e) {
-                btn.scrollIntoView({ inline: 'center', block: 'nearest' });
+                list.scrollLeft = Math.max(0, btn.offsetLeft);
             }
         };
-        if (behavior === 'auto') {
-            requestAnimationFrame(run);
-            return;
-        }
-        requestAnimationFrame(() => {
-            requestAnimationFrame(run);
-        });
+        requestAnimationFrame(run);
     }
 
     /**
@@ -5239,8 +5236,8 @@ class CountingSystem {
     }
 
     /**
-     * Getir CDN ürün görsel URL listesi: eşleşen ürünleri tabloya ekler; tabloda olanları atlar;
-     * yeni eklenenler mevcut sıranın sonuna (yapıştırma sırasıyla) yazılır.
+     * Getir CDN ürün görsel URL listesi: eşleşen ürünleri tabloya ekler.
+     * Yapıştırma sırası birebir korunur (mevcut ürünler de bu sıraya göre yeniden dizilir).
      * @param {string[]} urls
      */
     async bulkAddProductsFromGetirCdnPaste(urls) {
@@ -5250,12 +5247,11 @@ class CountingSystem {
             return { added: 0, skippedInTable: 0, noMatch: 0 };
         }
 
-        const priorOrder = this.getOrderedProductIds().filter((id) => this.countingData[id]);
-        const alreadyInTable = new Set(priorOrder);
-        const addedIds = [];
-        const seenNew = new Set();
+        const idsInPasteOrder = [];
+        const seenInPaste = new Set();
         let skippedInTable = 0;
         let noMatch = 0;
+        let addedCount = 0;
 
         for (let i = 0; i < urls.length; i++) {
             const product = findFn(this.allProducts, urls[i]);
@@ -5263,17 +5259,20 @@ class CountingSystem {
                 noMatch++;
                 continue;
             }
-            if (alreadyInTable.has(product.id)) {
-                skippedInTable++;
-                continue;
+            const wasInTable = !!this.countingData[product.id];
+            if (!seenInPaste.has(product.id)) {
+                seenInPaste.add(product.id);
+                idsInPasteOrder.push(product.id);
             }
-            if (seenNew.has(product.id)) continue;
-            seenNew.add(product.id);
-            this.addProductToCounting(product, { skipSave: true });
-            addedIds.push(product.id);
+            if (!wasInTable) {
+                this.addProductToCounting(product, { skipSave: true });
+                addedCount++;
+            } else {
+                skippedInTable++;
+            }
         }
 
-        if (addedIds.length === 0) {
+        if (idsInPasteOrder.length === 0) {
             if (noMatch > 0 && skippedInTable === 0) {
                 this.showToast('Bu görsel adresleriyle eşleşen ürün bulunamadı', 'warning', 4000);
             } else if (skippedInTable > 0) {
@@ -5289,32 +5288,41 @@ class CountingSystem {
             return { added: 0, skippedInTable, noMatch };
         }
 
-        this.countingData._productOrder = [...priorOrder.filter((id) => this.countingData[id]), ...addedIds];
+        // Yapıştırma sırasını uygula (yeni + mevcut ürünler birlikte)
+        this.applyImportedProductOrder(idsInPasteOrder);
 
         const tn = this.currentTableName || '';
         this.pushAuditEntry(
-            `Getir görselleri · ${addedIds.length} ürün${skippedInTable ? ` · ${skippedInTable} zaten vardı` : ''}${
-                noMatch ? ` · ${noMatch} eşleşmedi` : ''
-            }`,
+            `Getir görselleri · ${addedCount} yeni · ${idsInPasteOrder.length} sıralandı${
+                skippedInTable ? ` · ${skippedInTable} zaten vardı` : ''
+            }${noMatch ? ` · ${noMatch} eşleşmedi` : ''}`,
             { cat: 'import', tbl: tn }
         );
 
         await this.saveCountingData();
+
+        if (this._countingItemsTableReady === true) {
+            for (const productId of idsInPasteOrder) {
+                if (this.countingData[productId]) {
+                    await this.saveProductEntry(productId).catch(() => {});
+                }
+            }
+        }
+
         this.scheduleRenderTable();
         if (this.currentViewMode === 'rapid') {
             this.renderRapidCountingMode();
         }
         this.updateStatistics();
         this.updateCountingProgress();
-        this.updateTableSelector();
-        this.syncSayimSubTabToTable();
+        this._scheduleTableSelectorUpdate();
 
-        let msg = `${addedIds.length} ürün eklendi`;
+        let msg = addedCount > 0 ? `${addedCount} ürün eklendi` : `${idsInPasteOrder.length} ürün sıralandı`;
         if (skippedInTable) msg += `, ${skippedInTable} zaten tablodaydı`;
         if (noMatch) msg += `, ${noMatch} adres eşleşmedi`;
         this.showToast(msg, 'success', 4500);
 
-        return { added: addedIds.length, skippedInTable, noMatch };
+        return { added: addedCount, skippedInTable, noMatch };
     }
 
     findProduct(searchTerm) {
@@ -7726,56 +7734,27 @@ class CountingSystem {
         }
     }
 
-    _isIOSDevice() {
-        if (typeof navigator === 'undefined') return false;
-        const ua = navigator.userAgent || '';
-        if (/iPad|iPhone|iPod/.test(ua)) return true;
-        // iPadOS 13+ Safari'sini iPad olarak tanımıyor — touch-capable Mac olarak görünüyor
-        if (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1) return true;
-        return false;
-    }
-
     lockCountingSheetScroll() {
         if (this._countingSheetBodyLocked) return;
         this._countingSheetBodyLocked = true;
         this._countingSheetScrollY = window.scrollY || document.documentElement.scrollTop || 0;
         document.documentElement.classList.add('bottom-sheet-open');
         document.body.classList.add('bottom-sheet-open');
-
-        if (this._isIOSDevice()) {
-            // iOS Safari için: scroll'u position: fixed ile kilitle, yoksa arka plan scroll oluyor
-            document.body.style.position = 'fixed';
-            document.body.style.top = `-${this._countingSheetScrollY}px`;
-            document.body.style.left = '0';
-            document.body.style.right = '0';
-            document.body.style.width = '100%';
-        } else {
-            // Desktop / Android: overflow:hidden yeterli — position:fixed kullanma (scroll zıplaması yapıyor)
-            document.documentElement.style.overflow = 'hidden';
-            document.body.style.overflow = 'hidden';
-        }
+        // CSS (.bottom-sheet-open) overflow:hidden verir — position:fixed / scrollTo kullanma (sayfa zıplaması).
     }
 
     unlockCountingSheetScroll() {
         if (!this._countingSheetBodyLocked) return;
         this._countingSheetBodyLocked = false;
-        const y = this._countingSheetScrollY || 0;
         document.documentElement.classList.remove('bottom-sheet-open');
         document.body.classList.remove('bottom-sheet-open');
-
-        if (this._isIOSDevice()) {
-            // iOS: stil sıfırla ve scroll'u eski yerine geri taşı
-            document.body.style.position = '';
-            document.body.style.top = '';
-            document.body.style.left = '';
-            document.body.style.right = '';
-            document.body.style.width = '';
-            window.scrollTo(0, y);
-        } else {
-            // Desktop / Android: sadece overflow'u eski haline döndür — scroll zaten kayıp gitmedi
-            document.documentElement.style.overflow = '';
-            document.body.style.overflow = '';
-        }
+        document.documentElement.style.overflow = '';
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+        document.body.style.right = '';
+        document.body.style.width = '';
     }
 
     // Kamera ile barkod okutulduktan sonra sayım ekranını aç (sayarak ilerle modu)
@@ -7927,7 +7906,11 @@ class CountingSystem {
             // Focus on input after animation
             setTimeout(() => {
                 if (depoInput) {
-                    depoInput.focus();
+                    try {
+                        depoInput.focus({ preventScroll: true });
+                    } catch (e) {
+                        depoInput.focus();
+                    }
                 }
             }, 450);
         }
@@ -9112,10 +9095,10 @@ class CountingSystem {
                 const systemValue = systemStock * price;
                 const difference = warehouseValue - systemValue;
                 const stockDiff = warehouseStock - systemStock;
-                const barcode =
-                    product.barcodes && product.barcodes[0] && product.barcodes[0].code
-                        ? String(product.barcodes[0].code)
-                        : '';
+                const barcodes = (product.barcodes || [])
+                    .map((b) => (b && b.code != null ? String(b.code).trim() : ''))
+                    .filter(Boolean);
+                const barcode = barcodes.length ? barcodes[0] : '';
                 const imageUrl = product.image || '../assets/logo.png';
 
                 const category = product.category || 'Genel';
@@ -9133,6 +9116,7 @@ class CountingSystem {
                     difference,
                     stockDiff,
                     barcode,
+                    barcodes,
                     imageUrl
                 };
 
@@ -9634,7 +9618,8 @@ class CountingSystem {
                     warehouseValue,
                     systemValue,
                     difference: warehouseValue - systemValue,
-                    stockDiff: warehouseStock - systemStock
+                    stockDiff: warehouseStock - systemStock,
+                    barcodes: ex.barcodes && ex.barcodes.length ? ex.barcodes : (p.barcodes || []),
                 });
             }
         }
@@ -9677,9 +9662,17 @@ class CountingSystem {
         const productCard = (p, kind) => {
             const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
             const name = this.escapeHtml(p.productName || '');
-            const bc = p.barcode ? this.escapeHtml(p.barcode) : '—';
+            const barcodeList = Array.isArray(p.barcodes) && p.barcodes.length
+                ? p.barcodes
+                : (p.barcode ? [p.barcode] : []);
+            const barcodesHtml = barcodeList.length
+                ? barcodeList.map((bc) =>
+                    `<span class="inline-flex shrink-0 items-center rounded-full border border-slate-200/70 bg-slate-50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-slate-600">${this.escapeHtml(String(bc))}</span>`
+                ).join('')
+                : '<span class="text-[10px] text-gray-400">—</span>';
             const adetStr = p.stockDiff > 0 ? `+${p.stockDiff}` : `${p.stockDiff}`;
             const adetLabel = kind === 'miss' ? `${adetStr} adet eksik` : `${adetStr} adet fazla`;
+            const stockDiffClass = p.stockDiff > 0 ? 'text-emerald-700' : p.stockDiff < 0 ? 'text-rose-700' : 'text-gray-600';
             const tone =
                 kind === 'miss'
                     ? { bar: 'border-l-rose-400 bg-rose-50/35', ad: 'text-rose-700', tl: 'text-rose-800' }
@@ -9689,7 +9682,12 @@ class CountingSystem {
                     <img src="${img}" alt="" class="h-11 w-11 shrink-0 rounded-lg border border-white object-cover shadow-sm" loading="lazy" />
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</p>
-                        <p class="mt-0.5 font-mono text-[10px] text-gray-400">${bc}</p>
+                        <div class="mt-1 flex flex-wrap gap-1">${barcodesHtml}</div>
+                        <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
+                            <span>Depo: <strong>${p.warehouseStock ?? '—'}</strong></span>
+                            <span>Sistem: <strong>${p.systemStock ?? '—'}</strong></span>
+                            <span class="font-semibold ${stockDiffClass}">(${adetStr})</span>
+                        </div>
                         <div class="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 border-t border-gray-100/80 pt-1.5 text-[11px]">
                             <span class="font-semibold ${tone.ad}">${adetLabel}</span>
                             <span class="text-gray-500">Birim ${this.formatCurrency(p.price)}</span>
