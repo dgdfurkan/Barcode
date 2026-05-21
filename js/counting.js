@@ -1,4 +1,38 @@
 // Counting System for Stock Management
+
+/** Alt kategori listesi — tablo oluşturma combobox için */
+const COUNTING_SUBCATEGORIES = [
+    "Ağız Bakım","Ağda & Tüy Dökücü","Ayran & Kefir","Baharat","Bakliyat",
+    "Bal & Reçel","Balık & Deniz Ürünleri","Bar","Bebek Bakım","Bebek Bezi",
+    "Beyaz Et","Beyaz Peynir","Biberon & Emzik","Bisküvi","Böcek İlacı",
+    "Bulaşık","Bulgur","Buz","Çamaşır","Çamaşır &Temizlik","Çay",
+    "Çiğ Köfte & Meze","Çikolata Bar","Çocuklara Özel","Çorba","Çubuk",
+    "Çoklu","Cips","Deodorant","Demirbaş Ürünler","Dergi","Diğer",
+    "Donuk Et & Tavuk & Balık","Donuk Hazır Yemek & Atıştırmalık",
+    "Donuk Meyve Sebze","Donuk Pasta & Tatlı","Donuk Unlu Mamüller",
+    "Dondurma Paketleri","Duş & Banyo","EkipmanÜrün","Elektrik & Aydınlatma",
+    "Enerji İçeceği","Fit & Form","Fonksiyonel İçecekler","Gazlı İçecek",
+    "Genel Sağlık","Giyim","Glutensiz","Gofret","Hazır Yemek","Helva",
+    "Hijyenik Ped","Islak Havlu","İthal Peynir","Jel","Kağıt Ürünleri",
+    "Kahvaltılık Gevrek","Kahve","Kaşar & Tost Peyniri","Kedi","Kek",
+    "Kırmızı Et","Kırtasiye","Kolini Hazırla","Kolonya","Konserve","Köpek",
+    "Kozmetik","Kraker & Kurabiye","Krema & Kaymak","Kuruyemiş","Kutu",
+    "Külah","Maden Suyu","Makarna","Mama","Margarin","Meyve","Meyve Suyu",
+    "Mutfak","Mutfak Ürünleri","Oda Kokusu","Oyun & Oyuncak","Paketli Ekmek",
+    "Parti Malzemeleri","Pasta Malzemeleri","Pastörize Süt",
+    "Patlamış Mısır ve Tahıl Patlağı","Paylaşımlık & Draje","Piknik","Pil",
+    "Pirinç","Poşet","Prezervatif","Sabun","Saç Bakım","Saç Boyası",
+    "Sakız & Şekerleme","Salça","Sandviç","Sarf Malzeme","Sebze",
+    "Seyahat Ürünleri","Sıvı Yağ","Sirke & Salata Sosu","Sos","Soğuk Çay",
+    "Soğuk Kahve","Soğutucu Dolap","Su","Süt & Salep","Sütlü Tatlı",
+    "Sürülebilir","Sürülebilir Peynir","Şarj Aleti & Kablo","Şarküteri",
+    "Şeker","Tahin & Pekmez","Tablet Çikolata","Tatlı","Taze Fırın",
+    "Taze Yemek","Teknoloji","Temizlik","Tereyağı","Ton Balığı",
+    "Tıraş Malzemeleri","Turşu","Un","Unlu Mamüller","Uzun Ömürlü Süt",
+    "Vegan","Vücut & El Bakım","Yeşillik","Yoğurt","Yöresel Peynir",
+    "Yumurta","Zeytin","Zeytinyağı"
+];
+
 class CountingSystem {
     constructor() {
         this.countingData = {}; // { productId: { warehouseStock, systemStock, lastUpdated, history } }
@@ -1897,6 +1931,159 @@ class CountingSystem {
         this.syncSayimSubTabToTable();
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Tablo oluşturma combobox yardımcıları
+    // ─────────────────────────────────────────────────────────────
+
+    /** Combobox'u ilk kez / modal her açıldığında kur */
+    _setupCreateTableCombobox() {
+        const input = document.getElementById('newTableNameInput');
+        const dropdown = document.getElementById('tableNameDropdown');
+        const chevron = document.getElementById('tableNameChevron');
+        const confirmBtn = document.getElementById('confirmCreateTableBtn');
+        const hint = document.getElementById('tableNameHint');
+        if (!input || !dropdown) return;
+
+        // Zaten bağlandıysa tekrar bağlama
+        if (input._comboboxBound) {
+            // Modal yeniden açıldı: içeriği sıfırla ve dropdown'u yeniden çiz
+            input.value = '';
+            if (confirmBtn) { confirmBtn.disabled = true; }
+            if (hint) hint.textContent = 'Listedeki kategorilerden seçin';
+            dropdown.classList.add('hidden');
+            return;
+        }
+        input._comboboxBound = true;
+
+        const openDropdown = () => {
+            this._renderTableNameDropdown(input.value);
+            dropdown.classList.remove('hidden');
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+        };
+        const closeDropdown = () => {
+            dropdown.classList.add('hidden');
+            if (chevron) chevron.style.transform = '';
+        };
+
+        input.addEventListener('focus', () => openDropdown());
+        input.addEventListener('input', () => {
+            this._renderTableNameDropdown(input.value);
+            dropdown.classList.remove('hidden');
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+
+            const val = input.value.trim();
+            const isValid = COUNTING_SUBCATEGORIES.includes(val);
+            if (confirmBtn) confirmBtn.disabled = !isValid;
+            if (hint) {
+                if (!val) {
+                    hint.textContent = 'Listedeki kategorilerden seçin';
+                    hint.className = 'mt-1.5 text-xs text-gray-400';
+                } else if (isValid) {
+                    const already = this.getTableList().find(t => t.name === val);
+                    hint.textContent = already ? `✓ "${val}" zaten mevcut — seçince o tabloya geçilir` : `✓ "${val}" oluşturulabilir`;
+                    hint.className = `mt-1.5 text-xs ${already ? 'text-amber-500' : 'text-green-600'}`;
+                } else {
+                    hint.textContent = 'Listede bu kategori yok';
+                    hint.className = 'mt-1.5 text-xs text-red-500';
+                }
+            }
+        });
+
+        // Dropdown item seçimi (event delegation)
+        dropdown.addEventListener('mousedown', (e) => {
+            const item = e.target.closest('[data-cat]');
+            if (!item) return;
+            e.preventDefault();
+            const cat = item.dataset.cat;
+            input.value = cat;
+            input.dispatchEvent(new Event('input'));
+            closeDropdown();
+            input.focus();
+        });
+
+        // Dışarı tıklayınca kapat
+        document.addEventListener('mousedown', (e) => {
+            const wrap = document.getElementById('tableNameComboboxWrap');
+            if (wrap && !wrap.contains(e.target)) closeDropdown();
+        }, { capture: true });
+
+        // Escape ile kapat
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { closeDropdown(); input.blur(); }
+            if (e.key === 'ArrowDown') {
+                const first = dropdown.querySelector('[data-cat]');
+                if (first) { e.preventDefault(); first.focus(); }
+            }
+        });
+        dropdown.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { closeDropdown(); input.focus(); }
+            if (e.key === 'ArrowDown') {
+                const next = document.activeElement?.nextElementSibling;
+                if (next) { e.preventDefault(); next.focus(); }
+            }
+            if (e.key === 'ArrowUp') {
+                const prev = document.activeElement?.previousElementSibling;
+                if (prev) { e.preventDefault(); prev.focus(); }
+                else { closeDropdown(); input.focus(); }
+            }
+            if (e.key === 'Enter') {
+                const item = document.activeElement?.closest('[data-cat]');
+                if (item) { item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
+            }
+        });
+    }
+
+    /** Dropdown listesini query'e göre yeniden çizer */
+    _renderTableNameDropdown(query = '') {
+        const dropdown = document.getElementById('tableNameDropdown');
+        if (!dropdown) return;
+
+        const q = query.trim().toLocaleLowerCase('tr');
+        const existing = new Set(this.getTableList().map(t => t.name));
+
+        const filtered = q
+            ? COUNTING_SUBCATEGORIES.filter(c => c.toLocaleLowerCase('tr').includes(q))
+            : COUNTING_SUBCATEGORIES;
+
+        if (filtered.length === 0) {
+            dropdown.innerHTML = `<div class="px-4 py-3 text-sm text-gray-400 text-center">Sonuç bulunamadı</div>`;
+            return;
+        }
+
+        dropdown.innerHTML = filtered.map(cat => {
+            const isExisting = existing.has(cat);
+            const badge = isExisting
+                ? `<span class="ml-auto text-[10px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 shrink-0">Mevcut</span>`
+                : '';
+            return `
+                <button
+                    type="button"
+                    data-cat="${cat.replace(/"/g, '&quot;')}"
+                    tabindex="-1"
+                    class="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors"
+                >
+                    <span class="flex-1 truncate">${cat}</span>${badge}
+                </button>`;
+        }).join('');
+    }
+
+    /** Modal kapanınca combobox'u sıfırla */
+    _resetCreateTableCombobox() {
+        const input = document.getElementById('newTableNameInput');
+        const dropdown = document.getElementById('tableNameDropdown');
+        const chevron = document.getElementById('tableNameChevron');
+        const confirmBtn = document.getElementById('confirmCreateTableBtn');
+        const hint = document.getElementById('tableNameHint');
+        if (input) input.value = '';
+        if (dropdown) dropdown.classList.add('hidden');
+        if (chevron) chevron.style.transform = '';
+        if (confirmBtn) confirmBtn.disabled = true;
+        if (hint) {
+            hint.textContent = 'Listedeki kategorilerden seçin';
+            hint.className = 'mt-1.5 text-xs text-gray-400';
+        }
+    }
+
     // Create a new table
     async createTable(tableName, options = {}) {
         if (!tableName || tableName.trim() === '') {
@@ -3429,44 +3616,61 @@ class CountingSystem {
         const newTableNameInput = document.getElementById('newTableNameInput');
         const renameTableNameInput = document.getElementById('newTableNameInput');
         
+        const closeCreateModal = () => {
+            if (createTableModal) createTableModal.classList.add('hidden');
+            this._resetCreateTableCombobox();
+        };
+
         if (closeCreateTableModal) {
-            closeCreateTableModal.addEventListener('click', () => {
-                if (createTableModal) createTableModal.classList.add('hidden');
-                if (newTableNameInput) newTableNameInput.value = '';
-            });
+            closeCreateTableModal.addEventListener('click', closeCreateModal);
         }
-        
         if (cancelCreateTableBtn) {
-            cancelCreateTableBtn.addEventListener('click', () => {
-                if (createTableModal) createTableModal.classList.add('hidden');
-                if (newTableNameInput) newTableNameInput.value = '';
-            });
+            cancelCreateTableBtn.addEventListener('click', closeCreateModal);
         }
-        
+
         if (confirmCreateTableBtn) {
             confirmCreateTableBtn.addEventListener('click', async () => {
                 const tableName = newTableNameInput?.value.trim();
                 if (!tableName) {
-                    this.showToast('Lütfen tablo adı girin', 'error', 3000);
+                    this.showToast('Lütfen bir kategori seçin', 'error', 3000);
                     return;
                 }
-                
-                if (tableName.length > 50) {
-                    this.showToast('Tablo adı maksimum 50 karakter olabilir', 'error', 3000);
+                if (!COUNTING_SUBCATEGORIES.includes(tableName)) {
+                    this.showToast('Lütfen listeden bir kategori seçin', 'error', 3000);
                     return;
                 }
-                
+                // Zaten mevcut ise: o tabloya geç
+                const existing = this.getTableList().find(t => t.name === tableName);
+                if (existing) {
+                    closeCreateModal();
+                    if (tableName !== this.currentTableName) {
+                        await this.switchTable(tableName);
+                        this.showToast(`"${tableName}" tablosuna geçildi`, 'info', 2500);
+                    } else {
+                        this.showToast(`"${tableName}" zaten aktif tablo`, 'info', 2000);
+                    }
+                    return;
+                }
                 try {
                     await this.createTable(tableName);
-                    if (createTableModal) createTableModal.classList.add('hidden');
-                    if (newTableNameInput) newTableNameInput.value = '';
-                    this.showToast('Tablo oluşturuldu', 'success', 3000);
+                    closeCreateModal();
+                    this.showToast(`"${tableName}" tablosu oluşturuldu`, 'success', 3000);
                 } catch (error) {
                     this.showToast(error.message || 'Tablo oluşturulamadı', 'error', 4000);
                 }
             });
         }
-        
+
+        // Overlay tıklamasıyla kapat
+        if (createTableModal) {
+            createTableModal.addEventListener('click', (e) => {
+                if (e.target === createTableModal) closeCreateModal();
+            });
+        }
+
+        // Combobox kurulumu (bir kez)
+        this._setupCreateTableCombobox();
+
         if (closeDeleteTableModal) {
             closeDeleteTableModal.addEventListener('click', () => {
                 if (deleteTableModal) deleteTableModal.classList.add('hidden');
@@ -3487,16 +3691,6 @@ class CountingSystem {
                     this.showToast('Tablo silindi', 'success', 3000);
                 } catch (error) {
                     this.showToast(error.message || 'Tablo silinemedi', 'error', 4000);
-                }
-            });
-        }
-        
-        // Close modals on overlay click
-        if (createTableModal) {
-            createTableModal.addEventListener('click', (e) => {
-                if (e.target === createTableModal) {
-                    createTableModal.classList.add('hidden');
-                    if (newTableNameInput) newTableNameInput.value = '';
                 }
             });
         }
@@ -7812,13 +8006,15 @@ class CountingSystem {
     // Show create table modal
     showCreateTableModal() {
         const createTableModal = document.getElementById('createTableModal');
-        const newTableNameInput = document.getElementById('newTableNameInput');
-        if (createTableModal && newTableNameInput) {
-            newTableNameInput.value = '';
-            createTableModal.classList.remove('hidden');
-            // Focus on input
-            setTimeout(() => newTableNameInput.focus(), 100);
-        }
+        if (!createTableModal) return;
+        // Dropdown'daki "Mevcut" badge'lerini güncel listeden çiz
+        this._setupCreateTableCombobox();
+        this._resetCreateTableCombobox();
+        createTableModal.classList.remove('hidden');
+        setTimeout(() => {
+            const input = document.getElementById('newTableNameInput');
+            if (input) input.focus();
+        }, 80);
     }
     
     // Show delete table modal
