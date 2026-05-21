@@ -873,38 +873,12 @@ class CountingSystem {
         await this._saveFullBlobLegacy(fullData);
     }
 
-    /** Meta + ürün verisi güvenlik yedeklemesi.
-     *  - counting_items HAZIR: Supabase'e sadece meta yazar (hafif), localStorage'a TAM blob yazar (ürünler güvende).
-     *  - counting_items HAZIR DEĞİL: Her iki hedefe de tam blob yazar. */
+    /** Eski adı _saveMetaOnly olan, artık her zaman TAM blob yazan alias.
+     *  Kritik: meta-only yazım veri kaybına neden oluyordu (users.counting_data._tables siliniyordu).
+     *  Artık bu çağrı her durumda `_saveFullBlobLegacy`'ya yönlendiriliyor. */
     async _saveMetaOnly() {
         if (!this.currentUser) return;
-
-        // counting_items hazır değil → tam blob her iki yere de
-        if (this._countingItemsTableReady !== true) {
-            await this._saveFullBlobLegacy(this.cachedFullData);
-            return;
-        }
-
-        try {
-            const meta = this._buildMetaBlob();
-            this.cachedFullData._tableMeta = meta._tableMeta;
-
-            // Supabase: sadece meta (küçük, hızlı)
-            if (window.supabase) {
-                const { error } = await window.supabase
-                    .from('users')
-                    .update({ counting_data: meta })
-                    .eq('username', this.currentUser.username);
-                if (error) throw error;
-            }
-
-            // localStorage: TAM blob (ürünler dahil) — acil kurtarma yedeği
-            this._saveFullBlobToLocalStorage();
-        } catch (error) {
-            console.error('Error saving meta:', error);
-            // Supabase başarısız olursa bile localStorage'a tam blob yaz
-            this._saveFullBlobToLocalStorage();
-        }
+        await this._saveFullBlobLegacy(this.cachedFullData || { _api_info: {}, _tables: {} });
     }
 
     /** Tüm ürünleri localStorage'a yazar — sessiz, hızlı, senkron. */
@@ -956,6 +930,8 @@ class CountingSystem {
         if (!window.supabase || !this.currentUser) return;
         try {
             const fullBlob = this._buildFullBlob();
+            fullBlob._writerDeviceId = this.deviceId;
+            fullBlob._writerAt = Date.now();
             await window.supabase
                 .from('users')
                 .update({ counting_data: fullBlob })
@@ -981,13 +957,16 @@ class CountingSystem {
         };
     }
 
-    /** Eski yöntem: tüm blobu yazar (counting_items yokken kullanılır) */
+    /** Tam blobu Supabase + localStorage'a yazar. */
     async _saveFullBlobLegacy(fullData) {
         try {
             if (!fullData._tables) fullData._tables = {};
             fullData._tables[this.currentTableName] = this.countingData;
             if (!this.auditLog) this.auditLog = [];
             fullData._auditLog = this.auditLog.slice(-this.AUDIT_LOG_MAX);
+            // Echo filtresi için: bu cihazın yazdığını işaretle
+            fullData._writerDeviceId = this.deviceId;
+            fullData._writerAt = Date.now();
             this.cachedFullData = fullData;
 
             if (window.supabase && this.currentUser) {
@@ -1871,23 +1850,26 @@ class CountingSystem {
                 this.updateCountingProgress();
             }
         }
-        // localStorage yedek güncelle
-        try {
-            const key = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-            localStorage.setItem(key, JSON.stringify(this._buildMetaBlob()));
-        } catch (e) { /* ignore */ }
+        // localStorage TAM blob yedek (ürünler dahil — kayıp önleme)
+        this._saveFullBlobToLocalStorage();
     }
 
     /**
      * users tablosundaki meta değişikliklerini işler.
-     * Tablo ekleme/silme ve api_info güncellemelerini yakalar.
-     * counting_items varken ürün verisini işlemez.
+     * MERGE-only: tablo ekleme + meta + ürün verilerini birleştirir.
+     * Silme operasyonları realtime üzerinden YAPILMAZ (race condition güvenliği).
      */
     _handleRealtimeMetaUpdate(payload) {
         const incoming = payload?.new?.counting_data;
         if (!incoming) return;
 
+        // ── Echo filtresi: bu cihazın kendi yazdığı blob ise yoksay ──
+        if (incoming._writerDeviceId && incoming._writerDeviceId === this.deviceId) {
+            return;
+        }
+
         if (!this.cachedFullData) this.cachedFullData = { _tables: {} };
+        if (!this.cachedFullData._tables) this.cachedFullData._tables = {};
 
         // api_info güncelle
         if (incoming._api_info) this.cachedFullData._api_info = incoming._api_info;
@@ -1899,42 +1881,79 @@ class CountingSystem {
             this.cachedFullData._auditLog = this.auditLog;
         }
 
-        // counting_items yoksa eski yöntem: tüm tabloları merge et
-        if (this._countingItemsTableReady !== true && incoming._tables) {
-            const mergedTables = { ...incoming._tables };
-            // Kendi aktif tablomuzun yerel versiyonunu koru
-            mergedTables[this.currentTableName] = this.countingData;
-            this.cachedFullData._tables = mergedTables;
-            this.scheduleRenderTable();
+        let tablesChanged = false;
+
+        // ── Tabloları MERGE et (silme yok, sadece ekleme/birleştirme) ──
+        if (incoming._tables && typeof incoming._tables === 'object') {
+            for (const [tName, incomingTableData] of Object.entries(incoming._tables)) {
+                if (!incomingTableData || typeof incomingTableData !== 'object') continue;
+
+                if (!this.cachedFullData._tables[tName]) {
+                    // Yeni tablo geldi → ekle
+                    this.cachedFullData._tables[tName] = { ...incomingTableData };
+                    tablesChanged = true;
+                    continue;
+                }
+
+                // Var olan tablo: aktif tablo ise countingData'yı doğrudan değiştirme
+                // (kullanıcı yazıyor olabilir); diğerlerinde tam senkronizasyon yap.
+                const localTable = this.cachedFullData._tables[tName];
+
+                for (const [pId, incomingProduct] of Object.entries(incomingTableData)) {
+                    if (this.isReservedCountingKey(pId)) continue;
+                    if (!incomingProduct || typeof incomingProduct !== 'object') continue;
+
+                    const localProduct = localTable[pId];
+                    // last-write-wins: gelen daha yeniyse yaz
+                    const incomingTs = incomingProduct.lastUpdated ? new Date(incomingProduct.lastUpdated).getTime() : 0;
+                    const localTs = localProduct?.lastUpdated ? new Date(localProduct.lastUpdated).getTime() : 0;
+                    if (!localProduct || incomingTs >= localTs) {
+                        localTable[pId] = { ...incomingProduct };
+                        if (tName === this.currentTableName) {
+                            this.countingData[pId] = localTable[pId];
+                        }
+                    }
+                }
+
+                // Meta birleştir (createdAt + productOrder)
+                if (incomingTableData._tableMeta && !localTable._tableMeta) {
+                    localTable._tableMeta = { ...incomingTableData._tableMeta };
+                }
+                if (Array.isArray(incomingTableData._productOrder)) {
+                    const existing = Array.isArray(localTable._productOrder) ? localTable._productOrder : [];
+                    const merged = [...existing];
+                    for (const pId of incomingTableData._productOrder) {
+                        if (!merged.includes(pId)) merged.push(pId);
+                    }
+                    localTable._productOrder = merged;
+                }
+            }
+            tablesChanged = true;
         }
 
-        // Tablo meta'sını güncelle (yeni/silinen tablolar)
-        if (incoming._tableMeta) {
+        // ── _tableMeta merge (silme yok) ──
+        if (incoming._tableMeta && typeof incoming._tableMeta === 'object') {
             const currentMeta = this.cachedFullData._tableMeta || {};
-            // Yeni tablolar ekle
             for (const [tName, meta] of Object.entries(incoming._tableMeta)) {
                 if (!this.cachedFullData._tables[tName]) {
                     this.cachedFullData._tables[tName] = {
-                        _tableMeta: { createdAt: meta.createdAt },
-                        _productOrder: meta._productOrder || [],
+                        _tableMeta: { createdAt: meta?.createdAt || new Date().toISOString() },
+                        _productOrder: meta?._productOrder || [],
                     };
+                    tablesChanged = true;
                 }
-                currentMeta[tName] = meta;
-            }
-            // Silinen tablolar — sadece aktif olmayan tablolar silinebilir
-            for (const tName of Object.keys(this.cachedFullData._tables)) {
-                if (!incoming._tableMeta[tName] && tName !== this.currentTableName) {
-                    delete this.cachedFullData._tables[tName];
-                }
+                currentMeta[tName] = { ...(currentMeta[tName] || {}), ...meta };
             }
             this.cachedFullData._tableMeta = currentMeta;
         }
 
-        try {
-            const key = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-            localStorage.setItem(key, JSON.stringify(this._buildMetaBlob()));
-        } catch (e) { /* ignore */ }
+        if (tablesChanged) {
+            this.scheduleRenderTable();
+            this.updateStatistics();
+        }
 
+        // localStorage tam blob yedek (kayıp önleme)
+        this._saveFullBlobToLocalStorage();
         this.updateTableSelector();
     }
 
@@ -2296,10 +2315,12 @@ class CountingSystem {
         const rows = tableNames.map((name) => {
             const tableData = fullData._tables[name] || {};
             const createdAtMs = this.resolveTableCreatedMs(tableData) ?? 0;
+            const statusSummary = this.getTableStatusSummary(tableData);
             return {
                 name,
                 isCurrent: name === this.currentTableName,
                 productCount: Object.keys(tableData).filter((k) => !this.isReservedCountingKey(k)).length,
+                status: statusSummary.status,
                 _sortMs: createdAtMs,
             };
         });
@@ -2308,6 +2329,98 @@ class CountingSystem {
             return String(a.name).localeCompare(String(b.name), 'tr');
         });
         return rows.map(({ _sortMs, ...rest }) => rest);
+    }
+
+    /**
+     * Tablo sayım durumu: hiç başlanmamış / yarım / tamamlanmış (+ veya - finans).
+     */
+    getTableStatusSummary(tableData) {
+        if (!tableData || typeof tableData !== 'object') {
+            return { status: 'not-started', positiveCount: 0, negativeCount: 0 };
+        }
+
+        const productIds = Object.keys(tableData).filter((k) => !this.isReservedCountingKey(k));
+        if (productIds.length === 0) {
+            return { status: 'not-started', positiveCount: 0, negativeCount: 0 };
+        }
+
+        let startedCount = 0;
+        let completeCount = 0;
+        let positiveCount = 0;
+        let negativeCount = 0;
+
+        for (const pid of productIds) {
+            const data = tableData[pid];
+            if (!data || typeof data !== 'object') continue;
+
+            const warehouseStock = data.warehouseStock;
+            const systemStock = data.systemStock;
+            const hasWarehouse = warehouseStock !== null && warehouseStock !== undefined;
+            const hasSystem = systemStock !== null && systemStock !== undefined;
+
+            if (!hasWarehouse && !hasSystem) continue;
+
+            startedCount++;
+
+            if (hasWarehouse && hasSystem) {
+                completeCount++;
+                const diff = this.calculateDifference(warehouseStock, systemStock);
+                if (diff.type === 'positive') positiveCount++;
+                else if (diff.type === 'negative') negativeCount++;
+            }
+        }
+
+        if (startedCount === 0) {
+            return { status: 'not-started', positiveCount: 0, negativeCount: 0 };
+        }
+
+        if (completeCount < productIds.length) {
+            return { status: 'incomplete', positiveCount, negativeCount };
+        }
+
+        if (positiveCount > negativeCount) {
+            return { status: 'complete-positive', positiveCount, negativeCount };
+        }
+        if (negativeCount > positiveCount) {
+            return { status: 'complete-negative', positiveCount, negativeCount };
+        }
+        return { status: 'complete-balanced', positiveCount, negativeCount };
+    }
+
+    getTableStatusChipClasses(status, isActive) {
+        const map = {
+            'not-started': 'bg-slate-100 text-slate-600 border-slate-200',
+            incomplete: 'bg-orange-50 text-orange-900 border-orange-200',
+            'complete-positive': 'bg-emerald-50 text-emerald-900 border-emerald-200',
+            'complete-negative': 'bg-red-50 text-red-900 border-red-200',
+            'complete-balanced': 'bg-slate-50 text-slate-700 border-slate-200',
+        };
+        const base = map[status] || map['not-started'];
+        const active = isActive ? ' ring-2 ring-blue-400 ring-offset-1 shadow-sm font-semibold' : ' hover:brightness-[0.98]';
+        return `sayim-general-table-chip shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${base}${active}`;
+    }
+
+    getTableStatusCountBadgeClasses(status, isActive) {
+        if (isActive) return 'text-blue-700';
+        const map = {
+            'not-started': 'text-slate-400',
+            incomplete: 'text-orange-600',
+            'complete-positive': 'text-emerald-600',
+            'complete-negative': 'text-red-600',
+            'complete-balanced': 'text-slate-500',
+        };
+        return map[status] || map['not-started'];
+    }
+
+    getTableStatusDropdownRowClasses(status, isActive) {
+        const map = {
+            'not-started': isActive ? 'bg-slate-100 text-slate-800' : 'text-slate-600 hover:bg-slate-50',
+            incomplete: isActive ? 'bg-orange-50 text-orange-900' : 'text-orange-900 hover:bg-orange-50/80',
+            'complete-positive': isActive ? 'bg-emerald-50 text-emerald-900' : 'text-emerald-900 hover:bg-emerald-50/80',
+            'complete-negative': isActive ? 'bg-red-50 text-red-900' : 'text-red-900 hover:bg-red-50/80',
+            'complete-balanced': isActive ? 'bg-slate-50 text-slate-800' : 'text-slate-700 hover:bg-slate-50',
+        };
+        return map[status] || map['not-started'];
     }
 
     isDailyTableName(name) {
@@ -2982,20 +3095,17 @@ class CountingSystem {
         } else {
             filteredGeneral.forEach((table) => {
                 const isActive = table.name === this.currentTableName;
+                const status = table.status || 'not-started';
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.setAttribute('role', 'listitem');
                 btn.dataset.tableName = table.name;
+                btn.dataset.tableStatus = status;
                 btn.title = table.name;
-                btn.className = [
-                    'sayim-general-table-chip shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all',
-                    isActive
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300',
-                ].join(' ');
+                btn.className = this.getTableStatusChipClasses(status, isActive);
                 btn.innerHTML = `
                     <span class="truncate max-w-[10rem]">${this.escapeHtml(table.name)}</span>
-                    <span class="text-[10px] font-semibold ${isActive ? 'text-blue-600' : 'text-slate-400'}">${table.productCount ?? 0}</span>
+                    <span class="text-[10px] font-semibold ${this.getTableStatusCountBadgeClasses(status, isActive)}">${table.productCount ?? 0}</span>
                 `;
                 btn.addEventListener('click', async () => {
                     if (table.name !== this.currentTableName) {
@@ -3248,18 +3358,20 @@ class CountingSystem {
         } else {
             list.forEach((table) => {
                 const isActive = table.name === this.currentTableName;
+                const status = table.status || 'not-started';
                 const row = document.createElement('button');
                 row.type = 'button';
                 row.setAttribute('role', 'option');
                 row.setAttribute('aria-selected', isActive ? 'true' : 'false');
                 row.dataset.tableName = table.name;
+                row.dataset.tableStatus = status;
                 row.className = [
                     'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors',
-                    isActive ? 'bg-blue-50 text-blue-900' : 'text-slate-700 hover:bg-slate-50',
+                    this.getTableStatusDropdownRowClasses(status, isActive),
                 ].join(' ');
                 row.innerHTML = `
                     <span class="min-w-0 truncate font-medium">${this.escapeHtml(table.name)}</span>
-                    <span class="shrink-0 tabular-nums text-[10px] font-semibold ${isActive ? 'text-blue-600' : 'text-slate-400'}">${table.productCount ?? 0}</span>
+                    <span class="shrink-0 tabular-nums text-[10px] font-semibold ${this.getTableStatusCountBadgeClasses(status, isActive)}">${table.productCount ?? 0}</span>
                 `;
                 row.addEventListener('click', async () => {
                     document.getElementById('sayimGeneralTableDropdown')?.classList.add('hidden');
@@ -7047,9 +7159,20 @@ class CountingSystem {
     }
 
     /**
+     * Sayım tamamlanmamış mı?
+     * Depo stoku girilmemiş VEYA sistem stoku henüz alınmamışsa ürün tamamlanmamış sayılır.
+     */
+    isProductCountingIncomplete(data) {
+        const d = data || {};
+        const noWarehouse = d.warehouseStock === null || d.warehouseStock === undefined;
+        const noSystem = d.systemStock === null || d.systemStock === undefined;
+        return noWarehouse || noSystem;
+    }
+
+    /**
      * Listedeki bir sonraki ürünü döner.
-     * Önce sayılmamış (warehouseStock yok) ürünleri arar; hiç yoksa sıradaki herhangi ürünü döner.
-     * Bu sayede sayı girilmiş olsun ya da olmasın ilerleme her zaman mümkündür.
+     * Önce tamamlanmamış ürünleri arar (depo yok veya sistem stoku yok);
+     * hepsi tamamlanmışsa sıradaki herhangi ürüne gider.
      */
     findNextUncountedProduct(currentProductId) {
         const productIds = this.getOrderedProductIds();
@@ -7057,23 +7180,21 @@ class CountingSystem {
         if (currentIndex === -1) return null;
         if (productIds.length <= 1) return null;
 
-        // 1. Önce gerçekten sayılmamışları dene (orijinal davranış)
+        // 1. Önce tamamlanmamış ürünleri dene
         for (let i = currentIndex + 1; i < productIds.length; i++) {
-            const d = this.countingData[productIds[i]] || {};
-            if (d.warehouseStock === null || d.warehouseStock === undefined) return productIds[i];
+            if (this.isProductCountingIncomplete(this.countingData[productIds[i]])) return productIds[i];
         }
         for (let i = 0; i < currentIndex; i++) {
-            const d = this.countingData[productIds[i]] || {};
-            if (d.warehouseStock === null || d.warehouseStock === undefined) return productIds[i];
+            if (this.isProductCountingIncomplete(this.countingData[productIds[i]])) return productIds[i];
         }
 
-        // 2. Hepsi sayılmışsa — sıradaki ürüne git (listenin sonunda sarma)
+        // 2. Hepsi tamamlanmışsa — sıradaki ürüne git (listenin sonunda sarma)
         return productIds[(currentIndex + 1) % productIds.length];
     }
 
     /**
      * Listedeki bir önceki ürünü döner.
-     * Önce sayılmamış ürünleri arar; hiç yoksa bir önceki herhangi ürünü döner.
+     * Önce tamamlanmamış ürünleri arar; hepsi tamamlanmışsa bir önceki herhangi ürüne gider.
      */
     findPreviousUncountedProduct(currentProductId) {
         const productIds = this.getOrderedProductIds();
@@ -7081,17 +7202,15 @@ class CountingSystem {
         if (currentIndex === -1) return null;
         if (productIds.length <= 1) return null;
 
-        // 1. Önce gerçekten sayılmamışları dene (orijinal davranış)
+        // 1. Önce tamamlanmamış ürünleri dene
         for (let i = currentIndex - 1; i >= 0; i--) {
-            const d = this.countingData[productIds[i]] || {};
-            if (d.warehouseStock === null || d.warehouseStock === undefined) return productIds[i];
+            if (this.isProductCountingIncomplete(this.countingData[productIds[i]])) return productIds[i];
         }
         for (let i = productIds.length - 1; i > currentIndex; i--) {
-            const d = this.countingData[productIds[i]] || {};
-            if (d.warehouseStock === null || d.warehouseStock === undefined) return productIds[i];
+            if (this.isProductCountingIncomplete(this.countingData[productIds[i]])) return productIds[i];
         }
 
-        // 2. Hepsi sayılmışsa — bir önceki ürüne git (listenin başında sarma)
+        // 2. Hepsi tamamlanmışsa — bir önceki ürüne git (listenin başında sarma)
         return productIds[(currentIndex - 1 + productIds.length) % productIds.length];
     }
 
@@ -7841,6 +7960,9 @@ class CountingSystem {
         if (totalCountEl) totalCountEl.textContent = productIds.length;
         if (positiveCountEl) positiveCountEl.textContent = positiveCount;
         if (negativeCountEl) negativeCountEl.textContent = negativeCount;
+
+        // Tablo chip renklerini güncel sayım durumuna göre yenile
+        this.updateTableSelector();
     }
 
     openProductSearchModal() {
