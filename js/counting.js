@@ -1965,51 +1965,70 @@ class CountingSystem {
         const input = document.getElementById('newTableNameInput');
         const dropdown = document.getElementById('tableNameDropdown');
         const chevron = document.getElementById('tableNameChevron');
+        const toggleBtn = document.getElementById('tableNameToggleBtn');
         const confirmBtn = document.getElementById('confirmCreateTableBtn');
         const hint = document.getElementById('tableNameHint');
         if (!input || !dropdown) return;
 
-        // Zaten bağlandıysa tekrar bağlama
-        if (input._comboboxBound) {
-            // Modal yeniden açıldı: içeriği sıfırla ve dropdown'u yeniden çiz
-            input.value = '';
-            if (confirmBtn) { confirmBtn.disabled = true; }
-            if (hint) hint.textContent = 'Listedeki kategorilerden seçin';
+        const closeDropdown = () => {
             dropdown.classList.add('hidden');
-            return;
-        }
-        input._comboboxBound = true;
-
+            if (chevron) chevron.style.transform = '';
+            input._dropdownOpen = false;
+        };
         const openDropdown = () => {
             this._renderTableNameDropdown(input.value);
             dropdown.classList.remove('hidden');
             if (chevron) chevron.style.transform = 'rotate(180deg)';
+            input._dropdownOpen = true;
         };
-        const closeDropdown = () => {
-            dropdown.classList.add('hidden');
-            if (chevron) chevron.style.transform = '';
+        const toggleDropdown = () => {
+            if (input._dropdownOpen) closeDropdown();
+            else openDropdown();
         };
 
-        input.addEventListener('focus', () => openDropdown());
-        input.addEventListener('input', () => {
-            this._renderTableNameDropdown(input.value);
-            dropdown.classList.remove('hidden');
-            if (chevron) chevron.style.transform = 'rotate(180deg)';
+        // Zaten bağlandıysa tekrar bağlama
+        if (input._comboboxBound) {
+            closeDropdown();
+            return;
+        }
+        input._comboboxBound = true;
+        input._dropdownOpen = false;
 
+        const updateHint = () => {
             const val = input.value.trim();
             if (confirmBtn) confirmBtn.disabled = !val;
-            if (hint) {
-                if (!val) {
-                    hint.textContent = 'Listeden seçin veya özel isim yazın';
-                    hint.className = 'mt-1.5 text-xs text-gray-400';
-                } else {
-                    const already = this.getTableList().find(t => t.name === val);
-                    hint.textContent = already
-                        ? `"${val}" zaten mevcut — seçince o tabloya geçilir`
-                        : `"${val}" oluşturulabilir`;
-                    hint.className = `mt-1.5 text-xs ${already ? 'text-amber-500' : 'text-green-600'}`;
-                }
+            if (!hint) return;
+            if (!val) {
+                hint.textContent = 'Listeden seçin veya özel isim yazın';
+                hint.className = 'mt-1.5 text-xs text-gray-400';
+            } else {
+                const already = this.getTableList().find(t => t.name === val);
+                hint.textContent = already
+                    ? `"${val}" zaten mevcut — seçince o tabloya geçilir`
+                    : `"${val}" oluşturulabilir`;
+                hint.className = `mt-1.5 text-xs ${already ? 'text-amber-500' : 'text-green-600'}`;
             }
+        };
+
+        // Dropdown yalnızca tıklayınca açılır — focus ile otomatik açılmaz
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleDropdown();
+                input.focus();
+            });
+        }
+
+        input.addEventListener('click', () => {
+            if (!input._dropdownOpen) openDropdown();
+        });
+
+        input.addEventListener('input', () => {
+            if (input._dropdownOpen) {
+                this._renderTableNameDropdown(input.value);
+            }
+            updateHint();
         });
 
         // Dropdown item seçimi (event delegation)
@@ -2019,7 +2038,7 @@ class CountingSystem {
             e.preventDefault();
             const cat = item.dataset.cat;
             input.value = cat;
-            input.dispatchEvent(new Event('input'));
+            updateHint();
             closeDropdown();
             input.focus();
         });
@@ -2033,7 +2052,13 @@ class CountingSystem {
         // Escape ile kapat
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') { closeDropdown(); input.blur(); }
-            if (e.key === 'ArrowDown') {
+            if (e.key === 'ArrowDown' && !input._dropdownOpen) {
+                e.preventDefault();
+                openDropdown();
+                const first = dropdown.querySelector('[data-cat]');
+                if (first) first.focus();
+            }
+            if (e.key === 'ArrowDown' && input._dropdownOpen) {
                 const first = dropdown.querySelector('[data-cat]');
                 if (first) { e.preventDefault(); first.focus(); }
             }
@@ -2097,7 +2122,10 @@ class CountingSystem {
         const chevron = document.getElementById('tableNameChevron');
         const confirmBtn = document.getElementById('confirmCreateTableBtn');
         const hint = document.getElementById('tableNameHint');
-        if (input) input.value = '';
+        if (input) {
+            input.value = '';
+            input._dropdownOpen = false;
+        }
         if (dropdown) dropdown.classList.add('hidden');
         if (chevron) chevron.style.transform = '';
         if (confirmBtn) confirmBtn.disabled = true;
@@ -8026,14 +8054,9 @@ class CountingSystem {
     showCreateTableModal() {
         const createTableModal = document.getElementById('createTableModal');
         if (!createTableModal) return;
-        // Dropdown'daki "Mevcut" badge'lerini güncel listeden çiz
         this._setupCreateTableCombobox();
         this._resetCreateTableCombobox();
         createTableModal.classList.remove('hidden');
-        setTimeout(() => {
-            const input = document.getElementById('newTableNameInput');
-            if (input) input.focus();
-        }, 80);
     }
     
     // Show delete table modal

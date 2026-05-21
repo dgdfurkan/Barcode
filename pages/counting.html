@@ -2185,17 +2185,17 @@
     </div>
 
     <!-- Create Table Modal -->
-    <div id="createTableModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-[min(100%,42rem)] mx-4 overflow-visible">
-            <div class="flex items-center justify-between p-6 border-b border-gray-200 rounded-t-xl">
-                <h3 class="text-xl font-bold text-text-primary">Yeni Tablo Oluştur</h3>
+    <div id="createTableModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden p-2 sm:p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-visible">
+            <div class="flex items-center justify-between px-4 py-4 sm:px-6 sm:py-5 border-b border-gray-200 rounded-t-xl">
+                <h3 class="text-lg sm:text-xl font-bold text-text-primary">Yeni Tablo Oluştur</h3>
                 <button id="closeCreateTableModal" class="text-text-secondary hover:text-text-primary transition-colors">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                 </button>
             </div>
-            <div class="p-6 overflow-visible rounded-b-xl">
+            <div class="px-4 py-4 sm:px-6 sm:py-6 overflow-visible rounded-b-xl">
                 <div class="mb-5">
                     <label class="block text-sm font-medium text-gray-700 mb-2">Kategori Seç</label>
                     <!-- Combobox wrapper -->
@@ -2205,17 +2205,24 @@
                             id="newTableNameInput"
                             placeholder="Ara veya seç…"
                             autocomplete="off"
-                            class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                            class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
                         >
-                        <!-- Chevron icon -->
-                        <span id="tableNameChevron" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none transition-transform duration-150">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
-                        </span>
+                        <!-- Chevron toggle -->
+                        <button
+                            type="button"
+                            id="tableNameToggleBtn"
+                            aria-label="Kategori listesini aç"
+                            class="absolute right-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                        >
+                            <span id="tableNameChevron" class="transition-transform duration-150">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </span>
+                        </button>
                         <!-- Dropdown list -->
                         <div id="tableNameDropdown"
-                             class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-72 overflow-y-auto z-[200] min-w-full"
+                             class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-[50vh] sm:max-h-72 overflow-y-auto z-[200] w-full"
                              style="overscroll-behavior: contain;">
                             <!-- items injected by JS -->
                         </div>
