@@ -1849,23 +1849,39 @@ class CountingSystem {
     /**
      * Tüm tabloların listesini ve ürün sayılarını Supabase'den senkronize eder.
      * Yeni tablolar veya başka cihazlardan gelen ürün ekleme/silme'yi yakalar.
+     * Sıralama bozulmaması için tablo createdAt'ı her zaman users.counting_data._tableMeta'dan alınır.
      */
     async _refreshAllTablesMetaFromSupabase() {
         if (!window.supabase || !this.currentUser) return;
         if (this._countingItemsTableReady !== true) return;
 
         try {
-            const { data: rows, error } = await window.supabase
-                .from('counting_items')
-                .select('table_name, product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, history, api_fetch_failed, last_updated')
-                .eq('username', this.currentUser.username);
-            if (error) return;
+            // PARALEL: counting_items + users.counting_data — biri ürünler için, diğeri _tableMeta için
+            const [itemsRes, userRes] = await Promise.all([
+                window.supabase
+                    .from('counting_items')
+                    .select('table_name, product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, history, api_fetch_failed, last_updated, created_at')
+                    .eq('username', this.currentUser.username),
+                window.supabase
+                    .from('users')
+                    .select('counting_data')
+                    .eq('username', this.currentUser.username)
+                    .maybeSingle(),
+            ]);
 
-            if (!this.cachedFullData) this.cachedFullData = { _tables: {} };
+            if (itemsRes.error) return;
+            const rows = itemsRes.data || [];
+            const remoteMetaBlob = userRes?.data?.counting_data || null;
+            const remoteTableMeta = remoteMetaBlob?._tableMeta || {};
+
+            if (!this.cachedFullData) this.cachedFullData = { _tables: {}, _tableMeta: {} };
             if (!this.cachedFullData._tables) this.cachedFullData._tables = {};
+            if (!this.cachedFullData._tableMeta) this.cachedFullData._tableMeta = {};
 
+            // Her tablo için: ürünleri grupla + en eski counting_items.created_at'ı tut (fallback createdAt)
             const tablesByName = {};
-            for (const row of (rows || [])) {
+            const minCreatedAtByTable = {};
+            for (const row of rows) {
                 if (!tablesByName[row.table_name]) tablesByName[row.table_name] = {};
                 tablesByName[row.table_name][row.product_id] = {
                     warehouseStock: row.warehouse_stock ?? null,
@@ -1877,19 +1893,50 @@ class CountingSystem {
                     apiFetchFailed: row.api_fetch_failed || false,
                     lastUpdated: row.last_updated || new Date().toISOString(),
                 };
+                const ca = row.created_at ? new Date(row.created_at).getTime() : null;
+                if (ca && (!minCreatedAtByTable[row.table_name] || ca < minCreatedAtByTable[row.table_name])) {
+                    minCreatedAtByTable[row.table_name] = ca;
+                }
+            }
+
+            // Önceliklendirilmiş createdAt çözücü:
+            // 1. Yerel _tableMeta'da var → koru (değişmez)
+            // 2. Uzak users.counting_data._tableMeta'da var → onu kullan (cross-device tutarlı)
+            // 3. counting_items.MIN(created_at) → fallback
+            // 4. Yoksa epoch (en eskiye düşsün, sıralamayı bozmasın)
+            const resolveCreatedAt = (tName) => {
+                const local = this.cachedFullData._tableMeta?.[tName]?.createdAt;
+                if (local) return local;
+                const remote = remoteTableMeta[tName]?.createdAt;
+                if (remote) return remote;
+                const minCa = minCreatedAtByTable[tName];
+                if (minCa) return new Date(minCa).toISOString();
+                return new Date(0).toISOString();
+            };
+
+            // remoteTableMeta'daki tablolar varsa local'a yansıt (silinmemiş tabloların createdAt'ı)
+            for (const [tName, meta] of Object.entries(remoteTableMeta)) {
+                if (!this.cachedFullData._tableMeta[tName]) {
+                    this.cachedFullData._tableMeta[tName] = {
+                        createdAt: meta?.createdAt || resolveCreatedAt(tName),
+                        _productOrder: Array.isArray(meta?._productOrder) ? [...meta._productOrder] : [],
+                    };
+                }
             }
 
             let metaChanged = false;
             for (const [tName, products] of Object.entries(tablesByName)) {
                 if (!this.cachedFullData._tables[tName]) {
                     this.cachedFullData._tables[tName] = { ...products };
-                    if (!this.cachedFullData._tableMeta) this.cachedFullData._tableMeta = {};
+                    const createdAt = resolveCreatedAt(tName);
                     if (!this.cachedFullData._tableMeta[tName]) {
                         this.cachedFullData._tableMeta[tName] = {
-                            createdAt: new Date().toISOString(),
+                            createdAt,
                             _productOrder: Object.keys(products),
                         };
                     }
+                    // Tablo objesi içine de createdAt yansıt (resolveTableCreatedMs için)
+                    this.cachedFullData._tables[tName]._tableMeta = { createdAt };
                     metaChanged = true;
                     continue;
                 }
@@ -2017,7 +2064,16 @@ class CountingSystem {
 
         if (!this.cachedFullData) return;
         if (!this.cachedFullData._tables) this.cachedFullData._tables = {};
-        if (!this.cachedFullData._tables[tName]) this.cachedFullData._tables[tName] = {};
+        if (!this.cachedFullData._tableMeta) this.cachedFullData._tableMeta = {};
+        if (!this.cachedFullData._tables[tName]) {
+            // Realtime'da yeni tablo geliyor — createdAt'ı item.created_at'tan al (sıralama için kritik)
+            const createdAt = item.created_at || new Date().toISOString();
+            this.cachedFullData._tables[tName] = { _tableMeta: { createdAt } };
+            if (!this.cachedFullData._tableMeta[tName]) {
+                this.cachedFullData._tableMeta[tName] = { createdAt, _productOrder: [] };
+            }
+            this._scheduleTableSelectorUpdate();
+        }
 
         if (payload.eventType === 'DELETE') {
             delete this.cachedFullData._tables[tName][pId];
@@ -6875,20 +6931,6 @@ class CountingSystem {
             return;
         }
 
-        // Scroll pozisyonlarını render öncesi kaydet (innerHTML resetlemesi sonrası geri yükle)
-        const scrollY = window.scrollY || window.pageYOffset || 0;
-        const scrollSnapshot = {
-            window: scrollY,
-            containers: [],
-        };
-        try {
-            document.querySelectorAll('.counting-scroll-container, #countingTableContainer, #countingCardScroll').forEach((el) => {
-                if (el && (el.scrollTop > 0 || el.scrollLeft > 0)) {
-                    scrollSnapshot.containers.push({ el, top: el.scrollTop, left: el.scrollLeft });
-                }
-            });
-        } catch (e) { /* ignore */ }
-
         const tableBody = document.getElementById('countingTableBody');
         const cardView = document.getElementById('countingCardView');
         const emptyState = document.getElementById('emptyState');
@@ -7291,27 +7333,6 @@ class CountingSystem {
         }
 
         this.updateActiveTableActivityLine();
-
-        // Render sonrası scroll'u eski konumuna geri yükle — innerHTML reset scroll'u sıfırlamasın
-        try {
-            if (typeof scrollSnapshot !== 'undefined' && scrollSnapshot) {
-                // Browser scroll restoration'u atla ve manuel restore
-                const restoreScroll = () => {
-                    if (scrollSnapshot.window > 0) {
-                        window.scrollTo({ left: 0, top: scrollSnapshot.window, behavior: 'instant' });
-                    }
-                    for (const { el, top, left } of scrollSnapshot.containers || []) {
-                        if (el && el.isConnected) {
-                            el.scrollTop = top;
-                            el.scrollLeft = left;
-                        }
-                    }
-                };
-                // İki kere tetikle: hemen + RAF sonrası (rapid grid'in yüklemesi bittikten sonra)
-                restoreScroll();
-                requestAnimationFrame(restoreScroll);
-            }
-        } catch (e) { /* ignore */ }
     }
 
     /** Rapid kart için durum anahtarı — değişim tespitinde kullanılır */
@@ -7686,17 +7707,34 @@ class CountingSystem {
         }
     }
 
+    _isIOSDevice() {
+        if (typeof navigator === 'undefined') return false;
+        const ua = navigator.userAgent || '';
+        if (/iPad|iPhone|iPod/.test(ua)) return true;
+        // iPadOS 13+ Safari'sini iPad olarak tanımıyor — touch-capable Mac olarak görünüyor
+        if (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1) return true;
+        return false;
+    }
+
     lockCountingSheetScroll() {
         if (this._countingSheetBodyLocked) return;
         this._countingSheetBodyLocked = true;
         this._countingSheetScrollY = window.scrollY || document.documentElement.scrollTop || 0;
         document.documentElement.classList.add('bottom-sheet-open');
         document.body.classList.add('bottom-sheet-open');
-        document.body.style.position = 'fixed';
-        document.body.style.top = `-${this._countingSheetScrollY}px`;
-        document.body.style.left = '0';
-        document.body.style.right = '0';
-        document.body.style.width = '100%';
+
+        if (this._isIOSDevice()) {
+            // iOS Safari için: scroll'u position: fixed ile kilitle, yoksa arka plan scroll oluyor
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${this._countingSheetScrollY}px`;
+            document.body.style.left = '0';
+            document.body.style.right = '0';
+            document.body.style.width = '100%';
+        } else {
+            // Desktop / Android: overflow:hidden yeterli — position:fixed kullanma (scroll zıplaması yapıyor)
+            document.documentElement.style.overflow = 'hidden';
+            document.body.style.overflow = 'hidden';
+        }
     }
 
     unlockCountingSheetScroll() {
@@ -7705,12 +7743,20 @@ class CountingSystem {
         const y = this._countingSheetScrollY || 0;
         document.documentElement.classList.remove('bottom-sheet-open');
         document.body.classList.remove('bottom-sheet-open');
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.left = '';
-        document.body.style.right = '';
-        document.body.style.width = '';
-        window.scrollTo(0, y);
+
+        if (this._isIOSDevice()) {
+            // iOS: stil sıfırla ve scroll'u eski yerine geri taşı
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.left = '';
+            document.body.style.right = '';
+            document.body.style.width = '';
+            window.scrollTo(0, y);
+        } else {
+            // Desktop / Android: sadece overflow'u eski haline döndür — scroll zaten kayıp gitmedi
+            document.documentElement.style.overflow = '';
+            document.body.style.overflow = '';
+        }
     }
 
     // Kamera ile barkod okutulduktan sonra sayım ekranını aç (sayarak ilerle modu)
