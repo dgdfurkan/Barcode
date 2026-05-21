@@ -46,11 +46,17 @@ BEGIN
     END IF;
 END $$;
 
--- 4. Supabase Realtime için yayın (publication)
+-- 4. Role izinleri — anon/authenticated ile erişim için ZORUNLU
+-- Supabase'de RLS politikası yetmez; rolün tabloya erişim izni de olmalı.
+GRANT USAGE ON SCHEMA public TO anon;
+GRANT USAGE ON SCHEMA public TO authenticated;
+GRANT ALL ON counting_items TO anon;
+GRANT ALL ON counting_items TO authenticated;
+
+-- 5. Supabase Realtime için yayın (publication)
 -- "supabase_realtime" publication'ına ekle
 DO $$
 BEGIN
-    -- Zaten ekli değilse ekle
     IF NOT EXISTS (
         SELECT 1 FROM pg_publication_tables
         WHERE pubname = 'supabase_realtime'

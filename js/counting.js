@@ -705,34 +705,34 @@ class CountingSystem {
                     }
                 }
 
-                // Eski blob'da tablo var ama counting_items'ta ürün yok → boş tablo olarak kayıt
+                // ── 3a. Eski blob'dan eksik ürünleri kurtarma (counting_items'ta olmayan ürünler) ──
+                // Bu kritik güvenlik adımıdır: counting_items INSERT başarısız olduysa
+                // veya henüz migrate edilmediyse, tam blob'daki ürünleri kullan.
                 if (metaBlob?._tables) {
-                    for (const tName of Object.keys(metaBlob._tables)) {
+                    for (const [tName, tData] of Object.entries(metaBlob._tables)) {
                         if (!tables[tName]) tables[tName] = {};
+                        // counting_items'ta olmayan ürünleri blob'dan al (kayıp ürün kurtarma)
+                        for (const [pId, pData] of Object.entries(tData)) {
+                            if (this.isReservedCountingKey(pId) || typeof pData !== 'object' || !pData) continue;
+                            if (!tables[tName][pId]) {
+                                // Bu ürün counting_items'ta yok → blob'dan al
+                                tables[tName][pId] = { ...pData };
+                            }
+                        }
+                        // Meta verilerini de tamamla
+                        if (!tables[tName]._tableMeta && tData._tableMeta) {
+                            tables[tName]._tableMeta = tData._tableMeta;
+                        }
+                        if (!tables[tName]._productOrder && Array.isArray(tData._productOrder)) {
+                            tables[tName]._productOrder = [...tData._productOrder];
+                        }
                     }
                 }
 
-                // ── 3a. Mevcut ürünleri migration ettirme: eski blob'da ürün var, counting_items boş ──
+                // ── 3b. Mevcut ürünleri migration ettirme: eski blob'da ürün var, counting_items boş ──
                 if (itemRows.length === 0 && metaBlob?._tables) {
-                    await this._migrateOldDataToCountingItems(metaBlob);
-                    // Migration sonrası tekrar yükle
-                    const { data: migratedRows } = await window.supabase
-                        .from('counting_items')
-                        .select('table_name, product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, history, api_fetch_failed, last_updated')
-                        .eq('username', this.currentUser.username);
-                    for (const row of (migratedRows || [])) {
-                        if (!tables[row.table_name]) tables[row.table_name] = {};
-                        tables[row.table_name][row.product_id] = {
-                            warehouseStock: row.warehouse_stock ?? null,
-                            systemStock: row.system_stock ?? null,
-                            price: row.price ?? null,
-                            priceText: row.price_text ?? null,
-                            reservedStock: row.reserved_stock ?? null,
-                            history: row.history || [],
-                            apiFetchFailed: row.api_fetch_failed || false,
-                            lastUpdated: row.last_updated || new Date().toISOString(),
-                        };
-                    }
+                    // Async migration: blob → counting_items (performans için arka planda)
+                    this._migrateOldDataToCountingItems(metaBlob).catch(() => {});
                 }
             } else {
                 // counting_items yok → eski blob yöntemi (fallback)
@@ -866,15 +866,11 @@ class CountingSystem {
     }
 
     // Save full counting data structure (including all tables)
-    // counting_items tablosu hazırsa sadece meta kaydeder; yoksa eski blob yöntemini kullanır.
+    // Her zaman tam blob yazar — counting_items gerçek zamanlı sync için,
+    // users.counting_data çapraz-cihaz güvenlik yedeği için.
+    // NOT: counting_items INSERT başarısız olsa bile Supabase'de ürünler kaybolmaz.
     async saveFullCountingData(fullData) {
-        if (this._countingItemsTableReady === true) {
-            // Yeni yöntem: sadece meta kaydet
-            await this._saveMetaOnly();
-        } else {
-            // Fallback: eski blob yöntemi (counting_items tablosu henüz yok)
-            await this._saveFullBlobLegacy(fullData);
-        }
+        await this._saveFullBlobLegacy(fullData);
     }
 
     /** Meta + ürün verisi güvenlik yedeklemesi.
@@ -946,15 +942,14 @@ class CountingSystem {
 
     /**
      * Periyodik Supabase tam blob yedeği — counting_items başarısız olursa çapraz-cihaz kurtarma için.
-     * Her üründen sonra değil, 8 saniyelik debounce ile yazar.
+     * 3 saniyelik debounce ile yazar (daha hızlı çapraz-cihaz görünürlüğü).
      */
     _scheduleFullBackup() {
-        if (this._countingItemsTableReady !== true) return; // legacy zaten tam yazar
         if (this._fullBackupTimer) clearTimeout(this._fullBackupTimer);
         this._fullBackupTimer = setTimeout(() => {
             this._fullBackupTimer = null;
             this._writeFullBlobToSupabase().catch(() => {});
-        }, 8000);
+        }, 3000);
     }
 
     async _writeFullBlobToSupabase() {
@@ -1706,9 +1701,10 @@ class CountingSystem {
             this._scheduleFullBackup();
         } catch (e) {
             console.error('saveProductEntry hatası:', e);
-            // Başarısız: localStorage'a tam blob yaz (acil yedek), blob yoluna düş
+            // Başarısız: localStorage + Supabase tam blob yaz (çift güvenlik)
             this._saveFullBlobToLocalStorage();
-            this.scheduleSave(400);
+            this._scheduleFullBackup(); // 3s içinde Supabase'e tam blob yaz
+            this.scheduleSave(400);     // 400ms sonra saveFullCountingData → tam blob
         }
     }
 
@@ -1755,9 +1751,10 @@ class CountingSystem {
         }
         this._productSaveTimers[productId] = setTimeout(() => {
             delete this._productSaveTimers[productId];
+            // saveProductEntry: counting_items'a yazar (hızlı) VEYA scheduleSave tetikler (tam blob)
+            // _saveMetaOnly burada çağrılmıyor: meta-only yazarak tam blob'u ezmesin.
+            // _scheduleFullBackup, saveProductEntry içinden otomatik tetiklenir.
             this.saveProductEntry(productId).catch(e => console.error('_scheduleProductSave error:', e));
-            // Meta da güncellenir (productOrder vb.)
-            this._saveMetaOnly().catch(() => {});
         }, delay);
     }
 
@@ -4958,11 +4955,10 @@ class CountingSystem {
             });
         }
 
-        // Ürünü atomic olarak kaydet, meta'yı da güncelle
-        await Promise.all([
-            this.saveProductEntry(productId),
-            this._saveMetaOnly(),
-        ]);
+        // Ürünü kaydet: counting_items'a (hızlı) + tam blob backup (güvenli)
+        await this.saveProductEntry(productId);
+        // Yeni ürün eklenince _productOrder güncellendiğinden tam blob backup zorla
+        this._scheduleFullBackup();
         this.scheduleRenderTable();
 
         this.updateStatistics();
