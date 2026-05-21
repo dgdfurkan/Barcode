@@ -212,6 +212,9 @@ class CountingSystem {
             // Realtime listener: başka cihazdan gelen sayım değişikliklerini cache'e merge et
             this._setupRealtimeSync();
 
+            // Sayfa görünür olunca aktif tabloyu force refresh et (realtime kaçırılan güncellemeler için güvenlik ağı)
+            this._setupVisibilityRefresh();
+
             // beforeunload: pending save'leri flush et (localStorage'a en azından yaz)
             window.addEventListener('beforeunload', () => {
                 // Per-product timer'ları temizle
@@ -1779,6 +1782,10 @@ class CountingSystem {
                     .subscribe((status) => {
                         if (status === 'SUBSCRIBED') {
                             console.log('🟢 Realtime counting_items bağlandı (per-product)');
+                            this._realtimeItemsActive = true;
+                        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                            console.warn(`⚠️ Realtime counting_items: ${status} — visibility refresh fallback aktif`);
+                            this._realtimeItemsActive = false;
                         }
                     });
             }
@@ -1799,11 +1806,199 @@ class CountingSystem {
                 .subscribe((status) => {
                     if (status === 'SUBSCRIBED') {
                         console.log('🟢 Realtime meta sync bağlandı');
+                        this._realtimeMetaActive = true;
+                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                        console.warn(`⚠️ Realtime meta: ${status} — visibility refresh fallback aktif`);
+                        this._realtimeMetaActive = false;
                     }
                 });
         } catch (e) {
             console.error('Realtime sync kurulum hatası:', e);
         }
+    }
+
+    /**
+     * Sayfa görünür olunca / pencere fokus alınca / periyodik olarak aktif tabloyu Supabase'den force fetch eder.
+     * Realtime kaçırırsa veya kurulmazsa güvenlik ağı görevi görür.
+     */
+    _setupVisibilityRefresh() {
+        let lastRefresh = 0;
+        const REFRESH_COOLDOWN_MS = 5000;
+
+        const tryRefresh = () => {
+            if (document.visibilityState !== 'visible') return;
+            const now = Date.now();
+            if (now - lastRefresh < REFRESH_COOLDOWN_MS) return;
+            lastRefresh = now;
+            this.refreshCurrentTableFromSupabase().catch(() => {});
+            // Aynı zamanda tüm tabloların metasını da senkronize et (yeni tablo eklenmiş olabilir)
+            this._refreshAllTablesMetaFromSupabase().catch(() => {});
+        };
+
+        document.addEventListener('visibilitychange', tryRefresh);
+        window.addEventListener('focus', tryRefresh);
+
+        // Periyodik fallback (sayfa açıkken her 20 sn'de bir hafif kontrol)
+        this._periodicRefreshInterval = setInterval(() => {
+            if (document.visibilityState === 'visible') {
+                tryRefresh();
+            }
+        }, 20000);
+    }
+
+    /**
+     * Tüm tabloların listesini ve ürün sayılarını Supabase'den senkronize eder.
+     * Yeni tablolar veya başka cihazlardan gelen ürün ekleme/silme'yi yakalar.
+     */
+    async _refreshAllTablesMetaFromSupabase() {
+        if (!window.supabase || !this.currentUser) return;
+        if (this._countingItemsTableReady !== true) return;
+
+        try {
+            const { data: rows, error } = await window.supabase
+                .from('counting_items')
+                .select('table_name, product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, history, api_fetch_failed, last_updated')
+                .eq('username', this.currentUser.username);
+            if (error) return;
+
+            if (!this.cachedFullData) this.cachedFullData = { _tables: {} };
+            if (!this.cachedFullData._tables) this.cachedFullData._tables = {};
+
+            const tablesByName = {};
+            for (const row of (rows || [])) {
+                if (!tablesByName[row.table_name]) tablesByName[row.table_name] = {};
+                tablesByName[row.table_name][row.product_id] = {
+                    warehouseStock: row.warehouse_stock ?? null,
+                    systemStock: row.system_stock ?? null,
+                    price: row.price ?? null,
+                    priceText: row.price_text ?? null,
+                    reservedStock: row.reserved_stock ?? null,
+                    history: row.history || [],
+                    apiFetchFailed: row.api_fetch_failed || false,
+                    lastUpdated: row.last_updated || new Date().toISOString(),
+                };
+            }
+
+            let metaChanged = false;
+            for (const [tName, products] of Object.entries(tablesByName)) {
+                if (!this.cachedFullData._tables[tName]) {
+                    this.cachedFullData._tables[tName] = { ...products };
+                    if (!this.cachedFullData._tableMeta) this.cachedFullData._tableMeta = {};
+                    if (!this.cachedFullData._tableMeta[tName]) {
+                        this.cachedFullData._tableMeta[tName] = {
+                            createdAt: new Date().toISOString(),
+                            _productOrder: Object.keys(products),
+                        };
+                    }
+                    metaChanged = true;
+                    continue;
+                }
+                // Aktif tablo değilse merge et (aktif tablo refreshCurrentTableFromSupabase'da işleniyor)
+                if (tName !== this.currentTableName) {
+                    const local = this.cachedFullData._tables[tName];
+                    for (const [pId, incoming] of Object.entries(products)) {
+                        const localProduct = local[pId];
+                        if (!localProduct) {
+                            local[pId] = incoming;
+                            if (!Array.isArray(local._productOrder)) local._productOrder = [];
+                            if (!local._productOrder.includes(pId)) local._productOrder.push(pId);
+                            metaChanged = true;
+                        } else {
+                            const incomingTs = new Date(incoming.lastUpdated).getTime();
+                            const localTs = localProduct.lastUpdated ? new Date(localProduct.lastUpdated).getTime() : 0;
+                            if (incomingTs > localTs) {
+                                local[pId] = incoming;
+                                metaChanged = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (metaChanged) {
+                this._scheduleTableSelectorUpdate(100);
+                this._saveFullBlobToLocalStorage();
+            }
+        } catch (e) { /* sessiz */ }
+    }
+
+    /**
+     * Aktif tablonun ürünlerini counting_items'tan yeniden çeker; tüm tabloların metasını da günceller.
+     * Realtime gelmeyen senaryolar için kritik güvenlik ağı.
+     */
+    async refreshCurrentTableFromSupabase() {
+        if (!window.supabase || !this.currentUser) return;
+        if (this._countingItemsTableReady !== true) return;
+        if (!this.currentTableName) return;
+
+        try {
+            // 1. Aktif tablonun tüm ürünlerini çek
+            const { data: rows, error } = await window.supabase
+                .from('counting_items')
+                .select('product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, history, api_fetch_failed, last_updated')
+                .eq('username', this.currentUser.username)
+                .eq('table_name', this.currentTableName);
+            if (error) return;
+
+            const incomingMap = {};
+            for (const row of (rows || [])) {
+                incomingMap[row.product_id] = {
+                    warehouseStock: row.warehouse_stock ?? null,
+                    systemStock: row.system_stock ?? null,
+                    price: row.price ?? null,
+                    priceText: row.price_text ?? null,
+                    reservedStock: row.reserved_stock ?? null,
+                    history: row.history || [],
+                    apiFetchFailed: row.api_fetch_failed || false,
+                    lastUpdated: row.last_updated || new Date().toISOString(),
+                };
+            }
+
+            let changed = false;
+            const localTable = this.cachedFullData?._tables?.[this.currentTableName];
+            if (!localTable) return;
+
+            // Yeni gelen veya güncellenen ürünleri merge et (last-write-wins)
+            for (const [pId, incoming] of Object.entries(incomingMap)) {
+                const local = localTable[pId];
+                if (!local) {
+                    localTable[pId] = incoming;
+                    this.countingData[pId] = incoming;
+                    if (!Array.isArray(localTable._productOrder)) localTable._productOrder = [];
+                    if (!localTable._productOrder.includes(pId)) localTable._productOrder.push(pId);
+                    if (!Array.isArray(this.countingData._productOrder)) this.countingData._productOrder = [];
+                    if (!this.countingData._productOrder.includes(pId)) this.countingData._productOrder.push(pId);
+                    changed = true;
+                } else {
+                    const incomingTs = new Date(incoming.lastUpdated).getTime();
+                    const localTs = local.lastUpdated ? new Date(local.lastUpdated).getTime() : 0;
+                    if (incomingTs > localTs) {
+                        localTable[pId] = incoming;
+                        this.countingData[pId] = incoming;
+                        changed = true;
+                    }
+                }
+            }
+
+            if (changed) {
+                this.scheduleRenderTable();
+                this.updateStatistics();
+                this.updateCountingProgress();
+                this._scheduleTableSelectorUpdate();
+                this._saveFullBlobToLocalStorage();
+            }
+        } catch (e) { /* sessizce başarısız */ }
+    }
+
+    /**
+     * Tablo seçici şeridini debounce ile yeniden çizer (her ürün güncellemesinde değil, biraz bekleyerek).
+     */
+    _scheduleTableSelectorUpdate(delay = 250) {
+        if (this._tableSelectorUpdateTimer) clearTimeout(this._tableSelectorUpdateTimer);
+        this._tableSelectorUpdateTimer = setTimeout(() => {
+            this._tableSelectorUpdateTimer = null;
+            this.updateTableSelector();
+        }, delay);
     }
 
     /**
@@ -1842,13 +2037,28 @@ class CountingSystem {
                 apiFetchFailed: item.api_fetch_failed || false,
                 lastUpdated: item.last_updated || new Date().toISOString(),
             };
-            this.cachedFullData._tables[tName][pId] = productData;
+            const table = this.cachedFullData._tables[tName];
+            const isNewProduct = !table[pId];
+            table[pId] = productData;
+
+            // Yeni ürünü _productOrder'a ekle (cross-device görünürlük için kritik)
+            if (isNewProduct) {
+                if (!Array.isArray(table._productOrder)) table._productOrder = [];
+                if (!table._productOrder.includes(pId)) table._productOrder.push(pId);
+            }
+
             if (tName === this.currentTableName) {
                 this.countingData[pId] = productData;
+                if (isNewProduct) {
+                    if (!Array.isArray(this.countingData._productOrder)) this.countingData._productOrder = [];
+                    if (!this.countingData._productOrder.includes(pId)) this.countingData._productOrder.push(pId);
+                }
                 this.scheduleRenderTable();
                 this.updateStatistics();
                 this.updateCountingProgress();
             }
+            // Yeni tablo görünürse chip listesi de güncellensin
+            if (isNewProduct) this._scheduleTableSelectorUpdate();
         }
         // localStorage TAM blob yedek (ürünler dahil — kayıp önleme)
         this._saveFullBlobToLocalStorage();
@@ -1904,13 +2114,23 @@ class CountingSystem {
                     if (!incomingProduct || typeof incomingProduct !== 'object') continue;
 
                     const localProduct = localTable[pId];
+                    const wasNew = !localProduct;
                     // last-write-wins: gelen daha yeniyse yaz
                     const incomingTs = incomingProduct.lastUpdated ? new Date(incomingProduct.lastUpdated).getTime() : 0;
                     const localTs = localProduct?.lastUpdated ? new Date(localProduct.lastUpdated).getTime() : 0;
-                    if (!localProduct || incomingTs >= localTs) {
+                    if (wasNew || incomingTs >= localTs) {
                         localTable[pId] = { ...incomingProduct };
                         if (tName === this.currentTableName) {
                             this.countingData[pId] = localTable[pId];
+                        }
+                    }
+                    // Yeni ürünü _productOrder'a ekle
+                    if (wasNew) {
+                        if (!Array.isArray(localTable._productOrder)) localTable._productOrder = [];
+                        if (!localTable._productOrder.includes(pId)) localTable._productOrder.push(pId);
+                        if (tName === this.currentTableName) {
+                            if (!Array.isArray(this.countingData._productOrder)) this.countingData._productOrder = [];
+                            if (!this.countingData._productOrder.includes(pId)) this.countingData._productOrder.push(pId);
                         }
                     }
                 }
@@ -2332,22 +2552,14 @@ class CountingSystem {
     }
 
     /**
-     * Tablo sayım durumu: hiç başlanmamış / yarım / tamamlanmış (+ veya - finans).
+     * Tablo finansal kar/zararı (TL): Σ (depo − sistem) × fiyat
+     * Finans sekmesiyle aynı mantık; fiyatı olmayan ürünler toplama dahil edilmez.
      */
-    getTableStatusSummary(tableData) {
-        if (!tableData || typeof tableData !== 'object') {
-            return { status: 'not-started', positiveCount: 0, negativeCount: 0 };
-        }
+    calculateTableProfitLoss(tableData) {
+        if (!tableData || typeof tableData !== 'object') return 0;
 
+        let profitLoss = 0;
         const productIds = Object.keys(tableData).filter((k) => !this.isReservedCountingKey(k));
-        if (productIds.length === 0) {
-            return { status: 'not-started', positiveCount: 0, negativeCount: 0 };
-        }
-
-        let startedCount = 0;
-        let completeCount = 0;
-        let positiveCount = 0;
-        let negativeCount = 0;
 
         for (const pid of productIds) {
             const data = tableData[pid];
@@ -2355,45 +2567,75 @@ class CountingSystem {
 
             const warehouseStock = data.warehouseStock;
             const systemStock = data.systemStock;
-            const hasWarehouse = warehouseStock !== null && warehouseStock !== undefined;
-            const hasSystem = systemStock !== null && systemStock !== undefined;
+            if (warehouseStock === null || warehouseStock === undefined) continue;
+            if (systemStock === null || systemStock === undefined) continue;
+
+            const priceRaw = data.price;
+            let price = Number(priceRaw);
+            if (!price || Number.isNaN(price)) {
+                const product = this.productIndex?.get(pid);
+                price = Number(product?.price);
+            }
+            if (!price || Number.isNaN(price)) continue;
+
+            profitLoss += (Number(warehouseStock) - Number(systemStock)) * price;
+        }
+
+        return profitLoss;
+    }
+
+    /**
+     * Tablo sayım durumu: hiç başlanmamış / yarım / tamamlanmış (finansal kar veya zarar).
+     */
+    getTableStatusSummary(tableData) {
+        if (!tableData || typeof tableData !== 'object') {
+            return { status: 'not-started', profitLoss: 0 };
+        }
+
+        const productIds = Object.keys(tableData).filter((k) => !this.isReservedCountingKey(k));
+        if (productIds.length === 0) {
+            return { status: 'not-started', profitLoss: 0 };
+        }
+
+        let startedCount = 0;
+        let completeCount = 0;
+
+        for (const pid of productIds) {
+            const data = tableData[pid];
+            if (!data || typeof data !== 'object') continue;
+
+            const hasWarehouse = data.warehouseStock !== null && data.warehouseStock !== undefined;
+            const hasSystem = data.systemStock !== null && data.systemStock !== undefined;
 
             if (!hasWarehouse && !hasSystem) continue;
 
             startedCount++;
-
-            if (hasWarehouse && hasSystem) {
-                completeCount++;
-                const diff = this.calculateDifference(warehouseStock, systemStock);
-                if (diff.type === 'positive') positiveCount++;
-                else if (diff.type === 'negative') negativeCount++;
-            }
+            if (hasWarehouse && hasSystem) completeCount++;
         }
 
         if (startedCount === 0) {
-            return { status: 'not-started', positiveCount: 0, negativeCount: 0 };
+            return { status: 'not-started', profitLoss: 0 };
         }
 
         if (completeCount < productIds.length) {
-            return { status: 'incomplete', positiveCount, negativeCount };
+            return { status: 'incomplete', profitLoss: this.calculateTableProfitLoss(tableData) };
         }
 
-        if (positiveCount > negativeCount) {
-            return { status: 'complete-positive', positiveCount, negativeCount };
+        const profitLoss = this.calculateTableProfitLoss(tableData);
+        // Tamamlanmış tablolar: kar veya sıfır → yeşil, zarar → kırmızı
+        if (profitLoss < 0) {
+            return { status: 'complete-negative', profitLoss };
         }
-        if (negativeCount > positiveCount) {
-            return { status: 'complete-negative', positiveCount, negativeCount };
-        }
-        return { status: 'complete-balanced', positiveCount, negativeCount };
+        return { status: 'complete-positive', profitLoss };
     }
 
     getTableStatusChipClasses(status, isActive) {
         const map = {
             'not-started': 'bg-slate-100 text-slate-600 border-slate-200',
-            incomplete: 'bg-orange-50 text-orange-900 border-orange-200',
+            incomplete: 'bg-sky-50 text-sky-900 border-sky-200',
             'complete-positive': 'bg-emerald-50 text-emerald-900 border-emerald-200',
             'complete-negative': 'bg-red-50 text-red-900 border-red-200',
-            'complete-balanced': 'bg-slate-50 text-slate-700 border-slate-200',
+            'complete-balanced': 'bg-emerald-50 text-emerald-900 border-emerald-200',
         };
         const base = map[status] || map['not-started'];
         const active = isActive ? ' ring-2 ring-blue-400 ring-offset-1 shadow-sm font-semibold' : ' hover:brightness-[0.98]';
@@ -2404,10 +2646,10 @@ class CountingSystem {
         if (isActive) return 'text-blue-700';
         const map = {
             'not-started': 'text-slate-400',
-            incomplete: 'text-orange-600',
+            incomplete: 'text-sky-600',
             'complete-positive': 'text-emerald-600',
             'complete-negative': 'text-red-600',
-            'complete-balanced': 'text-slate-500',
+            'complete-balanced': 'text-emerald-600',
         };
         return map[status] || map['not-started'];
     }
@@ -2415,10 +2657,10 @@ class CountingSystem {
     getTableStatusDropdownRowClasses(status, isActive) {
         const map = {
             'not-started': isActive ? 'bg-slate-100 text-slate-800' : 'text-slate-600 hover:bg-slate-50',
-            incomplete: isActive ? 'bg-orange-50 text-orange-900' : 'text-orange-900 hover:bg-orange-50/80',
+            incomplete: isActive ? 'bg-sky-50 text-sky-900' : 'text-sky-900 hover:bg-sky-50/80',
             'complete-positive': isActive ? 'bg-emerald-50 text-emerald-900' : 'text-emerald-900 hover:bg-emerald-50/80',
             'complete-negative': isActive ? 'bg-red-50 text-red-900' : 'text-red-900 hover:bg-red-50/80',
-            'complete-balanced': isActive ? 'bg-slate-50 text-slate-800' : 'text-slate-700 hover:bg-slate-50',
+            'complete-balanced': isActive ? 'bg-emerald-50 text-emerald-900' : 'text-emerald-900 hover:bg-emerald-50/80',
         };
         return map[status] || map['not-started'];
     }
@@ -6618,7 +6860,21 @@ class CountingSystem {
             this.renderRapidCountingMode();
             return;
         }
-        
+
+        // Scroll pozisyonlarını render öncesi kaydet (innerHTML resetlemesi sonrası geri yükle)
+        const scrollY = window.scrollY || window.pageYOffset || 0;
+        const scrollSnapshot = {
+            window: scrollY,
+            containers: [],
+        };
+        try {
+            document.querySelectorAll('.counting-scroll-container, #countingTableContainer, #countingCardScroll').forEach((el) => {
+                if (el && (el.scrollTop > 0 || el.scrollLeft > 0)) {
+                    scrollSnapshot.containers.push({ el, top: el.scrollTop, left: el.scrollLeft });
+                }
+            });
+        } catch (e) { /* ignore */ }
+
         const tableBody = document.getElementById('countingTableBody');
         const cardView = document.getElementById('countingCardView');
         const emptyState = document.getElementById('emptyState');
@@ -7021,6 +7277,27 @@ class CountingSystem {
         }
 
         this.updateActiveTableActivityLine();
+
+        // Render sonrası scroll'u eski konumuna geri yükle — innerHTML reset scroll'u sıfırlamasın
+        try {
+            if (typeof scrollSnapshot !== 'undefined' && scrollSnapshot) {
+                // Browser scroll restoration'u atla ve manuel restore
+                const restoreScroll = () => {
+                    if (scrollSnapshot.window > 0) {
+                        window.scrollTo({ left: 0, top: scrollSnapshot.window, behavior: 'instant' });
+                    }
+                    for (const { el, top, left } of scrollSnapshot.containers || []) {
+                        if (el && el.isConnected) {
+                            el.scrollTop = top;
+                            el.scrollLeft = left;
+                        }
+                    }
+                };
+                // İki kere tetikle: hemen + RAF sonrası (rapid grid'in yüklemesi bittikten sonra)
+                restoreScroll();
+                requestAnimationFrame(restoreScroll);
+            }
+        } catch (e) { /* ignore */ }
     }
 
     /** Rapid kart için durum anahtarı — değişim tespitinde kullanılır */
@@ -7961,8 +8238,8 @@ class CountingSystem {
         if (positiveCountEl) positiveCountEl.textContent = positiveCount;
         if (negativeCountEl) negativeCountEl.textContent = negativeCount;
 
-        // Tablo chip renklerini güncel sayım durumuna göre yenile
-        this.updateTableSelector();
+        // Tablo chip renklerini güncel sayım durumuna göre yenile (debounced — performans)
+        this._scheduleTableSelectorUpdate();
     }
 
     openProductSearchModal() {
