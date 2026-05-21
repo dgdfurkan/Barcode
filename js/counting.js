@@ -734,10 +734,23 @@ class CountingSystem {
                         };
                     }
                 }
-            } else if (metaBlob?._tables) {
+            } else {
                 // counting_items yok → eski blob yöntemi (fallback)
-                for (const [tName, tData] of Object.entries(metaBlob._tables)) {
-                    tables[tName] = { ...tData };
+                if (metaBlob?._tables && Object.keys(metaBlob._tables).length > 0) {
+                    // Eski tam blob: _tables içinde ürünler var
+                    for (const [tName, tData] of Object.entries(metaBlob._tables)) {
+                        tables[tName] = { ...tData };
+                    }
+                } else if (metaBlob?._tableMeta) {
+                    // Yeni meta-only format ama counting_items yoksa: tablo listesini _tableMeta'dan çıkar
+                    // Ürünler localStorage'da olabilir
+                    for (const [tName, meta] of Object.entries(metaBlob._tableMeta)) {
+                        if (!tables[tName]) {
+                            tables[tName] = {};
+                            if (meta?.createdAt) tables[tName]._tableMeta = { createdAt: meta.createdAt };
+                            if (Array.isArray(meta?._productOrder)) tables[tName]._productOrder = meta._productOrder;
+                        }
+                    }
                 }
             }
 
@@ -773,8 +786,6 @@ class CountingSystem {
                 ? fullData._auditLog.slice(-this.AUDIT_LOG_MAX)
                 : [];
 
-            // Meta'yı güncelle (ürün verisi olmadan)
-            await this._saveMetaOnly();
             console.log('✅ loadCountingData tamamlandı, tablo:', this.currentTableName);
         } catch (error) {
             console.error('Error loading counting data:', error);
@@ -820,12 +831,18 @@ class CountingSystem {
 
     // Migrate old structure to new nested structure
     migrateToNestedStructure(data) {
-        // If already in new structure, return as is
+        // Zaten yeni yapıda (_tables mevcut)
         if (data._tables) {
             return data;
         }
 
-        // Migrate old structure
+        // Yeni meta-only format: _tableMeta var ama _tables yok
+        // Bu formatı boş _tables ile döndür — ürün verisi counting_items'tan gelir
+        if (data._tableMeta && !data._tables) {
+            return { ...data, _tables: {} };
+        }
+
+        // Eski format: ürün ID'leri doğrudan üst düzeyde
         const migrated = {
             _api_info: data._api_info || {},
             _tables: {},
@@ -836,10 +853,10 @@ class CountingSystem {
             migrated._auditLog = data._auditLog;
         }
 
-        // Move all product data to default table
+        const RESERVED = new Set(['_api_info', '_tables', '_currentTable', '_auditLog', '_tableMeta']);
         const defaultTable = {};
         for (const key in data) {
-            if (key !== '_api_info' && key !== '_tables' && key !== '_currentTable' && key !== '_auditLog') {
+            if (!RESERVED.has(key)) {
                 defaultTable[key] = data[key];
             }
         }
@@ -860,9 +877,17 @@ class CountingSystem {
         }
     }
 
-    /** Yalnızca meta verileri (api_info, auditLog, tableMeta) Supabase'e yazar — ürün verisi yazmaz */
+    /** Yalnızca meta verileri (api_info, auditLog, tableMeta) Supabase'e yazar — ürün verisi yazmaz.
+     *  counting_items tablosu yoksa ürünleri korumak için tam blob yazar. */
     async _saveMetaOnly() {
         if (!this.currentUser) return;
+
+        // counting_items hazır değil → ürün verisi bu blob'da duruyor, sadece meta yazmak veri kaybına yol açar
+        if (this._countingItemsTableReady !== true) {
+            await this._saveFullBlobLegacy(this.cachedFullData);
+            return;
+        }
+
         try {
             const meta = this._buildMetaBlob();
             this.cachedFullData._tableMeta = meta._tableMeta;
