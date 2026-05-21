@@ -2195,13 +2195,18 @@ class CountingSystem {
                 if (incomingTableData._tableMeta && !localTable._tableMeta) {
                     localTable._tableMeta = { ...incomingTableData._tableMeta };
                 }
+                // _productOrder: INCOMING kazanır (yazıcı son sırayı bilir).
+                // Yereldeki ekstra ID'ler sona eklenir (silinmesin diye).
                 if (Array.isArray(incomingTableData._productOrder)) {
-                    const existing = Array.isArray(localTable._productOrder) ? localTable._productOrder : [];
-                    const merged = [...existing];
-                    for (const pId of incomingTableData._productOrder) {
-                        if (!merged.includes(pId)) merged.push(pId);
+                    const incomingOrder = incomingTableData._productOrder;
+                    const incomingSet = new Set(incomingOrder);
+                    const localOrder = Array.isArray(localTable._productOrder) ? localTable._productOrder : [];
+                    const extras = localOrder.filter((id) => !incomingSet.has(id));
+                    localTable._productOrder = [...incomingOrder, ...extras];
+                    // Aktif tablo ise countingData._productOrder'ı da güncelle
+                    if (tName === this.currentTableName) {
+                        this.countingData._productOrder = [...localTable._productOrder];
                     }
-                    localTable._productOrder = merged;
                 }
             }
             tablesChanged = true;
@@ -3163,6 +3168,7 @@ class CountingSystem {
         let skipped = 0;
         const idsInPasteOrder = [];
         const seenPasteIds = new Set();
+        // 1. Aşama: Hızlı önce yereldeki countingData yapısını hazırla (skipSave: true → counting_items'a yazmıyor)
         for (const row of rows) {
             const product = this.matchDailyImportRow(row);
             if (!product) {
@@ -3188,7 +3194,9 @@ class CountingSystem {
             added++;
         }
 
+        // 2. Aşama: Paste sırasını uygula (bu en kritik — _productOrder'ı yapıştırma sırasına göre yazar)
         this.applyImportedProductOrder(idsInPasteOrder);
+
         if (added > 0) {
             this.pushAuditEntry(
                 `İçe aktarma · ${this.formatTableDisplayName(this.currentTableName)} · ${added} satır${
@@ -3197,7 +3205,18 @@ class CountingSystem {
                 { cat: 'import', tbl: this.currentTableName }
             );
         }
+
+        // 3. Aşama: Tam blob önce Supabase'e yaz (paste sırasını içerir, telefon doğru sırayı alır)
         await this.saveCountingData();
+
+        // 4. Aşama: Her ürünü counting_items'a SIRAYLA yaz (paralel değil — sıralı yazımla Supabase created_at sırası korunur)
+        if (this._countingItemsTableReady === true) {
+            for (const productId of idsInPasteOrder) {
+                if (this.countingData[productId]) {
+                    await this.saveProductEntry(productId).catch(() => {});
+                }
+            }
+        }
         this.renderTable();
         if (this.currentViewMode === 'rapid') {
             this.renderRapidCountingMode();

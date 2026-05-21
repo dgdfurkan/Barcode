@@ -19,6 +19,18 @@
     var RE_ERP_DOCS =
         /https?:\/\/vsrm-cdn\.erp\.getirapi\.com\/docs\/[^\s,?#"']+\.(?:jpe?g|png|gif|webp)/gi;
 
+    /** BİRLEŞTİRİLMİŞ regex — metni TEK SEFERDE soldan sağa tarayıp sıra korur.
+     *  Eski yaklaşımda her pattern tüm metni baştan tarıyordu → URL'ler pattern gruplarına göre sıralanıyordu (sıra bozuk). */
+    var RE_GETIR_ALL = new RegExp(
+        '(?:' +
+            'https?:\\/\\/cdn-image\\.getir\\.com\\/market\\/product\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(?:jpe?g|png|gif|webp)' +
+            '|https?:\\/\\/cdn\\.getir\\.com\\/product\\/[^\\s,?#"\']+?\\.(?:jpe?g|png|gif|webp)' +
+            '|https?:\\/\\/cdn\\.getir\\.com\\/misc\\/[^\\s,?#"\']+?\\.(?:jpe?g|png|gif|webp)' +
+            '|https?:\\/\\/vsrm-cdn\\.erp\\.getirapi\\.com\\/docs\\/[^\\s,?#"\']+?\\.(?:jpe?g|png|gif|webp)' +
+        ')',
+        'gi'
+    );
+
     function normalizeGetirImageFileKey(filename) {
         if (!filename) return '';
         var base = filename.split('?')[0].split('#')[0];
@@ -37,7 +49,8 @@
     }
 
     /**
-     * Virgül, boşluk veya satır sonlarıyla ayrılmış metinden Getir ürün görsel URL'lerini sırayla döner (yinelenenleri atar).
+     * Virgül, boşluk veya satır sonlarıyla ayrılmış metinden Getir ürün görsel URL'lerini SIRAYLA döner.
+     * KRİTİK: Tüm pattern'leri TEK regex ile soldan sağa tarar — yapıştırma sırası birebir korunur.
      * @param {string} text
      * @returns {string[]}
      */
@@ -45,18 +58,14 @@
         if (!text || typeof text !== 'string') return [];
         var seen = new Set();
         var out = [];
-        var patterns = [RE_CDN_IMAGE, RE_CDN_LEGACY, RE_CDN_MISC, RE_ERP_DOCS];
-        var pi;
+        RE_GETIR_ALL.lastIndex = 0;
         var m;
-        for (pi = 0; pi < patterns.length; pi++) {
-            patterns[pi].lastIndex = 0;
-            while ((m = patterns[pi].exec(text)) !== null) {
-                var u = m[0];
-                var key = u.toLowerCase();
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    out.push(u);
-                }
+        while ((m = RE_GETIR_ALL.exec(text)) !== null) {
+            var u = m[0];
+            var key = u.toLowerCase();
+            if (!seen.has(key)) {
+                seen.add(key);
+                out.push(u);
             }
         }
         return out;
