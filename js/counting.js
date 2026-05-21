@@ -2585,7 +2585,14 @@ class CountingSystem {
     }
 
     /**
-     * Tablo sayım durumu: hiç başlanmamış / yarım / tamamlanmış (finansal kar veya zarar).
+     * Tablo sayım durumu — TAMAMEN FİNANSAL TL BAZLI değerlendirme.
+     * Renk kararı ürün ADEDİNE değil, Σ (depo − sistem) × fiyat sonucuna göre verilir.
+     *
+     * - Hiç ürün yok / hiç sayım yok                     → not-started (gri)
+     * - Finansal kar/zarar hesaplanmış ve > 0            → complete-positive (yeşil) — yarım da olsa
+     * - Finansal kar/zarar hesaplanmış ve < 0            → complete-negative (kırmızı) — yarım da olsa
+     * - Tüm ürünlerin sayımı tamam, kar/zarar = 0        → complete-positive (yeşil) — denge tam tutmuş
+     * - Sayım yarım ve henüz net finans yok (price 0 vb) → incomplete (açık mavi)
      */
     getTableStatusSummary(tableData) {
         if (!tableData || typeof tableData !== 'object') {
@@ -2617,16 +2624,23 @@ class CountingSystem {
             return { status: 'not-started', profitLoss: 0 };
         }
 
-        if (completeCount < productIds.length) {
-            return { status: 'incomplete', profitLoss: this.calculateTableProfitLoss(tableData) };
-        }
-
         const profitLoss = this.calculateTableProfitLoss(tableData);
-        // Tamamlanmış tablolar: kar veya sıfır → yeşil, zarar → kırmızı
+
+        // TL bazlı kar → yeşil (yarım/tam fark etmez)
+        if (profitLoss > 0) {
+            return { status: 'complete-positive', profitLoss };
+        }
+        // TL bazlı zarar → kırmızı (yarım/tam fark etmez)
         if (profitLoss < 0) {
             return { status: 'complete-negative', profitLoss };
         }
-        return { status: 'complete-positive', profitLoss };
+        // profitLoss === 0
+        // Tüm ürünler tamam ve denge tutmuş → yeşil
+        if (completeCount === productIds.length) {
+            return { status: 'complete-positive', profitLoss: 0 };
+        }
+        // Yarım sayım + henüz net finans hesabı yok → mavi
+        return { status: 'incomplete', profitLoss: 0 };
     }
 
     getTableStatusChipClasses(status, isActive) {
