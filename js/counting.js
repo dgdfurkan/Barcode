@@ -2099,6 +2099,7 @@ class CountingSystem {
 
         // Dropdown item seçimi (event delegation)
         dropdown.addEventListener('mousedown', (e) => {
+            e.stopPropagation(); // overlay'e ulaşmasın
             const item = e.target.closest('[data-cat]');
             if (!item) return;
             e.preventDefault();
@@ -2108,6 +2109,10 @@ class CountingSystem {
             closeDropdown();
             input.focus();
         });
+
+        // touch eventleri için de aynı koruma (mobil)
+        dropdown.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+        dropdown.addEventListener('touchend', (e) => e.stopPropagation(), { passive: true });
 
         // Dışarı tıklayınca kapat
         document.addEventListener('mousedown', (e) => {
@@ -3774,10 +3779,13 @@ class CountingSystem {
             });
         }
 
-        // Overlay tıklamasıyla kapat
+        // Overlay tıklamasıyla kapat — dropdown açıkken kapanmaz
         if (createTableModal) {
             createTableModal.addEventListener('click', (e) => {
-                if (e.target === createTableModal) closeCreateModal();
+                if (e.target !== createTableModal) return;
+                const dropdown = document.getElementById('tableNameDropdown');
+                if (dropdown && !dropdown.classList.contains('hidden')) return;
+                closeCreateModal();
             });
         }
 
