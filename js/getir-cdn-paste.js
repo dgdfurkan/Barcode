@@ -105,8 +105,50 @@
         return null;
     }
 
+    /**
+     * Panodan Getir eklenti çıktısını okur (HTML öncelikli — URL'ler kaybolmaz).
+     * @returns {Promise<string>}
+     */
+    async function readClipboardTextForImport() {
+        try {
+            if (navigator.clipboard && typeof navigator.clipboard.read === 'function') {
+                var items = await navigator.clipboard.read();
+                for (var hi = 0; hi < items.length; hi++) {
+                    var item = items[hi];
+                    var types = item.types || [];
+                    if (types.indexOf('text/html') === -1) continue;
+                    var html = await (await item.getType('text/html')).text();
+                    if (html && typeof html === 'string' && html.trim()) {
+                        return html.trim();
+                    }
+                }
+                for (var pi = 0; pi < items.length; pi++) {
+                    var item2 = items[pi];
+                    var types2 = item2.types || [];
+                    if (types2.indexOf('text/plain') === -1) continue;
+                    var plain = await (await item2.getType('text/plain')).text();
+                    if (plain && typeof plain === 'string' && plain.trim()) {
+                        return plain.trim();
+                    }
+                }
+            }
+        } catch (e) {
+            /* izin yok veya read() desteklenmiyor */
+        }
+        try {
+            if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+                var t = await navigator.clipboard.readText();
+                if (t && typeof t === 'string' && t.trim()) return t.trim();
+            }
+        } catch (e2) {
+            /* izin reddedildi */
+        }
+        return '';
+    }
+
     global.GetirCdnPaste = {
         extractGetirCdnProductImageUrlsFromText: extractGetirCdnProductImageUrlsFromText,
         findProductByGetirImageUrl: findProductByGetirImageUrl,
+        readClipboardTextForImport: readClipboardTextForImport,
     };
 })(typeof window !== 'undefined' ? window : globalThis);

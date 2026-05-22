@@ -4249,6 +4249,16 @@ class CountingSystem {
             });
         }
 
+        // Getir CDN görsel listesi — panodan toplu ekle (eklenti çıktısı)
+        const getirCdnPasteBtn = document.getElementById('getirCdnPasteBtn');
+        if (getirCdnPasteBtn) {
+            getirCdnPasteBtn.addEventListener('click', () => {
+                void this.handleGetirCdnPasteFromClipboard().catch((err) =>
+                    console.error('handleGetirCdnPasteFromClipboard:', err)
+                );
+            });
+        }
+
         // Sync stocks button
         const syncStocksBtn = document.getElementById('syncStocksBtn');
         if (syncStocksBtn) {
@@ -5510,13 +5520,27 @@ class CountingSystem {
             this.showNotification('Lütfen ürün adı veya barkod girin', 'error');
             return;
         }
+        await this.handleManualAddFromText(value, { clearInput: true });
+    }
+
+    /** Arama kutusu / pano — Getir CDN toplu veya tekil ürün ekleme */
+    async handleManualAddFromText(rawText, options = {}) {
+        const { clearInput = false } = options;
+        const value = String(rawText || '').trim();
+        if (!value) {
+            this.showNotification('Lütfen ürün adı veya barkod girin', 'error');
+            return;
+        }
 
         const G = typeof window !== 'undefined' ? window.GetirCdnPaste : null;
         if (G && typeof G.extractGetirCdnProductImageUrlsFromText === 'function') {
             const urls = G.extractGetirCdnProductImageUrlsFromText(value);
             if (urls.length > 0) {
                 await this.bulkAddProductsFromGetirCdnPaste(urls);
-                if (input) input.value = '';
+                if (clearInput) {
+                    const input = document.getElementById('manualProductInput');
+                    if (input) input.value = '';
+                }
                 return;
             }
         }
@@ -5536,7 +5560,55 @@ class CountingSystem {
         }
 
         await this.addProductToCounting(product);
-        input.value = '';
+        if (clearInput) {
+            const input = document.getElementById('manualProductInput');
+            if (input) input.value = '';
+        }
+    }
+
+    /** Panodan Getir eklenti çıktısını okuyup tabloya ekler (arama + Enter ile aynı mantık) */
+    async handleGetirCdnPasteFromClipboard() {
+        if (this._getirPasteInProgress) return;
+        const btn = document.getElementById('getirCdnPasteBtn');
+        const G = typeof window !== 'undefined' ? window.GetirCdnPaste : null;
+
+        if (!G || typeof G.readClipboardTextForImport !== 'function') {
+            this.showToast('Getir yapıştırma modülü yüklenemedi', 'error', 3000);
+            return;
+        }
+
+        this._getirPasteInProgress = true;
+        if (btn) btn.disabled = true;
+
+        try {
+            const raw = await G.readClipboardTextForImport();
+            if (!raw) {
+                this.showToast(
+                    'Panoda metin yok veya tarayıcı pano izni verilmedi',
+                    'warning',
+                    4000
+                );
+                return;
+            }
+
+            const urls =
+                typeof G.extractGetirCdnProductImageUrlsFromText === 'function'
+                    ? G.extractGetirCdnProductImageUrlsFromText(raw)
+                    : [];
+            if (urls.length === 0) {
+                this.showToast(
+                    'Panoda Getir görsel linki bulunamadı. Eklenti çıktısını kopyalayıp tekrar deneyin.',
+                    'warning',
+                    4500
+                );
+                return;
+            }
+
+            await this.bulkAddProductsFromGetirCdnPaste(urls);
+        } finally {
+            this._getirPasteInProgress = false;
+            if (btn) btn.disabled = false;
+        }
     }
 
     /**
