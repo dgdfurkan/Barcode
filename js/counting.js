@@ -2769,6 +2769,8 @@ class CountingSystem {
         this.updateTableSelector();
         this.syncSayimSubTabToTable();
     }
+
+    // Delete a table
     async deleteTable(tableName) {
         if (!tableName) return;
 
@@ -10040,7 +10042,66 @@ class CountingSystem {
         return [...map.values()];
     }
 
-    /** Sayım tablosu / finans kartları — barkod rozetleri (SVG ikonlu) */
+    /** Finans Stok Özeti — terminal okutulabilir EAN-13 / Code128 SVG */
+    renderFinanceScannableBarcodesHtml(barcodes, options = {}) {
+        const maxVisible = options.maxVisible ?? 2;
+        const width = options.width ?? 196;
+        const height = options.height ?? 56;
+        const BV = typeof window !== 'undefined' ? window.BarcodeVisual : null;
+        const list = Array.isArray(barcodes) ? barcodes : [];
+        const codes = list
+            .map((b) => {
+                if (b == null) return '';
+                if (typeof b === 'object' && b.code != null) return String(b.code).trim();
+                return String(b).trim();
+            })
+            .filter(Boolean);
+        if (!codes.length) {
+            return options.emptyHtml || '<span class="text-[10px] text-gray-400">—</span>';
+        }
+
+        const visible = codes.slice(0, maxVisible);
+        const chunks = visible
+            .map((code) => {
+                const safe = this.escapeHtml(code);
+                let visual = null;
+                if (BV && typeof BV.generateBarcodeSVG === 'function') {
+                    visual = BV.generateBarcodeSVG(code, width, height);
+                }
+                if (!visual) {
+                    return `<button type="button" class="finance-barcode-fallback rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-[10px] text-slate-700 hover:bg-slate-50" data-barcode-copy="${safe}" title="Barkodu kopyala">${safe}</button>`;
+                }
+                return `<button type="button" class="finance-barcode-visual rounded-md border border-slate-200 bg-white px-1 py-0.5 shadow-sm hover:border-slate-300 hover:shadow transition-colors cursor-pointer" data-barcode-copy="${safe}" title="Terminal okutma / kopyalamak için tıklayın">${visual}</button>`;
+            })
+            .join('');
+
+        const extra =
+            codes.length > maxVisible
+                ? `<span class="self-center rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600">+${codes.length - maxVisible} barkod</span>`
+                : '';
+
+        return `<div class="flex flex-wrap items-end gap-2">${chunks}${extra}</div>`;
+    }
+
+    _bindFinanceBarcodeCopy(root) {
+        if (!root) return;
+        root.querySelectorAll('[data-barcode-copy]').forEach((el) => {
+            if (el.dataset.barcodeCopyBound === '1') return;
+            el.dataset.barcodeCopyBound = '1';
+            el.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const code = el.getAttribute('data-barcode-copy');
+                if (!code) return;
+                navigator.clipboard
+                    .writeText(code)
+                    .then(() => this.showToast(`Barkod kopyalandı: ${code}`, 'success', 2200))
+                    .catch(() => this.showToast('Barkod kopyalanamadı', 'error', 2200));
+            });
+        });
+    }
+
+    /** Sayım tablosu / genel — barkod rozetleri (SVG ikonlu metin) */
     renderBarcodeBadgesHtml(barcodes, options = {}) {
         const maxVisible = options.maxVisible ?? 3;
         const list = Array.isArray(barcodes) ? barcodes : [];
@@ -10109,7 +10170,7 @@ class CountingSystem {
             const barcodeList = Array.isArray(p.barcodes) && p.barcodes.length
                 ? p.barcodes
                 : (p.barcode ? [p.barcode] : []);
-            const barcodesHtml = this.renderBarcodeBadgesHtml(barcodeList, { maxVisible: 4 });
+            const barcodesHtml = this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 2 });
             const adetStr = p.stockDiff > 0 ? `+${p.stockDiff}` : `${p.stockDiff}`;
             const adetLabel = kind === 'miss' ? `${adetStr} adet eksik` : `${adetStr} adet fazla`;
             const stockDiffClass = p.stockDiff > 0 ? 'text-emerald-700' : p.stockDiff < 0 ? 'text-rose-700' : 'text-gray-600';
@@ -10197,6 +10258,7 @@ class CountingSystem {
                 </div>
             </div>
         `;
+        this._bindFinanceBarcodeCopy(container);
     }
 
     setupChartCarousel() {
