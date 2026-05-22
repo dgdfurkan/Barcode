@@ -189,6 +189,77 @@
 
     // Önceki API bilgilerini sakla (değişiklik tespiti için)
     let previousAPIInfo = null;
+
+    function parseJwtExpiryMsFromToken(tokenString) {
+        if (!tokenString || typeof tokenString !== 'string') return null;
+        try {
+            const bare = tokenString.replace(/^Bearer\s+/i, '').trim();
+            const parts = bare.split('.');
+            if (parts.length !== 3) return null;
+            const payload = parts[1];
+            const padded = payload + '='.repeat((4 - payload.length % 4) % 4);
+            const decoded = JSON.parse(atob(padded));
+            if (decoded.exp) return decoded.exp * 1000;
+        } catch (e) { /* ignore */ }
+        return null;
+    }
+
+    function normalizeExpiry(tokenExpiry) {
+        if (!tokenExpiry) return 0;
+        if (typeof tokenExpiry === 'number') return tokenExpiry;
+        if (typeof tokenExpiry === 'string') {
+            const t = new Date(tokenExpiry).getTime();
+            if (!isNaN(t)) return t;
+            const p = parseInt(tokenExpiry, 10);
+            return isNaN(p) ? 0 : p;
+        }
+        return 0;
+    }
+
+    function getEffectiveExpiryMs(apiInfo) {
+        if (!apiInfo || !apiInfo.token) return null;
+        let fromField = apiInfo.tokenExpiry ? normalizeExpiry(apiInfo.tokenExpiry) : 0;
+        const fromJwt = parseJwtExpiryMsFromToken(apiInfo.token);
+        const mx = Math.max(fromField || 0, fromJwt || 0);
+        return mx > 0 ? mx : null;
+    }
+
+    function pickBestApiInfo(candidates) {
+        const valid = (candidates || []).filter((c) => c && c.token && String(c.token).trim());
+        if (!valid.length) return null;
+        return valid.reduce((best, cur) => {
+            const expB = getEffectiveExpiryMs(best) || 0;
+            const expC = getEffectiveExpiryMs(cur) || 0;
+            if (expC > expB) return cur;
+            if (expC < expB) return best;
+            const tsB = best.timestamp || 0;
+            const tsC = cur.timestamp || 0;
+            return tsC >= tsB ? cur : best;
+        });
+    }
+
+    function mergeApiInfoForSave(winner, prev) {
+        if (!winner) return prev;
+        const bare = String(winner.token).replace(/^Bearer\s+/i, '').trim();
+        const token = bare ? `Bearer ${bare}` : winner.token;
+        const jwtExp = parseJwtExpiryMsFromToken(winner.token);
+        let tokenExpiry = winner.tokenExpiry || jwtExp || prev?.tokenExpiry;
+        if (tokenExpiry) {
+            const n = normalizeExpiry(tokenExpiry);
+            if (n) tokenExpiry = n;
+        } else if (jwtExp) {
+            tokenExpiry = jwtExp;
+        }
+        return {
+            token,
+            warehouseId: winner.warehouseId || prev?.warehouseId,
+            warehouseName: winner.warehouseName || prev?.warehouseName,
+            tokenExpiry: tokenExpiry || null,
+            baseUrl: winner.baseUrl || prev?.baseUrl || 'https://franchise-api-gateway.getirapi.com',
+            stockEndpoint: winner.stockEndpoint || prev?.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks',
+            timestamp: winner.timestamp || Date.now(),
+        };
+    }
     
     // Supabase'e API bilgilerini kaydet
     async function saveAPIInfoToSupabase(apiInfo) {
@@ -238,16 +309,23 @@
                 }
             }
             
-            // API bilgilerini _api_info key'ine kaydet
+            // En uzun süreli token kazanır — kısa token ile ezme yok
+            const existingApiInfo = countingData._api_info || null;
+            const merged = mergeApiInfoForSave(
+                pickBestApiInfo([existingApiInfo, apiInfo].filter(Boolean)),
+                existingApiInfo || {}
+            );
+            if (!merged || !merged.token) return;
+
             countingData._api_info = {
-                token: apiInfo.token,
-                warehouseId: apiInfo.warehouseId,
-                warehouseName: apiInfo.warehouseName || null,
-                tokenExpiry: apiInfo.tokenExpiry,
-                baseUrl: apiInfo.baseUrl,
-                stockEndpoint: apiInfo.stockEndpoint,
+                token: merged.token,
+                warehouseId: merged.warehouseId,
+                warehouseName: merged.warehouseName || null,
+                tokenExpiry: merged.tokenExpiry,
+                baseUrl: merged.baseUrl,
+                stockEndpoint: merged.stockEndpoint,
                 lastUpdated: new Date().toISOString(),
-                timestamp: apiInfo.timestamp
+                timestamp: merged.timestamp,
             };
             
             // Supabase'e kaydet

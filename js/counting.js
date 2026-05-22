@@ -445,6 +445,32 @@ class CountingSystem {
         return `${tok}|${exp}`;
     }
 
+    /**
+     * Tam blob yazımından önce _api_info'yu korur: Supabase + yerel cache arasında en uzun süreli token kazanır.
+     */
+    async _protectApiInfoInFullBlob(fullData) {
+        if (!fullData || typeof fullData !== 'object') return fullData;
+        const remote = await this.fetchSupabaseApiInfo();
+        const local = fullData._api_info || this.cachedFullData?._api_info || null;
+        const best = this.pickBestApiInfo([remote, local].filter(Boolean));
+        if (best && best.token) {
+            const merged = this.mergeApiInfoForSave(best, remote || local || {});
+            fullData._api_info = merged;
+            if (this.cachedFullData) this.cachedFullData._api_info = merged;
+        }
+        return fullData;
+    }
+
+    /** Gelen aday ile Supabase/cache birleştir — yalnızca en uzun süreli token yazılır */
+    _resolveBestApiInfoForSave(incoming, existingCandidates = []) {
+        if (!incoming || !incoming.token) return null;
+        const candidates = [...existingCandidates, incoming].filter((c) => c && c.token);
+        const best = this.pickBestApiInfo(candidates);
+        if (!best || !best.token) return null;
+        const prev = this.pickBestApiInfo(existingCandidates.filter(Boolean)) || {};
+        return this.mergeApiInfoForSave(best, prev);
+    }
+
     async fetchSupabaseApiInfo() {
         if (!window.supabase || !this.currentUser) return null;
         try {
@@ -945,6 +971,7 @@ class CountingSystem {
         if (!window.supabase || !this.currentUser) return;
         try {
             const fullBlob = this._buildFullBlob();
+            await this._protectApiInfoInFullBlob(fullBlob);
             fullBlob._writerDeviceId = this.deviceId;
             fullBlob._writerAt = Date.now();
             await window.supabase
@@ -980,6 +1007,7 @@ class CountingSystem {
             fullData._tables[this.currentTableName] = this.countingData;
             if (!this.auditLog) this.auditLog = [];
             fullData._auditLog = this.auditLog.slice(-this.AUDIT_LOG_MAX);
+            await this._protectApiInfoInFullBlob(fullData);
             // Echo filtresi için: bu cihazın yazdığını işaretle
             fullData._writerDeviceId = this.deviceId;
             fullData._writerAt = Date.now();
@@ -1886,6 +1914,7 @@ class CountingSystem {
             this.refreshCurrentTableFromSupabase().catch(() => {});
             // Aynı zamanda tüm tabloların metasını da senkronize et (yeni tablo eklenmiş olabilir)
             this._refreshAllTablesMetaFromSupabase().catch(() => {});
+            this.updateAPIStatusCard();
         };
 
         document.addEventListener('visibilitychange', tryRefresh);
@@ -2220,8 +2249,20 @@ class CountingSystem {
         if (!this.cachedFullData) this.cachedFullData = { _tables: {} };
         if (!this.cachedFullData._tables) this.cachedFullData._tables = {};
 
-        // api_info güncelle
-        if (incoming._api_info) this.cachedFullData._api_info = incoming._api_info;
+        // api_info: en uzun süreli token kazanır (kısa token ile ezme yok)
+        if (incoming._api_info) {
+            const local = this.cachedFullData._api_info || null;
+            const best = this.pickBestApiInfo([local, incoming._api_info].filter(Boolean));
+            if (best && best.token) {
+                this.cachedFullData._api_info = this.mergeApiInfoForSave(best, local || {});
+            }
+            if (!this._apiStatusRefreshTimer) {
+                this._apiStatusRefreshTimer = setTimeout(() => {
+                    this._apiStatusRefreshTimer = null;
+                    this.updateAPIStatusCard();
+                }, 400);
+            }
+        }
 
         // auditLog merge: daha uzun olan korunur
         if (Array.isArray(incoming._auditLog) &&
@@ -4096,84 +4137,73 @@ class CountingSystem {
     }
 
     // API bilgilerini Supabase'e kaydet (telefondan erişim için)
-    async saveAPIInfoToSupabase(apiInfo) {
+    async saveAPIInfoToSupabase(incomingApiInfo) {
         try {
             if (!window.supabase || !this.currentUser) {
                 console.warn('⚠️ Supabase veya kullanıcı yok, API bilgileri kaydedilemedi');
-                return; // Supabase veya kullanıcı yoksa kaydetme
+                return;
             }
+            if (!incomingApiInfo || !incomingApiInfo.token) return;
 
-            // Mevcut counting_data'yı al
             const { data: userData, error: fetchError } = await window.supabase
                 .from('users')
                 .select('counting_data')
                 .eq('username', this.currentUser.username)
                 .maybeSingle();
 
-            // Eğer kullanıcı bulunamadıysa veya counting_data yoksa, yeni oluştur
-            if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 = no rows returned
+            if (fetchError && fetchError.code !== 'PGRST116') {
                 console.warn('⚠️ Supabase counting_data okuma hatası:', fetchError);
-                // Hata varsa devam et, yeni yapı oluşturacağız
             }
 
-            // counting_data'yı parse et veya yeni oluştur
             let countingData = {};
             if (userData && userData.counting_data) {
                 try {
-                    countingData = typeof userData.counting_data === 'string' 
-                        ? JSON.parse(userData.counting_data) 
-                        : userData.counting_data;
+                    countingData =
+                        typeof userData.counting_data === 'string'
+                            ? JSON.parse(userData.counting_data)
+                            : userData.counting_data;
                 } catch (e) {
                     console.warn('⚠️ counting_data parse hatası:', e);
                     countingData = {};
                 }
             }
 
-            // Eğer counting_data yoksa veya yapısı bozuksa, yeni yapı oluştur
             if (!countingData || typeof countingData !== 'object') {
-                countingData = {
-                    _api_info: {},
-                    _tables: {},
-                    _currentTable: 'Ana Sayım'
-                };
+                countingData = { _api_info: {}, _tables: {}, _currentTable: 'Ana Sayım' };
             }
-
-            // _tables yoksa oluştur
             if (!countingData._tables || typeof countingData._tables !== 'object') {
                 countingData._tables = {};
             }
-
-            // Mevcut tablo yoksa varsayılan tabloyu oluştur
-            if (!countingData._currentTable) {
-                countingData._currentTable = 'Ana Sayım';
-            }
+            if (!countingData._currentTable) countingData._currentTable = 'Ana Sayım';
             if (!countingData._tables[countingData._currentTable]) {
                 countingData._tables[countingData._currentTable] = {};
             }
 
-            // Mevcut API bilgilerini kontrol et (değişiklik tespiti için)
-            const existingAPIInfo = countingData._api_info || {};
-            const existingToken = existingAPIInfo.token ? (existingAPIInfo.token.startsWith('Bearer ') ? existingAPIInfo.token.substring(7).trim() : existingAPIInfo.token) : '';
-            const newToken = apiInfo.token ? (apiInfo.token.startsWith('Bearer ') ? apiInfo.token.substring(7).trim() : apiInfo.token) : '';
-            
-            const hasChanged = 
-                existingToken !== newToken ||
-                existingAPIInfo.warehouseId !== apiInfo.warehouseId ||
-                existingAPIInfo.tokenExpiry !== apiInfo.tokenExpiry;
+            const existingApiInfo = countingData._api_info || null;
+            const cacheApiInfo = this.cachedFullData?._api_info || null;
+            const merged = this._resolveBestApiInfoForSave(incomingApiInfo, [existingApiInfo, cacheApiInfo]);
+            if (!merged || !merged.token) return;
 
-            // API bilgilerini _api_info key'ine kaydet
+            if (!this.cachedFullData) this.cachedFullData = { _tables: {} };
+            this.cachedFullData._api_info = merged;
+
+            const sigNew = this.apiInfoSignature(merged);
+            const sigOld = this.apiInfoSignature(existingApiInfo);
+            if (sigNew === sigOld && existingApiInfo?.token) {
+                return;
+            }
+
             countingData._api_info = {
-                token: apiInfo.token,
-                warehouseId: apiInfo.warehouseId,
-                warehouseName: apiInfo.warehouseName,
-                tokenExpiry: apiInfo.tokenExpiry,
-                baseUrl: apiInfo.baseUrl,
-                stockEndpoint: apiInfo.stockEndpoint,
+                token: merged.token,
+                warehouseId: merged.warehouseId,
+                warehouseName: merged.warehouseName,
+                tokenExpiry: merged.tokenExpiry,
+                baseUrl: merged.baseUrl,
+                stockEndpoint: merged.stockEndpoint,
                 lastUpdated: new Date().toISOString(),
-                timestamp: apiInfo.timestamp || Date.now()
+                timestamp: merged.timestamp || Date.now(),
             };
 
-            // Her zaman Supabase'e kaydet (kullanıcıya özel veri yapısını güncellemek için)
             const { error: updateError } = await window.supabase
                 .from('users')
                 .update({ counting_data: countingData })
@@ -4182,20 +4212,13 @@ class CountingSystem {
             if (updateError) {
                 console.warn('⚠️ Supabase API bilgileri kayıt hatası:', updateError);
             } else {
-                if (hasChanged) {
-                    console.log('✅ API bilgileri Supabase\'e kaydedildi (counting_data._api_info)', {
-                        username: this.currentUser.username,
-                        warehouseId: apiInfo.warehouseId,
-                        tokenLength: newToken.length,
-                        tokenExpiry: apiInfo.tokenExpiry ? new Date(apiInfo.tokenExpiry).toLocaleString('tr-TR') : 'N/A',
-                        changed: 'Token/Warehouse/Expiry güncellendi'
-                    });
-                } else {
-                    console.log('✅ API bilgileri Supabase\'de mevcut (değişiklik yok)', {
-                        username: this.currentUser.username,
-                        warehouseId: apiInfo.warehouseId
-                    });
-                }
+                console.log('✅ API bilgileri Supabase\'e kaydedildi (en uzun süreli token)', {
+                    username: this.currentUser.username,
+                    warehouseId: merged.warehouseId,
+                    tokenExpiry: merged.tokenExpiry
+                        ? new Date(merged.tokenExpiry).toLocaleString('tr-TR')
+                        : 'N/A',
+                });
             }
         } catch (error) {
             console.warn('⚠️ Supabase API bilgileri kayıt hatası:', error);
@@ -6609,8 +6632,9 @@ class CountingSystem {
                     tokenExpiry: apiInfo.tokenExpiry ? new Date(apiInfo.tokenExpiry).toLocaleString('tr-TR') : 'N/A'
                 });
                 
-                // Token geçerliliğini kontrol et
-                if (apiInfo.tokenExpiry && Date.now() >= (apiInfo.tokenExpiry - 5 * 60 * 1000)) {
+                // Token geçerliliğini kontrol et (JWT exp dahil)
+                const effectiveExpiry = this.getEffectiveExpiryMs(apiInfo);
+                if (effectiveExpiry && Date.now() >= effectiveExpiry - 5 * 60 * 1000) {
                     reject(new Error('Token süresi dolmuş. Lütfen Getir franchise sayfasını yenileyin (https://franchise.getir.com/stock/current).'));
                     return;
                 }
@@ -9286,6 +9310,8 @@ class CountingSystem {
             const best = this.pickBestApiInfo([supabaseSnapshot, extensionApiInfo].filter(Boolean));
             if (best && best.token) {
                 const mergedForSave = this.mergeApiInfoForSave(best, supabaseSnapshot || {});
+                if (!this.cachedFullData) this.cachedFullData = { _tables: {} };
+                this.cachedFullData._api_info = mergedForSave;
                 if (this.apiInfoSignature(mergedForSave) !== this.apiInfoSignature(supabaseSnapshot)) {
                     await this.saveAPIInfoToSupabase(mergedForSave);
                 }
@@ -9297,178 +9323,104 @@ class CountingSystem {
             // Update card based on API info
             if (apiInfo && apiInfo.token) {
                 apiStatusCard.classList.remove('hidden');
-                
-                const tokenExpiry = apiInfo.tokenExpiry;
+
+                const expiryTime = this.getEffectiveExpiryMs(apiInfo);
                 const now = Date.now();
-                
-                if (tokenExpiry) {
-                    // Token expiry'yi parse et (timestamp veya string olabilir)
-                    let expiryTime;
-                    if (typeof tokenExpiry === 'number') {
-                        expiryTime = tokenExpiry;
-                    } else if (typeof tokenExpiry === 'string') {
-                        // String ise parse et
-                        expiryTime = new Date(tokenExpiry).getTime();
-                        // Eğer parse edilemediyse (NaN), timestamp olarak dene
-                        if (isNaN(expiryTime)) {
-                            expiryTime = parseInt(tokenExpiry, 10);
-                        }
-                    } else {
-                        expiryTime = null;
-                    }
-                    
-                    // Geçerli bir timestamp değilse atla
-                    if (!expiryTime || isNaN(expiryTime)) {
-                        console.warn('⚠️ Token expiry geçersiz format:', tokenExpiry);
-                    }
-                    
-                    const timeRemaining = expiryTime && !isNaN(expiryTime) ? expiryTime - now : null;
-                    
-                    // Token expiry kontrolü: Eğer token süresi geçmişse veya 5 dakika içinde geçecekse,
-                    // ve son kontrol zamanından 30 saniye geçmişse, yeni token çek
-                    const shouldCheckForNewToken = timeRemaining !== null && 
-                                                   (timeRemaining < 0 || timeRemaining < 5 * 60 * 1000) && 
-                                                   (!this.lastTokenCheckTime || (now - this.lastTokenCheckTime) > 30000) &&
-                                                   (this.lastTokenExpiry !== tokenExpiry) &&
-                                                   !this.isTokenUpdateInProgress;
-                    
-                    // Time remaining değerlerini hesapla
-                    const minutesRemaining = timeRemaining !== null ? Math.floor(timeRemaining / (1000 * 60)) : 0;
-                    const hoursRemaining = timeRemaining !== null ? Math.floor(minutesRemaining / 60) : 0;
-                    const daysRemaining = timeRemaining !== null ? Math.floor(hoursRemaining / 24) : 0;
-                    
-                    if (shouldCheckForNewToken) {
-                        console.log('🔄 Token otomatik güncelleme tetiklendi:', {
-                            timeRemaining: timeRemaining,
-                            minutesRemaining: minutesRemaining,
-                            lastCheckTime: this.lastTokenCheckTime,
-                            lastTokenExpiry: this.lastTokenExpiry,
-                            currentTokenExpiry: tokenExpiry
-                        });
-                        
-                        // Yeni token çekmeyi dene
-                        this.lastTokenCheckTime = now;
-                        this.lastTokenExpiry = tokenExpiry;
-                        this.isTokenUpdateInProgress = true;
-                        
-                        // Extension'dan yeni token çek
-                        try {
-                            await this.checkAndSaveAPIInfoFromExtension();
-                            console.log('✅ Token otomatik güncelleme başarılı');
-                            // Token güncelleme sonrası UI'ı yenile (kısa bir gecikme ile)
-                            setTimeout(() => {
-                                this.isTokenUpdateInProgress = false;
-                                this.updateAPIStatusCard();
-                            }, 1000);
-                        } catch (error) {
-                            console.warn('⚠️ Token güncelleme hatası:', error);
+                const timeRemaining = expiryTime ? expiryTime - now : null;
+
+                const shouldCheckForNewToken =
+                    timeRemaining !== null &&
+                    (timeRemaining < 0 || timeRemaining < 5 * 60 * 1000) &&
+                    (!this.lastTokenCheckTime || now - this.lastTokenCheckTime > 30000) &&
+                    this.lastTokenExpiry !== expiryTime &&
+                    !this.isTokenUpdateInProgress;
+
+                const minutesRemaining = timeRemaining !== null ? Math.floor(timeRemaining / (1000 * 60)) : 0;
+                const hoursRemaining = timeRemaining !== null ? Math.floor(minutesRemaining / 60) : 0;
+                const daysRemaining = timeRemaining !== null ? Math.floor(hoursRemaining / 24) : 0;
+
+                if (shouldCheckForNewToken) {
+                    this.lastTokenCheckTime = now;
+                    this.lastTokenExpiry = expiryTime;
+                    this.isTokenUpdateInProgress = true;
+                    try {
+                        await this.checkAndSaveAPIInfoFromExtension();
+                        setTimeout(() => {
                             this.isTokenUpdateInProgress = false;
-                        }
+                            this.updateAPIStatusCard();
+                        }, 1000);
+                    } catch (error) {
+                        console.warn('⚠️ Token güncelleme hatası:', error);
+                        this.isTokenUpdateInProgress = false;
                     }
-                    
-                    // Determine status
-                    if (timeRemaining === null || isNaN(timeRemaining)) {
-                        // Token expiry geçersiz format
-                        apiStatusCard.className = 'bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
-                        apiStatusIcon.className = 'w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center';
-                        apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
-                        apiStatusText.textContent = 'Token bilgisi eksik';
-                        
-                        // Warehouse bilgisi
-                        if (apiInfo.warehouseId) {
-                            const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
-                            apiWarehouseName.textContent = `Depo: ${warehouseName}`;
-                        } else {
-                            apiWarehouseName.textContent = 'Depo bilgisi yok';
-                        }
-                        
-                        apiExpiryTime.innerHTML = '<span class="text-yellow-700">Token expiry bilgisi geçersiz format</span>';
-                    } else if (timeRemaining < 0) {
-                        // Expired
-                        apiStatusCard.className = 'bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
-                        apiStatusIcon.className = 'w-10 h-10 rounded-full bg-red-100 flex items-center justify-center';
-                        apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
-                        apiStatusText.textContent = 'Token süresi dolmuş';
-                        
-                        // Warehouse bilgisi
-                        if (apiInfo.warehouseId) {
-                            const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
-                            apiWarehouseName.textContent = `Depo: ${warehouseName}`;
-                        } else {
-                            apiWarehouseName.textContent = 'Depo bilgisi yok';
-                        }
-                        
-                        apiExpiryTime.innerHTML = '<span class="text-red-600 font-medium">Lütfen Getir franchise sayfasını yenileyin</span>';
-                    } else if (timeRemaining < 5 * 60 * 1000) {
-                        // Expiring soon (less than 5 minutes)
-                        apiStatusCard.className = 'bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
-                        apiStatusIcon.className = 'w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center';
-                        apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
-                        apiStatusText.textContent = 'Token yakında dolacak';
-                        
-                        // Warehouse bilgisi
-                        if (apiInfo.warehouseId) {
-                            const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
-                            apiWarehouseName.textContent = `Depo: ${warehouseName}`;
-                        } else {
-                            apiWarehouseName.textContent = 'Depo bilgisi yok';
-                        }
-                        
-                        apiExpiryTime.innerHTML = `<span class="text-yellow-700 font-medium">${minutesRemaining} dakika içinde Getir franchise sayfasını yenileyin</span>`;
-                    } else {
-                        // Valid
-                        apiStatusCard.className = 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
-                        apiStatusIcon.className = 'w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center';
-                        apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
-                        apiStatusText.textContent = 'API güncel ve aktif';
-                        
-                        // Warehouse bilgisi
-                        if (apiInfo.warehouseId) {
-                            const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
-                            apiWarehouseName.textContent = `Depo: ${warehouseName}`;
-                        } else {
-                            apiWarehouseName.textContent = 'Depo bilgisi yok';
-                        }
-                        
-                        // Format remaining time
-                        let timeText = '';
-                        if (daysRemaining > 0) {
-                            timeText = `${daysRemaining} gün ${hoursRemaining % 24} saat`;
-                        } else if (hoursRemaining > 0) {
-                            timeText = `${hoursRemaining} saat ${minutesRemaining % 60} dakika`;
-                        } else {
-                            timeText = `${minutesRemaining} dakika`;
-                        }
-                        
-                        const expiryDate = new Date(tokenExpiry).toLocaleString('tr-TR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
-                        
-                        apiExpiryTime.innerHTML = `
-                            <span class="text-gray-600">Kalan süre: <span class="font-medium text-blue-700">${timeText}</span></span><br>
-                            <span class="text-gray-500 text-xs mt-1">Son kullanma: ${expiryDate}</span>
-                        `;
-                    }
-                } else {
-                    // No expiry info
-                    apiStatusCard.className = 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
-                    apiStatusIcon.className = 'w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center';
-                    apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
-                    apiStatusText.textContent = 'API aktif';
-                    
-                    // Warehouse bilgisi
+                }
+
+                if (timeRemaining === null || isNaN(timeRemaining)) {
+                    apiStatusCard.className = 'bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
+                    apiStatusIcon.className = 'w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center';
+                    apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
+                    apiStatusText.textContent = 'Token bilgisi eksik';
                     if (apiInfo.warehouseId) {
                         const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
                         apiWarehouseName.textContent = `Depo: ${warehouseName}`;
                     } else {
                         apiWarehouseName.textContent = 'Depo bilgisi yok';
                     }
-                    
-                    apiExpiryTime.innerHTML = '<span class="text-gray-500">Token bilgisi mevcut</span>';
+                    apiExpiryTime.innerHTML = '<span class="text-yellow-700">Token expiry bilgisi geçersiz format</span>';
+                } else if (timeRemaining < 0) {
+                    apiStatusCard.className = 'bg-gradient-to-r from-red-50 to-rose-50 border border-red-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
+                    apiStatusIcon.className = 'w-10 h-10 rounded-full bg-red-100 flex items-center justify-center';
+                    apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+                    apiStatusText.textContent = 'Token süresi dolmuş';
+                    if (apiInfo.warehouseId) {
+                        const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                        apiWarehouseName.textContent = `Depo: ${warehouseName}`;
+                    } else {
+                        apiWarehouseName.textContent = 'Depo bilgisi yok';
+                    }
+                    apiExpiryTime.innerHTML = '<span class="text-red-600 font-medium">Lütfen Getir franchise sayfasını yenileyin</span>';
+                } else if (timeRemaining < 5 * 60 * 1000) {
+                    apiStatusCard.className = 'bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
+                    apiStatusIcon.className = 'w-10 h-10 rounded-full bg-yellow-100 flex items-center justify-center';
+                    apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
+                    apiStatusText.textContent = 'Token yakında dolacak';
+                    if (apiInfo.warehouseId) {
+                        const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                        apiWarehouseName.textContent = `Depo: ${warehouseName}`;
+                    } else {
+                        apiWarehouseName.textContent = 'Depo bilgisi yok';
+                    }
+                    apiExpiryTime.innerHTML = `<span class="text-yellow-700 font-medium">${minutesRemaining} dakika içinde Getir franchise sayfasını yenileyin</span>`;
+                } else {
+                    apiStatusCard.className = 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm p-4 sm:p-5 mb-6';
+                    apiStatusIcon.className = 'w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center';
+                    apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+                    apiStatusText.textContent = 'API güncel ve aktif';
+                    if (apiInfo.warehouseId) {
+                        const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                        apiWarehouseName.textContent = `Depo: ${warehouseName}`;
+                    } else {
+                        apiWarehouseName.textContent = 'Depo bilgisi yok';
+                    }
+                    let timeText = '';
+                    if (daysRemaining > 0) {
+                        timeText = `${daysRemaining} gün ${hoursRemaining % 24} saat`;
+                    } else if (hoursRemaining > 0) {
+                        timeText = `${hoursRemaining} saat ${minutesRemaining % 60} dakika`;
+                    } else {
+                        timeText = `${minutesRemaining} dakika`;
+                    }
+                    const expiryDate = new Date(expiryTime).toLocaleString('tr-TR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    });
+                    apiExpiryTime.innerHTML = `
+                            <span class="text-gray-600">Kalan süre: <span class="font-medium text-blue-700">${timeText}</span></span><br>
+                            <span class="text-gray-500 text-xs mt-1">Son kullanma: ${expiryDate}</span>
+                        `;
                 }
             } else {
                 // No API info
