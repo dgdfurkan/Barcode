@@ -57,6 +57,12 @@ class CountingSystem {
         this._farkTableSelection = null;
         /** Önceki tablo listesi — yalnızca yeni eklenen tablolar otomatik seçilir (kullanıcı iptalini ezmez) */
         this._farkTableNamesSnapshot = null;
+        /** Stok farkı: günlük tabloları listeden gizle */
+        try {
+            this._farkHideDailyTables = sessionStorage.getItem('counting_fark_hide_daily') === '1';
+        } catch (e) {
+            this._farkHideDailyTables = false;
+        }
         this.selectedFinancialTable = 'all'; // Seçili finans tablosu ('all' veya table name)
         this._financeBarcodesVisible = false; // Finans Stok Özeti barkodları (varsayılan gizli)
         this.productSortOrder = 'desc'; // 'asc' | 'desc' - Finans tabındaki ürün sıralaması
@@ -3012,6 +3018,62 @@ class CountingSystem {
         return map[status] || map['not-started'];
     }
 
+    /** Stok farkı checkbox etiketi — sayım şeridiyle aynı finansal durum renkleri */
+    getTableStatusFarkLabelClasses(status) {
+        const map = {
+            'not-started':
+                'border-slate-200/90 bg-slate-50 text-slate-700 hover:border-slate-300 has-[:checked]:border-slate-400 has-[:checked]:ring-2 has-[:checked]:ring-slate-200/80 has-[:checked]:shadow-sm',
+            incomplete:
+                'border-sky-200 bg-sky-50/90 text-sky-900 hover:border-sky-300 has-[:checked]:border-sky-400 has-[:checked]:ring-2 has-[:checked]:ring-sky-200/90 has-[:checked]:shadow-sm',
+            'complete-positive':
+                'border-emerald-200 bg-emerald-50/90 text-emerald-900 hover:border-emerald-300 has-[:checked]:border-emerald-400 has-[:checked]:ring-2 has-[:checked]:ring-emerald-200/90 has-[:checked]:shadow-sm',
+            'complete-negative':
+                'border-red-200 bg-red-50/90 text-red-900 hover:border-red-300 has-[:checked]:border-red-400 has-[:checked]:ring-2 has-[:checked]:ring-red-200/90 has-[:checked]:shadow-sm',
+            'complete-balanced':
+                'border-emerald-200 bg-emerald-50/90 text-emerald-900 hover:border-emerald-300 has-[:checked]:border-emerald-400 has-[:checked]:ring-2 has-[:checked]:ring-emerald-200/90 has-[:checked]:shadow-sm',
+        };
+        return map[status] || map['not-started'];
+    }
+
+    /** Stok farkı listesinde gösterilecek tablolar (günlük gizleme filtresi) */
+    getFarkVisibleTables() {
+        const tables = this.getTableList();
+        if (!this._farkHideDailyTables) return tables;
+        return tables.filter((t) => !this.isDailyTableName(t.name));
+    }
+
+    getFarkVisibleTableNames() {
+        return this.getFarkVisibleTables().map((t) => t.name);
+    }
+
+    _syncFarkHideDailyBtnUi() {
+        const btn = document.getElementById('farkHideDailyBtn');
+        if (!btn) return;
+        const hidden = !!this._farkHideDailyTables;
+        btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+        btn.textContent = hidden ? 'Günlük sayımları göster' : 'Günlük sayımları gizle';
+        btn.classList.toggle('border-indigo-300', hidden);
+        btn.classList.toggle('bg-indigo-50', hidden);
+        btn.classList.toggle('text-indigo-800', hidden);
+    }
+
+    _setFarkHideDailyTables(hidden) {
+        this._farkHideDailyTables = !!hidden;
+        try {
+            sessionStorage.setItem('counting_fark_hide_daily', this._farkHideDailyTables ? '1' : '0');
+        } catch (e) {
+            /* ignore */
+        }
+        if (this._farkHideDailyTables && this._farkTableSelection instanceof Set) {
+            for (const name of [...this._farkTableSelection]) {
+                if (this.isDailyTableName(name)) this._farkTableSelection.delete(name);
+            }
+        }
+        this._syncFarkHideDailyBtnUi();
+        this.populateFarkTableCheckboxes();
+        void this.renderFarkOzeti();
+    }
+
     isDailyTableName(name) {
         return typeof name === 'string' && name.startsWith(this.DAILY_TABLE_PREFIX);
     }
@@ -3064,7 +3126,7 @@ class CountingSystem {
 
     /** Sabit alt kategori chip'leri — hafif amber vurgu */
     getPresetSubcategoryChipAccentClasses() {
-        return ' preset-subcat-table-chip shadow-[0_0_0_1px_rgba(251,191,36,0.22)]';
+        return ' preset-subcat-table-chip';
     }
 
     /** Tablo nesnesinde ürün dışı anahtarlar (metadata) */
@@ -3823,7 +3885,7 @@ class CountingSystem {
                     (isPreset ? this.getPresetSubcategoryChipAccentClasses() : '');
                 btn.innerHTML = `
                     ${isPreset ? this.renderPresetSubcategoryBadgeHtml() : ''}
-                    <span class="flex min-w-0 items-center gap-2 ${isPreset ? 'pl-3.5' : ''}">
+                    <span class="flex min-w-0 items-center gap-2 ${isPreset ? 'pl-2.5' : ''}">
                         <span class="truncate max-w-[10rem]">${this.escapeHtml(table.name)}</span>
                         <span class="text-[10px] font-semibold shrink-0 ${this.getTableStatusCountBadgeClasses(status, isActive)}">${table.productCount ?? 0}</span>
                     </span>
@@ -3914,6 +3976,9 @@ class CountingSystem {
             });
         }
         this.updateDailyAddModalControls();
+        if (this.currentTab === 'stokfark') {
+            this.populateFarkTableCheckboxes();
+        }
     }
 
     /** Genel / Günlük sekmesi — aktif tablo türüyle hizala */
@@ -4087,7 +4152,7 @@ class CountingSystem {
                 row.className = [
                     'relative flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors',
                     this.getTableStatusDropdownRowClasses(status, isActive),
-                    isPreset ? 'preset-subcat-table-dropdown-row pl-8' : '',
+                    isPreset ? 'preset-subcat-table-dropdown-row pl-7' : '',
                 ].join(' ');
                 row.innerHTML = `
                     ${isPreset ? this.renderPresetSubcategoryBadgeHtml() : ''}
@@ -5171,12 +5236,13 @@ class CountingSystem {
     setupFarkTabControls() {
         const allBtn = document.getElementById('farkSelectAllBtn');
         const noneBtn = document.getElementById('farkSelectNoneBtn');
+        const hideDailyBtn = document.getElementById('farkHideDailyBtn');
         const wrap = document.getElementById('farkTableCheckboxes');
+        this._syncFarkHideDailyBtnUi();
         if (allBtn && !allBtn.dataset.bound) {
             allBtn.dataset.bound = '1';
             allBtn.addEventListener('click', () => {
-                const names = this.getTableList().map((t) => t.name);
-                this._farkTableSelection = new Set(names);
+                this._farkTableSelection = new Set(this.getFarkVisibleTableNames());
                 this.populateFarkTableCheckboxes();
                 void this.renderFarkOzeti();
             });
@@ -5187,6 +5253,12 @@ class CountingSystem {
                 this._farkTableSelection = new Set();
                 this.populateFarkTableCheckboxes();
                 void this.renderFarkOzeti();
+            });
+        }
+        if (hideDailyBtn && !hideDailyBtn.dataset.bound) {
+            hideDailyBtn.dataset.bound = '1';
+            hideDailyBtn.addEventListener('click', () => {
+                this._setFarkHideDailyTables(!this._farkHideDailyTables);
             });
         }
         if (wrap && !wrap.dataset.changeBound) {
@@ -5232,7 +5304,11 @@ class CountingSystem {
         const wrap = document.getElementById('farkTableCheckboxes');
         if (!wrap) return;
         this.ensureFarkTableSelection();
-        const tables = this.getTableList();
+        const tables = this.getFarkVisibleTables();
+        if (tables.length === 0) {
+            wrap.innerHTML = `<p class="w-full py-4 text-center text-xs text-slate-500">${this._farkHideDailyTables ? 'Günlük tablolar gizli — genel tablo yok.' : 'Henüz tablo yok.'}</p>`;
+            return;
+        }
         wrap.innerHTML = tables
             .map((row) => {
                 const name = row.name;
@@ -5240,19 +5316,21 @@ class CountingSystem {
                 const checked = this._farkTableSelection.has(name);
                 const label = this.formatTableDisplayName(name);
                 const isPreset = this.isPresetSubcategoryTable(name);
+                const status = row.status || 'not-started';
+                const statusClasses = this.getTableStatusFarkLabelClasses(status);
                 const cnt =
                     typeof row.productCount === 'number'
-                        ? `<span class="text-slate-400 font-normal tabular-nums">(${row.productCount})</span>`
+                        ? `<span class="font-normal tabular-nums opacity-75">(${row.productCount})</span>`
                         : '';
                 const aria = String(label).replace(/"/g, '&quot;');
                 return `
-                    <label class="relative inline-flex cursor-pointer select-none items-center gap-2.5 rounded-xl border border-slate-200/90 bg-white px-3 py-2 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50/90 has-[:checked]:border-indigo-300 has-[:checked]:bg-indigo-50/35 has-[:checked]:shadow-md has-[:checked]:shadow-indigo-100/40${isPreset ? ' preset-subcat-table-label pl-8 ring-1 ring-amber-200/50' : ''}">
+                    <label class="relative inline-flex cursor-pointer select-none items-center gap-2.5 rounded-xl border px-3 py-2 shadow-sm transition-all ${statusClasses}${isPreset ? ' preset-subcat-table-label pl-7' : ''}" data-table-status="${status}">
                         ${isPreset ? this.renderPresetSubcategoryBadgeHtml() : ''}
                         <input type="checkbox" class="peer sr-only fark-table-cb" data-fark-table="${enc}" ${checked ? 'checked' : ''} aria-label="${aria}"/>
-                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-slate-300 bg-white transition peer-checked:border-indigo-600 peer-checked:bg-indigo-600 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-400/50 peer-checked:[&_svg]:opacity-100">
+                        <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-current/25 bg-white/80 transition peer-checked:border-current peer-checked:bg-current/90 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-current/30 peer-checked:[&_svg]:opacity-100">
                             <svg class="h-3 w-3 text-white opacity-0 transition-opacity" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6l2.5 2.5L9.5 3"/></svg>
                         </span>
-                        <span class="text-xs sm:text-sm font-medium text-slate-800">${this.escapeHtml(label)} ${cnt}</span>
+                        <span class="text-xs sm:text-sm font-medium min-w-0 truncate">${this.escapeHtml(label)} ${cnt}</span>
                     </label>`;
             })
             .join('');
@@ -9736,15 +9814,12 @@ class CountingSystem {
         tables.forEach(table => {
             const option = document.createElement('div');
             const isPreset = this.isPresetSubcategoryTable(table.name);
-            option.className = `table-selector-option relative ${table.name === this.selectedFinancialTable ? 'active' : ''}${isPreset ? ' preset-subcat-table-dropdown-row pl-9' : ''}`;
+            option.className = `table-selector-option relative ${table.name === this.selectedFinancialTable ? 'active' : ''}${isPreset ? ' preset-subcat-table-dropdown-row pl-8' : ''}`;
             option.dataset.tableName = table.name;
             const label = this.formatTableDisplayName(table.name);
             option.innerHTML = `
                 ${isPreset ? this.renderPresetSubcategoryBadgeHtml() : ''}
-                <span class="min-w-0 flex-1 inline-flex items-center gap-1.5">
-                    ${isPreset ? this.renderPresetSubcategoryInlineStarHtml() : ''}
-                    <span class="truncate">${this.escapeHtml(label)}${table.productCount ? ` <span class="text-gray-500 text-xs">(${table.productCount})</span>` : ''}</span>
-                </span>
+                <span class="min-w-0 flex-1 truncate">${this.escapeHtml(label)}${table.productCount ? ` <span class="text-gray-500 text-xs">(${table.productCount})</span>` : ''}</span>
                 <svg class="check-icon shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
