@@ -699,9 +699,10 @@ class CountingSystem {
                 const tableMeta = metaBlob?._tableMeta || {};
                 for (const [tName, meta] of Object.entries(tableMeta)) {
                     if (!tables[tName]) tables[tName] = {};
-                    if (meta.createdAt) {
+                    if (meta.createdAt || meta.lastActivityAt) {
                         if (!tables[tName]._tableMeta) tables[tName]._tableMeta = {};
-                        tables[tName]._tableMeta.createdAt = meta.createdAt;
+                        if (meta.createdAt) tables[tName]._tableMeta.createdAt = meta.createdAt;
+                        if (meta.lastActivityAt) tables[tName]._tableMeta.lastActivityAt = meta.lastActivityAt;
                     }
                     if (Array.isArray(meta._productOrder)) {
                         tables[tName]._productOrder = meta._productOrder;
@@ -750,7 +751,11 @@ class CountingSystem {
                     for (const [tName, meta] of Object.entries(metaBlob._tableMeta)) {
                         if (!tables[tName]) {
                             tables[tName] = {};
-                            if (meta?.createdAt) tables[tName]._tableMeta = { createdAt: meta.createdAt };
+                            if (meta?.createdAt || meta?.lastActivityAt) {
+                                tables[tName]._tableMeta = {};
+                                if (meta?.createdAt) tables[tName]._tableMeta.createdAt = meta.createdAt;
+                                if (meta?.lastActivityAt) tables[tName]._tableMeta.lastActivityAt = meta.lastActivityAt;
+                            }
                             if (Array.isArray(meta?._productOrder)) tables[tName]._productOrder = meta._productOrder;
                         }
                     }
@@ -788,6 +793,11 @@ class CountingSystem {
             this.auditLog = Array.isArray(fullData._auditLog)
                 ? fullData._auditLog.slice(-this.AUDIT_LOG_MAX)
                 : [];
+
+            // Tablo chip sıralaması: ürün lastUpdated → lastActivityAt
+            for (const tName of Object.keys(tables)) {
+                this.syncTableLastActivityMeta(tName, tables[tName]);
+            }
 
             console.log('✅ loadCountingData tamamlandı, tablo:', this.currentTableName);
         } catch (error) {
@@ -906,6 +916,7 @@ class CountingSystem {
         for (const [tName, tData] of Object.entries(tables)) {
             tableMeta[tName] = {
                 createdAt: tData._tableMeta?.createdAt || null,
+                lastActivityAt: tData._tableMeta?.lastActivityAt || null,
                 _productOrder: Array.isArray(tData._productOrder) ? [...tData._productOrder] : [],
             };
         }
@@ -950,6 +961,7 @@ class CountingSystem {
         for (const [tName, tData] of Object.entries(tables)) {
             tableMeta[tName] = {
                 createdAt: tData._tableMeta?.createdAt || null,
+                lastActivityAt: tData._tableMeta?.lastActivityAt || null,
                 _productOrder: Array.isArray(tData._productOrder) ? [...tData._productOrder] : [],
             };
         }
@@ -1919,8 +1931,17 @@ class CountingSystem {
                 if (!this.cachedFullData._tableMeta[tName]) {
                     this.cachedFullData._tableMeta[tName] = {
                         createdAt: meta?.createdAt || resolveCreatedAt(tName),
+                        lastActivityAt: meta?.lastActivityAt || null,
                         _productOrder: Array.isArray(meta?._productOrder) ? [...meta._productOrder] : [],
                     };
+                } else if (meta?.lastActivityAt) {
+                    const incMs = new Date(meta.lastActivityAt).getTime();
+                    const locMs = this.cachedFullData._tableMeta[tName].lastActivityAt
+                        ? new Date(this.cachedFullData._tableMeta[tName].lastActivityAt).getTime()
+                        : 0;
+                    if (!Number.isNaN(incMs) && incMs >= locMs) {
+                        this.cachedFullData._tableMeta[tName].lastActivityAt = meta.lastActivityAt;
+                    }
                 }
             }
 
@@ -1935,8 +1956,28 @@ class CountingSystem {
                             _productOrder: Object.keys(products),
                         };
                     }
-                    // Tablo objesi içine de createdAt yansıt (resolveTableCreatedMs için)
-                    this.cachedFullData._tables[tName]._tableMeta = { createdAt };
+                    // Tablo objesi içine meta yansıt (sıralama + Son Sayım için)
+                    const remoteLast = remoteTableMeta[tName]?.lastActivityAt
+                        || this.cachedFullData._tableMeta[tName]?.lastActivityAt
+                        || null;
+                    const { maxMs } = this.getProductLastUpdatedBounds(this.cachedFullData._tables[tName]);
+                    let lastActivityAt = remoteLast;
+                    if (maxMs != null) {
+                        const maxIso = new Date(maxMs).toISOString();
+                        if (!lastActivityAt || maxMs > new Date(lastActivityAt).getTime()) {
+                            lastActivityAt = maxIso;
+                        }
+                    }
+                    this.cachedFullData._tables[tName]._tableMeta = {
+                        createdAt,
+                        ...(lastActivityAt ? { lastActivityAt } : {}),
+                    };
+                    if (lastActivityAt) {
+                        if (!this.cachedFullData._tableMeta[tName]) {
+                            this.cachedFullData._tableMeta[tName] = { createdAt, _productOrder: [] };
+                        }
+                        this.cachedFullData._tableMeta[tName].lastActivityAt = lastActivityAt;
+                    }
                     metaChanged = true;
                     continue;
                 }
@@ -1959,6 +2000,7 @@ class CountingSystem {
                             }
                         }
                     }
+                    this.syncTableLastActivityMeta(tName, local);
                 }
             }
 
@@ -2191,9 +2233,23 @@ class CountingSystem {
                     }
                 }
 
-                // Meta birleştir (createdAt + productOrder)
-                if (incomingTableData._tableMeta && !localTable._tableMeta) {
-                    localTable._tableMeta = { ...incomingTableData._tableMeta };
+                // Meta birleştir (createdAt + lastActivityAt + productOrder)
+                if (incomingTableData._tableMeta) {
+                    if (!localTable._tableMeta) localTable._tableMeta = {};
+                    const incomingMeta = incomingTableData._tableMeta;
+                    if (incomingMeta.createdAt && !localTable._tableMeta.createdAt) {
+                        localTable._tableMeta.createdAt = incomingMeta.createdAt;
+                    }
+                    const incomingAct = incomingMeta.lastActivityAt;
+                    if (incomingAct) {
+                        const incMs = new Date(incomingAct).getTime();
+                        const locMs = localTable._tableMeta.lastActivityAt
+                            ? new Date(localTable._tableMeta.lastActivityAt).getTime()
+                            : 0;
+                        if (!Number.isNaN(incMs) && incMs >= locMs) {
+                            localTable._tableMeta.lastActivityAt = incomingAct;
+                        }
+                    }
                 }
                 // _productOrder: INCOMING kazanır (yazıcı son sırayı bilir).
                 // Yereldeki ekstra ID'ler sona eklenir (silinmesin diye).
@@ -2275,7 +2331,11 @@ class CountingSystem {
                 .eq('table_name', tableName);
             fullData._tables[tableName] = {};
             const tMeta = fullData._tableMeta?.[tableName];
-            if (tMeta?.createdAt) fullData._tables[tableName]._tableMeta = { createdAt: tMeta.createdAt };
+            if (tMeta?.createdAt || tMeta?.lastActivityAt) {
+                fullData._tables[tableName]._tableMeta = {};
+                if (tMeta?.createdAt) fullData._tables[tableName]._tableMeta.createdAt = tMeta.createdAt;
+                if (tMeta?.lastActivityAt) fullData._tables[tableName]._tableMeta.lastActivityAt = tMeta.lastActivityAt;
+            }
             if (tMeta?._productOrder) fullData._tables[tableName]._productOrder = tMeta._productOrder;
             for (const row of (rows || [])) {
                 fullData._tables[tableName][row.product_id] = {
@@ -2324,6 +2384,79 @@ class CountingSystem {
     // Tablo oluşturma combobox yardımcıları
     // ─────────────────────────────────────────────────────────────
 
+    /** Dropdown açıkken pointer koordinatı liste kutusu içinde mi */
+    _isPointerInTableNameDropdown(clientX, clientY) {
+        const dropdown = document.getElementById('tableNameDropdown');
+        if (!dropdown || dropdown.classList.contains('hidden')) return false;
+        const rect = dropdown.getBoundingClientRect();
+        return (
+            clientX >= rect.left &&
+            clientX <= rect.right &&
+            clientY >= rect.top &&
+            clientY <= rect.bottom
+        );
+    }
+
+    /** Modal taşmasında tıklama kaybını önlemek için fixed konumlandırma */
+    _positionTableNameDropdown() {
+        const input = document.getElementById('newTableNameInput');
+        const dropdown = document.getElementById('tableNameDropdown');
+        const modal = document.getElementById('createTableModal');
+        if (!input || !dropdown || !modal || modal.classList.contains('hidden')) return;
+
+        const rect = input.getBoundingClientRect();
+        const gap = 4;
+        const maxHCap = Math.min(window.innerHeight * 0.5, 288);
+        const spaceBelow = window.innerHeight - rect.bottom - gap;
+        const spaceAbove = rect.top - gap;
+        const openUp = spaceBelow < 120 && spaceAbove > spaceBelow;
+
+        dropdown.style.position = 'fixed';
+        dropdown.style.left = `${Math.max(8, rect.left)}px`;
+        dropdown.style.width = `${Math.min(rect.width, window.innerWidth - 16)}px`;
+        dropdown.style.right = 'auto';
+        dropdown.style.zIndex = '10000';
+
+        if (openUp) {
+            dropdown.style.top = 'auto';
+            dropdown.style.bottom = `${Math.max(8, window.innerHeight - rect.top + gap)}px`;
+            dropdown.style.maxHeight = `${Math.min(maxHCap, spaceAbove - 8)}px`;
+        } else {
+            dropdown.style.top = `${rect.bottom + gap}px`;
+            dropdown.style.bottom = 'auto';
+            dropdown.style.maxHeight = `${Math.min(maxHCap, spaceBelow - 8)}px`;
+        }
+    }
+
+    _resetTableNameDropdownPosition() {
+        const dropdown = document.getElementById('tableNameDropdown');
+        if (!dropdown) return;
+        dropdown.style.position = '';
+        dropdown.style.left = '';
+        dropdown.style.top = '';
+        dropdown.style.bottom = '';
+        dropdown.style.width = '';
+        dropdown.style.right = '';
+        dropdown.style.zIndex = '';
+        dropdown.style.maxHeight = '';
+    }
+
+    _bindTableNameDropdownReposition() {
+        if (this._tableNameDropdownRepositionHandler) return;
+        this._tableNameDropdownRepositionHandler = () => {
+            const input = document.getElementById('newTableNameInput');
+            if (input?._dropdownOpen) this._positionTableNameDropdown();
+        };
+        window.addEventListener('resize', this._tableNameDropdownRepositionHandler);
+        window.addEventListener('scroll', this._tableNameDropdownRepositionHandler, true);
+    }
+
+    _unbindTableNameDropdownReposition() {
+        if (!this._tableNameDropdownRepositionHandler) return;
+        window.removeEventListener('resize', this._tableNameDropdownRepositionHandler);
+        window.removeEventListener('scroll', this._tableNameDropdownRepositionHandler, true);
+    }
+
     /** Combobox'u ilk kez / modal her açıldığında kur */
     _setupCreateTableCombobox() {
         const input = document.getElementById('newTableNameInput');
@@ -2338,13 +2471,18 @@ class CountingSystem {
             dropdown.classList.add('hidden');
             if (chevron) chevron.style.transform = '';
             input._dropdownOpen = false;
+            this._resetTableNameDropdownPosition();
+            this._unbindTableNameDropdownReposition();
         };
         const openDropdown = () => {
             this._renderTableNameDropdown(input.value);
             dropdown.classList.remove('hidden');
             if (chevron) chevron.style.transform = 'rotate(180deg)';
             input._dropdownOpen = true;
+            this._positionTableNameDropdown();
+            this._bindTableNameDropdownReposition();
         };
+        this._closeTableNameDropdown = closeDropdown;
         const toggleDropdown = () => {
             if (input._dropdownOpen) closeDropdown();
             else openDropdown();
@@ -2391,31 +2529,33 @@ class CountingSystem {
         input.addEventListener('input', () => {
             if (input._dropdownOpen) {
                 this._renderTableNameDropdown(input.value);
+                this._positionTableNameDropdown();
             }
             updateHint();
         });
 
-        // Dropdown item seçimi (event delegation)
-        dropdown.addEventListener('mousedown', (e) => {
-            e.stopPropagation(); // overlay'e ulaşmasın
+        const pickDropdownItem = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             const item = e.target.closest('[data-cat]');
             if (!item) return;
-            e.preventDefault();
-            const cat = item.dataset.cat;
-            input.value = cat;
+            input.value = item.dataset.cat || '';
             updateHint();
             closeDropdown();
             input.focus();
-        });
+        };
 
-        // touch eventleri için de aynı koruma (mobil)
-        dropdown.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
-        dropdown.addEventListener('touchend', (e) => e.stopPropagation(), { passive: true });
+        // pointerdown: mouse + touch; modal dışına taşan satırlarda da seçim çalışır
+        dropdown.addEventListener('pointerdown', pickDropdownItem);
 
-        // Dışarı tıklayınca kapat
+        // Dışarı tıklayınca kapat (fixed taşma alanı dahil)
         document.addEventListener('mousedown', (e) => {
+            const modal = document.getElementById('createTableModal');
+            if (!modal || modal.classList.contains('hidden') || !input._dropdownOpen) return;
             const wrap = document.getElementById('tableNameComboboxWrap');
-            if (wrap && !wrap.contains(e.target)) closeDropdown();
+            if (wrap && wrap.contains(e.target)) return;
+            if (this._isPointerInTableNameDropdown(e.clientX, e.clientY)) return;
+            closeDropdown();
         }, { capture: true });
 
         // Escape ile kapat
@@ -2496,6 +2636,8 @@ class CountingSystem {
             input._dropdownOpen = false;
         }
         if (dropdown) dropdown.classList.add('hidden');
+        this._resetTableNameDropdownPosition();
+        this._unbindTableNameDropdownReposition();
         if (chevron) chevron.style.transform = '';
         if (confirmBtn) confirmBtn.disabled = true;
         if (hint) {
@@ -2595,7 +2737,9 @@ class CountingSystem {
 
         const tableNames = Object.keys(fullData._tables);
         const rows = tableNames.map((name) => {
-            const tableData = fullData._tables[name] || {};
+            const tableData = this.resolveTableDataForList(name);
+            this.syncTableLastActivityMeta(name, tableData);
+            const lastActivityMs = this.resolveLastCountActivityMs(tableData, name) ?? 0;
             const createdAtMs = this.resolveTableCreatedMs(tableData) ?? 0;
             const statusSummary = this.getTableStatusSummary(tableData);
             return {
@@ -2603,14 +2747,16 @@ class CountingSystem {
                 isCurrent: name === this.currentTableName,
                 productCount: Object.keys(tableData).filter((k) => !this.isReservedCountingKey(k)).length,
                 status: statusSummary.status,
-                _sortMs: createdAtMs,
+                _sortLastMs: lastActivityMs,
+                _sortCreatedMs: createdAtMs,
             };
         });
         rows.sort((a, b) => {
-            if (b._sortMs !== a._sortMs) return b._sortMs - a._sortMs;
+            if (b._sortLastMs !== a._sortLastMs) return b._sortLastMs - a._sortLastMs;
+            if (b._sortCreatedMs !== a._sortCreatedMs) return b._sortCreatedMs - a._sortCreatedMs;
             return String(a.name).localeCompare(String(b.name), 'tr');
         });
-        return rows.map(({ _sortMs, ...rest }) => rest);
+        return rows.map(({ _sortLastMs, _sortCreatedMs, ...rest }) => rest);
     }
 
     /**
@@ -2878,10 +3024,99 @@ class CountingSystem {
         return minMs;
     }
 
-    /** Son sayım = ürünlerden en güncel lastUpdated */
-    resolveLastCountActivityMs(tableData) {
+    /** Son sayım = ürünlerden en güncel lastUpdated + tablo/global lastActivityAt */
+    resolveLastCountActivityMs(tableData, tableName) {
         const { maxMs } = this.getProductLastUpdatedBounds(tableData);
-        return maxMs;
+        let metaMs = null;
+        const candidates = [
+            tableData?._tableMeta?.lastActivityAt,
+            tableName && this.cachedFullData?._tableMeta?.[tableName]?.lastActivityAt,
+        ];
+        for (const raw of candidates) {
+            if (!raw) continue;
+            const t = new Date(raw).getTime();
+            if (!Number.isNaN(t)) metaMs = metaMs == null ? t : Math.max(metaMs, t);
+        }
+        if (maxMs != null && metaMs != null) return Math.max(maxMs, metaMs);
+        return maxMs ?? metaMs;
+    }
+
+    /** getTableList için tablo verisini çöz (aktif tablo + global meta birleşimi) */
+    resolveTableDataForList(tableName) {
+        const fullData = this.cachedFullData;
+        const tableData =
+            tableName === this.currentTableName && this.countingData
+                ? this.countingData
+                : (fullData?._tables?.[tableName] || {});
+
+        const globalMeta = fullData?._tableMeta?.[tableName];
+        if (globalMeta?.lastActivityAt || globalMeta?.createdAt) {
+            if (!tableData._tableMeta) tableData._tableMeta = {};
+            if (globalMeta.createdAt && !tableData._tableMeta.createdAt) {
+                tableData._tableMeta.createdAt = globalMeta.createdAt;
+            }
+            if (globalMeta.lastActivityAt) {
+                const gMs = new Date(globalMeta.lastActivityAt).getTime();
+                const lMs = tableData._tableMeta.lastActivityAt
+                    ? new Date(tableData._tableMeta.lastActivityAt).getTime()
+                    : 0;
+                if (!Number.isNaN(gMs) && gMs >= lMs) {
+                    tableData._tableMeta.lastActivityAt = globalMeta.lastActivityAt;
+                }
+            }
+        }
+        return tableData;
+    }
+
+    /** Ürün max(lastUpdated) ile tablo lastActivityAt'ı senkronize eder */
+    syncTableLastActivityMeta(tableName, tableData) {
+        if (!tableName || !tableData || typeof tableData !== 'object') return;
+        const bestMs = this.resolveLastCountActivityMs(tableData, tableName);
+        if (bestMs == null) return;
+
+        const ts = new Date(bestMs).toISOString();
+        if (!tableData._tableMeta) tableData._tableMeta = {};
+        const curMs = tableData._tableMeta.lastActivityAt
+            ? new Date(tableData._tableMeta.lastActivityAt).getTime()
+            : 0;
+        if (bestMs > curMs) tableData._tableMeta.lastActivityAt = ts;
+
+        if (!this.cachedFullData) this.cachedFullData = { _tables: {}, _tableMeta: {} };
+        if (!this.cachedFullData._tableMeta) this.cachedFullData._tableMeta = {};
+        if (!this.cachedFullData._tableMeta[tableName]) this.cachedFullData._tableMeta[tableName] = {};
+        const globalCurMs = this.cachedFullData._tableMeta[tableName].lastActivityAt
+            ? new Date(this.cachedFullData._tableMeta[tableName].lastActivityAt).getTime()
+            : 0;
+        if (bestMs > globalCurMs) {
+            this.cachedFullData._tableMeta[tableName].lastActivityAt = ts;
+        }
+    }
+
+    /** Tablo son sayım zamanını günceller (chip sıralaması + Son Sayım satırı) */
+    touchTableLastActivity(tableName, iso) {
+        const ts = iso || new Date().toISOString();
+        const tName = tableName || this.currentTableName;
+        if (!tName) return;
+
+        if (!this.cachedFullData) this.cachedFullData = { _tables: {}, _tableMeta: {} };
+        if (!this.cachedFullData._tables) this.cachedFullData._tables = {};
+        if (!this.cachedFullData._tableMeta) this.cachedFullData._tableMeta = {};
+
+        let table = this.cachedFullData._tables[tName];
+        if (!table) {
+            table = {};
+            this.cachedFullData._tables[tName] = table;
+        }
+        if (!table._tableMeta) table._tableMeta = {};
+        table._tableMeta.lastActivityAt = ts;
+
+        if (!this.cachedFullData._tableMeta[tName]) this.cachedFullData._tableMeta[tName] = {};
+        this.cachedFullData._tableMeta[tName].lastActivityAt = ts;
+
+        if (tName === this.currentTableName) {
+            if (!this.countingData._tableMeta) this.countingData._tableMeta = {};
+            this.countingData._tableMeta.lastActivityAt = ts;
+        }
     }
 
     /** Eski tablolara createdAt yazar (bir sonraki kayıtta kalıcı) */
@@ -2942,7 +3177,7 @@ class CountingSystem {
 
         const tableData = this.countingData;
         const createdMs = this.resolveTableCreatedMs(tableData);
-        const lastMs = this.resolveLastCountActivityMs(tableData);
+        const lastMs = this.resolveLastCountActivityMs(tableData, this.currentTableName);
 
         const clockSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-slate-400" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>`;
         const checkSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 text-indigo-500" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>`;
@@ -4173,7 +4408,7 @@ class CountingSystem {
         const confirmDeleteTableBtn = document.getElementById('confirmDeleteTableBtn');
         const confirmRenameTableBtn = document.getElementById('confirmRenameTableBtn');
         const newTableNameInput = document.getElementById('newTableNameInput');
-        const renameTableNameInput = document.getElementById('newTableNameInput');
+        const renameTableNameInput = document.getElementById('renameTableNameInput');
         
         const closeCreateModal = () => {
             if (createTableModal) createTableModal.classList.add('hidden');
@@ -4216,8 +4451,19 @@ class CountingSystem {
             });
         }
 
-        // Overlay tıklamasıyla kapat — dropdown açıkken kapanmaz
+        // Overlay tıklamasıyla kapat — dropdown açıkken önce listeyi kapat, modalı değil
         if (createTableModal) {
+            createTableModal.addEventListener('mousedown', (e) => {
+                if (e.target !== createTableModal) return;
+                const dropdown = document.getElementById('tableNameDropdown');
+                if (dropdown && !dropdown.classList.contains('hidden')) {
+                    if (this._isPointerInTableNameDropdown(e.clientX, e.clientY)) return;
+                    if (typeof this._closeTableNameDropdown === 'function') {
+                        this._closeTableNameDropdown();
+                    }
+                    return;
+                }
+            });
             createTableModal.addEventListener('click', (e) => {
                 if (e.target !== createTableModal) return;
                 const dropdown = document.getElementById('tableNameDropdown');
@@ -4265,7 +4511,7 @@ class CountingSystem {
         if (closeRenameTableModal) {
             closeRenameTableModal.addEventListener('click', () => {
                 if (renameTableModal) renameTableModal.classList.add('hidden');
-                const renameInput = renameTableModal?.querySelector('#newTableNameInput');
+                const renameInput = document.getElementById('renameTableNameInput');
                 if (renameInput) renameInput.value = '';
             });
         }
@@ -4273,14 +4519,14 @@ class CountingSystem {
         if (cancelRenameTableBtn) {
             cancelRenameTableBtn.addEventListener('click', () => {
                 if (renameTableModal) renameTableModal.classList.add('hidden');
-                const renameInput = renameTableModal?.querySelector('#newTableNameInput');
+                const renameInput = document.getElementById('renameTableNameInput');
                 if (renameInput) renameInput.value = '';
             });
         }
         
         if (confirmRenameTableBtn) {
             confirmRenameTableBtn.addEventListener('click', async () => {
-                const renameInput = renameTableModal?.querySelector('#newTableNameInput');
+                const renameInput = document.getElementById('renameTableNameInput');
                 const newName = renameInput?.value.trim();
                 if (!newName) {
                     this.showToast('Lütfen tablo adı girin', 'error', 3000);
@@ -4313,7 +4559,7 @@ class CountingSystem {
             renameTableModal.addEventListener('click', (e) => {
                 if (e.target === renameTableModal) {
                     renameTableModal.classList.add('hidden');
-                    const renameInput = renameTableModal.querySelector('#newTableNameInput');
+                    const renameInput = document.getElementById('renameTableNameInput');
                     if (renameInput) renameInput.value = '';
                 }
             });
@@ -5488,7 +5734,11 @@ class CountingSystem {
             }
         }
         if (countingChanged) {
-            this.countingData[productId].lastUpdated = now.toISOString();
+            const nowIso = now.toISOString();
+            this.countingData[productId].lastUpdated = nowIso;
+            this.touchTableLastActivity(this.currentTableName, nowIso);
+            this._scheduleTableSelectorUpdate();
+            this.updateActiveTableActivityLine();
             if (!this._auditSyncBatch) {
                 const d = normStock(this.countingData[productId].warehouseStock);
                 const s = normStock(this.countingData[productId].systemStock);
@@ -8657,9 +8907,9 @@ class CountingSystem {
                 const resetType = modal.dataset.resetType;
                 modal.classList.add('hidden');
                 if (resetType === 'warehouse') {
-                    this.executeResetWarehouseStocks();
+                    void this.executeResetWarehouseStocks();
                 } else {
-                    this.executeResetSystemStocks();
+                    void this.executeResetSystemStocks();
                 }
             });
             
@@ -8679,8 +8929,9 @@ class CountingSystem {
     }
     
     // Execute reset warehouse stocks
-    executeResetWarehouseStocks() {
+    async executeResetWarehouseStocks() {
         let resetCount = 0;
+        const resetIds = [];
         const productIds = Object.keys(this.countingData).filter((id) => !this.isReservedCountingKey(id));
         
         const nowIso = new Date().toISOString();
@@ -8690,6 +8941,7 @@ class CountingSystem {
                 if (data.warehouseStock !== null && data.warehouseStock !== undefined) {
                     this.countingData[productId].warehouseStock = null;
                     this.countingData[productId].lastUpdated = nowIso;
+                    resetIds.push(productId);
                     resetCount++;
                 }
             }
@@ -8697,13 +8949,21 @@ class CountingSystem {
         
         if (resetCount > 0) {
             const tn = this.currentTableName || '';
+            this.touchTableLastActivity(tn, nowIso);
             this.pushAuditEntry(
                 `📋 ${this.formatTableDisplayName(tn)} · Depo stoku sıfırlandı · ${resetCount} satır`,
                 { cat: 'reset', tbl: tn }
             );
-            this.saveCountingData();
+            await this.saveCountingData();
+            if (this._countingItemsTableReady === true) {
+                for (const productId of resetIds) {
+                    await this.saveProductEntry(productId).catch(() => {});
+                }
+            }
             this.renderTable();
             this.updateStatistics();
+            this.updateActiveTableActivityLine();
+            this._scheduleTableSelectorUpdate();
             this.showToast(`${resetCount} ürünün depo stoku sıfırlandı`, 'success', 3000);
         } else {
             this.showToast('Sıfırlanacak depo stoku bulunamadı', 'info', 3000);
@@ -8711,8 +8971,9 @@ class CountingSystem {
     }
     
     // Execute reset system stocks
-    executeResetSystemStocks() {
+    async executeResetSystemStocks() {
         let resetCount = 0;
+        const resetIds = [];
         const productIds = Object.keys(this.countingData).filter((id) => !this.isReservedCountingKey(id));
         
         const nowIso = new Date().toISOString();
@@ -8723,6 +8984,7 @@ class CountingSystem {
                     this.countingData[productId].systemStock = null;
                     this.countingData[productId].apiFetchFailed = false; // Reset failed flag too
                     this.countingData[productId].lastUpdated = nowIso;
+                    resetIds.push(productId);
                     resetCount++;
                 }
             }
@@ -8730,13 +8992,21 @@ class CountingSystem {
         
         if (resetCount > 0) {
             const tn = this.currentTableName || '';
+            this.touchTableLastActivity(tn, nowIso);
             this.pushAuditEntry(
                 `📋 ${this.formatTableDisplayName(tn)} · Sistem stoku sıfırlandı · ${resetCount} satır`,
                 { cat: 'reset', tbl: tn }
             );
-            this.saveCountingData();
+            await this.saveCountingData();
+            if (this._countingItemsTableReady === true) {
+                for (const productId of resetIds) {
+                    await this.saveProductEntry(productId).catch(() => {});
+                }
+            }
             this.renderTable();
             this.updateStatistics();
+            this.updateActiveTableActivityLine();
+            this._scheduleTableSelectorUpdate();
             this.showToast(`${resetCount} ürünün sistem stoku sıfırlandı`, 'success', 3000);
         } else {
             this.showToast('Sıfırlanacak sistem stoku bulunamadı', 'info', 3000);
@@ -8751,16 +9021,16 @@ class CountingSystem {
         }
         const renameTableModal = document.getElementById('renameTableModal');
         const currentTableNameDisplay = document.getElementById('currentTableNameDisplay');
-        const newTableNameInput = document.getElementById('newTableNameInput');
+        const renameTableNameInput = document.getElementById('renameTableNameInput');
         
-        if (renameTableModal && currentTableNameDisplay && newTableNameInput) {
+        if (renameTableModal && currentTableNameDisplay && renameTableNameInput) {
             currentTableNameDisplay.textContent = this.formatTableDisplayName(this.currentTableName);
-            newTableNameInput.value = this.currentTableName;
+            renameTableNameInput.value = this.currentTableName;
             renameTableModal.classList.remove('hidden');
             // Focus on input
             setTimeout(() => {
-                newTableNameInput.focus();
-                newTableNameInput.select();
+                renameTableNameInput.focus();
+                renameTableNameInput.select();
             }, 100);
         }
     }
@@ -9626,6 +9896,36 @@ class CountingSystem {
         return [...map.values()];
     }
 
+    /** Sayım tablosu / finans kartları — barkod rozetleri (SVG ikonlu) */
+    renderBarcodeBadgesHtml(barcodes, options = {}) {
+        const maxVisible = options.maxVisible ?? 3;
+        const list = Array.isArray(barcodes) ? barcodes : [];
+        const codes = list
+            .map((b) => {
+                if (b == null) return '';
+                if (typeof b === 'object' && b.code != null) return String(b.code).trim();
+                return String(b).trim();
+            })
+            .filter(Boolean);
+        if (!codes.length) {
+            return options.emptyHtml || '<span class="text-[10px] text-gray-400">—</span>';
+        }
+        const iconSvg =
+            '<svg class="w-3 h-3 mr-1 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>';
+        const visible = codes.slice(0, maxVisible);
+        const pills = visible
+            .map(
+                (code) =>
+                    `<span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 font-mono tabular-nums">${iconSvg}${this.escapeHtml(code)}</span>`
+            )
+            .join('');
+        const extra =
+            codes.length > maxVisible
+                ? `<span class="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">+${codes.length - maxVisible}</span>`
+                : '';
+        return `<div class="flex flex-wrap gap-1.5">${pills}${extra}</div>`;
+    }
+
     /**
      * Finans sekmesi altı: eksik / fazla ürünler, foto, tam ad, barkod, adet ve TL etkisi, net kar/zarar.
      */
@@ -9665,11 +9965,7 @@ class CountingSystem {
             const barcodeList = Array.isArray(p.barcodes) && p.barcodes.length
                 ? p.barcodes
                 : (p.barcode ? [p.barcode] : []);
-            const barcodesHtml = barcodeList.length
-                ? barcodeList.map((bc) =>
-                    `<span class="inline-flex shrink-0 items-center rounded-full border border-slate-200/70 bg-slate-50 px-2 py-0.5 font-mono text-[10px] tabular-nums text-slate-600">${this.escapeHtml(String(bc))}</span>`
-                ).join('')
-                : '<span class="text-[10px] text-gray-400">—</span>';
+            const barcodesHtml = this.renderBarcodeBadgesHtml(barcodeList, { maxVisible: 4 });
             const adetStr = p.stockDiff > 0 ? `+${p.stockDiff}` : `${p.stockDiff}`;
             const adetLabel = kind === 'miss' ? `${adetStr} adet eksik` : `${adetStr} adet fazla`;
             const stockDiffClass = p.stockDiff > 0 ? 'text-emerald-700' : p.stockDiff < 0 ? 'text-rose-700' : 'text-gray-600';
@@ -9682,7 +9978,7 @@ class CountingSystem {
                     <img src="${img}" alt="" class="h-11 w-11 shrink-0 rounded-lg border border-white object-cover shadow-sm" loading="lazy" />
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</p>
-                        <div class="mt-1 flex flex-wrap gap-1">${barcodesHtml}</div>
+                        <div class="mt-1.5">${barcodesHtml}</div>
                         <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
                             <span>Depo: <strong>${p.warehouseStock ?? '—'}</strong></span>
                             <span>Sistem: <strong>${p.systemStock ?? '—'}</strong></span>
