@@ -55,6 +55,7 @@ class CountingSystem {
         /** Önceki tablo listesi — yalnızca yeni eklenen tablolar otomatik seçilir (kullanıcı iptalini ezmez) */
         this._farkTableNamesSnapshot = null;
         this.selectedFinancialTable = 'all'; // Seçili finans tablosu ('all' veya table name)
+        this._financeBarcodesVisible = false; // Finans Stok Özeti barkodları (varsayılan gizli)
         this.productSortOrder = 'desc'; // 'asc' | 'desc' - Finans tabındaki ürün sıralaması
         this.financialProducts = []; // Finans tabındaki ürünler (sıralama için)
         this.categoryPieChart = null; // Chart.js pie chart instance
@@ -10101,6 +10102,34 @@ class CountingSystem {
         });
     }
 
+    _syncFinanceBarcodesVisibility(container) {
+        const root = container || document.getElementById('financialExecutiveReport');
+        if (!root) return;
+        const visible = !!this._financeBarcodesVisible;
+        root.querySelectorAll('.finance-barcodes-block').forEach((el) => {
+            el.classList.toggle('hidden', !visible);
+            el.setAttribute('aria-hidden', visible ? 'false' : 'true');
+        });
+        const btn = root.querySelector('#financeBarcodesToggleBtn');
+        if (!btn) return;
+        const label = btn.querySelector('[data-finance-barcode-label]');
+        if (label) label.textContent = visible ? 'Barkodları gizle' : 'Barkodları göster';
+        btn.setAttribute('aria-pressed', visible ? 'true' : 'false');
+        btn.classList.toggle('finance-barcodes-toggle--active', visible);
+    }
+
+    _bindFinanceBarcodeToggle(container) {
+        const root = container || document.getElementById('financialExecutiveReport');
+        if (!root) return;
+        const btn = root.querySelector('#financeBarcodesToggleBtn');
+        if (!btn) return;
+        btn.onclick = () => {
+            this._financeBarcodesVisible = !this._financeBarcodesVisible;
+            this._syncFinanceBarcodesVisibility(root);
+        };
+        this._syncFinanceBarcodesVisibility(root);
+    }
+
     /** Sayım tablosu / genel — barkod rozetleri (SVG ikonlu metin) */
     renderBarcodeBadgesHtml(barcodes, options = {}) {
         const maxVisible = options.maxVisible ?? 3;
@@ -10164,13 +10193,26 @@ class CountingSystem {
 
         const now = new Date().toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
 
+        const productHasBarcodes = (p) => {
+            const list = Array.isArray(p.barcodes) && p.barcodes.length ? p.barcodes : p.barcode ? [p.barcode] : [];
+            return list.some((b) => {
+                if (b == null) return false;
+                if (typeof b === 'object' && b.code != null) return String(b.code).trim().length > 0;
+                return String(b).trim().length > 0;
+            });
+        };
+        const hasAnyBarcodes = missing.some(productHasBarcodes) || surplus.some(productHasBarcodes);
+        const barcodesHiddenClass = this._financeBarcodesVisible ? '' : 'hidden';
+
         const productCard = (p, kind) => {
             const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
             const name = this.escapeHtml(p.productName || '');
             const barcodeList = Array.isArray(p.barcodes) && p.barcodes.length
                 ? p.barcodes
                 : (p.barcode ? [p.barcode] : []);
-            const barcodesHtml = this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 2 });
+            const barcodesHtml = productHasBarcodes(p)
+                ? `<div class="finance-barcodes-block mt-1.5 ${barcodesHiddenClass}" aria-hidden="${this._financeBarcodesVisible ? 'false' : 'true'}">${this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 2 })}</div>`
+                : '';
             const adetStr = p.stockDiff > 0 ? `+${p.stockDiff}` : `${p.stockDiff}`;
             const adetLabel = kind === 'miss' ? `${adetStr} adet eksik` : `${adetStr} adet fazla`;
             const stockDiffClass = p.stockDiff > 0 ? 'text-emerald-700' : p.stockDiff < 0 ? 'text-rose-700' : 'text-gray-600';
@@ -10183,7 +10225,7 @@ class CountingSystem {
                     <img src="${img}" alt="" class="h-11 w-11 shrink-0 rounded-lg border border-white object-cover shadow-sm" loading="lazy" />
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</p>
-                        <div class="mt-1.5">${barcodesHtml}</div>
+                        ${barcodesHtml}
                         <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
                             <span>Depo: <strong>${p.warehouseStock ?? '—'}</strong></span>
                             <span>Sistem: <strong>${p.systemStock ?? '—'}</strong></span>
@@ -10205,12 +10247,22 @@ class CountingSystem {
 
         container.innerHTML = `
             <div class="bg-white rounded-xl shadow-md border border-gray-100 p-3 sm:p-4">
-                <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
+                <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
                         <h3 class="text-base font-bold tracking-tight text-gray-900 sm:text-lg">Stok Özeti</h3>
                         <p class="mt-0.5 text-xs text-gray-500">${this.escapeHtml(scopeShort)}</p>
                     </div>
-                    <p class="text-[11px] text-gray-400">${this.escapeHtml(now)}</p>
+                    <div class="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                        ${
+                            hasAnyBarcodes
+                                ? `<button type="button" id="financeBarcodesToggleBtn" class="finance-barcodes-toggle inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md" aria-pressed="${this._financeBarcodesVisible ? 'true' : 'false'}" title="Terminal okutma için barkod görsellerini aç / kapat">
+                            <svg class="h-4 w-4 shrink-0 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>
+                            <span data-finance-barcode-label>${this._financeBarcodesVisible ? 'Barkodları gizle' : 'Barkodları göster'}</span>
+                        </button>`
+                                : ''
+                        }
+                        <p class="text-[11px] text-gray-400 sm:text-right">${this.escapeHtml(now)}</p>
+                    </div>
                 </div>
 
                 <div class="mb-5 grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
@@ -10259,6 +10311,7 @@ class CountingSystem {
             </div>
         `;
         this._bindFinanceBarcodeCopy(container);
+        this._bindFinanceBarcodeToggle(container);
     }
 
     setupChartCarousel() {
