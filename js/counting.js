@@ -3367,16 +3367,55 @@ class CountingSystem {
         }
     }
 
-    /** "2 saat önce" vb. */
+    /**
+     * Göreli zaman (Türkçe) — en fazla 2 birim:
+     * dakika | saat+dakika | gün+saat | hafta+gün | ay+hafta | yıl+ay
+     */
     formatRelativeAgoTr(ms) {
         if (ms == null || Number.isNaN(ms)) return '';
-        const diffSec = Math.floor((Date.now() - ms) / 1000);
+        const diffSec = Math.max(0, Math.floor((Date.now() - ms) / 1000));
         if (diffSec < 45) return 'az önce';
-        if (diffSec < 3600) return `${Math.floor(diffSec / 60)} dk önce`;
-        if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} saat önce`;
-        if (diffSec < 604800) return `${Math.floor(diffSec / 86400)} gün önce`;
-        const weeks = Math.floor(diffSec / 604800);
-        return `${weeks} hafta önce`;
+
+        const MIN = 60;
+        const HOUR = 3600;
+        const DAY = 86400;
+        const WEEK = 604800;
+        const MONTH = 2592000; // ~30 gün
+        const YEAR = 31536000; // ~365 gün
+
+        const part = (value, unit) => (value === 1 ? `1 ${unit}` : `${value} ${unit}`);
+
+        if (diffSec < HOUR) {
+            return `${part(Math.floor(diffSec / MIN), 'dakika')} önce`;
+        }
+        if (diffSec < DAY) {
+            const h = Math.floor(diffSec / HOUR);
+            const m = Math.floor((diffSec % HOUR) / MIN);
+            if (m === 0) return `${part(h, 'saat')} önce`;
+            return `${part(h, 'saat')} ${part(m, 'dakika')} önce`;
+        }
+        if (diffSec < WEEK) {
+            const d = Math.floor(diffSec / DAY);
+            const h = Math.floor((diffSec % DAY) / HOUR);
+            if (h === 0) return `${part(d, 'gün')} önce`;
+            return `${part(d, 'gün')} ${part(h, 'saat')} önce`;
+        }
+        if (diffSec < MONTH) {
+            const w = Math.floor(diffSec / WEEK);
+            const d = Math.floor((diffSec % WEEK) / DAY);
+            if (d === 0) return `${part(w, 'hafta')} önce`;
+            return `${part(w, 'hafta')} ${part(d, 'gün')} önce`;
+        }
+        if (diffSec < YEAR) {
+            const mo = Math.floor(diffSec / MONTH);
+            const w = Math.floor((diffSec % MONTH) / WEEK);
+            if (w === 0) return `${part(mo, 'ay')} önce`;
+            return `${part(mo, 'ay')} ${part(w, 'hafta')} önce`;
+        }
+        const y = Math.floor(diffSec / YEAR);
+        const mo = Math.floor((diffSec % YEAR) / MONTH);
+        if (mo === 0) return `${part(y, 'yıl')} önce`;
+        return `${part(y, 'yıl')} ${part(mo, 'ay')} önce`;
     }
 
     updateActiveTableActivityLine() {
