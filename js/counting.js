@@ -2430,25 +2430,31 @@ class CountingSystem {
     // Tablo oluşturma combobox yardımcıları
     // ─────────────────────────────────────────────────────────────
 
-    /** Dropdown açıkken pointer koordinatı liste kutusu içinde mi */
-    _isPointerInTableNameDropdown(clientX, clientY) {
+    /** Dropdown'u body'ye taşır — modal overflow/stacking tıklamayı yutmasın */
+    _mountTableNameDropdownPortal() {
         const dropdown = document.getElementById('tableNameDropdown');
-        if (!dropdown || dropdown.classList.contains('hidden')) return false;
-        const rect = dropdown.getBoundingClientRect();
-        return (
-            clientX >= rect.left &&
-            clientX <= rect.right &&
-            clientY >= rect.top &&
-            clientY <= rect.bottom
-        );
+        const wrap = document.getElementById('tableNameComboboxWrap');
+        if (!dropdown || !wrap) return;
+        if (!this._tableNameDropdownHome) this._tableNameDropdownHome = wrap;
+        if (dropdown.parentElement !== document.body) {
+            document.body.appendChild(dropdown);
+        }
     }
 
-    /** Modal taşmasında tıklama kaybını önlemek için fixed konumlandırma */
+    _unmountTableNameDropdownPortal() {
+        const dropdown = document.getElementById('tableNameDropdown');
+        const home = this._tableNameDropdownHome || document.getElementById('tableNameComboboxWrap');
+        if (!dropdown || !home) return;
+        if (dropdown.parentElement === document.body) {
+            home.appendChild(dropdown);
+        }
+    }
+
+    /** Modal taşmasında tıklama kaybını önlemek için fixed konumlandırma (body portal) */
     _positionTableNameDropdown() {
         const input = document.getElementById('newTableNameInput');
         const dropdown = document.getElementById('tableNameDropdown');
-        const modal = document.getElementById('createTableModal');
-        if (!input || !dropdown || !modal || modal.classList.contains('hidden')) return;
+        if (!input || !dropdown || dropdown.classList.contains('hidden')) return;
 
         const rect = input.getBoundingClientRect();
         const gap = 4;
@@ -2461,7 +2467,7 @@ class CountingSystem {
         dropdown.style.left = `${Math.max(8, rect.left)}px`;
         dropdown.style.width = `${Math.min(rect.width, window.innerWidth - 16)}px`;
         dropdown.style.right = 'auto';
-        dropdown.style.zIndex = '10000';
+        dropdown.style.zIndex = '99999';
 
         if (openUp) {
             dropdown.style.top = 'auto';
@@ -2517,15 +2523,19 @@ class CountingSystem {
             dropdown.classList.add('hidden');
             if (chevron) chevron.style.transform = '';
             input._dropdownOpen = false;
+            this._unmountTableNameDropdownPortal();
             this._resetTableNameDropdownPosition();
             this._unbindTableNameDropdownReposition();
         };
         const openDropdown = () => {
             this._renderTableNameDropdown(input.value);
+            this._mountTableNameDropdownPortal();
             dropdown.classList.remove('hidden');
             if (chevron) chevron.style.transform = 'rotate(180deg)';
             input._dropdownOpen = true;
-            this._positionTableNameDropdown();
+            requestAnimationFrame(() => {
+                this._positionTableNameDropdown();
+            });
             this._bindTableNameDropdownReposition();
         };
         this._closeTableNameDropdown = closeDropdown;
@@ -2581,7 +2591,6 @@ class CountingSystem {
         });
 
         const pickDropdownItem = (e) => {
-            e.preventDefault();
             e.stopPropagation();
             const item = e.target.closest('[data-cat]');
             if (!item) return;
@@ -2591,18 +2600,21 @@ class CountingSystem {
             input.focus();
         };
 
-        // pointerdown: mouse + touch; modal dışına taşan satırlarda da seçim çalışır
-        dropdown.addEventListener('pointerdown', pickDropdownItem);
+        // Input blur olmasın diye mousedown engelle; seçim click ile (capture race yok)
+        dropdown.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+        });
+        dropdown.addEventListener('click', pickDropdownItem);
 
-        // Dışarı tıklayınca kapat (fixed taşma alanı dahil)
-        document.addEventListener('mousedown', (e) => {
+        // Dışarı tıklayınca kapat — bubble (dropdown seçimi önce işlenir)
+        document.addEventListener('pointerdown', (e) => {
             const modal = document.getElementById('createTableModal');
             if (!modal || modal.classList.contains('hidden') || !input._dropdownOpen) return;
             const wrap = document.getElementById('tableNameComboboxWrap');
+            if (dropdown.contains(e.target)) return;
             if (wrap && wrap.contains(e.target)) return;
-            if (this._isPointerInTableNameDropdown(e.clientX, e.clientY)) return;
             closeDropdown();
-        }, { capture: true });
+        });
 
         // Escape ile kapat
         input.addEventListener('keydown', (e) => {
@@ -2631,7 +2643,7 @@ class CountingSystem {
             }
             if (e.key === 'Enter') {
                 const item = document.activeElement?.closest('[data-cat]');
-                if (item) { item.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); }
+                if (item) item.click();
             }
         });
     }
@@ -2681,7 +2693,10 @@ class CountingSystem {
             input.value = '';
             input._dropdownOpen = false;
         }
-        if (dropdown) dropdown.classList.add('hidden');
+        if (dropdown) {
+            dropdown.classList.add('hidden');
+            this._unmountTableNameDropdownPortal();
+        }
         this._resetTableNameDropdownPosition();
         this._unbindTableNameDropdownReposition();
         if (chevron) chevron.style.transform = '';
@@ -4519,23 +4534,17 @@ class CountingSystem {
             });
         }
 
-        // Overlay tıklamasıyla kapat — dropdown açıkken önce listeyi kapat, modalı değil
+        // Overlay tıklamasıyla kapat — dropdown açıkken modal kapanmaz
         if (createTableModal) {
-            createTableModal.addEventListener('mousedown', (e) => {
+            createTableModal.addEventListener('click', (e) => {
                 if (e.target !== createTableModal) return;
                 const dropdown = document.getElementById('tableNameDropdown');
                 if (dropdown && !dropdown.classList.contains('hidden')) {
-                    if (this._isPointerInTableNameDropdown(e.clientX, e.clientY)) return;
                     if (typeof this._closeTableNameDropdown === 'function') {
                         this._closeTableNameDropdown();
                     }
                     return;
                 }
-            });
-            createTableModal.addEventListener('click', (e) => {
-                if (e.target !== createTableModal) return;
-                const dropdown = document.getElementById('tableNameDropdown');
-                if (dropdown && !dropdown.classList.contains('hidden')) return;
                 closeCreateModal();
             });
         }
