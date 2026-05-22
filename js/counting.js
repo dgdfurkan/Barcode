@@ -30,8 +30,11 @@ const COUNTING_SUBCATEGORIES = [
     "Taze Yemek","Teknoloji","Temizlik","Tereyağı","Ton Balığı",
     "Tıraş Malzemeleri","Turşu","Un","Unlu Mamüller","Uzun Ömürlü Süt",
     "Vegan","Vücut & El Bakım","Yeşillik","Yoğurt","Yöresel Peynir",
-    "Yumurta","Zeytin","Zeytinyağı"
+    "Yumurta",    "Zeytin","Zeytinyağı"
 ];
+
+/** O(1) sabit alt kategori tablo adı kontrolü */
+const COUNTING_SUBCATEGORIES_SET = new Set(COUNTING_SUBCATEGORIES);
 
 class CountingSystem {
     constructor() {
@@ -2983,7 +2986,7 @@ class CountingSystem {
         };
         const base = map[status] || map['not-started'];
         const active = isActive ? ' ring-2 ring-blue-400 ring-offset-1 shadow-sm font-semibold' : ' hover:brightness-[0.98]';
-        return `sayim-general-table-chip shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${base}${active}`;
+        return `sayim-general-table-chip relative shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${base}${active}`;
     }
 
     getTableStatusCountBadgeClasses(status, isActive) {
@@ -3040,6 +3043,28 @@ class CountingSystem {
             return this.formatDailyDateLabelFromIso(iso);
         }
         return name;
+    }
+
+    /** Tablo adı sabit alt kategori listesinden mi (combobox ile oluşturulan) */
+    isPresetSubcategoryTable(name) {
+        if (!name || typeof name !== 'string') return false;
+        return COUNTING_SUBCATEGORIES_SET.has(name.trim());
+    }
+
+    /** Sol üst köşe yıldız rozeti — tablo adıyla çakışmaması için mutlak konumlu */
+    renderPresetSubcategoryBadgeHtml() {
+        const title = 'Sabit alt kategori tablosu';
+        return `<span class="preset-subcat-table-badge" title="${title}" aria-label="${title}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.35 7.23H22l-6.05 4.39 2.31 7.13L12 16.9l-6.26 4.85 2.31-7.13L2 9.23h7.65z"/></svg></span>`;
+    }
+
+    /** Dar alanlar (finans seçici butonu) için satır içi mini yıldız */
+    renderPresetSubcategoryInlineStarHtml() {
+        return `<svg class="preset-subcat-inline-star shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" title="Sabit alt kategori tablosu"><path d="M12 2l2.35 7.23H22l-6.05 4.39 2.31 7.13L12 16.9l-6.26 4.85 2.31-7.13L2 9.23h7.65z"/></svg>`;
+    }
+
+    /** Sabit alt kategori chip'leri — hafif amber vurgu */
+    getPresetSubcategoryChipAccentClasses() {
+        return ' preset-subcat-table-chip shadow-[0_0_0_1px_rgba(251,191,36,0.22)]';
     }
 
     /** Tablo nesnesinde ürün dışı anahtarlar (metadata) */
@@ -3785,16 +3810,23 @@ class CountingSystem {
             filteredGeneral.forEach((table) => {
                 const isActive = table.name === this.currentTableName;
                 const status = table.status || 'not-started';
+                const isPreset = this.isPresetSubcategoryTable(table.name);
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.setAttribute('role', 'listitem');
                 btn.dataset.tableName = table.name;
                 btn.dataset.tableStatus = status;
-                btn.title = table.name;
-                btn.className = this.getTableStatusChipClasses(status, isActive);
+                if (isPreset) btn.dataset.presetSubcat = '1';
+                btn.title = isPreset ? `${table.name} · Sabit alt kategori tablosu` : table.name;
+                btn.className =
+                    this.getTableStatusChipClasses(status, isActive) +
+                    (isPreset ? this.getPresetSubcategoryChipAccentClasses() : '');
                 btn.innerHTML = `
-                    <span class="truncate max-w-[10rem]">${this.escapeHtml(table.name)}</span>
-                    <span class="text-[10px] font-semibold ${this.getTableStatusCountBadgeClasses(status, isActive)}">${table.productCount ?? 0}</span>
+                    ${isPreset ? this.renderPresetSubcategoryBadgeHtml() : ''}
+                    <span class="flex min-w-0 items-center gap-2 ${isPreset ? 'pl-3.5' : ''}">
+                        <span class="truncate max-w-[10rem]">${this.escapeHtml(table.name)}</span>
+                        <span class="text-[10px] font-semibold shrink-0 ${this.getTableStatusCountBadgeClasses(status, isActive)}">${table.productCount ?? 0}</span>
+                    </span>
                 `;
                 btn.addEventListener('click', async () => {
                     if (table.name !== this.currentTableName) {
@@ -4044,17 +4076,21 @@ class CountingSystem {
             list.forEach((table) => {
                 const isActive = table.name === this.currentTableName;
                 const status = table.status || 'not-started';
+                const isPreset = this.isPresetSubcategoryTable(table.name);
                 const row = document.createElement('button');
                 row.type = 'button';
                 row.setAttribute('role', 'option');
                 row.setAttribute('aria-selected', isActive ? 'true' : 'false');
                 row.dataset.tableName = table.name;
                 row.dataset.tableStatus = status;
+                if (isPreset) row.dataset.presetSubcat = '1';
                 row.className = [
-                    'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors',
+                    'relative flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors',
                     this.getTableStatusDropdownRowClasses(status, isActive),
+                    isPreset ? 'preset-subcat-table-dropdown-row pl-8' : '',
                 ].join(' ');
                 row.innerHTML = `
+                    ${isPreset ? this.renderPresetSubcategoryBadgeHtml() : ''}
                     <span class="min-w-0 truncate font-medium">${this.escapeHtml(table.name)}</span>
                     <span class="shrink-0 tabular-nums text-[10px] font-semibold ${this.getTableStatusCountBadgeClasses(status, isActive)}">${table.productCount ?? 0}</span>
                 `;
@@ -5203,13 +5239,15 @@ class CountingSystem {
                 const enc = encodeURIComponent(name);
                 const checked = this._farkTableSelection.has(name);
                 const label = this.formatTableDisplayName(name);
+                const isPreset = this.isPresetSubcategoryTable(name);
                 const cnt =
                     typeof row.productCount === 'number'
                         ? `<span class="text-slate-400 font-normal tabular-nums">(${row.productCount})</span>`
                         : '';
                 const aria = String(label).replace(/"/g, '&quot;');
                 return `
-                    <label class="inline-flex cursor-pointer select-none items-center gap-2.5 rounded-xl border border-slate-200/90 bg-white px-3 py-2 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50/90 has-[:checked]:border-indigo-300 has-[:checked]:bg-indigo-50/35 has-[:checked]:shadow-md has-[:checked]:shadow-indigo-100/40">
+                    <label class="relative inline-flex cursor-pointer select-none items-center gap-2.5 rounded-xl border border-slate-200/90 bg-white px-3 py-2 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50/90 has-[:checked]:border-indigo-300 has-[:checked]:bg-indigo-50/35 has-[:checked]:shadow-md has-[:checked]:shadow-indigo-100/40${isPreset ? ' preset-subcat-table-label pl-8 ring-1 ring-amber-200/50' : ''}">
+                        ${isPreset ? this.renderPresetSubcategoryBadgeHtml() : ''}
                         <input type="checkbox" class="peer sr-only fark-table-cb" data-fark-table="${enc}" ${checked ? 'checked' : ''} aria-label="${aria}"/>
                         <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-slate-300 bg-white transition peer-checked:border-indigo-600 peer-checked:bg-indigo-600 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-400/50 peer-checked:[&_svg]:opacity-100">
                             <svg class="h-3 w-3 text-white opacity-0 transition-opacity" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6l2.5 2.5L9.5 3"/></svg>
@@ -9651,13 +9689,23 @@ class CountingSystem {
         const tables = this.getTableList();
         
         // Update button text
+        const financialTableSelectorBtn = document.getElementById('financialTableSelectorBtn');
         if (this.selectedFinancialTable === 'all') {
             financialTableSelectorText.textContent = 'Tüm Tablolar';
+            financialTableSelectorBtn?.classList.remove('preset-subcat-table-selector-active');
         } else {
             const selectedTable = tables.find(t => t.name === this.selectedFinancialTable);
-            financialTableSelectorText.textContent = selectedTable
+            const label = selectedTable
                 ? this.formatTableDisplayName(selectedTable.name)
                 : (this.selectedFinancialTable || 'Tüm Tablolar');
+            const isPreset = selectedTable && this.isPresetSubcategoryTable(selectedTable.name);
+            if (isPreset) {
+                financialTableSelectorText.innerHTML = `<span class="inline-flex min-w-0 items-center gap-1.5">${this.renderPresetSubcategoryInlineStarHtml()}<span class="truncate">${this.escapeHtml(label)}</span></span>`;
+                financialTableSelectorBtn?.classList.add('preset-subcat-table-selector-active');
+            } else {
+                financialTableSelectorText.textContent = label;
+                financialTableSelectorBtn?.classList.remove('preset-subcat-table-selector-active');
+            }
         }
 
         // Clear and populate dropdown
@@ -9687,12 +9735,17 @@ class CountingSystem {
         // Add table options
         tables.forEach(table => {
             const option = document.createElement('div');
-            option.className = `table-selector-option ${table.name === this.selectedFinancialTable ? 'active' : ''}`;
+            const isPreset = this.isPresetSubcategoryTable(table.name);
+            option.className = `table-selector-option relative ${table.name === this.selectedFinancialTable ? 'active' : ''}${isPreset ? ' preset-subcat-table-dropdown-row pl-9' : ''}`;
             option.dataset.tableName = table.name;
             const label = this.formatTableDisplayName(table.name);
             option.innerHTML = `
-                <span>${this.escapeHtml(label)}${table.productCount ? ` <span class="text-gray-500 text-xs">(${table.productCount})</span>` : ''}</span>
-                <svg class="check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                ${isPreset ? this.renderPresetSubcategoryBadgeHtml() : ''}
+                <span class="min-w-0 flex-1 inline-flex items-center gap-1.5">
+                    ${isPreset ? this.renderPresetSubcategoryInlineStarHtml() : ''}
+                    <span class="truncate">${this.escapeHtml(label)}${table.productCount ? ` <span class="text-gray-500 text-xs">(${table.productCount})</span>` : ''}</span>
+                </span>
+                <svg class="check-icon shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
             `;
