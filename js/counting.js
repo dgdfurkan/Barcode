@@ -2734,18 +2734,24 @@ class CountingSystem {
             throw new Error('Bu isimde bir tablo zaten mevcut');
         }
 
-        const newTableMeta = { createdAt: new Date().toISOString() };
+        const nowIso = new Date().toISOString();
+        const newTableMeta = { createdAt: nowIso, lastActivityAt: nowIso };
         if (this.countingData && fromTable) {
             fullData._tables[fromTable] = this.countingData;
         }
         fullData._tables[trimmed] = { _tableMeta: newTableMeta };
         if (!fullData._tableMeta) fullData._tableMeta = {};
-        fullData._tableMeta[trimmed] = { createdAt: newTableMeta.createdAt, _productOrder: [] };
+        fullData._tableMeta[trimmed] = {
+            createdAt: nowIso,
+            lastActivityAt: nowIso,
+            _productOrder: [],
+        };
 
         this.currentTableName = trimmed;
         this._saveDeviceCurrentTable(trimmed);
         this.countingData = fullData._tables[trimmed];
         this.cachedFullData = fullData;
+        this.touchTableLastActivity(trimmed, nowIso);
 
         this.pushAuditEntry(
             options.allowDaily
@@ -2759,11 +2765,10 @@ class CountingSystem {
         // Re-render UI
         this.renderTable();
         this.updateStatistics();
+        this.updateActiveTableActivityLine();
         this.updateTableSelector();
         this.syncSayimSubTabToTable();
     }
-
-    // Delete a table
     async deleteTable(tableName) {
         if (!tableName) return;
 
@@ -2820,7 +2825,7 @@ class CountingSystem {
                 isCurrent: name === this.currentTableName,
                 productCount: Object.keys(tableData).filter((k) => !this.isReservedCountingKey(k)).length,
                 status: statusSummary.status,
-                _sortLastMs: lastActivityMs,
+                _sortLastMs: Math.max(lastActivityMs, createdAtMs),
                 _sortCreatedMs: createdAtMs,
             };
         });
