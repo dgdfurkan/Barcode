@@ -1659,17 +1659,45 @@ class CountingSystem {
         }, delay);
     }
 
+    /** Tablo nesnesine güvenli erişim (tablo değişiminde countingData kaymasını önler) */
+    _getTableDataRef(tableName) {
+        const tName = tableName || this.currentTableName;
+        if (!tName) return null;
+        if (this.cachedFullData?._tables?.[tName]) return this.cachedFullData._tables[tName];
+        if (tName === this.currentTableName && this.countingData) return this.countingData;
+        return null;
+    }
+
+    /** saveProductEntry upsert anı için ürün satırı anlık görüntüsü */
+    _snapshotProductEntry(entry) {
+        if (!entry || typeof entry !== 'object') return null;
+        return {
+            warehouseStock: entry.warehouseStock ?? null,
+            systemStock: entry.systemStock ?? null,
+            price: entry.price ?? null,
+            priceText: entry.priceText ?? null,
+            reservedStock: entry.reservedStock ?? null,
+            history: Array.isArray(entry.history) ? entry.history.slice() : [],
+            apiFetchFailed: entry.apiFetchFailed || false,
+            lastUpdated: entry.lastUpdated || new Date().toISOString(),
+        };
+    }
+
     /**
      * Tek bir ürünü counting_items tablosuna upsert eder.
-     * counting_items hazır değilse eski blob yöntemine düşer.
+     * tableName baştan sabitlenir — tablo değişiminde A verisinin B'ye yazılmasını engeller.
      */
-    async saveProductEntry(productId) {
+    async saveProductEntry(productId, options = {}) {
         if (!productId || this.isReservedCountingKey(productId)) return;
-        const entry = this.countingData[productId];
-        if (!entry || typeof entry !== 'object') return;
+        const tableName = options.tableName || this.currentTableName;
+        if (!tableName) return;
+
+        const tableData = this._getTableDataRef(tableName);
+        const entry = tableData?.[productId];
+        const snapshot = this._snapshotProductEntry(entry);
+        if (!snapshot) return;
 
         if (this._countingItemsTableReady !== true) {
-            // counting_items yok: eski blob yöntemi
             this.scheduleSave(400);
             return;
         }
@@ -1677,17 +1705,17 @@ class CountingSystem {
         try {
             const { error } = await window.supabase.from('counting_items').upsert({
                 username: this.currentUser.username,
-                table_name: this.currentTableName,
+                table_name: tableName,
                 product_id: productId,
-                warehouse_stock: entry.warehouseStock ?? null,
-                system_stock: entry.systemStock ?? null,
-                price: entry.price ?? null,
-                price_text: entry.priceText ?? null,
-                reserved_stock: entry.reservedStock ?? null,
-                history: entry.history || [],
-                api_fetch_failed: entry.apiFetchFailed || false,
+                warehouse_stock: snapshot.warehouseStock,
+                system_stock: snapshot.systemStock,
+                price: snapshot.price,
+                price_text: snapshot.priceText,
+                reserved_stock: snapshot.reservedStock,
+                history: snapshot.history,
+                api_fetch_failed: snapshot.apiFetchFailed,
                 updated_by: this.deviceId,
-                last_updated: entry.lastUpdated || new Date().toISOString(),
+                last_updated: snapshot.lastUpdated,
             }, { onConflict: 'username,table_name,product_id' });
             if (error) throw error;
             // Başarılı: localStorage'ı tam blob ile güncelle + gecikmeli Supabase tam yedek
@@ -1740,16 +1768,28 @@ class CountingSystem {
      * sadece son değeri kaydeder.
      */
     _scheduleProductSave(productId, delay = 400) {
+        const tableName = this.currentTableName;
         if (this._productSaveTimers[productId]) {
             clearTimeout(this._productSaveTimers[productId]);
         }
         this._productSaveTimers[productId] = setTimeout(() => {
             delete this._productSaveTimers[productId];
-            // saveProductEntry: counting_items'a yazar (hızlı) VEYA scheduleSave tetikler (tam blob)
-            // _saveMetaOnly burada çağrılmıyor: meta-only yazarak tam blob'u ezmesin.
-            // _scheduleFullBackup, saveProductEntry içinden otomatik tetiklenir.
-            this.saveProductEntry(productId).catch(e => console.error('_scheduleProductSave error:', e));
+            this.saveProductEntry(productId, { tableName }).catch(e => console.error('_scheduleProductSave error:', e));
         }, delay);
+    }
+
+    /** Tablo değişmeden önce bekleyen ürün kayıtlarını o tablo adıyla flush eder */
+    async _flushPendingProductSaves(tableName) {
+        const tName = tableName || this.currentTableName;
+        if (!tName) return;
+        const pendingIds = Object.keys(this._productSaveTimers || {});
+        for (const pId of pendingIds) {
+            clearTimeout(this._productSaveTimers[pId]);
+            delete this._productSaveTimers[pId];
+        }
+        await Promise.all(
+            pendingIds.map((pId) => this.saveProductEntry(pId, { tableName: tName }).catch(() => {}))
+        );
     }
 
     /** Cihaza özgü aktif tablo adını localStorage'a kaydeder */
@@ -2305,19 +2345,25 @@ class CountingSystem {
             return;
         }
 
-        // Pending per-product timer'larını flush et
-        for (const [pId, timer] of Object.entries(this._productSaveTimers)) {
-            clearTimeout(timer);
-            delete this._productSaveTimers[pId];
-            await this.saveProductEntry(pId).catch(() => {});
-        }
+        const fromTable = this.currentTableName;
+
+        // Bekleyen tam blob kaydını ESKİ tablo adıyla flush et (iptal etme — veri kaybı + yanlış tablo yazımı)
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
             this._saveDebounceTimer = null;
+            await this.saveCountingData().catch(() => {});
         }
+
+        // Bekleyen ürün kayıtlarını ESKİ tablo adıyla yaz — currentTableName henüz değişmedi
+        await this._flushPendingProductSaves(fromTable);
 
         const fullData = this.cachedFullData || { _api_info: {}, _tables: {} };
         if (!fullData._tables) fullData._tables = {};
+
+        // Ayrılınan tablonun bellek referansını sabitle
+        if (this.countingData) {
+            fullData._tables[fromTable] = this.countingData;
+        }
 
         this.currentTableName = tableName;
         this._saveDeviceCurrentTable(tableName);
@@ -2653,6 +2699,15 @@ class CountingSystem {
         }
 
         const trimmed = tableName.trim();
+        const fromTable = this.currentTableName;
+
+        if (this._saveDebounceTimer) {
+            clearTimeout(this._saveDebounceTimer);
+            this._saveDebounceTimer = null;
+            await this.saveCountingData().catch(() => {});
+        }
+        await this._flushPendingProductSaves(fromTable);
+
         if (!options.allowDaily && trimmed.startsWith(this.DAILY_TABLE_PREFIX)) {
             throw new Error('Bu isim günlük sayım için ayrılmıştır; genel tabloda kullanılamaz');
         }
@@ -2665,6 +2720,9 @@ class CountingSystem {
         }
 
         const newTableMeta = { createdAt: new Date().toISOString() };
+        if (this.countingData && fromTable) {
+            fullData._tables[fromTable] = this.countingData;
+        }
         fullData._tables[trimmed] = { _tableMeta: newTableMeta };
         if (!fullData._tableMeta) fullData._tableMeta = {};
         fullData._tableMeta[trimmed] = { createdAt: newTableMeta.createdAt, _productOrder: [] };
