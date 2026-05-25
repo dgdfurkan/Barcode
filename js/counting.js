@@ -90,6 +90,7 @@ class CountingSystem {
         /** Sadece UI: renderTable çağrılarını birleştir (Supabase kaydına dokunmaz) */
         this._renderTableDebounceTimer = null;
         this.cameraScanAndCountMode = false; // Kamera: barkod okutunca sayım ekranı açılsın
+        this.cameraTableOnlyScanMode = false; // Tablo İçi Sayım: yalnızca tablodaki ürünler
         /** Seri okuma + sayarak ilerle: sayım sheet'i kamera akışından açıldı (Önceki/Sıradaki yerine Doğru Girdim) */
         this.countingBottomSheetFromCameraSeriSayar = false;
         /** DEPO yanındaki kamera ile barkod doğrulama devam ediyor mu */
@@ -4510,7 +4511,14 @@ class CountingSystem {
         const cameraScanAndCountToggle = document.getElementById('cameraScanAndCountToggle');
         if (cameraScanAndCountToggle) {
             cameraScanAndCountToggle.addEventListener('change', (e) => {
-                this.cameraScanAndCountMode = !!e.target.checked;
+                this.setCameraScanAndCountMode(!!e.target.checked);
+            });
+        }
+
+        const cameraTableOnlyScanToggle = document.getElementById('cameraTableOnlyScanToggle');
+        if (cameraTableOnlyScanToggle) {
+            cameraTableOnlyScanToggle.addEventListener('change', (e) => {
+                this.setCameraTableOnlyScanMode(!!e.target.checked);
             });
         }
         
@@ -8131,6 +8139,66 @@ class CountingSystem {
 
     isCameraScanAndCountMode() {
         return !!this.cameraScanAndCountMode;
+    }
+
+    isCameraTableOnlyScanMode() {
+        return !!this.cameraTableOnlyScanMode;
+    }
+
+    syncCameraScanModeToggles() {
+        const countToggle = document.getElementById('cameraScanAndCountToggle');
+        const tableOnlyToggle = document.getElementById('cameraTableOnlyScanToggle');
+        if (countToggle) countToggle.checked = !!this.cameraScanAndCountMode;
+        if (tableOnlyToggle) tableOnlyToggle.checked = !!this.cameraTableOnlyScanMode;
+    }
+
+    setCameraScanAndCountMode(enabled) {
+        this.cameraScanAndCountMode = !!enabled;
+        if (!this.cameraScanAndCountMode && this.cameraTableOnlyScanMode) {
+            this.cameraTableOnlyScanMode = false;
+        }
+        this.syncCameraScanModeToggles();
+    }
+
+    setCameraTableOnlyScanMode(enabled) {
+        this.cameraTableOnlyScanMode = !!enabled;
+        if (this.cameraTableOnlyScanMode) {
+            this.cameraScanAndCountMode = true;
+        }
+        this.syncCameraScanModeToggles();
+    }
+
+    /** Tablo İçi Sayım: barkod yalnızca aktif tabloda varsa sayım panelini açar */
+    handleCameraTableOnlyScan(code, result = null) {
+        const bs = window.barcodeScanner;
+        const product = this.findProductByBarcode(code);
+
+        const reject = (message, type = 'warning') => {
+            if (bs) {
+                if (type === 'error') bs.playErrorSound();
+                else bs.playWarningSound();
+                setTimeout(() => bs.hideBarcodeFrame(), 1000);
+            }
+            this.showToast(message, type, 2500);
+            if (bs && !bs.continuousMode) bs.stopScanning();
+        };
+
+        if (!product || !product.productId) {
+            reject(`Barkod "${code}" için ürün bulunamadı`, 'error');
+            return;
+        }
+
+        if (!this.countingData[product.productId]) {
+            reject('Bu ürün bu tabloda yok', 'warning');
+            return;
+        }
+
+        if (bs) {
+            bs.showSuccessFlash();
+            if (result) bs.showBarcodeFrame(result);
+            bs.playSuccessSound();
+        }
+        this.onCameraScannedProductOpenForCount(product.productId);
     }
 
     isSeriOkumaVeSayarakIlerle() {

@@ -1126,6 +1126,16 @@ class BarcodeScanner {
         this.lastScannedCode = code;
         this.lastScanTime = now;
 
+        if (window.countingSystem) {
+            if (
+                typeof window.countingSystem.isCameraTableOnlyScanMode === 'function' &&
+                window.countingSystem.isCameraTableOnlyScanMode()
+            ) {
+                window.countingSystem.handleCameraTableOnlyScan(code, result);
+                return;
+            }
+        }
+
         // Yeşil yanıp sönme efekti
         this.showSuccessFlash();
 
