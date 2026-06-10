@@ -1621,28 +1621,6 @@
                 </div>
             </div>
 
-            <!-- Product Details -->
-            <div class="bg-white rounded-xl shadow-md border border-gray-100 p-3 sm:p-4">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-base sm:text-lg font-bold text-gray-900">Ürün Detayları</h3>
-                    <div class="flex items-center space-x-2">
-                        <span class="text-xs text-gray-600 hidden sm:inline">Sırala:</span>
-                        <button id="sortProductsDesc" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors font-medium" title="En çok zarardan en az zarara">
-                            <span class="hidden sm:inline">Zarar ↓</span>
-                            <span class="sm:hidden">↓</span>
-                        </button>
-                        <button id="sortProductsAsc" class="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded transition-colors font-medium" title="En az zarardan en çok zarara">
-                            <span class="hidden sm:inline">Zarar ↑</span>
-                            <span class="sm:hidden">↑</span>
-                        </button>
-                    </div>
-                </div>
-                <!-- Compact Card View (All Devices) -->
-                <div id="productDetailsCards" class="space-y-2 max-h-[600px] overflow-y-auto">
-                    <!-- Cards will be populated by JavaScript -->
-                </div>
-            </div>
-
             <!-- Stok uyumsuzluk özeti: ekran görüntüsü / rapor (JS doldurur) -->
             <section id="financialExecutiveReport" class="mb-6" aria-label="Stok Özeti"></section>
         </div>
@@ -2300,7 +2278,7 @@
                 <div class="mb-5">
                     <div class="flex items-center justify-between gap-3 mb-2">
                         <label class="text-sm font-medium text-gray-700 shrink-0">Kategori Seç</label>
-                        <span id="createTablePresetRemaining" class="text-xs font-medium text-slate-500 tabular-nums"></span>
+                        <span id="createTablePresetRemaining" class="text-xs font-medium text-slate-500 tabular-nums text-right"></span>
                     </div>
                     <!-- Combobox wrapper -->
                     <div class="relative w-full" id="tableNameComboboxWrap">

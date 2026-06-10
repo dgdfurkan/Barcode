@@ -93,6 +93,8 @@ class CountingSystem {
         this.cameraTableOnlyScanMode = false; // Tablo İçi Sayım: yalnızca tablodaki ürünler
         /** Finans: orijinal (struckPrice) fiyatı kullan — default true, sayfa yenilenince sıfırlanır */
         this._financeUseStruckPrice = true;
+        /** Finans Stok Özeti — oturum içi yapıştırma rehberi (kaydedilmez) */
+        this._financePasteGuide = null;
         /** Seri okuma + sayarak ilerle: sayım sheet'i kamera akışından açıldı (Önceki/Sıradaki yerine Doğru Girdim) */
         this.countingBottomSheetFromCameraSeriSayar = false;
         /** DEPO yanındaki kamera ile barkod doğrulama devam ediyor mu */
@@ -2725,14 +2727,182 @@ class CountingSystem {
         return COUNTING_SUBCATEGORIES.filter((c) => !existing.has(c)).length;
     }
 
+    _getTotalCountedProductVarietyCount() {
+        const seen = new Set();
+        const tables = this.cachedFullData?._tables;
+        if (!tables || typeof tables !== 'object') return 0;
+        for (const tableData of Object.values(tables)) {
+            if (!tableData || typeof tableData !== 'object') continue;
+            for (const [pid, data] of Object.entries(tableData)) {
+                if (this.isReservedCountingKey(pid) || !data || typeof data !== 'object') continue;
+                if (data.warehouseStock !== null && data.warehouseStock !== undefined) {
+                    seen.add(pid);
+                }
+            }
+        }
+        return seen.size;
+    }
+
     _updateCreateTablePresetRemaining() {
         const el = document.getElementById('createTablePresetRemaining');
         if (!el) return;
         const remaining = this._getRemainingPresetSubcategoryCount();
         const total = COUNTING_SUBCATEGORIES.length;
         const created = total - remaining;
-        el.textContent = `${remaining} kategori kaldı`;
-        el.title = `${created} / ${total} oluşturuldu`;
+        const counted = this._getTotalCountedProductVarietyCount();
+        el.innerHTML = `<span>${remaining} kaldı / ${total}</span><span class="text-slate-400 mx-1.5">·</span><span>${counted.toLocaleString('tr-TR')} sayılan çeşit</span>`;
+        el.title = `${created} kategori oluşturuldu · ${remaining} kaldı`;
+    }
+
+    _clearFinancePasteGuide() {
+        this._financePasteGuide = null;
+    }
+
+    _financePasteGuideMatchesCurrentTable() {
+        if (!this._financePasteGuide) return false;
+        return this._financePasteGuide.tableKey === this.selectedFinancialTable;
+    }
+
+    async importFinancePasteFromClipboard(tableProducts) {
+        if (this.selectedFinancialTable === 'all') {
+            this.showToast('Önce tek bir tablo seçin', 'warning', 2500);
+            return;
+        }
+        const parser = window.SayimClipboardImport?.parseClipboardText;
+        if (typeof parser !== 'function') {
+            this.showToast('İçe aktarma modülü yüklenemedi.', 'error', 3000);
+            return;
+        }
+        let rawText = '';
+        try {
+            rawText = await navigator.clipboard.readText();
+        } catch (e) {
+            this.showToast('Panoya erişilemedi', 'error', 3000);
+            return;
+        }
+        const parsed = parser(rawText);
+        if (!parsed.ok || !parsed.items?.length) {
+            this.showToast(parsed.error || 'Geçerli satır bulunamadı.', 'error', 4000);
+            return;
+        }
+
+        const productById = new Map(
+            (Array.isArray(tableProducts) ? tableProducts : [])
+                .filter((p) => p?.productId)
+                .map((p) => [p.productId, p])
+        );
+        const ordered = [];
+        let unmatched = 0;
+        for (const row of parsed.items) {
+            const catalog = this.matchDailyImportRow(row);
+            const pid = catalog?.id || catalog?.productId;
+            if (!pid || !productById.has(pid)) {
+                unmatched++;
+                continue;
+            }
+            ordered.push(productById.get(pid));
+        }
+
+        this._financePasteGuide = {
+            tableKey: this.selectedFinancialTable,
+            items: ordered,
+            totalPaste: parsed.items.length,
+            unmatched,
+        };
+
+        if (this._lastFinanceExecutiveProducts) {
+            this.renderFinancialExecutiveReport(
+                this._lastFinanceExecutiveProducts,
+                this._lastFinanceExecutiveSummary
+            );
+        }
+        this.showToast(
+            `${ordered.length} ürün eşleşti${unmatched ? ` · ${unmatched} tabloda yok` : ''}`,
+            ordered.length ? 'success' : 'warning',
+            2500
+        );
+    }
+
+    _renderFinancePasteGuideHtml() {
+        const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
+        const canPaste = this.selectedFinancialTable !== 'all';
+        const listHtml = guide?.items?.length
+            ? guide.items.map((p, idx) => {
+                const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
+                const name = this.escapeHtml(p.productName || '');
+                const barcode = this.escapeHtml(p.barcode || (p.barcodes?.[0] ?? ''));
+                return `
+                    <div class="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50/60 px-2.5 py-2">
+                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">${idx + 1}</span>
+                        <img src="${img}" alt="" class="h-9 w-9 shrink-0 rounded-md border border-white object-cover" loading="lazy" />
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium text-gray-900">${name}</p>
+                            ${barcode ? `<p class="text-[10px] font-mono text-gray-500">${barcode}</p>` : ''}
+                        </div>
+                    </div>`;
+            }).join('')
+            : `<p class="py-4 text-center text-xs text-gray-400">${canPaste ? 'Liste yapıştırınca eşleşen ürünler burada sırayla görünür.' : 'Tek tablo seçin, ardından sayım listesini yapıştırın.'}</p>`;
+
+        return `
+            <div class="mt-5 border-t border-gray-100 pt-4" id="financePasteGuideSection">
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-900">Sayım sırası rehberi</h4>
+                        <p class="mt-0.5 text-[11px] text-gray-500">Kaydedilmez · sayfa yenilenince silinir</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" id="financePasteGuideBtn" class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none" ${canPaste ? '' : 'disabled'} title="Panodan sayım listesi yapıştır">
+                            Yapıştır
+                        </button>
+                        ${guide?.items?.length ? `<button type="button" id="financePasteGuideClearBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Temizle</button>` : ''}
+                    </div>
+                </div>
+                <span id="financePasteGuideStatus" class="mb-2 block text-xs text-gray-500 min-h-[1rem]" role="status" aria-live="polite">${guide ? `${guide.items.length} ürün · yapıştırma sırası` : ''}</span>
+                <div id="financePasteGuideList" class="max-h-64 space-y-1.5 overflow-y-auto">${listHtml}</div>
+            </div>`;
+    }
+
+    _renderFinancePasteGuideList() {
+        const list = document.getElementById('financePasteGuideList');
+        if (!list) return;
+        const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
+        if (!guide?.items?.length) {
+            list.innerHTML = '<p class="py-4 text-center text-xs text-gray-400">Liste yapıştırınca eşleşen ürünler burada sırayla görünür.</p>';
+            return;
+        }
+        list.innerHTML = guide.items.map((p, idx) => {
+            const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
+            const name = this.escapeHtml(p.productName || '');
+            const barcode = this.escapeHtml(p.barcode || (p.barcodes?.[0] ?? ''));
+            return `
+                <div class="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50/60 px-2.5 py-2">
+                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">${idx + 1}</span>
+                    <img src="${img}" alt="" class="h-9 w-9 shrink-0 rounded-md border border-white object-cover" loading="lazy" />
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium text-gray-900">${name}</p>
+                        ${barcode ? `<p class="text-[10px] font-mono text-gray-500">${barcode}</p>` : ''}
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    _bindFinancePasteGuide(container, tableProducts) {
+        if (!container) return;
+        const pasteBtn = container.querySelector('#financePasteGuideBtn');
+        const clearBtn = container.querySelector('#financePasteGuideClearBtn');
+        if (pasteBtn) {
+            pasteBtn.addEventListener('click', () => {
+                void this.importFinancePasteFromClipboard(tableProducts);
+            });
+        }
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                this._clearFinancePasteGuide();
+                const status = document.getElementById('financePasteGuideStatus');
+                if (status) status.textContent = '';
+                void this.renderFinancialTab();
+            });
+        }
     }
 
     /** Dropdown listesini query'e göre yeniden çizer */
@@ -5434,6 +5604,10 @@ class CountingSystem {
 
     switchTab(tab) {
         if (this.currentTab === tab) return;
+
+        if (this.currentTab === 'finans' && tab !== 'finans') {
+            this._clearFinancePasteGuide();
+        }
 
         this.currentTab = tab;
         localStorage.setItem('counting_active_tab', tab);
@@ -10094,6 +10268,7 @@ class CountingSystem {
             </svg>
         `;
         allOption.addEventListener('click', async () => {
+            this._clearFinancePasteGuide();
             this.selectedFinancialTable = 'all';
             await this.renderAllTablesFinancialData();
             this.updateFinancialTableSelector();
@@ -10124,6 +10299,9 @@ class CountingSystem {
             `;
 
             option.addEventListener('click', async () => {
+                if (this.selectedFinancialTable !== table.name) {
+                    this._clearFinancePasteGuide();
+                }
                 this.selectedFinancialTable = table.name;
                 await this.renderSingleTableFinancialData(table.name);
                 this.updateFinancialTableSelector();
@@ -10253,7 +10431,6 @@ class CountingSystem {
 
         this.renderFinancialSummary(aggregated.summary);
         this.renderCategoryBreakdown(Object.values(aggregated.categories));
-        this.renderProductDetails(aggregated.products);
         this.renderCharts(Object.values(aggregated.categories), aggregated.products);
         this.renderTopProductsTables(aggregated.products);
         this.renderFinancialExecutiveReport(aggregated.products, aggregated.summary);
@@ -10265,14 +10442,12 @@ class CountingSystem {
             // Show empty state
             this.renderFinancialSummary({ totalWarehouseValue: 0, totalSystemValue: 0, profitLoss: 0, productCount: 0, countedProducts: 0 });
             this.renderCategoryBreakdown([]);
-            this.renderProductDetails([]);
             this.renderFinancialExecutiveReport([], { totalWarehouseValue: 0, totalSystemValue: 0, profitLoss: 0, productCount: 0, countedProducts: 0 });
             return;
         }
 
         this.renderFinancialSummary(data.summary);
         this.renderCategoryBreakdown(data.categories);
-        this.renderProductDetails(data.products);
         this.renderCharts(data.categories, data.products);
         this.renderTopProductsTables(data.products);
         this.renderFinancialExecutiveReport(data.products, data.summary);
@@ -10375,96 +10550,6 @@ class CountingSystem {
                 </tr>
             `;
         }).join('');
-    }
-
-    renderProductDetails(products) {
-        const productDetailsCards = document.getElementById('productDetailsCards');
-        const sortProductsDesc = document.getElementById('sortProductsDesc');
-        const sortProductsAsc = document.getElementById('sortProductsAsc');
-
-        // Store products for sorting
-        this.financialProducts = products;
-
-        // Filter out products with zero difference
-        const filteredProducts = products.filter(product => product.difference !== 0);
-
-        if (filteredProducts.length === 0) {
-            if (productDetailsCards) {
-                productDetailsCards.innerHTML = '<p class="text-center text-gray-500 py-6 text-sm">Farkı olan ürün bulunamadı</p>';
-            }
-            return;
-        }
-
-        // Sort products based on current sort order
-        const sortedProducts = [...filteredProducts].sort((a, b) => {
-            if (this.productSortOrder === 'desc') {
-                return a.difference - b.difference; // En çok zarardan en az zarara (negatiften pozitife)
-            } else {
-                return b.difference - a.difference; // En az zarardan en çok zarara (pozitiften negatife)
-            }
-        });
-
-        // Update sort button states
-        if (sortProductsDesc && sortProductsAsc) {
-            if (this.productSortOrder === 'desc') {
-                sortProductsDesc.classList.add('bg-blue-100', 'text-blue-700');
-                sortProductsDesc.classList.remove('bg-gray-100');
-                sortProductsAsc.classList.remove('bg-blue-100', 'text-blue-700');
-                sortProductsAsc.classList.add('bg-gray-100');
-            } else {
-                sortProductsAsc.classList.add('bg-blue-100', 'text-blue-700');
-                sortProductsAsc.classList.remove('bg-gray-100');
-                sortProductsDesc.classList.remove('bg-blue-100', 'text-blue-700');
-                sortProductsDesc.classList.add('bg-gray-100');
-            }
-        }
-
-        // Setup sort button listeners
-        if (sortProductsDesc) {
-            sortProductsDesc.onclick = () => {
-                this.productSortOrder = 'desc';
-                this.renderProductDetails(this.financialProducts);
-            };
-        }
-        if (sortProductsAsc) {
-            sortProductsAsc.onclick = () => {
-                this.productSortOrder = 'asc';
-                this.renderProductDetails(this.financialProducts);
-            };
-        }
-
-        // Compact card view for all devices
-        if (productDetailsCards) {
-            productDetailsCards.innerHTML = sortedProducts.map(product => {
-                const cardClass = product.difference > 0 ? 'profit' : product.difference < 0 ? 'loss' : 'zero';
-                const stockDiff = product.warehouseStock - product.systemStock;
-                const stockDiffText = stockDiff > 0 ? `+${stockDiff}` : stockDiff < 0 ? `${stockDiff}` : '0';
-                const stockDiffClass = stockDiff > 0 ? 'text-green-600' : stockDiff < 0 ? 'text-red-600' : 'text-gray-600';
-                
-                return `
-                    <div class="product-financial-card ${cardClass}">
-                        <div class="flex items-start justify-between gap-2">
-                            <div class="flex-1 min-w-0">
-                                <h4 class="text-sm font-semibold text-gray-900 truncate mb-1">${product.productName}</h4>
-                                <div class="flex items-center gap-3 text-xs text-gray-600">
-                                    <span>${product.category}</span>
-                                    <span>•</span>
-                                    <span>Depo: <strong>${product.warehouseStock}</strong></span>
-                                    <span>Sistem: <strong>${product.systemStock}</strong></span>
-                                    <span class="${stockDiffClass} font-semibold">(${stockDiffText})</span>
-                                </div>
-                            </div>
-                            <div class="flex flex-col items-end gap-1 flex-shrink-0">
-                                <div class="text-xs text-gray-500">Fark</div>
-                                <div class="text-sm font-bold ${product.difference > 0 ? 'text-green-600' : product.difference < 0 ? 'text-red-600' : 'text-gray-600'}">
-                                    ${product.difference >= 0 ? '+' : ''}${this.formatCurrency(product.difference)}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
     }
 
     /**
@@ -10622,6 +10707,13 @@ class CountingSystem {
         const container = document.getElementById('financialExecutiveReport');
         if (!container) return;
 
+        this._lastFinanceExecutiveProducts = products;
+        this._lastFinanceExecutiveSummary = summary;
+
+        if (this._financePasteGuide && this._financePasteGuide.tableKey !== this.selectedFinancialTable) {
+            this._clearFinancePasteGuide();
+        }
+
         const safeSummary = summary || {
             totalWarehouseValue: 0,
             totalSystemValue: 0,
@@ -10763,10 +10855,12 @@ class CountingSystem {
                         </div>
                     </div>
                 </div>
+                ${this._renderFinancePasteGuideHtml()}
             </div>
         `;
         this._bindFinanceBarcodeCopy(container);
         this._bindFinanceBarcodeToggle(container);
+        this._bindFinancePasteGuide(container, list);
     }
 
     setupChartCarousel() {
