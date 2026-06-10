@@ -761,6 +761,14 @@ class CountingSystem {
                             if (!tables[tName][pId]) {
                                 // Bu ürün counting_items'ta yok → blob'dan al
                                 tables[tName][pId] = { ...pData };
+                            } else {
+                                // counting_items'ta var ama blob'da ek alan olabilir (struckPrice vb.)
+                                if (pData.struckPrice != null && tables[tName][pId].struckPrice == null) {
+                                    tables[tName][pId].struckPrice = pData.struckPrice;
+                                }
+                                if (pData.struckPriceText != null && tables[tName][pId].struckPriceText == null) {
+                                    tables[tName][pId].struckPriceText = pData.struckPriceText;
+                                }
                             }
                         }
                         // Meta verilerini de tamamla
@@ -10013,7 +10021,11 @@ class CountingSystem {
             struckPriceToggle.checked = this._financeUseStruckPrice;
             struckPriceToggle.addEventListener('change', () => {
                 this._financeUseStruckPrice = struckPriceToggle.checked;
-                this.renderAllTablesFinancialData();
+                if (this.selectedFinancialTable && this.selectedFinancialTable !== 'all') {
+                    this.renderSingleTableFinancialData(this.selectedFinancialTable);
+                } else {
+                    this.renderAllTablesFinancialData();
+                }
             });
         }
         
