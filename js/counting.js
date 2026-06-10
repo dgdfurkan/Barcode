@@ -2989,42 +2989,119 @@ class CountingSystem {
         );
     }
 
+    _formatPasteGuideStock(val) {
+        if (val === null || val === undefined || val === '') return '—';
+        return String(val);
+    }
+
+    /** Rehber satırı — güncel sayım verisi + orijinal fiyat toggle */
+    _getFinancePasteGuideItemDisplay(p) {
+        const pid = p?.productId;
+        const tableName = this.selectedFinancialTable;
+        const entry =
+            tableName && tableName !== 'all' && pid && this.cachedFullData?._tables?.[tableName]
+                ? this.cachedFullData._tables[tableName][pid]
+                : null;
+
+        const warehouseRaw = entry?.warehouseStock ?? p?.warehouseStock;
+        const systemRaw = entry?.systemStock ?? p?.systemStock;
+        const warehouseStock =
+            warehouseRaw !== null && warehouseRaw !== undefined && warehouseRaw !== ''
+                ? Number(warehouseRaw)
+                : null;
+        const systemStock =
+            systemRaw !== null && systemRaw !== undefined && systemRaw !== ''
+                ? Number(systemRaw)
+                : null;
+        const price = entry ? (this._resolveFinancePrice(entry) ?? p?.price ?? 0) : (p?.price ?? 0);
+        const priceText = entry
+            ? (this._resolveFinancePriceText(entry) || this.formatCurrency(price))
+            : (p?.priceText || this.formatCurrency(price));
+        const stockDiff =
+            warehouseStock !== null && systemStock !== null && !Number.isNaN(warehouseStock) && !Number.isNaN(systemStock)
+                ? warehouseStock - systemStock
+                : null;
+
+        return { warehouseStock, systemStock, price, priceText, stockDiff };
+    }
+
+    _renderFinancePasteGuideRowHtml(p, idx) {
+        const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
+        const name = this.escapeHtml(p.productName || '');
+        const barcode = this.escapeHtml(p.barcode || (p.barcodes?.[0] ?? ''));
+        const d = this._getFinancePasteGuideItemDisplay(p);
+        const depo = this._formatPasteGuideStock(d.warehouseStock);
+        const sistem = this._formatPasteGuideStock(d.systemStock);
+        const diffClass =
+            d.stockDiff > 0 ? 'text-emerald-700' : d.stockDiff < 0 ? 'text-rose-700' : 'text-slate-500';
+        const diffHtml =
+            d.stockDiff !== null
+                ? `<span class="text-[10px] font-semibold tabular-nums ${diffClass}">${d.stockDiff > 0 ? '+' : ''}${d.stockDiff}</span>`
+                : '';
+
+        return `
+            <div class="finance-paste-guide-row flex items-center gap-2.5 rounded-lg border border-slate-100 bg-white px-2.5 py-2 sm:gap-3 sm:px-3">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">${idx + 1}</span>
+                <img src="${img}" alt="" class="h-10 w-10 shrink-0 rounded-md border border-slate-100 object-cover sm:h-11 sm:w-11" loading="lazy" />
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere] line-clamp-2">${name}</p>
+                    ${barcode ? `<p class="mt-0.5 truncate text-[10px] font-mono text-gray-500">${barcode}</p>` : ''}
+                </div>
+                <div class="grid shrink-0 grid-cols-3 gap-2 text-center sm:gap-3">
+                    <div class="min-w-[2.75rem] sm:min-w-[3.25rem]">
+                        <p class="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Depo</p>
+                        <p class="mt-0.5 text-sm font-bold tabular-nums text-slate-800">${depo}</p>
+                    </div>
+                    <div class="min-w-[2.75rem] sm:min-w-[3.25rem]">
+                        <p class="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Sistem</p>
+                        <p class="mt-0.5 text-sm font-bold tabular-nums text-slate-800">${sistem}</p>
+                    </div>
+                    <div class="min-w-[4.5rem] sm:min-w-[5rem]">
+                        <p class="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Birim</p>
+                        <p class="mt-0.5 text-xs font-semibold tabular-nums text-slate-700">${this.escapeHtml(d.priceText)}</p>
+                        ${diffHtml}
+                    </div>
+                </div>
+            </div>`;
+    }
+
     _renderFinancePasteGuideHtml() {
         const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
         const canPaste = this.selectedFinancialTable !== 'all';
-        const listHtml = guide?.items?.length
-            ? guide.items.map((p, idx) => {
-                const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
-                const name = this.escapeHtml(p.productName || '');
-                const barcode = this.escapeHtml(p.barcode || (p.barcodes?.[0] ?? ''));
-                return `
-                    <div class="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50/60 px-2.5 py-2">
-                        <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">${idx + 1}</span>
-                        <img src="${img}" alt="" class="h-9 w-9 shrink-0 rounded-md border border-white object-cover" loading="lazy" />
-                        <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-medium text-gray-900">${name}</p>
-                            ${barcode ? `<p class="text-[10px] font-mono text-gray-500">${barcode}</p>` : ''}
-                        </div>
-                    </div>`;
-            }).join('')
-            : `<p class="py-4 text-center text-xs text-gray-400">${canPaste ? 'Liste yapıştırınca eşleşen ürünler burada sırayla görünür.' : 'Tek tablo seçin, ardından sayım listesini yapıştırın.'}</p>`;
+        const hasItems = !!(guide?.items?.length);
+        const listHtml = hasItems
+            ? guide.items.map((p, idx) => this._renderFinancePasteGuideRowHtml(p, idx)).join('')
+            : `<p class="py-6 text-center text-xs text-gray-400">${canPaste ? 'Liste yapıştırınca eşleşen ürünler burada sırayla görünür.' : 'Tek tablo seçin, ardından sayım listesini yapıştırın.'}</p>`;
+        const headerHtml = hasItems
+            ? `<div class="finance-paste-guide-head sticky top-0 z-10 mb-1.5 hidden items-center gap-2.5 rounded-lg bg-slate-100/95 px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400 backdrop-blur sm:flex sm:gap-3 sm:px-3">
+                    <span class="w-6 shrink-0 text-center">#</span>
+                    <span class="w-10 shrink-0 sm:w-11"></span>
+                    <span class="min-w-0 flex-1">Ürün</span>
+                    <span class="grid shrink-0 grid-cols-3 gap-2 text-center sm:gap-3">
+                        <span class="min-w-[2.75rem] sm:min-w-[3.25rem]">Depo</span>
+                        <span class="min-w-[2.75rem] sm:min-w-[3.25rem]">Sistem</span>
+                        <span class="min-w-[4.5rem] sm:min-w-[5rem]">Birim</span>
+                    </span>
+               </div>`
+            : '';
 
         return `
-            <div class="mt-5 border-t border-gray-100 pt-4" id="financePasteGuideSection">
+            <div class="finance-paste-guide-section -mx-1 mt-5 rounded-xl border border-slate-200/80 bg-slate-50/50 px-2 py-4 sm:-mx-2 sm:px-4" id="financePasteGuideSection">
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div>
                         <h4 class="text-sm font-semibold text-gray-900">Sayım sırası rehberi</h4>
-                        <p class="mt-0.5 text-[11px] text-gray-500">Kaydedilmez · sayfa yenilenince silinir</p>
+                        <p class="mt-0.5 text-[11px] text-gray-500">Kaydedilmez · sayfa yenilenince silinir · fiyatlar ${this._financeUseStruckPrice ? 'orijinal' : 'satış'} fiyatına göre</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
                         <button type="button" id="financePasteGuideBtn" class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none" ${canPaste ? '' : 'disabled'} title="Panodan sayım listesi yapıştır">
                             Yapıştır
                         </button>
-                        ${guide?.items?.length ? `<button type="button" id="financePasteGuideClearBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Temizle</button>` : ''}
+                        ${hasItems ? `<button type="button" id="financePasteGuideClearBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Temizle</button>` : ''}
                     </div>
                 </div>
                 <span id="financePasteGuideStatus" class="mb-2 block text-xs text-gray-500 min-h-[1rem]" role="status" aria-live="polite">${guide ? `${guide.items.length} ürün · yapıştırma sırası` : ''}</span>
-                <div id="financePasteGuideList" class="max-h-64 space-y-1.5 overflow-y-auto">${listHtml}</div>
+                ${headerHtml}
+                <div id="financePasteGuideList" class="finance-paste-guide-list max-h-[min(38rem,72vh)] space-y-1.5 overflow-y-auto overscroll-contain pr-0.5">${listHtml}</div>
             </div>`;
     }
 
@@ -3033,23 +3110,10 @@ class CountingSystem {
         if (!list) return;
         const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
         if (!guide?.items?.length) {
-            list.innerHTML = '<p class="py-4 text-center text-xs text-gray-400">Liste yapıştırınca eşleşen ürünler burada sırayla görünür.</p>';
+            list.innerHTML = '<p class="py-6 text-center text-xs text-gray-400">Liste yapıştırınca eşleşen ürünler burada sırayla görünür.</p>';
             return;
         }
-        list.innerHTML = guide.items.map((p, idx) => {
-            const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
-            const name = this.escapeHtml(p.productName || '');
-            const barcode = this.escapeHtml(p.barcode || (p.barcodes?.[0] ?? ''));
-            return `
-                <div class="flex items-center gap-2.5 rounded-lg border border-slate-100 bg-slate-50/60 px-2.5 py-2">
-                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">${idx + 1}</span>
-                    <img src="${img}" alt="" class="h-9 w-9 shrink-0 rounded-md border border-white object-cover" loading="lazy" />
-                    <div class="min-w-0 flex-1">
-                        <p class="truncate text-sm font-medium text-gray-900">${name}</p>
-                        ${barcode ? `<p class="text-[10px] font-mono text-gray-500">${barcode}</p>` : ''}
-                    </div>
-                </div>`;
-        }).join('');
+        list.innerHTML = guide.items.map((p, idx) => this._renderFinancePasteGuideRowHtml(p, idx)).join('');
     }
 
     _bindFinancePasteGuide(container, tableProducts) {
