@@ -5,26 +5,26 @@ const COUNTING_SUBCATEGORIES = [
     "Ağız Bakım","Ağda & Tüy Dökücü","Ayran & Kefir","Baharat","Bakliyat",
     "Bal & Reçel","Balık & Deniz Ürünleri","Bar","Bebek Bakım","Bebek Bezi",
     "Beyaz Et","Beyaz Peynir","Biberon & Emzik","Bisküvi","Böcek İlacı",
-    "Bulaşık","Bulgur","Buz","Çamaşır","Çamaşır &Temizlik","Çay",
+    "Bulaşık","Bulgur","Buz","Çamaşır","Çay",
     "Çiğ Köfte & Meze","Çikolata Bar","Çocuklara Özel","Çorba","Çubuk",
-    "Çoklu","Cips","Deodorant","Demirbaş Ürünler","Dergi","Diğer",
+    "Çoklu","Cips","Deodorant","Dergi","Diğer",
     "Donuk Et & Tavuk & Balık","Donuk Hazır Yemek & Atıştırmalık",
     "Donuk Meyve Sebze","Donuk Pasta & Tatlı","Donuk Unlu Mamüller",
-    "Dondurma Paketleri","Duş & Banyo","EkipmanÜrün","Elektrik & Aydınlatma",
+    "Duş & Banyo","Elektrik & Aydınlatma",
     "Enerji İçeceği","Fit & Form","Fonksiyonel İçecekler","Gazlı İçecek",
     "Genel Sağlık","Giyim","Glutensiz","Gofret","Hazır Yemek","Helva",
     "Hijyenik Ped","Islak Havlu","İthal Peynir","Jel","Kağıt Ürünleri",
     "Kahvaltılık Gevrek","Kahve","Kaşar & Tost Peyniri","Kedi","Kek",
-    "Kırmızı Et","Kırtasiye","Kolini Hazırla","Kolonya","Konserve","Köpek",
+    "Kırmızı Et","Kırtasiye","Kolonya","Konserve","Köpek",
     "Kozmetik","Kraker & Kurabiye","Krema & Kaymak","Kuruyemiş","Kutu",
     "Külah","Maden Suyu","Makarna","Mama","Margarin","Meyve","Meyve Suyu",
     "Mutfak","Mutfak Ürünleri","Oda Kokusu","Oyun & Oyuncak","Paketli Ekmek",
     "Parti Malzemeleri","Pasta Malzemeleri","Pastörize Süt",
     "Patlamış Mısır ve Tahıl Patlağı","Paylaşımlık & Draje","Piknik","Pil",
-    "Pirinç","Poşet","Prezervatif","Sabun","Saç Bakım","Saç Boyası",
-    "Sakız & Şekerleme","Salça","Sandviç","Sarf Malzeme","Sebze",
+    "Pirinç","Prezervatif","Sabun","Saç Bakım","Saç Boyası",
+    "Sakız & Şekerleme","Salça","Sandviç","Sebze",
     "Seyahat Ürünleri","Sıvı Yağ","Sirke & Salata Sosu","Sos","Soğuk Çay",
-    "Soğuk Kahve","Soğutucu Dolap","Su","Süt & Salep","Sütlü Tatlı",
+    "Soğuk Kahve","Su","Süt & Salep","Sütlü Tatlı",
     "Sürülebilir","Sürülebilir Peynir","Şarj Aleti & Kablo","Şarküteri",
     "Şeker","Tahin & Pekmez","Tablet Çikolata","Tatlı","Taze Fırın",
     "Taze Yemek","Teknoloji","Temizlik","Tereyağı","Ton Balığı",
@@ -2719,6 +2719,22 @@ class CountingSystem {
         });
     }
 
+    /** Henüz oluşturulmamış sabit alt kategori sayısı */
+    _getRemainingPresetSubcategoryCount() {
+        const existing = new Set(this.getTableList().map((t) => t.name));
+        return COUNTING_SUBCATEGORIES.filter((c) => !existing.has(c)).length;
+    }
+
+    _updateCreateTablePresetRemaining() {
+        const el = document.getElementById('createTablePresetRemaining');
+        if (!el) return;
+        const remaining = this._getRemainingPresetSubcategoryCount();
+        const total = COUNTING_SUBCATEGORIES.length;
+        const created = total - remaining;
+        el.textContent = `${remaining} kategori kaldı`;
+        el.title = `${created} / ${total} oluşturuldu`;
+    }
+
     /** Dropdown listesini query'e göre yeniden çizer */
     _renderTableNameDropdown(query = '') {
         const dropdown = document.getElementById('tableNameDropdown');
@@ -2751,6 +2767,7 @@ class CountingSystem {
                     <span class="flex-1 min-w-0 break-words leading-snug">${cat}</span>${badge}
                 </button>`;
         }).join('');
+        this._updateCreateTablePresetRemaining();
     }
 
     /** Modal kapanınca combobox'u sıfırla */
@@ -2776,6 +2793,7 @@ class CountingSystem {
             hint.textContent = 'Listeden seçin veya özel isim yazın';
             hint.className = 'mt-1.5 text-xs text-gray-400';
         }
+        this._updateCreateTablePresetRemaining();
     }
 
     // Create a new table
@@ -9411,6 +9429,7 @@ class CountingSystem {
         if (!createTableModal) return;
         this._setupCreateTableCombobox();
         this._resetCreateTableCombobox();
+        this._updateCreateTablePresetRemaining();
         createTableModal.classList.remove('hidden');
     }
     
@@ -10036,73 +10055,35 @@ class CountingSystem {
         await this.renderAllTablesFinancialData();
     }
 
-    setupFinancialTableSelector() {
-        const financialTableSelectorBtn = document.getElementById('financialTableSelectorBtn');
-        const financialTableSelectorText = document.getElementById('financialTableSelectorText');
+    _closeFinancialTableSelectorDropdown() {
         const financialTableSelectorDropdown = document.getElementById('financialTableSelectorDropdown');
         const financialTableSelectorIcon = document.getElementById('financialTableSelectorIcon');
-
-        if (!financialTableSelectorBtn || !financialTableSelectorText || !financialTableSelectorDropdown) return;
-
-        // Check if already set up (to avoid duplicate event listeners)
-        if (financialTableSelectorBtn.dataset.setup === 'true') return;
-        financialTableSelectorBtn.dataset.setup = 'true';
-
-        // Button click to toggle dropdown
-        financialTableSelectorBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            financialTableSelectorDropdown.classList.toggle('hidden');
-            if (financialTableSelectorIcon) {
-                financialTableSelectorIcon.style.transform = financialTableSelectorDropdown.classList.contains('hidden') 
-                    ? 'rotate(0deg)' 
-                    : 'rotate(180deg)';
-            }
-        });
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!financialTableSelectorBtn.contains(e.target) && !financialTableSelectorDropdown.contains(e.target)) {
-                financialTableSelectorDropdown.classList.add('hidden');
-                if (financialTableSelectorIcon) {
-                    financialTableSelectorIcon.style.transform = 'rotate(0deg)';
-                }
-            }
-        });
+        const financialTableSearch = document.getElementById('financialTableSearch');
+        if (financialTableSelectorDropdown) financialTableSelectorDropdown.classList.add('hidden');
+        if (financialTableSelectorIcon) financialTableSelectorIcon.style.transform = 'rotate(0deg)';
+        if (financialTableSearch) financialTableSearch.value = '';
     }
 
-    updateFinancialTableSelector() {
-        const financialTableSelectorText = document.getElementById('financialTableSelectorText');
-        const financialTableSelectorDropdown = document.getElementById('financialTableSelectorDropdown');
-        const financialTableSelectorIcon = document.getElementById('financialTableSelectorIcon');
+    _getFinancialTableSearchQuery() {
+        const el = document.getElementById('financialTableSearch');
+        return (el?.value || '').trim().toLocaleLowerCase('tr');
+    }
 
-        if (!financialTableSelectorText || !financialTableSelectorDropdown) return;
+    _renderFinancialTableSelectorList() {
+        const financialTableSelectorList = document.getElementById('financialTableSelectorList');
+        if (!financialTableSelectorList) return;
 
         const tables = this.getTableList();
-        
-        // Update button text
-        const financialTableSelectorBtn = document.getElementById('financialTableSelectorBtn');
-        if (this.selectedFinancialTable === 'all') {
-            financialTableSelectorText.textContent = 'Tüm Tablolar';
-            financialTableSelectorBtn?.classList.remove('preset-subcat-table-selector-active');
-        } else {
-            const selectedTable = tables.find(t => t.name === this.selectedFinancialTable);
-            const label = selectedTable
-                ? this.formatTableDisplayName(selectedTable.name)
-                : (this.selectedFinancialTable || 'Tüm Tablolar');
-            const isPreset = selectedTable && this.isPresetSubcategoryTable(selectedTable.name);
-            if (isPreset) {
-                financialTableSelectorText.innerHTML = `<span class="inline-flex min-w-0 items-center gap-1.5">${this.renderPresetSubcategoryInlineStarHtml()}<span class="truncate">${this.escapeHtml(label)}</span></span>`;
-                financialTableSelectorBtn?.classList.add('preset-subcat-table-selector-active');
-            } else {
-                financialTableSelectorText.textContent = label;
-                financialTableSelectorBtn?.classList.remove('preset-subcat-table-selector-active');
-            }
-        }
+        const q = this._getFinancialTableSearchQuery();
+        const filteredTables = q
+            ? tables.filter((t) => {
+                const label = this.formatTableDisplayName(t.name).toLocaleLowerCase('tr');
+                return label.includes(q) || String(t.name).toLocaleLowerCase('tr').includes(q);
+            })
+            : tables;
 
-        // Clear and populate dropdown
-        financialTableSelectorDropdown.innerHTML = '';
+        financialTableSelectorList.innerHTML = '';
 
-        // Add "Tüm Tablolar" option
         const allOption = document.createElement('div');
         allOption.className = `table-selector-option ${this.selectedFinancialTable === 'all' ? 'active' : ''}`;
         allOption.dataset.tableName = 'all';
@@ -10116,15 +10097,19 @@ class CountingSystem {
             this.selectedFinancialTable = 'all';
             await this.renderAllTablesFinancialData();
             this.updateFinancialTableSelector();
-            financialTableSelectorDropdown.classList.add('hidden');
-            if (financialTableSelectorIcon) {
-                financialTableSelectorIcon.style.transform = 'rotate(0deg)';
-            }
+            this._closeFinancialTableSelectorDropdown();
         });
-        financialTableSelectorDropdown.appendChild(allOption);
+        financialTableSelectorList.appendChild(allOption);
 
-        // Add table options
-        tables.forEach(table => {
+        if (filteredTables.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'px-4 py-3 text-sm text-gray-400 text-center';
+            empty.textContent = 'Arama ile eşleşen tablo yok.';
+            financialTableSelectorList.appendChild(empty);
+            return;
+        }
+
+        filteredTables.forEach((table) => {
             const option = document.createElement('div');
             const isPreset = this.isPresetSubcategoryTable(table.name);
             option.className = `table-selector-option relative ${table.name === this.selectedFinancialTable ? 'active' : ''}${isPreset ? ' preset-subcat-table-dropdown-row pl-8' : ''}`;
@@ -10137,19 +10122,96 @@ class CountingSystem {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>
             `;
-            
+
             option.addEventListener('click', async () => {
                 this.selectedFinancialTable = table.name;
                 await this.renderSingleTableFinancialData(table.name);
                 this.updateFinancialTableSelector();
-                financialTableSelectorDropdown.classList.add('hidden');
-                if (financialTableSelectorIcon) {
-                    financialTableSelectorIcon.style.transform = 'rotate(0deg)';
-                }
+                this._closeFinancialTableSelectorDropdown();
             });
-            
-            financialTableSelectorDropdown.appendChild(option);
+
+            financialTableSelectorList.appendChild(option);
         });
+    }
+
+    setupFinancialTableSelector() {
+        const financialTableSelectorBtn = document.getElementById('financialTableSelectorBtn');
+        const financialTableSelectorText = document.getElementById('financialTableSelectorText');
+        const financialTableSelectorDropdown = document.getElementById('financialTableSelectorDropdown');
+        const financialTableSelectorIcon = document.getElementById('financialTableSelectorIcon');
+        const financialTableSearch = document.getElementById('financialTableSearch');
+
+        if (!financialTableSelectorBtn || !financialTableSelectorText || !financialTableSelectorDropdown) return;
+
+        if (financialTableSelectorBtn.dataset.setup === 'true') return;
+        financialTableSelectorBtn.dataset.setup = 'true';
+
+        financialTableSelectorBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const willOpen = financialTableSelectorDropdown.classList.contains('hidden');
+            financialTableSelectorDropdown.classList.toggle('hidden');
+            if (financialTableSelectorIcon) {
+                financialTableSelectorIcon.style.transform = financialTableSelectorDropdown.classList.contains('hidden')
+                    ? 'rotate(0deg)'
+                    : 'rotate(180deg)';
+            }
+            if (willOpen) {
+                this._renderFinancialTableSelectorList();
+                requestAnimationFrame(() => financialTableSearch?.focus());
+            } else if (financialTableSearch) {
+                financialTableSearch.value = '';
+            }
+        });
+
+        if (financialTableSearch && !financialTableSearch.dataset.setup) {
+            financialTableSearch.dataset.setup = 'true';
+            let searchTimer = null;
+            financialTableSearch.addEventListener('input', () => {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(() => this._renderFinancialTableSelectorList(), 120);
+            });
+            financialTableSearch.addEventListener('click', (e) => e.stopPropagation());
+            financialTableSearch.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') this._closeFinancialTableSelectorDropdown();
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            if (financialTableSelectorDropdown.classList.contains('hidden')) return;
+            if (financialTableSelectorBtn.contains(e.target) || financialTableSelectorDropdown.contains(e.target)) return;
+            this._closeFinancialTableSelectorDropdown();
+        });
+    }
+
+    updateFinancialTableSelector() {
+        const financialTableSelectorText = document.getElementById('financialTableSelectorText');
+
+        if (!financialTableSelectorText) return;
+
+        const tables = this.getTableList();
+        const financialTableSelectorBtn = document.getElementById('financialTableSelectorBtn');
+        if (this.selectedFinancialTable === 'all') {
+            financialTableSelectorText.textContent = 'Tüm Tablolar';
+            financialTableSelectorBtn?.classList.remove('preset-subcat-table-selector-active');
+        } else {
+            const selectedTable = tables.find((t) => t.name === this.selectedFinancialTable);
+            const label = selectedTable
+                ? this.formatTableDisplayName(selectedTable.name)
+                : (this.selectedFinancialTable || 'Tüm Tablolar');
+            const isPreset = selectedTable && this.isPresetSubcategoryTable(selectedTable.name);
+            if (isPreset) {
+                financialTableSelectorText.innerHTML = `<span class="inline-flex min-w-0 items-center gap-1.5">${this.renderPresetSubcategoryInlineStarHtml()}<span class="truncate">${this.escapeHtml(label)}</span></span>`;
+                financialTableSelectorBtn?.classList.add('preset-subcat-table-selector-active');
+            } else {
+                financialTableSelectorText.textContent = label;
+                financialTableSelectorBtn?.classList.remove('preset-subcat-table-selector-active');
+            }
+        }
+
+        const financialTableSelectorDropdown = document.getElementById('financialTableSelectorDropdown');
+        if (financialTableSelectorDropdown && !financialTableSelectorDropdown.classList.contains('hidden')) {
+            this._renderFinancialTableSelectorList();
+        }
     }
 
     async renderAllTablesFinancialData() {
