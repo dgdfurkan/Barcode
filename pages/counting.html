@@ -1427,6 +1427,16 @@
             <div class="bg-white rounded-xl shadow-md border border-gray-100 p-4 sm:p-5 mb-6">
                 <div class="flex items-center justify-between flex-wrap gap-3">
                     <h3 class="text-lg sm:text-xl font-bold text-gray-900">Finansal Analiz</h3>
+                    <div class="flex items-center gap-3 flex-shrink-0">
+                        <!-- Orijinal fiyat toggle -->
+                        <label class="flex items-center gap-1.5 cursor-pointer select-none" title="Açık: kampanyalı ürünlerde orijinal (üstü çizili) fiyat kullanılır">
+                            <span class="text-xs text-gray-500 font-medium whitespace-nowrap">Orijinal fiyat</span>
+                            <div class="relative">
+                                <input type="checkbox" id="financeStruckPriceToggle" class="sr-only peer" checked>
+                                <div class="w-8 h-4 bg-gray-200 peer-checked:bg-blue-500 rounded-full transition-colors peer-focus:ring-2 peer-focus:ring-blue-300"></div>
+                                <div class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+                            </div>
+                        </label>
                     <div class="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
                         <!-- Custom Table Selector Dropdown -->
                         <div class="relative min-w-[120px] sm:min-w-[150px]">
@@ -1443,6 +1453,7 @@
                                 <!-- Options will be populated by JavaScript -->
                             </div>
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>

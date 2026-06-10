@@ -91,6 +91,8 @@ class CountingSystem {
         this._renderTableDebounceTimer = null;
         this.cameraScanAndCountMode = false; // Kamera: barkod okutunca sayım ekranı açılsın
         this.cameraTableOnlyScanMode = false; // Tablo İçi Sayım: yalnızca tablodaki ürünler
+        /** Finans: orijinal (struckPrice) fiyatı kullan — default true, sayfa yenilenince sıfırlanır */
+        this._financeUseStruckPrice = true;
         /** Seri okuma + sayarak ilerle: sayım sheet'i kamera akışından açıldı (Önceki/Sıradaki yerine Doğru Girdim) */
         this.countingBottomSheetFromCameraSeriSayar = false;
         /** DEPO yanındaki kamera ile barkod doğrulama devam ediyor mu */
@@ -2919,18 +2921,34 @@ class CountingSystem {
             if (warehouseStock === null || warehouseStock === undefined) continue;
             if (systemStock === null || systemStock === undefined) continue;
 
-            const priceRaw = data.price;
-            let price = Number(priceRaw);
-            if (!price || Number.isNaN(price)) {
-                const product = this.productIndex?.get(pid);
-                price = Number(product?.price);
-            }
+            const price = this._resolveFinancePrice(data);
             if (!price || Number.isNaN(price)) continue;
 
             profitLoss += (Number(warehouseStock) - Number(systemStock)) * price;
         }
 
         return profitLoss;
+    }
+
+    /** Toggle'a göre finans fiyatını seç: struckPrice (varsa, toggle açıksa) veya price */
+    _resolveFinancePrice(data) {
+        if (!data) return null;
+        if (this._financeUseStruckPrice && data.struckPrice) {
+            const p = Number(data.struckPrice);
+            if (!Number.isNaN(p) && p > 0) return p;
+        }
+        const p = Number(data.price);
+        return (!Number.isNaN(p) && p > 0) ? p : null;
+    }
+
+    /** Toggle'a göre finans fiyat metnini seç */
+    _resolveFinancePriceText(data) {
+        if (!data) return null;
+        if (this._financeUseStruckPrice && data.struckPrice) {
+            const p = Number(data.struckPrice);
+            if (!Number.isNaN(p) && p > 0) return data.struckPriceText || this.formatCurrency(p);
+        }
+        return data.priceText || (data.price ? this.formatCurrency(Number(data.price)) : null);
     }
 
     /**
@@ -5280,6 +5298,8 @@ class CountingSystem {
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
                     const price = typeof result === 'object' && result !== null ? result?.price : null;
                     const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
+                    const struckPrice = typeof result === 'object' && result !== null ? (result?.struckPrice ?? null) : null;
+                    const struckPriceText = typeof result === 'object' && result !== null ? (result?.struckPriceText ?? null) : null;
                     const reserved =
                         typeof result === 'object' && result !== null && 'reservedStock' in result
                             ? result.reservedStock
@@ -5292,7 +5312,9 @@ class CountingSystem {
                             stock,
                             price,
                             priceText,
-                            reserved
+                            reserved,
+                            struckPrice,
+                            struckPriceText
                         );
                         this.showToast('Sistem stoku yenilendi', 'success', 2000);
 
@@ -6155,7 +6177,7 @@ class CountingSystem {
         }, 24);
     }
 
-    async updateProductStock(productId, warehouseStock, systemStock = null, price = null, priceText = null, reservedStock = undefined) {
+    async updateProductStock(productId, warehouseStock, systemStock = null, price = null, priceText = null, reservedStock = undefined, struckPrice = null, struckPriceText = null) {
         if (!this.countingData[productId]) {
             console.error('Product not found in counting data:', productId);
             return;
@@ -6207,6 +6229,12 @@ class CountingSystem {
         }
         if (priceText !== null && priceText !== undefined) {
             this.countingData[productId].priceText = priceText;
+        }
+        if (struckPrice !== null && struckPrice !== undefined) {
+            this.countingData[productId].struckPrice = Number(struckPrice);
+        }
+        if (struckPriceText !== null && struckPriceText !== undefined) {
+            this.countingData[productId].struckPriceText = struckPriceText;
         }
         if (reservedStock !== undefined) {
             if (reservedStock === null) {
@@ -6632,6 +6660,8 @@ class CountingSystem {
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
                     const price = typeof result === 'object' && result !== null ? result?.price : null;
                     const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
+                    const struckPrice = typeof result === 'object' && result !== null ? (result?.struckPrice ?? null) : null;
+                    const struckPriceText = typeof result === 'object' && result !== null ? (result?.struckPriceText ?? null) : null;
                     const reserved =
                         typeof result === 'object' && result !== null && 'reservedStock' in result
                             ? result.reservedStock
@@ -6642,7 +6672,7 @@ class CountingSystem {
                         if (this.countingData[productId]) {
                             this.countingData[productId].apiFetchFailed = false;
                         }
-                        await this.updateProductStock(productId, null, stock, price, priceText, reserved);
+                        await this.updateProductStock(productId, null, stock, price, priceText, reserved, struckPrice, struckPriceText);
                     updatedCount++;
                         console.log(`✅ ${product.name || productId}: ${stock}${price ? ` (Fiyat: ${priceText || price})` : ''}`);
                     } else {
@@ -7452,10 +7482,14 @@ class CountingSystem {
                 // Price bilgisini de al
                 let price = null;
                 let priceText = null;
+                let struckPrice = null;
+                let struckPriceText = null;
                 
                 if (foundProduct) {
                     price = foundProduct.price !== null && foundProduct.price !== undefined ? foundProduct.price : null;
                     priceText = foundProduct.priceText || null;
+                    struckPrice = foundProduct.struckPrice !== null && foundProduct.struckPrice !== undefined ? foundProduct.struckPrice : null;
+                    struckPriceText = foundProduct.struckPriceText || null;
                     
                     // Kategori bilgisini API'den al ve allProducts array'ini güncelle
                     if (productId && foundProduct) {
@@ -7548,6 +7582,8 @@ class CountingSystem {
                     stock: stock,
                     price: price,
                     priceText: priceText,
+                    struckPrice,
+                    struckPriceText,
                     reservedStock
                 };
             }
@@ -8979,10 +9015,12 @@ class CountingSystem {
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
                     const price = typeof result === 'object' && result !== null ? result?.price : null;
                     const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
+                    const struckPrice = typeof result === 'object' && result !== null ? (result?.struckPrice ?? null) : null;
+                    const struckPriceText = typeof result === 'object' && result !== null ? (result?.struckPriceText ?? null) : null;
                     const reserved = typeof result === 'object' && result !== null && 'reservedStock' in result ? result.reservedStock : undefined;
                     if (stock !== null && stock !== undefined) {
                         if (this.countingData[productId]) this.countingData[productId].apiFetchFailed = false;
-                        await this.updateProductStock(productId, null, stock, price, priceText, reserved);
+                        await this.updateProductStock(productId, null, stock, price, priceText, reserved, struckPrice, struckPriceText);
                         this.showToast('Stok güncellendi', 'success', 3000);
                     } else {
                         if (this.countingData[productId]) { this.countingData[productId].apiFetchFailed = true; this.scheduleSave(200); this.renderTable(); }
@@ -9010,10 +9048,12 @@ class CountingSystem {
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
                     const price = typeof result === 'object' && result !== null ? result?.price : null;
                     const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
+                    const struckPrice = typeof result === 'object' && result !== null ? (result?.struckPrice ?? null) : null;
+                    const struckPriceText = typeof result === 'object' && result !== null ? (result?.struckPriceText ?? null) : null;
                     const reserved = typeof result === 'object' && result !== null && 'reservedStock' in result ? result.reservedStock : undefined;
                     if (stock !== null && stock !== undefined) {
                         if (this.countingData[productId]) this.countingData[productId].apiFetchFailed = false;
-                        await this.updateProductStock(productId, null, stock, price, priceText, reserved);
+                        await this.updateProductStock(productId, null, stock, price, priceText, reserved, struckPrice, struckPriceText);
                     } else {
                         if (this.countingData[productId]) { this.countingData[productId].apiFetchFailed = true; this.scheduleSave(200); this.renderTable(); }
                         this.showNotification('Ürün stoku bulunamadı', 'info');
@@ -9821,8 +9861,8 @@ class CountingSystem {
 
                 const warehouseStock = data.warehouseStock ?? 0;
                 const systemStock = data.systemStock ?? 0;
-                const price = data.price ?? 0;
-                const priceText = data.priceText || '₺0,00';
+                const price = this._resolveFinancePrice(data) ?? 0;
+                const priceText = this._resolveFinancePriceText(data) || '₺0,00';
 
                 if (price === 0 || price === null) continue;
 
@@ -9965,6 +10005,17 @@ class CountingSystem {
 
         // Setup financial table selector (same as counting table selector)
         this.setupFinancialTableSelector();
+
+        // Orijinal fiyat toggle
+        const struckPriceToggle = document.getElementById('financeStruckPriceToggle');
+        if (struckPriceToggle && !struckPriceToggle.dataset.setup) {
+            struckPriceToggle.dataset.setup = 'true';
+            struckPriceToggle.checked = this._financeUseStruckPrice;
+            struckPriceToggle.addEventListener('change', () => {
+                this._financeUseStruckPrice = struckPriceToggle.checked;
+                this.renderAllTablesFinancialData();
+            });
+        }
         
         // Update dropdown with current tables
         this.updateFinancialTableSelector();
