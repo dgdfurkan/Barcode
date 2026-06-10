@@ -36,6 +36,37 @@ const COUNTING_SUBCATEGORIES = [
 /** O(1) sabit alt kategori tablo adı kontrolü */
 const COUNTING_SUBCATEGORIES_SET = new Set(COUNTING_SUBCATEGORIES);
 
+/** Alt kategori başına tahmini ürün çeşidi (tablo oluşturma rehberi) */
+const COUNTING_SUBCATEGORY_ESTIMATES = {
+    'Ağda & Tüy Dökücü': 5, 'Ağız Bakım': 38, 'Ayran & Kefir': 27, 'Baharat': 33, 'Bakliyat': 17,
+    'Balık & Deniz Ürünleri': 2, 'Bal & Reçel': 8, 'Bar': 10, 'Bebek Bakım': 12, 'Bebek Bezi': 24,
+    'Beyaz Et': 10, 'Beyaz Peynir': 26, 'Biberon & Emzik': 2, 'Bisküvi': 70, 'Böcek İlacı': 10,
+    'Bulaşık': 24, 'Bulgur': 3, 'Buz': 1, 'Cips': 95, 'Çamaşır': 52, 'Çay': 27,
+    'Çiğ Köfte & Meze': 10, 'Çikolata Bar': 27, 'Çocuklara Özel': 14, 'Çoklu': 12, 'Çorba': 27,
+    'Çubuk': 31, 'Deodorant': 31, 'Dergi': 1, 'Diğer': 1,
+    'Donuk Et & Tavuk & Balık': 4, 'Donuk Hazır Yemek & Atıştırmalık': 6, 'Donuk Meyve Sebze': 15,
+    'Donuk Pasta & Tatlı': 3, 'Donuk Unlu Mamüller': 7, 'Duş & Banyo': 18, 'Elektrik & Aydınlatma': 4,
+    'Enerji İçeceği': 19, 'Fit & Form': 84, 'Fonksiyonel İçecekler': 1, 'Gazlı İçecek': 62,
+    'Genel Sağlık': 4, 'Giyim': 18, 'Glutensiz': 5, 'Gofret': 64, 'Hazır Yemek': 37, 'Helva': 6,
+    'Hijyenik Ped': 16, 'Islak Havlu': 2, 'İthal Peynir': 2, 'Jel': 3, 'Kağıt Ürünleri': 16,
+    'Kahvaltılık Gevrek': 32, 'Kahve': 59, 'Kaşar & Tost Peyniri': 16, 'Kedi': 29, 'Kek': 77,
+    'Kırmızı Et': 4, 'Kırtasiye': 8, 'Kolonya': 4, 'Konserve': 23, 'Köpek': 7, 'Kozmetik': 19,
+    'Kraker & Kurabiye': 41, 'Krema & Kaymak': 13, 'Kuruyemiş': 85, 'Kutu': 32, 'Külah': 17,
+    'Maden Suyu': 46, 'Makarna': 29, 'Mama': 27, 'Margarin': 5, 'Meyve': 19, 'Meyve Suyu': 64,
+    'Mutfak': 13, 'Mutfak Ürünleri': 5, 'Oda Kokusu': 6, 'Oyun & Oyuncak': 6, 'Paketli Ekmek': 26,
+    'Parti Malzemeleri': 2, 'Pasta Malzemeleri': 23, 'Pastörize Süt': 5,
+    'Patlamış Mısır ve Tahıl Patlağı': 21, 'Paylaşımlık & Draje': 48, 'Piknik': 6, 'Pil': 7,
+    'Pirinç': 9, 'Prezervatif': 13, 'Sabun': 16, 'Saç Bakım': 55, 'Saç Boyası': 8,
+    'Sakız & Şekerleme': 70, 'Salça': 13, 'Sandviç': 11, 'Sebze': 20, 'Seyahat Ürünleri': 1,
+    'Sıvı Yağ': 10, 'Sirke & Salata Sosu': 5, 'Soğuk Çay': 54, 'Soğuk Kahve': 18, 'Sos': 52,
+    'Su': 26, 'Sürülebilir': 23, 'Sürülebilir Peynir': 19, 'Süt & Salep': 1, 'Sütlü Tatlı': 21,
+    'Şarj Aleti & Kablo': 1, 'Şarküteri': 49, 'Şeker': 3, 'Tablet Çikolata': 80, 'Tahin & Pekmez': 4,
+    'Tatlı': 11, 'Taze Fırın': 16, 'Taze Yemek': 1, 'Teknoloji': 16, 'Temizlik': 48, 'Tereyağı': 12,
+    'Tıraş Malzemeleri': 14, 'Ton Balığı': 19, 'Turşu': 14, 'Un': 8, 'Unlu Mamüller': 17,
+    'Uzun Ömürlü Süt': 36, 'Vegan': 15, 'Vücut & El Bakım': 10, 'Yeşillik': 13, 'Yoğurt': 47,
+    'Yöresel Peynir': 17, 'Yumurta': 9, 'Zeytin': 28, 'Zeytinyağı': 6,
+};
+
 class CountingSystem {
     constructor() {
         this.countingData = {}; // { productId: { warehouseStock, systemStock, lastUpdated, history } }
@@ -2765,9 +2796,13 @@ class CountingSystem {
                 hint.className = 'mt-1.5 text-xs text-gray-400';
             } else {
                 const already = this.getTableList().find(t => t.name === val);
+                const variety = this._getSubcategoryVarietyLabel(val, already);
+                const varietyNote = variety
+                    ? (variety.isEstimate ? ` · ${variety.text} çeşit tahmini` : ` · ${variety.text} ürün`)
+                    : '';
                 hint.textContent = already
-                    ? `"${val}" zaten mevcut — seçince o tabloya geçilir`
-                    : `"${val}" oluşturulabilir`;
+                    ? `"${val}" zaten mevcut${varietyNote} — seçince o tabloya geçilir`
+                    : `"${val}" oluşturulabilir${varietyNote}`;
                 hint.className = `mt-1.5 text-xs ${already ? 'text-amber-500' : 'text-green-600'}`;
             }
         };
@@ -3042,7 +3077,7 @@ class CountingSystem {
         if (!dropdown) return;
 
         const q = query.trim().toLocaleLowerCase('tr');
-        const existing = new Set(this.getTableList().map(t => t.name));
+        const tableByName = new Map(this.getTableList().map((t) => [t.name, t]));
 
         const filtered = q
             ? COUNTING_SUBCATEGORIES.filter(c => c.toLocaleLowerCase('tr').includes(q))
@@ -3054,18 +3089,22 @@ class CountingSystem {
         }
 
         dropdown.innerHTML = filtered.map(cat => {
-            const isExisting = existing.has(cat);
-            const badge = isExisting
-                ? `<span class="ml-auto text-[10px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 shrink-0">Mevcut</span>`
+            const tableRow = tableByName.get(cat);
+            const isExisting = !!tableRow;
+            const varietyBadge = this._renderSubcategoryVarietyBadgeHtml(cat, tableRow);
+            const existingBadge = isExisting
+                ? `<span class="text-[10px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 shrink-0">Mevcut</span>`
                 : '';
+            const rightBadges = [varietyBadge, existingBadge].filter(Boolean).join('');
             return `
                 <button
                     type="button"
                     data-cat="${cat.replace(/"/g, '&quot;')}"
                     tabindex="-1"
-                    class="w-full flex items-start gap-2 text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors"
+                    class="w-full flex items-center gap-2 text-left px-4 py-2.5 text-sm text-gray-800 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none transition-colors"
                 >
-                    <span class="flex-1 min-w-0 break-words leading-snug">${cat}</span>${badge}
+                    <span class="flex-1 min-w-0 break-words leading-snug">${this.escapeHtml(cat)}</span>
+                    ${rightBadges ? `<span class="ml-auto flex shrink-0 items-center gap-2">${rightBadges}</span>` : ''}
                 </button>`;
         }).join('');
         this._updateCreateTablePresetRemaining();
@@ -3465,6 +3504,36 @@ class CountingSystem {
     isPresetSubcategoryTable(name) {
         if (!name || typeof name !== 'string') return false;
         return COUNTING_SUBCATEGORIES_SET.has(name.trim());
+    }
+
+    _getSubcategoryVarietyLabel(catName, tableRow = null) {
+        const name = String(catName || '').trim();
+        if (!name) return null;
+        const existing = tableRow || this.getTableList().find((t) => t.name === name);
+        if (existing) {
+            const n = existing.productCount ?? 0;
+            return {
+                text: n.toLocaleString('tr-TR'),
+                isEstimate: false,
+                title: 'Eklenen ürün çeşidi',
+            };
+        }
+        const estimate = COUNTING_SUBCATEGORY_ESTIMATES[name];
+        if (estimate == null) return null;
+        return {
+            text: `~${estimate.toLocaleString('tr-TR')}`,
+            isEstimate: true,
+            title: 'Tahmini ürün çeşidi',
+        };
+    }
+
+    _renderSubcategoryVarietyBadgeHtml(catName, tableRow = null) {
+        const label = this._getSubcategoryVarietyLabel(catName, tableRow);
+        if (!label) return '';
+        const cls = label.isEstimate
+            ? 'text-[11px] tabular-nums text-slate-400 font-medium shrink-0'
+            : 'text-[11px] tabular-nums text-slate-500 font-semibold shrink-0';
+        return `<span class="${cls}" title="${this.escapeHtml(label.title)}">${this.escapeHtml(label.text)}</span>`;
     }
 
     /** Sol üst köşe yıldız rozeti — tablo adıyla çakışmaması için mutlak konumlu */
