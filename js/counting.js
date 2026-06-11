@@ -94,7 +94,9 @@ class CountingSystem {
         } catch (e) {
             this._farkHideDailyTables = false;
         }
-        this.selectedFinancialTable = 'all'; // Seçili finans tablosu ('all' veya table name)
+        this.selectedFinancialTable = null; // Seçili finans tablosu ('all' veya table name) — sayım tablosuyla senkron
+        /** Tablo oluştur combobox: mevcut kategorileri gizle */
+        this._createTableHideExisting = false;
         this._financeBarcodesVisible = false; // Finans Stok Özeti barkodları (varsayılan gizli)
         this.productSortOrder = 'desc'; // 'asc' | 'desc' - Finans tabındaki ürün sıralaması
         this.financialProducts = []; // Finans tabındaki ürünler (sıralama için)
@@ -2752,6 +2754,7 @@ class CountingSystem {
         const toggleBtn = document.getElementById('tableNameToggleBtn');
         const confirmBtn = document.getElementById('confirmCreateTableBtn');
         const hint = document.getElementById('tableNameHint');
+        const hideExistingBtn = document.getElementById('createTableHideExistingBtn');
         if (!input || !dropdown) return;
 
         const closeDropdown = () => {
@@ -2786,6 +2789,23 @@ class CountingSystem {
         }
         input._comboboxBound = true;
         input._dropdownOpen = false;
+
+        if (hideExistingBtn && !hideExistingBtn.dataset.bound) {
+            hideExistingBtn.dataset.bound = '1';
+            hideExistingBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this._createTableHideExisting = !this._createTableHideExisting;
+                this._syncCreateTableHideExistingBtnUi();
+                if (input._dropdownOpen) {
+                    this._renderTableNameDropdown(input.value);
+                    requestAnimationFrame(() => this._positionTableNameDropdown());
+                } else {
+                    openDropdown();
+                }
+            });
+        }
+        this._syncCreateTableHideExistingBtnUi();
 
         const updateHint = () => {
             const val = input.value.trim();
@@ -2887,17 +2907,42 @@ class CountingSystem {
         });
     }
 
-    /** Henüz oluşturulmamış sabit alt kategori sayısı */
+    /** Günlük tablolar hariç mevcut genel tablo adları */
+    _getExistingGeneralTableNames() {
+        return new Set(
+            this.getTableList()
+                .filter((t) => !this.isDailyTableName(t.name))
+                .map((t) => t.name)
+        );
+    }
+
+    /** Henüz oluşturulmamış sabit alt kategori sayısı (günlük tablolar dahil edilmez) */
     _getRemainingPresetSubcategoryCount() {
-        const existing = new Set(this.getTableList().map((t) => t.name));
+        const existing = this._getExistingGeneralTableNames();
         return COUNTING_SUBCATEGORIES.filter((c) => !existing.has(c)).length;
     }
 
+    /** Kalan kategoriler için tahmini toplam ürün çeşidi */
+    _getRemainingEstimatedVarietyCount() {
+        const existing = this._getExistingGeneralTableNames();
+        let sum = 0;
+        for (const cat of COUNTING_SUBCATEGORIES) {
+            if (!existing.has(cat)) {
+                sum += COUNTING_SUBCATEGORY_ESTIMATES[cat] || 0;
+            }
+        }
+        return sum;
+    }
+
+    /** Sayılan çeşit: yalnızca sabit alt kategori tabloları (günlük asla dahil değil) */
     _getTotalCountedProductVarietyCount() {
         const seen = new Set();
         const tables = this.cachedFullData?._tables;
         if (!tables || typeof tables !== 'object') return 0;
-        for (const tableData of Object.values(tables)) {
+        for (const [tableName, tableData] of Object.entries(tables)) {
+            if (!this.isValidTableNameKey(tableName)) continue;
+            if (this.isDailyTableName(tableName)) continue;
+            if (!this.isPresetSubcategoryTable(tableName)) continue;
             if (!tableData || typeof tableData !== 'object') continue;
             for (const [pid, data] of Object.entries(tableData)) {
                 if (this.isReservedCountingKey(pid) || !data || typeof data !== 'object') continue;
@@ -2916,8 +2961,37 @@ class CountingSystem {
         const total = COUNTING_SUBCATEGORIES.length;
         const created = total - remaining;
         const counted = this._getTotalCountedProductVarietyCount();
-        el.innerHTML = `<span>${remaining} kaldı / ${total}</span><span class="text-slate-400 mx-1.5">·</span><span>${counted.toLocaleString('tr-TR')} sayılan çeşit</span>`;
-        el.title = `${created} kategori oluşturuldu · ${remaining} kaldı`;
+        const estRemaining = this._getRemainingEstimatedVarietyCount();
+        el.innerHTML = `
+            <span class="flex flex-col items-end gap-1">
+                <span class="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5">
+                    <span><strong class="text-slate-700 font-semibold">${remaining}</strong> kategori kaldı</span>
+                    <span class="text-slate-300">/</span>
+                    <span>${total}</span>
+                </span>
+                <span class="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 text-[11px] text-slate-400">
+                    <span>~<strong class="font-semibold text-violet-600/85">${estRemaining.toLocaleString('tr-TR')}</strong> çeşit tahmini kaldı</span>
+                    <span class="text-slate-300">·</span>
+                    <span><strong class="font-semibold text-slate-600">${counted.toLocaleString('tr-TR')}</strong> sayılan çeşit</span>
+                </span>
+            </span>`;
+        el.title = `${created} kategori oluşturuldu · ${remaining} kaldı · ~${estRemaining.toLocaleString('tr-TR')} çeşit tahmini kaldı · günlük tablolar hariç`;
+        this._syncCreateTableHideExistingBtnUi();
+    }
+
+    _syncCreateTableHideExistingBtnUi() {
+        const btn = document.getElementById('createTableHideExistingBtn');
+        if (!btn) return;
+        const on = this._createTableHideExisting === true;
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        btn.classList.toggle('border-violet-300', on);
+        btn.classList.toggle('bg-violet-50', on);
+        btn.classList.toggle('text-violet-800', on);
+        btn.classList.toggle('ring-2', on);
+        btn.classList.toggle('ring-violet-200/70', on);
+        btn.classList.toggle('border-slate-200', !on);
+        btn.classList.toggle('bg-white', !on);
+        btn.classList.toggle('text-slate-600', !on);
     }
 
     _clearFinancePasteGuide() {
@@ -3141,14 +3215,25 @@ class CountingSystem {
         if (!dropdown) return;
 
         const q = query.trim().toLocaleLowerCase('tr');
-        const tableByName = new Map(this.getTableList().map((t) => [t.name, t]));
+        const tableByName = new Map(
+            this.getTableList()
+                .filter((t) => !this.isDailyTableName(t.name))
+                .map((t) => [t.name, t])
+        );
 
-        const filtered = q
+        let filtered = q
             ? COUNTING_SUBCATEGORIES.filter(c => c.toLocaleLowerCase('tr').includes(q))
             : COUNTING_SUBCATEGORIES;
 
+        if (this._createTableHideExisting) {
+            filtered = filtered.filter((cat) => !tableByName.has(cat));
+        }
+
         if (filtered.length === 0) {
-            dropdown.innerHTML = `<div class="px-4 py-3 text-sm text-gray-400 text-center">Sonuç bulunamadı</div>`;
+            const emptyMsg = this._createTableHideExisting
+                ? (q ? 'Kalan kategorilerde arama sonucu yok.' : 'Tüm kategoriler oluşturulmuş — filtreyi kapatın.')
+                : 'Sonuç bulunamadı';
+            dropdown.innerHTML = `<div class="px-4 py-3 text-sm text-gray-400 text-center">${emptyMsg}</div>`;
             return;
         }
 
@@ -3197,6 +3282,8 @@ class CountingSystem {
             hint.textContent = 'Listeden seçin veya özel isim yazın';
             hint.className = 'mt-1.5 text-xs text-gray-400';
         }
+        this._createTableHideExisting = false;
+        this._syncCreateTableHideExistingBtnUi();
         this._updateCreateTablePresetRemaining();
     }
 
@@ -3359,12 +3446,176 @@ class CountingSystem {
         return profitLoss;
     }
 
+    /** API ürün satırından fiyat alanlarını çıkar */
+    _extractPriceFieldsFromApiProduct(foundProduct) {
+        if (!foundProduct || typeof foundProduct !== 'object') {
+            return { price: null, priceText: null, struckPrice: null, struckPriceText: null };
+        }
+        const pricing = foundProduct.pricing || foundProduct.priceInfo || foundProduct.product?.pricing || null;
+        const price =
+            foundProduct.price ??
+            foundProduct.salePrice ??
+            foundProduct.currentPrice ??
+            pricing?.price ??
+            pricing?.salePrice ??
+            null;
+        const priceText =
+            foundProduct.priceText ??
+            foundProduct.salePriceText ??
+            pricing?.priceText ??
+            null;
+        let struckPrice =
+            foundProduct.struckPrice ??
+            foundProduct.struck_price ??
+            foundProduct.originalPrice ??
+            foundProduct.listPrice ??
+            pricing?.struckPrice ??
+            pricing?.originalPrice ??
+            pricing?.listPrice ??
+            null;
+        let struckPriceText =
+            foundProduct.struckPriceText ??
+            foundProduct.struck_price_text ??
+            foundProduct.originalPriceText ??
+            pricing?.struckPriceText ??
+            null;
+        if ((struckPrice === null || struckPrice === undefined) && foundProduct.product) {
+            const nested = this._extractPriceFieldsFromApiProduct(foundProduct.product);
+            if (nested.struckPrice != null) struckPrice = nested.struckPrice;
+            if (nested.struckPriceText) struckPriceText = nested.struckPriceText;
+            if ((price === null || price === undefined) && nested.price != null) {
+                return { ...nested, price: nested.price ?? price, priceText: nested.priceText ?? priceText };
+            }
+        }
+        return { price, priceText, struckPrice, struckPriceText };
+    }
+
+    _countingEntryNeedsPriceEnrichment(entry) {
+        if (!entry || typeof entry !== 'object') return false;
+        const hasPrice = entry.price != null && !Number.isNaN(Number(entry.price)) && Number(entry.price) > 0;
+        const hasStruck =
+            entry.struckPrice != null && !Number.isNaN(Number(entry.struckPrice)) && Number(entry.struckPrice) > 0;
+        if (hasPrice && hasStruck) return false;
+        if (hasPrice && entry._apiNoStruckPrice === true) return false;
+        return !hasPrice || !hasStruck;
+    }
+
+    _mergePriceFieldsIntoCountingEntry(entry, fields) {
+        if (!entry || !fields) return;
+        if (fields.price != null && fields.price !== undefined && !Number.isNaN(Number(fields.price))) {
+            entry.price = Number(fields.price);
+        }
+        if (fields.priceText) entry.priceText = fields.priceText;
+        if (fields.struckPrice != null && fields.struckPrice !== undefined && !Number.isNaN(Number(fields.struckPrice))) {
+            entry.struckPrice = Number(fields.struckPrice);
+        } else if (fields.struckPrice === null && entry.price != null) {
+            entry._apiNoStruckPrice = true;
+        }
+        if (fields.struckPriceText) entry.struckPriceText = fields.struckPriceText;
+        entry._pricesEnrichedAt = new Date().toISOString();
+    }
+
+    _resolveCountingEntryForTable(tableName, productId) {
+        if (tableName === this.currentTableName && this.countingData?.[productId]) {
+            return this.countingData[productId];
+        }
+        return this.cachedFullData?._tables?.[tableName]?.[productId] || null;
+    }
+
+    async _fetchAndMergeProductPrices(productId, tableName) {
+        const entry = this._resolveCountingEntryForTable(tableName, productId);
+        if (!entry || !this._countingEntryNeedsPriceEnrichment(entry)) return false;
+        const product = this.productIndex.get(productId);
+        if (!product) return false;
+        const barcode = product.barcodes?.[0]?.code;
+        if (!barcode) return false;
+        try {
+            const result = await this.requestStockFromExtension(product.name, barcode, productId, { quiet: true });
+            if (!result || typeof result !== 'object') return false;
+            this._mergePriceFieldsIntoCountingEntry(entry, result);
+            if (tableName === this.currentTableName && this.countingData[productId]) {
+                this._mergePriceFieldsIntoCountingEntry(this.countingData[productId], result);
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async _ensureTablePricesEnriched(tableName, options = {}) {
+        if (!tableName || this.isDailyTableName(tableName)) return;
+        const tableData = this.cachedFullData?._tables?.[tableName];
+        if (!tableData || typeof tableData !== 'object') return;
+        const ids = Object.keys(tableData).filter((k) => !this.isReservedCountingKey(k));
+        const need = ids.filter((pid) => this._countingEntryNeedsPriceEnrichment(tableData[pid]));
+        if (need.length === 0) return;
+        const batchSize = options.batchSize || 2;
+        let changed = false;
+        for (let i = 0; i < need.length; i += batchSize) {
+            const batch = need.slice(i, i + batchSize);
+            const results = await Promise.all(batch.map((pid) => this._fetchAndMergeProductPrices(pid, tableName)));
+            if (results.some(Boolean)) changed = true;
+        }
+        if (changed) {
+            if (tableName === this.currentTableName) {
+                await this.saveCountingDataForTable(tableName).catch(() => {});
+            } else {
+                await this._saveMetaOnly().catch(() => {});
+            }
+        }
+    }
+
+    /** Finans hesabına dahil sabit alt kategori tabloları (günlük hariç) */
+    getFinanceEligibleTableNames() {
+        return this.getTableList()
+            .filter((t) => !this.isDailyTableName(t.name) && this.isPresetSubcategoryTable(t.name))
+            .map((t) => t.name);
+    }
+
+    _syncFinancialTableFromSayim() {
+        const current = this.currentTableName;
+        const eligible = this.getFinanceEligibleTableNames();
+        if (current && !this.isDailyTableName(current)) {
+            const exists = this.getTableList().some((t) => t.name === current);
+            if (exists) {
+                this.selectedFinancialTable = current;
+                return;
+            }
+        }
+        if (
+            this.selectedFinancialTable &&
+            this.selectedFinancialTable !== 'all' &&
+            !this.isDailyTableName(this.selectedFinancialTable) &&
+            this.getTableList().some((t) => t.name === this.selectedFinancialTable)
+        ) {
+            return;
+        }
+        if (eligible.length > 0) {
+            this.selectedFinancialTable = eligible[0];
+            return;
+        }
+        if (current && !this.isDailyTableName(current)) {
+            this.selectedFinancialTable = current;
+        }
+    }
+
+    async renderFinancialDataForSelection() {
+        if (this.selectedFinancialTable === 'all') {
+            await this.renderAllTablesFinancialData();
+        } else if (this.selectedFinancialTable) {
+            await this.renderSingleTableFinancialData(this.selectedFinancialTable);
+        } else {
+            this._syncFinancialTableFromSayim();
+            await this.renderFinancialDataForSelection();
+        }
+    }
+
     /** Toggle'a göre finans fiyatını seç: struckPrice (varsa, toggle açıksa) veya price */
     _resolveFinancePrice(data) {
         if (!data) return null;
-        if (this._financeUseStruckPrice && data.struckPrice) {
-            const p = Number(data.struckPrice);
-            if (!Number.isNaN(p) && p > 0) return p;
+        if (this._financeUseStruckPrice) {
+            const sp = Number(data.struckPrice);
+            if (!Number.isNaN(sp) && sp > 0) return sp;
         }
         const p = Number(data.price);
         return (!Number.isNaN(p) && p > 0) ? p : null;
@@ -3373,9 +3624,9 @@ class CountingSystem {
     /** Toggle'a göre finans fiyat metnini seç */
     _resolveFinancePriceText(data) {
         if (!data) return null;
-        if (this._financeUseStruckPrice && data.struckPrice) {
-            const p = Number(data.struckPrice);
-            if (!Number.isNaN(p) && p > 0) return data.struckPriceText || this.formatCurrency(p);
+        if (this._financeUseStruckPrice) {
+            const sp = Number(data.struckPrice);
+            if (!Number.isNaN(sp) && sp > 0) return data.struckPriceText || this.formatCurrency(sp);
         }
         return data.priceText || (data.price ? this.formatCurrency(Number(data.price)) : null);
     }
@@ -6538,6 +6789,12 @@ class CountingSystem {
             }
         }
 
+        void this._ensureTablePricesEnriched(this.currentTableName).then(() => {
+            if (this.currentTab === 'finans' && this.selectedFinancialTable === this.currentTableName) {
+                void this.renderFinancialDataForSelection();
+            }
+        });
+
         this.scheduleRenderTable();
         if (this.currentViewMode === 'rapid') {
             this.renderRapidCountingMode();
@@ -6715,6 +6972,20 @@ class CountingSystem {
         }
         if (struckPriceText !== null && struckPriceText !== undefined) {
             this.countingData[productId].struckPriceText = struckPriceText;
+        }
+        if (
+            warehouseStock !== null &&
+            warehouseStock !== undefined &&
+            this._countingEntryNeedsPriceEnrichment(this.countingData[productId])
+        ) {
+            const tn = this.currentTableName;
+            void this._fetchAndMergeProductPrices(productId, tn).then((ok) => {
+                if (!ok) return;
+                this._scheduleProductSave(productId, 200);
+                if (this.currentTab === 'finans') {
+                    void this.renderFinancialDataForSelection();
+                }
+            });
         }
         if (reservedStock !== undefined) {
             if (reservedStock === null) {
@@ -7959,17 +8230,10 @@ class CountingSystem {
             
             // 0 değeri de geçerli bir stok değeridir
             if (stock !== null && stock !== undefined) {
-                // Price bilgisini de al
-                let price = null;
-                let priceText = null;
-                let struckPrice = null;
-                let struckPriceText = null;
+                const priceFields = this._extractPriceFieldsFromApiProduct(foundProduct);
+                let { price, priceText, struckPrice, struckPriceText } = priceFields;
                 
                 if (foundProduct) {
-                    price = foundProduct.price !== null && foundProduct.price !== undefined ? foundProduct.price : null;
-                    priceText = foundProduct.priceText || null;
-                    struckPrice = foundProduct.struckPrice !== null && foundProduct.struckPrice !== undefined ? foundProduct.struckPrice : null;
-                    struckPriceText = foundProduct.struckPriceText || null;
                     
                     // Kategori bilgisini API'den al ve allProducts array'ini güncelle
                     if (productId && foundProduct) {
@@ -10327,6 +10591,8 @@ class CountingSystem {
                 return null;
             }
 
+            await this._ensureTablePricesEnriched(tableName);
+
             const tableData = fullData._tables[tableName];
             const products = [];
             const categoryMap = {};
@@ -10429,7 +10695,7 @@ class CountingSystem {
                 return [];
             }
 
-            const tables = Object.keys(fullData._tables);
+            const tables = this.getFinanceEligibleTableNames();
             const financialData = [];
 
             for (const tableName of tables) {
@@ -10494,19 +10760,13 @@ class CountingSystem {
             struckPriceToggle.checked = this._financeUseStruckPrice;
             struckPriceToggle.addEventListener('change', () => {
                 this._financeUseStruckPrice = struckPriceToggle.checked;
-                if (this.selectedFinancialTable && this.selectedFinancialTable !== 'all') {
-                    this.renderSingleTableFinancialData(this.selectedFinancialTable);
-                } else {
-                    this.renderAllTablesFinancialData();
-                }
+                void this.renderFinancialDataForSelection();
             });
         }
-        
-        // Update dropdown with current tables
-        this.updateFinancialTableSelector();
 
-        // Render initial data (default to all tables)
-        await this.renderAllTablesFinancialData();
+        this._syncFinancialTableFromSayim();
+        this.updateFinancialTableSelector();
+        await this.renderFinancialDataForSelection();
     }
 
     _closeFinancialTableSelectorDropdown() {
@@ -10527,7 +10787,7 @@ class CountingSystem {
         const financialTableSelectorList = document.getElementById('financialTableSelectorList');
         if (!financialTableSelectorList) return;
 
-        const tables = this.getTableList();
+        const tables = this.getTableList().filter((t) => !this.isDailyTableName(t.name));
         const q = this._getFinancialTableSearchQuery();
         const filteredTables = q
             ? tables.filter((t) => {
@@ -10542,7 +10802,10 @@ class CountingSystem {
         allOption.className = `table-selector-option ${this.selectedFinancialTable === 'all' ? 'active' : ''}`;
         allOption.dataset.tableName = 'all';
         allOption.innerHTML = `
-            <span>Tüm Tablolar</span>
+            <span class="flex flex-col min-w-0">
+                <span>Tüm Kategoriler</span>
+                <span class="text-[10px] font-normal text-gray-400">Sabit alt kategoriler · günlük hariç</span>
+            </span>
             <svg class="check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
             </svg>
@@ -10649,13 +10912,13 @@ class CountingSystem {
         const tables = this.getTableList();
         const financialTableSelectorBtn = document.getElementById('financialTableSelectorBtn');
         if (this.selectedFinancialTable === 'all') {
-            financialTableSelectorText.textContent = 'Tüm Tablolar';
+            financialTableSelectorText.textContent = 'Tüm Kategoriler';
             financialTableSelectorBtn?.classList.remove('preset-subcat-table-selector-active');
         } else {
             const selectedTable = tables.find((t) => t.name === this.selectedFinancialTable);
             const label = selectedTable
                 ? this.formatTableDisplayName(selectedTable.name)
-                : (this.selectedFinancialTable || 'Tüm Tablolar');
+                : (this.selectedFinancialTable || 'Tablo seçin');
             const isPreset = selectedTable && this.isPresetSubcategoryTable(selectedTable.name);
             if (isPreset) {
                 financialTableSelectorText.innerHTML = `<span class="inline-flex min-w-0 items-center gap-1.5">${this.renderPresetSubcategoryInlineStarHtml()}<span class="truncate">${this.escapeHtml(label)}</span></span>`;
@@ -11015,7 +11278,7 @@ class CountingSystem {
 
         const scopeShort =
             this.selectedFinancialTable === 'all'
-                ? 'Tüm tablolar · aynı ürün satırları birleştirildi'
+                ? 'Tüm kategoriler · sabit alt kategoriler · günlük hariç'
                 : this.formatTableDisplayName(this.selectedFinancialTable || '');
 
         const now = new Date().toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' });
