@@ -171,6 +171,10 @@ class CountingSystem {
         this._productSaveTimers = {};
         /** counting_items tablosu mevcut mu? (yoksa eski blob yoluna düş) */
         this._countingItemsTableReady = null; // null=bilinmiyor, true/false
+        /** counting_items struck_price kolonları (migration sonrası true) */
+        this._countingItemsPriceExtension = null;
+        /** Desktop tablo görünümü pasif — yalnızca grid render */
+        this._desktopTableModeDisabled = true;
     }
 
     async init() {
@@ -739,10 +743,10 @@ class CountingSystem {
             let countingItemsAvailable = false;
             if (window.supabase && this.currentUser) {
                 try {
-                    const { data: rows, error: rowErr } = await window.supabase
-                        .from('counting_items')
-                        .select('table_name, product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, history, api_fetch_failed, last_updated')
-                        .eq('username', this.currentUser.username);
+                    const { data: rows, error: rowErr } = await this._queryCountingItems(
+                        this._getCountingItemsSelectColumns(true),
+                        (q) => q.eq('username', this.currentUser.username)
+                    );
                     if (!rowErr) {
                         itemRows = rows || [];
                         countingItemsAvailable = true;
@@ -765,16 +769,7 @@ class CountingSystem {
                 // counting_items'tan ürün verilerini yükle
                 for (const row of itemRows) {
                     if (!tables[row.table_name]) tables[row.table_name] = {};
-                    tables[row.table_name][row.product_id] = {
-                        warehouseStock: row.warehouse_stock ?? null,
-                        systemStock: row.system_stock ?? null,
-                        price: row.price ?? null,
-                        priceText: row.price_text ?? null,
-                        reservedStock: row.reserved_stock ?? null,
-                        history: row.history || [],
-                        apiFetchFailed: row.api_fetch_failed || false,
-                        lastUpdated: row.last_updated || new Date().toISOString(),
-                    };
+                    tables[row.table_name][row.product_id] = this._mapCountingItemRowToEntry(row);
                 }
 
                 // Tablo meta verilerini (sıra, createdAt) ekle
@@ -918,6 +913,9 @@ class CountingSystem {
                     system_stock: pData.systemStock ?? null,
                     price: pData.price ?? null,
                     price_text: pData.priceText ?? null,
+                    struck_price: pData.struckPrice ?? null,
+                    struck_price_text: pData.struckPriceText ?? null,
+                    no_struck_price: pData._apiNoStruckPrice === true,
                     reserved_stock: pData.reservedStock ?? null,
                     history: pData.history || [],
                     api_fetch_failed: pData.apiFetchFailed || false,
@@ -929,7 +927,20 @@ class CountingSystem {
         // Toplu upsert (50'şer chunk)
         const CHUNK = 50;
         for (let i = 0; i < rows.length; i += CHUNK) {
-            await window.supabase.from('counting_items').upsert(rows.slice(i, i + CHUNK), { onConflict: 'username,table_name,product_id' });
+            const slice = rows.slice(i, i + CHUNK);
+            let { error } = await window.supabase.from('counting_items').upsert(slice, {
+                onConflict: 'username,table_name,product_id',
+            });
+            if (error && this._isMissingDbColumnError(error) && this._countingItemsPriceExtension !== false) {
+                this._countingItemsPriceExtension = false;
+                const fallbackSlice = slice.map(({ struck_price, struck_price_text, no_struck_price, ...rest }) => rest);
+                ({ error } = await window.supabase.from('counting_items').upsert(fallbackSlice, {
+                    onConflict: 'username,table_name,product_id',
+                }));
+            } else if (!error) {
+                this._countingItemsPriceExtension = true;
+            }
+            if (error) console.warn('Migration chunk hatası:', error.message);
         }
         console.log(`🔄 Migration tamamlandı: ${rows.length} ürün counting_items'a taşındı`);
     }
@@ -1900,6 +1911,47 @@ class CountingSystem {
         return null;
     }
 
+    /** Supabase kolon eksikliği hatası mı */
+    _isMissingDbColumnError(err) {
+        const msg = String(err?.message || err?.code || err || '').toLowerCase();
+        return (
+            msg.includes('column') &&
+            (msg.includes('does not exist') ||
+                msg.includes('could not find') ||
+                msg.includes('schema cache') ||
+                msg.includes('42703'))
+        );
+    }
+
+    _getCountingItemsSelectColumns(includeCreatedAt = true) {
+        const base = includeCreatedAt
+            ? 'table_name, product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, history, api_fetch_failed, last_updated, created_at'
+            : 'product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, history, api_fetch_failed, last_updated';
+        if (this._countingItemsPriceExtension === false) return base;
+        return `${base}, struck_price, struck_price_text, no_struck_price`;
+    }
+
+    _mapCountingItemRowToEntry(row) {
+        if (!row) return null;
+        const entry = {
+            warehouseStock: row.warehouse_stock ?? null,
+            systemStock: row.system_stock ?? null,
+            price: row.price ?? null,
+            priceText: row.price_text ?? null,
+            reservedStock: row.reserved_stock ?? null,
+            history: row.history || [],
+            apiFetchFailed: row.api_fetch_failed || false,
+            lastUpdated: row.last_updated || new Date().toISOString(),
+        };
+        if (row.struck_price != null && row.struck_price !== '') {
+            const sp = Number(row.struck_price);
+            if (!Number.isNaN(sp)) entry.struckPrice = sp;
+        }
+        if (row.struck_price_text) entry.struckPriceText = row.struck_price_text;
+        if (row.no_struck_price === true) entry._apiNoStruckPrice = true;
+        return entry;
+    }
+
     /** saveProductEntry upsert anı için ürün satırı anlık görüntüsü */
     _snapshotProductEntry(entry) {
         if (!entry || typeof entry !== 'object') return null;
@@ -1908,11 +1960,60 @@ class CountingSystem {
             systemStock: entry.systemStock ?? null,
             price: entry.price ?? null,
             priceText: entry.priceText ?? null,
+            struckPrice: entry.struckPrice ?? null,
+            struckPriceText: entry.struckPriceText ?? null,
+            _apiNoStruckPrice: entry._apiNoStruckPrice === true,
             reservedStock: entry.reservedStock ?? null,
             history: Array.isArray(entry.history) ? entry.history.slice() : [],
             apiFetchFailed: entry.apiFetchFailed || false,
             lastUpdated: entry.lastUpdated || new Date().toISOString(),
         };
+    }
+
+    _buildCountingItemUpsertRow(tableName, productId, snapshot) {
+        const row = {
+            username: this.currentUser.username,
+            table_name: tableName,
+            product_id: productId,
+            warehouse_stock: snapshot.warehouseStock,
+            system_stock: snapshot.systemStock,
+            price: snapshot.price,
+            price_text: snapshot.priceText,
+            reserved_stock: snapshot.reservedStock,
+            history: snapshot.history,
+            api_fetch_failed: snapshot.apiFetchFailed,
+            updated_by: this.deviceId,
+            last_updated: snapshot.lastUpdated,
+        };
+        if (this._countingItemsPriceExtension !== false) {
+            row.struck_price = snapshot.struckPrice ?? null;
+            row.struck_price_text = snapshot.struckPriceText ?? null;
+            row.no_struck_price = snapshot._apiNoStruckPrice === true;
+        }
+        return row;
+    }
+
+    async _queryCountingItems(selectCols, applyFilters) {
+        let query = window.supabase.from('counting_items').select(selectCols);
+        query = applyFilters(query);
+        let { data, error } = await query;
+        if (
+            error &&
+            this._isMissingDbColumnError(error) &&
+            selectCols.includes('struck_price')
+        ) {
+            this._countingItemsPriceExtension = false;
+            const fallbackCols = selectCols
+                .replace(', struck_price, struck_price_text, no_struck_price', '')
+                .replace('struck_price, struck_price_text, no_struck_price, ', '')
+                .replace('struck_price, struck_price_text, no_struck_price', '');
+            let q2 = window.supabase.from('counting_items').select(fallbackCols);
+            q2 = applyFilters(q2);
+            ({ data, error } = await q2);
+        } else if (!error && selectCols.includes('struck_price')) {
+            this._countingItemsPriceExtension = true;
+        }
+        return { data, error };
     }
 
     /**
@@ -1935,20 +2036,19 @@ class CountingSystem {
         }
 
         try {
-            const { error } = await window.supabase.from('counting_items').upsert({
-                username: this.currentUser.username,
-                table_name: tableName,
-                product_id: productId,
-                warehouse_stock: snapshot.warehouseStock,
-                system_stock: snapshot.systemStock,
-                price: snapshot.price,
-                price_text: snapshot.priceText,
-                reserved_stock: snapshot.reservedStock,
-                history: snapshot.history,
-                api_fetch_failed: snapshot.apiFetchFailed,
-                updated_by: this.deviceId,
-                last_updated: snapshot.lastUpdated,
-            }, { onConflict: 'username,table_name,product_id' });
+            const row = this._buildCountingItemUpsertRow(tableName, productId, snapshot);
+            let { error } = await window.supabase.from('counting_items').upsert(row, {
+                onConflict: 'username,table_name,product_id',
+            });
+            if (error && this._isMissingDbColumnError(error) && this._countingItemsPriceExtension !== false) {
+                this._countingItemsPriceExtension = false;
+                const fallbackRow = this._buildCountingItemUpsertRow(tableName, productId, snapshot);
+                ({ error } = await window.supabase.from('counting_items').upsert(fallbackRow, {
+                    onConflict: 'username,table_name,product_id',
+                }));
+            } else if (!error && row.struck_price !== undefined) {
+                this._countingItemsPriceExtension = true;
+            }
             if (error) throw error;
             // Başarılı: localStorage'ı tam blob ile güncelle + gecikmeli Supabase tam yedek
             this._saveFullBlobToLocalStorage();
@@ -2143,10 +2243,9 @@ class CountingSystem {
         try {
             // PARALEL: counting_items + users.counting_data — biri ürünler için, diğeri _tableMeta için
             const [itemsRes, userRes] = await Promise.all([
-                window.supabase
-                    .from('counting_items')
-                    .select('table_name, product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, history, api_fetch_failed, last_updated, created_at')
-                    .eq('username', this.currentUser.username),
+                this._queryCountingItems(this._getCountingItemsSelectColumns(true), (q) =>
+                    q.eq('username', this.currentUser.username)
+                ),
                 window.supabase
                     .from('users')
                     .select('counting_data')
@@ -2168,16 +2267,7 @@ class CountingSystem {
             const minCreatedAtByTable = {};
             for (const row of rows) {
                 if (!tablesByName[row.table_name]) tablesByName[row.table_name] = {};
-                tablesByName[row.table_name][row.product_id] = {
-                    warehouseStock: row.warehouse_stock ?? null,
-                    systemStock: row.system_stock ?? null,
-                    price: row.price ?? null,
-                    priceText: row.price_text ?? null,
-                    reservedStock: row.reserved_stock ?? null,
-                    history: row.history || [],
-                    apiFetchFailed: row.api_fetch_failed || false,
-                    lastUpdated: row.last_updated || new Date().toISOString(),
-                };
+                tablesByName[row.table_name][row.product_id] = this._mapCountingItemRowToEntry(row);
                 const ca = row.created_at ? new Date(row.created_at).getTime() : null;
                 if (ca && (!minCreatedAtByTable[row.table_name] || ca < minCreatedAtByTable[row.table_name])) {
                     minCreatedAtByTable[row.table_name] = ca;
@@ -2295,25 +2385,15 @@ class CountingSystem {
 
         try {
             // 1. Aktif tablonun tüm ürünlerini çek
-            const { data: rows, error } = await window.supabase
-                .from('counting_items')
-                .select('product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, history, api_fetch_failed, last_updated')
-                .eq('username', this.currentUser.username)
-                .eq('table_name', this.currentTableName);
+            const { data: rows, error } = await this._queryCountingItems(
+                this._getCountingItemsSelectColumns(false),
+                (q) => q.eq('username', this.currentUser.username).eq('table_name', this.currentTableName)
+            );
             if (error) return;
 
             const incomingMap = {};
-            for (const row of (rows || [])) {
-                incomingMap[row.product_id] = {
-                    warehouseStock: row.warehouse_stock ?? null,
-                    systemStock: row.system_stock ?? null,
-                    price: row.price ?? null,
-                    priceText: row.price_text ?? null,
-                    reservedStock: row.reserved_stock ?? null,
-                    history: row.history || [],
-                    apiFetchFailed: row.api_fetch_failed || false,
-                    lastUpdated: row.last_updated || new Date().toISOString(),
-                };
+            for (const row of rows || []) {
+                incomingMap[row.product_id] = this._mapCountingItemRowToEntry(row);
             }
 
             let changed = false;
@@ -2398,16 +2478,7 @@ class CountingSystem {
                 this.updateStatistics();
             }
         } else {
-            const productData = {
-                warehouseStock: item.warehouse_stock ?? null,
-                systemStock: item.system_stock ?? null,
-                price: item.price ?? null,
-                priceText: item.price_text ?? null,
-                reservedStock: item.reserved_stock ?? null,
-                history: item.history || [],
-                apiFetchFailed: item.api_fetch_failed || false,
-                lastUpdated: item.last_updated || new Date().toISOString(),
-            };
+            const productData = this._mapCountingItemRowToEntry(item);
             const table = this.cachedFullData._tables[tName];
             const isNewProduct = !table[pId];
             table[pId] = productData;
@@ -2616,11 +2687,10 @@ class CountingSystem {
 
         // counting_items mevcutsa ve tablo henüz bellekte yoksa yükle
         if (this._countingItemsTableReady === true && !fullData._tables[tableName]) {
-            const { data: rows } = await window.supabase
-                .from('counting_items')
-                .select('product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, history, api_fetch_failed, last_updated')
-                .eq('username', this.currentUser.username)
-                .eq('table_name', tableName);
+            const { data: rows } = await this._queryCountingItems(
+                this._getCountingItemsSelectColumns(false),
+                (q) => q.eq('username', this.currentUser.username).eq('table_name', tableName)
+            );
             fullData._tables[tableName] = {};
             const tMeta = fullData._tableMeta?.[tableName];
             if (tMeta?.createdAt || tMeta?.lastActivityAt) {
@@ -2629,17 +2699,8 @@ class CountingSystem {
                 if (tMeta?.lastActivityAt) fullData._tables[tableName]._tableMeta.lastActivityAt = tMeta.lastActivityAt;
             }
             if (tMeta?._productOrder) fullData._tables[tableName]._productOrder = tMeta._productOrder;
-            for (const row of (rows || [])) {
-                fullData._tables[tableName][row.product_id] = {
-                    warehouseStock: row.warehouse_stock ?? null,
-                    systemStock: row.system_stock ?? null,
-                    price: row.price ?? null,
-                    priceText: row.price_text ?? null,
-                    reservedStock: row.reserved_stock ?? null,
-                    history: row.history || [],
-                    apiFetchFailed: row.api_fetch_failed || false,
-                    lastUpdated: row.last_updated || new Date().toISOString(),
-                };
+            for (const row of rows || []) {
+                fullData._tables[tableName][row.product_id] = this._mapCountingItemRowToEntry(row);
             }
         } else if (!fullData._tables[tableName]) {
             fullData._tables[tableName] = {
@@ -3096,10 +3157,16 @@ class CountingSystem {
             systemRaw !== null && systemRaw !== undefined && systemRaw !== ''
                 ? Number(systemRaw)
                 : null;
-        const price = entry ? (this._resolveFinancePrice(entry) ?? p?.price ?? 0) : (p?.price ?? 0);
-        const priceText = entry
-            ? (this._resolveFinancePriceText(entry) || this.formatCurrency(price))
-            : (p?.priceText || this.formatCurrency(price));
+        const mergedEntry = entry ? this._mergeEntryWithPriceCacheForFinance(pid, entry) : null;
+        const resolvedPrice = mergedEntry
+            ? this._resolveFinancePrice(mergedEntry)
+            : (p?.price != null ? Number(p.price) : null);
+        const price = resolvedPrice ?? 0;
+        const priceText = resolvedPrice
+            ? (mergedEntry
+                ? (this._resolveFinancePriceText(mergedEntry) || this.formatCurrency(resolvedPrice))
+                : (p?.priceText || this.formatCurrency(resolvedPrice)))
+            : '—';
         const stockDiff =
             warehouseStock !== null && systemStock !== null && !Number.isNaN(warehouseStock) && !Number.isNaN(systemStock)
                 ? warehouseStock - systemStock
@@ -3502,11 +3569,27 @@ class CountingSystem {
     _countingEntryNeedsPriceEnrichment(entry) {
         if (!entry || typeof entry !== 'object') return false;
         const hasPrice = entry.price != null && !Number.isNaN(Number(entry.price)) && Number(entry.price) > 0;
+        if (!hasPrice) return true;
+        if (entry._apiNoStruckPrice === true) return false;
         const hasStruck =
             entry.struckPrice != null && !Number.isNaN(Number(entry.struckPrice)) && Number(entry.struckPrice) > 0;
-        if (hasPrice && hasStruck) return false;
-        if (hasPrice && entry._apiNoStruckPrice === true) return false;
-        return !hasPrice || !hasStruck;
+        return !hasStruck;
+    }
+
+    _finalizeStruckPriceState(entry) {
+        if (!entry || typeof entry !== 'object') return;
+        const hasStruck =
+            entry.struckPrice != null && !Number.isNaN(Number(entry.struckPrice)) && Number(entry.struckPrice) > 0;
+        if (hasStruck) {
+            entry._apiNoStruckPrice = false;
+        }
+    }
+
+    _markNoStruckPriceConfirmed(entry) {
+        if (!entry || typeof entry !== 'object') return;
+        const hasStruck =
+            entry.struckPrice != null && !Number.isNaN(Number(entry.struckPrice)) && Number(entry.struckPrice) > 0;
+        if (!hasStruck) entry._apiNoStruckPrice = true;
     }
 
     _mergePriceFieldsIntoCountingEntry(entry, fields) {
@@ -3516,12 +3599,16 @@ class CountingSystem {
         }
         if (fields.priceText) entry.priceText = fields.priceText;
         if (fields.struckPrice != null && fields.struckPrice !== undefined && !Number.isNaN(Number(fields.struckPrice))) {
-            entry.struckPrice = Number(fields.struckPrice);
-        } else if (fields.struckPrice === null && entry.price != null) {
-            entry._apiNoStruckPrice = true;
+            const sp = Number(fields.struckPrice);
+            if (sp > 0) {
+                entry.struckPrice = sp;
+                entry._apiNoStruckPrice = false;
+            }
         }
         if (fields.struckPriceText) entry.struckPriceText = fields.struckPriceText;
+        if (fields._apiNoStruckPrice === true) entry._apiNoStruckPrice = true;
         entry._pricesEnrichedAt = new Date().toISOString();
+        this._finalizeStruckPriceState(entry);
     }
 
     _resolveCountingEntryForTable(tableName, productId) {
@@ -3531,15 +3618,26 @@ class CountingSystem {
         return this.cachedFullData?._tables?.[tableName]?.[productId] || null;
     }
 
-    _cacheProductPriceFields(productId, fields) {
+    _cacheProductPriceFields(productId, fields, entryRef = null) {
         if (!productId || !fields) return;
         const prev = this._productPriceCache.get(productId) || {};
-        this._productPriceCache.set(productId, {
+        const merged = {
             price: fields.price ?? prev.price ?? null,
             priceText: fields.priceText ?? prev.priceText ?? null,
             struckPrice: fields.struckPrice ?? prev.struckPrice ?? null,
             struckPriceText: fields.struckPriceText ?? prev.struckPriceText ?? null,
-        });
+            _apiNoStruckPrice: fields._apiNoStruckPrice ?? prev._apiNoStruckPrice ?? false,
+        };
+        if (entryRef) {
+            if (merged._apiNoStruckPrice !== true) {
+                const hasStruck =
+                    entryRef.struckPrice != null &&
+                    !Number.isNaN(Number(entryRef.struckPrice)) &&
+                    Number(entryRef.struckPrice) > 0;
+                if (!hasStruck && entryRef.price != null) merged._apiNoStruckPrice = true;
+            }
+        }
+        this._productPriceCache.set(productId, merged);
     }
 
     _mergeEntryWithPriceCacheForFinance(productId, entry) {
@@ -3553,6 +3651,7 @@ class CountingSystem {
             out.struckPrice = cached.struckPrice;
         }
         if (!out.struckPriceText && cached.struckPriceText) out.struckPriceText = cached.struckPriceText;
+        if (cached._apiNoStruckPrice === true) out._apiNoStruckPrice = true;
         return out;
     }
 
@@ -3578,12 +3677,13 @@ class CountingSystem {
         this._financeCalcCache.delete('__all__');
     }
 
-    _scheduleFinanceRefresh() {
+    _scheduleFinanceRefresh(tableName) {
         if (this._financeBgRefreshTimer) clearTimeout(this._financeBgRefreshTimer);
         this._financeBgRefreshTimer = setTimeout(() => {
             this._financeBgRefreshTimer = null;
             if (this.currentTab !== 'finans') return;
-            this._financeCalcCache.clear();
+            if (tableName) this._invalidateFinanceCache(tableName);
+            else this._financeCalcCache.clear();
             void this.renderFinancialDataForSelection({ skipBackgroundEnrich: true });
         }, 350);
     }
@@ -3612,11 +3712,21 @@ class CountingSystem {
         try {
             const result = await this.requestStockFromExtension(product.name, barcode, productId, { quiet: true });
             if (!result || typeof result !== 'object') return false;
-            this._cacheProductPriceFields(productId, result);
             this._mergePriceFieldsIntoCountingEntry(entry, result);
             if (tableName === this.currentTableName && this.countingData[productId]) {
                 this._mergePriceFieldsIntoCountingEntry(this.countingData[productId], result);
             }
+            this._markNoStruckPriceConfirmed(entry);
+            if (tableName === this.currentTableName && this.countingData[productId]) {
+                this._markNoStruckPriceConfirmed(this.countingData[productId]);
+            }
+            this._cacheProductPriceFields(productId, {
+                price: entry.price,
+                priceText: entry.priceText,
+                struckPrice: entry.struckPrice,
+                struckPriceText: entry.struckPriceText,
+                _apiNoStruckPrice: entry._apiNoStruckPrice === true,
+            });
             return true;
         } catch (e) {
             return false;
@@ -3672,7 +3782,7 @@ class CountingSystem {
             this._financeBgEnrichRunner = null;
         }
         if (changed && this.currentTab === 'finans') {
-            this._scheduleFinanceRefresh();
+            this._scheduleFinanceRefresh(tableName);
         }
     }
 
@@ -3714,7 +3824,6 @@ class CountingSystem {
         const skipBg = options.skipBackgroundEnrich === true;
         if (this.selectedFinancialTable === 'all') {
             await this.renderAllTablesFinancialData();
-            if (!skipBg) this._scheduleBackgroundPriceEnrichment(this.getFinanceEligibleTableNames());
         } else if (this.selectedFinancialTable) {
             await this.renderSingleTableFinancialData(this.selectedFinancialTable);
             if (!skipBg) this._scheduleBackgroundPriceEnrichment(this.selectedFinancialTable);
@@ -6636,6 +6745,14 @@ class CountingSystem {
 
         if (!toggleBtn) return;
 
+        if (this._desktopTableModeDisabled) {
+            toggleBtn.classList.add('hidden');
+            toggleBtn.setAttribute('aria-hidden', 'true');
+            this.currentViewMode = 'rapid';
+            document.body.classList.add('grid-mode-active');
+            return;
+        }
+
         // View mode already loaded in init(), don't reload it here
 
         toggleBtn.addEventListener('click', () => {
@@ -6652,6 +6769,10 @@ class CountingSystem {
     }
 
     updateViewMode() {
+        if (this._desktopTableModeDisabled) {
+            this.currentViewMode = 'rapid';
+        }
+
         const viewModeText = document.getElementById('viewModeText');
         const viewModeIcon = document.getElementById('viewModeIcon');
         const rapidGrid = document.getElementById('rapidCountingGrid');
@@ -7079,6 +7200,7 @@ class CountingSystem {
         }
         if (struckPrice !== null && struckPrice !== undefined) {
             this.countingData[productId].struckPrice = Number(struckPrice);
+            this.countingData[productId]._apiNoStruckPrice = false;
         }
         if (struckPriceText !== null && struckPriceText !== undefined) {
             this.countingData[productId].struckPriceText = struckPriceText;
@@ -7089,12 +7211,17 @@ class CountingSystem {
             struckPrice !== null ||
             struckPriceText !== null
         ) {
-            this._cacheProductPriceFields(productId, {
-                price: this.countingData[productId].price,
-                priceText: this.countingData[productId].priceText,
-                struckPrice: this.countingData[productId].struckPrice,
-                struckPriceText: this.countingData[productId].struckPriceText,
-            });
+            this._cacheProductPriceFields(
+                productId,
+                {
+                    price: this.countingData[productId].price,
+                    priceText: this.countingData[productId].priceText,
+                    struckPrice: this.countingData[productId].struckPrice,
+                    struckPriceText: this.countingData[productId].struckPriceText,
+                    _apiNoStruckPrice: this.countingData[productId]._apiNoStruckPrice === true,
+                },
+                this.countingData[productId]
+            );
         }
         if (
             warehouseStock !== null &&
@@ -7107,7 +7234,7 @@ class CountingSystem {
                 this._scheduleProductSave(productId, 200);
                 this._invalidateFinanceCache(tn);
                 if (this.currentTab === 'finans') {
-                    this._scheduleFinanceRefresh();
+                    this._scheduleFinanceRefresh(tn);
                 }
             });
         }
@@ -8589,6 +8716,13 @@ class CountingSystem {
     }
 
     renderTable() {
+        // Desktop tablo modu pasif — yalnızca grid render (legacy kod korunur)
+        if (this._desktopTableModeDisabled) {
+            if (this.currentViewMode !== 'rapid') this.currentViewMode = 'rapid';
+            this.renderRapidCountingMode();
+            return;
+        }
+
         // If grid mode is active, don't render table - render grid instead
         if (this.currentViewMode === 'rapid') {
             this.renderRapidCountingMode();
@@ -10724,13 +10858,15 @@ class CountingSystem {
             const data = this._mergeEntryWithPriceCacheForFinance(productId, rawData);
             const warehouseStock = data.warehouseStock ?? 0;
             const systemStock = data.systemStock ?? 0;
-            const price = this._resolveFinancePrice(data) ?? 0;
-            const priceText = this._resolveFinancePriceText(data) || '₺0,00';
+            const resolvedPrice = this._resolveFinancePrice(data);
+            const price = resolvedPrice ?? 0;
+            const priceText = resolvedPrice
+                ? (this._resolveFinancePriceText(data) || this.formatCurrency(resolvedPrice))
+                : '—';
+            const pricePending = !resolvedPrice || resolvedPrice <= 0;
 
-            if (price === 0 || price === null) continue;
-
-            const warehouseValue = warehouseStock * price;
-            const systemValue = systemStock * price;
+            const warehouseValue = (resolvedPrice ? warehouseStock : 0) * (resolvedPrice || 0);
+            const systemValue = (resolvedPrice ? systemStock : 0) * (resolvedPrice || 0);
             const difference = warehouseValue - systemValue;
             const stockDiff = warehouseStock - systemStock;
             const barcodes = (product.barcodes || [])
@@ -10748,6 +10884,7 @@ class CountingSystem {
                 systemStock,
                 price,
                 priceText,
+                pricePending,
                 warehouseValue,
                 systemValue,
                 difference,
@@ -11449,7 +11586,7 @@ class CountingSystem {
                         </div>
                         <div class="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5 border-t border-gray-100/80 pt-1.5 text-[11px]">
                             <span class="font-semibold ${tone.ad}">${adetLabel}</span>
-                            <span class="text-gray-500">Birim ${this.formatCurrency(p.price)}</span>
+                            <span class="text-gray-500">Birim ${p.pricePending ? '—' : this.formatCurrency(p.price)}</span>
                             <span class="w-full text-right text-xs font-bold ${tone.tl} sm:w-auto">${p.difference >= 0 ? '+' : ''}${this.formatCurrency(p.difference)}</span>
                         </div>
                     </div>

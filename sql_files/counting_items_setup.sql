@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS counting_items (
     reserved_stock  NUMERIC                  DEFAULT NULL,
     history         JSONB                    DEFAULT '[]'::jsonb,
     api_fetch_failed BOOLEAN                 DEFAULT FALSE,
+    struck_price         NUMERIC                  DEFAULT NULL,
+    struck_price_text    TEXT                     DEFAULT NULL,
+    no_struck_price      BOOLEAN                  DEFAULT FALSE,
     updated_by      TEXT                     DEFAULT NULL,  -- device_id (echo filtreleme için)
     last_updated    TIMESTAMPTZ              DEFAULT NOW(),
     created_at      TIMESTAMPTZ              DEFAULT NOW(),
