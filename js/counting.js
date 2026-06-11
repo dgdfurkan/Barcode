@@ -175,6 +175,16 @@ class CountingSystem {
         this._countingItemsPriceExtension = null;
         /** Desktop tablo görünümü pasif — yalnızca grid render */
         this._desktopTableModeDisabled = true;
+        /** Finans grafik / ürün performans / kategori analizi pasif (kod durur, UI gizli) */
+        this._financeVisualAnalyticsDisabled = true;
+    }
+
+    _applyFinanceVisualAnalyticsVisibility() {
+        const hidden = this._financeVisualAnalyticsDisabled === true;
+        ['financialChartsSection', 'financialProductPerformanceSection', 'financialCategoryAnalysisSection'].forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('hidden', hidden);
+        });
     }
 
     async init() {
@@ -205,6 +215,7 @@ class CountingSystem {
 
             // Setup tab system
             this.setupTabSystem();
+            this._applyFinanceVisualAnalyticsVisibility();
             this.bindSayimAuditLogPanel();
             
             // Render based on current tab
@@ -11013,6 +11024,8 @@ class CountingSystem {
         const finansTabContent = document.getElementById('finansTabContent');
         if (!finansTabContent) return;
 
+        this._applyFinanceVisualAnalyticsVisibility();
+
         // Setup financial table selector (same as counting table selector)
         this.setupFinancialTableSelector();
 
@@ -11328,6 +11341,7 @@ class CountingSystem {
     }
 
     renderCategoryBreakdown(categories) {
+        if (this._financeVisualAnalyticsDisabled) return;
         const categoryBreakdownBody = document.getElementById('categoryBreakdownBody');
         if (!categoryBreakdownBody) return;
 
@@ -11731,6 +11745,7 @@ class CountingSystem {
     }
 
     renderCharts(categories, products = []) {
+        if (this._financeVisualAnalyticsDisabled) return;
         if (!window.Chart) {
             console.warn('Chart.js not loaded');
             return;
@@ -12131,6 +12146,7 @@ class CountingSystem {
     }
 
     renderTopProductsTables(products) {
+        if (this._financeVisualAnalyticsDisabled) return;
         if (!products || products.length === 0) return;
 
         const topProfitTable = document.getElementById('topProfitProductsTable');
