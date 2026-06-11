@@ -128,6 +128,14 @@ class CountingSystem {
         this._financeUseStruckPrice = true;
         /** Finans Stok Özeti — oturum içi yapıştırma rehberi (kaydedilmez) */
         this._financePasteGuide = null;
+        /** Oturum içi ürün fiyat önbelleği — API tekrarlarını azaltır */
+        this._productPriceCache = new Map();
+        this._priceFetchInFlight = new Set();
+        /** Finans hesap önbelleği — tablo anahtarı → { key, data } */
+        this._financeCalcCache = new Map();
+        this._financeBgEnrichQueue = new Set();
+        this._financeBgEnrichRunner = null;
+        this._financeBgRefreshTimer = null;
         /** Seri okuma + sayarak ilerle: sayım sheet'i kamera akışından açıldı (Önceki/Sıradaki yerine Doğru Girdim) */
         this.countingBottomSheetFromCameraSeriSayar = false;
         /** DEPO yanındaki kamera ile barkod doğrulama devam ediyor mu */
@@ -1735,6 +1743,7 @@ class CountingSystem {
                 this._safeWriteTableSlot(this.cachedFullData._tables, tName, this.countingData);
             }
             await this.saveFullCountingData(this.cachedFullData);
+            this._invalidateFinanceCache(tName);
         } catch (error) {
             console.error('Error saving counting data:', error);
             try {
@@ -3522,16 +3531,88 @@ class CountingSystem {
         return this.cachedFullData?._tables?.[tableName]?.[productId] || null;
     }
 
+    _cacheProductPriceFields(productId, fields) {
+        if (!productId || !fields) return;
+        const prev = this._productPriceCache.get(productId) || {};
+        this._productPriceCache.set(productId, {
+            price: fields.price ?? prev.price ?? null,
+            priceText: fields.priceText ?? prev.priceText ?? null,
+            struckPrice: fields.struckPrice ?? prev.struckPrice ?? null,
+            struckPriceText: fields.struckPriceText ?? prev.struckPriceText ?? null,
+        });
+    }
+
+    _mergeEntryWithPriceCacheForFinance(productId, entry) {
+        if (!entry) return entry;
+        const cached = this._productPriceCache.get(productId);
+        if (!cached) return entry;
+        const out = { ...entry };
+        if ((out.price == null || Number(out.price) <= 0) && cached.price != null) out.price = cached.price;
+        if (!out.priceText && cached.priceText) out.priceText = cached.priceText;
+        if ((out.struckPrice == null || Number(out.struckPrice) <= 0) && cached.struckPrice != null) {
+            out.struckPrice = cached.struckPrice;
+        }
+        if (!out.struckPriceText && cached.struckPriceText) out.struckPriceText = cached.struckPriceText;
+        return out;
+    }
+
+    _getTableFinanceCacheKey(tableName) {
+        const td = this.cachedFullData?._tables?.[tableName];
+        if (!td) return `${tableName}:0`;
+        let count = 0;
+        let sig = 0;
+        for (const [k, v] of Object.entries(td)) {
+            if (this.isReservedCountingKey(k) || !v || typeof v !== 'object') continue;
+            count++;
+            sig +=
+                (Number(v.warehouseStock) || 0) * 10007 +
+                (Number(v.systemStock) || 0) * 1009 +
+                (Number(v.price) || 0) * 17 +
+                (Number(v.struckPrice) || 0) * 23;
+        }
+        return `${tableName}:${count}:${sig}:${this._financeUseStruckPrice ? 1 : 0}:${this._productPriceCache.size}`;
+    }
+
+    _invalidateFinanceCache(tableName) {
+        if (tableName) this._financeCalcCache.delete(tableName);
+        this._financeCalcCache.delete('__all__');
+    }
+
+    _scheduleFinanceRefresh() {
+        if (this._financeBgRefreshTimer) clearTimeout(this._financeBgRefreshTimer);
+        this._financeBgRefreshTimer = setTimeout(() => {
+            this._financeBgRefreshTimer = null;
+            if (this.currentTab !== 'finans') return;
+            this._financeCalcCache.clear();
+            void this.renderFinancialDataForSelection({ skipBackgroundEnrich: true });
+        }, 350);
+    }
+
     async _fetchAndMergeProductPrices(productId, tableName) {
         const entry = this._resolveCountingEntryForTable(tableName, productId);
-        if (!entry || !this._countingEntryNeedsPriceEnrichment(entry)) return false;
+        if (!entry) return false;
+
+        const cached = this._productPriceCache.get(productId);
+        if (cached && this._countingEntryNeedsPriceEnrichment(entry)) {
+            this._mergePriceFieldsIntoCountingEntry(entry, cached);
+            if (tableName === this.currentTableName && this.countingData[productId]) {
+                this._mergePriceFieldsIntoCountingEntry(this.countingData[productId], cached);
+            }
+            if (!this._countingEntryNeedsPriceEnrichment(entry)) return true;
+        }
+        if (!this._countingEntryNeedsPriceEnrichment(entry)) return false;
+
+        if (this._priceFetchInFlight.has(productId)) return false;
         const product = this.productIndex.get(productId);
         if (!product) return false;
         const barcode = product.barcodes?.[0]?.code;
         if (!barcode) return false;
+
+        this._priceFetchInFlight.add(productId);
         try {
             const result = await this.requestStockFromExtension(product.name, barcode, productId, { quiet: true });
             if (!result || typeof result !== 'object') return false;
+            this._cacheProductPriceFields(productId, result);
             this._mergePriceFieldsIntoCountingEntry(entry, result);
             if (tableName === this.currentTableName && this.countingData[productId]) {
                 this._mergePriceFieldsIntoCountingEntry(this.countingData[productId], result);
@@ -3539,29 +3620,59 @@ class CountingSystem {
             return true;
         } catch (e) {
             return false;
+        } finally {
+            this._priceFetchInFlight.delete(productId);
         }
     }
 
     async _ensureTablePricesEnriched(tableName, options = {}) {
-        if (!tableName || this.isDailyTableName(tableName)) return;
+        if (!tableName || this.isDailyTableName(tableName)) return false;
         const tableData = this.cachedFullData?._tables?.[tableName];
-        if (!tableData || typeof tableData !== 'object') return;
+        if (!tableData || typeof tableData !== 'object') return false;
         const ids = Object.keys(tableData).filter((k) => !this.isReservedCountingKey(k));
         const need = ids.filter((pid) => this._countingEntryNeedsPriceEnrichment(tableData[pid]));
-        if (need.length === 0) return;
-        const batchSize = options.batchSize || 2;
+        if (need.length === 0) return false;
+        const batchSize = options.batchSize || 5;
         let changed = false;
         for (let i = 0; i < need.length; i += batchSize) {
             const batch = need.slice(i, i + batchSize);
             const results = await Promise.all(batch.map((pid) => this._fetchAndMergeProductPrices(pid, tableName)));
             if (results.some(Boolean)) changed = true;
         }
-        if (changed) {
+        if (changed && options.save !== false) {
             if (tableName === this.currentTableName) {
                 await this.saveCountingDataForTable(tableName).catch(() => {});
             } else {
                 await this._saveMetaOnly().catch(() => {});
             }
+            this._invalidateFinanceCache(tableName);
+        }
+        return changed;
+    }
+
+    _scheduleBackgroundPriceEnrichment(tableNameOrNames) {
+        const names = Array.isArray(tableNameOrNames) ? tableNameOrNames : [tableNameOrNames];
+        names.forEach((n) => {
+            if (n && !this.isDailyTableName(n)) this._financeBgEnrichQueue.add(n);
+        });
+        if (this._financeBgEnrichQueue.size === 0 || this._financeBgEnrichRunner) return;
+        this._financeBgEnrichRunner = this._runFinanceBackgroundPriceEnrichment();
+    }
+
+    async _runFinanceBackgroundPriceEnrichment() {
+        let changed = false;
+        try {
+            while (this._financeBgEnrichQueue.size > 0) {
+                const tableName = this._financeBgEnrichQueue.values().next().value;
+                this._financeBgEnrichQueue.delete(tableName);
+                const c = await this._ensureTablePricesEnriched(tableName, { batchSize: 5 });
+                if (c) changed = true;
+            }
+        } finally {
+            this._financeBgEnrichRunner = null;
+        }
+        if (changed && this.currentTab === 'finans') {
+            this._scheduleFinanceRefresh();
         }
     }
 
@@ -3599,14 +3710,17 @@ class CountingSystem {
         }
     }
 
-    async renderFinancialDataForSelection() {
+    async renderFinancialDataForSelection(options = {}) {
+        const skipBg = options.skipBackgroundEnrich === true;
         if (this.selectedFinancialTable === 'all') {
             await this.renderAllTablesFinancialData();
+            if (!skipBg) this._scheduleBackgroundPriceEnrichment(this.getFinanceEligibleTableNames());
         } else if (this.selectedFinancialTable) {
             await this.renderSingleTableFinancialData(this.selectedFinancialTable);
+            if (!skipBg) this._scheduleBackgroundPriceEnrichment(this.selectedFinancialTable);
         } else {
             this._syncFinancialTableFromSayim();
-            await this.renderFinancialDataForSelection();
+            await this.renderFinancialDataForSelection(options);
         }
     }
 
@@ -6789,11 +6903,7 @@ class CountingSystem {
             }
         }
 
-        void this._ensureTablePricesEnriched(this.currentTableName).then(() => {
-            if (this.currentTab === 'finans' && this.selectedFinancialTable === this.currentTableName) {
-                void this.renderFinancialDataForSelection();
-            }
-        });
+        this._scheduleBackgroundPriceEnrichment(this.currentTableName);
 
         this.scheduleRenderTable();
         if (this.currentViewMode === 'rapid') {
@@ -6974,6 +7084,19 @@ class CountingSystem {
             this.countingData[productId].struckPriceText = struckPriceText;
         }
         if (
+            price !== null ||
+            priceText !== null ||
+            struckPrice !== null ||
+            struckPriceText !== null
+        ) {
+            this._cacheProductPriceFields(productId, {
+                price: this.countingData[productId].price,
+                priceText: this.countingData[productId].priceText,
+                struckPrice: this.countingData[productId].struckPrice,
+                struckPriceText: this.countingData[productId].struckPriceText,
+            });
+        }
+        if (
             warehouseStock !== null &&
             warehouseStock !== undefined &&
             this._countingEntryNeedsPriceEnrichment(this.countingData[productId])
@@ -6982,8 +7105,9 @@ class CountingSystem {
             void this._fetchAndMergeProductPrices(productId, tn).then((ok) => {
                 if (!ok) return;
                 this._scheduleProductSave(productId, 200);
+                this._invalidateFinanceCache(tn);
                 if (this.currentTab === 'finans') {
-                    void this.renderFinancialDataForSelection();
+                    this._scheduleFinanceRefresh();
                 }
             });
         }
@@ -10583,105 +10707,109 @@ class CountingSystem {
     }
 
     // Financial Analysis Functions
+    _buildFinancialDataForTable(tableName) {
+        const fullData = this.cachedFullData;
+        if (!fullData?._tables?.[tableName]) return null;
+
+        const tableData = fullData._tables[tableName];
+        const products = [];
+        const categoryMap = {};
+
+        for (const [productId, rawData] of Object.entries(tableData)) {
+            if (this.isReservedCountingKey(productId)) continue;
+
+            const product = this.productIndex.get(productId);
+            if (!product) continue;
+
+            const data = this._mergeEntryWithPriceCacheForFinance(productId, rawData);
+            const warehouseStock = data.warehouseStock ?? 0;
+            const systemStock = data.systemStock ?? 0;
+            const price = this._resolveFinancePrice(data) ?? 0;
+            const priceText = this._resolveFinancePriceText(data) || '₺0,00';
+
+            if (price === 0 || price === null) continue;
+
+            const warehouseValue = warehouseStock * price;
+            const systemValue = systemStock * price;
+            const difference = warehouseValue - systemValue;
+            const stockDiff = warehouseStock - systemStock;
+            const barcodes = (product.barcodes || [])
+                .map((b) => (b && b.code != null ? String(b.code).trim() : ''))
+                .filter(Boolean);
+            const barcode = barcodes.length ? barcodes[0] : '';
+            const imageUrl = product.image || '../assets/logo.png';
+            const category = product.category || 'Genel';
+
+            const productData = {
+                productId,
+                productName: product.name || 'Bilinmeyen Ürün',
+                category,
+                warehouseStock,
+                systemStock,
+                price,
+                priceText,
+                warehouseValue,
+                systemValue,
+                difference,
+                stockDiff,
+                barcode,
+                barcodes,
+                imageUrl,
+            };
+
+            products.push(productData);
+
+            if (!categoryMap[category]) {
+                categoryMap[category] = {
+                    category,
+                    warehouseValue: 0,
+                    systemValue: 0,
+                    difference: 0,
+                    productCount: 0,
+                };
+            }
+            categoryMap[category].warehouseValue += warehouseValue;
+            categoryMap[category].systemValue += systemValue;
+            categoryMap[category].difference += difference;
+            categoryMap[category].productCount += 1;
+        }
+
+        const totalWarehouseValue = products.reduce((sum, p) => sum + p.warehouseValue, 0);
+        const totalSystemValue = products.reduce((sum, p) => sum + p.systemValue, 0);
+        const profitLoss = totalWarehouseValue - totalSystemValue;
+        const productCount = products.length;
+        const countedProducts = products.filter(
+            (p) => p.warehouseStock !== null && p.warehouseStock !== undefined
+        ).length;
+        const categories = Object.values(categoryMap).sort((a, b) => b.warehouseValue - a.warehouseValue);
+
+        return {
+            tableName,
+            summary: {
+                totalWarehouseValue,
+                totalSystemValue,
+                profitLoss,
+                productCount,
+                countedProducts,
+            },
+            categories,
+            products: products.sort((a, b) => b.warehouseValue - a.warehouseValue),
+        };
+    }
+
     async calculateFinancialData(tableName) {
         try {
-            // Load full counting data to access all tables
-            const fullData = await this.loadFullCountingData();
-            if (!fullData || !fullData._tables || !fullData._tables[tableName]) {
-                return null;
+            await this.loadFullCountingData();
+            const cacheKey = this._getTableFinanceCacheKey(tableName);
+            const cached = this._financeCalcCache.get(tableName);
+            if (cached?.key === cacheKey && cached.data) {
+                return cached.data;
             }
-
-            await this._ensureTablePricesEnriched(tableName);
-
-            const tableData = fullData._tables[tableName];
-            const products = [];
-            const categoryMap = {};
-
-            // Process each product in the table
-            for (const [productId, data] of Object.entries(tableData)) {
-                if (this.isReservedCountingKey(productId)) {
-                    continue;
-                }
-
-                const product = this.productIndex.get(productId);
-                if (!product) continue;
-
-                const warehouseStock = data.warehouseStock ?? 0;
-                const systemStock = data.systemStock ?? 0;
-                const price = this._resolveFinancePrice(data) ?? 0;
-                const priceText = this._resolveFinancePriceText(data) || '₺0,00';
-
-                if (price === 0 || price === null) continue;
-
-                const warehouseValue = warehouseStock * price;
-                const systemValue = systemStock * price;
-                const difference = warehouseValue - systemValue;
-                const stockDiff = warehouseStock - systemStock;
-                const barcodes = (product.barcodes || [])
-                    .map((b) => (b && b.code != null ? String(b.code).trim() : ''))
-                    .filter(Boolean);
-                const barcode = barcodes.length ? barcodes[0] : '';
-                const imageUrl = product.image || '../assets/logo.png';
-
-                const category = product.category || 'Genel';
-
-                const productData = {
-                    productId,
-                    productName: product.name || 'Bilinmeyen Ürün',
-                    category,
-                    warehouseStock,
-                    systemStock,
-                    price,
-                    priceText,
-                    warehouseValue,
-                    systemValue,
-                    difference,
-                    stockDiff,
-                    barcode,
-                    barcodes,
-                    imageUrl
-                };
-
-                products.push(productData);
-
-                // Aggregate by category
-                if (!categoryMap[category]) {
-                    categoryMap[category] = {
-                        category,
-                        warehouseValue: 0,
-                        systemValue: 0,
-                        difference: 0,
-                        productCount: 0
-                    };
-                }
-
-                categoryMap[category].warehouseValue += warehouseValue;
-                categoryMap[category].systemValue += systemValue;
-                categoryMap[category].difference += difference;
-                categoryMap[category].productCount += 1;
+            const data = this._buildFinancialDataForTable(tableName);
+            if (data) {
+                this._financeCalcCache.set(tableName, { key: cacheKey, data });
             }
-
-            // Calculate summary
-            const totalWarehouseValue = products.reduce((sum, p) => sum + p.warehouseValue, 0);
-            const totalSystemValue = products.reduce((sum, p) => sum + p.systemValue, 0);
-            const profitLoss = totalWarehouseValue - totalSystemValue;
-            const productCount = products.length;
-            const countedProducts = products.filter(p => p.warehouseStock !== null && p.warehouseStock !== undefined).length;
-
-            const categories = Object.values(categoryMap).sort((a, b) => b.warehouseValue - a.warehouseValue);
-
-            return {
-                tableName,
-                summary: {
-                    totalWarehouseValue,
-                    totalSystemValue,
-                    profitLoss,
-                    productCount,
-                    countedProducts
-                },
-                categories,
-                products: products.sort((a, b) => b.warehouseValue - a.warehouseValue)
-            };
+            return data;
         } catch (error) {
             console.error('Error calculating financial data:', error);
             return null;
@@ -10690,21 +10818,19 @@ class CountingSystem {
 
     async getAllTablesFinancialData() {
         try {
-            const fullData = await this.loadFullCountingData();
-            if (!fullData || !fullData._tables) {
-                return [];
-            }
-
+            await this.loadFullCountingData();
             const tables = this.getFinanceEligibleTableNames();
-            const financialData = [];
-
-            for (const tableName of tables) {
-                const data = await this.calculateFinancialData(tableName);
-                if (data) {
-                    financialData.push(data);
-                }
+            const allCacheKey = `__all__:${tables.map((t) => this._getTableFinanceCacheKey(t)).join(';')}`;
+            const cachedAll = this._financeCalcCache.get('__all__');
+            if (cachedAll?.key === allCacheKey && Array.isArray(cachedAll.data)) {
+                return cachedAll.data;
             }
 
+            const financialData = (
+                await Promise.all(tables.map((tableName) => this.calculateFinancialData(tableName)))
+            ).filter(Boolean);
+
+            this._financeCalcCache.set('__all__', { key: allCacheKey, data: financialData });
             return financialData;
         } catch (error) {
             console.error('Error getting all tables financial data:', error);
