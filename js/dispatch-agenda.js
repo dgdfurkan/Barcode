@@ -14,6 +14,7 @@ class DispatchAgendaApp {
         this._eventsBound = false;
         this._ready = false;
         this._toastTimer = null;
+        this._searchHighlight = -1;
     }
 
     async init() {
@@ -80,6 +81,13 @@ class DispatchAgendaApp {
         return p?.image || p?.imageUrl || '../assets/logo.png';
     }
 
+    _productBarcode(p) {
+        const barcodes = Array.isArray(p?.barcodes) ? p.barcodes : [];
+        const first = barcodes[0];
+        if (!first) return '';
+        return typeof first === 'object' ? first.code || '' : String(first);
+    }
+
     async _loadProducts() {
         try {
             if (window.userDataManager) {
@@ -108,7 +116,7 @@ class DispatchAgendaApp {
         }
     }
 
-    _searchProducts(query, limit = 24) {
+    _searchProducts(query, limit = 30) {
         const q = (query || '').trim().toLocaleLowerCase('tr');
         if (q.length < 2) return [];
         const tokens = q.split(/\s+/).filter(Boolean);
@@ -180,7 +188,7 @@ class DispatchAgendaApp {
                     <span class="agenda-qty-badge">−${qty}</span>
                 </div>
                 <p class="agenda-card-title">${name}</p>
-                <div class="flex flex-wrap items-center gap-1 mt-1">
+                <div class="flex flex-wrap items-center gap-1 mt-1.5">
                     <span class="text-[10px] text-text-secondary">${this._esc(dateStr)}</span>
                     ${pickup}
                 </div>
@@ -205,6 +213,7 @@ class DispatchAgendaApp {
         document.getElementById('addModalCancel')?.addEventListener('click', () => this.closeAddModal());
         document.getElementById('addModalSave')?.addEventListener('click', () => void this.saveNewItem());
         document.getElementById('addClearProductBtn')?.addEventListener('click', () => this._clearSelectedProduct());
+        document.getElementById('addSearchClearBtn')?.addEventListener('click', () => this._clearSearchInput());
         document.getElementById('detailCloseBtn')?.addEventListener('click', () => this.closeDetailSheet());
         document.getElementById('detailDeleteBtn')?.addEventListener('click', () => void this.completeAndDelete());
         document.getElementById('detailSheetBackdrop')?.addEventListener('click', () => this.closeDetailSheet());
@@ -214,19 +223,18 @@ class DispatchAgendaApp {
             window.location.href = '../index.html';
         });
 
+        document.querySelectorAll('#addReasonPills .agenda-reason-pill').forEach((pill) => {
+            pill.addEventListener('click', () => this._setReasonPreset(pill.getAttribute('data-reason')));
+        });
+
         const searchInput = document.getElementById('addProductSearch');
         if (searchInput) {
             searchInput.addEventListener('input', () => {
+                this._updateSearchClearBtn(searchInput.value);
                 clearTimeout(this._searchDebounce);
-                this._searchDebounce = setTimeout(() => this._renderProductSearchResults(searchInput.value), 150);
+                this._searchDebounce = setTimeout(() => this._renderProductSearchResults(searchInput.value), 120);
             });
-            searchInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const first = document.querySelector('#addProductResults [data-pick-id]');
-                    if (first) first.click();
-                }
-            });
+            searchInput.addEventListener('keydown', (e) => this._handleSearchKeydown(e));
         }
 
         const strip = document.getElementById('agendaCardStrip');
@@ -252,7 +260,8 @@ class DispatchAgendaApp {
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                if (!document.getElementById('addAgendaModal')?.classList.contains('hidden')) {
+                const modal = document.getElementById('addAgendaModal');
+                if (modal?.classList.contains('agenda-modal-open')) {
                     this.closeAddModal();
                 } else if (document.getElementById('detailSheet')?.classList.contains('agenda-sheet-open')) {
                     this.closeDetailSheet();
@@ -261,20 +270,61 @@ class DispatchAgendaApp {
         });
     }
 
+    _updateSearchClearBtn(value) {
+        const btn = document.getElementById('addSearchClearBtn');
+        if (btn) btn.classList.toggle('hidden', !(value || '').trim());
+    }
+
+    _clearSearchInput() {
+        const search = document.getElementById('addProductSearch');
+        if (search) {
+            search.value = '';
+            search.focus();
+        }
+        this._updateSearchClearBtn('');
+        this._renderProductSearchResults('');
+    }
+
+    _setReasonPreset(reason) {
+        const preset = reason || this.REASON_PRESETS[0];
+        document.querySelectorAll('#addReasonPills .agenda-reason-pill').forEach((pill) => {
+            pill.classList.toggle('is-active', pill.getAttribute('data-reason') === preset);
+        });
+        const select = document.getElementById('addReasonPreset');
+        if (select) select.value = preset;
+    }
+
+    _getReasonPreset() {
+        const active = document.querySelector('#addReasonPills .agenda-reason-pill.is-active');
+        return active?.getAttribute('data-reason') || this.REASON_PRESETS[0];
+    }
+
+    _showFormSection(show) {
+        const section = document.getElementById('addFormSection');
+        const saveBtn = document.getElementById('addModalSave');
+        if (section) section.classList.toggle('is-visible', show);
+        if (saveBtn) saveBtn.disabled = !show;
+    }
+
     openAddModal() {
         this.selectedProduct = null;
+        this._searchHighlight = -1;
         const modal = document.getElementById('addAgendaModal');
         const search = document.getElementById('addProductSearch');
         const picked = document.getElementById('addSelectedProduct');
         const results = document.getElementById('addProductResults');
+        const hint = document.getElementById('addSearchHint');
 
         if (search) search.value = '';
+        this._updateSearchClearBtn('');
         picked?.classList.add('hidden');
-        picked?.classList.remove('flex');
         if (results) {
-            results.innerHTML =
-                '<p class="px-3 py-3 text-xs text-text-secondary">En az 2 karakter yazın (ürün adı veya barkod)</p>';
+            results.innerHTML = '';
+            results.classList.add('hidden');
         }
+        hint?.classList.remove('hidden');
+        this._showFormSection(false);
+
         const qtyEl = document.getElementById('addQuantity');
         const noteEl = document.getElementById('addReasonNote');
         const addrEl = document.getElementById('addAddress');
@@ -283,24 +333,23 @@ class DispatchAgendaApp {
         if (noteEl) noteEl.value = '';
         if (addrEl) addrEl.value = '';
         if (pickupEl) pickupEl.checked = false;
-        const reason = document.getElementById('addReasonPreset');
-        if (reason) reason.value = this.REASON_PRESETS[0];
+        this._setReasonPreset(this.REASON_PRESETS[0]);
         this._setDefaultDate('addEventDate');
 
         if (modal) {
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+            modal.classList.add('agenda-modal-open');
             modal.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
         }
-        setTimeout(() => search?.focus(), 50);
+        setTimeout(() => search?.focus(), 80);
     }
 
     closeAddModal() {
         const modal = document.getElementById('addAgendaModal');
         if (modal) {
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            modal.classList.remove('agenda-modal-open');
             modal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
         }
     }
 
@@ -308,7 +357,8 @@ class DispatchAgendaApp {
         this.selectedProduct = null;
         const picked = document.getElementById('addSelectedProduct');
         picked?.classList.add('hidden');
-        picked?.classList.remove('flex');
+        this._showFormSection(false);
+        document.getElementById('addSearchHint')?.classList.remove('hidden');
         document.getElementById('addProductSearch')?.focus();
     }
 
@@ -317,49 +367,106 @@ class DispatchAgendaApp {
         const picked = document.getElementById('addSelectedProduct');
         const nameEl = document.getElementById('addSelectedName');
         const imgEl = document.getElementById('addSelectedImg');
+        const barcodeEl = document.getElementById('addSelectedBarcode');
+        const results = document.getElementById('addProductResults');
+        const hint = document.getElementById('addSearchHint');
+
         if (nameEl) nameEl.textContent = this._productName(product);
         if (imgEl) imgEl.src = this._productImage(product);
-        if (picked) {
-            picked.classList.remove('hidden');
-            picked.classList.add('flex');
+        if (barcodeEl) {
+            const bc = this._productBarcode(product);
+            barcodeEl.textContent = bc ? `Barkod: ${bc}` : '';
+            barcodeEl.classList.toggle('hidden', !bc);
         }
-        const results = document.getElementById('addProductResults');
-        if (results) results.innerHTML = '';
+        picked?.classList.remove('hidden');
+        if (results) {
+            results.innerHTML = '';
+            results.classList.add('hidden');
+        }
+        hint?.classList.add('hidden');
+        this._showFormSection(true);
         document.getElementById('addQuantity')?.focus();
+    }
+
+    _handleSearchKeydown(e) {
+        const container = document.getElementById('addProductResults');
+        const hits = container ? [...container.querySelectorAll('[data-pick-id]')] : [];
+        if (!hits.length) {
+            if (e.key === 'Enter') e.preventDefault();
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this._searchHighlight = Math.min(this._searchHighlight + 1, hits.length - 1);
+            this._updateSearchHighlight(hits);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this._searchHighlight = Math.max(this._searchHighlight - 1, 0);
+            this._updateSearchHighlight(hits);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const target = hits[this._searchHighlight >= 0 ? this._searchHighlight : 0];
+            target?.click();
+        }
+    }
+
+    _updateSearchHighlight(hits) {
+        hits.forEach((el, i) => {
+            el.setAttribute('aria-selected', i === this._searchHighlight ? 'true' : 'false');
+            if (i === this._searchHighlight) el.scrollIntoView({ block: 'nearest' });
+        });
     }
 
     _renderProductSearchResults(query) {
         const container = document.getElementById('addProductResults');
         if (!container) return;
 
+        this._searchHighlight = -1;
         const q = (query || '').trim();
+
         if (q.length < 2) {
-            container.innerHTML =
-                '<p class="px-3 py-3 text-xs text-text-secondary">En az 2 karakter yazın (ürün adı veya barkod)</p>';
+            container.innerHTML = '';
+            container.classList.add('hidden');
             return;
         }
 
         if (!this.allProducts.length) {
             container.innerHTML =
-                '<p class="px-3 py-3 text-xs text-amber-700">Ürün kataloğu yüklenemedi. Sayfayı yenileyin.</p>';
+                '<p class="px-4 py-4 text-sm text-center text-amber-700">Ürün kataloğu yüklenemedi. Sayfayı yenileyin.</p>';
+            container.classList.remove('hidden');
             return;
         }
 
         const matches = this._searchProducts(q);
         if (!matches.length) {
-            container.innerHTML = '<p class="px-3 py-3 text-xs text-text-secondary">Eşleşen ürün bulunamadı</p>';
+            container.innerHTML =
+                '<p class="px-4 py-6 text-sm text-center text-slate-500">Eşleşen ürün bulunamadı</p>';
+            container.classList.remove('hidden');
             return;
         }
 
         container.innerHTML = matches
-            .map(
-                (p) => `
-            <button type="button" class="agenda-search-hit flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left" data-pick-id="${this._esc(this._productId(p))}">
-                <img src="${this._esc(this._productImage(p))}" alt="" class="h-9 w-9 shrink-0 rounded-md border border-border object-cover" loading="lazy" />
-                <span class="min-w-0 flex-1 text-sm text-text-primary [overflow-wrap:anywhere]">${this._esc(this._productName(p))}</span>
-            </button>`
-            )
+            .map((p) => {
+                const id = this._esc(this._productId(p));
+                const name = this._esc(this._productName(p));
+                const img = this._esc(this._productImage(p));
+                const barcode = this._esc(this._productBarcode(p));
+                const brand = this._esc(p.brand || '');
+                const meta = [brand, barcode ? `Barkod: ${barcode}` : ''].filter(Boolean).join(' · ');
+                return `
+            <button type="button" class="agenda-search-hit" data-pick-id="${id}" aria-selected="false">
+                <img src="${img}" alt="" class="h-12 w-12 shrink-0 rounded-xl border border-slate-100 object-cover bg-slate-50" loading="lazy" />
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-slate-900 [overflow-wrap:anywhere] leading-snug">${name}</p>
+                    ${meta ? `<p class="mt-0.5 text-xs text-slate-500 truncate">${meta}</p>` : ''}
+                </div>
+                <span class="shrink-0 rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">Seç</span>
+            </button>`;
+            })
             .join('');
+
+        container.classList.remove('hidden');
     }
 
     async saveNewItem() {
@@ -375,7 +482,7 @@ class DispatchAgendaApp {
             return;
         }
 
-        const reasonPreset = document.getElementById('addReasonPreset')?.value || this.REASON_PRESETS[0];
+        const reasonPreset = this._getReasonPreset();
         const reasonNote = (document.getElementById('addReasonNote')?.value || '').trim();
         const pickupRequired = !!document.getElementById('addPickupRequired')?.checked;
         const address = (document.getElementById('addAddress')?.value || '').trim();
@@ -410,7 +517,7 @@ class DispatchAgendaApp {
             console.error(e);
             this._toast(e.message || 'Kayıt eklenemedi', 'error');
         } finally {
-            if (saveBtn) saveBtn.disabled = false;
+            if (saveBtn) saveBtn.disabled = !this.selectedProduct;
         }
     }
 
@@ -427,29 +534,29 @@ class DispatchAgendaApp {
             .join(', ');
 
         body.innerHTML = `
-            <div class="flex items-start gap-3">
-                <img src="${this._esc(item.product_image || '../assets/logo.png')}" alt="" class="h-14 w-14 shrink-0 rounded-xl border border-border object-cover" />
+            <div class="flex items-start gap-3.5 rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50 to-blue-50/40 p-3.5">
+                <img src="${this._esc(item.product_image || '../assets/logo.png')}" alt="" class="h-16 w-16 shrink-0 rounded-xl border-2 border-white object-cover shadow-sm" />
                 <div class="min-w-0 flex-1">
-                    <h3 class="text-base font-semibold text-text-primary [overflow-wrap:anywhere]">${this._esc(item.product_name)}</h3>
-                    <p class="mt-1 text-sm font-bold text-rose-700">−${Number(item.quantity) || 1} Adet</p>
+                    <h3 class="text-base font-bold text-slate-900 [overflow-wrap:anywhere] leading-snug">${this._esc(item.product_name)}</h3>
+                    <p class="mt-1.5 inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-700">−${Number(item.quantity) || 1} Adet Eksik</p>
                 </div>
             </div>
-            <dl class="mt-4 space-y-2.5 text-sm">
-                <div class="flex justify-between gap-3 border-b border-border pb-2">
-                    <dt class="text-text-secondary shrink-0">Sebep</dt>
-                    <dd class="text-right font-medium text-text-primary">${this._esc(item.reason_preset || '—')}</dd>
+            <dl class="mt-4 space-y-0 text-sm">
+                <div class="flex justify-between gap-3 border-b border-slate-100 py-2.5">
+                    <dt class="text-slate-500 shrink-0">Sebep</dt>
+                    <dd class="text-right font-semibold text-slate-900">${this._esc(item.reason_preset || '—')}</dd>
                 </div>
-                ${item.reason_note ? `<div class="flex justify-between gap-3 border-b border-border pb-2"><dt class="text-text-secondary shrink-0">Not</dt><dd class="text-right text-text-primary [overflow-wrap:anywhere]">${this._esc(item.reason_note)}</dd></div>` : ''}
-                <div class="flex justify-between gap-3 border-b border-border pb-2">
-                    <dt class="text-text-secondary shrink-0">Tarih</dt>
-                    <dd class="text-right text-text-primary">${this._esc(this._formatDate(item.event_date || item.created_at))}</dd>
+                ${item.reason_note ? `<div class="flex justify-between gap-3 border-b border-slate-100 py-2.5"><dt class="text-slate-500 shrink-0">Not</dt><dd class="text-right text-slate-800 [overflow-wrap:anywhere]">${this._esc(item.reason_note)}</dd></div>` : ''}
+                <div class="flex justify-between gap-3 border-b border-slate-100 py-2.5">
+                    <dt class="text-slate-500 shrink-0">Tarih</dt>
+                    <dd class="text-right text-slate-900">${this._esc(this._formatDate(item.event_date || item.created_at))}</dd>
                 </div>
-                <div class="flex justify-between gap-3 border-b border-border pb-2">
-                    <dt class="text-text-secondary shrink-0">Müşteriden Alınacak</dt>
-                    <dd class="text-right font-medium ${item.pickup_required ? 'text-blue-700' : 'text-text-secondary'}">${item.pickup_required ? 'Evet' : 'Hayır'}</dd>
+                <div class="flex justify-between gap-3 border-b border-slate-100 py-2.5">
+                    <dt class="text-slate-500 shrink-0">Müşteriden Alınacak</dt>
+                    <dd class="text-right font-semibold ${item.pickup_required ? 'text-blue-700' : 'text-slate-400'}">${item.pickup_required ? 'Evet' : 'Hayır'}</dd>
                 </div>
-                ${item.address ? `<div class="flex justify-between gap-3 border-b border-border pb-2"><dt class="text-text-secondary shrink-0">Adres</dt><dd class="text-right text-text-primary [overflow-wrap:anywhere]">${this._esc(item.address)}</dd></div>` : ''}
-                ${barcodeText ? `<div class="flex justify-between gap-3"><dt class="text-text-secondary shrink-0">Barkod</dt><dd class="text-right text-xs text-text-secondary [overflow-wrap:anywhere]">${this._esc(barcodeText)}</dd></div>` : ''}
+                ${item.address ? `<div class="flex justify-between gap-3 border-b border-slate-100 py-2.5"><dt class="text-slate-500 shrink-0">Adres</dt><dd class="text-right text-slate-800 [overflow-wrap:anywhere]">${this._esc(item.address)}</dd></div>` : ''}
+                ${barcodeText ? `<div class="flex justify-between gap-3 py-2.5"><dt class="text-slate-500 shrink-0">Barkod</dt><dd class="text-right text-xs font-mono text-slate-600 [overflow-wrap:anywhere]">${this._esc(barcodeText)}</dd></div>` : ''}
             </dl>`;
 
         sheet.classList.remove('hidden');
@@ -462,7 +569,7 @@ class DispatchAgendaApp {
         if (!sheet) return;
         sheet.classList.remove('agenda-sheet-open');
         sheet.setAttribute('aria-hidden', 'true');
-        setTimeout(() => sheet.classList.add('hidden'), 220);
+        setTimeout(() => sheet.classList.add('hidden'), 280);
         this.detailItem = null;
     }
 
@@ -526,7 +633,7 @@ class DispatchAgendaApp {
             info: 'bg-slate-800',
         };
         el.textContent = msg;
-        el.className = `fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 max-w-[90vw] rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-lg ${colors[type] || colors.info}`;
+        el.className = `fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 max-w-[90vw] rounded-xl px-4 py-2.5 text-sm font-medium text-white shadow-xl ${colors[type] || colors.info}`;
         el.classList.remove('hidden');
         clearTimeout(this._toastTimer);
         this._toastTimer = setTimeout(() => el.classList.add('hidden'), type === 'error' ? 4500 : 2800);
