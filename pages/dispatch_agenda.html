@@ -115,13 +115,13 @@
         <div class="w-full mx-auto px-2 sm:px-4 lg:px-8">
             <div class="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
                 <div class="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 min-w-0">
-                    <button type="button" id="backToSearchBtn" class="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors text-xs sm:text-sm font-medium flex-shrink-0" title="Barkod Arama Sayfasına Dön">
+                    <a href="product_search.html" id="backToSearchBtn" class="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors text-xs sm:text-sm font-medium flex-shrink-0" title="Ürün Arama Sayfasına Dön">
                         <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
                         </svg>
-                        <span class="hidden sm:inline">Barkod Aramaya Dön</span>
+                        <span class="hidden sm:inline">Ürün Aramaya Dön</span>
                         <span class="sm:hidden">Arama</span>
-                    </button>
+                    </a>
                     <div class="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
                         <img src="../assets/logo.png" alt="Jet Barkod" class="w-full h-full object-contain">
                     </div>
@@ -131,21 +131,16 @@
                     </div>
                 </div>
                 <div class="flex-1"></div>
-                <div class="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
-                    <button type="button" id="agendaAddBtn" class="btn-primary text-xs sm:text-sm inline-flex items-center gap-1.5 hidden">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        <span class="hidden sm:inline">Ürün Ekle</span>
-                        <span class="sm:hidden">Ekle</span>
-                    </button>
-                    <button type="button" id="agendaRefreshBtn" class="btn-secondary text-xs sm:text-sm hidden sm:inline-flex">Yenile</button>
-                    <div class="text-right hidden md:block max-w-[8rem]">
-                        <p class="text-sm font-semibold text-text-primary truncate" id="headerUserName">—</p>
+                <div class="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+                    <div class="text-right hidden sm:block flex-shrink-0 max-w-[10rem] lg:max-w-[12rem]">
+                        <p class="text-sm font-semibold text-text-primary truncate" id="headerUserName">Yükleniyor…</p>
+                        <p class="text-xs text-text-secondary truncate" id="headerUserCompany">—</p>
                     </div>
-                    <button type="button" id="headerLogoutBtn" class="btn-secondary text-xs sm:text-sm p-1.5 sm:p-2">
+                    <button type="button" id="headerLogoutBtn" class="btn-secondary text-xs sm:text-sm p-1.5 sm:p-2 flex-shrink-0" title="Çıkış">
                         <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                         </svg>
-                        <span class="hidden sm:inline ml-1">Çıkış</span>
+                        <span class="hidden sm:inline ml-1 sm:ml-2">Çıkış</span>
                     </button>
                 </div>
             </div>
@@ -182,9 +177,9 @@
                             <p class="text-sm text-text-secondary">Eksik bildirimler · karta dokunun · detay ve silme</p>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <span id="agendaCountBadge" class="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800">0</span>
-                        <button type="button" id="agendaAddBtnMain" class="btn-primary text-sm inline-flex items-center gap-1.5 sm:hidden">
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span id="agendaCountBadge" class="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800 tabular-nums">0</span>
+                        <button type="button" id="agendaAddBtn" class="btn-primary text-sm inline-flex items-center gap-1.5">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             Ürün Ekle
                         </button>

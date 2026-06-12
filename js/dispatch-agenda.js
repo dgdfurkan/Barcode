@@ -25,8 +25,7 @@ class DispatchAgendaApp {
             return;
         }
         this._username = session.username;
-        const nameEl = document.getElementById('headerUserName');
-        if (nameEl) nameEl.textContent = session.username || '—';
+        this._updateHeaderUser(session);
 
         try {
             if (window.premiumFeatures) {
@@ -43,12 +42,17 @@ class DispatchAgendaApp {
 
         this._ready = true;
         this._show('mainContent');
-        document.getElementById('agendaAddBtn')?.classList.remove('hidden');
-        document.getElementById('agendaRefreshBtn')?.classList.remove('hidden');
 
         await this._loadProducts();
         await this.loadItems();
         this._setDefaultDate();
+    }
+
+    _updateHeaderUser(session) {
+        const nameEl = document.getElementById('headerUserName');
+        const companyEl = document.getElementById('headerUserCompany');
+        if (nameEl) nameEl.textContent = session?.username || session?.user_id || 'Kullanıcı';
+        if (companyEl) companyEl.textContent = session?.company || '';
     }
 
     _show(id) {
@@ -190,9 +194,7 @@ class DispatchAgendaApp {
         };
 
         document.getElementById('agendaAddBtn')?.addEventListener('click', openAdd);
-        document.getElementById('agendaAddBtnMain')?.addEventListener('click', openAdd);
         document.getElementById('agendaEmptyAddBtn')?.addEventListener('click', openAdd);
-        document.getElementById('agendaRefreshBtn')?.addEventListener('click', () => void this.loadItems());
         document.getElementById('addModalClose')?.addEventListener('click', () => this.closeAddModal());
         document.getElementById('addModalCancel')?.addEventListener('click', () => this.closeAddModal());
         document.getElementById('addModalSave')?.addEventListener('click', () => void this.saveNewItem());
@@ -201,9 +203,6 @@ class DispatchAgendaApp {
         document.getElementById('detailDeleteBtn')?.addEventListener('click', () => void this.completeAndDelete());
         document.getElementById('detailSheetBackdrop')?.addEventListener('click', () => this.closeDetailSheet());
 
-        document.getElementById('backToSearchBtn')?.addEventListener('click', () => {
-            window.location.href = 'product_search.html';
-        });
         document.getElementById('headerLogoutBtn')?.addEventListener('click', () => {
             window.authUtils?.logout?.();
             window.location.href = '../index.html';
