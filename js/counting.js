@@ -3228,45 +3228,62 @@ class CountingSystem {
             warehouseStock !== null && systemStock !== null && !Number.isNaN(warehouseStock) && !Number.isNaN(systemStock)
                 ? warehouseStock - systemStock
                 : null;
+        const difference =
+            stockDiff !== null && resolvedPrice && resolvedPrice > 0 ? stockDiff * resolvedPrice : null;
 
-        return { warehouseStock, systemStock, price, priceText, stockDiff };
+        return { warehouseStock, systemStock, price, priceText, stockDiff, difference };
     }
 
     _renderFinancePasteGuideRowHtml(p, idx) {
         const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
         const name = this.escapeHtml(p.productName || '');
-        const barcode = this.escapeHtml(p.barcode || (p.barcodes?.[0] ?? ''));
         const d = this._getFinancePasteGuideItemDisplay(p);
         const depo = this._formatPasteGuideStock(d.warehouseStock);
         const sistem = this._formatPasteGuideStock(d.systemStock);
-        const diffClass =
-            d.stockDiff > 0 ? 'text-emerald-700' : d.stockDiff < 0 ? 'text-rose-700' : 'text-slate-500';
-        const diffHtml =
-            d.stockDiff !== null
-                ? `<span class="text-[10px] font-semibold tabular-nums ${diffClass}">${d.stockDiff > 0 ? '+' : ''}${d.stockDiff}</span>`
-                : '';
+        const adetStr =
+            d.stockDiff !== null ? (d.stockDiff > 0 ? `+${d.stockDiff}` : `${d.stockDiff}`) : '';
+        const stockDiffClass =
+            d.stockDiff > 0 ? 'text-emerald-700' : d.stockDiff < 0 ? 'text-rose-700' : 'text-gray-600';
+        const toneClass =
+            d.stockDiff > 0 ? 'text-emerald-700' : d.stockDiff < 0 ? 'text-rose-700' : 'text-gray-600';
+        const tlClass =
+            d.stockDiff > 0 ? 'text-emerald-800' : d.stockDiff < 0 ? 'text-rose-800' : 'text-gray-700';
+        let adetLabel = '';
+        if (d.stockDiff > 0) adetLabel = `${adetStr} adet fazla`;
+        else if (d.stockDiff < 0) adetLabel = `${adetStr} adet eksik`;
+
+        const barcodeList =
+            Array.isArray(p.barcodes) && p.barcodes.length ? p.barcodes : p.barcode ? [p.barcode] : [];
+        const hasBarcodes = barcodeList.some((b) => {
+            if (b == null) return false;
+            if (typeof b === 'object' && b.code != null) return String(b.code).trim().length > 0;
+            return String(b).trim().length > 0;
+        });
+        const barcodesHiddenClass = this._financeBarcodesVisible ? '' : 'hidden';
+        const barcodesHtml = hasBarcodes
+            ? `<div class="finance-barcodes-block mt-1.5 ${barcodesHiddenClass}" aria-hidden="${this._financeBarcodesVisible ? 'false' : 'true'}">${this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 2 })}</div>`
+            : '';
 
         return `
-            <div class="finance-paste-guide-row flex items-center gap-2.5 rounded-lg border border-slate-100 bg-white px-2.5 py-2 sm:gap-3 sm:px-3">
+            <div class="finance-paste-guide-row flex items-start gap-2.5 rounded-lg border border-slate-100 bg-white px-2.5 py-2 sm:gap-3 sm:px-3">
                 <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">${idx + 1}</span>
                 <img src="${img}" alt="" class="h-10 w-10 shrink-0 rounded-md border border-slate-100 object-cover sm:h-11 sm:w-11" loading="lazy" />
                 <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere] line-clamp-2">${name}</p>
-                    ${barcode ? `<p class="mt-0.5 truncate text-[10px] font-mono text-gray-500">${barcode}</p>` : ''}
-                </div>
-                <div class="grid shrink-0 grid-cols-3 gap-2 text-center sm:gap-3">
-                    <div class="min-w-[2.75rem] sm:min-w-[3.25rem]">
-                        <p class="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Depo</p>
-                        <p class="mt-0.5 text-sm font-bold tabular-nums text-slate-800">${depo}</p>
+                    <p class="text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</p>
+                    ${barcodesHtml}
+                    <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
+                        <span>Depo: <strong>${depo}</strong></span>
+                        <span>Sistem: <strong>${sistem}</strong></span>
+                        ${d.stockDiff !== null ? `<span class="font-semibold ${stockDiffClass}">(${adetStr})</span>` : ''}
                     </div>
-                    <div class="min-w-[2.75rem] sm:min-w-[3.25rem]">
-                        <p class="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Sistem</p>
-                        <p class="mt-0.5 text-sm font-bold tabular-nums text-slate-800">${sistem}</p>
-                    </div>
-                    <div class="min-w-[4.5rem] sm:min-w-[5rem]">
-                        <p class="text-[9px] font-semibold uppercase tracking-wide text-slate-400">Birim</p>
-                        <p class="mt-0.5 text-xs font-semibold tabular-nums text-slate-700">${this.escapeHtml(d.priceText)}</p>
-                        ${diffHtml}
+                    <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
+                        ${adetLabel ? `<span class="font-semibold ${toneClass}">${adetLabel}</span>` : ''}
+                        <span class="text-gray-500">Birim ${this.escapeHtml(d.priceText)}</span>
+                        ${
+                            d.difference !== null
+                                ? `<span class="font-bold ${tlClass}">${d.difference >= 0 ? '+' : ''}${this.formatCurrency(d.difference)}</span>`
+                                : ''
+                        }
                     </div>
                 </div>
             </div>`;
@@ -3283,12 +3300,7 @@ class CountingSystem {
             ? `<div class="finance-paste-guide-head sticky top-0 z-10 mb-1.5 hidden items-center gap-2.5 rounded-lg bg-slate-100/95 px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400 backdrop-blur sm:flex sm:gap-3 sm:px-3">
                     <span class="w-6 shrink-0 text-center">#</span>
                     <span class="w-10 shrink-0 sm:w-11"></span>
-                    <span class="min-w-0 flex-1">Ürün</span>
-                    <span class="grid shrink-0 grid-cols-3 gap-2 text-center sm:gap-3">
-                        <span class="min-w-[2.75rem] sm:min-w-[3.25rem]">Depo</span>
-                        <span class="min-w-[2.75rem] sm:min-w-[3.25rem]">Sistem</span>
-                        <span class="min-w-[4.5rem] sm:min-w-[5rem]">Birim</span>
-                    </span>
+                    <span class="min-w-0 flex-1">Ürün · depo / sistem / birim</span>
                </div>`
             : '';
 
@@ -3296,7 +3308,7 @@ class CountingSystem {
             <div class="finance-paste-guide-section -mx-1 mt-5 rounded-xl border border-slate-200/80 bg-slate-50/50 px-2 py-4 sm:-mx-2 sm:px-4" id="financePasteGuideSection">
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div>
-                        <h4 class="text-sm font-semibold text-gray-900">Sayım sırası rehberi</h4>
+                        <h4 class="text-sm font-semibold text-gray-900">Sayım Sırası Rehberi</h4>
                         <p class="mt-0.5 text-[11px] text-gray-500">Kaydedilmez · sayfa yenilenince silinir · fiyatlar ${this._financeUseStruckPrice ? 'orijinal' : 'satış'} fiyatına göre</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
