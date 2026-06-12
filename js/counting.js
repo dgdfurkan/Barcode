@@ -130,7 +130,9 @@ class CountingSystem {
         this._financePasteGuide = null;
         /** Rehber SKT önbelleği — productId → [{ date, qty }] (kaydedilmez) */
         this._financePasteGuideSkt = new Map();
-        this._financePasteGuideSktLoading = false;
+        /** SKT Getir sonrası warehouse linki + yapıştır modu */
+        this._financePasteGuideSktLinkReady = false;
+        this._financePasteGuideSktUrl = null;
         this._financePasteGuideSelectedIndex = null;
         /** Oturum içi ürün fiyat önbelleği — API tekrarlarını azaltır */
         this._productPriceCache = new Map();
@@ -3128,7 +3130,8 @@ class CountingSystem {
     _clearFinancePasteGuide() {
         this._financePasteGuide = null;
         this._financePasteGuideSkt = new Map();
-        this._financePasteGuideSktLoading = false;
+        this._financePasteGuideSktLinkReady = false;
+        this._financePasteGuideSktUrl = null;
         this._financePasteGuideSelectedIndex = null;
     }
 
@@ -3184,6 +3187,8 @@ class CountingSystem {
             unmatched,
         };
         this._financePasteGuideSkt = new Map();
+        this._financePasteGuideSktLinkReady = false;
+        this._financePasteGuideSktUrl = null;
         this._financePasteGuideSelectedIndex = null;
 
         if (this._lastFinanceExecutiveProducts) {
@@ -3251,9 +3256,6 @@ class CountingSystem {
     _renderFinancePasteGuideSktHtml(productId) {
         const entries = this._getFinancePasteGuideSktEntries(productId);
         if (!entries.length) {
-            if (this._financePasteGuideSktLoading) {
-                return `<div class="mt-1.5 text-[10px] text-gray-400">SKT bekleniyor…</div>`;
-            }
             return '';
         }
         const chips = entries
@@ -3265,47 +3267,120 @@ class CountingSystem {
         return `<div class="mt-1.5 flex flex-wrap items-center gap-1 text-[10px]"><span class="shrink-0 font-semibold text-gray-500">SKT</span>${chips}</div>`;
     }
 
-    _updateFinancePasteGuideStatus(text) {
-        const status = document.getElementById('financePasteGuideStatus');
-        if (status) status.textContent = text || '';
+    _getFinancePasteGuideWarehouseId() {
+        return this.cachedFullData?._api_info?.warehouseId || '5dcafe6ae2c61b1e52cf1704';
     }
 
-    _updateFinancePasteGuideSktButtonState() {
-        const btn = document.getElementById('financePasteGuideSktBtn');
-        if (!btn) return;
-        const loading = this._financePasteGuideSktLoading;
-        btn.disabled = loading;
-        btn.textContent = loading ? 'SKT alınıyor…' : 'SKT Getir';
-        btn.classList.toggle('opacity-60', loading);
-        btn.classList.toggle('pointer-events-none', loading);
+    _formatFinancePasteGuideSktStartDate() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
-    async _waitForGetirExtensionBridge(timeoutMs = 2500) {
-        if (window.__getirExtensionBridgeReady) return true;
-        return new Promise((resolve) => {
-            const onMsg = (event) => {
-                if (event?.data?.type === 'GETIR_EXTENSION_PONG' || event?.data?.type === 'GETIR_EXTENSION_READY') {
-                    window.__getirExtensionBridgeReady = true;
-                    window.removeEventListener('message', onMsg);
-                    resolve(true);
-                }
-            };
-            window.addEventListener('message', onMsg);
-            window.postMessage({ type: 'GETIR_EXTENSION_PING' }, '*');
-            setTimeout(() => {
-                window.removeEventListener('message', onMsg);
-                resolve(!!window.__getirExtensionBridgeReady);
-            }, timeoutMs);
+    _buildFinancePasteGuideSktUrl(productIds) {
+        const warehouseId = this._getFinancePasteGuideWarehouseId();
+        const ids = (productIds || []).map(String).filter(Boolean).join(',');
+        const startDate = this._formatFinancePasteGuideSktStartDate();
+        return `https://warehouse.getir.com/r/${warehouseId}/stock/stock-management/product/expiration/list?offset=1&productIds=${ids}&startDate=${startDate}&endDate=2030-07-31`;
+    }
+
+    _sortFinancePasteGuideSktEntries(entries) {
+        entries.sort((a, b) => {
+            const [da, ma, ya] = String(a.date).split('.').map(Number);
+            const [db, mb, yb] = String(b.date).split('.').map(Number);
+            return new Date(ya, ma - 1, da) - new Date(yb, mb - 1, db);
         });
     }
 
-    async fetchFinancePasteGuideSkt() {
+    _mergeFinancePasteGuideSktRows(rows) {
+        let mergedCount = 0;
+        for (const row of rows || []) {
+            const pid = String(row.productId || '').trim();
+            const date = String(row.date || '').trim();
+            const qty = Number(row.qty);
+            if (!pid || !date || !qty || Number.isNaN(qty)) continue;
+
+            if (!this._financePasteGuideSkt.has(pid)) {
+                this._financePasteGuideSkt.set(pid, []);
+            }
+            const arr = this._financePasteGuideSkt.get(pid);
+            const existing = arr.find((e) => e.date === date);
+            if (existing) existing.qty += qty;
+            else arr.push({ date, qty });
+            this._sortFinancePasteGuideSktEntries(arr);
+            mergedCount++;
+        }
+        return mergedCount;
+    }
+
+    _parseFinancePasteGuideSktHtml(htmlText) {
+        const raw = String(htmlText || '').trim();
+        if (!raw) return { ok: false, error: 'Yapıştırılan metin boş', rows: [] };
+
+        let doc;
+        try {
+            doc = new DOMParser().parseFromString(raw, 'text/html');
+        } catch (e) {
+            return { ok: false, error: 'HTML okunamadı', rows: [] };
+        }
+
+        const rows = [];
+        doc.querySelectorAll('tr[data-row-key]').forEach((tr) => {
+            if (tr.classList.contains('ant-table-measure-row')) return;
+            const productId = tr.getAttribute('data-row-key');
+            if (!productId) return;
+
+            const expiryCell = tr.querySelector('td.expiryDate');
+            let date = '';
+            if (expiryCell) {
+                const spaceItem = expiryCell.querySelector('.ant-space-item');
+                date = (spaceItem?.textContent || expiryCell.textContent || '').trim();
+            }
+            if (!date) return;
+
+            const cells = tr.querySelectorAll('td.ant-table-cell');
+            const qtyCell = cells.length ? cells[cells.length - 1] : null;
+            const qty = qtyCell ? parseInt(String(qtyCell.textContent).trim(), 10) : NaN;
+            if (!qty || Number.isNaN(qty)) return;
+
+            rows.push({ productId, date, qty });
+        });
+
+        if (!rows.length) {
+            return {
+                ok: false,
+                error: 'SKT tablosu bulunamadı. Warehouse sayfasından tablo HTML\'ini kopyalayın.',
+                rows: [],
+            };
+        }
+        return { ok: true, rows };
+    }
+
+    _countFinancePasteGuideSktMatched() {
+        const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
+        if (!guide?.items?.length) return 0;
+        const guideIds = new Set(guide.items.map((p) => String(p?.productId)).filter(Boolean));
+        let count = 0;
+        guideIds.forEach((pid) => {
+            if ((this._financePasteGuideSkt.get(pid) || []).length) count++;
+        });
+        return count;
+    }
+
+    _refreshFinancePasteGuideSection() {
+        if (this._lastFinanceExecutiveProducts) {
+            this.renderFinancialExecutiveReport(
+                this._lastFinanceExecutiveProducts,
+                this._lastFinanceExecutiveSummary
+            );
+        }
+    }
+
+    prepareFinancePasteGuideSktLink() {
         const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
         if (!guide?.items?.length) {
             this.showToast('Önce rehber listesini yapıştırın', 'warning', 2500);
             return;
         }
-        if (this._financePasteGuideSktLoading) return;
 
         const productIds = guide.items.map((p) => p?.productId).filter(Boolean);
         if (!productIds.length) {
@@ -3313,80 +3388,69 @@ class CountingSystem {
             return;
         }
 
-        const bridgeOk = await this._waitForGetirExtensionBridge(2500);
-        if (!bridgeOk) {
-            this.showToast(
-                'Extension bulunamadı. Chrome\'da «Getir Stok Senkronizasyonu» v1.1.1+ etkinleştirip sayfayı yenileyin; warehouse.getir.com açık kalsın.',
-                'error',
-                6000
-            );
+        const url = this._buildFinancePasteGuideSktUrl(productIds);
+        this._financePasteGuideSktLinkReady = true;
+        this._financePasteGuideSktUrl = url;
+
+        this._updateFinancePasteGuideStatus(
+            `${productIds.length} ürün · linke gidin · tablo HTML\'ini kopyalayıp SKT Yapıştır`
+        );
+        this._refreshFinancePasteGuideSection();
+
+        try {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        } catch (e) {
+            /* popup engellendi */
+        }
+
+        void navigator.clipboard
+            .writeText(url)
+            .then(() => {
+                this.showToast('SKT linki kopyalandı · SKT Yapıştır aktif', 'success', 3200);
+            })
+            .catch(() => {
+                this.showToast('SKT linki hazır · SKT Yapıştır aktif', 'success', 2800);
+            });
+    }
+
+    async importFinancePasteGuideSktFromClipboard() {
+        if (!this._financePasteGuideSktLinkReady) {
+            this.showToast('Önce SKT Getir ile linki oluşturun', 'warning', 2500);
             return;
         }
 
-        this._financePasteGuideSktLoading = true;
-        this._updateFinancePasteGuideSktButtonState();
-        this._updateFinancePasteGuideStatus('SKT isteği başlatılıyor…');
-        this._renderFinancePasteGuideList();
+        const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
+        if (!guide?.items?.length) {
+            this.showToast('Rehber listesi yok', 'warning', 2500);
+            return;
+        }
 
-        const warehouseId = '5dcafe6ae2c61b1e52cf1704';
-        const endDate = '2030-07-31';
+        let rawText = '';
+        try {
+            rawText = await navigator.clipboard.readText();
+        } catch (e) {
+            this.showToast('Panoya erişilemedi', 'error', 3000);
+            return;
+        }
 
-        const finish = (payload) => {
-            this._financePasteGuideSktLoading = false;
-            this._updateFinancePasteGuideSktButtonState();
-            if (payload?.success && payload.byProductId) {
-                Object.entries(payload.byProductId).forEach(([pid, entries]) => {
-                    if (Array.isArray(entries) && entries.length) {
-                        this._financePasteGuideSkt.set(String(pid), entries);
-                    }
-                });
-                const withData = payload.withData ?? Object.values(payload.byProductId).filter((a) => a?.length).length;
-                this._updateFinancePasteGuideStatus(`${withData}/${productIds.length} ürün SKT · kaydedilmez`);
-                this.showToast(`${withData} ürün için SKT alındı`, withData ? 'success' : 'warning', 2800);
-            } else {
-                this._updateFinancePasteGuideStatus(payload?.error || 'SKT alınamadı');
-                this.showToast(payload?.error || 'SKT alınamadı', 'error', 4000);
-            }
-            this._renderFinancePasteGuideList();
-        };
+        const parsed = this._parseFinancePasteGuideSktHtml(rawText);
+        if (!parsed.ok || !parsed.rows?.length) {
+            this.showToast(parsed.error || 'SKT satırı bulunamadı', 'error', 4000);
+            return;
+        }
 
-        const onWindowMessage = (event) => {
-            if (!event?.data) return;
-            if (event.data.type === 'WAREHOUSE_EXPIRY_PROGRESS') {
-                this._updateFinancePasteGuideStatus(event.data.message || '');
-            } else if (event.data.type === 'WAREHOUSE_EXPIRY_RESPONSE') {
-                window.removeEventListener('message', onWindowMessage);
-                finish(event.data);
-            }
-        };
-        window.addEventListener('message', onWindowMessage);
-
-        const dispatchError = (message) => {
-            window.removeEventListener('message', onWindowMessage);
-            finish({
-                success: false,
-                error:
-                    message ||
-                    'Stok eklentisi yanıt vermedi. «Getir Stok Senkronizasyonu» v1.1.1+ etkin mi? Sayfayı yenileyin; warehouse.getir.com açık olsun.',
-            });
-        };
-
-        window.postMessage(
-            {
-                type: 'GETIR_FETCH_EXPIRY_REQUEST',
-                productIds,
-                warehouseId,
-                endDate,
-            },
-            '*'
+        const mergedCount = this._mergeFinancePasteGuideSktRows(parsed.rows);
+        const matched = this._countFinancePasteGuideSktMatched();
+        this._updateFinancePasteGuideStatus(
+            `${matched}/${guide.items.length} ürün SKT · ${mergedCount} satır işlendi · tekrar yapıştırabilirsiniz`
         );
+        this._renderFinancePasteGuideList();
+        this.showToast(`${mergedCount} SKT satırı eklendi`, 'success', 2500);
+    }
 
-        setTimeout(() => {
-            if (!this._financePasteGuideSktLoading) return;
-            dispatchError(
-                'Stok eklentisi yanıt vermedi. Chrome\'da «Getir Stok Senkronizasyonu» v1.1.1+ yüklü mü? Sayfayı (F5) yenileyin; warehouse.getir.com açık kalsın.'
-            );
-        }, 90000);
+    _updateFinancePasteGuideStatus(text) {
+        const status = document.getElementById('financePasteGuideStatus');
+        if (status) status.textContent = text || '';
     }
 
     _renderFinancePasteGuideRowHtml(p, idx) {
@@ -3459,6 +3523,8 @@ class CountingSystem {
         const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
         const canPaste = this.selectedFinancialTable !== 'all';
         const hasItems = !!(guide?.items?.length);
+        const sktLinkReady = !!(hasItems && this._financePasteGuideSktLinkReady && this._financePasteGuideSktUrl);
+        const sktMatched = hasItems ? this._countFinancePasteGuideSktMatched() : 0;
         const listHtml = hasItems
             ? guide.items.map((p, idx) => this._renderFinancePasteGuideRowHtml(p, idx)).join('')
             : `<p class="py-6 text-center text-xs text-gray-400">${canPaste ? 'Liste yapıştırınca eşleşen ürünler burada sırayla görünür.' : 'Tek tablo seçin, ardından sayım listesini yapıştırın.'}</p>`;
@@ -3468,6 +3534,22 @@ class CountingSystem {
                     <span class="w-10 shrink-0 sm:w-11"></span>
                     <span class="min-w-0 flex-1">Ürün · depo / sistem / birim</span>
                </div>`
+            : '';
+        const sktPanelHtml = sktLinkReady
+            ? `<div id="financePasteGuideSktPanel" class="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-2.5">
+                    <p class="text-[11px] font-semibold text-amber-950">Warehouse SKT linki hazır</p>
+                    <p class="mt-1 text-[10px] text-amber-900/80">Linke gidin · tabloyu kopyalayın · <strong>SKT Yapıştır</strong> · sayfa sayfa tekrarlayın</p>
+                    <div class="mt-2 flex flex-wrap items-center gap-2">
+                        <a href="${this.escapeHtml(this._financePasteGuideSktUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex max-w-full items-center rounded-md bg-white px-2.5 py-1.5 text-[10px] font-semibold text-amber-950 ring-1 ring-amber-200 hover:bg-amber-50 truncate">Warehouse SKT sayfasını aç</a>
+                        <button type="button" id="financePasteGuideSktCopyLinkBtn" class="rounded-md border border-amber-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-amber-900 hover:bg-amber-100">Linki kopyala</button>
+                    </div>
+               </div>`
+            : '';
+
+        const statusText = guide
+            ? sktLinkReady
+                ? `${sktMatched}/${guide.items.length} ürün SKT · linke gidin · SKT Yapıştır aktif`
+                : `${guide.items.length} ürün · yapıştırma sırası`
             : '';
 
         return `
@@ -3482,10 +3564,12 @@ class CountingSystem {
                             Yapıştır
                         </button>
                         ${hasItems ? `<button type="button" id="financePasteGuideClearBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Temizle</button>` : ''}
-                        ${hasItems ? `<button type="button" id="financePasteGuideSktBtn" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100" title="Warehouse SKT listesinden bugün itibariyle son kullanma tarihlerini getir">SKT Getir</button>` : ''}
+                        ${hasItems ? `<button type="button" id="financePasteGuideSktBtn" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100" title="Tüm ürünler için warehouse SKT linki oluştur">SKT Getir</button>` : ''}
+                        ${hasItems ? `<button type="button" id="financePasteGuideSktPasteBtn" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-40 disabled:pointer-events-none" ${sktLinkReady ? '' : 'disabled'} title="Warehouse tablo HTML\'ini panodan yapıştır">SKT Yapıştır</button>` : ''}
                     </div>
                 </div>
-                <span id="financePasteGuideStatus" class="mb-2 block text-xs text-gray-500 min-h-[1rem]" role="status" aria-live="polite">${guide ? `${guide.items.length} ürün · yapıştırma sırası` : ''}</span>
+                <span id="financePasteGuideStatus" class="mb-2 block text-xs text-gray-500 min-h-[1rem]" role="status" aria-live="polite">${statusText}</span>
+                ${sktPanelHtml}
                 ${headerHtml}
                 <div id="financePasteGuideList" class="finance-paste-guide-list max-h-[min(38rem,72vh)] space-y-1.5 overflow-y-auto overscroll-contain pr-0.5">${listHtml}</div>
             </div>`;
@@ -3507,6 +3591,8 @@ class CountingSystem {
         const pasteBtn = container.querySelector('#financePasteGuideBtn');
         const clearBtn = container.querySelector('#financePasteGuideClearBtn');
         const sktBtn = container.querySelector('#financePasteGuideSktBtn');
+        const sktPasteBtn = container.querySelector('#financePasteGuideSktPasteBtn');
+        const sktCopyLinkBtn = container.querySelector('#financePasteGuideSktCopyLinkBtn');
         const list = container.querySelector('#financePasteGuideList');
         if (pasteBtn) {
             pasteBtn.addEventListener('click', () => {
@@ -3522,7 +3608,20 @@ class CountingSystem {
         }
         if (sktBtn) {
             sktBtn.addEventListener('click', () => {
-                void this.fetchFinancePasteGuideSkt();
+                this.prepareFinancePasteGuideSktLink();
+            });
+        }
+        if (sktPasteBtn) {
+            sktPasteBtn.addEventListener('click', () => {
+                void this.importFinancePasteGuideSktFromClipboard();
+            });
+        }
+        if (sktCopyLinkBtn && this._financePasteGuideSktUrl) {
+            sktCopyLinkBtn.addEventListener('click', () => {
+                void navigator.clipboard
+                    .writeText(this._financePasteGuideSktUrl)
+                    .then(() => this.showToast('SKT linki kopyalandı', 'success', 2000))
+                    .catch(() => this.showToast('Link kopyalanamadı', 'error', 2500));
             });
         }
         if (list && !list.dataset.guideSelectBound) {
@@ -3547,7 +3646,6 @@ class CountingSystem {
                 row.click();
             });
         }
-        this._updateFinancePasteGuideSktButtonState();
     }
 
     /** Dropdown listesini query'e göre yeniden çizer */
