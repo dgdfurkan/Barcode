@@ -234,6 +234,91 @@
             background: rgb(248 250 252);
         }
 
+        /* Butonlar — btn-primary main.css'te yok, @apply tarayıcıda çalışmaz */
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+            border: none;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background: linear-gradient(180deg, rgb(37 99 235) 0%, rgb(29 78 216) 100%);
+            border-radius: 0.625rem;
+            padding: 0.5625rem 1.125rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            line-height: 1.25;
+            color: #fff;
+            text-decoration: none;
+            white-space: nowrap;
+            box-shadow: 0 1px 2px rgb(29 78 216 / 0.25), 0 4px 14px rgb(37 99 235 / 0.35);
+            transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(180deg, rgb(29 78 216) 0%, rgb(30 64 175) 100%);
+            box-shadow: 0 4px 18px rgb(37 99 235 / 0.45);
+        }
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+        .btn-primary:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgb(37 99 235 / 0.35), 0 4px 14px rgb(37 99 235 / 0.35);
+        }
+        .btn-primary:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        #agendaAddBtn,
+        #agendaEmptyAddBtn {
+            padding: 0.625rem 1.25rem;
+            font-weight: 700;
+            border-radius: 0.75rem;
+        }
+        #detailDeleteBtn {
+            display: flex;
+            width: 100%;
+            padding: 0.8125rem 1rem;
+            font-size: 0.9375rem;
+            font-weight: 700;
+            border-radius: 0.75rem;
+        }
+        #addModalSave {
+            display: flex;
+            flex: 1;
+            min-height: 2.75rem;
+            font-weight: 700;
+        }
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+            border: 1px solid rgb(226 232 240);
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgb(248 250 252);
+            border-radius: 0.625rem;
+            padding: 0.5625rem 1.125rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: rgb(51 65 85);
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .btn-secondary:hover {
+            background: rgb(241 245 249);
+            border-color: rgb(203 213 225);
+        }
+        #addModalCancel {
+            display: flex;
+            flex: 1;
+            min-height: 2.75rem;
+        }
+
         /* Detail sheet */
         #detailSheet { transition: opacity 0.22s ease; }
         #detailSheet:not(.agenda-sheet-open) .agenda-sheet-panel { transform: translateY(100%); }
@@ -320,7 +405,7 @@
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <span id="agendaCountBadge" class="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800 tabular-nums">0</span>
-                        <button type="button" id="agendaAddBtn" class="btn-primary text-sm inline-flex items-center gap-1.5 shadow-md shadow-blue-500/20">
+                        <button type="button" id="agendaAddBtn" class="btn-primary">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             Ürün Ekle
                         </button>
@@ -335,7 +420,7 @@
                         </div>
                         <p class="text-sm font-medium text-text-primary mb-1">Henüz kayıt yok</p>
                         <p class="text-xs text-text-secondary mb-5">Müşteri eksik bildirimlerini buradan takip edin</p>
-                        <button type="button" id="agendaEmptyAddBtn" class="btn-primary text-sm inline-flex items-center gap-1.5 shadow-md shadow-blue-500/20">
+                        <button type="button" id="agendaEmptyAddBtn" class="btn-primary">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             İlk Kaydı Ekle
                         </button>
@@ -449,7 +534,7 @@
 
             <div class="shrink-0 flex gap-2 border-t border-slate-100 bg-slate-50/90 px-4 py-3.5 sm:px-5">
                 <button type="button" id="addModalCancel" class="btn-secondary flex-1 justify-center">İptal</button>
-                <button type="button" id="addModalSave" class="btn-primary flex-1 justify-center shadow-md shadow-blue-500/25 disabled:opacity-50 disabled:pointer-events-none" disabled>Kaydet</button>
+                <button type="button" id="addModalSave" class="btn-primary" disabled>Kaydet</button>
             </div>
         </div>
     </div>
@@ -468,7 +553,7 @@
                 </div>
                 <div id="detailSheetBody" class="px-4 pb-4 max-h-[55vh] overflow-y-auto"></div>
                 <div class="border-t border-slate-100 bg-slate-50/80 p-4">
-                    <button type="button" id="detailDeleteBtn" class="w-full btn-primary justify-center py-3 shadow-md shadow-blue-500/20">Tamamlandı · Sil</button>
+                    <button type="button" id="detailDeleteBtn" class="btn-primary">Tamamlandı · Sil</button>
                 </div>
             </div>
         </div>
