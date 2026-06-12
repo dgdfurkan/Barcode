@@ -21,6 +21,7 @@ class DispatchAgendaApp {
 
         const session = window.authUtils?.checkAuth();
         if (!session) {
+            this._updateHeaderUser(null);
             this._show('noAuth');
             return;
         }
@@ -51,8 +52,13 @@ class DispatchAgendaApp {
     _updateHeaderUser(session) {
         const nameEl = document.getElementById('headerUserName');
         const companyEl = document.getElementById('headerUserCompany');
-        if (nameEl) nameEl.textContent = session?.username || session?.user_id || 'Kullanıcı';
-        if (companyEl) companyEl.textContent = session?.company || '';
+        if (!session) {
+            if (nameEl) nameEl.textContent = 'Misafir';
+            if (companyEl) companyEl.textContent = '';
+            return;
+        }
+        if (nameEl) nameEl.textContent = session.username || session.user_id || 'Kullanıcı';
+        if (companyEl) companyEl.textContent = session.company || '';
     }
 
     _show(id) {
@@ -269,10 +275,14 @@ class DispatchAgendaApp {
             results.innerHTML =
                 '<p class="px-3 py-3 text-xs text-text-secondary">En az 2 karakter yazın (ürün adı veya barkod)</p>';
         }
-        document.getElementById('addQuantity')?.value = '1';
-        document.getElementById('addReasonNote')?.value = '';
-        document.getElementById('addAddress')?.value = '';
-        document.getElementById('addPickupRequired')?.checked = false;
+        const qtyEl = document.getElementById('addQuantity');
+        const noteEl = document.getElementById('addReasonNote');
+        const addrEl = document.getElementById('addAddress');
+        const pickupEl = document.getElementById('addPickupRequired');
+        if (qtyEl) qtyEl.value = '1';
+        if (noteEl) noteEl.value = '';
+        if (addrEl) addrEl.value = '';
+        if (pickupEl) pickupEl.checked = false;
         const reason = document.getElementById('addReasonPreset');
         if (reason) reason.value = this.REASON_PRESETS[0];
         this._setDefaultDate('addEventDate');
