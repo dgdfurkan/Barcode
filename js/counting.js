@@ -177,6 +177,12 @@ class CountingSystem {
         this._desktopTableModeDisabled = true;
         /** Finans grafik / ürün performans / kategori analizi pasif (kod durur, UI gizli) */
         this._financeVisualAnalyticsDisabled = true;
+        /** Sayım tablosu anlık filtre (ürün silmez, yalnızca görünüm + sıradaki/önceki kapsamı) */
+        this._tableProductSearchQuery = '';
+        this._tableProductSearchTimer = null;
+        /** Son Getir yapıştırmada eşleşmeyen görsel URL'leri */
+        this._lastUnmatchedGetirUrls = [];
+        this._unmatchedGetirModalIndex = 0;
     }
 
     _applyFinanceVisualAnalyticsVisibility() {
@@ -207,6 +213,7 @@ class CountingSystem {
             
             // Setup event listeners
             this.setupEventListeners();
+            this.bindCountingTableSearch();
             this.bindSayimSubTabControls();
             this.bindSayimTableCardMenu();
             this.bindSayimGeneralTableDropdown();
@@ -1812,8 +1819,44 @@ class CountingSystem {
         if (removedIds.length === 0) return;
         for (const pid of removedIds) {
             delete this.countingData[pid];
-            await this.deleteProductEntry(pid, tName).catch(() => {});
         }
+        if (this._countingItemsTableReady === true && removedIds.length > 0) {
+            await Promise.all(removedIds.map((pid) => this.deleteProductEntry(pid, tName).catch(() => {})));
+        }
+    }
+
+    /** Toplu counting_items upsert — yapıştırma sonrası tek seferde (50'şer chunk) */
+    async _bulkSaveProductEntries(productIds, tableName) {
+        if (this._countingItemsTableReady !== true || !Array.isArray(productIds) || productIds.length === 0) return;
+        const tName = tableName || this.currentTableName;
+        if (!tName) return;
+
+        const rows = [];
+        for (const pid of productIds) {
+            const snapshot = this._snapshotProductEntry(this.countingData[pid]);
+            if (snapshot) rows.push(this._buildCountingItemUpsertRow(tName, pid, snapshot));
+        }
+        if (rows.length === 0) return;
+
+        const CHUNK = 50;
+        for (let i = 0; i < rows.length; i += CHUNK) {
+            const slice = rows.slice(i, i + CHUNK);
+            let { error } = await window.supabase.from('counting_items').upsert(slice, {
+                onConflict: 'username,table_name,product_id',
+            });
+            if (error && this._isMissingDbColumnError(error) && this._countingItemsPriceExtension !== false) {
+                this._countingItemsPriceExtension = false;
+                const fallbackSlice = slice.map(({ struck_price, struck_price_text, no_struck_price, ...rest }) => rest);
+                ({ error } = await window.supabase.from('counting_items').upsert(fallbackSlice, {
+                    onConflict: 'username,table_name,product_id',
+                }));
+            } else if (!error) {
+                this._countingItemsPriceExtension = true;
+            }
+            if (error) console.warn('_bulkSaveProductEntries chunk hatası:', error.message);
+        }
+        this._saveFullBlobToLocalStorage();
+        this._scheduleFullBackup();
     }
 
     _cloneTableDataSlot(source) {
@@ -2722,6 +2765,9 @@ class CountingSystem {
         this._activateCountingTable(tableName, { fromTable, persistFrom: false });
         this._saveDeviceCurrentTable(tableName);
         await this._saveMetaOnly();
+
+        this._tableProductSearchQuery = '';
+        this._syncCountingTableSearchUi();
 
         if (this.isDailyTableName(tableName)) {
             const iso = this.getIsoFromDailyTableName(tableName);
@@ -4283,6 +4329,115 @@ class CountingSystem {
         return next;
     }
 
+    /** Tablo araması aktifken filtrelenmiş; değilse tam sıra */
+    getDisplayOrderedProductIds() {
+        const all = this.getOrderedProductIds();
+        const q = (this._tableProductSearchQuery || '').trim();
+        if (q.length < 2) return all;
+        return this._filterTableProductIdsBySearch(all, q);
+    }
+
+    _productMatchesTableSearch(productId, query) {
+        if (!query || query.length < 2) return true;
+        const product = this.productIndex.get(productId);
+        if (!product) return false;
+        const searchTerm = query.trim().toLowerCase();
+        const tokens = this.tokenizeQuery(searchTerm);
+
+        if (product.barcodes && product.barcodes.length > 0) {
+            for (const barcode of product.barcodes) {
+                if (!barcode?.code) continue;
+                const codeLower = String(barcode.code).toLowerCase();
+                if (codeLower === searchTerm || codeLower.includes(searchTerm)) return true;
+            }
+        }
+
+        if (product.name) {
+            if (this.containsAllTokens(product.name, tokens)) return true;
+            const gramMatch = /(\d+)\s*g/i.exec(product.name);
+            if (gramMatch) {
+                const gramValue = gramMatch[1];
+                if (searchTerm.includes(gramValue + 'g') || searchTerm.includes(gramValue + ' g')) return true;
+            }
+        }
+
+        if (product.brand && this.containsAllTokens(product.brand, tokens)) return true;
+        if (product.category && this.containsAllTokens(product.category, tokens)) return true;
+
+        return false;
+    }
+
+    _filterTableProductIdsBySearch(productIds, query) {
+        const q = (query || '').trim();
+        if (!q || q.length < 2) return productIds;
+        return productIds.filter((pid) => this._productMatchesTableSearch(pid, q));
+    }
+
+    _syncCountingTableSearchUi() {
+        const input = document.getElementById('countingTableSearchInput');
+        const clearBtn = document.getElementById('countingTableSearchClear');
+        const meta = document.getElementById('countingTableSearchMeta');
+        const q = (this._tableProductSearchQuery || '').trim();
+        if (input && input.value !== q) input.value = q;
+        if (clearBtn) {
+            clearBtn.classList.toggle('hidden', q.length === 0);
+            clearBtn.classList.toggle('inline-flex', q.length > 0);
+        }
+        if (meta) {
+            if (q.length < 2) {
+                meta.textContent = '';
+            } else {
+                const all = this.getOrderedProductIds().length;
+                const shown = this.getDisplayOrderedProductIds().length;
+                meta.textContent = shown
+                    ? `${shown} ürün gösteriliyor${all !== shown ? ` · toplam ${all}` : ''}`
+                    : 'Arama ile eşleşen ürün yok';
+            }
+        }
+    }
+
+    bindCountingTableSearch() {
+        const input = document.getElementById('countingTableSearchInput');
+        const clearBtn = document.getElementById('countingTableSearchClear');
+        if (!input || input.dataset.setup === 'true') return;
+        input.dataset.setup = 'true';
+
+        const applySearch = () => {
+            this._tableProductSearchQuery = input.value;
+            this._syncCountingTableSearchUi();
+            if (this.currentViewMode === 'rapid') {
+                this.renderRapidCountingMode();
+            } else {
+                this.scheduleRenderTable();
+            }
+        };
+
+        input.addEventListener('input', () => {
+            clearTimeout(this._tableProductSearchTimer);
+            this._tableProductSearchTimer = setTimeout(applySearch, 120);
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                input.value = '';
+                applySearch();
+                input.blur();
+            }
+        });
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                input.value = '';
+                applySearch();
+                input.focus();
+            });
+        }
+
+        this._syncCountingTableSearchUi();
+    }
+
     appendProductToOrder(productId) {
         if (this.isReservedCountingKey(productId)) return;
         const raw = Object.keys(this.countingData).filter((k) => !this.isReservedCountingKey(k));
@@ -4819,14 +4974,8 @@ class CountingSystem {
         // 3. Aşama: Tam blob önce Supabase'e yaz (paste sırasını içerir, telefon doğru sırayı alır)
         await this.saveCountingData();
 
-        // 4. Aşama: Her ürünü counting_items'a SIRAYLA yaz (paralel değil — sıralı yazımla Supabase created_at sırası korunur)
-        if (this._countingItemsTableReady === true) {
-            for (const productId of idsInPasteOrder) {
-                if (this.countingData[productId]) {
-                    await this.saveProductEntry(productId).catch(() => {});
-                }
-            }
-        }
+        await this._bulkSaveProductEntries(idsInPasteOrder, this.currentTableName);
+
         this.renderTable();
         if (this.currentViewMode === 'rapid') {
             this.renderRapidCountingMode();
@@ -5570,6 +5719,8 @@ class CountingSystem {
                 );
             });
         }
+
+        this.bindUnmatchedGetirImagesModal();
 
         // Sync stocks button
         const syncStocksBtn = document.getElementById('syncStocksBtn');
@@ -6967,21 +7118,36 @@ class CountingSystem {
     async bulkAddProductsFromGetirCdnPaste(urls) {
         this._verifyCountingDataTableBinding();
         const G = typeof window !== 'undefined' ? window.GetirCdnPaste : null;
-        const findFn = G && typeof G.findProductByGetirImageUrl === 'function' ? G.findProductByGetirImageUrl : null;
-        if (!findFn || !Array.isArray(urls) || urls.length === 0) {
-            return { added: 0, skippedInTable: 0, noMatch: 0 };
+        const buildIndex = G && typeof G.buildGetirImageProductIndex === 'function' ? G.buildGetirImageProductIndex : null;
+        const findFromIndex = G && typeof G.findProductByGetirImageUrlFromIndex === 'function'
+            ? G.findProductByGetirImageUrlFromIndex
+            : null;
+        const findLegacy = G && typeof G.findProductByGetirImageUrl === 'function' ? G.findProductByGetirImageUrl : null;
+        if ((!buildIndex || !findFromIndex) && !findLegacy) {
+            return { added: 0, skippedInTable: 0, noMatch: 0, unmatchedUrls: [] };
         }
+        if (!Array.isArray(urls) || urls.length === 0) {
+            return { added: 0, skippedInTable: 0, noMatch: 0, unmatchedUrls: [] };
+        }
+
+        const imageIndex = buildIndex ? buildIndex(this.allProducts) : null;
+        const resolveProduct = (url) => {
+            if (imageIndex && findFromIndex) return findFromIndex(imageIndex, url);
+            return findLegacy ? findLegacy(this.allProducts, url) : null;
+        };
 
         const idsInPasteOrder = [];
         const seenInPaste = new Set();
+        const unmatchedUrls = [];
         let skippedInTable = 0;
         let noMatch = 0;
         let addedCount = 0;
 
         for (let i = 0; i < urls.length; i++) {
-            const product = findFn(this.allProducts, urls[i]);
+            const product = resolveProduct(urls[i]);
             if (!product) {
                 noMatch++;
+                unmatchedUrls.push(urls[i]);
                 continue;
             }
             const wasInTable = !!this.countingData[product.id];
@@ -6997,23 +7163,34 @@ class CountingSystem {
             }
         }
 
+        this._lastUnmatchedGetirUrls = unmatchedUrls;
+
         if (idsInPasteOrder.length === 0) {
             if (noMatch > 0 && skippedInTable === 0) {
-                this.showToast('Bu görsel adresleriyle eşleşen ürün bulunamadı', 'warning', 4000);
+                this.showToast('Bu görsel adresleriyle eşleşen ürün bulunamadı', 'warning', 5000, {
+                    actionHint: 'Eşleşmeyen görselleri görmek için tıklayın',
+                    onClick: () => this._openUnmatchedGetirImagesModal(unmatchedUrls),
+                });
             } else if (skippedInTable > 0) {
                 const allDup = skippedInTable === urls.length && noMatch === 0;
+                const toastOpts = noMatch
+                    ? {
+                          actionHint: 'Eşleşmeyen görselleri görmek için tıklayın',
+                          onClick: () => this._openUnmatchedGetirImagesModal(unmatchedUrls),
+                      }
+                    : null;
                 this.showToast(
                     allDup
                         ? 'Yapıştırılan ürünler zaten tabloda'
                         : `${skippedInTable} ürün zaten tablodaydı${noMatch ? ` · ${noMatch} eşleşmedi` : ''}`,
                     'info',
-                    4500
+                    5000,
+                    toastOpts
                 );
             }
-            return { added: 0, skippedInTable, noMatch };
+            return { added: 0, skippedInTable, noMatch, unmatchedUrls };
         }
 
-        // Yapıştırma listesi o tablonun ürün kümesi — listede olmayanlar (önceki tablo sızıntısı dahil) silinir
         await this._purgeTableProductsNotInSet(idsInPasteOrder);
         this.applyImportedProductOrder(idsInPasteOrder, { replaceRest: true });
 
@@ -7026,14 +7203,7 @@ class CountingSystem {
         );
 
         await this.saveCountingData();
-
-        if (this._countingItemsTableReady === true) {
-            for (const productId of idsInPasteOrder) {
-                if (this.countingData[productId]) {
-                    await this.saveProductEntry(productId).catch(() => {});
-                }
-            }
-        }
+        await this._bulkSaveProductEntries(idsInPasteOrder, tn);
 
         this._scheduleBackgroundPriceEnrichment(this.currentTableName);
 
@@ -7048,9 +7218,16 @@ class CountingSystem {
         let msg = addedCount > 0 ? `${addedCount} ürün eklendi` : `${idsInPasteOrder.length} ürün sıralandı`;
         if (skippedInTable) msg += `, ${skippedInTable} zaten tablodaydı`;
         if (noMatch) msg += `, ${noMatch} adres eşleşmedi`;
-        this.showToast(msg, 'success', 4500);
 
-        return { added: addedCount, skippedInTable, noMatch };
+        const toastOpts = noMatch
+            ? {
+                  actionHint: 'Eşleşmeyen görselleri görmek için tıklayın',
+                  onClick: () => this._openUnmatchedGetirImagesModal(unmatchedUrls),
+              }
+            : null;
+        this.showToast(msg, 'success', 5500, toastOpts);
+
+        return { added: addedCount, skippedInTable, noMatch, unmatchedUrls };
     }
 
     findProduct(searchTerm) {
@@ -7461,17 +7638,15 @@ class CountingSystem {
     }
     
     // Modern toast notification sistemi
-    showToast(message, type = 'info', duration = 4000) {
+    showToast(message, type = 'info', duration = 4000, options = null) {
         const container = document.getElementById('toastContainer');
         if (!container) {
             console.warn('Toast container bulunamadı');
             return;
         }
 
-        // position: fixed olduğu için scroll pozisyonuna göre ayarlamaya gerek yok
-
         const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
+        toast.className = `toast toast-${type}${options?.onClick ? ' cursor-pointer hover:brightness-[0.98]' : ''}`;
         
         // Icon seç
         let iconSvg = '';
@@ -7488,11 +7663,16 @@ class CountingSystem {
             default:
                 iconSvg = '<svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
         }
+
+        const actionHint = options?.actionHint
+            ? `<div class="toast-action-hint mt-0.5 text-[11px] font-medium opacity-80">${this.escapeHtml(options.actionHint)}</div>`
+            : '';
         
         toast.innerHTML = `
             <div class="toast-icon">${iconSvg}</div>
             <div class="toast-content">
                 <div class="toast-message">${this.escapeHtml(message)}</div>
+                ${actionHint}
             </div>
             <div class="toast-close" onclick="this.closest('.toast').remove()">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7503,6 +7683,13 @@ class CountingSystem {
                 <div class="toast-progress-bar" style="width: 100%; transition: width ${duration}ms linear;"></div>
             </div>
         `;
+
+        if (typeof options?.onClick === 'function') {
+            toast.addEventListener('click', (e) => {
+                if (e.target.closest('.toast-close')) return;
+                options.onClick();
+            });
+        }
 
         container.appendChild(toast);
 
@@ -7529,6 +7716,78 @@ class CountingSystem {
                 }
             }, 300);
         }, duration);
+    }
+
+    bindUnmatchedGetirImagesModal() {
+        const modal = document.getElementById('unmatchedGetirImagesModal');
+        const closeBtn = document.getElementById('unmatchedGetirImagesCloseBtn');
+        const prevBtn = document.getElementById('unmatchedGetirImagesPrevBtn');
+        const nextBtn = document.getElementById('unmatchedGetirImagesNextBtn');
+        if (!modal || modal.dataset.setup === 'true') return;
+        modal.dataset.setup = 'true';
+
+        const close = () => modal.classList.add('hidden');
+        const renderSlide = () => {
+            const urls = this._lastUnmatchedGetirUrls || [];
+            const idx = this._unmatchedGetirModalIndex;
+            const counter = document.getElementById('unmatchedGetirImagesCounter');
+            const preview = document.getElementById('unmatchedGetirImagesPreview');
+            const urlEl = document.getElementById('unmatchedGetirImagesUrl');
+            if (!urls.length) {
+                close();
+                return;
+            }
+            const safeIdx = Math.max(0, Math.min(idx, urls.length - 1));
+            this._unmatchedGetirModalIndex = safeIdx;
+            if (counter) counter.textContent = `${safeIdx + 1} / ${urls.length}`;
+            if (preview) preview.src = urls[safeIdx];
+            if (urlEl) urlEl.textContent = urls[safeIdx];
+            if (prevBtn) prevBtn.disabled = safeIdx <= 0;
+            if (nextBtn) nextBtn.disabled = safeIdx >= urls.length - 1;
+        };
+
+        closeBtn?.addEventListener('click', close);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) close();
+        });
+        prevBtn?.addEventListener('click', () => {
+            this._unmatchedGetirModalIndex -= 1;
+            renderSlide();
+        });
+        nextBtn?.addEventListener('click', () => {
+            this._unmatchedGetirModalIndex += 1;
+            renderSlide();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (modal.classList.contains('hidden')) return;
+            if (e.key === 'Escape') close();
+            if (e.key === 'ArrowLeft') {
+                this._unmatchedGetirModalIndex -= 1;
+                renderSlide();
+            }
+            if (e.key === 'ArrowRight') {
+                this._unmatchedGetirModalIndex += 1;
+                renderSlide();
+            }
+        });
+
+        this._renderUnmatchedGetirSlide = renderSlide;
+    }
+
+    _openUnmatchedGetirImagesModal(urls) {
+        const list = Array.isArray(urls) && urls.length ? urls : this._lastUnmatchedGetirUrls;
+        if (!list || !list.length) {
+            this.showToast('Eşleşmeyen görsel kaydı yok', 'info', 2500);
+            return;
+        }
+        this._lastUnmatchedGetirUrls = list;
+        this._unmatchedGetirModalIndex = 0;
+        const modal = document.getElementById('unmatchedGetirImagesModal');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+        if (typeof this._renderUnmatchedGetirSlide === 'function') {
+            this._renderUnmatchedGetirSlide();
+        }
     }
     
     // Sync progress toast (aşama aşama gösterim)
@@ -9169,13 +9428,13 @@ class CountingSystem {
         if (hasWarehouse && hasSystem) {
             if (diff.type === 'positive') {
                 stockIndicator = '<div class="stock-indicator bg-emerald-400"></div>';
-                statusIcon = '<div class="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg></div>';
+                statusIcon = '<div class="w-4 h-4 flex items-center justify-center"><svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg></div>';
             } else if (diff.type === 'negative') {
                 stockIndicator = '<div class="stock-indicator bg-rose-400"></div>';
-                statusIcon = '<div class="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg></div>';
+                statusIcon = '<div class="w-4 h-4 flex items-center justify-center"><svg class="w-3 h-3 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg></div>';
             } else {
                 stockIndicator = '<div class="stock-indicator bg-gray-300"></div>';
-                statusIcon = '<div class="w-4 h-4 bg-gray-500 rounded-full flex items-center justify-center shadow-sm"><svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 9h14M5 15h14"/></svg></div>';
+                statusIcon = '<div class="w-4 h-4 flex items-center justify-center"><svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 9h14M5 15h14"/></svg></div>';
             }
         } else if (hasSystem && !hasWarehouse) {
             stockIndicator = '<div class="stock-indicator bg-orange-400"></div>';
@@ -9197,10 +9456,15 @@ class CountingSystem {
         const gridContainer = document.getElementById('rapidCountingGridContainer');
         if (!gridContainer) return;
 
-        const sortedProductIds = this.getOrderedProductIds();
+        const sortedProductIds = this.getDisplayOrderedProductIds();
 
         if (sortedProductIds.length === 0) {
-            gridContainer.innerHTML = '<div class="col-span-full text-center py-12 text-gray-500">Henüz ürün eklenmedi</div>';
+            const q = (this._tableProductSearchQuery || '').trim();
+            const emptyMsg =
+                q.length >= 2
+                    ? 'Arama ile eşleşen ürün yok'
+                    : 'Henüz ürün eklenmedi';
+            gridContainer.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">${emptyMsg}</div>`;
             this._rapidRenderedIds = [];
             this._rapidRenderedStates.clear();
             return;
@@ -9296,7 +9560,7 @@ class CountingSystem {
      * hepsi tamamlanmışsa sıradaki herhangi ürüne gider.
      */
     findNextUncountedProduct(currentProductId) {
-        const productIds = this.getOrderedProductIds();
+        const productIds = this.getDisplayOrderedProductIds();
         const currentIndex = productIds.indexOf(currentProductId);
         if (currentIndex === -1) return null;
         if (productIds.length <= 1) return null;
@@ -9318,7 +9582,7 @@ class CountingSystem {
      * Önce tamamlanmamış ürünleri arar; hepsi tamamlanmışsa bir önceki herhangi ürüne gider.
      */
     findPreviousUncountedProduct(currentProductId) {
-        const productIds = this.getOrderedProductIds();
+        const productIds = this.getDisplayOrderedProductIds();
         const currentIndex = productIds.indexOf(currentProductId);
         if (currentIndex === -1) return null;
         if (productIds.length <= 1) return null;
@@ -11047,9 +11311,11 @@ class CountingSystem {
 
     _closeFinancialTableSelectorDropdown() {
         const financialTableSelectorDropdown = document.getElementById('financialTableSelectorDropdown');
+        const financialTableSelectorBtn = document.getElementById('financialTableSelectorBtn');
         const financialTableSelectorIcon = document.getElementById('financialTableSelectorIcon');
         const financialTableSearch = document.getElementById('financialTableSearch');
         if (financialTableSelectorDropdown) financialTableSelectorDropdown.classList.add('hidden');
+        if (financialTableSelectorBtn) financialTableSelectorBtn.setAttribute('aria-expanded', 'false');
         if (financialTableSelectorIcon) financialTableSelectorIcon.style.transform = 'rotate(0deg)';
         if (financialTableSearch) financialTableSearch.value = '';
     }
@@ -11074,60 +11340,61 @@ class CountingSystem {
 
         financialTableSelectorList.innerHTML = '';
 
-        const allOption = document.createElement('div');
-        allOption.className = `table-selector-option ${this.selectedFinancialTable === 'all' ? 'active' : ''}`;
-        allOption.dataset.tableName = 'all';
-        allOption.innerHTML = `
-            <span class="flex flex-col min-w-0">
-                <span>Tüm Kategoriler</span>
-                <span class="text-[10px] font-normal text-gray-400">Sabit alt kategoriler · günlük hariç</span>
-            </span>
-            <svg class="check-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-        `;
-        allOption.addEventListener('click', async () => {
-            this._clearFinancePasteGuide();
-            this.selectedFinancialTable = 'all';
-            await this.renderAllTablesFinancialData();
-            this.updateFinancialTableSelector();
-            this._closeFinancialTableSelectorDropdown();
-        });
-        financialTableSelectorList.appendChild(allOption);
+        const appendRow = (labelHtml, isActive, status, onPick, extraClass = '') => {
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.setAttribute('role', 'option');
+            row.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            row.className = [
+                'relative flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors',
+                this.getTableStatusDropdownRowClasses(status, isActive),
+                extraClass,
+            ].join(' ');
+            row.innerHTML = labelHtml;
+            row.addEventListener('click', onPick);
+            financialTableSelectorList.appendChild(row);
+        };
+
+        appendRow(
+            `<span class="min-w-0 flex-1 truncate font-medium">Tüm Kategoriler</span><span class="shrink-0 text-[10px] font-normal text-slate-400">Günlük hariç</span>`,
+            this.selectedFinancialTable === 'all',
+            'not-started',
+            async () => {
+                this._clearFinancePasteGuide();
+                this.selectedFinancialTable = 'all';
+                await this.renderAllTablesFinancialData();
+                this.updateFinancialTableSelector();
+                this._closeFinancialTableSelectorDropdown();
+            }
+        );
 
         if (filteredTables.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'px-4 py-3 text-sm text-gray-400 text-center';
-            empty.textContent = 'Arama ile eşleşen tablo yok.';
+            const empty = document.createElement('p');
+            empty.className = 'px-3 py-4 text-center text-[11px] text-slate-500';
+            empty.textContent = tables.length ? 'Arama ile eşleşen tablo yok.' : 'Henüz tablo yok.';
             financialTableSelectorList.appendChild(empty);
             return;
         }
 
         filteredTables.forEach((table) => {
-            const option = document.createElement('div');
+            const isActive = table.name === this.selectedFinancialTable;
             const isPreset = this.isPresetSubcategoryTable(table.name);
-            option.className = `table-selector-option relative ${table.name === this.selectedFinancialTable ? 'active' : ''}${isPreset ? ' preset-subcat-table-dropdown-row pl-8' : ''}`;
-            option.dataset.tableName = table.name;
             const label = this.formatTableDisplayName(table.name);
-            option.innerHTML = `
-                ${isPreset ? this.renderPresetSubcategoryBadgeHtml() : ''}
-                <span class="min-w-0 flex-1 truncate">${this.escapeHtml(label)}${table.productCount ? ` <span class="text-gray-500 text-xs">(${table.productCount})</span>` : ''}</span>
-                <svg class="check-icon shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                </svg>
-            `;
-
-            option.addEventListener('click', async () => {
-                if (this.selectedFinancialTable !== table.name) {
-                    this._clearFinancePasteGuide();
-                }
-                this.selectedFinancialTable = table.name;
-                await this.renderSingleTableFinancialData(table.name);
-                this.updateFinancialTableSelector();
-                this._closeFinancialTableSelectorDropdown();
-            });
-
-            financialTableSelectorList.appendChild(option);
+            appendRow(
+                `${isPreset ? this.renderPresetSubcategoryBadgeHtml() : ''}<span class="min-w-0 truncate font-medium">${this.escapeHtml(label)}</span><span class="shrink-0 tabular-nums text-[10px] font-semibold ${this.getTableStatusCountBadgeClasses(table.status, isActive)}">${table.productCount ?? 0}</span>`,
+                isActive,
+                table.status || 'not-started',
+                async () => {
+                    if (this.selectedFinancialTable !== table.name) {
+                        this._clearFinancePasteGuide();
+                    }
+                    this.selectedFinancialTable = table.name;
+                    await this.renderSingleTableFinancialData(table.name);
+                    this.updateFinancialTableSelector();
+                    this._closeFinancialTableSelectorDropdown();
+                },
+                isPreset ? 'preset-subcat-table-dropdown-row pl-7' : ''
+            );
         });
     }
 
@@ -11146,17 +11413,14 @@ class CountingSystem {
         financialTableSelectorBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const willOpen = financialTableSelectorDropdown.classList.contains('hidden');
-            financialTableSelectorDropdown.classList.toggle('hidden');
-            if (financialTableSelectorIcon) {
-                financialTableSelectorIcon.style.transform = financialTableSelectorDropdown.classList.contains('hidden')
-                    ? 'rotate(0deg)'
-                    : 'rotate(180deg)';
-            }
             if (willOpen) {
+                financialTableSelectorDropdown.classList.remove('hidden');
+                financialTableSelectorBtn.setAttribute('aria-expanded', 'true');
+                if (financialTableSelectorIcon) financialTableSelectorIcon.style.transform = 'rotate(180deg)';
                 this._renderFinancialTableSelectorList();
-                requestAnimationFrame(() => financialTableSearch?.focus());
-            } else if (financialTableSearch) {
-                financialTableSearch.value = '';
+                setTimeout(() => financialTableSearch?.focus(), 30);
+            } else {
+                this._closeFinancialTableSelectorDropdown();
             }
         });
 
@@ -11182,27 +11446,33 @@ class CountingSystem {
 
     updateFinancialTableSelector() {
         const financialTableSelectorText = document.getElementById('financialTableSelectorText');
+        const financeActiveTableLabel = document.getElementById('financeActiveTableLabel');
 
-        if (!financialTableSelectorText) return;
+        if (!financialTableSelectorText && !financeActiveTableLabel) return;
 
         const tables = this.getTableList();
         const financialTableSelectorBtn = document.getElementById('financialTableSelectorBtn');
+        let activeLabel = 'Tablo seçin';
         if (this.selectedFinancialTable === 'all') {
-            financialTableSelectorText.textContent = 'Tüm Kategoriler';
+            activeLabel = 'Tüm Kategoriler';
             financialTableSelectorBtn?.classList.remove('preset-subcat-table-selector-active');
         } else {
             const selectedTable = tables.find((t) => t.name === this.selectedFinancialTable);
-            const label = selectedTable
+            activeLabel = selectedTable
                 ? this.formatTableDisplayName(selectedTable.name)
                 : (this.selectedFinancialTable || 'Tablo seçin');
             const isPreset = selectedTable && this.isPresetSubcategoryTable(selectedTable.name);
             if (isPreset) {
-                financialTableSelectorText.innerHTML = `<span class="inline-flex min-w-0 items-center gap-1.5">${this.renderPresetSubcategoryInlineStarHtml()}<span class="truncate">${this.escapeHtml(label)}</span></span>`;
                 financialTableSelectorBtn?.classList.add('preset-subcat-table-selector-active');
             } else {
-                financialTableSelectorText.textContent = label;
                 financialTableSelectorBtn?.classList.remove('preset-subcat-table-selector-active');
             }
+        }
+        if (financeActiveTableLabel) {
+            financeActiveTableLabel.textContent = activeLabel;
+        }
+        if (financialTableSelectorText) {
+            financialTableSelectorText.textContent = 'Liste';
         }
 
         const financialTableSelectorDropdown = document.getElementById('financialTableSelectorDropdown');

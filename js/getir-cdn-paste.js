@@ -76,33 +76,53 @@
      * @param {string} imageUrl
      * @returns {object|null}
      */
-    function findProductByGetirImageUrl(products, imageUrl) {
-        if (!products || !imageUrl || typeof imageUrl !== 'string') return null;
+    /**
+     * Toplu yapıştırma için O(1) görsel → ürün indeksi (tek seferlik kurulur).
+     * @param {Array} products
+     * @returns {{ byFullUrl: Map, byFileKey: Map, byUuid: Map }}
+     */
+    function buildGetirImageProductIndex(products) {
+        var byFullUrl = new Map();
+        var byFileKey = new Map();
+        var byUuid = new Map();
+        if (!products || !products.length) return { byFullUrl: byFullUrl, byFileKey: byFileKey, byUuid: byUuid };
+        for (var i = 0; i < products.length; i++) {
+            var product = products[i];
+            if (!product || !product.image) continue;
+            var pi = String(product.image).toLowerCase().trim();
+            if (!byFullUrl.has(pi)) byFullUrl.set(pi, product);
+            var pf = pi.split('/').pop().split('?')[0];
+            if (!pf) continue;
+            var fk = normalizeGetirImageFileKey(pf);
+            if (fk && !byFileKey.has(fk)) byFileKey.set(fk, product);
+            var uuid = extractEmbeddedProductUuid(pf + ' ' + pi);
+            if (uuid && !byUuid.has(uuid)) byUuid.set(uuid, product);
+        }
+        return { byFullUrl: byFullUrl, byFileKey: byFileKey, byUuid: byUuid };
+    }
+
+    function findProductByGetirImageUrlFromIndex(index, imageUrl) {
+        if (!index || !imageUrl || typeof imageUrl !== 'string') return null;
         var searchLower = imageUrl.toLowerCase().trim();
+        var direct = index.byFullUrl.get(searchLower);
+        if (direct) return direct;
         var searchFile = searchLower.split('/').pop().split('?')[0];
         var searchKey = normalizeGetirImageFileKey(searchFile);
+        if (searchKey) {
+            var byKey = index.byFileKey.get(searchKey);
+            if (byKey) return byKey;
+        }
         var searchUuid = extractEmbeddedProductUuid(searchFile + ' ' + imageUrl);
-        var i;
-        var product;
-        var pi;
-        var pf;
-        var pfKey;
-        var prodUuid;
-        for (i = 0; i < products.length; i++) {
-            product = products[i];
-            if (!product || !product.image) continue;
-            pi = String(product.image).toLowerCase().trim();
-            if (pi === searchLower) return product;
-            pf = pi.split('/').pop().split('?')[0];
-            if (pf && pf === searchFile) return product;
-            pfKey = normalizeGetirImageFileKey(pf);
-            if (searchKey && pfKey && searchKey === pfKey) return product;
-            if (searchUuid) {
-                prodUuid = extractEmbeddedProductUuid(pf + ' ' + pi);
-                if (prodUuid && prodUuid === searchUuid) return product;
-            }
+        if (searchUuid) {
+            var byUuidHit = index.byUuid.get(searchUuid);
+            if (byUuidHit) return byUuidHit;
         }
         return null;
+    }
+
+    function findProductByGetirImageUrl(products, imageUrl) {
+        if (!products || !imageUrl || typeof imageUrl !== 'string') return null;
+        return findProductByGetirImageUrlFromIndex(buildGetirImageProductIndex(products), imageUrl);
     }
 
     /**
@@ -148,6 +168,8 @@
 
     global.GetirCdnPaste = {
         extractGetirCdnProductImageUrlsFromText: extractGetirCdnProductImageUrlsFromText,
+        buildGetirImageProductIndex: buildGetirImageProductIndex,
+        findProductByGetirImageUrlFromIndex: findProductByGetirImageUrlFromIndex,
         findProductByGetirImageUrl: findProductByGetirImageUrl,
         readClipboardTextForImport: readClipboardTextForImport,
     };
