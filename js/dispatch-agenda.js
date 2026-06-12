@@ -215,8 +215,15 @@ class DispatchAgendaApp {
         document.getElementById('addClearProductBtn')?.addEventListener('click', () => this._clearSelectedProduct());
         document.getElementById('addSearchClearBtn')?.addEventListener('click', () => this._clearSearchInput());
         document.getElementById('detailCloseBtn')?.addEventListener('click', () => this.closeDetailSheet());
-        document.getElementById('detailDeleteBtn')?.addEventListener('click', () => void this.completeAndDelete());
+        document.getElementById('detailDeleteBtn')?.addEventListener('click', () => this.openDeleteConfirmModal());
         document.getElementById('detailSheetBackdrop')?.addEventListener('click', () => this.closeDetailSheet());
+
+        document.getElementById('agendaDeleteConfirmClose')?.addEventListener('click', () => this.closeDeleteConfirmModal());
+        document.getElementById('agendaDeleteConfirmCancel')?.addEventListener('click', () => this.closeDeleteConfirmModal());
+        document.getElementById('agendaDeleteConfirmConfirm')?.addEventListener('click', () => void this.completeAndDelete());
+        document.getElementById('agendaDeleteConfirmModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'agendaDeleteConfirmModal') this.closeDeleteConfirmModal();
+        });
 
         document.getElementById('headerLogoutBtn')?.addEventListener('click', () => {
             window.authUtils?.logout?.();
@@ -260,6 +267,11 @@ class DispatchAgendaApp {
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                const deleteModal = document.getElementById('agendaDeleteConfirmModal');
+                if (deleteModal?.classList.contains('agenda-modal-open')) {
+                    this.closeDeleteConfirmModal();
+                    return;
+                }
                 const modal = document.getElementById('addAgendaModal');
                 if (modal?.classList.contains('agenda-modal-open')) {
                     this.closeAddModal();
@@ -573,9 +585,30 @@ class DispatchAgendaApp {
         this.detailItem = null;
     }
 
+    openDeleteConfirmModal() {
+        if (!this.detailItem?.id) return;
+        const modal = document.getElementById('agendaDeleteConfirmModal');
+        const nameEl = document.getElementById('agendaDeleteConfirmProduct');
+        if (nameEl) nameEl.textContent = this.detailItem.product_name || 'Bu';
+        if (modal) {
+            modal.classList.add('agenda-modal-open');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+    }
+
+    closeDeleteConfirmModal() {
+        const modal = document.getElementById('agendaDeleteConfirmModal');
+        if (modal) {
+            modal.classList.remove('agenda-modal-open');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+    }
+
     async completeAndDelete() {
         if (!this.detailItem?.id) return;
-        if (!confirm('Bu kaydı tamamlandı olarak silmek istiyor musunuz?')) return;
+
+        const confirmBtn = document.getElementById('agendaDeleteConfirmConfirm');
+        if (confirmBtn) confirmBtn.disabled = true;
 
         try {
             const { error } = await window.supabase
@@ -584,12 +617,15 @@ class DispatchAgendaApp {
                 .eq('id', this.detailItem.id)
                 .eq('username', this._username);
             if (error) throw error;
+            this.closeDeleteConfirmModal();
             this._toast('Kayıt silindi', 'success');
             this.closeDetailSheet();
             await this.loadItems();
         } catch (e) {
             console.error(e);
             this._toast(e.message || 'Silinemedi', 'error');
+        } finally {
+            if (confirmBtn) confirmBtn.disabled = false;
         }
     }
 

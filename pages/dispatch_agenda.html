@@ -318,6 +318,34 @@
             flex: 1;
             min-height: 2.75rem;
         }
+        .btn-danger {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background: linear-gradient(180deg, rgb(239 68 68) 0%, rgb(220 38 38) 100%);
+            border-radius: 0.625rem;
+            padding: 0.5625rem 1.125rem;
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: #fff;
+            box-shadow: 0 1px 2px rgb(220 38 38 / 0.25), 0 4px 14px rgb(239 68 68 / 0.35);
+            transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+        }
+        .btn-danger:hover {
+            background: linear-gradient(180deg, rgb(220 38 38) 0%, rgb(185 28 28) 100%);
+            box-shadow: 0 4px 18px rgb(239 68 68 / 0.45);
+        }
+        .btn-danger:active { transform: scale(0.98); }
+        .btn-danger:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        #agendaDeleteConfirmConfirm { min-width: 6.5rem; }
 
         /* Detail sheet */
         #detailSheet { transition: opacity 0.22s ease; }
@@ -554,6 +582,38 @@
                 <div id="detailSheetBody" class="px-4 pb-4 max-h-[55vh] overflow-y-auto"></div>
                 <div class="border-t border-slate-100 bg-slate-50/80 p-4">
                     <button type="button" id="detailDeleteBtn" class="btn-primary">Tamamlandı · Sil</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
+    <!-- Silme onayı — tarayıcı confirm değil -->
+    <div id="agendaDeleteConfirmModal" class="agenda-modal-backdrop fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/60 p-4" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="agendaDeleteConfirmTitle">
+        <div class="agenda-modal-panel w-full max-w-md overflow-hidden rounded-2xl bg-white border border-slate-200/80 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-rose-50 to-orange-50/60 px-4 py-3.5 sm:px-5">
+                <h3 id="agendaDeleteConfirmTitle" class="text-base font-bold text-slate-900">Kaydı Sil</h3>
+                <button type="button" id="agendaDeleteConfirmClose" class="rounded-xl p-2 text-slate-500 hover:bg-white/80 hover:text-slate-900 transition-colors" aria-label="Kapat">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="px-4 py-5 sm:px-5">
+                <div class="mb-4 flex justify-center">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-full bg-rose-100">
+                        <svg class="h-6 w-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-center text-sm text-slate-700 leading-relaxed">
+                    <span class="font-bold text-slate-900" id="agendaDeleteConfirmProduct"></span>
+                    kaydını tamamlandı olarak silmek istiyor musunuz?
+                </p>
+                <p class="mt-2 text-center text-xs text-slate-500">Bu işlem geri alınamaz.</p>
+                <div class="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+                    <button type="button" id="agendaDeleteConfirmCancel" class="btn-secondary">İptal</button>
+                    <button type="button" id="agendaDeleteConfirmConfirm" class="btn-danger">Evet, Sil</button>
                 </div>
             </div>
         </div>
