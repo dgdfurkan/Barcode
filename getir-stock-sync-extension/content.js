@@ -1347,6 +1347,28 @@
             sendResponse({ success: false, error: 'Warehouse ID bulunamadı' });
             return true;
         }
+
+        if (request.type === 'WAREHOUSE_EXPIRY_PROGRESS') {
+            window.postMessage({ type: 'WAREHOUSE_EXPIRY_PROGRESS', message: request.message || '' }, '*');
+            sendResponse({ success: true });
+            return true;
+        }
+
+        if (request.type === 'WAREHOUSE_EXPIRY_RESPONSE') {
+            window.postMessage(
+                {
+                    type: 'WAREHOUSE_EXPIRY_RESPONSE',
+                    success: request.success,
+                    byProductId: request.byProductId,
+                    error: request.error,
+                    total: request.total,
+                    withData: request.withData
+                },
+                '*'
+            );
+            sendResponse({ success: true });
+            return true;
+        }
         
         return false;
     });
@@ -1387,6 +1409,47 @@
             },
             isAvailable: function() {
                 return typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage;
+            },
+            fetchExpiryProducts: function(productIds, options = {}) {
+                const ids = Array.isArray(productIds) ? productIds.filter(Boolean) : [];
+                const warehouseId = options.warehouseId || '5dcafe6ae2c61b1e52cf1704';
+                const endDate = options.endDate || '2030-07-31';
+                return new Promise((resolve, reject) => {
+                    if (!ids.length) {
+                        reject(new Error('Ürün listesi boş'));
+                        return;
+                    }
+                    if (!this.isAvailable()) {
+                        reject(new Error('Stok extension bağlantısı yok'));
+                        return;
+                    }
+                    let settled = false;
+                    const finish = (ok, payload) => {
+                        if (settled) return;
+                        settled = true;
+                        cleanup();
+                        if (ok) resolve(payload);
+                        else reject(new Error(payload || 'SKT alınamadı'));
+                    };
+                    const onResponse = (e) => {
+                        if (e?.data?.type !== 'WAREHOUSE_EXPIRY_RESPONSE') return;
+                        if (e.data.success) finish(true, e.data);
+                        else finish(false, e.data.error || 'SKT alınamadı');
+                    };
+                    const cleanup = () => window.removeEventListener('message', onResponse);
+                    window.addEventListener('message', onResponse);
+                    chrome.runtime.sendMessage(
+                        { type: 'FETCH_EXPIRY_PRODUCTS', productIds: ids, warehouseId, endDate },
+                        (response) => {
+                            if (chrome.runtime.lastError) {
+                                finish(false, chrome.runtime.lastError.message);
+                            } else if (response && response.success === false && response.error) {
+                                finish(false, response.error);
+                            }
+                        }
+                    );
+                    setTimeout(() => finish(false, 'SKT isteği zaman aşımına uğradı'), 120000);
+                });
             },
             extensionId: 'dhgdhdnnpeakmomlgpgmokecmdmeoebn'
         };

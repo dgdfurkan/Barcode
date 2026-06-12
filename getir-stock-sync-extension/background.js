@@ -1,6 +1,8 @@
 // Background script for Getir Stock Sync Extension
 // Supabase'den stok isteklerini dinler ve content script'e yönlendirir
 
+import { handleFetchExpiryProducts } from './expiry-fetch.js';
+
 console.log('✅ Background script yüklendi');
 
 // Token ve warehouse ID yakalama için webRequest listener
@@ -623,6 +625,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 }
             });
         return true; // Async response - channel'ı açık tut
+    }
+
+    if (request.type === 'FETCH_EXPIRY_PRODUCTS') {
+        handleFetchExpiryProducts(request, sendResponse, sender).catch((error) => {
+            console.error('❌ SKT fetch hatası:', error);
+            try {
+                sendResponse({ success: false, error: error.message || 'SKT alınamadı' });
+            } catch (e) {
+                /* channel closed */
+            }
+        });
+        return true;
     }
     
     // Eşleşmeyen mesajlar için false döndür (synchronous response)

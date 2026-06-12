@@ -3332,6 +3332,27 @@ class CountingSystem {
         };
         window.addEventListener('message', onWindowMessage);
 
+        const dispatchError = (message) => {
+            window.removeEventListener('message', onWindowMessage);
+            finish({
+                success: false,
+                error:
+                    message ||
+                    'Extension bağlantısı kurulamadı. Getir Stok Senkronizasyonu eklentisini yenileyin; warehouse.getir.com sekmesi açık olsun.',
+            });
+        };
+
+        if (window.getirExtensionHelper?.fetchExpiryProducts) {
+            window.getirExtensionHelper
+                .fetchExpiryProducts(productIds, { warehouseId, endDate })
+                .then((data) => {
+                    window.removeEventListener('message', onWindowMessage);
+                    finish(data);
+                })
+                .catch((err) => dispatchError(err?.message));
+            return;
+        }
+
         const payload = {
             type: 'WAREHOUSE_FETCH_EXPIRY_PRODUCTS',
             productIds,
@@ -3349,33 +3370,9 @@ class CountingSystem {
                 },
                 (response) => {
                     if (chrome?.runtime?.lastError) {
-                        window.removeEventListener('message', onWindowMessage);
-                        finish({ success: false, error: chrome.runtime.lastError.message });
+                        dispatchError(chrome.runtime.lastError.message);
                     } else if (response && response.success === false && response.error) {
-                        window.removeEventListener('message', onWindowMessage);
-                        finish(response);
-                    }
-                }
-            );
-            return;
-        }
-
-        const extId =
-            window.getirWarehouseExtensionId ||
-            (typeof localStorage !== 'undefined' ? localStorage.getItem('getir_warehouse_extension_id') : null);
-        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage && extId) {
-            chrome.runtime.sendMessage(
-                extId,
-                { type: 'FETCH_EXPIRY_PRODUCTS', productIds, warehouseId, endDate },
-                (response) => {
-                    if (chrome.runtime.lastError) {
-                        window.removeEventListener('message', onWindowMessage);
-                        finish({ success: false, error: chrome.runtime.lastError.message });
-                        return;
-                    }
-                    if (response && response.success === false && response.error) {
-                        window.removeEventListener('message', onWindowMessage);
-                        finish(response);
+                        dispatchError(response.error);
                     }
                 }
             );
@@ -3385,12 +3382,10 @@ class CountingSystem {
         window.postMessage(payload, '*');
         setTimeout(() => {
             if (!this._financePasteGuideSktLoading) return;
-            window.removeEventListener('message', onWindowMessage);
-            finish({
-                success: false,
-                error: 'Warehouse extension bulunamadı. getir-warehouse-shelf-label-fetcher eklentisini yükleyin ve warehouse.getir.com sekmesini açın.',
-            });
-        }, 8000);
+            dispatchError(
+                'Extension bulunamadı. Chrome’da «Getir Stok Senkronizasyonu» eklentisini etkinleştirip sayfayı yenileyin; warehouse.getir.com açık kalsın.'
+            );
+        }, 12000);
     }
 
     _renderFinancePasteGuideRowHtml(p, idx) {

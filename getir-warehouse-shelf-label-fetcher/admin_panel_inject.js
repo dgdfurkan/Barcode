@@ -47,20 +47,26 @@
           message: '✅ Extension\'a bağlandı, SKT isteği gönderiliyor…'
         }, '*');
 
-        chrome.runtime.sendMessage({
-          type: 'FETCH_EXPIRY_PRODUCTS',
-          productIds: event.data.productIds || [],
-          warehouseId: event.data.warehouseId,
-          endDate: event.data.endDate
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            window.postMessage({
-              type: 'WAREHOUSE_EXPIRY_RESPONSE',
-              success: false,
-              byProductId: {},
-              error: chrome.runtime.lastError.message || 'Extension hatası'
-            }, '*');
-          }
+        const sendFetch = () => {
+          chrome.runtime.sendMessage({
+            type: 'FETCH_EXPIRY_PRODUCTS',
+            productIds: event.data.productIds || [],
+            warehouseId: event.data.warehouseId,
+            endDate: event.data.endDate
+          }, (response) => {
+            if (chrome.runtime.lastError) {
+              window.postMessage({
+                type: 'WAREHOUSE_EXPIRY_RESPONSE',
+                success: false,
+                byProductId: {},
+                error: chrome.runtime.lastError.message || 'Extension hatası'
+              }, '*');
+            }
+          });
+        };
+
+        chrome.runtime.sendMessage({ type: 'WAKE_UP' }, () => {
+          sendFetch();
         });
       } else if (event.data && event.data.type === 'WAREHOUSE_EXPORT_SHELF_LABELS') {
         console.log('📋 Admin panelden raf etiketi çekme isteği alındı');
