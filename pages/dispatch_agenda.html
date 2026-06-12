@@ -37,19 +37,16 @@
         body { font-family: 'Inter', sans-serif; background: var(--color-background); }
 
         .agenda-strip {
-            display: flex;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(9.75rem, 1fr));
             gap: 0.875rem;
-            overflow-x: auto;
-            overscroll-behavior-x: contain;
-            scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch;
             padding: 0.25rem 0.25rem 0.75rem;
+            align-items: start;
         }
 
         .agenda-card {
-            width: 10rem;
-            flex-shrink: 0;
-            scroll-snap-align: start;
+            width: 100%;
+            min-width: 0;
             text-align: left;
             border-radius: 1rem;
             border: 1px solid rgb(226 232 240);
@@ -354,7 +351,10 @@
         .agenda-sheet-panel { transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
 
         @media (min-width: 640px) {
-            .agenda-card { width: 11rem; }
+            .agenda-strip {
+                grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+                gap: 1rem;
+            }
             #detailSheet .agenda-sheet-panel {
                 max-width: 28rem;
                 margin-left: auto;
