@@ -40,7 +40,29 @@
     // Window'dan gelen mesajları dinle (admin panelden)
     window.addEventListener('message', function(event) {
       // Sadece aynı origin'den gelen mesajları kabul et
-      if (event.data && event.data.type === 'WAREHOUSE_EXPORT_SHELF_LABELS') {
+      if (event.data && event.data.type === 'WAREHOUSE_FETCH_EXPIRY_PRODUCTS') {
+        console.log('📅 Admin panelden SKT çekme isteği alındı');
+        window.postMessage({
+          type: 'WAREHOUSE_EXPIRY_PROGRESS',
+          message: '✅ Extension\'a bağlandı, SKT isteği gönderiliyor…'
+        }, '*');
+
+        chrome.runtime.sendMessage({
+          type: 'FETCH_EXPIRY_PRODUCTS',
+          productIds: event.data.productIds || [],
+          warehouseId: event.data.warehouseId,
+          endDate: event.data.endDate
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            window.postMessage({
+              type: 'WAREHOUSE_EXPIRY_RESPONSE',
+              success: false,
+              byProductId: {},
+              error: chrome.runtime.lastError.message || 'Extension hatası'
+            }, '*');
+          }
+        });
+      } else if (event.data && event.data.type === 'WAREHOUSE_EXPORT_SHELF_LABELS') {
         console.log('📋 Admin panelden raf etiketi çekme isteği alındı');
         
         // İlerleme mesajı gönder
@@ -98,6 +120,24 @@
           error: message.error,
           total: message.total,
           message: message.message
+        }, '*');
+        sendResponse({ success: true });
+        return true;
+      } else if (message.type === 'WAREHOUSE_EXPIRY_PROGRESS') {
+        window.postMessage({
+          type: 'WAREHOUSE_EXPIRY_PROGRESS',
+          message: message.message
+        }, '*');
+        sendResponse({ success: true });
+        return true;
+      } else if (message.type === 'WAREHOUSE_EXPIRY_RESPONSE') {
+        window.postMessage({
+          type: 'WAREHOUSE_EXPIRY_RESPONSE',
+          success: message.success,
+          byProductId: message.byProductId,
+          error: message.error,
+          total: message.total,
+          withData: message.withData
         }, '*');
         sendResponse({ success: true });
         return true;

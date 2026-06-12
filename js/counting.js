@@ -128,6 +128,10 @@ class CountingSystem {
         this._financeUseStruckPrice = true;
         /** Finans Stok Özeti — oturum içi yapıştırma rehberi (kaydedilmez) */
         this._financePasteGuide = null;
+        /** Rehber SKT önbelleği — productId → [{ date, qty }] (kaydedilmez) */
+        this._financePasteGuideSkt = new Map();
+        this._financePasteGuideSktLoading = false;
+        this._financePasteGuideSelectedIndex = null;
         /** Oturum içi ürün fiyat önbelleği — API tekrarlarını azaltır */
         this._productPriceCache = new Map();
         this._priceFetchInFlight = new Set();
@@ -3123,6 +3127,9 @@ class CountingSystem {
 
     _clearFinancePasteGuide() {
         this._financePasteGuide = null;
+        this._financePasteGuideSkt = new Map();
+        this._financePasteGuideSktLoading = false;
+        this._financePasteGuideSelectedIndex = null;
     }
 
     _financePasteGuideMatchesCurrentTable() {
@@ -3176,6 +3183,8 @@ class CountingSystem {
             totalPaste: parsed.items.length,
             unmatched,
         };
+        this._financePasteGuideSkt = new Map();
+        this._financePasteGuideSelectedIndex = null;
 
         if (this._lastFinanceExecutiveProducts) {
             this.renderFinancialExecutiveReport(
@@ -3234,6 +3243,156 @@ class CountingSystem {
         return { warehouseStock, systemStock, price, priceText, stockDiff, difference };
     }
 
+    _getFinancePasteGuideSktEntries(productId) {
+        if (!productId) return [];
+        return this._financePasteGuideSkt.get(String(productId)) || [];
+    }
+
+    _renderFinancePasteGuideSktHtml(productId) {
+        const entries = this._getFinancePasteGuideSktEntries(productId);
+        if (!entries.length) {
+            if (this._financePasteGuideSktLoading) {
+                return `<div class="mt-1.5 text-[10px] text-gray-400">SKT bekleniyor…</div>`;
+            }
+            return '';
+        }
+        const chips = entries
+            .map(
+                (e) =>
+                    `<span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 ring-1 ring-amber-100/80"><span>${this.escapeHtml(e.date)}</span><span class="font-bold">×${e.qty}</span></span>`
+            )
+            .join('');
+        return `<div class="mt-1.5 flex flex-wrap items-center gap-1 text-[10px]"><span class="shrink-0 font-semibold text-gray-500">SKT</span>${chips}</div>`;
+    }
+
+    _updateFinancePasteGuideStatus(text) {
+        const status = document.getElementById('financePasteGuideStatus');
+        if (status) status.textContent = text || '';
+    }
+
+    _updateFinancePasteGuideSktButtonState() {
+        const btn = document.getElementById('financePasteGuideSktBtn');
+        if (!btn) return;
+        const loading = this._financePasteGuideSktLoading;
+        btn.disabled = loading;
+        btn.textContent = loading ? 'SKT alınıyor…' : 'SKT Getir';
+        btn.classList.toggle('opacity-60', loading);
+        btn.classList.toggle('pointer-events-none', loading);
+    }
+
+    async fetchFinancePasteGuideSkt() {
+        const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
+        if (!guide?.items?.length) {
+            this.showToast('Önce rehber listesini yapıştırın', 'warning', 2500);
+            return;
+        }
+        if (this._financePasteGuideSktLoading) return;
+
+        const productIds = guide.items.map((p) => p?.productId).filter(Boolean);
+        if (!productIds.length) {
+            this.showToast('Ürün kimliği bulunamadı', 'error', 3000);
+            return;
+        }
+
+        this._financePasteGuideSktLoading = true;
+        this._updateFinancePasteGuideSktButtonState();
+        this._updateFinancePasteGuideStatus('SKT isteği başlatılıyor…');
+        this._renderFinancePasteGuideList();
+
+        const warehouseId = '5dcafe6ae2c61b1e52cf1704';
+        const endDate = '2030-07-31';
+
+        const finish = (payload) => {
+            this._financePasteGuideSktLoading = false;
+            this._updateFinancePasteGuideSktButtonState();
+            if (payload?.success && payload.byProductId) {
+                Object.entries(payload.byProductId).forEach(([pid, entries]) => {
+                    if (Array.isArray(entries) && entries.length) {
+                        this._financePasteGuideSkt.set(String(pid), entries);
+                    }
+                });
+                const withData = payload.withData ?? Object.values(payload.byProductId).filter((a) => a?.length).length;
+                this._updateFinancePasteGuideStatus(`${withData}/${productIds.length} ürün SKT · kaydedilmez`);
+                this.showToast(`${withData} ürün için SKT alındı`, withData ? 'success' : 'warning', 2800);
+            } else {
+                this._updateFinancePasteGuideStatus(payload?.error || 'SKT alınamadı');
+                this.showToast(payload?.error || 'SKT alınamadı', 'error', 4000);
+            }
+            this._renderFinancePasteGuideList();
+        };
+
+        const onWindowMessage = (event) => {
+            if (!event?.data) return;
+            if (event.data.type === 'WAREHOUSE_EXPIRY_PROGRESS') {
+                this._updateFinancePasteGuideStatus(event.data.message || '');
+            } else if (event.data.type === 'WAREHOUSE_EXPIRY_RESPONSE') {
+                window.removeEventListener('message', onWindowMessage);
+                finish(event.data);
+            }
+        };
+        window.addEventListener('message', onWindowMessage);
+
+        const payload = {
+            type: 'WAREHOUSE_FETCH_EXPIRY_PRODUCTS',
+            productIds,
+            warehouseId,
+            endDate,
+        };
+
+        if (typeof window.getirWarehouseExtensionSendMessage === 'function') {
+            window.getirWarehouseExtensionSendMessage(
+                {
+                    type: 'FETCH_EXPIRY_PRODUCTS',
+                    productIds,
+                    warehouseId,
+                    endDate,
+                },
+                (response) => {
+                    if (chrome?.runtime?.lastError) {
+                        window.removeEventListener('message', onWindowMessage);
+                        finish({ success: false, error: chrome.runtime.lastError.message });
+                    } else if (response && response.success === false && response.error) {
+                        window.removeEventListener('message', onWindowMessage);
+                        finish(response);
+                    }
+                }
+            );
+            return;
+        }
+
+        const extId =
+            window.getirWarehouseExtensionId ||
+            (typeof localStorage !== 'undefined' ? localStorage.getItem('getir_warehouse_extension_id') : null);
+        if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage && extId) {
+            chrome.runtime.sendMessage(
+                extId,
+                { type: 'FETCH_EXPIRY_PRODUCTS', productIds, warehouseId, endDate },
+                (response) => {
+                    if (chrome.runtime.lastError) {
+                        window.removeEventListener('message', onWindowMessage);
+                        finish({ success: false, error: chrome.runtime.lastError.message });
+                        return;
+                    }
+                    if (response && response.success === false && response.error) {
+                        window.removeEventListener('message', onWindowMessage);
+                        finish(response);
+                    }
+                }
+            );
+            return;
+        }
+
+        window.postMessage(payload, '*');
+        setTimeout(() => {
+            if (!this._financePasteGuideSktLoading) return;
+            window.removeEventListener('message', onWindowMessage);
+            finish({
+                success: false,
+                error: 'Warehouse extension bulunamadı. getir-warehouse-shelf-label-fetcher eklentisini yükleyin ve warehouse.getir.com sekmesini açın.',
+            });
+        }, 8000);
+    }
+
     _renderFinancePasteGuideRowHtml(p, idx) {
         const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
         const name = this.escapeHtml(p.productName || '');
@@ -3264,9 +3423,19 @@ class CountingSystem {
             ? `<div class="finance-barcodes-block mt-1.5 ${barcodesHiddenClass}" aria-hidden="${this._financeBarcodesVisible ? 'false' : 'true'}">${this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 2 })}</div>`
             : '';
 
+        const selected = this._financePasteGuideSelectedIndex === idx;
+        const rowBgClass =
+            d.stockDiff < 0
+                ? 'border-rose-100/90 bg-rose-50/85'
+                : d.stockDiff > 0
+                  ? 'border-emerald-100/90 bg-emerald-50/85'
+                  : 'border-slate-100 bg-white';
+        const selectedClass = selected ? 'ring-2 ring-slate-400/90 shadow-sm' : '';
+        const sktHtml = this._renderFinancePasteGuideSktHtml(p?.productId);
+
         return `
-            <div class="finance-paste-guide-row flex items-start gap-2.5 rounded-lg border border-slate-100 bg-white px-2.5 py-2 sm:gap-3 sm:px-3">
-                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-50 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">${idx + 1}</span>
+            <div class="finance-paste-guide-row flex cursor-pointer items-start gap-2.5 rounded-lg border px-2.5 py-2 transition-shadow sm:gap-3 sm:px-3 ${rowBgClass} ${selectedClass}" data-guide-index="${idx}" role="button" tabindex="0" aria-pressed="${selected ? 'true' : 'false'}">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/80 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">${idx + 1}</span>
                 <img src="${img}" alt="" class="h-10 w-10 shrink-0 rounded-md border border-slate-100 object-cover sm:h-11 sm:w-11" loading="lazy" />
                 <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</p>
@@ -3285,6 +3454,7 @@ class CountingSystem {
                                 : ''
                         }
                     </div>
+                    ${sktHtml}
                 </div>
             </div>`;
     }
@@ -3316,6 +3486,7 @@ class CountingSystem {
                             Yapıştır
                         </button>
                         ${hasItems ? `<button type="button" id="financePasteGuideClearBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Temizle</button>` : ''}
+                        ${hasItems ? `<button type="button" id="financePasteGuideSktBtn" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100" title="Warehouse SKT listesinden bugün itibariyle son kullanma tarihlerini getir">SKT Getir</button>` : ''}
                     </div>
                 </div>
                 <span id="financePasteGuideStatus" class="mb-2 block text-xs text-gray-500 min-h-[1rem]" role="status" aria-live="polite">${guide ? `${guide.items.length} ürün · yapıştırma sırası` : ''}</span>
@@ -3339,6 +3510,8 @@ class CountingSystem {
         if (!container) return;
         const pasteBtn = container.querySelector('#financePasteGuideBtn');
         const clearBtn = container.querySelector('#financePasteGuideClearBtn');
+        const sktBtn = container.querySelector('#financePasteGuideSktBtn');
+        const list = container.querySelector('#financePasteGuideList');
         if (pasteBtn) {
             pasteBtn.addEventListener('click', () => {
                 void this.importFinancePasteFromClipboard(tableProducts);
@@ -3347,11 +3520,38 @@ class CountingSystem {
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
                 this._clearFinancePasteGuide();
-                const status = document.getElementById('financePasteGuideStatus');
-                if (status) status.textContent = '';
+                this._updateFinancePasteGuideStatus('');
                 void this.renderFinancialTab();
             });
         }
+        if (sktBtn) {
+            sktBtn.addEventListener('click', () => {
+                void this.fetchFinancePasteGuideSkt();
+            });
+        }
+        if (list && !list.dataset.guideSelectBound) {
+            list.dataset.guideSelectBound = '1';
+            list.addEventListener('click', (e) => {
+                const row = e.target.closest('[data-guide-index]');
+                if (!row) return;
+                const idx = parseInt(row.getAttribute('data-guide-index'), 10);
+                if (Number.isNaN(idx)) return;
+                this._financePasteGuideSelectedIndex = this._financePasteGuideSelectedIndex === idx ? null : idx;
+                this._renderFinancePasteGuideList();
+                const updated = list.querySelector(`[data-guide-index="${idx}"]`);
+                if (updated && this._financePasteGuideSelectedIndex === idx) {
+                    updated.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            });
+            list.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                const row = e.target.closest('[data-guide-index]');
+                if (!row) return;
+                e.preventDefault();
+                row.click();
+            });
+        }
+        this._updateFinancePasteGuideSktButtonState();
     }
 
     /** Dropdown listesini query'e göre yeniden çizer */
@@ -11505,7 +11705,7 @@ class CountingSystem {
             financeActiveTableLabel.textContent = activeLabel;
         }
         if (financialTableSelectorText) {
-            financialTableSelectorText.textContent = 'Liste';
+            financialTableSelectorText.textContent = activeLabel;
         }
 
         const financialTableSelectorDropdown = document.getElementById('financialTableSelectorDropdown');
