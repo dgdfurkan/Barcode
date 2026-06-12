@@ -9052,8 +9052,8 @@ class CountingSystem {
                             <div class="relative">
                                 <img src="${product.image || '../assets/logo.png'}" alt="${product.name}" class="w-16 h-16 object-cover rounded-xl shadow-sm border-2 border-white">
                                 ${diff.value !== null && diff.value !== 0 ? 
-                                    `<div class="absolute -top-1 -right-1 w-5 h-5 rounded-full ${diff.type === 'positive' ? 'bg-emerald-500' : 'bg-rose-500'} border-2 border-white flex items-center justify-center">
-                                        <span class="text-white text-xs font-bold">${diffIcon}</span>
+                                    `<div class="absolute -top-1 -right-1 w-5 h-5 rounded-full ${diff.type === 'positive' ? 'bg-emerald-100' : 'bg-rose-100'} flex items-center justify-center">
+                                        <span class="${diff.type === 'positive' ? 'text-emerald-700' : 'text-rose-700'} text-xs font-bold">${diffIcon}</span>
                                     </div>` : ''
                                 }
                             </div>
@@ -9237,8 +9237,8 @@ class CountingSystem {
                                 <div class="relative flex-shrink-0">
                                     <img src="${product.image || '../assets/logo.png'}" alt="${product.name}" class="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-xl shadow-sm border-2 border-white">
                                     ${diff.value !== null && diff.value !== 0 ? 
-                                        `<div class="absolute -top-1 -right-1 w-6 h-6 rounded-full ${diff.type === 'positive' ? 'bg-emerald-500' : 'bg-rose-500'} border-2 border-white flex items-center justify-center">
-                                            <span class="text-white text-xs font-bold">${diffIcon}</span>
+                                        `<div class="absolute -top-1 -right-1 w-6 h-6 rounded-full ${diff.type === 'positive' ? 'bg-emerald-100' : 'bg-rose-100'} flex items-center justify-center">
+                                            <span class="${diff.type === 'positive' ? 'text-emerald-700' : 'text-rose-700'} text-xs font-bold">${diffIcon}</span>
                                         </div>` : ''
                                     }
                                 </div>
@@ -9415,6 +9415,20 @@ class CountingSystem {
         return 'orange';
     }
 
+    /** Rapid kart sağ üst rozet sınıfı (fazla/eksik soft arka plan) */
+    _getRapidStatusIconWrapClass(data) {
+        const hasWarehouse = data.warehouseStock !== null && data.warehouseStock !== undefined;
+        const hasSystem = data.systemStock !== null && data.systemStock !== undefined;
+        let iconWrapClass = 'product-status-icon';
+        if (hasWarehouse && hasSystem) {
+            const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
+            if (diff.type === 'positive') iconWrapClass += ' product-status-icon--positive';
+            else if (diff.type === 'negative') iconWrapClass += ' product-status-icon--negative';
+            else if (diff.type === 'zero') iconWrapClass += ' product-status-icon--zero';
+        }
+        return iconWrapClass;
+    }
+
     /** Tek bir rapid kart için innerHTML string'i */
     _buildRapidCardInner(product, data) {
         const isCounted = data.warehouseStock !== null && data.warehouseStock !== undefined;
@@ -9424,17 +9438,18 @@ class CountingSystem {
         const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
         let stockIndicator = '';
         let statusIcon = '';
+        let iconWrapClass = this._getRapidStatusIconWrapClass(data);
 
         if (hasWarehouse && hasSystem) {
             if (diff.type === 'positive') {
                 stockIndicator = '<div class="stock-indicator bg-emerald-400"></div>';
-                statusIcon = '<div class="w-4 h-4 flex items-center justify-center"><svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg></div>';
+                statusIcon = '<svg class="w-3 h-3 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 15l7-7 7 7"/></svg>';
             } else if (diff.type === 'negative') {
                 stockIndicator = '<div class="stock-indicator bg-rose-400"></div>';
-                statusIcon = '<div class="w-4 h-4 flex items-center justify-center"><svg class="w-3 h-3 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg></div>';
+                statusIcon = '<svg class="w-3 h-3 text-rose-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M19 9l-7 7-7-7"/></svg>';
             } else {
                 stockIndicator = '<div class="stock-indicator bg-gray-300"></div>';
-                statusIcon = '<div class="w-4 h-4 flex items-center justify-center"><svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 9h14M5 15h14"/></svg></div>';
+                statusIcon = '<svg class="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 9h14M5 15h14"/></svg>';
             }
         } else if (hasSystem && !hasWarehouse) {
             stockIndicator = '<div class="stock-indicator bg-orange-400"></div>';
@@ -9449,7 +9464,7 @@ class CountingSystem {
         const productName = product.name || 'Ürün';
         const productImage = product.image || '../assets/logo.png';
 
-        return `<div class="product-status-icon">${statusIcon}</div>${stockIndicator}<div class="flex-1 flex flex-col p-1 sm:p-1.5 overflow-hidden"><div class="flex-1 flex items-center justify-center mb-0.5 sm:mb-1 min-h-0 overflow-hidden"><img src="${productImage}" alt="${product.name || ''}" class="max-w-full max-h-full w-auto h-auto object-contain" onerror="this.src='../assets/logo.png'"></div><div class="text-center flex-shrink-0 px-0.5"><p class="text-[9px] sm:text-[10px] font-semibold text-gray-900 line-clamp-1 leading-tight truncate">${productName}</p></div></div>`;
+        return `<div class="${iconWrapClass}">${statusIcon}</div>${stockIndicator}<div class="flex-1 flex flex-col p-1 sm:p-1.5 overflow-hidden"><div class="flex-1 flex items-center justify-center mb-0.5 sm:mb-1 min-h-0 overflow-hidden"><img src="${productImage}" alt="${product.name || ''}" class="max-w-full max-h-full w-auto h-auto object-contain" onerror="this.src='../assets/logo.png'"></div><div class="text-center flex-shrink-0 px-0.5"><p class="text-[9px] sm:text-[10px] font-semibold text-gray-900 line-clamp-1 leading-tight truncate">${productName}</p></div></div>`;
     }
 
     renderRapidCountingMode() {
@@ -9502,6 +9517,12 @@ class CountingSystem {
                     existing.dataset.rapidState = stateKey;
                     existing.className = `rapid-product-card ${cardClass}`;
                     this._rapidRenderedStates.set(productId, stateKey);
+                } else {
+                    const iconEl = existing.querySelector('.product-status-icon');
+                    const expectedClass = this._getRapidStatusIconWrapClass(data);
+                    if (iconEl && iconEl.className !== expectedClass) {
+                        existing.innerHTML = this._buildRapidCardInner(product, data);
+                    }
                 }
             } else {
                 const div = document.createElement('div');
