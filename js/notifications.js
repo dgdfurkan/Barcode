@@ -351,7 +351,8 @@ class NotificationSystem {
             'unlimitedHistory': 'Sınırsız Geçmiş',
             'favorites': 'Favoriler',
             'stokSayimi': 'Stok Sayımı',
-            'lowStockAlert': 'Düşük Stok Uyarısı'
+            'lowStockAlert': 'Düşük Stok Uyarısı',
+            'urunAjandasi': 'Ürün Ajandası'
         };
         return featureNames[featureName] || featureName;
     }
@@ -369,7 +370,8 @@ class NotificationSystem {
             'unlimitedHistory': '📜',
             'favorites': '⭐',
             'stokSayimi': '📊',
-            'lowStockAlert': '🔔'
+            'lowStockAlert': '🔔',
+            'urunAjandasi': '📒'
         };
         return emojis[featureName] || '✨';
     }
@@ -387,7 +389,8 @@ class NotificationSystem {
             'unlimitedHistory': 'Arama geçmişiniz sınırsız saklanır. Daha önce aradığınız ürünleri kolayca tekrar bulabilirsiniz.',
             'favorites': 'Sık kullandığınız ürünleri favorilere ekleyip hızlı erişim sağlayabilirsiniz. Zaman kazandıran pratik bir özellik.',
             'stokSayimi': 'Getir franchise depolarında fiziksel stok sayımını dijitalleştirin. Depo stoklarınızı girin, sistem Getir API\'den otomatik olarak mevcut stok bilgisini çeker ve farkları gösterir. Mobil, tablet ve PC\'de çalışır, birden fazla sayım tablosu oluşturabilirsiniz.',
-            'lowStockAlert': 'Stok hareketlerine göre eşiğin altına düşen ürünlerde sesli/görsel uyarı alırsınız. Liste Stoğu Düşük sayfasında güncel tutulur; Chrome eklentisi ile franchise sayfasında anlık bildirim alabilirsiniz.'
+            'lowStockAlert': 'Stok hareketlerine göre eşiğin altına düşen ürünlerde sesli/görsel uyarı alırsınız. Liste Stoğu Düşük sayfasında güncel tutulur; Chrome eklentisi ile franchise sayfasında anlık bildirim alabilirsiniz.',
+            'urunAjandasi': 'Müşterinin eksik bildirdiği ürünleri ajandaya kaydedin. Eksik adet, sebep ve not ile takip edin; tamamlanan kayıtları silebilirsiniz.'
         };
         return descriptions[featureName] || 'Bu özellik çalışma verimliliğinizi artırır.';
     }

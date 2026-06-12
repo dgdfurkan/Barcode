@@ -16,8 +16,7 @@ async function resolveCallerTabs(sender) {
         'http://localhost/*',
         'http://127.0.0.1/*',
         'https://jetbarkod.com.tr/*',
-        'https://www.jetbarkod.com.tr/*',
-        'https://*/*'
+        'https://www.jetbarkod.com.tr/*'
       ]
     });
   } catch (e) {
@@ -25,15 +24,35 @@ async function resolveCallerTabs(sender) {
   }
 }
 
+async function postMessageToTabMainWorld(tabId, payload) {
+  if (!tabId) return;
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: (data) => {
+        window.postMessage(data, '*');
+      },
+      args: [payload]
+    });
+  } catch (e) {
+    /* content bridge veya izin yok */
+  }
+}
+
 function sendExpiryProgress(callerTabs, message) {
+  const payload = { type: 'WAREHOUSE_EXPIRY_PROGRESS', message };
   for (const tab of callerTabs) {
-    chrome.tabs.sendMessage(tab.id, { type: 'WAREHOUSE_EXPIRY_PROGRESS', message }).catch(() => {});
+    chrome.tabs.sendMessage(tab.id, payload).catch(() => {});
+    void postMessageToTabMainWorld(tab.id, payload);
   }
 }
 
 function sendExpiryResponse(callerTabs, payload) {
+  const msg = { type: 'WAREHOUSE_EXPIRY_RESPONSE', ...payload };
   for (const tab of callerTabs) {
-    chrome.tabs.sendMessage(tab.id, { type: 'WAREHOUSE_EXPIRY_RESPONSE', ...payload }).catch(() => {});
+    chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
+    void postMessageToTabMainWorld(tab.id, msg);
   }
 }
 

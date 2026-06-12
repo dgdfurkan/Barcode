@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e293b">
+    <link rel="manifest" href="../manifest.json">
+    <title>Ürün Ajandası - Jet Barkod</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/logo.png?v=2">
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
+    <link rel="stylesheet" href="../css/main.css" />
+    <link rel="stylesheet" href="../css/tailwind.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script>
+        (function () {
+            const SUPABASE_URL = 'https://ytekbbxvfdheiexsojpx.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
+            const initSupabaseClient = () => {
+                if (typeof window.supabase !== 'undefined' && window.supabase?.createClient) {
+                    window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                } else setTimeout(initSupabaseClient, 50);
+            };
+            initSupabaseClient();
+        })();
+    </script>
+    <script src="temp_products.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/user-manager.js"></script>
+    <script src="../js/premium-features.js"></script>
+    <script src="../js/notifications.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: var(--color-background); }
+        .agenda-strip {
+            display: flex;
+            gap: 0.75rem;
+            overflow-x: auto;
+            overscroll-behavior-x: contain;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            padding: 0.25rem 0.25rem 0.75rem;
+        }
+        .agenda-card {
+            width: 9.5rem;
+            flex-shrink: 0;
+            scroll-snap-align: start;
+            text-align: left;
+            border-radius: 1rem;
+            border: 1px solid rgb(226 232 240);
+            background: white;
+            padding: 0.625rem;
+            box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+            transition: box-shadow 0.15s, transform 0.15s;
+        }
+        .agenda-card:active { transform: scale(0.98); }
+        .agenda-card-img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            border-radius: 0.75rem;
+            border: 1px solid rgb(241 245 249);
+            background: rgb(248 250 252);
+        }
+        .agenda-qty-badge {
+            position: absolute;
+            top: 0.35rem;
+            right: 0.35rem;
+            min-width: 1.75rem;
+            padding: 0.125rem 0.375rem;
+            border-radius: 9999px;
+            background: rgb(254 226 226);
+            color: rgb(159 18 57);
+            font-size: 0.7rem;
+            font-weight: 800;
+            text-align: center;
+            box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+        }
+        .agenda-card-title {
+            margin-top: 0.5rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            line-height: 1.25;
+            color: rgb(15 23 42);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            overflow-wrap: anywhere;
+        }
+        #detailSheet {
+            transition: opacity 0.22s ease;
+        }
+        #detailSheet:not(.agenda-sheet-open) .agenda-sheet-panel {
+            transform: translateY(100%);
+        }
+        #detailSheet.agenda-sheet-open .agenda-sheet-panel {
+            transform: translateY(0);
+        }
+        .agenda-sheet-panel {
+            transition: transform 0.22s ease;
+        }
+        @media (min-width: 640px) {
+            .agenda-card { width: 10.5rem; }
+            #detailSheet .agenda-sheet-panel {
+                max-width: 28rem;
+                margin-left: auto;
+                margin-right: auto;
+                border-radius: 1rem 1rem 0 0;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-background">
+    <header class="bg-surface border-b border-border shadow-sm sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 gap-3">
+                <a href="product_search.html" class="flex items-center gap-3 min-w-0">
+                    <img src="../assets/logo.png" alt="Jet Barkod" class="w-8 h-8 object-contain shrink-0">
+                    <div class="min-w-0">
+                        <h1 class="text-lg sm:text-xl font-bold text-text-primary truncate">Ürün Ajandası</h1>
+                        <p class="text-[11px] text-text-secondary truncate">Eksik / gönderim takibi</p>
+                    </div>
+                </a>
+                <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" id="agendaRefreshBtn" class="btn-secondary text-sm hidden sm:inline-flex">Yenile</button>
+                    <button type="button" id="agendaAddBtn" class="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:from-violet-700 hover:to-fuchsia-700">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        <span class="hidden xs:inline">Ekle</span>
+                    </button>
+                    <a href="product_search.html" class="btn-secondary text-sm hidden sm:inline-flex">Arama</a>
+                    <span id="headerUserName" class="text-xs text-text-secondary hidden md:block max-w-[8rem] truncate"></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div id="noAuth" class="hidden">
+            <div class="bg-surface rounded-xl border border-border p-12 text-center">
+                <p class="text-text-secondary mb-4">Bu sayfayı kullanmak için giriş yapın.</p>
+                <a href="../index.html" class="btn-primary inline-flex">Giriş Yap</a>
+            </div>
+        </div>
+        <div id="noPremium" class="hidden">
+            <div class="bg-surface rounded-xl border border-border p-12 text-center">
+                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-100 text-2xl">📒</div>
+                <h2 class="text-xl font-semibold text-text-primary mb-2">Ürün Ajandası premium özellik</h2>
+                <p class="text-text-secondary mb-6">Müşteri eksik bildirimlerini takip etmek için yöneticinizden «Ürün Ajandası» özelliğini açmasını isteyin.</p>
+                <a href="product_search.html" class="btn-secondary inline-flex">Ürün Aramaya Dön</a>
+            </div>
+        </div>
+
+        <div id="mainContent" class="hidden space-y-5">
+            <section class="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-gradient-to-r from-violet-50/80 to-fuchsia-50/50 px-4 py-3 sm:px-5">
+                    <div>
+                        <h2 class="text-base font-semibold text-slate-900">Açık kayıtlar</h2>
+                        <p class="text-xs text-slate-500">Karta tıklayın · detay ve silme</p>
+                    </div>
+                    <span id="agendaCountBadge" class="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-bold text-violet-800">0</span>
+                </div>
+                <div class="p-3 sm:p-4">
+                    <div id="agendaEmpty" class="hidden py-10 text-center">
+                        <p class="text-sm text-slate-500 mb-3">Henüz kayıt yok.</p>
+                        <button type="button" class="text-sm font-semibold text-violet-700 hover:text-violet-900" onclick="document.getElementById('agendaAddBtn')?.click()">+ İlk kaydı ekle</button>
+                    </div>
+                    <div id="agendaCardStrip" class="agenda-strip" role="list"></div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Yeni kayıt modal -->
+    <div id="addAgendaModal" class="fixed inset-0 z-[80] hidden flex items-end sm:items-center justify-center bg-slate-900/50 p-0 sm:p-4">
+        <div class="w-full max-w-lg rounded-t-2xl sm:rounded-2xl bg-white shadow-xl max-h-[92vh] overflow-y-auto">
+            <div class="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-4 py-3">
+                <h3 class="text-base font-semibold text-slate-900">Ajandaya ekle</h3>
+                <button type="button" id="addModalClose" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100" aria-label="Kapat">✕</button>
+            </div>
+            <div class="space-y-4 p-4">
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-slate-600" for="addProductSearch">Ürün ara</label>
+                    <input type="search" id="addProductSearch" autocomplete="off" placeholder="Ad veya barkod…" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20" />
+                    <div id="addProductResults" class="mt-2 max-h-44 overflow-y-auto rounded-xl border border-slate-100"></div>
+                </div>
+                <div id="addSelectedProduct" class="hidden flex items-center gap-3 rounded-xl border border-violet-100 bg-violet-50/60 p-3">
+                    <img id="addSelectedImg" src="../assets/logo.png" alt="" class="h-12 w-12 rounded-lg border border-white object-cover" />
+                    <p id="addSelectedName" class="min-w-0 flex-1 text-sm font-semibold text-slate-900 [overflow-wrap:anywhere]"></p>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-slate-600" for="addQuantity">Eksik adet</label>
+                        <input type="number" id="addQuantity" min="1" value="1" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-slate-600" for="addEventDate">Tarih</label>
+                        <input type="date" id="addEventDate" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+                    </div>
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-slate-600" for="addReasonPreset">Sebep</label>
+                    <select id="addReasonPreset" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
+                        <option>Eksik ürün</option>
+                        <option>Yanlış adet</option>
+                        <option>Hasarlı</option>
+                        <option>Diğer</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-slate-600" for="addReasonNote">Ek not (isteğe bağlı)</label>
+                    <textarea id="addReasonNote" rows="2" placeholder="Müşteri notu, sipariş no…" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm resize-none"></textarea>
+                </div>
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" id="addPickupRequired" class="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                    Müşteriden alınacak
+                </label>
+                <div>
+                    <label class="mb-1 block text-xs font-semibold text-slate-600" for="addAddress">Adres (isteğe bağlı)</label>
+                    <input type="text" id="addAddress" placeholder="Teslimat / müşteri adresi" class="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+                </div>
+            </div>
+            <div class="sticky bottom-0 flex gap-2 border-t border-slate-100 bg-white p-4">
+                <button type="button" id="addModalCancel" class="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600">İptal</button>
+                <button type="button" id="addModalSave" class="flex-1 rounded-xl bg-violet-600 py-2.5 text-sm font-semibold text-white hover:bg-violet-700">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detay sheet -->
+    <div id="detailSheet" class="fixed inset-0 z-[85] hidden" aria-hidden="true">
+        <div id="detailSheetBackdrop" class="absolute inset-0 bg-slate-900/40"></div>
+        <div class="absolute inset-x-0 bottom-0 agenda-sheet-panel bg-white shadow-2xl">
+            <div class="mx-auto w-full max-w-lg">
+                <div class="flex justify-center py-2"><span class="h-1 w-10 rounded-full bg-slate-200"></span></div>
+                <div class="flex items-center justify-between px-4 pb-2">
+                    <h3 class="text-sm font-semibold text-slate-900">Kayıt detayı</h3>
+                    <button type="button" id="detailCloseBtn" class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100">✕</button>
+                </div>
+                <div id="detailSheetBody" class="px-4 pb-4 max-h-[50vh] overflow-y-auto"></div>
+                <div class="border-t border-slate-100 p-4">
+                    <button type="button" id="detailDeleteBtn" class="w-full rounded-xl bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700">Tamamlandı · Sil</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/dispatch-agenda.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            void window.dispatchAgendaApp?.init();
+        });
+    </script>
+</body>
+</html>

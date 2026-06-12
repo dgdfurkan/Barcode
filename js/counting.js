@@ -3280,6 +3280,25 @@ class CountingSystem {
         btn.classList.toggle('pointer-events-none', loading);
     }
 
+    async _waitForGetirExtensionBridge(timeoutMs = 2500) {
+        if (window.__getirExtensionBridgeReady) return true;
+        return new Promise((resolve) => {
+            const onMsg = (event) => {
+                if (event?.data?.type === 'GETIR_EXTENSION_PONG' || event?.data?.type === 'GETIR_EXTENSION_READY') {
+                    window.__getirExtensionBridgeReady = true;
+                    window.removeEventListener('message', onMsg);
+                    resolve(true);
+                }
+            };
+            window.addEventListener('message', onMsg);
+            window.postMessage({ type: 'GETIR_EXTENSION_PING' }, '*');
+            setTimeout(() => {
+                window.removeEventListener('message', onMsg);
+                resolve(!!window.__getirExtensionBridgeReady);
+            }, timeoutMs);
+        });
+    }
+
     async fetchFinancePasteGuideSkt() {
         const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
         if (!guide?.items?.length) {
@@ -3291,6 +3310,16 @@ class CountingSystem {
         const productIds = guide.items.map((p) => p?.productId).filter(Boolean);
         if (!productIds.length) {
             this.showToast('Ürün kimliği bulunamadı', 'error', 3000);
+            return;
+        }
+
+        const bridgeOk = await this._waitForGetirExtensionBridge(2500);
+        if (!bridgeOk) {
+            this.showToast(
+                'Extension bulunamadı. Chrome\'da «Getir Stok Senkronizasyonu» v1.1.1+ etkinleştirip sayfayı yenileyin; warehouse.getir.com açık kalsın.',
+                'error',
+                6000
+            );
             return;
         }
 
@@ -3338,54 +3367,26 @@ class CountingSystem {
                 success: false,
                 error:
                     message ||
-                    'Extension bağlantısı kurulamadı. Getir Stok Senkronizasyonu eklentisini yenileyin; warehouse.getir.com sekmesi açık olsun.',
+                    'Stok eklentisi yanıt vermedi. «Getir Stok Senkronizasyonu» v1.1.1+ etkin mi? Sayfayı yenileyin; warehouse.getir.com açık olsun.',
             });
         };
 
-        if (window.getirExtensionHelper?.fetchExpiryProducts) {
-            window.getirExtensionHelper
-                .fetchExpiryProducts(productIds, { warehouseId, endDate })
-                .then((data) => {
-                    window.removeEventListener('message', onWindowMessage);
-                    finish(data);
-                })
-                .catch((err) => dispatchError(err?.message));
-            return;
-        }
+        window.postMessage(
+            {
+                type: 'GETIR_FETCH_EXPIRY_REQUEST',
+                productIds,
+                warehouseId,
+                endDate,
+            },
+            '*'
+        );
 
-        const payload = {
-            type: 'WAREHOUSE_FETCH_EXPIRY_PRODUCTS',
-            productIds,
-            warehouseId,
-            endDate,
-        };
-
-        if (typeof window.getirWarehouseExtensionSendMessage === 'function') {
-            window.getirWarehouseExtensionSendMessage(
-                {
-                    type: 'FETCH_EXPIRY_PRODUCTS',
-                    productIds,
-                    warehouseId,
-                    endDate,
-                },
-                (response) => {
-                    if (chrome?.runtime?.lastError) {
-                        dispatchError(chrome.runtime.lastError.message);
-                    } else if (response && response.success === false && response.error) {
-                        dispatchError(response.error);
-                    }
-                }
-            );
-            return;
-        }
-
-        window.postMessage(payload, '*');
         setTimeout(() => {
             if (!this._financePasteGuideSktLoading) return;
             dispatchError(
-                'Extension bulunamadı. Chrome’da «Getir Stok Senkronizasyonu» eklentisini etkinleştirip sayfayı yenileyin; warehouse.getir.com açık kalsın.'
+                'Stok eklentisi yanıt vermedi. Chrome\'da «Getir Stok Senkronizasyonu» v1.1.1+ yüklü mü? Sayfayı (F5) yenileyin; warehouse.getir.com açık kalsın.'
             );
-        }, 12000);
+        }, 90000);
     }
 
     _renderFinancePasteGuideRowHtml(p, idx) {
