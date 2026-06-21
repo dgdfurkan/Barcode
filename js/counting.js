@@ -1073,13 +1073,14 @@ class CountingSystem {
     async _writeFullBlobToSupabase() {
         if (!window.supabase || !this.currentUser) return;
         try {
-            const fullBlob = this._buildFullBlob();
-            await this._protectApiInfoInFullBlob(fullBlob);
-            fullBlob._writerDeviceId = this.deviceId;
-            fullBlob._writerAt = Date.now();
+            const payload =
+                this._countingItemsTableReady === true ? this._buildMetaBlob() : this._buildFullBlob();
+            await this._protectApiInfoInFullBlob(payload);
+            payload._writerDeviceId = this.deviceId;
+            payload._writerAt = Date.now();
             await window.supabase
                 .from('users')
-                .update({ counting_data: fullBlob })
+                .update({ counting_data: payload })
                 .eq('username', this.currentUser.username);
         } catch (e) { /* ignore */ }
     }
@@ -1117,9 +1118,14 @@ class CountingSystem {
             this.cachedFullData = fullData;
 
             if (window.supabase && this.currentUser) {
+                const remotePayload =
+                    this._countingItemsTableReady === true ? this._buildMetaBlob() : fullData;
+                await this._protectApiInfoInFullBlob(remotePayload);
+                remotePayload._writerDeviceId = this.deviceId;
+                remotePayload._writerAt = Date.now();
                 const { error } = await window.supabase
                     .from('users')
-                    .update({ counting_data: fullData })
+                    .update({ counting_data: remotePayload })
                     .eq('username', this.currentUser.username);
                 if (error) throw error;
             }
@@ -1991,6 +1997,18 @@ class CountingSystem {
         return `${base}, struck_price, struck_price_text, no_struck_price`;
     }
 
+    /** Meta sync / polling — history hariç (egress tasarrufu) */
+    _getCountingItemsMetaSyncColumns() {
+        const base =
+            'table_name, product_id, warehouse_stock, system_stock, price, price_text, reserved_stock, api_fetch_failed, last_updated, created_at';
+        if (this._countingItemsPriceExtension === false) return base;
+        return `${base}, struck_price, struck_price_text, no_struck_price`;
+    }
+
+    _isCountingRealtimeHealthy() {
+        return this._realtimeItemsActive === true || this._realtimeMetaActive === true;
+    }
+
     _mapCountingItemRowToEntry(row) {
         if (!row) return null;
         const entry = {
@@ -2267,28 +2285,88 @@ class CountingSystem {
      */
     _setupVisibilityRefresh() {
         let lastRefresh = 0;
-        const REFRESH_COOLDOWN_MS = 5000;
+        let lastHiddenAt = document.visibilityState === 'hidden' ? Date.now() : 0;
 
-        const tryRefresh = () => {
+        const tryRefresh = (options = {}) => {
             if (document.visibilityState !== 'visible') return;
             const now = Date.now();
-            if (now - lastRefresh < REFRESH_COOLDOWN_MS) return;
+            const realtimeOk = this._isCountingRealtimeHealthy();
+            const cooldownMs = realtimeOk ? 120000 : 30000;
+            const hiddenMs = lastHiddenAt ? now - lastHiddenAt : 0;
+            const forceMeta = options.forceMeta === true || hiddenMs >= 90000;
+
+            if (now - lastRefresh < cooldownMs && !forceMeta) return;
             lastRefresh = now;
+
             this.refreshCurrentTableFromSupabase().catch(() => {});
-            // Aynı zamanda tüm tabloların metasını da senkronize et (yeni tablo eklenmiş olabilir)
-            this._refreshAllTablesMetaFromSupabase().catch(() => {});
+
+            if (forceMeta || !realtimeOk) {
+                this._refreshAllTablesMetaFromSupabase().catch(() => {});
+            } else {
+                this._refreshTableMetaOnlyFromSupabase().catch(() => {});
+            }
             this.updateAPIStatusCard();
         };
 
-        document.addEventListener('visibilitychange', tryRefresh);
-        window.addEventListener('focus', tryRefresh);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                lastHiddenAt = Date.now();
+                return;
+            }
+            tryRefresh({ forceMeta: true });
+        });
+        window.addEventListener('focus', () => tryRefresh({ forceMeta: true }));
 
-        // Periyodik fallback (sayfa açıkken her 20 sn'de bir hafif kontrol)
+        // Realtime durumuna göre periyodik aralık (kurulum anında henüz bağlı olmayabilir)
         this._periodicRefreshInterval = setInterval(() => {
             if (document.visibilityState === 'visible') {
-                tryRefresh();
+                tryRefresh({ forceMeta: !this._isCountingRealtimeHealthy() });
             }
-        }, 20000);
+        }, 120000);
+    }
+
+    /**
+     * Hafif meta sync — tüm counting_items çekmeden tablo listesi / _tableMeta günceller (egress tasarrufu).
+     */
+    async _refreshTableMetaOnlyFromSupabase() {
+        if (!window.supabase || !this.currentUser) return;
+        if (this._countingItemsTableReady !== true) return;
+
+        try {
+            const { data, error } = await window.supabase
+                .from('users')
+                .select('counting_data')
+                .eq('username', this.currentUser.username)
+                .maybeSingle();
+            if (error || !data?.counting_data) return;
+
+            const remoteTableMeta = data.counting_data._tableMeta || {};
+            if (!this.cachedFullData) this.cachedFullData = { _tables: {}, _tableMeta: {} };
+            if (!this.cachedFullData._tableMeta) this.cachedFullData._tableMeta = {};
+
+            let metaChanged = false;
+            for (const [tName, meta] of Object.entries(remoteTableMeta)) {
+                if (!this.cachedFullData._tableMeta[tName]) {
+                    this.cachedFullData._tableMeta[tName] = {
+                        createdAt: meta?.createdAt || new Date(0).toISOString(),
+                        lastActivityAt: meta?.lastActivityAt || null,
+                        _productOrder: Array.isArray(meta?._productOrder) ? [...meta._productOrder] : [],
+                    };
+                    metaChanged = true;
+                } else if (meta?.lastActivityAt) {
+                    const incMs = new Date(meta.lastActivityAt).getTime();
+                    const locMs = this.cachedFullData._tableMeta[tName].lastActivityAt
+                        ? new Date(this.cachedFullData._tableMeta[tName].lastActivityAt).getTime()
+                        : 0;
+                    if (incMs > locMs) {
+                        this.cachedFullData._tableMeta[tName].lastActivityAt = meta.lastActivityAt;
+                        metaChanged = true;
+                    }
+                }
+            }
+
+            if (metaChanged) this._scheduleTableSelectorUpdate(100);
+        } catch (e) { /* sessiz */ }
     }
 
     /**
@@ -2303,7 +2381,7 @@ class CountingSystem {
         try {
             // PARALEL: counting_items + users.counting_data — biri ürünler için, diğeri _tableMeta için
             const [itemsRes, userRes] = await Promise.all([
-                this._queryCountingItems(this._getCountingItemsSelectColumns(true), (q) =>
+                this._queryCountingItems(this._getCountingItemsMetaSyncColumns(), (q) =>
                     q.eq('username', this.currentUser.username)
                 ),
                 window.supabase

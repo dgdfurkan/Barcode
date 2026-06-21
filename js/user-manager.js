@@ -3,6 +3,7 @@ class UserDataManager {
     constructor() {
         this.currentUser = null;
         this.userData = null;
+        this._saveUserDataPromise = null;
     }
 
     // Initialize user data
@@ -108,77 +109,70 @@ class UserDataManager {
 
     // Save user data (ONLY to custom_products and settings columns, NOT to data column)
     async saveUserData() {
+        if (this._saveUserDataPromise) {
+            return this._saveUserDataPromise;
+        }
+        this._saveUserDataPromise = this._saveUserDataInternal();
         try {
-            // Prepare data for saving
-            const customProducts = (this.userData.products || []).filter(p => !p.isDefault);
+            await this._saveUserDataPromise;
+        } finally {
+            this._saveUserDataPromise = null;
+        }
+    }
+
+    async _saveUserDataInternal() {
+        try {
+            const customProducts = (this.userData.products || []).filter((p) => !p.isDefault);
             const settings = this.userData.settings || {};
-            
-            // Save to Supabase - ONLY to custom_products and settings columns
-            if (window.supabase) {
-                // Save to new structure (custom_products + settings columns)
+
+            if (window.supabase && this.currentUser?.username) {
                 const updateData = {
-                    username: this.currentUser.username,
                     custom_products: customProducts,
-                    settings: settings,
-                    updated_at: new Date().toISOString()
+                    settings,
+                    updated_at: new Date().toISOString(),
                 };
-                
-                // Önce mevcut satırı bul (en son güncellenmiş olanı)
-                const { data: existingData, error: findError } = await window.supabase
+
+                const { data: updatedRows, error: updateError } = await window.supabase
                     .from('user_data')
-                    .select('id')
+                    .update(updateData)
                     .eq('username', this.currentUser.username)
-                    .order('updated_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-                
-                if (findError && findError.code !== 'PGRST116') {
-                    // PGRST116 = no rows found, bu normal
-                    console.error('Error finding existing data:', findError);
-                }
-                
-                // Eğer mevcut satır varsa update, yoksa insert
-                let error;
-                if (existingData && existingData.id) {
-                    // Update existing row
-                    const { error: updateError } = await window.supabase
-                        .from('user_data')
-                        .update(updateData)
-                        .eq('id', existingData.id);
-                    error = updateError;
-                } else {
-                    // Insert new row
-                    const { error: insertError } = await window.supabase
-                        .from('user_data')
-                        .insert(updateData);
-                    error = insertError;
-                }
-                
-                if (error) {
-                    // If new columns don't exist, inform user but don't write to data column
-                    if (error.message && error.message.includes('column') && error.message.includes('does not exist')) {
-                        console.error('⚠️ New columns (custom_products, settings) not found. Please run migration SQL first!');
+                    .select('id');
+
+                if (updateError) {
+                    if (
+                        updateError.message &&
+                        updateError.message.includes('column') &&
+                        updateError.message.includes('does not exist')
+                    ) {
                         throw new Error('Yeni kolonlar bulunamadı. Lütfen migration SQL dosyasını çalıştırın!');
-                    } else {
-                        throw error;
+                    }
+                    throw updateError;
+                }
+
+                if (!updatedRows || updatedRows.length === 0) {
+                    const { error: insertError } = await window.supabase.from('user_data').insert({
+                        username: this.currentUser.username,
+                        ...updateData,
+                    });
+                    if (insertError) throw insertError;
+                } else if (updatedRows.length > 1) {
+                    const keepId = updatedRows[0].id;
+                    const extraIds = updatedRows.slice(1).map((r) => r.id).filter(Boolean);
+                    if (extraIds.length) {
+                        await window.supabase.from('user_data').delete().in('id', extraIds);
+                        console.warn(`🧹 user_data duplicate temizlendi (${this.currentUser.username}): ${extraIds.length} satır`);
                     }
                 }
             }
-            
-            // Save to local storage as backup
-            const localData = {
-                products: customProducts,
-                settings: settings
-            };
+
+            const localData = { products: customProducts, settings };
             localStorage.setItem(`userData_${this.currentUser.username}`, JSON.stringify(localData));
-            
             console.log('✅ User data saved successfully');
         } catch (error) {
             console.error('Error saving user data:', error);
-            // Fallback to local storage only
             const localData = {
-                products: (this.userData.products || []).filter(p => !p.isDefault),
-                settings: this.userData.settings || {}
+                products: (this.userData.products || []).filter((p) => !p.isDefault),
+                settings: this.userData.settings || {},
             };
             localStorage.setItem(`userData_${this.currentUser.username}`, JSON.stringify(localData));
         }
