@@ -3,6 +3,7 @@ class PremiumFeatures {
     constructor() {
         this.currentUser = null;
         this.premiumFeatures = {};
+        this._loadPromise = null;
     }
 
     // Initialize premium features for current user
@@ -12,13 +13,28 @@ class PremiumFeatures {
             console.warn('No user session found for premium features');
             return;
         }
-        
+
+        if (this.currentUser?.username === session.username && Object.keys(this.premiumFeatures).length) {
+            return;
+        }
+
         this.currentUser = session;
         await this.loadPremiumFeatures();
     }
 
     // Load premium features from Supabase
     async loadPremiumFeatures() {
+        if (this._loadPromise) return this._loadPromise;
+
+        this._loadPromise = this._fetchPremiumFeaturesFromSupabase();
+        try {
+            await this._loadPromise;
+        } finally {
+            this._loadPromise = null;
+        }
+    }
+
+    async _fetchPremiumFeaturesFromSupabase() {
         try {
             if (!window.supabase || !this.currentUser) {
                 this.premiumFeatures = {};
@@ -34,7 +50,6 @@ class PremiumFeatures {
             if (!error && data && data.premium_features) {
                 this.premiumFeatures = data.premium_features;
             } else {
-                // Default to empty object if no features found
                 this.premiumFeatures = {};
             }
         } catch (error) {

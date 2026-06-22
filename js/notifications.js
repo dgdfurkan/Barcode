@@ -6,6 +6,8 @@ class NotificationSystem {
         this.reloadTimer = null;
         this.pollingInterval = null;
         this.lastKnownFeatures = null;
+        this._realtimeSubscribed = false;
+        this._initialFeaturesLoaded = false;
     }
 
     // Initialize notification system
@@ -59,15 +61,14 @@ class NotificationSystem {
                     console.log('🔔 Subscription status:', status);
                     if (status === 'SUBSCRIBED') {
                         console.log('✅ Premium features realtime subscription established');
-                        // Realtime çalışıyor, ama yine de polling'i backup olarak başlat
-                        // (Realtime bazen gecikebilir veya kaçırabilir)
-                        this.setupPollingFallback();
+                        this._realtimeSubscribed = true;
+                        if (this.pollingInterval) {
+                            clearInterval(this.pollingInterval);
+                            this.pollingInterval = null;
+                        }
                     } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
                         console.warn('⚠️ Realtime subscription failed, falling back to polling only');
-                        this.setupPollingFallback();
-                    } else {
-                        console.log('⏳ Realtime subscription pending:', status);
-                        // Pending durumunda da polling'i başlat (güvenlik için)
+                        this._realtimeSubscribed = false;
                         this.setupPollingFallback();
                     }
                 });
@@ -77,21 +78,25 @@ class NotificationSystem {
         }
     }
 
-    // Fallback polling mechanism for file:// protocol or when realtime fails
+    // Fallback polling — yalnızca Realtime yoksa (egress tasarrufu)
     setupPollingFallback() {
-        console.log('🔄 Setting up polling fallback for premium features');
-        
-        // Load initial state
-        this.loadInitialPremiumFeatures();
-        
-        // Polling aktif - Realtime çalışmazsa veya gecikirse polling ile kontrol et
-        if (this.pollingInterval) {
-            clearInterval(this.pollingInterval);
+        if (this._realtimeSubscribed) return;
+        if (this.pollingInterval) return;
+
+        console.log('🔄 Premium features polling fallback (60s)');
+
+        if (!this._initialFeaturesLoaded) {
+            void this.loadInitialPremiumFeatures();
         }
-        
+
         this.pollingInterval = setInterval(async () => {
+            if (this._realtimeSubscribed) {
+                clearInterval(this.pollingInterval);
+                this.pollingInterval = null;
+                return;
+            }
             await this.checkPremiumFeaturesChanges();
-        }, 3000); // Her 3 saniyede bir kontrol et
+        }, 60000);
     }
 
     // Load initial premium features state
@@ -109,6 +114,7 @@ class NotificationSystem {
                 const currentFeatures = data.premium_features || {};
                 
                 this.lastKnownFeatures = currentFeatures;
+                this._initialFeaturesLoaded = true;
                 
                 // Update premium features cache
                 if (window.premiumFeatures) {
@@ -164,12 +170,14 @@ class NotificationSystem {
 
     // Handle premium features update from realtime
     handlePremiumFeaturesUpdate(payload) {
-        if (!payload.new || !payload.new.premium_features) {
-            return;
-        }
+        if (!payload.new) return;
 
         const newFeatures = payload.new.premium_features || {};
         const oldFeatures = payload.old?.premium_features || this.lastKnownFeatures || {};
+
+        if (JSON.stringify(newFeatures) === JSON.stringify(oldFeatures)) {
+            return;
+        }
 
         // Detect which features changed
         const changedFeatures = this.detectFeatureChanges(oldFeatures, newFeatures);
