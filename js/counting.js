@@ -175,6 +175,10 @@ class CountingSystem {
         this.deviceId = 'dev_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
         /** Toplu yapıştırma / içe aktarma sırasında arka plan sync'i durdurur */
         this._importInProgress = false;
+        /** Aktif tablo catch-up debounce (çok cihaz — tek tablo sorgusu) */
+        this._activeTableCatchUpTimer = null;
+        this._activeTableCatchUpInFlight = false;
+        this._activeTableCatchUpQueued = false;
         /** Per-product debounce timers: { productId: timeoutId } */
         this._productSaveTimers = {};
         /** counting_items tablosu mevcut mu? (yoksa eski blob yoluna düş) */
@@ -298,8 +302,11 @@ class CountingSystem {
             // Realtime listener: başka cihazdan gelen sayım değişikliklerini cache'e merge et
             this._setupRealtimeSync();
 
-            // Sayfa görünür olunca aktif tabloyu force refresh et (realtime kaçırılan güncellemeler için güvenlik ağı)
+            // Sayfa görünür olunca aktif tabloyu hafif catch-up (realtime kaçırılan güncellemeler için)
             this._setupVisibilityRefresh();
+
+            // İlk açılış: aktif tabloyu DB ile hizala (telefon/PC aynı anda girdiğinde)
+            this._scheduleActiveTableCatchUp(800);
 
             // beforeunload: pending save'leri flush et (localStorage'a en azından yaz)
             window.addEventListener('beforeunload', () => {
@@ -1943,6 +1950,86 @@ class CountingSystem {
         this.cachedFullData._tableMeta[tName]._productOrder = [...data._productOrder];
     }
 
+    /** Uzak cihazdan gelen sırayı yerel ürünlerle birleştirir (yapıştırma sırası korunur) */
+    _mergeRemoteProductOrder(incomingOrder, localProductIds, existingLocalOrder = []) {
+        const localSet = new Set(localProductIds);
+        const merged = [];
+        const seen = new Set();
+        for (const id of incomingOrder || []) {
+            if (!localSet.has(id) || seen.has(id)) continue;
+            merged.push(id);
+            seen.add(id);
+        }
+        for (const id of existingLocalOrder || []) {
+            if (!localSet.has(id) || seen.has(id)) continue;
+            merged.push(id);
+            seen.add(id);
+        }
+        for (const id of localProductIds) {
+            if (seen.has(id)) continue;
+            merged.push(id);
+            seen.add(id);
+        }
+        return merged;
+    }
+
+    /** Meta blob veya parametreden gelen sırayı tablo slotuna uygular */
+    _applyRemoteProductOrderForTable(tableName, incomingOrder) {
+        const tName = tableName || this.currentTableName;
+        if (!tName) return false;
+        const table = this.cachedFullData?._tables?.[tName];
+        if (!table) return false;
+        const order = incomingOrder || this.cachedFullData?._tableMeta?.[tName]?._productOrder;
+        if (!Array.isArray(order) || order.length === 0) return false;
+        const localIds = Object.keys(table).filter((k) => !this.isReservedCountingKey(k));
+        const merged = this._mergeRemoteProductOrder(order, localIds, table._productOrder);
+        if (merged.length === 0) return false;
+        const prev = table._productOrder;
+        if (Array.isArray(prev) && prev.length === merged.length && prev.every((id, i) => id === merged[i])) {
+            return false;
+        }
+        table._productOrder = merged;
+        if (tName === this.currentTableName && this.countingData) {
+            this.countingData._productOrder = [...merged];
+        }
+        return true;
+    }
+
+    /** Debounced aktif tablo catch-up — tek counting_items sorgusu, egress dostu */
+    _scheduleActiveTableCatchUp(delay = 350) {
+        if (this._importInProgress || !this.currentTableName) return;
+        if (this._activeTableCatchUpTimer) clearTimeout(this._activeTableCatchUpTimer);
+        this._activeTableCatchUpTimer = setTimeout(() => {
+            this._activeTableCatchUpTimer = null;
+            this._catchUpActiveTableFromSupabase().catch(() => {});
+        }, delay);
+    }
+
+    /** Aktif tablonun ürünlerini + sırasını Supabase ile hizalar (realtime güvenlik ağı) */
+    async _catchUpActiveTableFromSupabase() {
+        if (this._importInProgress || !this.currentTableName) return;
+        if (this._activeTableCatchUpInFlight) {
+            this._activeTableCatchUpQueued = true;
+            return;
+        }
+        this._activeTableCatchUpInFlight = true;
+        try {
+            await this.refreshCurrentTableFromSupabase();
+            const orderChanged = this._applyRemoteProductOrderForTable(this.currentTableName);
+            if (orderChanged) {
+                this.scheduleRenderTable();
+                this.updateStatistics();
+                this.updateCountingProgress();
+            }
+        } finally {
+            this._activeTableCatchUpInFlight = false;
+            if (this._activeTableCatchUpQueued) {
+                this._activeTableCatchUpQueued = false;
+                this._scheduleActiveTableCatchUp(400);
+            }
+        }
+    }
+
     /** countingData ile cachedFullData slotunun aynı tabloya bağlı olduğunu doğrular */
     _verifyCountingDataTableBinding() {
         const name = this.currentTableName;
@@ -2303,6 +2390,7 @@ class CountingSystem {
                         if (status === 'SUBSCRIBED') {
                             console.log('🟢 Realtime counting_items bağlandı (per-product)');
                             this._realtimeItemsActive = true;
+                            this._scheduleActiveTableCatchUp(300);
                         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
                             console.warn(`⚠️ Realtime counting_items: ${status} — visibility refresh fallback aktif`);
                             this._realtimeItemsActive = false;
@@ -2327,6 +2415,7 @@ class CountingSystem {
                     if (status === 'SUBSCRIBED') {
                         console.log('🟢 Realtime meta sync bağlandı');
                         this._realtimeMetaActive = true;
+                        this._scheduleActiveTableCatchUp(400);
                     } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
                         console.warn(`⚠️ Realtime meta: ${status} — visibility refresh fallback aktif`);
                         this._realtimeMetaActive = false;
@@ -2338,25 +2427,30 @@ class CountingSystem {
     }
 
     /**
-     * Sayfa görünür olunca / pencere fokus alınca / periyodik olarak aktif tabloyu Supabase'den force fetch eder.
-     * Realtime kaçırırsa veya kurulmazsa güvenlik ağı görevi görür.
+     * Sayfa görünür olunca aktif tablo catch-up + seyrek meta sync.
+     * Realtime birincil kanal; polling yalnızca güvenlik ağı (tek tablo sorgusu).
      */
     _setupVisibilityRefresh() {
-        let lastRefresh = 0;
+        let lastMetaRefresh = 0;
         let lastHiddenAt = document.visibilityState === 'hidden' ? Date.now() : 0;
 
-        const tryRefresh = (options = {}) => {
+        const tryActiveCatchUp = () => {
             if (document.visibilityState !== 'visible') return;
+            if (this._importInProgress) return;
+            this._scheduleActiveTableCatchUp(200);
+        };
+
+        const tryMetaRefresh = (options = {}) => {
+            if (document.visibilityState !== 'visible') return;
+            if (this._importInProgress) return;
             const now = Date.now();
             const realtimeOk = this._isCountingRealtimeHealthy();
             const cooldownMs = realtimeOk ? 120000 : 30000;
             const hiddenMs = lastHiddenAt ? now - lastHiddenAt : 0;
-            const forceMeta = options.forceMeta === true || hiddenMs >= 90000;
+            const forceMeta = options.forceMeta === true || hiddenMs >= 60000;
 
-            if (now - lastRefresh < cooldownMs && !forceMeta) return;
-            lastRefresh = now;
-
-            this.refreshCurrentTableFromSupabase().catch(() => {});
+            if (now - lastMetaRefresh < cooldownMs && !forceMeta) return;
+            lastMetaRefresh = now;
 
             if (forceMeta || !realtimeOk) {
                 this._refreshAllTablesMetaFromSupabase().catch(() => {});
@@ -2369,18 +2463,32 @@ class CountingSystem {
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
                 lastHiddenAt = Date.now();
+                this._flushPendingProductSaves(this.currentTableName).catch(() => {});
+                if (this._saveDebounceTimer) {
+                    clearTimeout(this._saveDebounceTimer);
+                    this._saveDebounceTimer = null;
+                    this.saveCountingData().catch(() => {});
+                }
                 return;
             }
-            tryRefresh({ forceMeta: true });
+            tryActiveCatchUp();
+            tryMetaRefresh({ forceMeta: true });
         });
-        window.addEventListener('focus', () => tryRefresh({ forceMeta: true }));
+        window.addEventListener('focus', () => {
+            tryActiveCatchUp();
+            tryMetaRefresh({ forceMeta: true });
+        });
 
-        // Realtime durumuna göre periyodik aralık (kurulum anında henüz bağlı olmayabilir)
+        // Realtime sağlıklıyken: 60 sn'de bir yalnızca aktif tablo (hafif)
+        // Realtime kopuksa: aktif tablo + meta listesi
         this._periodicRefreshInterval = setInterval(() => {
-            if (document.visibilityState === 'visible') {
-                tryRefresh({ forceMeta: !this._isCountingRealtimeHealthy() });
+            if (document.visibilityState !== 'visible') return;
+            if (this._importInProgress) return;
+            tryActiveCatchUp();
+            if (!this._isCountingRealtimeHealthy()) {
+                tryMetaRefresh({ forceMeta: true });
             }
-        }, 120000);
+        }, 60000);
     }
 
     /**
@@ -2647,12 +2755,16 @@ class CountingSystem {
      * Bu cihazdan gelen echo'ları filtreler; sadece başka cihazların değişikliklerini işler.
      */
     _handleProductUpdate(payload) {
-        if (!payload || !payload.new) return;
+        if (!payload) return;
         if (this._importInProgress) return;
-        const item = payload.new;
 
-        // Bu cihazın kendi kaydı ise yoksay (echo)
-        if (item.updated_by === this.deviceId) return;
+        const eventType = payload.eventType;
+        const item = payload.new || payload.old;
+        if (!item) return;
+
+        // Echo filtresi: bu cihazın kendi kaydı ise yoksay
+        const writerId = payload.new?.updated_by || payload.old?.updated_by;
+        if (writerId === this.deviceId) return;
 
         const tName = item.table_name;
         const pId = item.product_id;
@@ -2670,10 +2782,17 @@ class CountingSystem {
             this._scheduleTableSelectorUpdate();
         }
 
-        if (payload.eventType === 'DELETE') {
+        if (eventType === 'DELETE') {
             delete this.cachedFullData._tables[tName][pId];
+            if (Array.isArray(this.cachedFullData._tables[tName]._productOrder)) {
+                this.cachedFullData._tables[tName]._productOrder =
+                    this.cachedFullData._tables[tName]._productOrder.filter((id) => id !== pId);
+            }
             if (tName === this.currentTableName) {
                 delete this.countingData[pId];
+                if (Array.isArray(this.countingData._productOrder)) {
+                    this.countingData._productOrder = this.countingData._productOrder.filter((id) => id !== pId);
+                }
                 this.scheduleRenderTable();
                 this.updateStatistics();
             }
@@ -2853,6 +2972,11 @@ class CountingSystem {
                     tablesChanged = true;
                 }
                 currentMeta[tName] = { ...(currentMeta[tName] || {}), ...meta };
+                if (Array.isArray(meta?._productOrder) && meta._productOrder.length > 0) {
+                    if (this._applyRemoteProductOrderForTable(tName, meta._productOrder)) {
+                        tablesChanged = true;
+                    }
+                }
             }
             this.cachedFullData._tableMeta = currentMeta;
         }
@@ -2926,6 +3050,8 @@ class CountingSystem {
         this._activateCountingTable(tableName, { fromTable, persistFrom: false });
         this._saveDeviceCurrentTable(tableName);
         await this._saveMetaOnly();
+
+        await this._catchUpActiveTableFromSupabase();
 
         this._tableProductSearchQuery = '';
         this._syncCountingTableSearchUi();
