@@ -179,6 +179,8 @@ class CountingSystem {
         this._activeTableCatchUpTimer = null;
         this._activeTableCatchUpInFlight = false;
         this._activeTableCatchUpQueued = false;
+        /** Toplu yapıştırma bittikten sonra kısa catch-up susturma (sayı zıplamasını önler) */
+        this._suppressCatchUpUntil = 0;
         /** Per-product debounce timers: { productId: timeoutId } */
         this._productSaveTimers = {};
         /** counting_items tablosu mevcut mu? (yoksa eski blob yoluna düş) */
@@ -1935,6 +1937,7 @@ class CountingSystem {
 
     _endBulkImportLock() {
         this._importInProgress = false;
+        this._suppressCatchUpUntil = Date.now() + 5000;
     }
 
     _syncProductOrderMeta(tableName) {
@@ -1998,6 +2001,7 @@ class CountingSystem {
     /** Debounced aktif tablo catch-up — tek counting_items sorgusu, egress dostu */
     _scheduleActiveTableCatchUp(delay = 350) {
         if (this._importInProgress || !this.currentTableName) return;
+        if (this._suppressCatchUpUntil && Date.now() < this._suppressCatchUpUntil) return;
         if (this._activeTableCatchUpTimer) clearTimeout(this._activeTableCatchUpTimer);
         this._activeTableCatchUpTimer = setTimeout(() => {
             this._activeTableCatchUpTimer = null;
@@ -2008,6 +2012,7 @@ class CountingSystem {
     /** Aktif tablonun ürünlerini + sırasını Supabase ile hizalar (realtime güvenlik ağı) */
     async _catchUpActiveTableFromSupabase() {
         if (this._importInProgress || !this.currentTableName) return;
+        if (this._suppressCatchUpUntil && Date.now() < this._suppressCatchUpUntil) return;
         if (this._activeTableCatchUpInFlight) {
             this._activeTableCatchUpQueued = true;
             return;
@@ -2999,10 +3004,13 @@ class CountingSystem {
     }
 
     // Switch to a different table
-    async switchTable(tableName) {
+    async switchTable(tableName, options = {}) {
         if (!tableName || tableName === this.currentTableName) {
             return;
         }
+
+        const skipCatchUp = options.skipCatchUp === true;
+        const skipRender = options.skipRender === true;
 
         const fromTable = this.currentTableName;
 
@@ -3051,7 +3059,9 @@ class CountingSystem {
         this._saveDeviceCurrentTable(tableName);
         await this._saveMetaOnly();
 
-        await this._catchUpActiveTableFromSupabase();
+        if (!skipCatchUp) {
+            await this._catchUpActiveTableFromSupabase();
+        }
 
         this._tableProductSearchQuery = '';
         this._syncCountingTableSearchUi();
@@ -3068,6 +3078,8 @@ class CountingSystem {
                 }
             }
         }
+
+        if (skipRender) return;
 
         // Re-render UI
         this.renderTable();
@@ -4060,6 +4072,8 @@ class CountingSystem {
         );
 
         await this._saveMetaOnly();
+
+        if (options.skipRender === true) return;
 
         // Re-render UI
         this.renderTable();
@@ -5491,7 +5505,7 @@ class CountingSystem {
         const pending = this._pendingSayimDailyPaste;
         if (!pending || pending.iso !== iso || !pending.items?.length) return;
         try {
-            await this.ensureDailyTableForDate(iso);
+            await this.ensureDailyTableForDate(iso, { forImport: true });
         } catch (err) {
             this.showToast(err?.message || 'Tablo açılamadı', 'error', 4000);
             return;
@@ -5501,25 +5515,27 @@ class CountingSystem {
         this.closeDailyAddModal();
     }
 
-    async ensureDailyTableForDate(iso) {
+    async ensureDailyTableForDate(iso, options = {}) {
         if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
             throw new Error('Geçersiz tarih');
         }
         const tableName = this.DAILY_TABLE_PREFIX + iso;
         const tables = this.getTableList();
         const exists = tables.some((t) => t.name === tableName);
+        const forImport = options.forImport === true;
         if (!exists) {
-            await this.createTable(tableName, { allowDaily: true });
+            await this.createTable(tableName, { allowDaily: true, skipRender: forImport });
+        } else if (forImport) {
+            await this.switchTable(tableName, { skipCatchUp: true, skipRender: true });
         } else {
             await this.switchTable(tableName);
         }
     }
 
-    async applyImportedRows(rows) {
+    async applyImportedRows(rows, options = {}) {
         this._beginBulkImportLock();
         try {
             this._verifyCountingDataTableBinding();
-            const productCountBefore = this._countTableProductKeys(this.countingData);
             let added = 0;
             let skipped = 0;
             const idsInPasteOrder = [];
@@ -5550,12 +5566,13 @@ class CountingSystem {
                 added++;
             }
 
-            // 2. Aşama: Paste sırasını uygula — boş tabloda yalnızca yapıştırılan ürünler kalır
-            const replaceRest = productCountBefore === 0;
-            if (replaceRest) {
+            // 2. Aşama: Yapıştırma = tablonun yeni tam listesi (eski kısmi DB verisi kalmasın)
+            const fullReplace = options.fullReplace !== false;
+            if (fullReplace && idsInPasteOrder.length > 0) {
                 await this._purgeTableProductsNotInSet(idsInPasteOrder);
             }
-            this.applyImportedProductOrder(idsInPasteOrder, { replaceRest });
+            this.applyImportedProductOrder(idsInPasteOrder, { replaceRest: fullReplace });
+
             this._verifyCountingDataTableBinding();
             this._syncProductOrderMeta();
 
@@ -5571,6 +5588,10 @@ class CountingSystem {
             // 3. Aşama: Meta blob + counting_items toplu kayıt (sıra korunur)
             await this.saveCountingData();
             await this._bulkSaveProductEntries(idsInPasteOrder, this.currentTableName);
+
+            // Grid önbelleğini sıfırla — incremental render eski kartları bırakmasın
+            this._rapidRenderedIds = [];
+            this._rapidRenderedStates.clear();
 
             this.renderTable();
             if (this.currentViewMode === 'rapid') {
@@ -5698,7 +5719,7 @@ class CountingSystem {
             return;
         }
         try {
-            await this.ensureDailyTableForDate(this.getDailySelectedIso());
+            await this.ensureDailyTableForDate(this.getDailySelectedIso(), { forImport: true });
         } catch (err) {
             this.showToast(err?.message || 'Tablo açılamadı', 'error', 4000);
             return;
