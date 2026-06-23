@@ -173,6 +173,8 @@ class CountingSystem {
         this._delegatedListenersSetup = false;
         /** Cihaza özgü benzersiz kimlik — realtime echo filtrelemesi için */
         this.deviceId = 'dev_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
+        /** Toplu yapıştırma / içe aktarma sırasında arka plan sync'i durdurur */
+        this._importInProgress = false;
         /** Per-product debounce timers: { productId: timeoutId } */
         this._productSaveTimers = {};
         /** counting_items tablosu mevcut mu? (yoksa eski blob yoluna düş) */
@@ -1088,6 +1090,9 @@ class CountingSystem {
     /** Tüm tablolardan meta bilgisini (createdAt, _productOrder) çıkarır */
     _buildMetaBlob() {
         if (!this.auditLog) this.auditLog = [];
+        if (this.currentTableName && this.countingData && this.cachedFullData?._tables) {
+            this._safeWriteTableSlot(this.cachedFullData._tables, this.currentTableName, this.countingData);
+        }
         const tableMeta = {};
         const tables = this.cachedFullData?._tables || {};
         for (const [tName, tData] of Object.entries(tables)) {
@@ -1888,6 +1893,56 @@ class CountingSystem {
         return clone;
     }
 
+    /** Yerel tablo verisini hedef slota birleştirir (ürün kaybını önler) */
+    _mergeTableDataSlotInto(target, source) {
+        if (!target || !source || typeof target !== 'object' || typeof source !== 'object') return;
+        for (const [k, v] of Object.entries(source)) {
+            if (this.isReservedCountingKey(k)) {
+                if (k === '_tableMeta' && v && typeof v === 'object') {
+                    if (!target._tableMeta) target._tableMeta = {};
+                    Object.assign(target._tableMeta, v);
+                } else if (k === '_productOrder' && Array.isArray(v) && v.length > 0) {
+                    target._productOrder = [...v];
+                }
+                continue;
+            }
+            if (!v || typeof v !== 'object') continue;
+            const incTs = v.lastUpdated ? new Date(v.lastUpdated).getTime() : 0;
+            const locTs = target[k]?.lastUpdated ? new Date(target[k].lastUpdated).getTime() : 0;
+            if (!target[k] || incTs >= locTs) {
+                target[k] = {
+                    ...v,
+                    history: Array.isArray(v.history) ? [...v.history] : [],
+                };
+            }
+        }
+    }
+
+    _beginBulkImportLock() {
+        this._importInProgress = true;
+        if (this._saveDebounceTimer) {
+            clearTimeout(this._saveDebounceTimer);
+            this._saveDebounceTimer = null;
+        }
+    }
+
+    _endBulkImportLock() {
+        this._importInProgress = false;
+    }
+
+    _syncProductOrderMeta(tableName) {
+        const tName = tableName || this.currentTableName;
+        if (!tName || !this.cachedFullData) return;
+        const data =
+            tName === this.currentTableName && this.countingData
+                ? this.countingData
+                : this.cachedFullData._tables?.[tName];
+        if (!data || !Array.isArray(data._productOrder)) return;
+        if (!this.cachedFullData._tableMeta) this.cachedFullData._tableMeta = {};
+        if (!this.cachedFullData._tableMeta[tName]) this.cachedFullData._tableMeta[tName] = {};
+        this.cachedFullData._tableMeta[tName]._productOrder = [...data._productOrder];
+    }
+
     /** countingData ile cachedFullData slotunun aynı tabloya bağlı olduğunu doğrular */
     _verifyCountingDataTableBinding() {
         const name = this.currentTableName;
@@ -1916,13 +1971,16 @@ class CountingSystem {
                     break;
                 }
             }
-            if (sharedWithOther || !slot) {
-                slot = slot && !sharedWithOther ? slot : (slot || { _tableMeta: { createdAt: new Date().toISOString() } });
+            if (!slot || typeof slot !== 'object') {
+                slot = { _tableMeta: { createdAt: new Date().toISOString() } };
                 fullData._tables[name] = slot;
-                this.countingData = slot;
+            } else if (sharedWithOther) {
+                slot = this._cloneTableDataSlot(this.countingData);
+                fullData._tables[name] = slot;
             } else {
-                this.countingData = slot;
+                this._mergeTableDataSlotInto(slot, this.countingData);
             }
+            this.countingData = slot;
         } else if (!this.countingData) {
             if (!slot || typeof slot !== 'object') {
                 slot = { _tableMeta: { createdAt: new Date().toISOString() } };
@@ -2331,6 +2389,7 @@ class CountingSystem {
     async _refreshTableMetaOnlyFromSupabase() {
         if (!window.supabase || !this.currentUser) return;
         if (this._countingItemsTableReady !== true) return;
+        if (this._importInProgress) return;
 
         try {
             const { data, error } = await window.supabase
@@ -2377,6 +2436,7 @@ class CountingSystem {
     async _refreshAllTablesMetaFromSupabase() {
         if (!window.supabase || !this.currentUser) return;
         if (this._countingItemsTableReady !== true) return;
+        if (this._importInProgress) return;
 
         try {
             // PARALEL: counting_items + users.counting_data — biri ürünler için, diğeri _tableMeta için
@@ -2520,6 +2580,7 @@ class CountingSystem {
         if (!window.supabase || !this.currentUser) return;
         if (this._countingItemsTableReady !== true) return;
         if (!this.currentTableName) return;
+        if (this._importInProgress) return;
 
         try {
             // 1. Aktif tablonun tüm ürünlerini çek
@@ -2587,6 +2648,7 @@ class CountingSystem {
      */
     _handleProductUpdate(payload) {
         if (!payload || !payload.new) return;
+        if (this._importInProgress) return;
         const item = payload.new;
 
         // Bu cihazın kendi kaydı ise yoksay (echo)
@@ -2652,6 +2714,7 @@ class CountingSystem {
     _handleRealtimeMetaUpdate(payload) {
         const incoming = payload?.new?.counting_data;
         if (!incoming) return;
+        if (this._importInProgress) return;
 
         // ── Echo filtresi: bu cihazın kendi yazdığı blob ise yoksay ──
         if (incoming._writerDeviceId && incoming._writerDeviceId === this.deviceId) {
@@ -2747,17 +2810,31 @@ class CountingSystem {
                         }
                     }
                 }
-                // _productOrder: INCOMING kazanır (yazıcı son sırayı bilir).
-                // Yereldeki ekstra ID'ler sona eklenir (silinmesin diye).
+                // _productOrder: yerel sıra korunur (yapıştırma sırası); uzaktan yalnızca yeni ID eklenir
                 if (Array.isArray(incomingTableData._productOrder)) {
-                    const incomingOrder = incomingTableData._productOrder;
-                    const incomingSet = new Set(incomingOrder);
                     const localOrder = Array.isArray(localTable._productOrder) ? localTable._productOrder : [];
-                    const extras = localOrder.filter((id) => !incomingSet.has(id));
-                    localTable._productOrder = [...incomingOrder, ...extras];
-                    // Aktif tablo ise countingData._productOrder'ı da güncelle
+                    const localIds = Object.keys(localTable).filter((k) => !this.isReservedCountingKey(k));
+                    const localSet = new Set(localIds);
+                    const merged = [];
+                    const seen = new Set();
+                    for (const id of localOrder) {
+                        if (!localSet.has(id) || seen.has(id)) continue;
+                        merged.push(id);
+                        seen.add(id);
+                    }
+                    for (const id of localIds) {
+                        if (seen.has(id)) continue;
+                        merged.push(id);
+                        seen.add(id);
+                    }
+                    for (const id of incomingTableData._productOrder) {
+                        if (seen.has(id) || localSet.has(id)) continue;
+                        merged.push(id);
+                        seen.add(id);
+                    }
+                    localTable._productOrder = merged;
                     if (tName === this.currentTableName) {
-                        this.countingData._productOrder = [...localTable._productOrder];
+                        this.countingData._productOrder = [...merged];
                     }
                 }
             }
@@ -4603,8 +4680,14 @@ class CountingSystem {
                         changed = true;
                     } else if (k === '_productOrder' && Array.isArray(v)) {
                         const cur = Array.isArray(target._productOrder) ? target._productOrder : [];
-                        const set = new Set([...cur, ...v]);
-                        target._productOrder = [...set];
+                        const merged = [...cur];
+                        const seen = new Set(cur);
+                        for (const id of v) {
+                            if (seen.has(id)) continue;
+                            merged.push(id);
+                            seen.add(id);
+                        }
+                        target._productOrder = merged;
                         changed = true;
                     }
                     continue;
@@ -5307,73 +5390,79 @@ class CountingSystem {
     }
 
     async applyImportedRows(rows) {
-        this._verifyCountingDataTableBinding();
-        const productCountBefore = this._countTableProductKeys(this.countingData);
-        let added = 0;
-        let skipped = 0;
-        const idsInPasteOrder = [];
-        const seenPasteIds = new Set();
-        // 1. Aşama: Hızlı önce yereldeki countingData yapısını hazırla (skipSave: true → counting_items'a yazmıyor)
-        for (const row of rows) {
-            const product = this.matchDailyImportRow(row);
-            if (!product) {
-                skipped++;
-                continue;
-            }
-            if (!seenPasteIds.has(product.id)) {
-                seenPasteIds.add(product.id);
-                idsInPasteOrder.push(product.id);
-            }
-            this.addProductToCounting(product, { skipSave: true });
-            if (
-                row.quantity !== undefined &&
-                row.quantity !== null &&
-                this.countingData[product.id]
-            ) {
-                const q = Number(row.quantity);
-                if (!Number.isNaN(q)) {
-                    this.countingData[product.id].warehouseStock = q;
-                    this.countingData[product.id].lastUpdated = new Date().toISOString();
+        this._beginBulkImportLock();
+        try {
+            this._verifyCountingDataTableBinding();
+            const productCountBefore = this._countTableProductKeys(this.countingData);
+            let added = 0;
+            let skipped = 0;
+            const idsInPasteOrder = [];
+            const seenPasteIds = new Set();
+            // 1. Aşama: Hızlı önce yereldeki countingData yapısını hazırla (skipSave: true → counting_items'a yazmıyor)
+            for (const row of rows) {
+                const product = this.matchDailyImportRow(row);
+                if (!product) {
+                    skipped++;
+                    continue;
                 }
+                if (!seenPasteIds.has(product.id)) {
+                    seenPasteIds.add(product.id);
+                    idsInPasteOrder.push(product.id);
+                }
+                this.addProductToCounting(product, { skipSave: true });
+                if (
+                    row.quantity !== undefined &&
+                    row.quantity !== null &&
+                    this.countingData[product.id]
+                ) {
+                    const q = Number(row.quantity);
+                    if (!Number.isNaN(q)) {
+                        this.countingData[product.id].warehouseStock = q;
+                        this.countingData[product.id].lastUpdated = new Date().toISOString();
+                    }
+                }
+                added++;
             }
-            added++;
-        }
 
-        // 2. Aşama: Paste sırasını uygula — boş tabloda yalnızca yapıştırılan ürünler kalır
-        const replaceRest = productCountBefore === 0;
-        if (replaceRest) {
-            await this._purgeTableProductsNotInSet(idsInPasteOrder);
-        }
-        this.applyImportedProductOrder(idsInPasteOrder, { replaceRest });
+            // 2. Aşama: Paste sırasını uygula — boş tabloda yalnızca yapıştırılan ürünler kalır
+            const replaceRest = productCountBefore === 0;
+            if (replaceRest) {
+                await this._purgeTableProductsNotInSet(idsInPasteOrder);
+            }
+            this.applyImportedProductOrder(idsInPasteOrder, { replaceRest });
+            this._verifyCountingDataTableBinding();
+            this._syncProductOrderMeta();
 
-        if (added > 0) {
-            this.pushAuditEntry(
-                `İçe aktarma · ${this.formatTableDisplayName(this.currentTableName)} · ${added} satır${
-                    skipped ? ` · ${skipped} eşleşmedi` : ''
-                }`,
-                { cat: 'import', tbl: this.currentTableName }
+            if (added > 0) {
+                this.pushAuditEntry(
+                    `İçe aktarma · ${this.formatTableDisplayName(this.currentTableName)} · ${added} satır${
+                        skipped ? ` · ${skipped} eşleşmedi` : ''
+                    }`,
+                    { cat: 'import', tbl: this.currentTableName }
+                );
+            }
+
+            // 3. Aşama: Meta blob + counting_items toplu kayıt (sıra korunur)
+            await this.saveCountingData();
+            await this._bulkSaveProductEntries(idsInPasteOrder, this.currentTableName);
+
+            this.renderTable();
+            if (this.currentViewMode === 'rapid') {
+                this.renderRapidCountingMode();
+            }
+            this.updateStatistics();
+            this.updateCountingProgress();
+            this.updateTableSelector();
+            this.syncSayimSubTabToTable();
+            this.showToast(
+                `${added} ürün işlendi${skipped ? `, ${skipped} satır eşleşmedi` : ''}`,
+                added ? 'success' : 'warning',
+                4000
             );
+            return { added, skipped };
+        } finally {
+            this._endBulkImportLock();
         }
-
-        // 3. Aşama: Tam blob önce Supabase'e yaz (paste sırasını içerir, telefon doğru sırayı alır)
-        await this.saveCountingData();
-
-        await this._bulkSaveProductEntries(idsInPasteOrder, this.currentTableName);
-
-        this.renderTable();
-        if (this.currentViewMode === 'rapid') {
-            this.renderRapidCountingMode();
-        }
-        this.updateStatistics();
-        this.updateCountingProgress();
-        this.updateTableSelector();
-        this.syncSayimSubTabToTable();
-        this.showToast(
-            `${added} ürün işlendi${skipped ? `, ${skipped} satır eşleşmedi` : ''}`,
-            added ? 'success' : 'warning',
-            4000
-        );
-        return { added, skipped };
     }
 
     async importDailyCountForDate(iso) {
@@ -7500,8 +7589,10 @@ class CountingSystem {
      * @param {string[]} urls
      */
     async bulkAddProductsFromGetirCdnPaste(urls) {
-        this._verifyCountingDataTableBinding();
-        const G = typeof window !== 'undefined' ? window.GetirCdnPaste : null;
+        this._beginBulkImportLock();
+        try {
+            this._verifyCountingDataTableBinding();
+            const G = typeof window !== 'undefined' ? window.GetirCdnPaste : null;
         const buildIndex = G && typeof G.buildGetirImageProductIndex === 'function' ? G.buildGetirImageProductIndex : null;
         const findFromIndex = G && typeof G.findProductByGetirImageUrlFromIndex === 'function'
             ? G.findProductByGetirImageUrlFromIndex
@@ -7577,6 +7668,8 @@ class CountingSystem {
 
         await this._purgeTableProductsNotInSet(idsInPasteOrder);
         this.applyImportedProductOrder(idsInPasteOrder, { replaceRest: true });
+        this._verifyCountingDataTableBinding();
+        this._syncProductOrderMeta();
 
         const tn = this.currentTableName || '';
         this.pushAuditEntry(
@@ -7612,6 +7705,9 @@ class CountingSystem {
         this.showToast(msg, 'success', 5500, toastOpts);
 
         return { added: addedCount, skippedInTable, noMatch, unmatchedUrls };
+        } finally {
+            this._endBulkImportLock();
+        }
     }
 
     findProduct(searchTerm) {
@@ -7665,7 +7761,9 @@ class CountingSystem {
             return;
         }
 
-        this._verifyCountingDataTableBinding();
+        if (!this._importInProgress) {
+            this._verifyCountingDataTableBinding();
+        }
         const productId = product.id;
         const now = new Date();
         const skipSave = options.skipSave === true;
