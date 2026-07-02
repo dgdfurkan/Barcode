@@ -51,7 +51,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="temp_products.js"></script>
     <script src="../js/getir-cdn-paste.js"></script>
+    <script src="../js/guest-access-config.js"></script>
     <script src="../js/auth.js"></script>
+    <script src="../js/guest-access.js"></script>
     <script src="../js/image-lightbox.js"></script>
     <script src="../js/trial-notifications.js"></script>
     <script src="../js/user-manager.js"></script>
@@ -10589,7 +10591,10 @@
         // Initialize app when page loads
         document.addEventListener('DOMContentLoaded', async () => {
             // Check authentication first
-            const session = window.authUtils.checkAuth();
+            let session = window.authUtils.checkAuth();
+            if (!session && window.jetbarkodGuestAccess?.isEnabled?.()) {
+                session = window.jetbarkodGuestAccess.ensureGuestSessionForAppPage();
+            }
             if (!session) {
                 window.location.replace('/index.html');
                 return;
@@ -10601,9 +10606,10 @@
                 return;
             }
             
-            // ÖNCE Supabase'den güncel trial_end değerini çek (CACHE YOK, DİREKT SUPABASE!)
+            // ÖNCE Supabase'den güncel trial_end değerini çek (misafir modunda atla)
             let trialEndDate = session.trialEnd;
             
+            if (!session.isGuest) {
             // Supabase hazır olana kadar bekle
             for (let i = 0; i < 50; i++) {
                 if (window.supabase) break;
@@ -10639,6 +10645,7 @@
                 } catch (error) {
                     // Sessizce devam et, session değerini kullan
                 }
+            }
             }
             
             // Update user info in header

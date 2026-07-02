@@ -184,7 +184,7 @@
         <div class="scanline"></div>
     </div>
 
-    <div class="relative z-10 w-full max-w-[1200px] flex flex-col items-center justify-center p-6 fade-in-up">
+    <div class="relative z-10 w-full max-w-[1200px] flex flex-col items-center justify-center p-6 fade-in-up" id="loginPageShell">
         <!-- Top header: logo + Destek -->
         <div class="absolute top-0 left-0 right-0 px-6 sm:px-10 py-6 flex justify-between items-center hidden lg:flex">
             <div class="flex items-center gap-3 text-white">
@@ -400,7 +400,9 @@
             initSupabaseClient();
         })();
     </script>
+    <script src="js/guest-access-config.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/guest-access.js"></script>
     <script src="js/image-lightbox.js"></script>
     <script src="js/ip-ban-checker.js"></script>
     <script src="js/guest-user-manager.js"></script>

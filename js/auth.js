@@ -363,6 +363,16 @@ function checkAuth() {
     try {
         const sessionData = JSON.parse(decodeURIComponent(escape(atob(token))));
         const now = new Date();
+
+        // Geçici misafir erişimi (DB kapalı dönem)
+        if (sessionData.isGuest === true) {
+            if (!window.JETBARKOD_GUEST_ACCESS?.enabled) {
+                logout();
+                return false;
+            }
+            return sessionData;
+        }
+
         const loginTime = new Date(sessionData.loginTime);
         
         // Check if session is older than 24 hours
@@ -401,6 +411,15 @@ async function checkAuthAsync() {
     try {
         const sessionData = JSON.parse(decodeURIComponent(escape(atob(token))));
         const now = new Date();
+
+        if (sessionData.isGuest === true) {
+            if (!window.JETBARKOD_GUEST_ACCESS?.enabled) {
+                logout();
+                return false;
+            }
+            return sessionData;
+        }
+
         const loginTime = new Date(sessionData.loginTime);
         
         // Check if session is older than 24 hours
@@ -574,9 +593,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check if already logged in (only on index.html)
     if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/') {
         const session = checkAuth();
-        if (session) {
+        if (session && !session.isGuest) {
             // Show user info instead of login form
             showUserInfo(session);
+            return;
+        }
+        if (window.JETBARKOD_GUEST_ACCESS?.enabled) {
+            // Misafir akışı guest-access.js tarafından yönetilir
             return;
         }
     }
