@@ -6,4 +6,6 @@ window.JETBARKOD_GUEST_ACCESS = {
     enabled: true,
     contactEmail: 'furkan@flowcobalt.com',
     welcomeStorageKey: 'jetbarkod_welcome_seen_v1',
+    /** Misafir modunda açık premium özellikler */
+    guestPremiumFeatures: ['autoPaste', 'bulkCopy', 'imageSearch'],
 };

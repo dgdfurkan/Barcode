@@ -6,6 +6,30 @@ class PremiumFeatures {
         this._loadPromise = null;
     }
 
+    _getGuestPremiumFeatureKeys() {
+        if (window.jetbarkodGuestAccess?.getGuestPremiumFeatures) {
+            return window.jetbarkodGuestAccess.getGuestPremiumFeatures();
+        }
+        const cfg = window.JETBARKOD_GUEST_ACCESS || {};
+        return Array.isArray(cfg.guestPremiumFeatures)
+            ? cfg.guestPremiumFeatures
+            : ['autoPaste', 'bulkCopy', 'imageSearch'];
+    }
+
+    _isGuestPremiumFeature(featureName) {
+        const session = this.currentUser || window.authUtils?.checkAuth?.();
+        if (!session?.isGuest) return false;
+        if (!window.jetbarkodGuestAccess?.isEnabled?.()) return false;
+        return this._getGuestPremiumFeatureKeys().includes(featureName);
+    }
+
+    _applyGuestPremiumFeatures() {
+        this.premiumFeatures = {};
+        this._getGuestPremiumFeatureKeys().forEach((key) => {
+            this.premiumFeatures[key] = true;
+        });
+    }
+
     // Initialize premium features for current user
     async init() {
         const session = window.authUtils?.checkAuth();
@@ -14,11 +38,17 @@ class PremiumFeatures {
             return;
         }
 
+        this.currentUser = session;
+
+        if (session.isGuest && window.jetbarkodGuestAccess?.isEnabled?.()) {
+            this._applyGuestPremiumFeatures();
+            return;
+        }
+
         if (this.currentUser?.username === session.username && Object.keys(this.premiumFeatures).length) {
             return;
         }
 
-        this.currentUser = session;
         await this.loadPremiumFeatures();
     }
 
@@ -60,6 +90,10 @@ class PremiumFeatures {
 
     // Check if a specific premium feature is enabled
     checkPremiumFeature(featureName) {
+        if (this._isGuestPremiumFeature(featureName)) {
+            return true;
+        }
+
         if (!this.premiumFeatures || typeof this.premiumFeatures !== 'object') {
             return false;
         }
@@ -105,6 +139,10 @@ class PremiumFeatures {
 
     // Validate premium feature with backend (security check)
     async validatePremiumFeature(featureName) {
+        if (this._isGuestPremiumFeature(featureName)) {
+            return true;
+        }
+
         try {
             if (!window.supabase || !this.currentUser) {
                 return false;
