@@ -151,13 +151,11 @@ INSERT INTO users (
     counting_data, allowed_ips
 )
 SELECT
-    id, username, password, company, NULLIF(contact_email,''), trial_end::timestamptz,
-    is_active::boolean, is_admin::boolean,
-    NULLIF(created_at,'')::timestamptz, NULLIF(updated_at,'')::timestamptz,
-    NULLIF(max_ip_count,'')::integer, ip_tracking_enabled::boolean,
-    tracked_ips::text[], chat_messages, NULLIF(last_chat_update,'')::timestamptz,
-    premium_features::jsonb, keyboard_shortcuts::jsonb, counting_data::jsonb,
-    allowed_ips::text[]
+    id, username, password, company, NULLIF(contact_email,''),
+    trial_end, is_active, is_admin, created_at, updated_at,
+    max_ip_count, ip_tracking_enabled, tracked_ips, chat_messages,
+    last_chat_update, premium_features, keyboard_shortcuts, counting_data,
+    allowed_ips
 FROM stg_users
 ON CONFLICT (username) DO UPDATE SET
     password = EXCLUDED.password,
@@ -196,8 +194,7 @@ def main():
     optional = [
         ('user_data', ['user_data_rows', 'user_data.csv'], """
 INSERT INTO user_data (id, username, custom_products, settings, created_at, updated_at)
-SELECT id, username, custom_products::jsonb, settings::jsonb,
-       created_at::timestamptz, updated_at::timestamptz
+SELECT id, username, custom_products, settings, created_at, updated_at
 FROM stg_import
 ON CONFLICT (username) DO UPDATE SET
     custom_products = EXCLUDED.custom_products,
@@ -209,7 +206,7 @@ INSERT INTO admin_settings (id, telegram_bot_token, telegram_chat_id, gemini_api
     cloudinary_cloud_name, cloudinary_api_key, cloudinary_upload_preset, updated_at)
 SELECT id, NULLIF(telegram_bot_token,''), NULLIF(telegram_chat_id,''), NULLIF(gemini_api_key,''),
     NULLIF(cloudinary_cloud_name,''), NULLIF(cloudinary_api_key,''), NULLIF(cloudinary_upload_preset,''),
-    NULLIF(updated_at,'')::timestamptz
+    updated_at
 FROM stg_import
 ON CONFLICT (id) DO UPDATE SET
     telegram_bot_token = EXCLUDED.telegram_bot_token,
@@ -223,8 +220,8 @@ ON CONFLICT (id) DO UPDATE SET
         ('system_features', ['system_features_rows', 'system_features.csv'], """
 INSERT INTO system_features (id, feature_key, feature_name, current_value, default_value,
     value_type, description, is_active, created_at, updated_at)
-SELECT id, feature_key, feature_name, current_value::jsonb, default_value::jsonb,
-    value_type, description, is_active::boolean, created_at::timestamptz, updated_at::timestamptz
+SELECT id, feature_key, feature_name, current_value, default_value,
+    value_type, description, is_active, created_at, updated_at
 FROM stg_import
 ON CONFLICT (feature_key) DO UPDATE SET
     feature_name = EXCLUDED.feature_name,
@@ -240,9 +237,8 @@ INSERT INTO dispatch_agenda_items (id, username, product_id, product_name, produ
     barcodes, quantity, reason_preset, reason_note, pickup_required, address, event_date,
     created_at, updated_at)
 SELECT id, username, product_id, product_name, NULLIF(product_image,''),
-    barcodes::jsonb, quantity::integer, reason_preset, NULLIF(reason_note,''),
-    pickup_required::boolean, NULLIF(address,''), NULLIF(event_date,'')::date,
-    created_at::timestamptz, updated_at::timestamptz
+    barcodes, quantity, reason_preset, NULLIF(reason_note,''),
+    pickup_required, NULLIF(address,''), event_date, created_at, updated_at
 FROM stg_import
 ON CONFLICT (id) DO UPDATE SET
     quantity = EXCLUDED.quantity,
@@ -252,10 +248,9 @@ ON CONFLICT (id) DO UPDATE SET
         ('updates', ['updates_rows', 'updates.csv'], """
 INSERT INTO updates (id, update_number, title, description, steps, feature_changes,
     scheduled_at, is_active, created_at, updated_at)
-SELECT id, update_number, title, NULLIF(description,''), steps::jsonb,
-    COALESCE(NULLIF(feature_changes,''), '[]')::jsonb,
-    NULLIF(scheduled_at,'')::timestamptz, is_active::boolean,
-    created_at::timestamptz, updated_at::timestamptz
+SELECT id, update_number, title, NULLIF(description,''), steps,
+    COALESCE(NULLIF(feature_changes,''), '[]'::jsonb),
+    scheduled_at, is_active, created_at, updated_at
 FROM stg_import
 ON CONFLICT (update_number) DO UPDATE SET
     title = EXCLUDED.title,
@@ -269,9 +264,8 @@ ON CONFLICT (update_number) DO UPDATE SET
         ('user_update_status', ['user_update_status_rows', 'user_update_status.csv'], """
 INSERT INTO user_update_status (id, username, update_number, is_seen, is_completed,
     seen_at, completed_at, created_at, updated_at)
-SELECT id, username, update_number, is_seen::boolean, is_completed::boolean,
-    NULLIF(seen_at,'')::timestamptz, NULLIF(completed_at,'')::timestamptz,
-    created_at::timestamptz, updated_at::timestamptz
+SELECT id, username, update_number, is_seen, is_completed,
+    seen_at, completed_at, created_at, updated_at
 FROM stg_import
 ON CONFLICT (username, update_number) DO UPDATE SET
     is_seen = EXCLUDED.is_seen,
