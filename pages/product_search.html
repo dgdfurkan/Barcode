@@ -1340,13 +1340,14 @@
             #settingsBtn,
             #logoutBtn {
                 padding: 0.5rem 0.75rem !important;
-                font-size: 0.875rem !important;
             }
 
-            #settingsBtn svg,
-            #logoutBtn svg {
-                width: 18px !important;
-                height: 18px !important;
+            .header-icon-btn .header-icon-label {
+                display: none;
+            }
+
+            .header-user-card {
+                max-width: 9rem;
             }
 
             .premium-nav-chip {
@@ -1399,10 +1400,164 @@
         }
         .premium-nav-chip.hidden { display: none !important; }
 
+        /* Header toolbar — kullanıcı + aksiyonlar */
+        .header-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            min-width: 0;
+            flex-shrink: 1;
+        }
+
+        .header-toolbar-divider {
+            width: 1px;
+            height: 1.75rem;
+            background: rgb(226 232 240);
+            flex-shrink: 0;
+        }
+
+        .header-trial-pill {
+            display: none;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            border: 1px solid rgb(226 232 240);
+            background: linear-gradient(135deg, rgb(248 250 252), rgb(241 245 249));
+            flex-shrink: 0;
+        }
+
+        .header-trial-pill--warning {
+            border-color: rgb(253 230 138);
+            background: linear-gradient(135deg, rgb(255 251 235), rgb(254 243 199));
+        }
+
+        .header-trial-pill--danger {
+            border-color: rgb(254 202 202);
+            background: linear-gradient(135deg, rgb(254 242 242), rgb(254 226 226));
+        }
+
+        .header-trial-pill svg {
+            width: 0.875rem;
+            height: 0.875rem;
+            color: rgb(100 116 139);
+            flex-shrink: 0;
+        }
+
+        .header-user-card {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.3rem 0.75rem 0.3rem 0.3rem;
+            border-radius: 9999px;
+            border: 1px solid rgb(226 232 240);
+            background: white;
+            min-width: 0;
+            max-width: 12rem;
+            box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+        }
+
+        .header-user-avatar {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 9999px;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: rgb(248 250 252);
+            border: 1px solid rgb(241 245 249);
+        }
+
+        .header-user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .header-user-text {
+            min-width: 0;
+            text-align: left;
+            line-height: 1.2;
+        }
+
+        .header-user-text .header-user-name {
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: rgb(15 23 42);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .header-user-text .header-user-company {
+            font-size: 0.6875rem;
+            color: rgb(100 116 139);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.2rem;
+            border-radius: 9999px;
+            border: 1px solid rgb(226 232 240);
+            background: rgb(248 250 252);
+            flex-shrink: 0;
+        }
+
+        .header-icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            padding: 0.45rem 0.7rem;
+            border-radius: 9999px;
+            border: none;
+            background: transparent;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: rgb(71 85 105);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+        }
+
+        .header-icon-btn svg {
+            width: 1rem;
+            height: 1rem;
+            flex-shrink: 0;
+        }
+
+        .header-icon-btn:hover {
+            background: white;
+            color: rgb(15 23 42);
+            box-shadow: 0 1px 4px rgb(15 23 42 / 0.08);
+        }
+
+        .header-icon-btn--logout:hover {
+            background: rgb(254 242 242);
+            color: rgb(220 38 38);
+        }
+
+        .header-icon-btn:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgb(37 99 235 / 0.2);
+        }
+
         @media (min-width: 901px) and (max-width: 1024px) {
             /* Tablet Orta */
             #scanEffectContainer {
                 transform: scale(0.9);
+            }
+
+            .header-icon-btn .header-icon-label {
+                display: none;
+            }
+
+            .header-user-card {
+                max-width: 10rem;
             }
         }
 
@@ -1951,9 +2106,9 @@
 </head>
 <body class="bg-background min-h-screen">
     <!-- Header Section -->
-    <header class="bg-surface border-b border-border shadow-sm">
+    <header class="bg-surface border-b border-border shadow-sm site-header">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
+            <div class="flex items-center justify-between h-16 gap-3">
                 <!-- Logo -->
                 <div class="flex items-center space-x-3">
                     <div>
@@ -1970,8 +2125,8 @@
                     <p class="loader"><span>Scan</span></p>
                 </div>
                 
-                <!-- User Info -->
-                <div class="flex items-center space-x-4 header-user-info">
+                <!-- Sağ toolbar -->
+                <div class="flex items-center header-user-info header-toolbar">
                     <nav id="headerPremiumNav" class="header-premium-nav hidden" aria-label="Premium sayfalar">
                         <button id="headerCountingPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Sayım Sayfası">
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1998,39 +2153,46 @@
                             <span>Raftaki Eksikler</span>
                         </button>
                     </nav>
-                    <div id="trialCountdownContainer" class="flex items-center space-x-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200">
-                        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+                    <div id="trialCountdownContainer" class="header-trial-pill" aria-live="polite">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        <div class="flex items-center space-x-1">
-                            <span id="trialCountdownValue1" class="text-sm font-semibold text-gray-800">--</span>
-                            <span id="trialCountdownLabel1" class="text-xs text-gray-600">gün</span>
-                            <span id="trialCountdownSeparator" class="text-xs text-gray-400 mx-1">•</span>
-                            <span id="trialCountdownValue2" class="text-sm font-semibold text-gray-800">--</span>
-                            <span id="trialCountdownLabel2" class="text-xs text-gray-600">saat</span>
+                        <div class="flex items-center gap-1 text-xs">
+                            <span id="trialCountdownValue1" class="font-bold text-slate-800">--</span>
+                            <span id="trialCountdownLabel1" class="text-slate-500">gün</span>
+                            <span id="trialCountdownSeparator" class="text-slate-300 mx-0.5">·</span>
+                            <span id="trialCountdownValue2" class="font-bold text-slate-800">--</span>
+                            <span id="trialCountdownLabel2" class="text-slate-500">saat</span>
                         </div>
                     </div>
-                    
-                    <!-- Kullanıcı Adı ve Depo Adı - Sağda, Altlı Üstlü -->
-                    <div class="text-right">
-                        <p class="text-lg font-semibold text-text-primary" id="userName">Yükleniyor...</p>
-                        <p class="text-sm text-text-secondary" id="userCompany">Yükleniyor...</p>
+
+                    <div class="header-toolbar-divider hidden" id="headerToolbarDivider" aria-hidden="true"></div>
+
+                    <div class="header-user-card">
+                        <div class="header-user-avatar">
+                            <img src="../assets/logo.png" alt="" />
+                        </div>
+                        <div class="header-user-text">
+                            <p class="header-user-name" id="userName">Yükleniyor...</p>
+                            <p class="header-user-company" id="userCompany">Yükleniyor...</p>
+                        </div>
                     </div>
-                    <button id="settingsBtn" class="btn-secondary text-sm mr-2">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                        </svg>
-                        <span>Ayarlar</span>
-                    </button>
-                    <button id="logoutBtn" class="btn-secondary text-sm">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                        </svg>
-                        <span>Çıkış</span>
-                    </button>
-                    <div class="w-10 h-10 rounded-full overflow-hidden">
-                        <img src="../assets/logo.png" alt="Jet Barkod" class="w-full h-full object-contain">
+
+                    <div class="header-actions">
+                        <button id="settingsBtn" class="header-icon-btn" type="button" aria-label="Ayarlar" title="Ayarlar">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            <span class="header-icon-label">Ayarlar</span>
+                        </button>
+                        <button id="logoutBtn" class="header-icon-btn header-icon-btn--logout" type="button" aria-label="Çıkış" title="Çıkış">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                            </svg>
+                            <span class="header-icon-label">Çıkış</span>
+                        </button>
                     </div>
                 </div>
 
@@ -3441,6 +3603,8 @@
                 if (navWrap) {
                     navWrap.classList.toggle('hidden', !anyVisible);
                 }
+                const divider = document.getElementById('headerToolbarDivider');
+                if (divider) divider.classList.toggle('hidden', !anyVisible);
             } catch (e) {
                 hideAll();
             }
@@ -5127,7 +5291,7 @@
                         value2El.textContent = '0';
                         label1El.textContent = 'gün';
                         label2El.textContent = 'saat';
-                        container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-red-50 border border-red-200';
+                        container.className = 'header-trial-pill header-trial-pill--danger';
                         value1El.className = 'text-sm font-semibold text-red-600';
                         value2El.className = 'text-sm font-semibold text-red-600';
                         label1El.className = 'text-xs text-red-500';
@@ -5161,7 +5325,7 @@
                         label2El.textContent = months === 1 ? 'ay' : 'ay';
                         
                         // Normal renk (uzun süre)
-                        container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200';
+                        container.className = 'header-trial-pill';
                         value1El.className = 'text-sm font-semibold text-gray-800';
                         value2El.className = 'text-sm font-semibold text-gray-800';
                         label1El.className = 'text-xs text-gray-600';
@@ -5179,7 +5343,7 @@
                         label2El.textContent = remainingDays === 1 ? 'gün' : 'gün';
                         
                         // Normal renk
-                        container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200';
+                        container.className = 'header-trial-pill';
                         value1El.className = 'text-sm font-semibold text-gray-800';
                         value2El.className = 'text-sm font-semibold text-gray-800';
                         label1El.className = 'text-xs text-gray-600';
@@ -5195,21 +5359,21 @@
                         
                         // Renk değişimi
                         if (days <= 3) {
-                            container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-red-50 border border-red-200';
+                            container.className = 'header-trial-pill header-trial-pill--danger';
                             value1El.className = 'text-sm font-semibold text-red-600';
                             value2El.className = 'text-sm font-semibold text-red-600';
                             label1El.className = 'text-xs text-red-500';
                             label2El.className = 'text-xs text-red-500';
                             separatorEl.className = 'text-xs text-red-400 mx-1';
                         } else if (days <= 7) {
-                            container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-yellow-50 border border-yellow-200';
+                            container.className = 'header-trial-pill header-trial-pill--warning';
                             value1El.className = 'text-sm font-semibold text-yellow-600';
                             value2El.className = 'text-sm font-semibold text-yellow-600';
                             label1El.className = 'text-xs text-yellow-500';
                             label2El.className = 'text-xs text-yellow-500';
                             separatorEl.className = 'text-xs text-yellow-400 mx-1';
                         } else {
-                            container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200';
+                            container.className = 'header-trial-pill';
                             value1El.className = 'text-sm font-semibold text-gray-800';
                             value2El.className = 'text-sm font-semibold text-gray-800';
                             label1El.className = 'text-xs text-gray-600';
@@ -5225,7 +5389,7 @@
                         label2El.textContent = 'dakika';
                         
                         // Kırmızı renk (acil)
-                        container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-red-50 border border-red-200';
+                        container.className = 'header-trial-pill header-trial-pill--danger';
                         value1El.className = 'text-sm font-semibold text-red-600';
                         value2El.className = 'text-sm font-semibold text-red-600';
                         label1El.className = 'text-xs text-red-500';
@@ -5240,7 +5404,7 @@
                         label2El.textContent = 'saniye';
                         
                         // Kırmızı renk (çok acil)
-                        container.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-md bg-red-50 border border-red-200';
+                        container.className = 'header-trial-pill header-trial-pill--danger';
                         value1El.className = 'text-sm font-semibold text-red-600';
                         value2El.className = 'text-sm font-semibold text-red-600';
                         label1El.className = 'text-xs text-red-500';
