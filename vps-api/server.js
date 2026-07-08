@@ -1,10 +1,14 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
+const STORAGE_ROOT = process.env.STORAGE_ROOT || '/var/www/jetbarkod-storage';
+const refreshSignals = new Map();
 
 const pool = new Pool({
     host: process.env.DB_HOST || '127.0.0.1',
@@ -234,6 +238,53 @@ app.post('/api/auth/login', async (req, res) => {
         return res.status(500).json({ ok: false, error: 'Sunucu hatası. Lütfen tekrar deneyin.' });
     }
 });
+
+app.post('/api/broadcast/refresh', async (req, res) => {
+    const username = String(req.body?.username || '').trim();
+    if (!username) {
+        return res.status(400).json({ ok: false, error: 'username required' });
+    }
+    refreshSignals.set(username, {
+        at: Date.now(),
+        payload: { username, timestamp: new Date().toISOString() },
+    });
+    return res.json({ ok: true });
+});
+
+app.get('/api/broadcast/refresh/:username', (req, res) => {
+    const username = req.params.username;
+    const sig = refreshSignals.get(username);
+    if (!sig || Date.now() - sig.at > 60000) {
+        return res.json({ pending: false });
+    }
+    refreshSignals.delete(username);
+    return res.json({ pending: true, payload: sig.payload });
+});
+
+app.post(
+    '/storage/v1/object/*',
+    express.raw({ type: '*/*', limit: '12mb' }),
+    (req, res) => {
+        try {
+            const rest = req.params[0] || '';
+            const slash = rest.indexOf('/');
+            if (slash < 1) {
+                return res.status(400).json({ error: 'invalid storage path' });
+            }
+            const bucket = rest.slice(0, slash);
+            const filePath = rest.slice(slash + 1);
+            const target = path.join(STORAGE_ROOT, bucket, filePath);
+            fs.mkdirSync(path.dirname(target), { recursive: true });
+            fs.writeFileSync(target, req.body);
+            return res.status(200).json({ Key: filePath });
+        } catch (e) {
+            console.error('storage upload error:', e);
+            return res.status(500).json({ error: e.message });
+        }
+    }
+);
+
+app.use('/storage/v1/object/public', express.static(STORAGE_ROOT));
 
 app.listen(PORT, '127.0.0.1', () => {
     console.log(`Jet Barkod API calisiyor: 127.0.0.1:${PORT}`);

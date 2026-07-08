@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <!-- JsBarcode: Barkodun matematiksel çizimini yapan çekirdek kütüphane -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+</head>
+<body>
+
+    <!-- Barkodun basılacağı alan (SVG formatı en yüksek kaliteyi verir) -->
+    <svg id="barcode"></svg>
+
+    <script>
+        /**
+         * EAN-13 Checksum (Kontrol Hanesi) Hesaplayıcı
+         * Standartlara uygun kaliteli bir barkod için 13. hane şarttır.
+         */
+        function getEan13Code(input) {
+            let code = input.replace(/\D/g, '').substring(0, 12);
+            if (code.length < 12) return null;
+            
+            let sum = 0;
+            for (let i = 0; i < 12; i++) {
+                sum += parseInt(code[i]) * (i % 2 === 0 ? 1 : 3);
+            }
+            const checksum = (10 - (sum % 10)) % 10;
+            return code + checksum;
+        }
+
+        /**
+         * Barkodu Çizdirme Fonksiyonu
+         * @param {string} number - 12 haneli sayı dizisi
+         */
+        function generateBarcode(number) {
+            const finalCode = getEan13Code(number);
+            
+            if (finalCode) {
+                JsBarcode("#barcode", finalCode, {
+                    format: "EAN13",
+                    width: 2,          // Çizgi kalınlığı
+                    height: 100,       // Barkod yüksekliği
+                    displayValue: true,// Altındaki sayıları göster
+                    fontSize: 20,
+                    margin: 10,
+                    background: "#ffffff",
+                    lineColor: "#000000"
+                });
+            }
+        }
+
+        // Kullanım örneği:
+        generateBarcode("869123456789");
+    </script>
+
+</body>
+</html>

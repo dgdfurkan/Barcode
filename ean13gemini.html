@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EAN-13 Barkod Üretici</title>
+    <!-- Tailwind CSS for modern UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JsBarcode Library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .barcode-container { transition: all 0.3s ease; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
+        <!-- Üst Başlık -->
+        <div class="bg-indigo-600 p-6 text-white text-center">
+            <h1 class="text-2xl font-bold">EAN-13 Barkod Sistemi</h1>
+            <p class="text-indigo-100 text-sm mt-1">Hızlı ve Standart Barkod Üretimi</p>
+        </div>
+
+        <div class="p-8">
+            <!-- Giriş Alanı -->
+            <div class="mb-6">
+                <label for="barcodeInput" class="block text-sm font-semibold text-slate-700 mb-2">
+                    Barkod Numarası (12 veya 13 Hane)
+                </label>
+                <input 
+                    type="text" 
+                    id="barcodeInput" 
+                    placeholder="Örn: 869123456789" 
+                    maxlength="13"
+                    class="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-lg tracking-widest text-center"
+                >
+                <p id="helperText" class="mt-2 text-xs text-slate-500 italic">
+                    * 12 hane girerseniz 13. basamak otomatik hesaplanır.
+                </p>
+            </div>
+
+            <!-- Barkod Görünümü -->
+            <div id="displayArea" class="barcode-container flex flex-col items-center justify-center p-6 bg-slate-100 rounded-xl border-2 border-dashed border-slate-200 min-h-[180px]">
+                <svg id="barcodeCanvas"></svg>
+                <p id="errorMessage" class="hidden text-red-500 text-sm font-medium text-center">Geçersiz barkod formatı!</p>
+            </div>
+
+            <!-- İşlem Butonları -->
+            <div class="grid grid-cols-2 gap-4 mt-8">
+                <button 
+                    onclick="generateRandom()" 
+                    class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold rounded-lg transition-colors"
+                >
+                    Rastgele Üret
+                </button>
+                <button 
+                    onclick="downloadBarcode()" 
+                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition-colors"
+                >
+                    Resim Olarak İndir
+                </button>
+            </div>
+        </div>
+        
+        <div class="px-8 py-4 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-400 text-center">
+            EAN-13 Standartlarına Uygundur
+        </div>
+    </div>
+
+    <script>
+        const barcodeInput = document.getElementById('barcodeInput');
+        const barcodeCanvas = document.getElementById('barcodeCanvas');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // EAN-13 Checksum (Kontrol Basamağı) Hesaplama
+        function calculateEan13Checksum(code) {
+            if (code.length < 12) return null;
+            let sum = 0;
+            for (let i = 0; i < 12; i++) {
+                // Çift endeksler (1, 3, 5...) 1 ile, tekler (2, 4, 6...) 3 ile çarpılır
+                sum += parseInt(code[i]) * (i % 2 === 0 ? 1 : 3);
+            }
+            const remainder = sum % 10;
+            return remainder === 0 ? 0 : 10 - remainder;
+        }
+
+        // Barkodu Çizme Fonksiyonu
+        function renderBarcode(value) {
+            let finalCode = value;
+
+            // Sadece sayıları al
+            finalCode = finalCode.replace(/\D/g, '');
+
+            // 12 hane ise checksum ekle
+            if (finalCode.length === 12) {
+                const checksum = calculateEan13Checksum(finalCode);
+                finalCode += checksum;
+                barcodeInput.value = finalCode; // Inputu güncelle
+            }
+
+            if (finalCode.length === 13) {
+                try {
+                    JsBarcode("#barcodeCanvas", finalCode, {
+                        format: "EAN13",
+                        lineColor: "#1e293b",
+                        width: 2,
+                        height: 80,
+                        displayValue: true,
+                        fontSize: 16,
+                        fontOptions: "bold",
+                        background: "transparent"
+                    });
+                    barcodeCanvas.classList.remove('hidden');
+                    errorMessage.classList.add('hidden');
+                } catch (e) {
+                    showError();
+                }
+            } else {
+                showError();
+            }
+        }
+
+        function showError() {
+            barcodeCanvas.classList.add('hidden');
+            errorMessage.classList.remove('hidden');
+        }
+
+        function generateRandom() {
+            // Rastgele 12 hane oluştur (Türkiye kodu 869 ile başlar genelde)
+            let res = "869";
+            for(let i=0; i<9; i++) res += Math.floor(Math.random() * 10);
+            barcodeInput.value = res;
+            renderBarcode(res);
+        }
+
+        function downloadBarcode() {
+            // SVG'yi Canvas üzerinden PNG'ye çevirme işlemi
+            const svg = document.querySelector('#barcodeCanvas');
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            const img = new Image();
+            
+            img.onload = function() {
+                canvas.width = img.width + 40;
+                canvas.height = img.height + 40;
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 20, 20);
+                
+                const pngFile = canvas.toDataURL("image/png");
+                const downloadLink = document.createElement("a");
+                downloadLink.download = `barkod-${barcodeInput.value}.png`;
+                downloadLink.href = pngFile;
+                downloadLink.click();
+            };
+            
+            img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+        }
+
+        // Dinleme (Input değiştikçe barkod güncellenir)
+        barcodeInput.addEventListener('input', (e) => {
+            const val = e.target.value;
+            if (val.length >= 12) {
+                renderBarcode(val);
+            } else {
+                showError();
+            }
+        });
+
+        // Sayfa açıldığında örnek bir barkod göster
+        window.onload = () => {
+            barcodeInput.value = "869123456789";
+            renderBarcode("869123456789");
+        };
+    </script>
+</body>
+</html>

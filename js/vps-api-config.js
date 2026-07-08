@@ -1,8 +1,9 @@
 /**
- * VPS API — Supabase yerine kendi sunucumuz.
- * Kapatmak için enabled: false yapın.
+ * @deprecated — ayarlar js/supabase-config.js içinde. Geriye uyumluluk için bırakıldı.
  */
-window.JETBARKOD_VPS_API = {
-    enabled: true,
-    baseUrl: 'https://api.flowcobalt.com',
-};
+if (!window.JETBARKOD_VPS_API) {
+    window.JETBARKOD_VPS_API = {
+        enabled: true,
+        baseUrl: 'https://api.flowcobalt.com',
+    };
+}

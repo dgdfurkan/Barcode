@@ -24,31 +24,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Supabase Client Library -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <!-- Initialize Supabase immediately after CDN load -->
-    <script>
-        // Initialize Supabase client after CDN loads
-        (function() {
-            const SUPABASE_URL = 'https://ytekbbxvfdheiexsojpx.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
-            
-            // Wait for Supabase to be loaded from CDN
-            const initSupabaseClient = () => {
-                if (typeof window.supabase !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
-                    window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                    console.log('✅ Supabase client initialized in counting.html');
-                } else {
-                    // Retry after a short delay
-                    setTimeout(initSupabaseClient, 50);
-                }
-            };
-            
-            // Start initialization immediately (don't wait for DOMContentLoaded)
-            initSupabaseClient();
-        })();
-    </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script src="../js/supabase-config.js"></script>
+    <script src="../js/vps-supabase-shim.js"></script>
+    <script src="../js/supabase-bootstrap.js"></script>
     <script src="temp_products.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
     <script src="../js/auth.js"></script>
     <script src="../js/user-manager.js"></script>
     <script src="../js/premium-features.js"></script>

@@ -23,28 +23,9 @@
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <!-- Supabase Client Library -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <!-- Initialize Supabase immediately after CDN load -->
-    <script>
-        // Initialize Supabase client after CDN loads
-        (function() {
-            const SUPABASE_URL = 'https://ytekbbxvfdheiexsojpx.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
-            
-            // Wait for Supabase to be loaded from CDN
-            const initSupabaseClient = () => {
-                if (typeof window.supabase !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
-                    window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                    console.log('✅ Supabase client initialized in product_search.html');
-                } else {
-                    // Retry after a short delay
-                    setTimeout(initSupabaseClient, 50);
-                }
-            };
-            
-            // Start initialization immediately (don't wait for DOMContentLoaded)
-            initSupabaseClient();
-        })();
-    </script>
+    <script src="../js/supabase-config.js"></script>
+    <script src="../js/vps-supabase-shim.js"></script>
+    <script src="../js/supabase-bootstrap.js"></script>
     <!-- QR Code Library - Using QRCode.js (more reliable) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onload="console.log('✅ QRCode.js library loaded')" onerror="console.error('❌ QRCode.js failed to load')"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
