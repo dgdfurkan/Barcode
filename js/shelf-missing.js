@@ -25,6 +25,7 @@ class ShelfMissingApp {
 
     async init() {
         this._bindEvents();
+        this._bindVisibilityRefresh();
 
         const session = window.authUtils?.checkAuth();
         if (!session) {
@@ -35,10 +36,18 @@ class ShelfMissingApp {
         this._username = session.username;
         this._updateHeaderUser(session);
 
+        await this._waitForDb();
+
         try {
             if (window.premiumFeatures) await window.premiumFeatures.init();
         } catch (e) {
             console.error('Premium yüklenemedi:', e);
+        }
+
+        if (!window.premiumFeatures?.checkPremiumFeature('raftakiEksikler')) {
+            try {
+                await window.premiumFeatures?.loadPremiumFeatures();
+            } catch (e) { /* ignore */ }
         }
 
         if (!window.premiumFeatures?.checkPremiumFeature('raftakiEksikler')) {
@@ -56,6 +65,33 @@ class ShelfMissingApp {
         this._switchTab('shelves');
         this._updateBasketBadge();
         this._initViewPrefs();
+    }
+
+    async _waitForDb(maxWait = 10000) {
+        if (typeof window.jetbarkodWaitForSupabase === 'function') {
+            await window.jetbarkodWaitForSupabase(maxWait);
+            return;
+        }
+        const start = Date.now();
+        while (Date.now() - start < maxWait) {
+            if (window.supabase?.from) return;
+            await new Promise((r) => setTimeout(r, 100));
+        }
+    }
+
+    _bindVisibilityRefresh() {
+        if (this._visibilityBound) return;
+        this._visibilityBound = true;
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible' || !this._ready) return;
+            void this._refreshFromServer();
+        });
+    }
+
+    async _refreshFromServer() {
+        await this._waitForDb(5000);
+        await this.loadShelves();
+        await this.loadItems();
     }
 
     _lsKey(suffix) {
@@ -323,8 +359,16 @@ class ShelfMissingApp {
         return '<div class="sm-shelf-icon-wrap">📦</div>';
     }
 
-    async loadShelves() {
-        if (!window.supabase || !this._username) return;
+    async loadShelves(retry = 0) {
+        if (!this._username) return;
+        if (!window.supabase?.from) {
+            if (retry < 3) {
+                await this._waitForDb(3000);
+                return this.loadShelves(retry + 1);
+            }
+            this._toast('Veritabanı bağlantısı kurulamadı', 'error');
+            return;
+        }
         try {
             const { data, error } = await window.supabase
                 .from('shelf_missing_shelves')
@@ -342,8 +386,16 @@ class ShelfMissingApp {
         this._renderShelvesView();
     }
 
-    async loadItems() {
-        if (!window.supabase || !this._username) return;
+    async loadItems(retry = 0) {
+        if (!this._username) return;
+        if (!window.supabase?.from) {
+            if (retry < 3) {
+                await this._waitForDb(3000);
+                return this.loadItems(retry + 1);
+            }
+            this._toast('Ürünler yüklenemedi — bağlantı yok', 'error');
+            return;
+        }
         try {
             const { data, error } = await window.supabase
                 .from('shelf_missing_items')

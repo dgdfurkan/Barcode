@@ -119,6 +119,12 @@ class NotificationSystem {
                 // Update premium features cache
                 if (window.premiumFeatures) {
                     window.premiumFeatures.premiumFeatures = this.lastKnownFeatures;
+                    if (this.currentUser?.username) {
+                        window.premiumFeatures._writePremiumCache?.(
+                            this.currentUser.username,
+                            this.lastKnownFeatures
+                        );
+                    }
                 }
             }
         } catch (error) {

@@ -30,6 +30,50 @@ class PremiumFeatures {
         });
     }
 
+    _premiumStorageKey(username) {
+        return `jetbarkod_premium_${username || 'unknown'}`;
+    }
+
+    _readPremiumCache(username) {
+        try {
+            const sessionCached = sessionStorage.getItem('jetbarkod_premium_features');
+            if (sessionCached) {
+                const parsed = JSON.parse(sessionCached);
+                if (parsed && typeof parsed === 'object') return parsed;
+            }
+        } catch (e) { /* ignore */ }
+        try {
+            const localCached = localStorage.getItem(this._premiumStorageKey(username));
+            if (localCached) {
+                const parsed = JSON.parse(localCached);
+                if (parsed && typeof parsed === 'object') return parsed;
+            }
+        } catch (e) { /* ignore */ }
+        return null;
+    }
+
+    _writePremiumCache(username, features) {
+        const payload = JSON.stringify(features || {});
+        try {
+            sessionStorage.setItem('jetbarkod_premium_features', payload);
+        } catch (e) { /* ignore */ }
+        try {
+            localStorage.setItem(this._premiumStorageKey(username), payload);
+        } catch (e) { /* ignore */ }
+    }
+
+    async _waitForSupabase(maxWait = 10000) {
+        if (typeof window.jetbarkodWaitForSupabase === 'function') {
+            return window.jetbarkodWaitForSupabase(maxWait);
+        }
+        const start = Date.now();
+        while (Date.now() - start < maxWait) {
+            if (window.supabase?.from) return window.supabase;
+            await new Promise((r) => setTimeout(r, 100));
+        }
+        return window.supabase || null;
+    }
+
     // Initialize premium features for current user
     async init() {
         const session = window.authUtils?.checkAuth();
@@ -45,15 +89,20 @@ class PremiumFeatures {
             return;
         }
 
+        const cached = this._readPremiumCache(session.username);
+        if (cached && Object.keys(cached).length) {
+            this.premiumFeatures = cached;
+        }
+
         if (window.JETBARKOD_VPS_API?.enabled) {
-            try {
-                const cached = sessionStorage.getItem('jetbarkod_premium_features');
-                if (cached) {
-                    this.premiumFeatures = JSON.parse(cached) || {};
-                    return;
-                }
-            } catch (e) {
-                this.premiumFeatures = {};
+            if (cached && Object.keys(cached).length) {
+                void this._refreshPremiumInBackground();
+                return;
+            }
+            await this._waitForSupabase();
+            await this.loadPremiumFeatures();
+            if (Object.keys(this.premiumFeatures).length) {
+                this._writePremiumCache(session.username, this.premiumFeatures);
             }
             return;
         }
@@ -62,7 +111,23 @@ class PremiumFeatures {
             return;
         }
 
+        await this._waitForSupabase();
         await this.loadPremiumFeatures();
+        if (Object.keys(this.premiumFeatures).length) {
+            this._writePremiumCache(session.username, this.premiumFeatures);
+        }
+    }
+
+    async _refreshPremiumInBackground() {
+        try {
+            await this._waitForSupabase(8000);
+            await this.loadPremiumFeatures();
+            if (this.currentUser && Object.keys(this.premiumFeatures).length) {
+                this._writePremiumCache(this.currentUser.username, this.premiumFeatures);
+            }
+        } catch (e) {
+            console.warn('Premium arka plan yenilemesi başarısız:', e);
+        }
     }
 
     // Load premium features from Supabase
@@ -92,6 +157,9 @@ class PremiumFeatures {
 
             if (!error && data && data.premium_features) {
                 this.premiumFeatures = data.premium_features;
+                if (this.currentUser?.username) {
+                    this._writePremiumCache(this.currentUser.username, this.premiumFeatures);
+                }
             } else {
                 this.premiumFeatures = {};
             }

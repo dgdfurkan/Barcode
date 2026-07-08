@@ -19,6 +19,7 @@ class DispatchAgendaApp {
 
     async init() {
         this._bindEvents();
+        this._bindVisibilityRefresh();
 
         const session = window.authUtils?.checkAuth();
         if (!session) {
@@ -29,12 +30,20 @@ class DispatchAgendaApp {
         this._username = session.username;
         this._updateHeaderUser(session);
 
+        await this._waitForDb();
+
         try {
             if (window.premiumFeatures) {
                 await window.premiumFeatures.init();
             }
         } catch (e) {
             console.error('Premium yüklenemedi:', e);
+        }
+
+        if (!window.premiumFeatures?.checkPremiumFeature('urunAjandasi')) {
+            try {
+                await window.premiumFeatures?.loadPremiumFeatures();
+            } catch (e) { /* ignore */ }
         }
 
         if (!window.premiumFeatures?.checkPremiumFeature('urunAjandasi')) {
@@ -48,6 +57,27 @@ class DispatchAgendaApp {
         await this._loadProducts();
         await this.loadItems();
         this._setDefaultDate();
+    }
+
+    async _waitForDb(maxWait = 10000) {
+        if (typeof window.jetbarkodWaitForSupabase === 'function') {
+            await window.jetbarkodWaitForSupabase(maxWait);
+            return;
+        }
+        const start = Date.now();
+        while (Date.now() - start < maxWait) {
+            if (window.supabase?.from) return;
+            await new Promise((r) => setTimeout(r, 100));
+        }
+    }
+
+    _bindVisibilityRefresh() {
+        if (this._visibilityBound) return;
+        this._visibilityBound = true;
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState !== 'visible' || !this._ready) return;
+            void this.loadItems();
+        });
     }
 
     _updateHeaderUser(session) {
@@ -139,11 +169,19 @@ class DispatchAgendaApp {
         return results;
     }
 
-    async loadItems() {
+    async loadItems(retry = 0) {
         const listEl = document.getElementById('agendaCardStrip');
         const emptyEl = document.getElementById('agendaEmpty');
         const countEl = document.getElementById('agendaCountBadge');
-        if (!window.supabase || !this._username) return;
+        if (!this._username) return;
+        if (!window.supabase?.from) {
+            if (retry < 3) {
+                await this._waitForDb(3000);
+                return this.loadItems(retry + 1);
+            }
+            this._toast('Ajanda yüklenemedi — bağlantı yok', 'error');
+            return;
+        }
 
         try {
             const { data, error } = await window.supabase

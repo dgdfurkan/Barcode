@@ -78,5 +78,23 @@
         window.dispatchEvent(new CustomEvent('jetbarkod-supabase-ready', { detail: { mode: cfg.mode } }));
     }
 
+    window.jetbarkodWaitForSupabase = function waitForSupabase(maxWait = 10000) {
+        return new Promise((resolve) => {
+            if (window.supabase && typeof window.supabase.from === 'function') {
+                resolve(window.supabase);
+                return;
+            }
+            let settled = false;
+            const done = (client) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(client || null);
+            };
+            const timer = setTimeout(() => done(window.supabase || null), maxWait);
+            window.addEventListener('jetbarkod-supabase-ready', () => done(window.supabase), { once: true });
+        });
+    };
+
     initClient();
 })();

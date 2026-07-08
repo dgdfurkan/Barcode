@@ -164,9 +164,11 @@ async function loginViaVpsApi(username, password, clientIP) {
 
     if (payload.premiumFeatures && typeof payload.premiumFeatures === 'object') {
         try {
-            sessionStorage.setItem(
-                'jetbarkod_premium_features',
-                JSON.stringify(payload.premiumFeatures)
+            const premiumJson = JSON.stringify(payload.premiumFeatures);
+            sessionStorage.setItem('jetbarkod_premium_features', premiumJson);
+            localStorage.setItem(
+                `jetbarkod_premium_${sessionData.username}`,
+                premiumJson
             );
         } catch (e) {
             /* ignore */
