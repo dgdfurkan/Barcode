@@ -18,6 +18,8 @@ class ShelfMissingApp {
         this._sortable = null;
         this._pickItemId = null;
         this._toastTimer = null;
+        this._pendingCoverImage = undefined;
+        this._lastSearchQuery = '';
     }
 
     async init() {
@@ -122,22 +124,79 @@ class ShelfMissingApp {
         }
     }
 
-    _searchProducts(query, limit = 30) {
-        const q = (query || '').trim().toLocaleLowerCase('tr');
+    _normSearch(text) {
+        return String(text || '')
+            .toLocaleLowerCase('tr')
+            .replace(/(\d)\s*(l|lt|litre|ml|g|kg|gr|gram)\b/gi, (_, n, u) => `${n}${String(u).charAt(0).toLowerCase()}`)
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    _compactSearch(text) {
+        return this._normSearch(text).replace(/\s/g, '');
+    }
+
+    _searchProducts(query, limit = 40) {
+        const q = (query || '').trim();
         if (q.length < 2) return [];
-        const tokens = q.split(/\s+/).filter(Boolean);
-        const results = [];
+        const tokens = this._normSearch(q).split(/\s+/).filter(Boolean);
+        const scored = [];
 
         for (const p of this.allProducts || []) {
             const id = this._productId(p);
             if (!id) continue;
-            const name = this._productName(p).toLocaleLowerCase('tr');
+
+            const name = this._normSearch(this._productName(p));
+            const nameCompact = name.replace(/\s/g, '');
             const barcodeStr = this._normalizeBarcodes(p).join(' ').toLocaleLowerCase('tr');
-            const haystack = `${name} ${barcodeStr} ${String(id).toLocaleLowerCase('tr')}`;
-            if (tokens.every((t) => haystack.includes(t))) results.push(p);
-            if (results.length >= limit) break;
+            const idStr = String(id).toLocaleLowerCase('tr');
+
+            let score = 0;
+            let allMatch = true;
+
+            for (const token of tokens) {
+                const tokenCompact = token.replace(/\s/g, '');
+                const inName = name.includes(token) || nameCompact.includes(tokenCompact);
+                const inBarcode = barcodeStr.includes(token);
+                const inId = idStr.includes(token);
+
+                if (!inName && !inBarcode && !inId) {
+                    allMatch = false;
+                    break;
+                }
+
+                if (name.includes(token)) score += 12;
+                else if (nameCompact.includes(tokenCompact)) score += 10;
+                else if (inBarcode) score += 4;
+                else score += 1;
+
+                if (name.startsWith(token)) score += 6;
+                if (name.split(/\s+/).some((w) => w.startsWith(token))) score += 4;
+            }
+
+            if (allMatch) scored.push({ p, score });
         }
-        return results;
+
+        scored.sort((a, b) => b.score - a.score || this._productName(a.p).localeCompare(this._productName(b.p), 'tr'));
+        return scored.slice(0, limit).map((x) => x.p);
+    }
+
+    _itemOnShelf(shelfId, productId) {
+        return this.items.find((i) => i.shelf_id === shelfId && String(i.product_id) === String(productId));
+    }
+
+    _shelfCoverUrl(shelf) {
+        if (shelf?.cover_image) return shelf.cover_image;
+        const first = this._itemsForShelf(shelf.id).find((i) => i.product_image);
+        return first?.product_image || null;
+    }
+
+    _shelfCoverHtml(shelf) {
+        const url = this._shelfCoverUrl(shelf);
+        if (url) {
+            return `<div class="sm-shelf-icon-wrap sm-shelf-icon-wrap--img"><img src="${this._esc(url)}" alt="" loading="lazy" /></div>`;
+        }
+        return '<div class="sm-shelf-icon-wrap">📦</div>';
     }
 
     async loadShelves() {
@@ -266,7 +325,7 @@ class ShelfMissingApp {
             const badge = needed > 0 ? `<span class="sm-shelf-badge">${needed}</span>` : '';
             return `
                 <button type="button" class="sm-shelf-card" data-shelf-id="${this._esc(s.id)}" aria-label="${this._esc(s.name)}">
-                    <div class="sm-shelf-icon-wrap">📦</div>
+                    ${this._shelfCoverHtml(s)}
                     <p class="sm-shelf-name">${this._esc(s.name)}</p>
                     <p class="sm-shelf-meta">${count} ürün${needed > 0 ? ' · ' + needed + ' eksik' : ''}</p>
                     ${badge}
@@ -333,6 +392,9 @@ class ShelfMissingApp {
             : '<p class="sm-item-needed-label" style="color:rgb(100 116 139);font-weight:600">Stokta var</p>';
         return `
             <div class="sm-item-card${neededClass}" data-item-id="${this._esc(item.id)}" draggable="false">
+                <button type="button" class="sm-item-delete" data-delete-item="${this._esc(item.id)}" aria-label="Raftan kaldır" title="Kaldır">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
                 <img src="${img}" alt="" class="sm-item-img" loading="lazy" />
                 <p class="sm-item-name">${name}</p>
                 ${neededLabel}
@@ -380,24 +442,23 @@ class ShelfMissingApp {
                             <p class="sm-basket-name">${name}</p>
                             ${barcode ? `<p class="sm-basket-barcode">${barcode}</p>` : ''}
                         </div>
-                        <div class="sm-basket-actions">
-                            <span class="sm-basket-qty-pill">×${needed}</span>
-                            <div class="sm-stepper">
+                        <div class="sm-basket-inline">
+                            <span class="sm-basket-qty">×${needed}</span>
+                            <div class="sm-stepper sm-stepper--mini">
                                 <button type="button" class="sm-stepper-btn" data-action="dec" data-item-id="${this._esc(item.id)}" aria-label="Azalt">−</button>
-                                <span class="sm-stepper-val">${needed}</span>
                                 <button type="button" class="sm-stepper-btn" data-action="inc" data-item-id="${this._esc(item.id)}" aria-label="Artır">+</button>
                             </div>
-                            <button type="button" class="sm-pick-btn" data-pick-id="${this._esc(item.id)}">✓ Aldım</button>
+                            <button type="button" class="sm-pick-btn" data-pick-id="${this._esc(item.id)}" aria-label="Aldım" title="Aldım">
+                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            </button>
                         </div>
                     </div>`;
             }).join('');
 
-            const sectionTotal = items.reduce((s, i) => s + (Number(i.needed) || 0), 0);
             html.push(`
                 <section class="sm-basket-section">
                     <div class="sm-basket-section-head">
                         <h3 class="sm-basket-section-title">${this._esc(shelfName)}</h3>
-                        <span class="sm-basket-section-count">${sectionTotal} adet</span>
                     </div>
                     <div class="sm-basket-rows">${rows}</div>
                 </section>`);
@@ -448,28 +509,90 @@ class ShelfMissingApp {
         }
     }
 
-    async renameShelf(shelfId, newName) {
-        const trimmed = (newName || '').trim();
+    async saveShelfEdit(shelfId, name, coverImage) {
+        const trimmed = (name || '').trim();
         if (!trimmed || !window.supabase) return false;
+        const payload = { name: trimmed };
+        if (coverImage !== undefined) payload.cover_image = coverImage || null;
         try {
             const { error } = await window.supabase
                 .from('shelf_missing_shelves')
-                .update({ name: trimmed })
+                .update(payload)
                 .eq('id', shelfId)
                 .eq('username', this._username);
             if (error) throw error;
             const shelf = this.shelves.find((s) => s.id === shelfId);
-            if (shelf) shelf.name = trimmed;
+            if (shelf) {
+                shelf.name = trimmed;
+                if (coverImage !== undefined) shelf.cover_image = coverImage || null;
+            }
             const title = document.getElementById('shelfDetailTitle');
             if (title && this._activeShelfId === shelfId) title.textContent = trimmed;
             this._renderShelvesView();
             if (this._activeTab === 'basket') this._renderBasket();
-            this._toast('Raf adı güncellendi', 'success');
+            this._toast('Raf güncellendi', 'success');
             return true;
         } catch (e) {
-            this._toast('Raf adı güncellenemedi', 'error');
+            console.error('Raf güncellenemedi:', e);
+            this._toast(e.message?.includes('unique') ? 'Bu isimde raf zaten var' : 'Raf güncellenemedi', 'error');
             return false;
         }
+    }
+
+    async renameShelf(shelfId, newName) {
+        return this.saveShelfEdit(shelfId, newName, undefined);
+    }
+
+    async deleteItem(itemId) {
+        const item = this.items.find((i) => i.id === itemId);
+        if (!item || !window.supabase) return false;
+
+        const shelf = this.shelves.find((s) => s.id === item.shelf_id);
+        const wasCover = shelf && shelf.cover_image && shelf.cover_image === item.product_image;
+
+        try {
+            const { error } = await window.supabase
+                .from('shelf_missing_items')
+                .delete()
+                .eq('id', itemId)
+                .eq('username', this._username);
+            if (error) throw error;
+
+            this.items = this.items.filter((i) => i.id !== itemId);
+
+            if (wasCover && shelf) {
+                const nextCover = this._itemsForShelf(shelf.id).find((i) => i.product_image)?.product_image || null;
+                shelf.cover_image = nextCover;
+                await window.supabase
+                    .from('shelf_missing_shelves')
+                    .update({ cover_image: nextCover })
+                    .eq('id', shelf.id)
+                    .eq('username', this._username);
+            }
+
+            if (this._activeShelfId) this._renderShelfDetail();
+            this._renderShelvesView();
+            if (this._activeTab === 'basket') this._renderBasket();
+            this._updateBasketBadge();
+            if (this._lastSearchQuery.length >= 2) this._renderSearchResults(this._lastSearchQuery);
+            this._toast('Ürün raftan kaldırıldı', 'success');
+            return true;
+        } catch (e) {
+            console.error('Ürün silinemedi:', e);
+            this._toast('Ürün kaldırılamadı', 'error');
+            return false;
+        }
+    }
+
+    async toggleProductOnShelf(product) {
+        if (!this._activeShelfId) return;
+        const productId = String(this._productId(product));
+        const existing = this._itemOnShelf(this._activeShelfId, productId);
+        if (existing) {
+            await this.deleteItem(existing.id);
+            return;
+        }
+        await this.upsertItem(this._activeShelfId, product);
     }
 
     async deleteShelf(shelfId) {
@@ -527,6 +650,7 @@ class ShelfMissingApp {
             if (data) this.items.push(data);
             this._renderShelfDetail();
             this._renderShelvesView();
+            if (this._lastSearchQuery.length >= 2) this._renderSearchResults(this._lastSearchQuery);
             this._toast('Ürün eklendi', 'success');
         } catch (e) {
             console.error('Ürün eklenemedi:', e);
@@ -675,8 +799,9 @@ class ShelfMissingApp {
     }
 
     _renderSearchResults(query) {
+        this._lastSearchQuery = query || '';
         const box = document.getElementById('shelfSearchResults');
-        if (!box) return;
+        if (!box || !this._activeShelfId) return;
         const hits = this._searchProducts(query);
         if (!hits.length) {
             box.innerHTML = query.length >= 2
@@ -684,19 +809,50 @@ class ShelfMissingApp {
                 : '';
             return;
         }
-        const existing = new Set(
-            this._itemsForShelf(this._activeShelfId).map((i) => String(i.product_id))
-        );
         box.innerHTML = hits.map((p) => {
             const id = this._esc(this._productId(p));
-            const onShelf = existing.has(String(this._productId(p)));
+            const onShelf = !!this._itemOnShelf(this._activeShelfId, this._productId(p));
             return `
-                <button type="button" class="sm-search-hit" data-product-id="${id}" ${onShelf ? 'disabled' : ''}>
+                <button type="button" class="sm-search-hit${onShelf ? ' is-on-shelf' : ''}" data-product-id="${id}">
                     <img src="${this._esc(this._productImage(p))}" alt="" class="sm-search-img" loading="lazy" />
                     <span class="sm-search-name">${this._esc(this._productName(p))}</span>
-                    ${onShelf ? '<span class="sm-search-tag">Rafta</span>' : '<span class="sm-search-add">+ Ekle</span>'}
+                    ${onShelf
+                        ? '<span class="sm-search-remove">✓ Rafta · Kaldır</span>'
+                        : '<span class="sm-search-add">+ Ekle</span>'}
                 </button>`;
         }).join('');
+    }
+
+    _renderCoverPicker(shelfId) {
+        const picker = document.getElementById('editShelfCoverPicker');
+        if (!picker) return;
+        const shelf = this.shelves.find((s) => s.id === shelfId);
+        const items = this._itemsForShelf(shelfId);
+        const selected = this._pendingCoverImage !== undefined
+            ? this._pendingCoverImage
+            : (shelf?.cover_image || null);
+
+        let html = `<button type="button" class="sm-cover-option sm-cover-option--default${!selected ? ' is-selected' : ''}" data-cover="" title="Varsayılan">📦</button>`;
+        const seen = new Set();
+        for (const item of items) {
+            const url = item.product_image;
+            if (!url || seen.has(url)) continue;
+            seen.add(url);
+            html += `<button type="button" class="sm-cover-option${selected === url ? ' is-selected' : ''}" data-cover="${this._esc(url)}" title="Kapak yap"><img src="${this._esc(url)}" alt="" loading="lazy" /></button>`;
+        }
+        if (!items.length) {
+            html += '<p class="text-xs text-slate-500 w-full">Kapak için önce rafa ürün ekleyin.</p>';
+        }
+        picker.innerHTML = html;
+    }
+
+    _openEditShelfModal() {
+        const shelf = this.shelves.find((s) => s.id === this._activeShelfId);
+        const input = document.getElementById('editShelfNameInput');
+        if (input && shelf) input.value = shelf.name;
+        this._pendingCoverImage = shelf?.cover_image ?? null;
+        this._renderCoverPicker(this._activeShelfId);
+        this._openModal('editShelfModal');
     }
 
     _openModal(id) {
@@ -755,19 +911,25 @@ class ShelfMissingApp {
         });
 
         document.getElementById('shelfDetailBack')?.addEventListener('click', () => this._hideShelfDetail());
-        document.getElementById('shelfEditBtn')?.addEventListener('click', () => {
-            const shelf = this.shelves.find((s) => s.id === this._activeShelfId);
-            const input = document.getElementById('editShelfNameInput');
-            if (input && shelf) input.value = shelf.name;
-            this._openModal('editShelfModal');
-        });
+        document.getElementById('shelfEditBtn')?.addEventListener('click', () => this._openEditShelfModal());
         document.getElementById('shelfDeleteBtn')?.addEventListener('click', () => this._openModal('deleteShelfModal'));
         document.getElementById('editShelfClose')?.addEventListener('click', () => this._closeModal('editShelfModal'));
         document.getElementById('editShelfCancel')?.addEventListener('click', () => this._closeModal('editShelfModal'));
         document.getElementById('editShelfSave')?.addEventListener('click', async () => {
             const input = document.getElementById('editShelfNameInput');
-            const ok = await this.renameShelf(this._activeShelfId, input?.value);
+            const ok = await this.saveShelfEdit(
+                this._activeShelfId,
+                input?.value,
+                this._pendingCoverImage
+            );
             if (ok) this._closeModal('editShelfModal');
+        });
+
+        document.getElementById('editShelfCoverPicker')?.addEventListener('click', (e) => {
+            const opt = e.target.closest('[data-cover]');
+            if (!opt) return;
+            this._pendingCoverImage = opt.dataset.cover || null;
+            this._renderCoverPicker(this._activeShelfId);
         });
         document.getElementById('deleteShelfClose')?.addEventListener('click', () => this._closeModal('deleteShelfModal'));
         document.getElementById('deleteShelfCancel')?.addEventListener('click', () => this._closeModal('deleteShelfModal'));
@@ -784,13 +946,18 @@ class ShelfMissingApp {
         });
 
         document.getElementById('shelfSearchResults')?.addEventListener('click', (e) => {
-            const hit = e.target.closest('[data-product-id]:not([disabled])');
+            const hit = e.target.closest('[data-product-id]');
             if (!hit || !this._activeShelfId) return;
             const product = this.productIndex.get(hit.dataset.productId);
-            if (product) void this.upsertItem(this._activeShelfId, product);
+            if (product) void this.toggleProductOnShelf(product);
         });
 
         document.getElementById('shelfItemGrid')?.addEventListener('click', (e) => {
+            const del = e.target.closest('[data-delete-item]');
+            if (del?.dataset.deleteItem) {
+                void this.deleteItem(del.dataset.deleteItem);
+                return;
+            }
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
             const itemId = btn.dataset.itemId;
