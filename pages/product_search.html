@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Jet Barkod">
     <meta name="theme-color" content="#1e293b">
@@ -376,7 +377,6 @@
             });
         }
     </script>
-<script type="module" src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Fproductba5734back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.8"></script>
     
     <!-- Animated Scan Effect CSS -->
     <style>
@@ -10229,14 +10229,18 @@
             // Duplicate toggle
             // Removed showDuplicates - feature not useful
             
-            // Product management event listeners
-            document.getElementById('manageProductsBtn').addEventListener('click', showProductManagement);
-            document.getElementById('exportProductsBtn').addEventListener('click', exportUserProducts);
-            document.getElementById('forceReloadDefaultsBtn').addEventListener('click', forceReloadDefaults);
-            document.getElementById('closeProductManagement').addEventListener('click', hideProductManagement);
-            document.getElementById('selectAllProducts').addEventListener('click', selectAllProducts);
-            document.getElementById('deselectAllProducts').addEventListener('click', deselectAllProducts);
-            document.getElementById('deleteSelectedProducts').addEventListener('click', deleteSelectedProducts);
+            // Product management event listeners (optional DOM — eksik butonlar sayfayı kırmaz)
+            function onClickIfPresent(id, handler) {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('click', handler);
+            }
+            onClickIfPresent('manageProductsBtn', showProductManagement);
+            onClickIfPresent('exportProductsBtn', exportUserProducts);
+            onClickIfPresent('forceReloadDefaultsBtn', forceReloadDefaults);
+            onClickIfPresent('closeProductManagement', hideProductManagement);
+            onClickIfPresent('selectAllProducts', selectAllProducts);
+            onClickIfPresent('deselectAllProducts', deselectAllProducts);
+            onClickIfPresent('deleteSelectedProducts', deleteSelectedProducts);
             
             // Default products toggle
             // Get user preference for anti-glare mode (stored in localStorage)

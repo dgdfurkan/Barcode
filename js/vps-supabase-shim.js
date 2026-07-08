@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    let broadcastApiAvailable = true;
+
     function parseFilter(filter) {
         if (!filter || typeof filter !== 'string') return null;
         const m = filter.match(/^(\w+)=eq\.(.+)$/);
@@ -90,11 +92,16 @@
         }
 
         async _pollBroadcast(handler) {
+            if (!broadcastApiAvailable) return;
             if (handler.filter?.event !== 'refresh-page') return;
             const m = this.name.match(/^user-refresh-(.+)$/);
             if (!m) return;
             const username = m[1];
             const res = await fetch(`${this.baseUrl}/api/broadcast/refresh/${encodeURIComponent(username)}`);
+            if (res.status === 404) {
+                broadcastApiAvailable = false;
+                return;
+            }
             if (!res.ok) return;
             const json = await res.json();
             if (json?.pending) {
