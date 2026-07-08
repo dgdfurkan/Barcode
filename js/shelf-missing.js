@@ -99,28 +99,22 @@ class ShelfMissingApp {
         this._applyShelfGridCols();
     }
 
-    _getBasketViewMode() {
-        const m = this._getLocal('basket_view', 'list');
-        return m === 'grid' ? 'grid' : 'list';
+    _getBasketLayout() {
+        const v = this._getLocal('basket_layout', null);
+        if (v === 'list' || v === 'grid-2' || v === 'grid-3' || v === 'grid-4') return v;
+        const legacyView = this._getLocal('basket_view', 'list');
+        if (legacyView === 'list') return 'list';
+        const legacyCols = parseInt(this._getLocal('basket_grid_cols', '3'), 10);
+        const cols = [2, 3, 4].includes(legacyCols) ? legacyCols : 3;
+        return `grid-${cols}`;
     }
 
-    _getBasketGridCols() {
-        const n = parseInt(this._getLocal('basket_grid_cols', '3'), 10);
-        return [2, 3, 4].includes(n) ? n : 3;
-    }
-
-    _toggleBasketViewMode() {
-        const next = this._getBasketViewMode() === 'list' ? 'grid' : 'list';
-        this._setLocal('basket_view', next);
-        this._applyBasketViewPrefs();
-        if (this._activeTab === 'basket') this._renderBasket();
-    }
-
-    _cycleBasketGridCols() {
-        const order = [3, 4, 2];
-        const cur = this._getBasketGridCols();
-        const next = order[(order.indexOf(cur) + 1) % order.length];
-        this._setLocal('basket_grid_cols', String(next));
+    _cycleBasketLayout() {
+        const order = ['list', 'grid-3', 'grid-4', 'grid-2'];
+        const cur = this._getBasketLayout();
+        const idx = Math.max(0, order.indexOf(cur));
+        const next = order[(idx + 1) % order.length];
+        this._setLocal('basket_layout', next);
         this._applyBasketViewPrefs();
         if (this._activeTab === 'basket') this._renderBasket();
     }
@@ -164,22 +158,23 @@ class ShelfMissingApp {
     }
 
     _applyBasketViewPrefs() {
-        const mode = this._getBasketViewMode();
-        const cols = this._getBasketGridCols();
-        const viewBtn = document.getElementById('basketViewToggleBtn');
-        const viewIcon = document.getElementById('basketViewIcon');
-        const colsBtn = document.getElementById('basketGridColsBtn');
-        const colsIcon = document.getElementById('basketGridColsIcon');
-        if (viewIcon) {
-            viewIcon.innerHTML = mode === 'list' ? this._listIconSvg() : this._gridIconSvg(cols);
+        const layout = this._getBasketLayout();
+        const btn = document.getElementById('basketLayoutBtn');
+        const icon = document.getElementById('basketLayoutIcon');
+        if (layout === 'list') {
+            if (icon) icon.innerHTML = this._listIconSvg();
+            if (btn) {
+                btn.title = 'Liste görünümü · tıkla: grid';
+                btn.setAttribute('aria-label', btn.title);
+            }
+        } else {
+            const cols = parseInt(layout.replace('grid-', ''), 10) || 3;
+            if (icon) icon.innerHTML = this._gridIconSvg(cols);
+            if (btn) {
+                btn.title = `Grid: ${cols} sütun · tıkla: değiştir`;
+                btn.setAttribute('aria-label', btn.title);
+            }
         }
-        if (viewBtn) {
-            viewBtn.title = mode === 'list' ? 'Liste görünümü' : 'Grid görünümü';
-            viewBtn.setAttribute('aria-label', viewBtn.title);
-        }
-        if (colsBtn) colsBtn.classList.toggle('hidden', mode !== 'grid');
-        if (colsIcon) colsIcon.innerHTML = this._gridIconSvg(cols);
-        if (colsBtn) colsBtn.title = `Grid: ${cols} sütun`;
     }
 
     _allBarcodes(item) {
@@ -519,19 +514,21 @@ class ShelfMissingApp {
         const neededClass = needed > 0 ? ' has-needed' : '';
         const neededLabel = needed > 0
             ? `<p class="sm-item-needed-label">${needed} eksik</p>`
-            : '<p class="sm-item-needed-label" style="color:rgb(100 116 139);font-weight:600">Stokta var</p>';
+            : '<p class="sm-item-needed-label is-ok">Stokta var</p>';
         return `
             <div class="sm-item-card${neededClass}" data-item-id="${this._esc(item.id)}" draggable="false">
                 <button type="button" class="sm-item-delete" data-delete-item="${this._esc(item.id)}" aria-label="Raftan kaldır" title="Kaldır">
                     <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
                 <img src="${img}" alt="" class="sm-item-img" loading="lazy" data-preview-item="${this._esc(item.id)}" role="button" tabindex="0" />
-                <p class="sm-item-name">${name}</p>
-                ${neededLabel}
-                <div class="sm-stepper">
-                    <button type="button" class="sm-stepper-btn" data-action="dec" data-item-id="${this._esc(item.id)}" aria-label="Azalt">−</button>
-                    <span class="sm-stepper-val">${needed}</span>
-                    <button type="button" class="sm-stepper-btn" data-action="inc" data-item-id="${this._esc(item.id)}" aria-label="Artır">+</button>
+                <p class="sm-item-name" title="${name}">${name}</p>
+                <div class="sm-item-card-footer">
+                    ${neededLabel}
+                    <div class="sm-stepper">
+                        <button type="button" class="sm-stepper-btn" data-action="dec" data-item-id="${this._esc(item.id)}" aria-label="Azalt">−</button>
+                        <span class="sm-stepper-val">${needed}</span>
+                        <button type="button" class="sm-stepper-btn" data-action="inc" data-item-id="${this._esc(item.id)}" aria-label="Artır">+</button>
+                    </div>
                 </div>
             </div>`;
     }
@@ -550,8 +547,9 @@ class ShelfMissingApp {
         }
         empty?.classList.add('hidden');
 
-        const viewMode = this._getBasketViewMode();
-        const gridCols = this._getBasketGridCols();
+        const layout = this._getBasketLayout();
+        const viewMode = layout === 'list' ? 'list' : 'grid';
+        const gridCols = layout === 'list' ? 3 : (parseInt(layout.replace('grid-', ''), 10) || 3);
         const byShelf = new Map();
         for (const item of basket) {
             if (!byShelf.has(item.shelf_id)) byShelf.set(item.shelf_id, []);
@@ -593,7 +591,7 @@ class ShelfMissingApp {
             <div class="sm-basket-row" data-item-id="${this._esc(item.id)}">
                 <img src="${img}" alt="" class="sm-basket-img" loading="lazy" data-preview-item="${this._esc(item.id)}" role="button" tabindex="0" />
                 <div class="sm-basket-info">
-                    <p class="sm-basket-name">${name}</p>
+                    <p class="sm-basket-name" title="${name}">${name}</p>
                     ${barcode ? `<p class="sm-basket-barcode">${barcode}</p>` : ''}
                 </div>
                 <div class="sm-basket-inline">
@@ -616,7 +614,7 @@ class ShelfMissingApp {
         return `
             <div class="sm-basket-card" data-item-id="${this._esc(item.id)}">
                 <img src="${img}" alt="" class="sm-basket-img" loading="lazy" data-preview-item="${this._esc(item.id)}" role="button" tabindex="0" />
-                <p class="sm-basket-name">${name}</p>
+                <p class="sm-basket-name" title="${name}">${name}</p>
                 <div class="sm-basket-inline">
                     <span class="sm-basket-qty">×${needed}</span>
                     <div class="sm-stepper sm-stepper--mini">
@@ -860,6 +858,54 @@ class ShelfMissingApp {
         }
     }
 
+    _patchShelfBadges() {
+        for (const s of this.shelves) {
+            const needed = this._shelfNeededSum(s.id);
+            const card = document.querySelector(`[data-shelf-id="${CSS.escape(String(s.id))}"]`);
+            if (!card) continue;
+            let badge = card.querySelector('.sm-shelf-badge');
+            if (needed > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'sm-shelf-badge';
+                    card.appendChild(badge);
+                }
+                badge.textContent = String(needed);
+            } else if (badge) {
+                badge.remove();
+            }
+            const meta = card.querySelector('.sm-shelf-meta');
+            if (meta) {
+                const count = this._itemsForShelf(s.id).length;
+                meta.textContent = `${count} ürün${needed > 0 ? ` · ${needed} eksik` : ''}`;
+            }
+        }
+        this._updateSummaries();
+        this._updateBasketBadge();
+    }
+
+    _patchItemNeeded(itemId) {
+        const item = this.items.find((i) => i.id === itemId);
+        if (!item) return;
+        const needed = Number(item.needed) || 0;
+        const sel = `[data-item-id="${CSS.escape(String(itemId))}"]`;
+        document.querySelectorAll(sel).forEach((el) => {
+            if (el.classList.contains('sm-item-card')) {
+                el.classList.toggle('has-needed', needed > 0);
+                const label = el.querySelector('.sm-item-needed-label');
+                if (label) {
+                    label.classList.toggle('is-ok', needed === 0);
+                    label.textContent = needed > 0 ? `${needed} eksik` : 'Stokta var';
+                }
+            }
+            const val = el.querySelector('.sm-stepper-val');
+            if (val) val.textContent = String(needed);
+            const qty = el.querySelector('.sm-basket-qty');
+            if (qty) qty.textContent = `×${needed}`;
+        });
+        this._patchShelfBadges();
+    }
+
     setNeeded(itemId, delta) {
         const item = this.items.find((i) => i.id === itemId);
         if (!item) return;
@@ -869,10 +915,17 @@ class ShelfMissingApp {
         if (next === prev) return;
 
         item.needed = next;
-        if (this._activeShelfId) this._renderShelfDetail();
-        if (this._activeTab === 'basket') this._renderBasket();
-        this._renderShelvesView();
-        this._updateBasketBadge();
+
+        const leftBasket = prev > 0 && next === 0;
+        const enteredBasket = prev === 0 && next > 0;
+
+        if (leftBasket || enteredBasket) {
+            if (this._activeShelfId) this._renderShelfDetail();
+            if (this._activeTab === 'basket') this._renderBasket();
+            else this._patchShelfBadges();
+        } else {
+            this._patchItemNeeded(itemId);
+        }
 
         this._neededPending.set(itemId, next);
         clearTimeout(this._neededTimers.get(itemId));
@@ -1175,8 +1228,7 @@ class ShelfMissingApp {
         });
 
         document.getElementById('shelfGridColsBtn')?.addEventListener('click', () => this._cycleShelfGridCols());
-        document.getElementById('basketViewToggleBtn')?.addEventListener('click', () => this._toggleBasketViewMode());
-        document.getElementById('basketGridColsBtn')?.addEventListener('click', () => this._cycleBasketGridCols());
+        document.getElementById('basketLayoutBtn')?.addEventListener('click', () => this._cycleBasketLayout());
 
         document.getElementById('deleteItemCancel')?.addEventListener('click', () => {
             this._pendingDeleteItemId = null;
