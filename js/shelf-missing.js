@@ -20,6 +20,7 @@ class ShelfMissingApp {
         this._toastTimer = null;
         this._pendingCoverImage = undefined;
         this._lastSearchQuery = '';
+        this._pendingDeleteItemId = null;
     }
 
     async init() {
@@ -54,6 +55,136 @@ class ShelfMissingApp {
         await this.loadItems();
         this._switchTab('shelves');
         this._updateBasketBadge();
+        this._initViewPrefs();
+    }
+
+    _lsKey(suffix) {
+        return `sm_${suffix}_${this._username || 'guest'}`;
+    }
+
+    _getLocal(key, fallback = null) {
+        try {
+            const v = localStorage.getItem(this._lsKey(key));
+            return v == null ? fallback : v;
+        } catch {
+            return fallback;
+        }
+    }
+
+    _setLocal(key, value) {
+        try {
+            if (value == null || value === '') localStorage.removeItem(this._lsKey(key));
+            else localStorage.setItem(this._lsKey(key), String(value));
+        } catch { /* ignore */ }
+    }
+
+    _getShelfIconUrl(shelfId) {
+        return this._getLocal(`icon_${shelfId}`, null);
+    }
+
+    _setShelfIconUrl(shelfId, url) {
+        this._setLocal(`icon_${shelfId}`, url || null);
+    }
+
+    _getShelfGridCols() {
+        const n = parseInt(this._getLocal('shelf_grid_cols', '3'), 10);
+        return [2, 3, 4].includes(n) ? n : 3;
+    }
+
+    _cycleShelfGridCols() {
+        const order = [3, 4, 2];
+        const cur = this._getShelfGridCols();
+        const next = order[(order.indexOf(cur) + 1) % order.length];
+        this._setLocal('shelf_grid_cols', String(next));
+        this._applyShelfGridCols();
+    }
+
+    _getBasketViewMode() {
+        const m = this._getLocal('basket_view', 'list');
+        return m === 'grid' ? 'grid' : 'list';
+    }
+
+    _getBasketGridCols() {
+        const n = parseInt(this._getLocal('basket_grid_cols', '3'), 10);
+        return [2, 3, 4].includes(n) ? n : 3;
+    }
+
+    _toggleBasketViewMode() {
+        const next = this._getBasketViewMode() === 'list' ? 'grid' : 'list';
+        this._setLocal('basket_view', next);
+        this._applyBasketViewPrefs();
+        if (this._activeTab === 'basket') this._renderBasket();
+    }
+
+    _cycleBasketGridCols() {
+        const order = [3, 4, 2];
+        const cur = this._getBasketGridCols();
+        const next = order[(order.indexOf(cur) + 1) % order.length];
+        this._setLocal('basket_grid_cols', String(next));
+        this._applyBasketViewPrefs();
+        if (this._activeTab === 'basket') this._renderBasket();
+    }
+
+    _gridIconSvg(cols) {
+        const n = cols || 3;
+        let rects = '';
+        const size = 16;
+        const pad = 1.5;
+        const cell = (size - pad * (n + 1)) / n;
+        for (let r = 0; r < n; r++) {
+            for (let c = 0; c < n; c++) {
+                const x = pad + c * (cell + pad);
+                const y = pad + r * (cell + pad);
+                rects += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${cell.toFixed(1)}" height="${cell.toFixed(1)}" rx="1" fill="currentColor"/>`;
+            }
+        }
+        return `<svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true">${rects}</svg>`;
+    }
+
+    _listIconSvg() {
+        return `<svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>`;
+    }
+
+    _initViewPrefs() {
+        this._applyShelfGridCols();
+        this._applyBasketViewPrefs();
+    }
+
+    _applyShelfGridCols() {
+        const cols = this._getShelfGridCols();
+        const grid = document.getElementById('shelfItemGrid');
+        if (grid) {
+            grid.classList.remove('sm-cols-2', 'sm-cols-3', 'sm-cols-4');
+            grid.classList.add(`sm-cols-${cols}`);
+        }
+        const btn = document.getElementById('shelfGridColsBtn');
+        const icon = document.getElementById('shelfGridColsIcon');
+        if (btn) btn.title = `Görünüm: ${cols} sütun`;
+        if (icon) icon.innerHTML = this._gridIconSvg(cols);
+    }
+
+    _applyBasketViewPrefs() {
+        const mode = this._getBasketViewMode();
+        const cols = this._getBasketGridCols();
+        const viewBtn = document.getElementById('basketViewToggleBtn');
+        const viewIcon = document.getElementById('basketViewIcon');
+        const colsBtn = document.getElementById('basketGridColsBtn');
+        const colsIcon = document.getElementById('basketGridColsIcon');
+        if (viewIcon) {
+            viewIcon.innerHTML = mode === 'list' ? this._listIconSvg() : this._gridIconSvg(cols);
+        }
+        if (viewBtn) {
+            viewBtn.title = mode === 'list' ? 'Liste görünümü' : 'Grid görünümü';
+            viewBtn.setAttribute('aria-label', viewBtn.title);
+        }
+        if (colsBtn) colsBtn.classList.toggle('hidden', mode !== 'grid');
+        if (colsIcon) colsIcon.innerHTML = this._gridIconSvg(cols);
+        if (colsBtn) colsBtn.title = `Grid: ${cols} sütun`;
+    }
+
+    _allBarcodes(item) {
+        const codes = Array.isArray(item?.barcodes) ? item.barcodes : [];
+        return codes.map((b) => (typeof b === 'object' && b?.code ? b.code : String(b))).filter(Boolean);
     }
 
     _updateHeaderUser(session) {
@@ -186,9 +317,7 @@ class ShelfMissingApp {
     }
 
     _shelfCoverUrl(shelf) {
-        if (shelf?.cover_image) return shelf.cover_image;
-        const first = this._itemsForShelf(shelf.id).find((i) => i.product_image);
-        return first?.product_image || null;
+        return this._getShelfIconUrl(shelf?.id) || null;
     }
 
     _shelfCoverHtml(shelf) {
@@ -356,6 +485,7 @@ class ShelfMissingApp {
         document.getElementById('shelfSearchResults')?.replaceChildren();
 
         this._renderShelfDetail();
+        this._applyShelfGridCols();
         this._updateChrome();
     }
 
@@ -395,7 +525,7 @@ class ShelfMissingApp {
                 <button type="button" class="sm-item-delete" data-delete-item="${this._esc(item.id)}" aria-label="Raftan kaldır" title="Kaldır">
                     <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
-                <img src="${img}" alt="" class="sm-item-img" loading="lazy" />
+                <img src="${img}" alt="" class="sm-item-img" loading="lazy" data-preview-item="${this._esc(item.id)}" role="button" tabindex="0" />
                 <p class="sm-item-name">${name}</p>
                 ${neededLabel}
                 <div class="sm-stepper">
@@ -420,6 +550,8 @@ class ShelfMissingApp {
         }
         empty?.classList.add('hidden');
 
+        const viewMode = this._getBasketViewMode();
+        const gridCols = this._getBasketGridCols();
         const byShelf = new Map();
         for (const item of basket) {
             if (!byShelf.has(item.shelf_id)) byShelf.set(item.shelf_id, []);
@@ -431,40 +563,71 @@ class ShelfMissingApp {
             const shelf = this.shelves.find((s) => s.id === shelfId);
             const shelfName = shelf?.name || 'Raf';
             const rows = items.map((item) => {
-                const needed = Number(item.needed) || 0;
-                const img = this._esc(item.product_image || '../assets/logo.png');
-                const name = this._esc(item.product_name || 'Ürün');
-                const barcode = this._esc(this._firstBarcode(item));
-                return `
-                    <div class="sm-basket-row" data-item-id="${this._esc(item.id)}">
-                        <img src="${img}" alt="" class="sm-basket-img" loading="lazy" />
-                        <div class="sm-basket-info">
-                            <p class="sm-basket-name">${name}</p>
-                            ${barcode ? `<p class="sm-basket-barcode">${barcode}</p>` : ''}
-                        </div>
-                        <div class="sm-basket-inline">
-                            <span class="sm-basket-qty">×${needed}</span>
-                            <div class="sm-stepper sm-stepper--mini">
-                                <button type="button" class="sm-stepper-btn" data-action="dec" data-item-id="${this._esc(item.id)}" aria-label="Azalt">−</button>
-                                <button type="button" class="sm-stepper-btn" data-action="inc" data-item-id="${this._esc(item.id)}" aria-label="Artır">+</button>
-                            </div>
-                            <button type="button" class="sm-pick-btn" data-pick-id="${this._esc(item.id)}" aria-label="Aldım" title="Aldım">
-                                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                            </button>
-                        </div>
-                    </div>`;
+                if (viewMode === 'grid') return this._renderBasketCard(item);
+                return this._renderBasketRow(item);
             }).join('');
+
+            const rowsClass = viewMode === 'grid'
+                ? `sm-basket-rows sm-basket-grid sm-cols-${gridCols}`
+                : 'sm-basket-rows';
 
             html.push(`
                 <section class="sm-basket-section">
                     <div class="sm-basket-section-head">
                         <h3 class="sm-basket-section-title">${this._esc(shelfName)}</h3>
                     </div>
-                    <div class="sm-basket-rows">${rows}</div>
+                    <div class="${rowsClass}">${rows}</div>
                 </section>`);
         }
         container.innerHTML = html.join('');
+        this._applyBasketViewPrefs();
         this._updateSummaries();
+    }
+
+    _renderBasketRow(item) {
+        const needed = Number(item.needed) || 0;
+        const img = this._esc(item.product_image || '../assets/logo.png');
+        const name = this._esc(item.product_name || 'Ürün');
+        const barcode = this._esc(this._firstBarcode(item));
+        return `
+            <div class="sm-basket-row" data-item-id="${this._esc(item.id)}">
+                <img src="${img}" alt="" class="sm-basket-img" loading="lazy" data-preview-item="${this._esc(item.id)}" role="button" tabindex="0" />
+                <div class="sm-basket-info">
+                    <p class="sm-basket-name">${name}</p>
+                    ${barcode ? `<p class="sm-basket-barcode">${barcode}</p>` : ''}
+                </div>
+                <div class="sm-basket-inline">
+                    <span class="sm-basket-qty">×${needed}</span>
+                    <div class="sm-stepper sm-stepper--mini">
+                        <button type="button" class="sm-stepper-btn" data-action="dec" data-item-id="${this._esc(item.id)}" aria-label="Azalt">−</button>
+                        <button type="button" class="sm-stepper-btn" data-action="inc" data-item-id="${this._esc(item.id)}" aria-label="Artır">+</button>
+                    </div>
+                    <button type="button" class="sm-pick-btn" data-pick-id="${this._esc(item.id)}" aria-label="Aldım" title="Aldım">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    _renderBasketCard(item) {
+        const needed = Number(item.needed) || 0;
+        const img = this._esc(item.product_image || '../assets/logo.png');
+        const name = this._esc(item.product_name || 'Ürün');
+        return `
+            <div class="sm-basket-card" data-item-id="${this._esc(item.id)}">
+                <img src="${img}" alt="" class="sm-basket-img" loading="lazy" data-preview-item="${this._esc(item.id)}" role="button" tabindex="0" />
+                <p class="sm-basket-name">${name}</p>
+                <div class="sm-basket-inline">
+                    <span class="sm-basket-qty">×${needed}</span>
+                    <div class="sm-stepper sm-stepper--mini">
+                        <button type="button" class="sm-stepper-btn" data-action="dec" data-item-id="${this._esc(item.id)}" aria-label="Azalt">−</button>
+                        <button type="button" class="sm-stepper-btn" data-action="inc" data-item-id="${this._esc(item.id)}" aria-label="Artır">+</button>
+                    </div>
+                    <button type="button" class="sm-pick-btn" data-pick-id="${this._esc(item.id)}" aria-label="Aldım" title="Aldım">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                    </button>
+                </div>
+            </div>`;
     }
 
     _updateBasketBadge() {
@@ -509,22 +672,20 @@ class ShelfMissingApp {
         }
     }
 
-    async saveShelfEdit(shelfId, name, coverImage) {
+    async saveShelfEdit(shelfId, name) {
         const trimmed = (name || '').trim();
         if (!trimmed || !window.supabase) return false;
-        const payload = { name: trimmed };
-        if (coverImage !== undefined) payload.cover_image = coverImage || null;
         try {
             const { error } = await window.supabase
                 .from('shelf_missing_shelves')
-                .update(payload)
+                .update({ name: trimmed })
                 .eq('id', shelfId)
                 .eq('username', this._username);
             if (error) throw error;
             const shelf = this.shelves.find((s) => s.id === shelfId);
-            if (shelf) {
-                shelf.name = trimmed;
-                if (coverImage !== undefined) shelf.cover_image = coverImage || null;
+            if (shelf) shelf.name = trimmed;
+            if (this._pendingCoverImage !== undefined) {
+                this._setShelfIconUrl(shelfId, this._pendingCoverImage || null);
             }
             const title = document.getElementById('shelfDetailTitle');
             if (title && this._activeShelfId === shelfId) title.textContent = trimmed;
@@ -540,15 +701,36 @@ class ShelfMissingApp {
     }
 
     async renameShelf(shelfId, newName) {
-        return this.saveShelfEdit(shelfId, newName, undefined);
+        return this.saveShelfEdit(shelfId, newName);
     }
 
-    async deleteItem(itemId) {
+    _requestDeleteItem(itemId) {
+        const item = this.items.find((i) => i.id === itemId);
+        if (!item) return;
+        this._pendingDeleteItemId = itemId;
+        const nameEl = document.getElementById('deleteItemName');
+        if (nameEl) nameEl.textContent = item.product_name || 'Ürün';
+        this._openModal('deleteItemModal');
+    }
+
+    async _executeDeleteItem(itemId) {
         const item = this.items.find((i) => i.id === itemId);
         if (!item || !window.supabase) return false;
 
-        const shelf = this.shelves.find((s) => s.id === item.shelf_id);
-        const wasCover = shelf && shelf.cover_image && shelf.cover_image === item.product_image;
+        const productId = String(item.product_id);
+        const shelfId = item.shelf_id;
+        const snapshot = { ...item };
+        const iconUrl = this._getShelfIconUrl(shelfId);
+
+        this.items = this.items.filter((i) => i.id !== itemId);
+        if (iconUrl && iconUrl === item.product_image) {
+            this._setShelfIconUrl(shelfId, null);
+        }
+        this._patchSearchHit(productId, false);
+        if (this._activeShelfId) this._renderShelfDetail();
+        this._renderShelvesView();
+        if (this._activeTab === 'basket') this._renderBasket();
+        this._updateBasketBadge();
 
         try {
             const { error } = await window.supabase
@@ -557,31 +739,27 @@ class ShelfMissingApp {
                 .eq('id', itemId)
                 .eq('username', this._username);
             if (error) throw error;
-
-            this.items = this.items.filter((i) => i.id !== itemId);
-
-            if (wasCover && shelf) {
-                const nextCover = this._itemsForShelf(shelf.id).find((i) => i.product_image)?.product_image || null;
-                shelf.cover_image = nextCover;
-                await window.supabase
-                    .from('shelf_missing_shelves')
-                    .update({ cover_image: nextCover })
-                    .eq('id', shelf.id)
-                    .eq('username', this._username);
-            }
-
-            if (this._activeShelfId) this._renderShelfDetail();
-            this._renderShelvesView();
-            if (this._activeTab === 'basket') this._renderBasket();
-            this._updateBasketBadge();
-            if (this._lastSearchQuery.length >= 2) this._renderSearchResults(this._lastSearchQuery);
             this._toast('Ürün raftan kaldırıldı', 'success');
             return true;
         } catch (e) {
             console.error('Ürün silinemedi:', e);
+            this.items.push(snapshot);
+            this._patchSearchHit(productId, true);
+            if (iconUrl && iconUrl === snapshot.product_image) {
+                this._setShelfIconUrl(shelfId, iconUrl);
+            }
+            if (this._activeShelfId) this._renderShelfDetail();
+            this._renderShelvesView();
+            if (this._activeTab === 'basket') this._renderBasket();
+            this._updateBasketBadge();
             this._toast('Ürün kaldırılamadı', 'error');
             return false;
         }
+    }
+
+    async deleteItem(itemId) {
+        this._requestDeleteItem(itemId);
+        return false;
     }
 
     async toggleProductOnShelf(product) {
@@ -589,10 +767,11 @@ class ShelfMissingApp {
         const productId = String(this._productId(product));
         const existing = this._itemOnShelf(this._activeShelfId, productId);
         if (existing) {
-            await this.deleteItem(existing.id);
+            this._requestDeleteItem(existing.id);
             return;
         }
-        await this.upsertItem(this._activeShelfId, product);
+        this._patchSearchHit(productId, true);
+        await this.upsertItem(this._activeShelfId, product, { skipSearchPatch: true });
     }
 
     async deleteShelf(shelfId) {
@@ -604,6 +783,7 @@ class ShelfMissingApp {
                 .eq('id', shelfId)
                 .eq('username', this._username);
             if (error) throw error;
+            this._setShelfIconUrl(shelfId, null);
             this.shelves = this.shelves.filter((s) => s.id !== shelfId);
             this.items = this.items.filter((i) => i.shelf_id !== shelfId);
             if (this._activeShelfId === shelfId) this._hideShelfDetail();
@@ -618,7 +798,7 @@ class ShelfMissingApp {
         }
     }
 
-    async upsertItem(shelfId, product) {
+    async upsertItem(shelfId, product, opts = {}) {
         const productId = String(this._productId(product));
         if (!productId || !window.supabase) return;
 
@@ -628,8 +808,12 @@ class ShelfMissingApp {
             return;
         }
 
+        if (!opts.skipSearchPatch) this._patchSearchHit(productId, true);
+
         const maxOrder = this._itemsForShelf(shelfId).reduce((m, i) => Math.max(m, i.sort_order || 0), -1);
-        const row = {
+        const tempId = `opt-${Date.now()}`;
+        const optimistic = {
+            id: tempId,
             username: this._username,
             shelf_id: shelfId,
             product_id: productId,
@@ -637,6 +821,20 @@ class ShelfMissingApp {
             product_image: this._productImage(product),
             barcodes: this._normalizeBarcodes(product),
             sort_order: maxOrder + 1,
+            needed: 0
+        };
+        this.items.push(optimistic);
+        this._renderShelfDetail();
+        this._renderShelvesView();
+
+        const row = {
+            username: this._username,
+            shelf_id: shelfId,
+            product_id: productId,
+            product_name: optimistic.product_name,
+            product_image: optimistic.product_image,
+            barcodes: optimistic.barcodes,
+            sort_order: optimistic.sort_order,
             needed: 0
         };
 
@@ -647,13 +845,17 @@ class ShelfMissingApp {
                 .select('*')
                 .maybeSingle();
             if (error) throw error;
+            this.items = this.items.filter((i) => i.id !== tempId);
             if (data) this.items.push(data);
             this._renderShelfDetail();
             this._renderShelvesView();
-            if (this._lastSearchQuery.length >= 2) this._renderSearchResults(this._lastSearchQuery);
-            this._toast('Ürün eklendi', 'success');
+            if (!opts.silent) this._toast('Ürün eklendi', 'success');
         } catch (e) {
             console.error('Ürün eklenemedi:', e);
+            this.items = this.items.filter((i) => i.id !== tempId);
+            this._patchSearchHit(productId, false);
+            this._renderShelfDetail();
+            this._renderShelvesView();
             this._toast('Ürün eklenemedi', 'error');
         }
     }
@@ -798,6 +1000,29 @@ class ShelfMissingApp {
         }
     }
 
+    _searchActionHtml(onShelf) {
+        return onShelf
+            ? '<span class="sm-search-action sm-search-action--remove">✓ Rafta</span>'
+            : '<span class="sm-search-action sm-search-action--add">+ Ekle</span>';
+    }
+
+    _patchSearchHit(productId, onShelf) {
+        const box = document.getElementById('shelfSearchResults');
+        if (!box) return;
+        const hit = box.querySelector(`[data-product-id="${CSS.escape(String(productId))}"]`);
+        if (!hit) return;
+        hit.classList.toggle('is-on-shelf', onShelf);
+        let action = hit.querySelector('.sm-search-action');
+        if (!action) {
+            action = document.createElement('span');
+            hit.appendChild(action);
+        }
+        action.className = onShelf
+            ? 'sm-search-action sm-search-action--remove'
+            : 'sm-search-action sm-search-action--add';
+        action.textContent = onShelf ? '✓ Rafta' : '+ Ekle';
+    }
+
     _renderSearchResults(query) {
         this._lastSearchQuery = query || '';
         const box = document.getElementById('shelfSearchResults');
@@ -816,11 +1041,26 @@ class ShelfMissingApp {
                 <button type="button" class="sm-search-hit${onShelf ? ' is-on-shelf' : ''}" data-product-id="${id}">
                     <img src="${this._esc(this._productImage(p))}" alt="" class="sm-search-img" loading="lazy" />
                     <span class="sm-search-name">${this._esc(this._productName(p))}</span>
-                    ${onShelf
-                        ? '<span class="sm-search-remove">✓ Rafta · Kaldır</span>'
-                        : '<span class="sm-search-add">+ Ekle</span>'}
+                    ${this._searchActionHtml(onShelf)}
                 </button>`;
         }).join('');
+    }
+
+    _openProductPreview(itemId) {
+        const item = this.items.find((i) => i.id === itemId);
+        if (!item) return;
+        const imgEl = document.getElementById('productPreviewImg');
+        const nameEl = document.getElementById('productPreviewName');
+        const barcodesEl = document.getElementById('productPreviewBarcodes');
+        if (imgEl) imgEl.src = item.product_image || '../assets/logo.png';
+        if (nameEl) nameEl.textContent = item.product_name || 'Ürün';
+        if (barcodesEl) {
+            const codes = this._allBarcodes(item);
+            barcodesEl.innerHTML = codes.length
+                ? codes.map((c) => `<div class="sm-preview-barcode">${this._esc(c)}</div>`).join('')
+                : '<p class="text-sm text-slate-500">Barkod kaydı yok</p>';
+        }
+        this._openModal('productPreviewModal');
     }
 
     _renderCoverPicker(shelfId) {
@@ -830,7 +1070,7 @@ class ShelfMissingApp {
         const items = this._itemsForShelf(shelfId);
         const selected = this._pendingCoverImage !== undefined
             ? this._pendingCoverImage
-            : (shelf?.cover_image || null);
+            : this._getShelfIconUrl(shelfId);
 
         let html = `<button type="button" class="sm-cover-option sm-cover-option--default${!selected ? ' is-selected' : ''}" data-cover="" title="Varsayılan">📦</button>`;
         const seen = new Set();
@@ -838,7 +1078,7 @@ class ShelfMissingApp {
             const url = item.product_image;
             if (!url || seen.has(url)) continue;
             seen.add(url);
-            html += `<button type="button" class="sm-cover-option${selected === url ? ' is-selected' : ''}" data-cover="${this._esc(url)}" title="Kapak yap"><img src="${this._esc(url)}" alt="" loading="lazy" /></button>`;
+            html += `<button type="button" class="sm-cover-option${selected === url ? ' is-selected' : ''}" data-cover="${this._esc(url)}" title="İkon yap"><img src="${this._esc(url)}" alt="" loading="lazy" /></button>`;
         }
         if (!items.length) {
             html += '<p class="text-xs text-slate-500 w-full">Kapak için önce rafa ürün ekleyin.</p>';
@@ -850,7 +1090,7 @@ class ShelfMissingApp {
         const shelf = this.shelves.find((s) => s.id === this._activeShelfId);
         const input = document.getElementById('editShelfNameInput');
         if (input && shelf) input.value = shelf.name;
-        this._pendingCoverImage = shelf?.cover_image ?? null;
+        this._pendingCoverImage = this._getShelfIconUrl(this._activeShelfId);
         this._renderCoverPicker(this._activeShelfId);
         this._openModal('editShelfModal');
     }
@@ -917,11 +1157,7 @@ class ShelfMissingApp {
         document.getElementById('editShelfCancel')?.addEventListener('click', () => this._closeModal('editShelfModal'));
         document.getElementById('editShelfSave')?.addEventListener('click', async () => {
             const input = document.getElementById('editShelfNameInput');
-            const ok = await this.saveShelfEdit(
-                this._activeShelfId,
-                input?.value,
-                this._pendingCoverImage
-            );
+            const ok = await this.saveShelfEdit(this._activeShelfId, input?.value);
             if (ok) this._closeModal('editShelfModal');
         });
 
@@ -938,6 +1174,23 @@ class ShelfMissingApp {
             if (ok) this._closeModal('deleteShelfModal');
         });
 
+        document.getElementById('shelfGridColsBtn')?.addEventListener('click', () => this._cycleShelfGridCols());
+        document.getElementById('basketViewToggleBtn')?.addEventListener('click', () => this._toggleBasketViewMode());
+        document.getElementById('basketGridColsBtn')?.addEventListener('click', () => this._cycleBasketGridCols());
+
+        document.getElementById('deleteItemCancel')?.addEventListener('click', () => {
+            this._pendingDeleteItemId = null;
+            this._closeModal('deleteItemModal');
+        });
+        document.getElementById('deleteItemConfirm')?.addEventListener('click', async () => {
+            const id = this._pendingDeleteItemId;
+            this._pendingDeleteItemId = null;
+            this._closeModal('deleteItemModal');
+            if (id) await this._executeDeleteItem(id);
+        });
+
+        document.getElementById('productPreviewClose')?.addEventListener('click', () => this._closeModal('productPreviewModal'));
+
         const searchInput = document.getElementById('shelfProductSearch');
         searchInput?.addEventListener('input', () => {
             clearTimeout(this._searchDebounce);
@@ -953,9 +1206,14 @@ class ShelfMissingApp {
         });
 
         document.getElementById('shelfItemGrid')?.addEventListener('click', (e) => {
+            const preview = e.target.closest('[data-preview-item]');
+            if (preview?.dataset.previewItem) {
+                this._openProductPreview(preview.dataset.previewItem);
+                return;
+            }
             const del = e.target.closest('[data-delete-item]');
             if (del?.dataset.deleteItem) {
-                void this.deleteItem(del.dataset.deleteItem);
+                this._requestDeleteItem(del.dataset.deleteItem);
                 return;
             }
             const btn = e.target.closest('[data-action]');
@@ -966,6 +1224,11 @@ class ShelfMissingApp {
         });
 
         document.getElementById('basketGroups')?.addEventListener('click', (e) => {
+            const preview = e.target.closest('[data-preview-item]');
+            if (preview?.dataset.previewItem) {
+                this._openProductPreview(preview.dataset.previewItem);
+                return;
+            }
             const stepBtn = e.target.closest('[data-action]');
             if (stepBtn?.dataset.itemId) {
                 if (stepBtn.dataset.action === 'inc') this.setNeeded(stepBtn.dataset.itemId, 1);

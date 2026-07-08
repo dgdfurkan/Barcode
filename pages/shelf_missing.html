@@ -133,8 +133,13 @@
                         <div id="shelfSearchResults" class="sm-search-results"></div>
 
                         <div>
-                            <p class="sm-section-label">Raftaki ürünler · sürükleyerek sırala · +/− ile eksik adet</p>
-                            <div id="shelfItemGrid" class="sm-item-grid"></div>
+                            <div class="sm-section-toolbar">
+                                <p class="sm-section-label sm-section-label--inline">Raftaki ürünler · sürükleyerek sırala</p>
+                                <button type="button" id="shelfGridColsBtn" class="sm-icon-btn sm-icon-btn--ghost" aria-label="Grid sütun sayısı" title="Görünüm: 3 sütun">
+                                    <span id="shelfGridColsIcon"></span>
+                                </button>
+                            </div>
+                            <div id="shelfItemGrid" class="sm-item-grid sm-cols-3"></div>
                         </div>
                     </section>
                 </div>
@@ -147,6 +152,14 @@
                         <div class="min-w-0">
                             <h2 class="sm-panel-title">Toplama Sepeti</h2>
                             <p class="sm-panel-sub" id="basketSummary">0 eksik ürün</p>
+                        </div>
+                        <div class="sm-panel-tools">
+                            <button type="button" id="basketViewToggleBtn" class="sm-icon-btn sm-icon-btn--ghost" aria-label="Liste görünümü" title="Liste görünümü">
+                                <span id="basketViewIcon"></span>
+                            </button>
+                            <button type="button" id="basketGridColsBtn" class="sm-icon-btn sm-icon-btn--ghost hidden" aria-label="Grid sütun sayısı" title="Grid: 3 sütun">
+                                <span id="basketGridColsIcon"></span>
+                            </button>
                         </div>
                     </div>
 
@@ -207,7 +220,7 @@
             </div>
             <label class="sm-section-label" for="editShelfNameInput">Raf adı</label>
             <input type="text" id="editShelfNameInput" class="sm-field-input mb-4" maxlength="80" />
-            <p class="sm-section-label">Raf görseli — raftaki bir ürünü kapak yap</p>
+            <p class="sm-section-label">Raf ikonu — ürün görseli seç (sadece bu cihazda)</p>
             <div id="editShelfCoverPicker" class="sm-cover-picker mb-4"></div>
             <div class="sm-modal-actions">
                 <button type="button" id="editShelfCancel" class="sm-icon-btn sm-icon-btn--lg" aria-label="İptal" title="İptal">
@@ -236,6 +249,39 @@
                 </button>
             </div>
             <button type="button" id="deleteShelfClose" class="sr-only">Kapat</button>
+        </div>
+    </div>
+
+    <!-- Ürün Sil -->
+    <div id="deleteItemModal" class="sm-modal-backdrop" aria-hidden="true">
+        <div class="sm-modal-panel" role="dialog">
+            <h3 class="sm-modal-title mb-2">Ürünü Raftan Kaldır?</h3>
+            <p class="sm-modal-desc mb-1" id="deleteItemName">—</p>
+            <p class="sm-modal-desc mb-4">Unutmayalım diye soruyoruz — bu ürün raftan silinecek.</p>
+            <div class="sm-modal-actions">
+                <button type="button" id="deleteItemCancel" class="sm-icon-btn sm-icon-btn--lg" aria-label="İptal" title="İptal">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+                <button type="button" id="deleteItemConfirm" class="sm-icon-btn sm-icon-btn--danger sm-icon-btn--lg flex-1" aria-label="Kaldır" title="Kaldır">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    <span>Kaldır</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ürün Görseli -->
+    <div id="productPreviewModal" class="sm-modal-backdrop" aria-hidden="true">
+        <div class="sm-modal-panel sm-modal-panel--wide" role="dialog">
+            <div class="sm-modal-head">
+                <h3 class="sm-modal-title">Ürün</h3>
+                <button type="button" id="productPreviewClose" class="sm-modal-x" aria-label="Kapat">✕</button>
+            </div>
+            <div class="sm-preview-body">
+                <img id="productPreviewImg" src="../assets/logo.png" alt="" class="sm-preview-img" />
+                <p id="productPreviewName" class="sm-preview-name"></p>
+                <div id="productPreviewBarcodes" class="sm-preview-barcodes"></div>
+            </div>
         </div>
     </div>
 
