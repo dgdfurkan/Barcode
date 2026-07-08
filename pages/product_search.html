@@ -114,12 +114,9 @@
                             .select('current_value')
                             .eq('feature_key', 'scan_effect_visible')
                             .eq('is_active', true)
-                            .single();
+                            .maybeSingle();
                         
-                        console.log('📡 [SCAN] Supabase query result:', { data, error, feature_key: 'scan_effect_visible' });
-                        
-                        if (error || !data) {
-                            console.warn('⚠️ [SCAN] scan_effect_visible not found in DB, using default value from feature-definitions');
+                        if (!data) {
                             // Supabase'de veri yoksa, feature-definitions.js'den default değeri al
                             const definition = window.getFeatureDefinition?.('scan_effect_visible');
                             if (definition && definition.defaultValue !== undefined) {
@@ -10306,10 +10303,9 @@
                             .select('current_value')
                             .eq('feature_key', 'anti_glare_mode')
                             .eq('is_active', true)
-                            .single();
+                            .maybeSingle();
                         
-                        if (error || !data) {
-                            console.warn('⚠️ anti_glare_mode not found in DB, assuming false');
+                        if (!data) {
                             featureEnabled = false;
                         } else {
                             featureEnabled = data.current_value === true;
@@ -10462,11 +10458,11 @@
                         .select('current_value')
                         .eq('feature_key', 'scan_effect_visible')
                         .eq('is_active', true)
-                        .single();
+                        .maybeSingle();
                     
                     let isVisible = true; // Default fallback
                     
-                    if (error || !data) {
+                    if (!data) {
                         // Supabase'de veri yoksa default değeri kullan
                         const definition = window.getFeatureDefinition?.('scan_effect_visible');
                         if (definition && definition.defaultValue !== undefined) {

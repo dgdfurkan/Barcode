@@ -36,10 +36,14 @@
                     .select('current_value')
                     .eq('feature_key', featureKey)
                     .eq('is_active', true)
-                    .single();
+                    .maybeSingle();
 
-                if (error || !data) {
-                    console.warn(`Feature ${featureKey} not found, using default value`);
+                if (error) {
+                    console.warn(`Feature ${featureKey} query failed, using default value`);
+                    return this.getDefaultValue(featureKey);
+                }
+
+                if (!data) {
                     return this.getDefaultValue(featureKey);
                 }
 
@@ -104,7 +108,7 @@
                     .from('system_features')
                     .select('current_value')
                     .eq('feature_key', featureKey)
-                    .single();
+                    .maybeSingle();
 
                 const oldValue = currentFeature?.current_value ?? null;
 
@@ -196,7 +200,7 @@
                     .eq('update_number', updateNumber) // Aynı versiyon numarası kontrolü
                     .order('changed_at', { ascending: false })
                     .limit(1)
-                    .single();
+                    .maybeSingle();
 
                 // Eğer aynı feature_key + aynı update_number varsa, sadece tarihi güncelle
                 if (existingHistory) {
