@@ -3,7 +3,7 @@
  * Kapatmak için yalnızca enabled: false yapın ve deploy edin.
  */
 window.JETBARKOD_GUEST_ACCESS = {
-    enabled: true,
+    enabled: false,
     contactEmail: 'furkan@flowcobalt.com',
     welcomeStorageKey: 'jetbarkod_welcome_seen_v1',
     /** Misafir modunda açık premium özellikler */

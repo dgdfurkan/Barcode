@@ -45,6 +45,19 @@ class PremiumFeatures {
             return;
         }
 
+        if (window.JETBARKOD_VPS_API?.enabled) {
+            try {
+                const cached = sessionStorage.getItem('jetbarkod_premium_features');
+                if (cached) {
+                    this.premiumFeatures = JSON.parse(cached) || {};
+                    return;
+                }
+            } catch (e) {
+                this.premiumFeatures = {};
+            }
+            return;
+        }
+
         if (this.currentUser?.username === session.username && Object.keys(this.premiumFeatures).length) {
             return;
         }
@@ -141,6 +154,10 @@ class PremiumFeatures {
     async validatePremiumFeature(featureName) {
         if (this._isGuestPremiumFeature(featureName)) {
             return true;
+        }
+
+        if (window.JETBARKOD_VPS_API?.enabled) {
+            return this.checkPremiumFeature(featureName);
         }
 
         try {

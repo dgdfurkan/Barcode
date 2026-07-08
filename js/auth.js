@@ -111,12 +111,90 @@ const RATE_LIMIT = {
 };
 
 // Login function
+async function loginViaVpsApi(username, password, clientIP) {
+    const cfg = window.JETBARKOD_VPS_API || {};
+    const baseUrl = (cfg.baseUrl || '').replace(/\/$/, '');
+    if (!baseUrl) {
+        throw new Error('VPS API adresi tanımlı değil.');
+    }
+
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, clientIP }),
+    });
+
+    let payload = null;
+    try {
+        payload = await response.json();
+    } catch (e) {
+        throw new Error('Sunucu yanıtı okunamadı.');
+    }
+
+    if (!response.ok || !payload?.ok) {
+        if (payload?.code === 'trial_expired' && window.showTrialExpiredLoginNotification) {
+            window.showTrialExpiredLoginNotification();
+            setTimeout(() => openChatWithUsernameForTrialExpired(username), 1500);
+        }
+        if (payload?.code === 'ip_blocked') {
+            const ipBanMessage = document.getElementById('ipBanMessage');
+            if (ipBanMessage) ipBanMessage.classList.remove('hidden');
+            setTimeout(async () => {
+                await openChatForBlockedIP(clientIP, username);
+            }, 1000);
+            return;
+        }
+        throw new Error(payload?.error || 'Giriş başarısız.');
+    }
+
+    const sessionData = {
+        username: payload.session.username,
+        company: payload.session.company || '',
+        trialEnd: payload.session.trialEnd,
+        isAdmin: !!payload.session.isAdmin,
+        loginTime: payload.session.loginTime || new Date().toISOString(),
+        clientIP: payload.session.clientIP || clientIP,
+    };
+
+    localStorage.setItem('userSession', JSON.stringify(sessionData));
+    localStorage.setItem(
+        'authToken',
+        btoa(unescape(encodeURIComponent(JSON.stringify(sessionData))))
+    );
+
+    if (payload.premiumFeatures && typeof payload.premiumFeatures === 'object') {
+        try {
+            sessionStorage.setItem(
+                'jetbarkod_premium_features',
+                JSON.stringify(payload.premiumFeatures)
+            );
+        } catch (e) {
+            /* ignore */
+        }
+        if (window.premiumFeatures) {
+            window.premiumFeatures.currentUser = sessionData;
+            window.premiumFeatures.premiumFeatures = payload.premiumFeatures;
+        }
+    }
+
+    if (sessionData.isAdmin) {
+        window.location.replace('admin.html');
+    } else {
+        window.location.replace('pages/product_search.html');
+    }
+}
+
 async function login(username, password) {
     showLoading(true);
     
     try {
         const clientIP = await getClientIP();
         console.log('Client IP:', clientIP);
+
+        if (window.JETBARKOD_VPS_API?.enabled) {
+            await loginViaVpsApi(username, password, clientIP);
+            return;
+        }
         
         // Rate limiting check
         if (!RATE_LIMIT.check(clientIP)) {
