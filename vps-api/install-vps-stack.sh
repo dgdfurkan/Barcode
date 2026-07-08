@@ -5,13 +5,13 @@
 set -euo pipefail
 
 API_DIR="/opt/jetbarkod-api"
-POSTGREST_VERSION="12.2.3"
+POSTGREST_VERSION="v14.2"
 POSTGREST_BIN="/usr/local/bin/postgrest"
 ENV_FILE="$API_DIR/postgrest.env"
 
 echo "=== 1) PostgREST indir ==="
 cd /tmp
-curl -fsSL -o postgrest.tar.xz "https://github.com/PostgREST/postgrest/releases/download/v${POSTGREST_VERSION}/postgrest-v${POSTGREST_VERSION}-ubuntu.tar.xz"
+curl -fsSL -o postgrest.tar.xz "https://github.com/PostgREST/postgrest/releases/download/${POSTGREST_VERSION}/postgrest-${POSTGREST_VERSION}-linux-static-x86-64.tar.xz"
 tar -xJf postgrest.tar.xz
 chmod +x postgrest
 mv postgrest "$POSTGREST_BIN"
