@@ -64,7 +64,19 @@ def write_csv(path, columns, rows):
             w.writerow([row.get(c, '') for c in columns])
 
 
+def make_postgres_readable(path):
+    """postgres kullanıcısı sudo -u postgres psql ile dosyayı okuyabilsin."""
+    if os.path.isdir(path):
+        os.chmod(path, 0o755)
+        for name in os.listdir(path):
+            make_postgres_readable(os.path.join(path, name))
+    else:
+        os.chmod(path, 0o644)
+
+
 def run_psql_file(sql_path):
+    make_postgres_readable(sql_path)
+    make_postgres_readable(os.path.dirname(sql_path))
     proc = subprocess.run(
         ['sudo', '-u', 'postgres', 'psql', '-d', DB_NAME, '-v', 'ON_ERROR_STOP=1', '-f', sql_path],
         capture_output=True,
