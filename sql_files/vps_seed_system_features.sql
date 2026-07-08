@@ -21,3 +21,5 @@ ON CONFLICT (feature_key) DO UPDATE SET
     updated_at = NOW();
 
 SELECT feature_key, current_value FROM system_features ORDER BY feature_key;
+
+NOTIFY pgrst, 'reload schema';

@@ -20,3 +20,5 @@ INSERT INTO admin_settings (id) VALUES ('00000000-0000-0000-0000-000000000001')
 ON CONFLICT (id) DO NOTHING;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON admin_settings TO jetbarkod;
+
+NOTIFY pgrst, 'reload schema';

@@ -23,7 +23,7 @@ cat > "$ENV_FILE" <<EOF
 db-uri = "postgresql://jetbarkod:${DB_PASS}@127.0.0.1:5432/jetbarkod"
 db-schemas = "public"
 db-anon-role = "jetbarkod"
-server-host = 127.0.0.1
+server-host = "127.0.0.1"
 server-port = 3002
 EOF
 chmod 600 "$ENV_FILE"
@@ -92,6 +92,7 @@ systemctl reload apache2
 echo "=== 6) Schema patch ==="
 if [ -f "$API_DIR/vps_schema_patch.sql" ]; then
   sudo -u postgres psql -d jetbarkod -f "$API_DIR/vps_schema_patch.sql"
+  systemctl restart postgrest
 fi
 
 echo "=== 7) API restart ==="

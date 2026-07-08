@@ -2497,13 +2497,29 @@ AdminPanel.prototype.renderMediaContent = function(step) {
 
 const ADMIN_SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
 
+function emptyAdminSettingsRow() {
+    return {
+        id: ADMIN_SETTINGS_ID,
+        telegram_bot_token: null,
+        telegram_chat_id: null,
+        gemini_api_key: null,
+        cloudinary_cloud_name: null,
+        cloudinary_api_key: null,
+        cloudinary_upload_preset: null,
+        updated_at: null,
+    };
+}
+
 AdminPanel.prototype.getAdminSettingsRow = async function(forceRefresh = false) {
+    if (this._adminSettingsTableMissing) {
+        return emptyAdminSettingsRow();
+    }
+
     if (this.adminSettings && !forceRefresh) {
         return this.adminSettings;
     }
 
     if (!window.supabase) {
-        console.warn('Supabase mevcut değil, admin ayarları yüklenemedi');
         return null;
     }
 
@@ -2511,28 +2527,35 @@ AdminPanel.prototype.getAdminSettingsRow = async function(forceRefresh = false) 
         .from('admin_settings')
         .select('*')
         .eq('id', ADMIN_SETTINGS_ID)
-        .single();
+        .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
+        if (error.code === 'PGRST205') {
+            this._adminSettingsTableMissing = true;
+            return emptyAdminSettingsRow();
+        }
         console.error('Admin ayarları alınamadı:', error);
         return null;
     }
 
-    // Eğer satır yoksa oluştur
-    if (error && error.code === 'PGRST116') {
+    if (!data) {
         const { data: inserted, error: insertError } = await window.supabase
             .from('admin_settings')
             .insert({ id: ADMIN_SETTINGS_ID })
             .select('*')
-            .single();
+            .maybeSingle();
 
         if (insertError) {
+            if (insertError.code === 'PGRST205') {
+                this._adminSettingsTableMissing = true;
+                return emptyAdminSettingsRow();
+            }
             console.error('Admin ayarları oluşturulamadı:', insertError);
             return null;
         }
 
-        this.adminSettings = inserted;
-        return inserted;
+        this.adminSettings = inserted || emptyAdminSettingsRow();
+        return this.adminSettings;
     }
 
     this.adminSettings = data;
@@ -2652,6 +2675,11 @@ AdminPanel.prototype.saveAdminSettings = async function() {
             .single();
 
         if (error) {
+            if (error.code === 'PGRST205') {
+                this._adminSettingsTableMissing = true;
+                alert('admin_settings tablosu VPS\'te yok. vps_schema_patch.sql dosyasını çalıştırın.');
+                return;
+            }
             console.error('Admin ayarları kaydedilemedi:', error);
             alert('Ayarlar kaydedilemedi, lütfen tekrar deneyin.');
             return;
