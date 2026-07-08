@@ -22,174 +22,198 @@
     <script src="../js/auth.js"></script>
     <script src="../js/user-manager.js"></script>
     <script src="../js/premium-features.js"></script>
-    <style>
-        body { font-family: 'Inter', sans-serif; background: var(--color-background); padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)); }
-        @media (min-width: 768px) { body { padding-bottom: 0; } }
-        .btn-primary {
-            display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
-            border: none; cursor: pointer; background: linear-gradient(180deg, rgb(37 99 235), rgb(29 78 216));
-            border-radius: 0.625rem; padding: 0.5625rem 1.125rem; font-size: 0.875rem; font-weight: 600; color: #fff;
-        }
-        .btn-secondary {
-            display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
-            border: 1px solid rgb(226 232 240); cursor: pointer; background: rgb(248 250 252);
-            border-radius: 0.625rem; padding: 0.5625rem 1.125rem; font-size: 0.875rem; font-weight: 600; color: rgb(51 65 85);
-        }
-        .btn-danger {
-            display: inline-flex; align-items: center; justify-content: center;
-            border: none; cursor: pointer; background: linear-gradient(180deg, rgb(239 68 68), rgb(220 38 38));
-            border-radius: 0.625rem; padding: 0.5625rem 1.125rem; font-size: 0.875rem; font-weight: 700; color: #fff;
-        }
-        .sm-field-input {
-            width: 100%; border-radius: 0.625rem; border: 1px solid rgb(226 232 240);
-            padding: 0.55rem 0.75rem; font-size: 0.875rem;
-        }
-        .sm-field-input:focus { outline: none; border-color: rgb(37 99 235); box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15); }
-    </style>
 </head>
-<body class="min-h-screen bg-background">
-    <header class="bg-surface border-b border-border shadow-sm sticky top-0 z-40">
-        <div class="w-full mx-auto px-2 sm:px-4 lg:px-8">
-            <div class="flex items-center justify-between h-14 sm:h-16 gap-2">
-                <div class="flex items-center space-x-2 sm:space-x-3 min-w-0">
-                    <a href="product_search.html" class="flex items-center space-x-1 px-2 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs sm:text-sm font-medium">
+<body class="min-h-screen bg-background sm-page">
+    <header class="sm-header sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-14 sm:h-16 gap-3">
+                <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <a href="product_search.html" class="sm-back-link" title="Ürün aramaya dön">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                        <span class="hidden sm:inline">Aramaya Dön</span>
+                        <span class="hidden sm:inline">Arama</span>
                     </a>
-                    <div class="w-8 h-8"><img src="../assets/logo.png" alt="" class="w-full h-full object-contain"></div>
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 shrink-0">
+                        <img src="../assets/logo.png" alt="" class="w-full h-full object-contain">
+                    </div>
                     <div class="min-w-0">
-                        <h1 class="text-lg font-bold text-text-primary truncate">Raftaki Eksikler</h1>
-                        <p class="text-xs text-text-secondary truncate">Raflar · Sepet</p>
+                        <h1 class="text-base sm:text-lg font-bold text-text-primary truncate">Raftaki Eksikler</h1>
+                        <p class="text-xs text-text-secondary truncate">Raflar · Sepet · Senkron</p>
                     </div>
                 </div>
-                <div class="text-right hidden sm:block max-w-[10rem]">
-                    <p class="text-sm font-semibold truncate" id="headerUserName">—</p>
-                    <p class="text-xs text-text-secondary truncate" id="headerUserCompany">—</p>
+                <div class="flex items-center gap-2 shrink-0">
+                    <div class="hidden sm:block text-right max-w-[9rem]">
+                        <p class="text-sm font-semibold truncate" id="headerUserName">—</p>
+                        <p class="text-xs text-text-secondary truncate" id="headerUserCompany">—</p>
+                    </div>
+                    <button type="button" id="headerLogoutBtn" class="sm-icon-btn" title="Çıkış" aria-label="Çıkış">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    </button>
                 </div>
-                <button type="button" id="headerLogoutBtn" class="btn-secondary text-xs p-1.5" title="Çıkış">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                </button>
             </div>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-6">
+    <main class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 md:pb-8">
         <div id="noAuth" class="hidden">
-            <div class="bg-surface rounded-xl border border-border p-12 text-center">
+            <div class="sm-gate-card">
                 <p class="text-text-secondary mb-4">Bu sayfayı kullanmak için giriş yapın.</p>
-                <a href="../index.html" class="btn-primary">Giriş Yap</a>
+                <a href="../index.html" class="sm-btn sm-btn-primary">Giriş Yap</a>
             </div>
         </div>
         <div id="noPremium" class="hidden">
-            <div class="bg-surface rounded-xl border border-border p-12 text-center">
-                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-2xl">📋</div>
-                <h2 class="text-xl font-semibold mb-2">Raftaki Eksikler — Premium</h2>
+            <div class="sm-gate-card">
+                <div class="sm-gate-icon">📋</div>
+                <h2 class="text-xl font-semibold mb-2">Premium Özellik</h2>
                 <p class="text-text-secondary mb-6">Yöneticinizden «Raftaki Eksikler» özelliğini açmasını isteyin.</p>
-                <a href="product_search.html" class="btn-secondary">Ürün Aramaya Dön</a>
+                <a href="product_search.html" class="sm-btn sm-btn-secondary">Ürün Aramaya Dön</a>
             </div>
         </div>
 
-        <div id="mainContent" class="hidden space-y-4">
+        <div id="mainContent" class="hidden">
+            <!-- Desktop tabs -->
             <div class="sm-desktop-tabs sm-tab-bar mb-4">
-                <button type="button" class="sm-tab-btn is-active" data-sm-tab="shelves">📦 Raflar</button>
+                <button type="button" class="sm-tab-btn is-active" data-sm-tab="shelves">
+                    <span class="sm-tab-icon">📦</span><span>Raflar</span>
+                </button>
                 <button type="button" class="sm-tab-btn" data-sm-tab="basket">
-                    🛒 Sepet
+                    <span class="sm-tab-icon">🛒</span><span>Sepet</span>
                     <span id="basketTabBadge" class="sm-tab-badge hidden">0</span>
                 </button>
             </div>
 
+            <!-- RAFLAR -->
             <div id="shelvesPanel">
                 <div id="shelfListView">
-                    <section class="bg-surface rounded-xl border border-border shadow-sm p-4">
-                        <div id="shelfEmpty" class="hidden py-12 text-center">
-                            <p class="text-sm font-medium mb-1">Henüz raf yok</p>
-                            <p class="text-xs text-text-secondary mb-4">Depo raflarınızı oluşturup eksik ürünleri takip edin</p>
-                            <button type="button" id="emptyAddShelfBtn" class="btn-primary">+ İlk Rafı Oluştur</button>
+                    <section class="sm-panel">
+                        <div class="sm-panel-header">
+                            <div class="min-w-0">
+                                <h2 class="sm-panel-title">Raflarınız</h2>
+                                <p class="sm-panel-sub" id="shelfListSummary">0 raf</p>
+                            </div>
+                            <button type="button" id="listAddShelfBtn" class="sm-btn sm-btn-primary sm-btn-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                Yeni Raf
+                            </button>
                         </div>
+
+                        <div id="shelfEmpty" class="hidden sm-empty-state">
+                            <div class="sm-empty-icon">📦</div>
+                            <p class="sm-empty-title">Henüz raf yok</p>
+                            <p class="sm-empty-desc">Depo raflarınızı oluşturun, ürün ekleyin ve eksik adetleri sepette toplayın.</p>
+                            <button type="button" id="emptyAddShelfBtn" class="sm-btn sm-btn-primary">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                İlk Rafı Oluştur
+                            </button>
+                        </div>
+
                         <div id="shelfGrid" class="sm-shelf-grid"></div>
                     </section>
                 </div>
 
                 <div id="shelfDetailView" class="hidden">
-                    <section class="bg-surface rounded-xl border border-border shadow-sm p-4 space-y-4">
-                        <div class="flex items-center justify-between gap-2">
-                            <button type="button" id="shelfDetailBack" class="btn-secondary text-sm">← Raflar</button>
-                            <h2 id="shelfDetailTitle" class="text-base font-bold truncate flex-1 text-center">Raf</h2>
-                            <div class="flex gap-1">
-                                <button type="button" id="shelfEditBtn" class="btn-secondary text-xs px-2">Düzenle</button>
-                                <button type="button" id="shelfDeleteBtn" class="btn-secondary text-xs px-2 text-red-600">Sil</button>
+                    <section class="sm-panel space-y-4">
+                        <div class="sm-detail-top">
+                            <button type="button" id="shelfDetailBack" class="sm-btn sm-btn-ghost sm-btn-sm">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                                Raflar
+                            </button>
+                            <h2 id="shelfDetailTitle" class="sm-detail-title">Raf</h2>
+                            <div class="sm-detail-actions">
+                                <button type="button" id="shelfEditBtn" class="sm-btn sm-btn-secondary sm-btn-sm">Düzenle</button>
+                                <button type="button" id="shelfDeleteBtn" class="sm-btn sm-btn-danger-outline sm-btn-sm">Sil</button>
                             </div>
                         </div>
-                        <div>
-                            <label class="text-xs font-bold uppercase text-slate-500" for="shelfProductSearch">Ürün Ara (min 2 karakter)</label>
-                            <input type="search" id="shelfProductSearch" class="sm-field-input mt-1" placeholder="Ürün adı veya barkod…" autocomplete="off" />
-                            <div id="shelfSearchResults" class="sm-search-results"></div>
+
+                        <div class="sm-search-wrap">
+                            <svg class="sm-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            <input type="search" id="shelfProductSearch" class="sm-field-input sm-search-input" placeholder="Ürün adı veya barkod ara (min 2 karakter)…" autocomplete="off" />
                         </div>
-                        <div id="shelfItemGrid" class="sm-item-grid"></div>
+                        <div id="shelfSearchResults" class="sm-search-results"></div>
+
+                        <div>
+                            <p class="sm-section-label">Raftaki ürünler · sürükleyerek sırala · +/− ile eksik adet</p>
+                            <div id="shelfItemGrid" class="sm-item-grid"></div>
+                        </div>
                     </section>
                 </div>
             </div>
 
+            <!-- SEPET -->
             <div id="basketPanel" class="hidden">
-                <section class="bg-surface rounded-xl border border-border shadow-sm p-4">
-                    <div id="basketEmpty" class="hidden py-12 text-center">
-                        <p class="text-sm font-medium mb-1">Sepet boş</p>
-                        <p class="text-xs text-text-secondary">Raflarda eksik adet belirlediğiniz ürünler burada görünür</p>
+                <section class="sm-panel">
+                    <div class="sm-panel-header">
+                        <div class="min-w-0">
+                            <h2 class="sm-panel-title">Toplama Sepeti</h2>
+                            <p class="sm-panel-sub" id="basketSummary">0 eksik ürün</p>
+                        </div>
                     </div>
+
+                    <div id="basketEmpty" class="hidden sm-empty-state">
+                        <div class="sm-empty-icon">🛒</div>
+                        <p class="sm-empty-title">Sepet boş</p>
+                        <p class="sm-empty-desc">Raflarda ürünlerin yanındaki + ile eksik adet belirleyin; burada raf bazlı toplarsınız.</p>
+                        <button type="button" id="basketGoShelvesBtn" class="sm-btn sm-btn-primary">Raflara Git</button>
+                    </div>
+
                     <div id="basketGroups"></div>
                 </section>
             </div>
         </div>
     </main>
 
-    <button type="button" id="addShelfBtn" class="sm-fab hidden" aria-label="Yeni Raf">+</button>
+    <button type="button" id="addShelfBtn" class="sm-fab hidden" aria-label="Yeni raf ekle" title="Yeni Raf">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+    </button>
 
-    <nav class="sm-bottom-nav" id="smBottomNav">
-        <button type="button" class="sm-tab-btn is-active flex-1" data-sm-tab="shelves">📦 Raflar</button>
+    <nav class="sm-bottom-nav" id="smBottomNav" aria-label="Sekmeler">
+        <button type="button" class="sm-tab-btn is-active flex-1" data-sm-tab="shelves">
+            <span class="sm-tab-icon">📦</span><span>Raflar</span>
+        </button>
         <button type="button" class="sm-tab-btn flex-1" data-sm-tab="basket">
-            🛒 Sepet
+            <span class="sm-tab-icon">🛒</span><span>Sepet</span>
             <span class="sm-tab-badge hidden basket-mobile-badge">0</span>
         </button>
     </nav>
 
     <!-- Yeni Raf -->
     <div id="newShelfModal" class="sm-modal-backdrop" aria-hidden="true">
-        <div class="sm-modal-panel">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold">Yeni Raf</h3>
-                <button type="button" id="newShelfClose" class="p-2 text-slate-500">✕</button>
+        <div class="sm-modal-panel" role="dialog" aria-labelledby="newShelfModalTitle">
+            <div class="sm-modal-head">
+                <h3 id="newShelfModalTitle" class="sm-modal-title">Yeni Raf</h3>
+                <button type="button" id="newShelfClose" class="sm-modal-x" aria-label="Kapat">✕</button>
             </div>
-            <input type="text" id="newShelfNameInput" class="sm-field-input mb-4" placeholder="Raf adı (ör. Sütlük)" maxlength="80" />
-            <div class="flex gap-2">
-                <button type="button" id="newShelfCancel" class="btn-secondary flex-1">İptal</button>
-                <button type="button" id="newShelfSave" class="btn-primary flex-1">Oluştur</button>
+            <p class="sm-modal-desc">Raf adını girin — örn. Sütlük, Şarküteri, Dondurma</p>
+            <input type="text" id="newShelfNameInput" class="sm-field-input mb-4" placeholder="Raf adı" maxlength="80" />
+            <div class="sm-modal-actions">
+                <button type="button" id="newShelfCancel" class="sm-btn sm-btn-secondary flex-1">İptal</button>
+                <button type="button" id="newShelfSave" class="sm-btn sm-btn-primary flex-1">Oluştur</button>
             </div>
         </div>
     </div>
 
     <!-- Raf Düzenle -->
     <div id="editShelfModal" class="sm-modal-backdrop" aria-hidden="true">
-        <div class="sm-modal-panel">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold">Raf Adını Düzenle</h3>
-                <button type="button" id="editShelfClose" class="p-2 text-slate-500">✕</button>
+        <div class="sm-modal-panel" role="dialog">
+            <div class="sm-modal-head">
+                <h3 class="sm-modal-title">Raf Adını Düzenle</h3>
+                <button type="button" id="editShelfClose" class="sm-modal-x" aria-label="Kapat">✕</button>
             </div>
             <input type="text" id="editShelfNameInput" class="sm-field-input mb-4" maxlength="80" />
-            <div class="flex gap-2">
-                <button type="button" id="editShelfCancel" class="btn-secondary flex-1">İptal</button>
-                <button type="button" id="editShelfSave" class="btn-primary flex-1">Kaydet</button>
+            <div class="sm-modal-actions">
+                <button type="button" id="editShelfCancel" class="sm-btn sm-btn-secondary flex-1">İptal</button>
+                <button type="button" id="editShelfSave" class="sm-btn sm-btn-primary flex-1">Kaydet</button>
             </div>
         </div>
     </div>
 
     <!-- Raf Sil -->
     <div id="deleteShelfModal" class="sm-modal-backdrop" aria-hidden="true">
-        <div class="sm-modal-panel">
-            <h3 class="text-lg font-bold mb-2">Rafı Sil?</h3>
-            <p class="text-sm text-slate-600 mb-4">Bu raftaki tüm ürünler de silinir.</p>
-            <div class="flex gap-2">
-                <button type="button" id="deleteShelfCancel" class="btn-secondary flex-1">İptal</button>
-                <button type="button" id="deleteShelfConfirm" class="btn-danger flex-1">Sil</button>
+        <div class="sm-modal-panel" role="dialog">
+            <h3 class="sm-modal-title mb-2">Rafı Sil?</h3>
+            <p class="sm-modal-desc mb-4">Bu raftaki tüm ürünler de silinir. Bu işlem geri alınamaz.</p>
+            <div class="sm-modal-actions">
+                <button type="button" id="deleteShelfCancel" class="sm-btn sm-btn-secondary flex-1">İptal</button>
+                <button type="button" id="deleteShelfConfirm" class="sm-btn sm-btn-danger flex-1">Sil</button>
             </div>
             <button type="button" id="deleteShelfClose" class="sr-only">Kapat</button>
         </div>
@@ -197,31 +221,24 @@
 
     <!-- Aldım -->
     <div id="pickModal" class="sm-modal-backdrop" aria-hidden="true">
-        <div class="sm-modal-panel">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="text-lg font-bold">Aldım</h3>
-                <button type="button" id="pickModalClose" class="p-2 text-slate-500">✕</button>
+        <div class="sm-modal-panel" role="dialog">
+            <div class="sm-modal-head">
+                <h3 class="sm-modal-title">Aldım</h3>
+                <button type="button" id="pickModalClose" class="sm-modal-x" aria-label="Kapat">✕</button>
             </div>
-            <p id="pickProductName" class="font-semibold mb-3 text-sm"></p>
-            <p class="text-xs text-slate-500 mb-2">Eksik: <span id="pickQtyMax">0</span> adet</p>
-            <label class="text-xs font-bold uppercase text-slate-500" for="pickQtyInput">Kaç adet aldınız?</label>
+            <div class="sm-pick-preview">
+                <img id="pickProductImg" src="../assets/logo.png" alt="" class="sm-pick-img" />
+                <p id="pickProductName" class="sm-pick-name"></p>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">Eksik: <strong id="pickQtyMax">0</strong> adet</p>
+            <label class="sm-section-label" for="pickQtyInput">Kaç adet aldınız?</label>
             <input type="number" id="pickQtyInput" class="sm-field-input mt-1 mb-4" min="1" value="1" />
-            <button type="button" id="pickFullBtn" class="btn-primary w-full mb-2">Tamamını Aldım</button>
-            <button type="button" id="pickPartialBtn" class="btn-secondary w-full mb-2">Kısmi Miktar Kaydet</button>
-            <button type="button" id="pickModalCancel" class="btn-secondary w-full">İptal</button>
+            <button type="button" id="pickFullBtn" class="sm-btn sm-btn-primary w-full mb-2">Tamamını Aldım</button>
+            <button type="button" id="pickPartialBtn" class="sm-btn sm-btn-secondary w-full mb-2">Kısmi Miktar Kaydet</button>
+            <button type="button" id="pickModalCancel" class="sm-btn sm-btn-ghost w-full">İptal</button>
         </div>
     </div>
 
     <script src="../js/shelf-missing.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const fab = document.getElementById('addShelfBtn');
-            const main = document.getElementById('mainContent');
-            const obs = new MutationObserver(() => {
-                if (fab && main && !main.classList.contains('hidden')) fab.classList.remove('hidden');
-            });
-            if (main) obs.observe(main, { attributes: true, attributeFilter: ['class'] });
-        });
-    </script>
 </body>
 </html>

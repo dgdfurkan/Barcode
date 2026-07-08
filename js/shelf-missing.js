@@ -45,6 +45,7 @@ class ShelfMissingApp {
 
         this._ready = true;
         this._show('mainContent');
+        this._updateChrome();
 
         await this._loadCatalog();
         await this.loadShelves();
@@ -210,6 +211,40 @@ class ShelfMissingApp {
         } else {
             this._renderShelvesView();
         }
+        this._updateChrome();
+    }
+
+    _updateChrome() {
+        const fab = document.getElementById('addShelfBtn');
+        const onShelfList = this._ready && this._activeTab === 'shelves' && !this._activeShelfId;
+        if (fab) fab.classList.toggle('hidden', !onShelfList);
+    }
+
+    _openNewShelfModal() {
+        const input = document.getElementById('newShelfNameInput');
+        if (input) {
+            input.value = '';
+            setTimeout(() => input.focus(), 120);
+        }
+        this._openModal('newShelfModal');
+    }
+
+    _updateSummaries() {
+        const shelfSummary = document.getElementById('shelfListSummary');
+        const basketSummary = document.getElementById('basketSummary');
+        const totalNeeded = this._basketItems().reduce((s, i) => s + (Number(i.needed) || 0), 0);
+        if (shelfSummary) {
+            const n = this.shelves.length;
+            shelfSummary.textContent = n === 0
+                ? '0 raf'
+                : `${n} raf${totalNeeded > 0 ? ` · ${totalNeeded} eksik` : ''}`;
+        }
+        if (basketSummary) {
+            const count = this._basketItems().length;
+            basketSummary.textContent = count === 0
+                ? '0 eksik ürün'
+                : `${count} ürün · ${totalNeeded} adet`;
+        }
     }
 
     _renderShelvesView() {
@@ -220,24 +255,30 @@ class ShelfMissingApp {
         if (!this.shelves.length) {
             grid.innerHTML = '';
             empty?.classList.remove('hidden');
+            this._updateSummaries();
             return;
         }
         empty?.classList.add('hidden');
 
-        grid.innerHTML = this.shelves.map((s) => {
+        const cards = this.shelves.map((s) => {
             const needed = this._shelfNeededSum(s.id);
             const count = this._itemsForShelf(s.id).length;
-            const badge = needed > 0
-                ? `<span class="sm-shelf-badge">${needed}</span>`
-                : '';
+            const badge = needed > 0 ? `<span class="sm-shelf-badge">${needed}</span>` : '';
             return `
                 <button type="button" class="sm-shelf-card" data-shelf-id="${this._esc(s.id)}" aria-label="${this._esc(s.name)}">
-                    <div class="sm-shelf-icon">📦</div>
+                    <div class="sm-shelf-icon-wrap">📦</div>
                     <p class="sm-shelf-name">${this._esc(s.name)}</p>
                     <p class="sm-shelf-meta">${count} ürün${needed > 0 ? ' · ' + needed + ' eksik' : ''}</p>
                     ${badge}
                 </button>`;
         }).join('');
+
+        grid.innerHTML = cards + `
+            <button type="button" class="sm-add-shelf-card" id="gridAddShelfBtn" aria-label="Yeni raf ekle">
+                <div class="sm-add-shelf-plus">+</div>
+                <span class="sm-add-shelf-label">Yeni Raf</span>
+            </button>`;
+        this._updateSummaries();
     }
 
     _openShelfDetail(shelfId) {
@@ -256,6 +297,7 @@ class ShelfMissingApp {
         document.getElementById('shelfSearchResults')?.replaceChildren();
 
         this._renderShelfDetail();
+        this._updateChrome();
     }
 
     _hideShelfDetail() {
@@ -263,6 +305,7 @@ class ShelfMissingApp {
         document.getElementById('shelfListView')?.classList.remove('hidden');
         document.getElementById('shelfDetailView')?.classList.add('hidden');
         this._destroySortable();
+        this._updateChrome();
     }
 
     _renderShelfDetail() {
@@ -285,10 +328,14 @@ class ShelfMissingApp {
         const img = this._esc(item.product_image || '../assets/logo.png');
         const name = this._esc(item.product_name || 'Ürün');
         const neededClass = needed > 0 ? ' has-needed' : '';
+        const neededLabel = needed > 0
+            ? `<p class="sm-item-needed-label">${needed} eksik</p>`
+            : '<p class="sm-item-needed-label" style="color:rgb(100 116 139);font-weight:600">Stokta var</p>';
         return `
             <div class="sm-item-card${neededClass}" data-item-id="${this._esc(item.id)}" draggable="false">
                 <img src="${img}" alt="" class="sm-item-img" loading="lazy" />
                 <p class="sm-item-name">${name}</p>
+                ${neededLabel}
                 <div class="sm-stepper">
                     <button type="button" class="sm-stepper-btn" data-action="dec" data-item-id="${this._esc(item.id)}" aria-label="Azalt">−</button>
                     <span class="sm-stepper-val">${needed}</span>
@@ -306,6 +353,7 @@ class ShelfMissingApp {
         if (!basket.length) {
             container.innerHTML = '';
             empty?.classList.remove('hidden');
+            this._updateSummaries();
             return;
         }
         empty?.classList.add('hidden');
@@ -332,18 +380,30 @@ class ShelfMissingApp {
                             <p class="sm-basket-name">${name}</p>
                             ${barcode ? `<p class="sm-basket-barcode">${barcode}</p>` : ''}
                         </div>
-                        <span class="sm-basket-qty">×${needed}</span>
-                        <button type="button" class="sm-pick-btn" data-item-id="${this._esc(item.id)}">Aldım</button>
+                        <div class="sm-basket-actions">
+                            <span class="sm-basket-qty-pill">×${needed}</span>
+                            <div class="sm-stepper">
+                                <button type="button" class="sm-stepper-btn" data-action="dec" data-item-id="${this._esc(item.id)}" aria-label="Azalt">−</button>
+                                <span class="sm-stepper-val">${needed}</span>
+                                <button type="button" class="sm-stepper-btn" data-action="inc" data-item-id="${this._esc(item.id)}" aria-label="Artır">+</button>
+                            </div>
+                            <button type="button" class="sm-pick-btn" data-pick-id="${this._esc(item.id)}">✓ Aldım</button>
+                        </div>
                     </div>`;
             }).join('');
 
+            const sectionTotal = items.reduce((s, i) => s + (Number(i.needed) || 0), 0);
             html.push(`
                 <section class="sm-basket-section">
-                    <h3 class="sm-basket-section-title">${this._esc(shelfName)}</h3>
+                    <div class="sm-basket-section-head">
+                        <h3 class="sm-basket-section-title">${this._esc(shelfName)}</h3>
+                        <span class="sm-basket-section-count">${sectionTotal} adet</span>
+                    </div>
                     <div class="sm-basket-rows">${rows}</div>
                 </section>`);
         }
         container.innerHTML = html.join('');
+        this._updateSummaries();
     }
 
     _updateBasketBadge() {
@@ -522,9 +582,11 @@ class ShelfMissingApp {
         this._pickItemId = itemId;
         const max = Number(item.needed) || 0;
         const nameEl = document.getElementById('pickProductName');
+        const imgEl = document.getElementById('pickProductImg');
         const qtyEl = document.getElementById('pickQtyInput');
         const maxEl = document.getElementById('pickQtyMax');
         if (nameEl) nameEl.textContent = item.product_name || 'Ürün';
+        if (imgEl) imgEl.src = item.product_image || '../assets/logo.png';
         if (qtyEl) {
             qtyEl.value = String(max);
             qtyEl.max = String(max);
@@ -632,7 +694,7 @@ class ShelfMissingApp {
                 <button type="button" class="sm-search-hit" data-product-id="${id}" ${onShelf ? 'disabled' : ''}>
                     <img src="${this._esc(this._productImage(p))}" alt="" class="sm-search-img" loading="lazy" />
                     <span class="sm-search-name">${this._esc(this._productName(p))}</span>
-                    ${onShelf ? '<span class="sm-search-tag">Rafta</span>' : ''}
+                    ${onShelf ? '<span class="sm-search-tag">Rafta</span>' : '<span class="sm-search-add">+ Ekle</span>'}
                 </button>`;
         }).join('');
     }
@@ -664,8 +726,14 @@ class ShelfMissingApp {
             });
         });
 
-        document.getElementById('addShelfBtn')?.addEventListener('click', () => this._openModal('newShelfModal'));
-        document.getElementById('emptyAddShelfBtn')?.addEventListener('click', () => this._openModal('newShelfModal'));
+        document.getElementById('addShelfBtn')?.addEventListener('click', () => this._openNewShelfModal());
+        document.getElementById('listAddShelfBtn')?.addEventListener('click', () => this._openNewShelfModal());
+        document.getElementById('emptyAddShelfBtn')?.addEventListener('click', () => this._openNewShelfModal());
+        document.getElementById('basketGoShelvesBtn')?.addEventListener('click', () => this._switchTab('shelves'));
+
+        document.getElementById('newShelfNameInput')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('newShelfSave')?.click();
+        });
         document.getElementById('newShelfClose')?.addEventListener('click', () => this._closeModal('newShelfModal'));
         document.getElementById('newShelfCancel')?.addEventListener('click', () => this._closeModal('newShelfModal'));
         document.getElementById('newShelfSave')?.addEventListener('click', async () => {
@@ -678,6 +746,10 @@ class ShelfMissingApp {
         });
 
         document.getElementById('shelfGrid')?.addEventListener('click', (e) => {
+            if (e.target.closest('#gridAddShelfBtn')) {
+                this._openNewShelfModal();
+                return;
+            }
             const card = e.target.closest('[data-shelf-id]');
             if (card?.dataset.shelfId) this._openShelfDetail(card.dataset.shelfId);
         });
@@ -727,8 +799,14 @@ class ShelfMissingApp {
         });
 
         document.getElementById('basketGroups')?.addEventListener('click', (e) => {
-            const btn = e.target.closest('.sm-pick-btn');
-            if (btn?.dataset.itemId) this.openPickModal(btn.dataset.itemId);
+            const stepBtn = e.target.closest('[data-action]');
+            if (stepBtn?.dataset.itemId) {
+                if (stepBtn.dataset.action === 'inc') this.setNeeded(stepBtn.dataset.itemId, 1);
+                if (stepBtn.dataset.action === 'dec') this.setNeeded(stepBtn.dataset.itemId, -1);
+                return;
+            }
+            const pickBtn = e.target.closest('[data-pick-id]');
+            if (pickBtn?.dataset.pickId) this.openPickModal(pickBtn.dataset.pickId);
         });
 
         document.getElementById('pickModalClose')?.addEventListener('click', () => this._closeModal('pickModal'));
@@ -771,7 +849,12 @@ class ShelfMissingApp {
             el.className = 'sm-toast hidden';
             document.body.appendChild(el);
         }
-        const colors = { success: 'bg-emerald-600', error: 'bg-red-600', warning: 'bg-amber-600', info: 'bg-slate-700' };
+        const colors = {
+            success: 'sm-toast-success',
+            error: 'sm-toast-error',
+            warning: 'sm-toast-warning',
+            info: 'sm-toast-info'
+        };
         el.className = `sm-toast ${colors[type] || colors.info}`;
         el.textContent = msg;
         el.classList.remove('hidden');
