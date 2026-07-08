@@ -249,7 +249,7 @@ ON CONFLICT (id) DO UPDATE SET
 INSERT INTO updates (id, update_number, title, description, steps, feature_changes,
     scheduled_at, is_active, created_at, updated_at)
 SELECT id, update_number, title, NULLIF(description,''), steps,
-    COALESCE(NULLIF(feature_changes,''), '[]'::jsonb),
+    COALESCE(feature_changes, '[]'::jsonb),
     scheduled_at, is_active, created_at, updated_at
 FROM stg_import
 ON CONFLICT (update_number) DO UPDATE SET
