@@ -360,7 +360,8 @@ class NotificationSystem {
             'favorites': 'Favoriler',
             'stokSayimi': 'Stok Sayımı',
             'lowStockAlert': 'Düşük Stok Uyarısı',
-            'urunAjandasi': 'Ürün Ajandası'
+            'urunAjandasi': 'Ürün Ajandası',
+            'raftakiEksikler': 'Raftaki Eksikler'
         };
         return featureNames[featureName] || featureName;
     }
@@ -379,7 +380,8 @@ class NotificationSystem {
             'favorites': '⭐',
             'stokSayimi': '📊',
             'lowStockAlert': '🔔',
-            'urunAjandasi': '📒'
+            'urunAjandasi': '📒',
+            'raftakiEksikler': '📋'
         };
         return emojis[featureName] || '✨';
     }
@@ -398,7 +400,8 @@ class NotificationSystem {
             'favorites': 'Sık kullandığınız ürünleri favorilere ekleyip hızlı erişim sağlayabilirsiniz. Zaman kazandıran pratik bir özellik.',
             'stokSayimi': 'Getir franchise depolarında fiziksel stok sayımını dijitalleştirin. Depo stoklarınızı girin, sistem Getir API\'den otomatik olarak mevcut stok bilgisini çeker ve farkları gösterir. Mobil, tablet ve PC\'de çalışır, birden fazla sayım tablosu oluşturabilirsiniz.',
             'lowStockAlert': 'Stok hareketlerine göre eşiğin altına düşen ürünlerde sesli/görsel uyarı alırsınız. Liste Stoğu Düşük sayfasında güncel tutulur; Chrome eklentisi ile franchise sayfasında anlık bildirim alabilirsiniz.',
-            'urunAjandasi': 'Müşterinin eksik bildirdiği ürünleri ajandaya kaydedin. Eksik adet, sebep ve not ile takip edin; tamamlanan kayıtları silebilirsiniz.'
+            'urunAjandasi': 'Müşterinin eksik bildirdiği ürünleri ajandaya kaydedin. Eksik adet, sebep ve not ile takip edin; tamamlanan kayıtları silebilirsiniz.',
+            'raftakiEksikler': 'Depo raflarınızı oluşturun, eksik ürünleri işaretleyin ve sepetten toplama yapın. PC ve telefon arasında anlık senkron.'
         };
         return descriptions[featureName] || 'Bu özellik çalışma verimliliğinizi artırır.';
     }

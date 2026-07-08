@@ -1254,7 +1254,7 @@
             }
 
             .header-user-info,
-            #headerCountingPageBtn,
+            #headerPremiumNav,
             #settingsBtn,
             #logoutBtn,
             header .w-10 {
@@ -1338,19 +1338,66 @@
             }
 
             #settingsBtn,
-            #logoutBtn,
-            #headerCountingPageBtn {
+            #logoutBtn {
                 padding: 0.5rem 0.75rem !important;
                 font-size: 0.875rem !important;
             }
 
             #settingsBtn svg,
-            #logoutBtn svg,
-            #headerCountingPageBtn svg {
+            #logoutBtn svg {
                 width: 18px !important;
                 height: 18px !important;
             }
+
+            .premium-nav-chip {
+                padding: 0.35rem 0.625rem !important;
+                font-size: 0.6875rem !important;
+            }
         }
+
+        /* Premium nav chips */
+        .header-premium-nav {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            gap: 0.375rem;
+            max-width: min(100%, 30rem);
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding: 0.125rem 0;
+            margin-right: 0.25rem;
+        }
+        .header-premium-nav::-webkit-scrollbar { display: none; }
+
+        .premium-nav-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-shrink: 0;
+            padding: 0.4rem 0.8rem;
+            border-radius: 9999px;
+            border: 1px solid rgb(226 232 240);
+            background: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: rgb(51 65 85);
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s;
+            white-space: nowrap;
+        }
+        .premium-nav-chip:hover {
+            border-color: rgb(191 219 254);
+            background: rgb(239 246 255);
+            color: rgb(29 78 216);
+            box-shadow: 0 2px 8px rgb(37 99 235 / 0.12);
+        }
+        .premium-nav-chip svg {
+            width: 1rem;
+            height: 1rem;
+            flex-shrink: 0;
+        }
+        .premium-nav-chip.hidden { display: none !important; }
 
         @media (min-width: 901px) and (max-width: 1024px) {
             /* Tablet Orta */
@@ -1925,26 +1972,32 @@
                 
                 <!-- User Info -->
                 <div class="flex items-center space-x-4 header-user-info">
-                    <!-- Sayım Sayfası (sadece premium stokSayimi aktifse görünür) -->
-                    <button id="headerCountingPageBtn" class="btn-secondary text-sm mr-2 hidden" type="button" aria-label="Sayım Sayfası">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                        <span>Sayım Sayfası</span>
-                    </button>
-                    <!-- Stoğu Düşük Ürünler (sadece premium lowStockAlert aktifse görünür) -->
-                    <button id="headerLowStockPageBtn" class="btn-secondary text-sm mr-2 hidden" type="button" aria-label="Stoğu Düşük Ürünler">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                        </svg>
-                        <span>Stoğu Düşük</span>
-                    </button>
-                    <button id="headerAgendaPageBtn" class="btn-secondary text-sm mr-2 hidden" type="button" aria-label="Ürün Ajandası">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                        </svg>
-                        <span>Ürün Ajandası</span>
-                    </button>
+                    <nav id="headerPremiumNav" class="header-premium-nav hidden" aria-label="Premium sayfalar">
+                        <button id="headerCountingPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Sayım Sayfası">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <span>Sayım</span>
+                        </button>
+                        <button id="headerLowStockPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Stoğu Düşük Ürünler">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                            </svg>
+                            <span>Düşük Stok</span>
+                        </button>
+                        <button id="headerAgendaPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Ürün Ajandası">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                            </svg>
+                            <span>Ajanda</span>
+                        </button>
+                        <button id="headerShelfMissingPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Raftaki Eksikler">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                            </svg>
+                            <span>Raftaki Eksikler</span>
+                        </button>
+                    </nav>
                     <div id="trialCountdownContainer" class="flex items-center space-x-2 px-3 py-1.5 rounded-md bg-gray-100 border border-gray-200">
                         <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -2051,6 +2104,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
                 </svg>
                 <span>Ürün Ajandası</span>
+            </button>
+            <button id="mobileShelfMissingPageBtn" class="mobile-menu-item hidden" type="button" aria-label="Raftaki Eksikler">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                </svg>
+                <span>Raftaki Eksikler</span>
             </button>
 
             <button id="mobileSettingsBtn" class="mobile-menu-item">
@@ -2860,6 +2919,19 @@
                 window.location.replace('dispatch_agenda.html');
             });
         }
+        const headerShelfMissingPageBtn = document.getElementById('headerShelfMissingPageBtn');
+        if (headerShelfMissingPageBtn) {
+            headerShelfMissingPageBtn.addEventListener('click', () => {
+                window.location.replace('shelf_missing.html');
+            });
+        }
+        const mobileShelfMissingPageBtn = document.getElementById('mobileShelfMissingPageBtn');
+        if (mobileShelfMissingPageBtn) {
+            mobileShelfMissingPageBtn.addEventListener('click', () => {
+                closeMobileMenu();
+                window.location.replace('shelf_missing.html');
+            });
+        }
 
         // Sync user info to mobile menu
         function syncUserInfoToMobileMenu() {
@@ -3302,61 +3374,78 @@
             } catch (e) {}
         }
         
-        // Sayım Sayfası ve Stoğu Düşük butonlarını premium'e göre göster (header + mobil menü)
-        async function updateCountingPageButtonsVisibility() {
+        // Premium nav chip görünürlüğü (header + mobil menü)
+        async function updatePremiumNavVisibility() {
+            const navWrap = document.getElementById('headerPremiumNav');
             const headerBtn = document.getElementById('headerCountingPageBtn');
             const mobileBtn = document.getElementById('mobileCountingPageBtn');
             const headerLowStockBtn = document.getElementById('headerLowStockPageBtn');
             const mobileLowStockBtn = document.getElementById('mobileLowStockPageBtn');
             const headerAgendaBtn = document.getElementById('headerAgendaPageBtn');
             const mobileAgendaBtn = document.getElementById('mobileAgendaPageBtn');
-            if (!headerBtn && !mobileBtn && !headerLowStockBtn && !mobileLowStockBtn && !headerAgendaBtn && !mobileAgendaBtn) return;
+            const headerShelfBtn = document.getElementById('headerShelfMissingPageBtn');
+            const mobileShelfBtn = document.getElementById('mobileShelfMissingPageBtn');
+
+            const hideAll = () => {
+                if (navWrap) navWrap.classList.add('hidden');
+                [headerBtn, mobileBtn, headerLowStockBtn, mobileLowStockBtn, headerAgendaBtn, mobileAgendaBtn, headerShelfBtn, mobileShelfBtn].forEach((el) => {
+                    if (el) el.classList.add('hidden');
+                });
+            };
+
+            if (!headerBtn && !mobileBtn && !headerLowStockBtn && !mobileLowStockBtn && !headerAgendaBtn && !mobileAgendaBtn && !headerShelfBtn && !mobileShelfBtn) return;
+
             try {
                 if (!window.authUtils || !window.authUtils.checkAuth()) {
-                    if (headerBtn) headerBtn.classList.add('hidden');
-                    if (mobileBtn) mobileBtn.classList.add('hidden');
-                    if (headerLowStockBtn) headerLowStockBtn.classList.add('hidden');
-                    if (mobileLowStockBtn) mobileLowStockBtn.classList.add('hidden');
-                    if (headerAgendaBtn) headerAgendaBtn.classList.add('hidden');
-                    if (mobileAgendaBtn) mobileAgendaBtn.classList.add('hidden');
+                    hideAll();
                     return;
                 }
                 if (window.premiumFeatures) {
                     await window.premiumFeatures.init();
                 }
-                const hasStokSayimi = window.premiumFeatures && window.premiumFeatures.checkPremiumFeature('stokSayimi');
-                if (hasStokSayimi) {
-                    if (headerBtn) headerBtn.classList.remove('hidden');
-                    if (mobileBtn) mobileBtn.classList.remove('hidden');
+
+                let anyVisible = false;
+                const show = (header, mobile) => {
+                    if (header) { header.classList.remove('hidden'); anyVisible = true; }
+                    if (mobile) mobile.classList.remove('hidden');
+                };
+
+                if (window.premiumFeatures?.checkPremiumFeature('stokSayimi')) {
+                    show(headerBtn, mobileBtn);
                 } else {
                     if (headerBtn) headerBtn.classList.add('hidden');
                     if (mobileBtn) mobileBtn.classList.add('hidden');
                 }
-                const hasLowStockAlert = window.premiumFeatures && window.premiumFeatures.checkPremiumFeature('lowStockAlert');
-                if (hasLowStockAlert) {
-                    if (headerLowStockBtn) headerLowStockBtn.classList.remove('hidden');
-                    if (mobileLowStockBtn) mobileLowStockBtn.classList.remove('hidden');
+
+                if (window.premiumFeatures?.checkPremiumFeature('lowStockAlert')) {
+                    show(headerLowStockBtn, mobileLowStockBtn);
                 } else {
                     if (headerLowStockBtn) headerLowStockBtn.classList.add('hidden');
                     if (mobileLowStockBtn) mobileLowStockBtn.classList.add('hidden');
                 }
-                const hasUrunAjandasi = window.premiumFeatures && window.premiumFeatures.checkPremiumFeature('urunAjandasi');
-                if (hasUrunAjandasi) {
-                    if (headerAgendaBtn) headerAgendaBtn.classList.remove('hidden');
-                    if (mobileAgendaBtn) mobileAgendaBtn.classList.remove('hidden');
+
+                if (window.premiumFeatures?.checkPremiumFeature('urunAjandasi')) {
+                    show(headerAgendaBtn, mobileAgendaBtn);
                 } else {
                     if (headerAgendaBtn) headerAgendaBtn.classList.add('hidden');
                     if (mobileAgendaBtn) mobileAgendaBtn.classList.add('hidden');
                 }
+
+                if (window.premiumFeatures?.checkPremiumFeature('raftakiEksikler')) {
+                    show(headerShelfBtn, mobileShelfBtn);
+                } else {
+                    if (headerShelfBtn) headerShelfBtn.classList.add('hidden');
+                    if (mobileShelfBtn) mobileShelfBtn.classList.add('hidden');
+                }
+
+                if (navWrap) {
+                    navWrap.classList.toggle('hidden', !anyVisible);
+                }
             } catch (e) {
-                if (headerBtn) headerBtn.classList.add('hidden');
-                if (mobileBtn) mobileBtn.classList.add('hidden');
-                if (headerLowStockBtn) headerLowStockBtn.classList.add('hidden');
-                if (mobileLowStockBtn) mobileLowStockBtn.classList.add('hidden');
-                if (headerAgendaBtn) headerAgendaBtn.classList.add('hidden');
-                if (mobileAgendaBtn) mobileAgendaBtn.classList.add('hidden');
+                hideAll();
             }
         }
+        const updateCountingPageButtonsVisibility = updatePremiumNavVisibility;
 
         // Initialize premium features when ready
         async function initAutoPasteFeature() {
@@ -3395,7 +3484,7 @@
                         }
                     });
                 }
-                updateCountingPageButtonsVisibility();
+                updatePremiumNavVisibility();
             } else {
                 // Fallback: use local storage if premium features not loaded
                 if (autoPasteEnabledEl) {
@@ -3404,7 +3493,7 @@
                         setAutoPasteEnabled(autoPasteEnabledEl.checked);
                     });
                 }
-                updateCountingPageButtonsVisibility();
+                updatePremiumNavVisibility();
             }
         }
         
@@ -7987,6 +8076,12 @@
                 name: 'Ürün Ajandası',
                 description: 'Müşteri eksik bildirimlerini kaydet — gönderdiğin ama eksik görünen ürünleri takip et',
                 emoji: '📒',
+                storageKey: null
+            },
+            'raftakiEksikler': {
+                name: 'Raftaki Eksikler',
+                description: 'Depo raflarında eksik ürün takibi — sepet ve cihazlar arası senkron',
+                emoji: '📋',
                 storageKey: null
             },
             'getirStockBarcodesExtension': {
