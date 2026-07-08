@@ -496,6 +496,20 @@ class AdminPanel {
                     .insert([newUser]);
                 
                 if (error) throw error;
+
+                const { error: userDataError } = await window.supabase.from('user_data').insert({
+                    username,
+                    custom_products: [],
+                    settings: {
+                        showDuplicates: false,
+                        theme: 'light',
+                        searchHistory: [],
+                        showDefaultProducts: true,
+                    },
+                });
+                if (userDataError && !String(userDataError.message || '').includes('duplicate')) {
+                    throw userDataError;
+                }
             } else {
                 // Fallback: Save to localStorage for demo
                 const localUsers = JSON.parse(localStorage.getItem('LOCAL_USERS') || '{}');

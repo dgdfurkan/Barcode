@@ -18,6 +18,34 @@
         };
     }
 
+    function createVpsRestFetch(baseUrl) {
+        const root = (baseUrl || '').replace(/\/$/, '');
+        return function vpsRestFetch(input, init) {
+            const url =
+                typeof input === 'string'
+                    ? input
+                    : input && typeof input.url === 'string'
+                      ? input.url
+                      : '';
+            const isRestCall =
+                url.includes('/rest/v1/') ||
+                (root && url.startsWith(root) && url.includes('/rest/'));
+
+            if (!isRestCall) {
+                return fetch(input, init);
+            }
+
+            const nextInit = init ? { ...init } : {};
+            const headers = new Headers(
+                nextInit.headers ||
+                    (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined)
+            );
+            headers.delete('Authorization');
+            nextInit.headers = headers;
+            return fetch(input, nextInit);
+        };
+    }
+
     function initClient() {
         const createClient = window.supabase?.createClient;
         if (typeof createClient !== 'function') {
@@ -26,13 +54,19 @@
         }
 
         const cfg = getConfig();
-        let client = createClient(cfg.url, cfg.key, {
+        const clientOptions = {
             auth: {
                 autoRefreshToken: false,
                 persistSession: false,
                 detectSessionInUrl: false,
             },
-        });
+        };
+
+        if (cfg.mode === 'vps') {
+            clientOptions.global = { fetch: createVpsRestFetch(cfg.url) };
+        }
+
+        let client = createClient(cfg.url, cfg.key, clientOptions);
 
         if (cfg.mode === 'vps' && typeof window.wrapVpsSupabaseClient === 'function') {
             client = window.wrapVpsSupabaseClient(client, cfg.url);
