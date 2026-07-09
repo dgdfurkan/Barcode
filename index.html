@@ -8,7 +8,40 @@
     <meta name="apple-mobile-web-app-title" content="Jet Barkod">
     <meta name="theme-color" content="#1e293b">
     <link rel="manifest" href="manifest.json">
-    <title>Jet Barkod – Giriş</title>
+    <title>Jet Barkod | Ürün Arama, Stok Sayımı &amp; Depo Yönetimi</title>
+    <meta name="description" content="Jet Barkod — market ve depo ekipleri için hızlı barkod arama, stok sayımı, düşük stok takibi ve eksik ürün yönetimi. Tek panelden operasyonlarınızı yönetin.">
+    <meta name="keywords" content="Jet Barkod, barkod arama, ürün arama, stok sayımı, depo yönetimi, market yazılımı, Getir barkod">
+    <meta name="author" content="Jet Barkod">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://jetbarkod.com.tr/">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="tr_TR">
+    <meta property="og:site_name" content="Jet Barkod">
+    <meta property="og:title" content="Jet Barkod | Ürün Arama, Stok Sayımı &amp; Depo Yönetimi">
+    <meta property="og:description" content="Market ve depo ekipleri için hızlı barkod arama, stok sayımı ve eksik ürün takibi. Jet Barkod ile operasyonlarınızı tek yerden yönetin.">
+    <meta property="og:url" content="https://jetbarkod.com.tr/">
+    <meta property="og:image" content="https://jetbarkod.com.tr/assets/logo.png">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Jet Barkod | Ürün Arama &amp; Depo Yönetimi">
+    <meta name="twitter:description" content="Barkod arama, stok sayımı ve eksik ürün takibi — market ve depo ekipleri için Jet Barkod.">
+    <meta name="twitter:image" content="https://jetbarkod.com.tr/assets/logo.png">
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Jet Barkod",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "url": "https://jetbarkod.com.tr/",
+        "description": "Market ve depo ekipleri için barkod arama, stok sayımı, düşük stok takibi ve eksik ürün yönetimi platformu.",
+        "inLanguage": "tr",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "TRY"
+        }
+    }
+    </script>
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="assets/logo.png?v=2">
     <link rel="icon" type="image/png" sizes="16x16" href="assets/logo.png?v=2">
@@ -174,6 +207,14 @@
         .fade-in-up { animation: fadeInUp 0.5s ease-out; }
         .feature-icon { transition: transform 0.2s ease; }
         .feature-icon:hover { transform: scale(1.08); }
+        .landing-hero {
+            animation: fadeInUp 0.6s ease-out 0.1s both;
+        }
+        .landing-feature {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(8px);
+        }
     </style>
 </head>
 <body class="font-display min-h-screen flex items-center justify-center m-0 p-0 overflow-x-hidden">
@@ -197,19 +238,52 @@
             </div>
         </div>
 
+        <div class="w-full flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-14 xl:gap-20 mt-0 lg:mt-8">
+            <div class="lg:hidden text-center text-white mb-6 max-w-md mx-auto">
+                <h1 class="text-2xl font-bold tracking-tight">Jet Barkod</h1>
+                <p class="text-white/70 text-sm mt-2 leading-relaxed">Barkod arama, stok sayımı ve depo operasyonları tek platformda.</p>
+            </div>
+            <!-- Tanıtım — Google + masaüstü -->
+            <section class="landing-hero hidden lg:flex flex-col flex-1 max-w-lg text-white pr-4" aria-label="Jet Barkod tanıtım">
+                <p class="text-[#7eb6ff] text-xs font-bold uppercase tracking-[0.2em] mb-4">Depo &amp; Market Operasyonları</p>
+                <h2 class="text-4xl xl:text-5xl font-bold tracking-tight leading-[1.1] mb-5">
+                    Ürünlerinizi saniyeler içinde bulun.
+                </h2>
+                    Jet Barkod; barkod arama, stok sayımı, düşük stok uyarıları ve eksik ürün takibini tek panelde birleştirir. Ekipleriniz için hızlı, güvenli ve kullanımı kolay.
+                </p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="landing-feature rounded-xl px-4 py-3">
+                        <p class="text-sm font-semibold">Barkod Arama</p>
+                        <p class="text-white/55 text-xs mt-1">Anlık ürün sorgulama</p>
+                    </div>
+                    <div class="landing-feature rounded-xl px-4 py-3">
+                        <p class="text-sm font-semibold">Stok Sayımı</p>
+                        <p class="text-white/55 text-xs mt-1">Fiziksel sayım takibi</p>
+                    </div>
+                    <div class="landing-feature rounded-xl px-4 py-3">
+                        <p class="text-sm font-semibold">Düşük Stok</p>
+                        <p class="text-white/55 text-xs mt-1">Eşik bazlı uyarılar</p>
+                    </div>
+                    <div class="landing-feature rounded-xl px-4 py-3">
+                        <p class="text-sm font-semibold">Eksik &amp; Ajanda</p>
+                        <p class="text-white/55 text-xs mt-1">Raf ve gönderim takibi</p>
+                    </div>
+                </div>
+            </section>
+
         <!-- Login card -->
-        <div class="bg-white dark:bg-slate-900 w-full max-w-[440px] rounded-xl shadow-2xl overflow-hidden flex flex-col border border-slate-200/50 dark:border-slate-700">
+        <div class="bg-white dark:bg-slate-900 w-full max-w-[440px] rounded-xl shadow-2xl overflow-hidden flex flex-col border border-slate-200/50 dark:border-slate-700 shrink-0">
             <div class="pt-10 pb-6 px-8 text-center border-b border-slate-100 dark:border-slate-800">
                 <div class="flex justify-center mb-4">
-                    <img src="assets/logo.png" alt="Logo" class="w-16 h-16 object-contain">
+                    <img src="assets/logo.png" alt="Jet Barkod logosu" class="w-16 h-16 object-contain">
                 </div>
-                <h1 class="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Jet Barkod</h1>
+                <p class="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Jet Barkod</p>
                 <p class="text-slate-500 dark:text-slate-400 text-sm mt-1 font-medium">Ürün Barkod Arama Sistemi</p>
             </div>
             <div class="p-8">
                 <div class="mb-6">
-                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Hesabınıza Giriş Yapın</h2>
-                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Devam etmek için lütfen bilgilerinizi girin.</p>
+                    <h2 class="text-xl font-bold text-slate-800 dark:text-slate-100">Giriş Yap</h2>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm mt-1">Hesabınızla devam edin.</p>
                 </div>
 
                 <form id="loginForm" class="space-y-5">
@@ -298,6 +372,7 @@
                     <p class="text-slate-500 dark:text-slate-400 text-xs">Bir hesabınız yok mu? <button type="button" id="openSupportChatBize" class="text-[#135bec] font-bold hover:underline cursor-pointer">Bize Ulaşın</button></p>
                 </div>
             </div>
+        </div>
         </div>
 
         <div class="text-center mt-8">

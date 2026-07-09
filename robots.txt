@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://jetbarkod.com.tr/sitemap.xml

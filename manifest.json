@@ -1,6 +1,7 @@
 {
   "short_name": "Jet Barkod",
-  "name": "Jet Barkod",
+  "name": "Jet Barkod — Ürün Arama & Depo Yönetimi",
+  "description": "Barkod arama, stok sayımı ve eksik ürün takibi için market ve depo ekiplerine özel platform.",
   "icons": [
     {
       "src": "assets/logo.png",
