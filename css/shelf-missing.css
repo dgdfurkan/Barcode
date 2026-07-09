@@ -974,9 +974,9 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.5rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.35rem;
 }
-.sm-section-label--inline { margin-bottom: 0; flex: 1; min-width: 0; }
+.sm-section-toolbar--end { justify-content: flex-end; }
 .sm-panel-tools { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
 
 .sm-basket-rows.sm-basket-grid {

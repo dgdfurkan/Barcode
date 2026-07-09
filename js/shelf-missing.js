@@ -189,7 +189,7 @@ class ShelfMissingApp {
         }
         const btn = document.getElementById('shelfGridColsBtn');
         const icon = document.getElementById('shelfGridColsIcon');
-        if (btn) btn.title = `Görünüm: ${cols} sütun`;
+        if (btn) btn.title = `${cols} sütun`;
         if (icon) icon.innerHTML = this._gridIconSvg(cols);
     }
 
