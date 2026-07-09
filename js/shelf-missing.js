@@ -21,6 +21,7 @@ class ShelfMissingApp {
         this._pendingCoverImage = undefined;
         this._lastSearchQuery = '';
         this._pendingDeleteItemId = null;
+        this._pendingClearShelfId = undefined;
         this._modalOpenCount = 0;
         this._scrollLockY = 0;
     }
@@ -1294,6 +1295,32 @@ class ShelfMissingApp {
         this._openModal('clearBasketModal');
     }
 
+    _requestClearBasketConfirm(shelfId = null) {
+        const targets = shelfId
+            ? this.items.filter((i) => i.shelf_id === shelfId && (Number(i.needed) || 0) > 0)
+            : this._basketItems();
+        if (!targets.length) {
+            this._toast('Sepet zaten boş', 'warning');
+            return;
+        }
+
+        const productCount = targets.length;
+        const qty = targets.reduce((s, i) => s + (Number(i.needed) || 0), 0);
+        const shelfName = shelfId
+            ? (this.shelves.find((s) => s.id === shelfId)?.name || 'Raf')
+            : null;
+        const label = shelfName
+            ? `${shelfName} rafı sepetindeki ${productCount} ürün (${qty} adet) temizlenecek.`
+            : `Tüm sepetteki ${productCount} ürün (${qty} adet) temizlenecek.`;
+
+        this._pendingClearShelfId = shelfId;
+        const labelEl = document.getElementById('clearBasketConfirmLabel');
+        if (labelEl) labelEl.textContent = label;
+
+        this._closeModal('clearBasketModal');
+        this._openModal('clearBasketConfirmModal');
+    }
+
     async clearBasketNeeded(shelfId = null) {
         const targets = shelfId
             ? this.items.filter((i) => i.shelf_id === shelfId && (Number(i.needed) || 0) > 0)
@@ -1303,7 +1330,7 @@ class ShelfMissingApp {
         const prev = new Map(targets.map((i) => [i.id, Number(i.needed) || 0]));
         for (const item of targets) item.needed = 0;
 
-        this._closeModal('clearBasketModal');
+        this._closeModal('clearBasketConfirmModal');
         if (this._activeShelfId) this._renderShelfDetail();
         this._renderShelvesView();
         if (this._activeTab === 'basket') this._renderBasket();
@@ -1520,10 +1547,19 @@ class ShelfMissingApp {
         document.getElementById('basketClearBtn')?.addEventListener('click', () => this._openClearBasketModal());
         document.getElementById('clearBasketClose')?.addEventListener('click', () => this._closeModal('clearBasketModal'));
         document.getElementById('clearBasketCancel')?.addEventListener('click', () => this._closeModal('clearBasketModal'));
-        document.getElementById('clearBasketAllBtn')?.addEventListener('click', () => void this.clearBasketNeeded(null));
+        document.getElementById('clearBasketAllBtn')?.addEventListener('click', () => this._requestClearBasketConfirm(null));
         document.getElementById('clearBasketShelfList')?.addEventListener('click', (e) => {
             const btn = e.target.closest('[data-clear-shelf]');
-            if (btn?.dataset.clearShelf) void this.clearBasketNeeded(btn.dataset.clearShelf);
+            if (btn?.dataset.clearShelf) this._requestClearBasketConfirm(btn.dataset.clearShelf);
+        });
+        document.getElementById('clearBasketConfirmCancel')?.addEventListener('click', () => {
+            this._pendingClearShelfId = undefined;
+            this._closeModal('clearBasketConfirmModal');
+        });
+        document.getElementById('clearBasketConfirmBtn')?.addEventListener('click', () => {
+            const shelfId = this._pendingClearShelfId === undefined ? null : this._pendingClearShelfId;
+            this._pendingClearShelfId = undefined;
+            void this.clearBasketNeeded(shelfId);
         });
 
         document.getElementById('pickModalClose')?.addEventListener('click', () => this._closeModal('pickModal'));
