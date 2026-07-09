@@ -261,6 +261,110 @@ app.get('/api/broadcast/refresh/:username', (req, res) => {
     return res.json({ pending: true, payload: sig.payload });
 });
 
+const ADMIN_SETTINGS_ID = '00000000-0000-0000-0000-000000000001';
+const TELEGRAM_TIMEOUT_MS = 8000;
+const telegramRateMap = new Map();
+const TELEGRAM_RATE_WINDOW_MS = 60 * 1000;
+const TELEGRAM_RATE_MAX = 20;
+
+function checkTelegramRate(clientIP) {
+    const now = Date.now();
+    const entry = telegramRateMap.get(clientIP) || { count: 0, start: now };
+    if (now - entry.start > TELEGRAM_RATE_WINDOW_MS) {
+        entry.count = 0;
+        entry.start = now;
+    }
+    entry.count += 1;
+    telegramRateMap.set(clientIP, entry);
+    return entry.count <= TELEGRAM_RATE_MAX;
+}
+
+async function loadTelegramSettings() {
+    const result = await pool.query(
+        `SELECT telegram_bot_token, telegram_chat_id
+         FROM admin_settings
+         WHERE id = $1
+         LIMIT 1`,
+        [ADMIN_SETTINGS_ID]
+    );
+    return result.rows[0] || null;
+}
+
+async function dispatchTelegramMessage({ username, message, isTest = false }) {
+    const settings = await loadTelegramSettings();
+    if (!settings?.telegram_bot_token || !settings?.telegram_chat_id) {
+        return { skipped: true, reason: 'missing_settings' };
+    }
+
+    const text = isTest
+        ? 'Test başarılı!'
+        : `📩 Yeni Destek Mesajı!\nKimden: ${username}\nMesaj: ${message}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TELEGRAM_TIMEOUT_MS);
+
+    try {
+        const telegramResp = await fetch(
+            `https://api.telegram.org/bot${settings.telegram_bot_token}/sendMessage`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: settings.telegram_chat_id,
+                    text,
+                }),
+                signal: controller.signal,
+            }
+        );
+
+        clearTimeout(timeout);
+
+        if (!telegramResp.ok) {
+            const detail = await telegramResp.text().catch(() => 'unknown');
+            return { ok: false, error: 'telegram_error', detail };
+        }
+
+        return { ok: true };
+    } catch (error) {
+        clearTimeout(timeout);
+        return { ok: false, error: 'exception', detail: String(error) };
+    }
+}
+
+app.post('/api/telegram/notify', async (req, res) => {
+    const clientIP = String(req.headers['x-client-ip'] || req.headers['x-forwarded-for'] || req.ip || 'unknown')
+        .split(',')[0]
+        .trim()
+        .replace('::ffff:', '');
+
+    if (!checkTelegramRate(clientIP)) {
+        return res.status(429).json({ ok: false, error: 'rate_limited' });
+    }
+
+    const username = String(req.body?.username || 'Bilinmiyor').trim().slice(0, 120);
+    const message = String(req.body?.message || '').trim().slice(0, 2000);
+    const isTest = Boolean(req.body?.isTest);
+
+    if (!isTest && !message) {
+        return res.status(400).json({ ok: false, error: 'message_required' });
+    }
+
+    try {
+        const result = await dispatchTelegramMessage({ username, message, isTest });
+        if (result.skipped) {
+            return res.json(result);
+        }
+        if (!result.ok) {
+            console.error('telegram notify failed:', result);
+            return res.status(500).json(result);
+        }
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('telegram notify error:', err);
+        return res.status(500).json({ ok: false, error: 'server_error' });
+    }
+});
+
 app.post(
     '/storage/v1/object/*',
     express.raw({ type: '*/*', limit: '12mb' }),

@@ -2706,15 +2706,21 @@ AdminPanel.prototype.sendTelegramTestMessage = async function() {
             return;
         }
 
-        // Get anon key for authorization
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
-        
-        const response = await fetch('https://ytekbbxvfdheiexsojpx.functions.supabase.co/telegram-notify', {
+        const cfg = window.JETBARKOD_VPS_API || {};
+        const baseUrl = (cfg.baseUrl || '').replace(/\/$/, '');
+        const legacyUrl = 'https://ytekbbxvfdheiexsojpx.functions.supabase.co/telegram-notify';
+        const endpoint = cfg.enabled && baseUrl
+            ? `${baseUrl}/api/telegram/notify`
+            : legacyUrl;
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (!cfg.enabled || !baseUrl) {
+            headers.Authorization = `Bearer ${window.JETBARKOD_SUPABASE_LEGACY?.anonKey || ''}`;
+        }
+
+        const response = await fetch(endpoint, {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-            },
+            headers,
             body: JSON.stringify({
                 username: 'Admin',
                 message: 'Test başarılı!',
@@ -2725,6 +2731,11 @@ AdminPanel.prototype.sendTelegramTestMessage = async function() {
         if (!response.ok) {
             const detail = await response.text();
             throw new Error(detail || 'Telegram test mesajı gönderilemedi');
+        }
+
+        const data = await response.json().catch(() => ({}));
+        if (data.skipped) {
+            throw new Error('Telegram ayarları eksik. Token ve Chat ID kayıtlı mı kontrol edin.');
         }
 
         console.log('✅ Telegram test mesajı gönderildi');

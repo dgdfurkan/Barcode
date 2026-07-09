@@ -612,6 +612,39 @@ class ChatSystem {
         });
     }
 
+    async _notifyTelegram(username, message) {
+        try {
+            const cfg = window.JETBARKOD_VPS_API || {};
+            const baseUrl = (cfg.baseUrl || '').replace(/\/$/, '');
+            const legacyUrl = 'https://ytekbbxvfdheiexsojpx.functions.supabase.co/telegram-notify';
+            const endpoint = cfg.enabled && baseUrl
+                ? `${baseUrl}/api/telegram/notify`
+                : legacyUrl;
+
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, message }),
+            });
+
+            if (!response.ok) {
+                const detail = await response.text().catch(() => '');
+                console.warn('⚠️ Telegram bildirimi gönderilemedi:', detail || response.status);
+                return;
+            }
+
+            const data = await response.json().catch(() => ({}));
+            if (data.skipped) {
+                console.warn('⚠️ Telegram ayarları eksik, bildirim atlandı');
+                return;
+            }
+
+            console.log('📨 Telegram bildirimi gönderildi');
+        } catch (error) {
+            console.warn('⚠️ Telegram bildirimi hatası:', error);
+        }
+    }
+
     async saveMessageToSupabase(message) {
         try {
             if (window.supabase) {
@@ -665,9 +698,8 @@ class ChatSystem {
                     this.saveToLocalStorage(message);
                 } else {
                     console.log('✅ User message saved to chat successfully');
-                    
-                    // Update local messages array
                     this.messages = chatMessages;
+                    void this._notifyTelegram(this.currentUser, message);
                 }
             } else {
                 // Fallback to localStorage
@@ -760,6 +792,7 @@ class ChatSystem {
 
             console.log('✅ Guest message saved successfully');
             this.messages = chatMessages;
+            void this._notifyTelegram(this.currentUser, message);
             
             // Update last seen
             if (window.guestUserManager) {
