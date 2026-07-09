@@ -207,13 +207,191 @@
         .fade-in-up { animation: fadeInUp 0.5s ease-out; }
         .feature-icon { transition: transform 0.2s ease; }
         .feature-icon:hover { transform: scale(1.08); }
+
+        /* Landing hero — premium, sade, kibar animasyonlar */
         .landing-hero {
-            animation: fadeInUp 0.6s ease-out 0.1s both;
+            position: relative;
+            isolation: isolate;
+        }
+        .landing-glow {
+            position: absolute;
+            top: -12%;
+            left: -18%;
+            width: 22rem;
+            height: 22rem;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(19,91,236,0.22) 0%, rgba(19,91,236,0.06) 42%, transparent 72%);
+            filter: blur(2px);
+            pointer-events: none;
+            animation: landingGlow 9s ease-in-out infinite;
+        }
+        .landing-glow--secondary {
+            top: auto;
+            bottom: -8%;
+            left: auto;
+            right: -10%;
+            width: 16rem;
+            height: 16rem;
+            background: radial-gradient(circle, rgba(99,102,241,0.14) 0%, transparent 70%);
+            animation-delay: -4s;
+        }
+        @keyframes landingGlow {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.75; }
+            50% { transform: translate(10px, -8px) scale(1.06); opacity: 1; }
+        }
+        .landing-hero-inner { position: relative; z-index: 1; }
+        .landing-reveal {
+            opacity: 0;
+            transform: translateY(14px);
+            animation: landingReveal 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            animation-delay: calc(0.08s * var(--d, 0));
+        }
+        @keyframes landingReveal {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .landing-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.42rem 0.9rem 0.42rem 0.65rem;
+            border-radius: 9999px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(190, 215, 255, 0.95);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+        .landing-badge-dot {
+            width: 0.45rem;
+            height: 0.45rem;
+            border-radius: 50%;
+            background: #4ade80;
+            box-shadow: 0 0 0 rgba(74, 222, 128, 0.4);
+            animation: landingPulse 2.8s ease-in-out infinite;
+        }
+        @keyframes landingPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.35); }
+            50% { box-shadow: 0 0 0 6px rgba(74, 222, 128, 0); }
+        }
+        .landing-title {
+            margin: 1.35rem 0 0;
+            font-size: clamp(2.15rem, 3.2vw, 3.15rem);
+            font-weight: 700;
+            line-height: 1.08;
+            letter-spacing: -0.03em;
+            color: #fff;
+        }
+        .landing-title-accent {
+            background: linear-gradient(120deg, #93c5fd 0%, #60a5fa 45%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .landing-desc {
+            margin: 1.25rem 0 0;
+            max-width: 30rem;
+            font-size: 0.98rem;
+            line-height: 1.65;
+            color: rgba(226, 232, 240, 0.72);
+            font-weight: 400;
+        }
+        .landing-features {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 0.75rem;
+            margin-top: 2rem;
         }
         .landing-feature {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 0.95rem 1rem;
+            border-radius: 1rem;
+            background: linear-gradient(145deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%);
+            border: 1px solid rgba(255,255,255,0.09);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 28px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.05);
+            transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.35s ease, background 0.35s ease, box-shadow 0.35s ease;
+        }
+        .landing-feature:hover {
+            transform: translateY(-3px);
+            border-color: rgba(147, 197, 253, 0.28);
+            background: linear-gradient(145deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%);
+            box-shadow: 0 14px 34px rgba(19, 91, 236, 0.14), inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+        .landing-feature-icon {
+            flex-shrink: 0;
+            width: 2.25rem;
+            height: 2.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.7rem;
+            background: rgba(19, 91, 236, 0.16);
+            border: 1px solid rgba(147, 197, 253, 0.18);
+            color: #bfdbfe;
+            transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), background 0.35s ease;
+        }
+        .landing-feature:hover .landing-feature-icon {
+            transform: scale(1.05);
+            background: rgba(19, 91, 236, 0.24);
+        }
+        .landing-feature-title {
+            font-size: 0.84rem;
+            font-weight: 600;
+            color: rgba(248, 250, 252, 0.96);
+            letter-spacing: -0.01em;
+        }
+        .landing-feature-sub {
+            margin-top: 0.2rem;
+            font-size: 0.72rem;
+            line-height: 1.4;
+            color: rgba(203, 213, 225, 0.62);
+        }
+        .landing-foot {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.45rem 0.55rem;
+            margin-top: 2rem;
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: rgba(148, 163, 184, 0.72);
+        }
+        .landing-foot-sep { opacity: 0.45; }
+        .landing-mobile {
+            text-align: center;
+            color: #fff;
+            margin-bottom: 1.5rem;
+            max-width: 22rem;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .landing-mobile-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(190, 215, 255, 0.9);
             background: rgba(255,255,255,0.06);
             border: 1px solid rgba(255,255,255,0.1);
-            backdrop-filter: blur(8px);
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .landing-reveal { opacity: 1; transform: none; animation: none; }
+            .landing-glow, .landing-badge-dot { animation: none; }
+            .landing-feature { transition: none; }
+            .landing-feature:hover { transform: none; }
         }
     </style>
 </head>
@@ -239,35 +417,77 @@
         </div>
 
         <div class="w-full flex flex-col lg:flex-row lg:items-center lg:justify-center lg:gap-14 xl:gap-20 mt-0 lg:mt-8">
-            <div class="lg:hidden text-center text-white mb-6 max-w-md mx-auto">
-                <h1 class="text-2xl font-bold tracking-tight">Jet Barkod</h1>
-                <p class="text-white/70 text-sm mt-2 leading-relaxed">Barkod arama, stok sayımı ve depo operasyonları tek platformda.</p>
+            <div class="landing-mobile lg:hidden landing-reveal" style="--d:0">
+                <span class="landing-mobile-badge"><span class="landing-badge-dot"></span> Jet Barkod</span>
+                <h1 class="text-2xl font-bold tracking-tight mt-4">Operasyonlarınız tek yerde</h1>
+                <p class="text-white/65 text-sm mt-2 leading-relaxed">Barkod arama, stok sayımı ve depo takibi — hızlı, sade, güvenilir.</p>
             </div>
-            <!-- Tanıtım — Google + masaüstü -->
-            <section class="landing-hero hidden lg:flex flex-col flex-1 max-w-lg text-white pr-4" aria-label="Jet Barkod tanıtım">
-                <p class="text-[#7eb6ff] text-xs font-bold uppercase tracking-[0.2em] mb-4">Depo &amp; Market Operasyonları</p>
-                <h2 class="text-4xl xl:text-5xl font-bold tracking-tight leading-[1.1] mb-5">
-                    Ürünlerinizi saniyeler içinde bulun.
-                </h2>
-                    Jet Barkod; barkod arama, stok sayımı, düşük stok uyarıları ve eksik ürün takibini tek panelde birleştirir. Ekipleriniz için hızlı, güvenli ve kullanımı kolay.
-                </p>
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="landing-feature rounded-xl px-4 py-3">
-                        <p class="text-sm font-semibold">Barkod Arama</p>
-                        <p class="text-white/55 text-xs mt-1">Anlık ürün sorgulama</p>
+
+            <section class="landing-hero hidden lg:flex flex-col flex-1 max-w-[34rem] text-white pr-6 xl:pr-10" aria-label="Jet Barkod tanıtım">
+                <div class="landing-glow" aria-hidden="true"></div>
+                <div class="landing-glow landing-glow--secondary" aria-hidden="true"></div>
+
+                <div class="landing-hero-inner">
+                    <span class="landing-badge landing-reveal" style="--d:0">
+                        <span class="landing-badge-dot" aria-hidden="true"></span>
+                        Depo &amp; Market
+                    </span>
+
+                    <h1 class="landing-title landing-reveal" style="--d:1">
+                        Ürünlerinizi<br>
+                        <span class="landing-title-accent">saniyeler içinde</span> bulun.
+                    </h1>
+
+                    <p class="landing-desc landing-reveal" style="--d:2">
+                        Jet Barkod; barkod arama, stok sayımı, düşük stok uyarıları ve eksik ürün takibini tek panelde birleştirir. Ekipleriniz için hızlı, güvenli ve sade.
+                    </p>
+
+                    <div class="landing-features">
+                        <article class="landing-feature landing-reveal" style="--d:3">
+                            <div class="landing-feature-icon" aria-hidden="true">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"/></svg>
+                            </div>
+                            <div>
+                                <p class="landing-feature-title">Barkod Arama</p>
+                                <p class="landing-feature-sub">Anlık ürün sorgulama</p>
+                            </div>
+                        </article>
+                        <article class="landing-feature landing-reveal" style="--d:4">
+                            <div class="landing-feature-icon" aria-hidden="true">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                            </div>
+                            <div>
+                                <p class="landing-feature-title">Stok Sayımı</p>
+                                <p class="landing-feature-sub">Fiziksel sayım takibi</p>
+                            </div>
+                        </article>
+                        <article class="landing-feature landing-reveal" style="--d:5">
+                            <div class="landing-feature-icon" aria-hidden="true">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                            </div>
+                            <div>
+                                <p class="landing-feature-title">Düşük Stok</p>
+                                <p class="landing-feature-sub">Eşik bazlı uyarılar</p>
+                            </div>
+                        </article>
+                        <article class="landing-feature landing-reveal" style="--d:6">
+                            <div class="landing-feature-icon" aria-hidden="true">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 7V3m8 4V3M5 11h14M5 19h14a2 2 0 002-2V7H3v10a2 2 0 002 2z"/></svg>
+                            </div>
+                            <div>
+                                <p class="landing-feature-title">Eksik &amp; Ajanda</p>
+                                <p class="landing-feature-sub">Raf ve gönderim takibi</p>
+                            </div>
+                        </article>
                     </div>
-                    <div class="landing-feature rounded-xl px-4 py-3">
-                        <p class="text-sm font-semibold">Stok Sayımı</p>
-                        <p class="text-white/55 text-xs mt-1">Fiziksel sayım takibi</p>
-                    </div>
-                    <div class="landing-feature rounded-xl px-4 py-3">
-                        <p class="text-sm font-semibold">Düşük Stok</p>
-                        <p class="text-white/55 text-xs mt-1">Eşik bazlı uyarılar</p>
-                    </div>
-                    <div class="landing-feature rounded-xl px-4 py-3">
-                        <p class="text-sm font-semibold">Eksik &amp; Ajanda</p>
-                        <p class="text-white/55 text-xs mt-1">Raf ve gönderim takibi</p>
-                    </div>
+
+                    <p class="landing-foot landing-reveal" style="--d:7">
+                        <span>Güvenli giriş</span>
+                        <span class="landing-foot-sep" aria-hidden="true">·</span>
+                        <span>Premium modüller</span>
+                        <span class="landing-foot-sep" aria-hidden="true">·</span>
+                        <span>Canlı destek</span>
+                    </p>
                 </div>
             </section>
 
