@@ -581,6 +581,9 @@ class ShelfMissingApp {
                         <span class="sm-stepper-val">${needed}</span>
                         <button type="button" class="sm-stepper-btn" data-action="inc" data-item-id="${this._esc(item.id)}" aria-label="Artır">+</button>
                     </div>
+                    <button type="button" class="sm-item-drag-handle" aria-label="Sıralamak için sürükle" title="Sürükle">
+                        <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+                    </button>
                 </div>
             </div>`;
     }
@@ -1090,7 +1093,13 @@ class ShelfMissingApp {
         this._sortable = Sortable.create(grid, {
             animation: 150,
             draggable: '.sm-item-card',
+            handle: '.sm-item-drag-handle',
             ghostClass: 'sm-sort-ghost',
+            chosenClass: 'sm-sort-chosen',
+            delay: 120,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5,
+            forceFallback: false,
             onEnd: () => {
                 const ids = [...grid.querySelectorAll('.sm-item-card')].map((el) => el.dataset.itemId);
                 void this.reorderItems(this._activeShelfId, ids);
