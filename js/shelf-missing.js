@@ -21,6 +21,8 @@ class ShelfMissingApp {
         this._pendingCoverImage = undefined;
         this._lastSearchQuery = '';
         this._pendingDeleteItemId = null;
+        this._modalOpenCount = 0;
+        this._scrollLockY = 0;
     }
 
     async init() {
@@ -594,13 +596,16 @@ class ShelfMissingApp {
         if (!container) return;
 
         const basket = this._basketItems();
+        const clearBtn = document.getElementById('basketClearBtn');
         if (!basket.length) {
             container.innerHTML = '';
             empty?.classList.remove('hidden');
+            if (clearBtn) clearBtn.classList.add('hidden');
             this._updateSummaries();
             return;
         }
         empty?.classList.add('hidden');
+        if (clearBtn) clearBtn.classList.remove('hidden');
 
         const layout = this._getBasketLayout();
         const viewMode = layout === 'list' ? 'list' : 'grid';
@@ -1260,20 +1265,118 @@ class ShelfMissingApp {
         this._openModal('editShelfModal');
     }
 
+    _openClearBasketModal() {
+        const basket = this._basketItems();
+        if (!basket.length) {
+            this._toast('Sepet zaten boş', 'warning');
+            return;
+        }
+        const byShelf = new Map();
+        for (const item of basket) {
+            if (!byShelf.has(item.shelf_id)) byShelf.set(item.shelf_id, []);
+            byShelf.get(item.shelf_id).push(item);
+        }
+        const list = document.getElementById('clearBasketShelfList');
+        if (list) {
+            const rows = [];
+            for (const [shelfId, items] of byShelf) {
+                const shelf = this.shelves.find((s) => s.id === shelfId);
+                const name = shelf?.name || 'Raf';
+                const qty = items.reduce((s, i) => s + (Number(i.needed) || 0), 0);
+                rows.push(`
+                    <button type="button" class="sm-clear-shelf-opt" data-clear-shelf="${this._esc(shelfId)}">
+                        ${this._esc(name)}
+                        <span>${items.length} ürün · ${qty} adet</span>
+                    </button>`);
+            }
+            list.innerHTML = rows.join('');
+        }
+        this._openModal('clearBasketModal');
+    }
+
+    async clearBasketNeeded(shelfId = null) {
+        const targets = shelfId
+            ? this.items.filter((i) => i.shelf_id === shelfId && (Number(i.needed) || 0) > 0)
+            : this._basketItems();
+        if (!targets.length) return;
+
+        const prev = new Map(targets.map((i) => [i.id, Number(i.needed) || 0]));
+        for (const item of targets) item.needed = 0;
+
+        this._closeModal('clearBasketModal');
+        if (this._activeShelfId) this._renderShelfDetail();
+        this._renderShelvesView();
+        if (this._activeTab === 'basket') this._renderBasket();
+        this._updateBasketBadge();
+        this._patchShelfBadges();
+
+        if (!window.supabase) return;
+
+        try {
+            await Promise.all(targets.map((item) =>
+                window.supabase
+                    .from('shelf_missing_items')
+                    .update({ needed: 0 })
+                    .eq('id', item.id)
+                    .eq('username', this._username)
+            ));
+            const label = shelfId
+                ? (this.shelves.find((s) => s.id === shelfId)?.name || 'Raf')
+                : 'Sepet';
+            this._toast(shelfId ? `${label} sepeti temizlendi` : 'Sepet temizlendi', 'success');
+        } catch (e) {
+            console.error('Sepet temizlenemedi:', e);
+            for (const item of targets) {
+                const p = prev.get(item.id);
+                if (p !== undefined) item.needed = p;
+            }
+            if (this._activeShelfId) this._renderShelfDetail();
+            this._renderShelvesView();
+            if (this._activeTab === 'basket') this._renderBasket();
+            this._updateBasketBadge();
+            this._patchShelfBadges();
+            this._toast('Sepet temizlenemedi', 'error');
+        }
+    }
+
+    _lockBodyScroll() {
+        this._modalOpenCount += 1;
+        if (this._modalOpenCount !== 1) return;
+        this._scrollLockY = window.scrollY || document.documentElement.scrollTop || 0;
+        document.body.classList.add('sm-modal-locked');
+        document.body.style.top = `-${this._scrollLockY}px`;
+    }
+
+    _unlockBodyScroll() {
+        this._modalOpenCount = Math.max(0, this._modalOpenCount - 1);
+        if (this._modalOpenCount !== 0) return;
+        document.body.classList.remove('sm-modal-locked');
+        document.body.style.top = '';
+        window.scrollTo(0, this._scrollLockY || 0);
+    }
+
+    _syncScrollLock() {
+        const openCount = document.querySelectorAll('.sm-modal-backdrop.sm-modal-open').length;
+        if (openCount === 0 && this._modalOpenCount > 0) {
+            this._modalOpenCount = 1;
+            this._unlockBodyScroll();
+        }
+    }
+
     _openModal(id) {
         const el = document.getElementById(id);
-        if (el) {
-            el.classList.add('sm-modal-open');
-            el.setAttribute('aria-hidden', 'false');
-        }
+        if (!el || el.classList.contains('sm-modal-open')) return;
+        el.classList.add('sm-modal-open');
+        el.setAttribute('aria-hidden', 'false');
+        this._lockBodyScroll();
     }
 
     _closeModal(id) {
         const el = document.getElementById(id);
-        if (el) {
-            el.classList.remove('sm-modal-open');
-            el.setAttribute('aria-hidden', 'true');
-        }
+        if (!el || !el.classList.contains('sm-modal-open')) return;
+        el.classList.remove('sm-modal-open');
+        el.setAttribute('aria-hidden', 'true');
+        this._unlockBodyScroll();
     }
 
     _bindEvents() {
@@ -1414,6 +1517,15 @@ class ShelfMissingApp {
             if (pickBtn?.dataset.pickId) this.openPickModal(pickBtn.dataset.pickId);
         });
 
+        document.getElementById('basketClearBtn')?.addEventListener('click', () => this._openClearBasketModal());
+        document.getElementById('clearBasketClose')?.addEventListener('click', () => this._closeModal('clearBasketModal'));
+        document.getElementById('clearBasketCancel')?.addEventListener('click', () => this._closeModal('clearBasketModal'));
+        document.getElementById('clearBasketAllBtn')?.addEventListener('click', () => void this.clearBasketNeeded(null));
+        document.getElementById('clearBasketShelfList')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-clear-shelf]');
+            if (btn?.dataset.clearShelf) void this.clearBasketNeeded(btn.dataset.clearShelf);
+        });
+
         document.getElementById('pickModalClose')?.addEventListener('click', () => this._closeModal('pickModal'));
         document.getElementById('pickModalCancel')?.addEventListener('click', () => this._closeModal('pickModal'));
         document.getElementById('pickFullBtn')?.addEventListener('click', () => {
@@ -1432,7 +1544,7 @@ class ShelfMissingApp {
 
         document.querySelectorAll('.sm-modal-backdrop').forEach((backdrop) => {
             backdrop.addEventListener('click', (e) => {
-                if (e.target === backdrop) backdrop.classList.remove('sm-modal-open');
+                if (e.target === backdrop && backdrop.id) this._closeModal(backdrop.id);
             });
         });
     }

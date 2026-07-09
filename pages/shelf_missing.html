@@ -154,6 +154,9 @@
                             <p class="sm-panel-sub" id="basketSummary">0 eksik ürün</p>
                         </div>
                         <div class="sm-panel-tools">
+                            <button type="button" id="basketClearBtn" class="sm-icon-btn sm-icon-btn--ghost hidden" aria-label="Sepeti temizle" title="Sepeti temizle">
+                                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
                             <button type="button" id="basketLayoutBtn" class="sm-icon-btn sm-icon-btn--ghost" aria-label="Liste görünümü" title="Liste görünümü">
                                 <span id="basketLayoutIcon"></span>
                             </button>
@@ -283,6 +286,27 @@
                     <h4 class="sm-preview-barcodes-title">Barkodlar</h4>
                     <div id="productPreviewBarcodes" class="sm-preview-barcodes"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sepet Temizle -->
+    <div id="clearBasketModal" class="sm-modal-backdrop" aria-hidden="true">
+        <div class="sm-modal-panel" role="dialog">
+            <div class="sm-modal-head">
+                <h3 class="sm-modal-title">Sepeti Temizle</h3>
+                <button type="button" id="clearBasketClose" class="sm-modal-x" aria-label="Kapat">✕</button>
+            </div>
+            <p class="sm-modal-desc">Sadece eksik adetler sıfırlanır — raflardaki ürünler kalır.</p>
+            <div id="clearBasketShelfList" class="sm-clear-shelf-list mb-3"></div>
+            <div class="sm-modal-actions">
+                <button type="button" id="clearBasketCancel" class="sm-icon-btn sm-icon-btn--lg" aria-label="İptal" title="İptal">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+                <button type="button" id="clearBasketAllBtn" class="sm-icon-btn sm-icon-btn--danger sm-icon-btn--lg flex-1" title="Tüm sepeti temizle">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    <span>Tümü</span>
+                </button>
             </div>
         </div>
     </div>

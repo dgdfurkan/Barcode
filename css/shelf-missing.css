@@ -808,6 +808,37 @@
 }
 .sm-desktop-tabs { display: none; }
 
+body.sm-modal-locked {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+    left: 0;
+    right: 0;
+}
+
+.sm-clear-shelf-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+.sm-clear-shelf-opt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border-radius: 0.625rem;
+    border: 1px solid rgb(226 232 240);
+    background: white;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: rgb(51 65 85);
+    cursor: pointer;
+    text-align: left;
+}
+.sm-clear-shelf-opt:hover { background: rgb(248 250 252); border-color: rgb(203 213 225); }
+.sm-clear-shelf-opt span { color: rgb(148 163 184); font-size: 0.75rem; font-weight: 500; }
+
 .sm-modal-backdrop {
     position: fixed;
     inset: 0;
