@@ -1054,11 +1054,6 @@
     align-self: center;
 }
 
-.sm-stepper--mini {
-    margin-top: 0;
-    padding: 0.1rem;
-}
-
 .sm-preview-body {
     text-align: center;
     padding-bottom: 0.25rem;
