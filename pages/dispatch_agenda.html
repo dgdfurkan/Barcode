@@ -31,8 +31,38 @@
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(9.75rem, 1fr));
             gap: 0.875rem;
-            padding: 0.25rem 0.25rem 0.75rem;
+            padding: 0.25rem 0.25rem 0;
             align-items: start;
+        }
+
+        .agenda-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1.35rem;
+            padding-bottom: 0.75rem;
+        }
+
+        .agenda-date-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+        }
+
+        .agenda-date-head {
+            margin: 0;
+            padding: 0 0.25rem;
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: rgb(51 65 85);
+            letter-spacing: -0.01em;
+        }
+
+        .agenda-date-head::after {
+            content: '';
+            display: block;
+            height: 1px;
+            margin-top: 0.4rem;
+            background: rgb(226 232 240);
         }
 
         .agenda-card {
@@ -444,7 +474,7 @@
                             İlk Kaydı Ekle
                         </button>
                     </div>
-                    <div id="agendaCardStrip" class="agenda-strip" role="list"></div>
+                    <div id="agendaCardStrip" class="agenda-list" role="list"></div>
                 </div>
             </section>
         </div>

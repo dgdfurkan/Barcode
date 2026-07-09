@@ -206,18 +206,67 @@ class DispatchAgendaApp {
             return;
         }
         emptyEl?.classList.add('hidden');
-        if (listEl) {
-            listEl.innerHTML = this.items.map((item) => this._renderCard(item)).join('');
+        if (listEl) this._renderAgendaList(listEl);
+    }
+
+    _dateKey(item) {
+        const raw = item?.event_date || item?.created_at;
+        if (!raw) return '0000-00-00';
+        const s = String(raw);
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+        const d = new Date(raw);
+        if (Number.isNaN(d.getTime())) return s.split('T')[0] || '0000-00-00';
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    _groupItemsByDate() {
+        const sorted = [...this.items].sort((a, b) => {
+            const ka = this._dateKey(a);
+            const kb = this._dateKey(b);
+            if (ka !== kb) return kb.localeCompare(ka);
+            const ca = new Date(a.created_at || 0).getTime();
+            const cb = new Date(b.created_at || 0).getTime();
+            return cb - ca;
+        });
+
+        const groups = new Map();
+        const order = [];
+        for (const item of sorted) {
+            const key = this._dateKey(item);
+            if (!groups.has(key)) {
+                groups.set(key, []);
+                order.push(key);
+            }
+            groups.get(key).push(item);
         }
+
+        return order.map((key) => ({
+            key,
+            label: this._formatDate(`${key}T12:00:00`),
+            items: groups.get(key),
+        }));
+    }
+
+    _renderAgendaList(listEl) {
+        const groups = this._groupItemsByDate();
+        listEl.innerHTML = groups.map((group) => `
+            <section class="agenda-date-section" data-date-key="${this._esc(group.key)}">
+                <h3 class="agenda-date-head">${this._esc(group.label)}</h3>
+                <div class="agenda-strip" role="list">
+                    ${group.items.map((item) => this._renderCard(item)).join('')}
+                </div>
+            </section>`).join('');
     }
 
     _renderCard(item) {
         const img = this._esc(item.product_image || '../assets/logo.png');
         const name = this._esc(item.product_name || 'Ürün');
         const qty = Number(item.quantity) || 1;
-        const dateStr = this._formatDate(item.event_date || item.created_at);
         const pickup = item.pickup_required
             ? '<span class="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-semibold text-blue-800">Alınacak</span>'
+            : '';
+        const meta = pickup
+            ? `<div class="flex flex-wrap items-center gap-1 mt-1.5">${pickup}</div>`
             : '';
         return `
             <button type="button" class="agenda-card" data-item-id="${this._esc(item.id)}" aria-label="${name}">
@@ -226,10 +275,7 @@ class DispatchAgendaApp {
                     <span class="agenda-qty-badge">−${qty}</span>
                 </div>
                 <p class="agenda-card-title">${name}</p>
-                <div class="flex flex-wrap items-center gap-1 mt-1.5">
-                    <span class="text-[10px] text-text-secondary">${this._esc(dateStr)}</span>
-                    ${pickup}
-                </div>
+                ${meta}
             </button>`;
     }
 
