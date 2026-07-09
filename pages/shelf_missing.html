@@ -15,6 +15,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <script src="../js/supabase-config.js"></script>
     <script src="../js/vps-supabase-shim.js"></script>
     <script src="../js/supabase-bootstrap.js"></script>
@@ -275,9 +276,14 @@
                 <button type="button" id="productPreviewClose" class="sm-modal-x" aria-label="Kapat">✕</button>
             </div>
             <div class="sm-preview-body">
-                <img id="productPreviewImg" src="../assets/logo.png" alt="" class="sm-preview-img" />
+                <div class="sm-preview-img-wrap">
+                    <img id="productPreviewImg" src="../assets/logo.png" alt="" class="sm-preview-img" />
+                </div>
                 <p id="productPreviewName" class="sm-preview-name"></p>
-                <div id="productPreviewBarcodes" class="sm-preview-barcodes"></div>
+                <div class="sm-preview-barcodes-box">
+                    <h4 class="sm-preview-barcodes-title">Barkodlar</h4>
+                    <div id="productPreviewBarcodes" class="sm-preview-barcodes"></div>
+                </div>
             </div>
         </div>
     </div>

@@ -1160,6 +1160,56 @@ class ShelfMissingApp {
         }).join('');
     }
 
+    _renderPreviewBarcodeRow(code, index) {
+        const esc = this._esc(code);
+        return `
+            <div class="sm-preview-barcode-row">
+                <div class="sm-preview-barcode-strip">
+                    <svg class="sm-preview-barcode-svg" data-barcode-index="${index}" role="img" aria-label="Barkod ${esc}"></svg>
+                </div>
+                <div class="sm-preview-barcode-foot">
+                    <span class="sm-preview-barcode-code">${esc}</span>
+                    <button type="button" class="sm-preview-barcode-copy" data-copy-barcode="${esc}" aria-label="Barkodu kopyala" title="Kopyala">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    _drawPreviewBarcodes(codes) {
+        if (typeof JsBarcode === 'undefined') return;
+        const box = document.getElementById('productPreviewBarcodes');
+        if (!box) return;
+        box.querySelectorAll('.sm-preview-barcode-svg').forEach((svg, i) => {
+            const code = codes[i];
+            if (!code) return;
+            const digits = String(code).replace(/\D/g, '');
+            try {
+                if (digits.length === 12 || digits.length === 13) {
+                    JsBarcode(svg, digits.length === 12 ? `0${digits}` : digits, {
+                        format: 'EAN13',
+                        lineColor: '#0f172a',
+                        width: 1.5,
+                        height: 44,
+                        displayValue: false,
+                        margin: 2
+                    });
+                } else {
+                    JsBarcode(svg, String(code), {
+                        format: 'CODE128',
+                        lineColor: '#0f172a',
+                        width: 1.4,
+                        height: 44,
+                        displayValue: false,
+                        margin: 2
+                    });
+                }
+            } catch (e) {
+                console.warn('Barkod çizilemedi:', code, e);
+            }
+        });
+    }
+
     _openProductPreview(itemId) {
         const item = this.items.find((i) => i.id === itemId);
         if (!item) return;
@@ -1168,13 +1218,14 @@ class ShelfMissingApp {
         const barcodesEl = document.getElementById('productPreviewBarcodes');
         if (imgEl) imgEl.src = item.product_image || '../assets/logo.png';
         if (nameEl) nameEl.textContent = item.product_name || 'Ürün';
+        const codes = this._allBarcodes(item);
         if (barcodesEl) {
-            const codes = this._allBarcodes(item);
             barcodesEl.innerHTML = codes.length
-                ? codes.map((c) => `<div class="sm-preview-barcode">${this._esc(c)}</div>`).join('')
-                : '<p class="text-sm text-slate-500">Barkod kaydı yok</p>';
+                ? codes.map((c, i) => this._renderPreviewBarcodeRow(c, i)).join('')
+                : '<p class="sm-preview-empty">Kayıtlı barkod yok</p>';
         }
         this._openModal('productPreviewModal');
+        requestAnimationFrame(() => this._drawPreviewBarcodes(codes));
     }
 
     _renderCoverPicker(shelfId) {
@@ -1303,6 +1354,17 @@ class ShelfMissingApp {
         });
 
         document.getElementById('productPreviewClose')?.addEventListener('click', () => this._closeModal('productPreviewModal'));
+        document.getElementById('productPreviewBarcodes')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-copy-barcode]');
+            if (!btn?.dataset.copyBarcode) return;
+            const code = btn.dataset.copyBarcode;
+            const done = () => this._toast('Barkod kopyalandı', 'success');
+            if (navigator.clipboard?.writeText) {
+                navigator.clipboard.writeText(code).then(done).catch(() => this._toast('Kopyalanamadı', 'error'));
+            } else {
+                this._toast('Kopyalanamadı', 'error');
+            }
+        });
 
         const searchInput = document.getElementById('shelfProductSearch');
         searchInput?.addEventListener('input', () => {
