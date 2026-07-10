@@ -227,8 +227,6 @@ class CountingSystem {
             }
             this.currentUser = session;
 
-            this.showCountingStatus('Sayım açılıyor…', 'Ürün kataloğu hazırlanıyor', { lock: false });
-
             const hadLocalCache = this._hydrateFromLocalStorageOnly();
 
             this.setupEventListeners();
@@ -246,13 +244,10 @@ class CountingSystem {
             this.currentTab = 'sayim';
 
             if (hadLocalCache) {
-                this.updateCountingStatus('Tablolar hazır', 'Sunucu ile eşitleniyor');
                 this.renderTable();
                 this.updateStatistics();
                 this.updateTableSelector();
                 this.updateViewMode();
-            } else {
-                this.showCountingStatus('Tablolar yükleniyor…', 'Sayım verisi alınıyor', { lock: false });
             }
 
             await Promise.all([this.loadProducts(), this.loadCountingData()]);
@@ -263,7 +258,6 @@ class CountingSystem {
             this.updateTableSelector();
             this.scheduleScrollActiveGeneralTableChip();
             this.syncDeleteTableButtonsVisibility();
-            this.hideCountingStatus();
             
             // Setup scroll listener for toast positioning
             this.setupToastScrollListener();
@@ -813,7 +807,6 @@ class CountingSystem {
             let countingItemsAvailable = false;
 
             if (window.supabase && this.currentUser) {
-                this.updateCountingStatus('Sunucuya bağlanılıyor…', 'Tablo listesi ve ürünler alınıyor');
                 const resolvedForFetch =
                     this.currentTableName ||
                     metaBlob?._currentTable ||
@@ -1103,7 +1096,7 @@ class CountingSystem {
         this._fullBackupTimer = setTimeout(() => {
             this._fullBackupTimer = null;
             this._writeFullBlobToSupabase().catch(() => {});
-        }, 1500);
+        }, 1200);
     }
 
     async _writeFullBlobToSupabase() {
@@ -1995,6 +1988,7 @@ class CountingSystem {
             detailEl.style.display = detail ? 'block' : 'none';
         }
         if (dock) {
+            dock.classList.toggle('is-lock', lock);
             dock.classList.remove('hidden');
             requestAnimationFrame(() => dock.classList.add('is-visible'));
         }
@@ -2010,10 +2004,10 @@ class CountingSystem {
         if (this._statusDepth > 0) return;
         const dock = document.getElementById('countingStatusDock');
         if (dock) {
-            dock.classList.remove('is-visible');
+            dock.classList.remove('is-visible', 'is-lock');
             setTimeout(() => {
                 if ((this._statusDepth || 0) === 0) dock.classList.add('hidden');
-            }, 260);
+            }, 240);
         }
         document.documentElement.classList.remove('counting-status-lock');
     }
