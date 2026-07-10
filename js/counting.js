@@ -221,19 +221,16 @@ class CountingSystem {
 
     async init() {
         try {
-            // Get current user
             const session = window.authUtils?.checkAuth();
             if (!session) {
                 throw new Error('User not authenticated');
             }
             this.currentUser = session;
-            
-            // Load all products
-            await this.loadProducts();
+
+            this.showCountingStatus('Sayım açılıyor…', 'Ürün kataloğu hazırlanıyor', { lock: false });
 
             const hadLocalCache = this._hydrateFromLocalStorageOnly();
-            
-            // Setup event listeners (önce — yerel önbellek varsa anında çizim)
+
             this.setupEventListeners();
             this.bindCountingTableSearch();
             this.bindSayimSubTabControls();
@@ -247,27 +244,26 @@ class CountingSystem {
 
             this.currentViewMode = 'rapid';
             this.currentTab = 'sayim';
+
             if (hadLocalCache) {
+                this.updateCountingStatus('Tablolar hazır', 'Sunucu ile eşitleniyor');
                 this.renderTable();
                 this.updateStatistics();
                 this.updateTableSelector();
                 this.updateViewMode();
+            } else {
+                this.showCountingStatus('Tablolar yükleniyor…', 'Sayım verisi alınıyor', { lock: false });
             }
 
-            // Uzak veriyi arka planda birleştir (aktif tablo odaklı)
-            await this.loadCountingData();
-            
+            await Promise.all([this.loadProducts(), this.loadCountingData()]);
+
             this.renderTable();
             this.updateViewMode();
-            
-            // Update statistics
             this.updateStatistics();
-            
-            // Update table selector
             this.updateTableSelector();
             this.scheduleScrollActiveGeneralTableChip();
-            
             this.syncDeleteTableButtonsVisibility();
+            this.hideCountingStatus();
             
             // Setup scroll listener for toast positioning
             this.setupToastScrollListener();
@@ -813,14 +809,38 @@ class CountingSystem {
                 /* ignore */
             }
 
+            let itemRows = null;
+            let countingItemsAvailable = false;
+
             if (window.supabase && this.currentUser) {
-                const { data, error } = await window.supabase
-                    .from('users')
-                    .select('counting_data')
-                    .eq('username', this.currentUser.username)
-                    .maybeSingle();
-                if (!error && data?.counting_data) {
-                    metaBlob = this.migrateToNestedStructure(data.counting_data);
+                this.updateCountingStatus('Sunucuya bağlanılıyor…', 'Tablo listesi ve ürünler alınıyor');
+                const resolvedForFetch =
+                    this.currentTableName ||
+                    metaBlob?._currentTable ||
+                    this._loadDeviceCurrentTable() ||
+                    'Ana Sayım';
+
+                const [userRes, itemsRes] = await Promise.all([
+                    window.supabase
+                        .from('users')
+                        .select('counting_data')
+                        .eq('username', this.currentUser.username)
+                        .maybeSingle(),
+                    this._queryCountingItems(this._getCountingItemsSelectColumns(true), (q) =>
+                        q.eq('username', this.currentUser.username).eq('table_name', resolvedForFetch)
+                    ),
+                ]);
+
+                if (!userRes.error && userRes.data?.counting_data) {
+                    metaBlob = this.migrateToNestedStructure(userRes.data.counting_data);
+                }
+
+                if (!itemsRes.error) {
+                    itemRows = itemsRes.data || [];
+                    countingItemsAvailable = true;
+                    this._countingItemsTableReady = true;
+                } else {
+                    this._countingItemsTableReady = false;
                 }
             }
 
@@ -834,29 +854,6 @@ class CountingSystem {
             const metaKeys = Object.keys(metaBlob?._tableMeta || {}).filter((n) => !this._isTableTombstoned(n));
             if (metaKeys.length && !metaKeys.includes(resolvedTable)) {
                 resolvedTable = metaKeys[0];
-            }
-
-            let itemRows = null;
-            let countingItemsAvailable = false;
-            if (window.supabase && this.currentUser) {
-                try {
-                    const { data: rows, error: rowErr } = await this._queryCountingItems(
-                        this._getCountingItemsSelectColumns(true),
-                        (q) =>
-                            q
-                                .eq('username', this.currentUser.username)
-                                .eq('table_name', resolvedTable)
-                    );
-                    if (!rowErr) {
-                        itemRows = rows || [];
-                        countingItemsAvailable = true;
-                        this._countingItemsTableReady = true;
-                    } else {
-                        this._countingItemsTableReady = false;
-                    }
-                } catch (e) {
-                    this._countingItemsTableReady = false;
-                }
             }
 
             const tables = {};
@@ -1959,7 +1956,7 @@ class CountingSystem {
 
     _beginBulkImportLock(message = 'Ürünler işleniyor…') {
         this._importInProgress = true;
-        this.showCountingBusy(message);
+        this.showCountingStatus(message, 'Lütfen bekleyin', { lock: true });
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
             this._saveDebounceTimer = null;
@@ -1969,35 +1966,56 @@ class CountingSystem {
     _endBulkImportLock() {
         this._importInProgress = false;
         this._suppressCatchUpUntil = Date.now() + 3000;
-        this.hideCountingBusy();
+        this.hideCountingStatus();
     }
 
-    showCountingBusy(message = 'İşleniyor…', detail = '') {
-        this._busyDepth = (this._busyDepth || 0) + 1;
-        const overlay = document.getElementById('countingBusyOverlay');
-        const msgEl = document.getElementById('countingBusyMsg');
-        const detailEl = document.getElementById('countingBusyDetail');
+    showCountingBusy(message = 'İşleniyor…', detail = '', options = {}) {
+        const lock = options.lock === true;
+        this.showCountingStatus(message, detail, { lock });
+    }
+
+    hideCountingBusy() {
+        this.hideCountingStatus();
+    }
+
+    showCountingStatus(message = 'Yükleniyor…', detail = '', options = {}) {
+        const lock = options.lock === true;
+        const bump = options.bump !== false;
+        if (bump) {
+            if (!this._statusDepth) this._statusDepth = 0;
+            this._statusDepth += 1;
+        }
+
+        const dock = document.getElementById('countingStatusDock');
+        const msgEl = document.getElementById('countingStatusMsg');
+        const detailEl = document.getElementById('countingStatusDetail');
         if (msgEl) msgEl.textContent = message;
         if (detailEl) {
             detailEl.textContent = detail || '';
             detailEl.style.display = detail ? 'block' : 'none';
         }
-        if (overlay) {
-            overlay.classList.remove('hidden');
-            requestAnimationFrame(() => overlay.classList.add('is-visible'));
+        if (dock) {
+            dock.classList.remove('hidden');
+            requestAnimationFrame(() => dock.classList.add('is-visible'));
         }
-        document.documentElement.classList.add('counting-busy-active');
+        document.documentElement.classList.toggle('counting-status-lock', lock);
     }
 
-    hideCountingBusy() {
-        this._busyDepth = Math.max(0, (this._busyDepth || 1) - 1);
-        if (this._busyDepth > 0) return;
-        const overlay = document.getElementById('countingBusyOverlay');
-        if (overlay) {
-            overlay.classList.remove('is-visible');
-            if ((this._busyDepth || 0) === 0) overlay.classList.add('hidden');
+    updateCountingStatus(message, detail = '') {
+        this.showCountingStatus(message, detail, { lock: false, bump: false });
+    }
+
+    hideCountingStatus() {
+        this._statusDepth = Math.max(0, (this._statusDepth || 1) - 1);
+        if (this._statusDepth > 0) return;
+        const dock = document.getElementById('countingStatusDock');
+        if (dock) {
+            dock.classList.remove('is-visible');
+            setTimeout(() => {
+                if ((this._statusDepth || 0) === 0) dock.classList.add('hidden');
+            }, 260);
         }
-        document.documentElement.classList.remove('counting-busy-active');
+        document.documentElement.classList.remove('counting-status-lock');
     }
 
     _isTableTombstoned(tableName) {
@@ -4347,7 +4365,7 @@ class CountingSystem {
         }
 
         const useBusy = options.skipRender !== true && !this._importInProgress;
-        if (useBusy) this.showCountingBusy('Tablo oluşturuluyor…');
+        if (useBusy) this.showCountingStatus('Tablo oluşturuluyor…', 'Kısa sürecek', { lock: true });
 
         try {
         const trimmed = tableName.trim();
@@ -4408,7 +4426,7 @@ class CountingSystem {
         this.updateTableSelector();
         this.syncSayimSubTabToTable();
         } finally {
-            if (useBusy) this.hideCountingBusy();
+            if (useBusy) this.hideCountingStatus();
         }
     }
     async deleteTable(tableName) {
