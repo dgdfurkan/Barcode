@@ -21,6 +21,8 @@ class ShelfMissingApp {
         this._toastUndoTimer = null;
         this._toastUndoFn = null;
         this._reorderSaving = false;
+        this._NEEDED_DEBOUNCE_MS = 160;
+        this._TOAST_UNDO_MS = 3000;
         this._pendingCoverImage = undefined;
         this._lastSearchQuery = '';
         this._pendingDeleteItemId = null;
@@ -969,12 +971,7 @@ class ShelfMissingApp {
         const sel = `[data-item-id="${CSS.escape(String(itemId))}"]`;
         document.querySelectorAll(sel).forEach((el) => {
             if (el.classList.contains('sm-item-card')) {
-                const hadNeeded = el.classList.contains('has-needed');
                 el.classList.toggle('has-needed', needed > 0);
-                if (hadNeeded !== (needed > 0)) {
-                    el.classList.add('sm-needed-flash');
-                    setTimeout(() => el.classList.remove('sm-needed-flash'), 420);
-                }
                 const label = el.querySelector('.sm-item-needed-label');
                 if (label) {
                     label.classList.toggle('is-ok', needed === 0);
@@ -982,11 +979,104 @@ class ShelfMissingApp {
                 }
             }
             const val = el.querySelector('.sm-stepper-val');
-            if (val) val.textContent = String(needed);
+            if (val) {
+                val.textContent = String(needed);
+                val.classList.remove('is-bump');
+                void val.offsetWidth;
+                val.classList.add('is-bump');
+                setTimeout(() => val.classList.remove('is-bump'), 180);
+            }
             const qty = el.querySelector('.sm-basket-qty');
             if (qty) qty.textContent = `×${needed}`;
         });
         this._patchShelfBadges();
+    }
+
+    _syncNeededUI(itemId, { basketFadeOut = false } = {}) {
+        this._patchItemNeeded(itemId);
+        this._updateBasketBadge();
+        this._updateSummaries();
+
+        if (!basketFadeOut || this._activeTab !== 'basket') return;
+
+        const row = document.querySelector(
+            `.sm-basket-row[data-item-id="${CSS.escape(String(itemId))}"], .sm-basket-card[data-item-id="${CSS.escape(String(itemId))}"]`
+        );
+        if (!row) return;
+
+        row.classList.add('sm-basket-done');
+        const cleanup = () => {
+            row.remove();
+            const basket = this._basketItems();
+            const empty = document.getElementById('basketEmpty');
+            const groups = document.getElementById('basketGroups');
+            if (!basket.length) {
+                if (groups) groups.innerHTML = '';
+                empty?.classList.remove('hidden');
+                document.getElementById('basketClearBtn')?.classList.add('hidden');
+            }
+        };
+        row.addEventListener('animationend', cleanup, { once: true });
+        setTimeout(() => {
+            if (row.isConnected) cleanup();
+        }, 360);
+    }
+
+    _neededPickMessage(prev, next) {
+        const picked = prev - next;
+        if (next === 0) return 'Tamamlandı';
+        return `${picked} adet alındı`;
+    }
+
+    async _undoNeeded(itemId, restoreValue, failedValue) {
+        const item = this.items.find((i) => i.id === itemId);
+        if (!item) return;
+
+        item.needed = restoreValue;
+        this._syncNeededUI(itemId);
+        if (this._activeTab === 'basket' && restoreValue > 0) this._renderBasket();
+
+        try {
+            const { error } = await window.supabase
+                .from('shelf_missing_items')
+                .update({ needed: restoreValue })
+                .eq('id', itemId)
+                .eq('username', this._username);
+            if (error) throw error;
+            this._toast('Geri alındı', 'info');
+        } catch (e) {
+            console.error('Geri alınamadı:', e);
+            item.needed = failedValue;
+            this._syncNeededUI(itemId, { basketFadeOut: failedValue === 0 });
+            if (this._activeTab === 'basket') this._renderBasket();
+            this._toast('Geri alınamadı', 'error');
+        }
+    }
+
+    async _persistNeededPick(itemId, prev, next) {
+        const item = this.items.find((i) => i.id === itemId);
+        if (!item || !window.supabase) return;
+
+        clearTimeout(this._neededTimers.get(itemId));
+        this._neededPending.delete(itemId);
+
+        const msg = this._neededPickMessage(prev, next);
+
+        try {
+            const { error } = await window.supabase
+                .from('shelf_missing_items')
+                .update({ needed: next })
+                .eq('id', itemId)
+                .eq('username', this._username);
+            if (error) throw error;
+
+            this._toastWithUndo(msg, () => this._undoNeeded(itemId, prev, next));
+        } catch (e) {
+            item.needed = prev;
+            this._syncNeededUI(itemId);
+            if (this._activeTab === 'basket' && prev > 0) this._renderBasket();
+            this._toast('Kaydedilemedi', 'error');
+        }
     }
 
     setNeeded(itemId, delta) {
@@ -998,14 +1088,21 @@ class ShelfMissingApp {
         if (next === prev) return;
 
         item.needed = next;
-        this._patchItemNeeded(itemId);
-        this._updateBasketBadge();
-        this._updateSummaries();
-        if (this._activeTab === 'basket') this._renderBasket();
+        this._syncNeededUI(itemId, { basketFadeOut: next === 0 });
+
+        if (delta < 0) {
+            clearTimeout(this._neededTimers.get(itemId));
+            this._neededPending.delete(itemId);
+            void this._persistNeededPick(itemId, prev, next);
+            return;
+        }
 
         this._neededPending.set(itemId, next);
         clearTimeout(this._neededTimers.get(itemId));
-        this._neededTimers.set(itemId, setTimeout(() => this._flushNeeded(itemId, prev), 300));
+        this._neededTimers.set(
+            itemId,
+            setTimeout(() => this._flushNeeded(itemId, prev), this._NEEDED_DEBOUNCE_MS)
+        );
     }
 
     async _flushNeeded(itemId, rollbackValue) {
@@ -1023,10 +1120,8 @@ class ShelfMissingApp {
         } catch (e) {
             const item = this.items.find((i) => i.id === itemId);
             if (item) item.needed = rollbackValue;
-            this._patchItemNeeded(itemId);
-            if (this._activeTab === 'basket') this._renderBasket();
-            this._updateBasketBadge();
-            this._updateSummaries();
+            this._syncNeededUI(itemId, { basketFadeOut: rollbackValue === 0 });
+            if (this._activeTab === 'basket' && rollbackValue > 0) this._renderBasket();
             this._toast('Kaydedilemedi', 'error');
         }
     }
@@ -1056,75 +1151,17 @@ class ShelfMissingApp {
         const item = this.items.find((i) => i.id === itemId);
         if (!item) return;
 
-        const max = Number(item.needed) || 0;
+        const prev = Number(item.needed) || 0;
         let n = parseInt(qty, 10);
-        if (!Number.isFinite(n) || n < 1) n = max;
-        if (n > max) n = max;
+        if (!Number.isFinite(n) || n < 1) n = prev;
+        if (n > prev) n = prev;
 
-        const prev = max;
         const next = Math.max(0, prev - n);
-        const picked = prev - next;
-
         this._closeModal('pickModal');
 
-        if (this._activeTab === 'basket') {
-            const row = document.querySelector(
-                `.sm-basket-row[data-item-id="${CSS.escape(String(itemId))}"], .sm-basket-card[data-item-id="${CSS.escape(String(itemId))}"]`
-            );
-            if (row) {
-                row.classList.add('sm-basket-done');
-                await new Promise((r) => setTimeout(r, 300));
-            }
-        }
-
         item.needed = next;
-        if (this._activeShelfId) this._renderShelfDetail();
-        if (this._activeTab === 'basket') this._renderBasket();
-        this._renderShelvesView();
-        this._updateBasketBadge();
-
-        const msg = next === 0 ? 'Tamamlandı' : `${picked} adet alındı`;
-
-        try {
-            const { error } = await window.supabase
-                .from('shelf_missing_items')
-                .update({ needed: next })
-                .eq('id', itemId)
-                .eq('username', this._username);
-            if (error) throw error;
-
-            this._toastWithUndo(msg, async () => {
-                item.needed = prev;
-                if (this._activeShelfId) this._renderShelfDetail();
-                if (this._activeTab === 'basket') this._renderBasket();
-                this._renderShelvesView();
-                this._updateBasketBadge();
-                try {
-                    const { error: undoErr } = await window.supabase
-                        .from('shelf_missing_items')
-                        .update({ needed: prev })
-                        .eq('id', itemId)
-                        .eq('username', this._username);
-                    if (undoErr) throw undoErr;
-                    this._toast('Geri alındı', 'info');
-                } catch (undoE) {
-                    console.error('Geri alınamadı:', undoE);
-                    item.needed = next;
-                    if (this._activeShelfId) this._renderShelfDetail();
-                    if (this._activeTab === 'basket') this._renderBasket();
-                    this._renderShelvesView();
-                    this._updateBasketBadge();
-                    this._toast('Geri alınamadı', 'error');
-                }
-            });
-        } catch (e) {
-            item.needed = prev;
-            if (this._activeShelfId) this._renderShelfDetail();
-            if (this._activeTab === 'basket') this._renderBasket();
-            this._renderShelvesView();
-            this._updateBasketBadge();
-            this._toast('Kaydedilemedi', 'error');
-        }
+        this._syncNeededUI(itemId, { basketFadeOut: next === 0 });
+        void this._persistNeededPick(itemId, prev, next);
     }
 
     async reorderItems(shelfId, orderedIds) {
@@ -1674,7 +1711,7 @@ class ShelfMissingApp {
     _dismissToast() {
         const el = document.getElementById('smToast');
         if (!el) return;
-        el.classList.remove('sm-toast--show', 'sm-toast--action');
+        el.classList.remove('sm-toast--show', 'sm-toast--action', 'sm-toast--snack');
         clearTimeout(this._toastTimer);
         clearTimeout(this._toastUndoTimer);
         this._toastUndoFn = null;
@@ -1700,25 +1737,30 @@ class ShelfMissingApp {
     }
 
     _toastWithUndo(msg, onUndo) {
+        this._dismissToast();
         const el = this._getToastEl();
-        el.className = 'sm-toast sm-toast-success sm-toast--action';
+        const ms = this._TOAST_UNDO_MS;
+        el.className = 'sm-toast sm-toast--snack';
         el.innerHTML = `
-            <span class="sm-toast-text">${this._esc(msg)}</span>
-            <button type="button" class="sm-toast-undo-btn">Geri al</button>`;
+            <div class="sm-toast-snack-body">
+                <span class="sm-toast-check" aria-hidden="true">✓</span>
+                <span class="sm-toast-text">${this._esc(msg)}</span>
+                <button type="button" class="sm-toast-undo-link">Geri al</button>
+            </div>
+            <div class="sm-toast-progress" aria-hidden="true"><span style="animation-duration:${ms}ms"></span></div>`;
         el.classList.remove('hidden');
         requestAnimationFrame(() => el.classList.add('sm-toast--show'));
 
         clearTimeout(this._toastTimer);
-        clearTimeout(this._toastUndoTimer);
         this._toastUndoFn = onUndo;
 
-        el.querySelector('.sm-toast-undo-btn')?.addEventListener('click', () => {
+        el.querySelector('.sm-toast-undo-link')?.addEventListener('click', () => {
             const fn = this._toastUndoFn;
             this._dismissToast();
             if (fn) void fn();
         }, { once: true });
 
-        this._toastTimer = setTimeout(() => this._dismissToast(), 3000);
+        this._toastTimer = setTimeout(() => this._dismissToast(), ms);
     }
 }
 
