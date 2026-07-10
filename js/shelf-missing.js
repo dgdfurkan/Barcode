@@ -18,6 +18,9 @@ class ShelfMissingApp {
         this._sortable = null;
         this._pickItemId = null;
         this._toastTimer = null;
+        this._toastUndoTimer = null;
+        this._toastUndoFn = null;
+        this._reorderSaving = false;
         this._pendingCoverImage = undefined;
         this._lastSearchQuery = '';
         this._pendingDeleteItemId = null;
@@ -92,6 +95,7 @@ class ShelfMissingApp {
     }
 
     async _refreshFromServer() {
+        if (this._reorderSaving) return;
         await this._waitForDb(5000);
         await this.loadShelves();
         await this.loadItems();
@@ -404,6 +408,7 @@ class ShelfMissingApp {
                 .from('shelf_missing_items')
                 .select('*')
                 .eq('username', this._username)
+                .order('shelf_id', { ascending: true })
                 .order('sort_order', { ascending: true });
             if (error) throw error;
             this.items = Array.isArray(data) ? data : [];
@@ -425,11 +430,23 @@ class ShelfMissingApp {
     }
 
     _itemsForShelf(shelfId) {
-        return this.items.filter((i) => i.shelf_id === shelfId);
+        return this.items
+            .filter((i) => i.shelf_id === shelfId)
+            .sort((a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0));
     }
 
     _basketItems() {
-        return this.items.filter((i) => (Number(i.needed) || 0) > 0);
+        const shelfOrder = new Map(
+            this.shelves.map((s, idx) => [s.id, Number(s.sort_order) || idx])
+        );
+        return this.items
+            .filter((i) => (Number(i.needed) || 0) > 0)
+            .sort((a, b) => {
+                const sa = shelfOrder.get(a.shelf_id) ?? 0;
+                const sb = shelfOrder.get(b.shelf_id) ?? 0;
+                if (sa !== sb) return sa - sb;
+                return (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+            });
     }
 
     _switchTab(tab) {
@@ -498,12 +515,12 @@ class ShelfMissingApp {
         }
         empty?.classList.add('hidden');
 
-        const cards = this.shelves.map((s) => {
+        const cards = this.shelves.map((s, idx) => {
             const needed = this._shelfNeededSum(s.id);
             const count = this._itemsForShelf(s.id).length;
             const badge = needed > 0 ? `<span class="sm-shelf-badge">${needed}</span>` : '';
             return `
-                <button type="button" class="sm-shelf-card" data-shelf-id="${this._esc(s.id)}" aria-label="${this._esc(s.name)}">
+                <button type="button" class="sm-shelf-card sm-animate-in" data-shelf-id="${this._esc(s.id)}" aria-label="${this._esc(s.name)}" style="--sm-i:${idx}">
                     ${this._shelfCoverHtml(s)}
                     <p class="sm-shelf-name">${this._esc(s.name)}</p>
                     <p class="sm-shelf-meta">${count} ürün${needed > 0 ? ' · ' + needed + ' eksik' : ''}</p>
@@ -558,11 +575,11 @@ class ShelfMissingApp {
             return;
         }
 
-        grid.innerHTML = items.map((item) => this._renderItemCard(item)).join('');
+        grid.innerHTML = items.map((item, idx) => this._renderItemCard(item, idx)).join('');
         this._initSortable(grid);
     }
 
-    _renderItemCard(item) {
+    _renderItemCard(item, animIndex = 0) {
         const needed = Number(item.needed) || 0;
         const img = this._esc(item.product_image || '../assets/logo.png');
         const name = this._esc(item.product_name || 'Ürün');
@@ -571,7 +588,7 @@ class ShelfMissingApp {
             ? `<p class="sm-item-needed-label">${needed} eksik</p>`
             : '<p class="sm-item-needed-label is-ok">Stokta var</p>';
         return `
-            <div class="sm-item-card${neededClass}" data-item-id="${this._esc(item.id)}" draggable="false">
+            <div class="sm-item-card sm-animate-in${neededClass}" data-item-id="${this._esc(item.id)}" draggable="false" style="--sm-i:${animIndex}">
                 <button type="button" class="sm-item-delete" data-delete-item="${this._esc(item.id)}" aria-label="Raftan kaldır" title="Kaldır">
                     <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
@@ -1048,13 +1065,27 @@ class ShelfMissingApp {
 
         const prev = max;
         const next = Math.max(0, prev - n);
-        item.needed = next;
+        const picked = prev - next;
 
         this._closeModal('pickModal');
+
+        if (this._activeTab === 'basket') {
+            const row = document.querySelector(
+                `.sm-basket-row[data-item-id="${CSS.escape(String(itemId))}"], .sm-basket-card[data-item-id="${CSS.escape(String(itemId))}"]`
+            );
+            if (row) {
+                row.classList.add('sm-basket-done');
+                await new Promise((r) => setTimeout(r, 300));
+            }
+        }
+
+        item.needed = next;
         if (this._activeShelfId) this._renderShelfDetail();
         if (this._activeTab === 'basket') this._renderBasket();
         this._renderShelvesView();
         this._updateBasketBadge();
+
+        const msg = next === 0 ? 'Tamamlandı' : `${picked} adet alındı`;
 
         try {
             const { error } = await window.supabase
@@ -1063,7 +1094,31 @@ class ShelfMissingApp {
                 .eq('id', itemId)
                 .eq('username', this._username);
             if (error) throw error;
-            this._toast(n >= prev ? 'Tamamlandı' : `${n} adet alındı`, 'success');
+
+            this._toastWithUndo(msg, async () => {
+                item.needed = prev;
+                if (this._activeShelfId) this._renderShelfDetail();
+                if (this._activeTab === 'basket') this._renderBasket();
+                this._renderShelvesView();
+                this._updateBasketBadge();
+                try {
+                    const { error: undoErr } = await window.supabase
+                        .from('shelf_missing_items')
+                        .update({ needed: prev })
+                        .eq('id', itemId)
+                        .eq('username', this._username);
+                    if (undoErr) throw undoErr;
+                    this._toast('Geri alındı', 'info');
+                } catch (undoE) {
+                    console.error('Geri alınamadı:', undoE);
+                    item.needed = next;
+                    if (this._activeShelfId) this._renderShelfDetail();
+                    if (this._activeTab === 'basket') this._renderBasket();
+                    this._renderShelvesView();
+                    this._updateBasketBadge();
+                    this._toast('Geri alınamadı', 'error');
+                }
+            });
         } catch (e) {
             item.needed = prev;
             if (this._activeShelfId) this._renderShelfDetail();
@@ -1075,21 +1130,31 @@ class ShelfMissingApp {
     }
 
     async reorderItems(shelfId, orderedIds) {
-        if (!window.supabase) return;
-        const updates = orderedIds.map((id, idx) => {
-            const item = this.items.find((i) => i.id === id);
+        if (!shelfId || !orderedIds?.length) return;
+
+        orderedIds.forEach((id, idx) => {
+            const item = this.items.find((i) => String(i.id) === String(id) && i.shelf_id === shelfId);
             if (item) item.sort_order = idx;
-            return window.supabase
-                .from('shelf_missing_items')
-                .update({ sort_order: idx })
-                .eq('id', id)
-                .eq('username', this._username);
         });
+
+        if (!window.supabase) return;
+
+        this._reorderSaving = true;
         try {
-            await Promise.all(updates);
+            await Promise.all(orderedIds.map((id, idx) =>
+                window.supabase
+                    .from('shelf_missing_items')
+                    .update({ sort_order: idx })
+                    .eq('id', id)
+                    .eq('shelf_id', shelfId)
+                    .eq('username', this._username)
+            ));
         } catch (e) {
             console.error('Sıralama kaydedilemedi:', e);
+            this._toast('Sıralama kaydedilemedi', 'error');
             await this.loadItems();
+        } finally {
+            this._reorderSaving = false;
         }
     }
 
@@ -1107,8 +1172,11 @@ class ShelfMissingApp {
             touchStartThreshold: 5,
             forceFallback: false,
             onEnd: () => {
-                const ids = [...grid.querySelectorAll('.sm-item-card')].map((el) => el.dataset.itemId);
-                void this.reorderItems(this._activeShelfId, ids);
+                const shelfId = this._activeShelfId;
+                const ids = [...grid.querySelectorAll('.sm-item-card')]
+                    .map((el) => el.dataset.itemId)
+                    .filter(Boolean);
+                if (shelfId && ids.length) void this.reorderItems(shelfId, ids);
             }
         });
     }
@@ -1594,7 +1662,7 @@ class ShelfMissingApp {
             .replace(/"/g, '&quot;');
     }
 
-    _toast(msg, type = 'info') {
+    _getToastEl() {
         let el = document.getElementById('smToast');
         if (!el) {
             el = document.createElement('div');
@@ -1602,6 +1670,21 @@ class ShelfMissingApp {
             el.className = 'sm-toast hidden';
             document.body.appendChild(el);
         }
+        return el;
+    }
+
+    _dismissToast() {
+        const el = document.getElementById('smToast');
+        if (!el) return;
+        el.classList.remove('sm-toast--show', 'sm-toast--action');
+        clearTimeout(this._toastTimer);
+        clearTimeout(this._toastUndoTimer);
+        this._toastUndoFn = null;
+        this._toastTimer = setTimeout(() => el.classList.add('hidden'), 280);
+    }
+
+    _toast(msg, type = 'info') {
+        const el = this._getToastEl();
         const colors = {
             success: 'sm-toast-success',
             error: 'sm-toast-error',
@@ -1611,8 +1694,33 @@ class ShelfMissingApp {
         el.className = `sm-toast ${colors[type] || colors.info}`;
         el.textContent = msg;
         el.classList.remove('hidden');
+        requestAnimationFrame(() => el.classList.add('sm-toast--show'));
         clearTimeout(this._toastTimer);
-        this._toastTimer = setTimeout(() => el.classList.add('hidden'), type === 'error' ? 4500 : 2800);
+        clearTimeout(this._toastUndoTimer);
+        this._toastUndoFn = null;
+        this._toastTimer = setTimeout(() => this._dismissToast(), type === 'error' ? 4500 : 2800);
+    }
+
+    _toastWithUndo(msg, onUndo) {
+        const el = this._getToastEl();
+        el.className = 'sm-toast sm-toast-success sm-toast--action';
+        el.innerHTML = `
+            <span class="sm-toast-text">${this._esc(msg)}</span>
+            <button type="button" class="sm-toast-undo-btn">Geri al</button>`;
+        el.classList.remove('hidden');
+        requestAnimationFrame(() => el.classList.add('sm-toast--show'));
+
+        clearTimeout(this._toastTimer);
+        clearTimeout(this._toastUndoTimer);
+        this._toastUndoFn = onUndo;
+
+        el.querySelector('.sm-toast-undo-btn')?.addEventListener('click', () => {
+            const fn = this._toastUndoFn;
+            this._dismissToast();
+            if (fn) void fn();
+        }, { once: true });
+
+        this._toastTimer = setTimeout(() => this._dismissToast(), 3000);
     }
 }
 

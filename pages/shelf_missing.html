@@ -91,7 +91,7 @@
                                 <h2 class="sm-panel-title">Raflarınız</h2>
                                 <p class="sm-panel-sub" id="shelfListSummary">0 raf</p>
                             </div>
-                            <button type="button" id="listAddShelfBtn" class="sm-icon-btn sm-icon-btn--primary" aria-label="Yeni raf" title="Yeni Raf">
+                            <button type="button" id="listAddShelfBtn" class="sm-icon-btn sm-icon-btn--primary sm-icon-btn--fab" aria-label="Yeni raf" title="Yeni Raf">
                                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             </button>
                         </div>
@@ -113,7 +113,7 @@
                 <div id="shelfDetailView" class="hidden">
                     <section class="sm-panel space-y-4">
                         <div class="sm-detail-top">
-                            <button type="button" id="shelfDetailBack" class="sm-icon-btn sm-icon-btn--ghost" aria-label="Raflara dön" title="Raflar">
+                            <button type="button" id="shelfDetailBack" class="sm-icon-btn sm-icon-btn--toolbar" aria-label="Raflara dön" title="Raflar">
                                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                             </button>
                             <h2 id="shelfDetailTitle" class="sm-detail-title">Raf</h2>
@@ -135,7 +135,7 @@
 
                         <div>
                             <div class="sm-section-toolbar sm-section-toolbar--end">
-                                <button type="button" id="shelfGridColsBtn" class="sm-icon-btn sm-icon-btn--ghost" aria-label="Grid sütun sayısı" title="Görünüm">
+                                <button type="button" id="shelfGridColsBtn" class="sm-icon-btn sm-icon-btn--toolbar" aria-label="Grid sütun sayısı" title="Görünüm">
                                     <span id="shelfGridColsIcon"></span>
                                 </button>
                             </div>
@@ -153,11 +153,11 @@
                             <h2 class="sm-panel-title">Toplama Sepeti</h2>
                             <p class="sm-panel-sub" id="basketSummary">0 eksik ürün</p>
                         </div>
-                        <div class="sm-panel-tools">
-                            <button type="button" id="basketClearBtn" class="sm-icon-btn sm-icon-btn--ghost hidden" aria-label="Sepeti temizle" title="Sepeti temizle">
+                        <div class="sm-panel-tools sm-panel-tools--raised">
+                            <button type="button" id="basketClearBtn" class="sm-icon-btn sm-icon-btn--toolbar sm-icon-btn--danger-soft hidden" aria-label="Sepeti temizle" title="Sepeti temizle">
                                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
-                            <button type="button" id="basketLayoutBtn" class="sm-icon-btn sm-icon-btn--ghost" aria-label="Liste görünümü" title="Liste görünümü">
+                            <button type="button" id="basketLayoutBtn" class="sm-icon-btn sm-icon-btn--toolbar" aria-label="Liste görünümü" title="Görünüm">
                                 <span id="basketLayoutIcon"></span>
                             </button>
                         </div>
