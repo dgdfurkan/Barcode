@@ -227,6 +227,8 @@ class CountingSystem {
             }
             this.currentUser = session;
 
+            this.showCountingStatus('Sayım hazırlanıyor…', 'Veriler yükleniyor', { lock: true });
+
             const hadLocalCache = this._hydrateFromLocalStorageOnly();
 
             this.setupEventListeners();
@@ -244,10 +246,13 @@ class CountingSystem {
             this.currentTab = 'sayim';
 
             if (hadLocalCache) {
+                this.updateCountingStatus('Neredeyse hazır', 'Sunucu ile eşitleniyor', { lock: true });
                 this.renderTable();
                 this.updateStatistics();
                 this.updateTableSelector();
                 this.updateViewMode();
+            } else {
+                this.updateCountingStatus('Tablolar yükleniyor…', 'Sayım verisi alınıyor', { lock: true });
             }
 
             await Promise.all([this.loadProducts(), this.loadCountingData()]);
@@ -258,6 +263,7 @@ class CountingSystem {
             this.updateTableSelector();
             this.scheduleScrollActiveGeneralTableChip();
             this.syncDeleteTableButtonsVisibility();
+            this.hideCountingStatus();
             
             // Setup scroll listener for toast positioning
             this.setupToastScrollListener();
@@ -330,6 +336,7 @@ class CountingSystem {
             console.log('✅ Counting system initialized');
         } catch (error) {
             console.error('Error initializing counting system:', error);
+            this.hideCountingStatus();
         }
     }
     
@@ -807,6 +814,9 @@ class CountingSystem {
             let countingItemsAvailable = false;
 
             if (window.supabase && this.currentUser) {
+                if ((this._statusDepth || 0) > 0) {
+                    this.updateCountingStatus('Sunucuya bağlanılıyor…', 'Güncel veriler alınıyor', { lock: true });
+                }
                 const resolvedForFetch =
                     this.currentTableName ||
                     metaBlob?._currentTable ||
@@ -1992,11 +2002,15 @@ class CountingSystem {
             dock.classList.remove('hidden');
             requestAnimationFrame(() => dock.classList.add('is-visible'));
         }
+        document.documentElement.classList.add('counting-status-active');
         document.documentElement.classList.toggle('counting-status-lock', lock);
     }
 
-    updateCountingStatus(message, detail = '') {
-        this.showCountingStatus(message, detail, { lock: false, bump: false });
+    updateCountingStatus(message, detail = '', options = {}) {
+        this.showCountingStatus(message, detail, {
+            lock: options.lock === true,
+            bump: false,
+        });
     }
 
     hideCountingStatus() {
@@ -2007,9 +2021,9 @@ class CountingSystem {
             dock.classList.remove('is-visible', 'is-lock');
             setTimeout(() => {
                 if ((this._statusDepth || 0) === 0) dock.classList.add('hidden');
-            }, 240);
+            }, 260);
         }
-        document.documentElement.classList.remove('counting-status-lock');
+        document.documentElement.classList.remove('counting-status-active', 'counting-status-lock');
     }
 
     _isTableTombstoned(tableName) {
