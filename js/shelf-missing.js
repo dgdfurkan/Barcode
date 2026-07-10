@@ -969,7 +969,12 @@ class ShelfMissingApp {
         const sel = `[data-item-id="${CSS.escape(String(itemId))}"]`;
         document.querySelectorAll(sel).forEach((el) => {
             if (el.classList.contains('sm-item-card')) {
+                const hadNeeded = el.classList.contains('has-needed');
                 el.classList.toggle('has-needed', needed > 0);
+                if (hadNeeded !== (needed > 0)) {
+                    el.classList.add('sm-needed-flash');
+                    setTimeout(() => el.classList.remove('sm-needed-flash'), 420);
+                }
                 const label = el.querySelector('.sm-item-needed-label');
                 if (label) {
                     label.classList.toggle('is-ok', needed === 0);
@@ -993,17 +998,10 @@ class ShelfMissingApp {
         if (next === prev) return;
 
         item.needed = next;
-
-        const leftBasket = prev > 0 && next === 0;
-        const enteredBasket = prev === 0 && next > 0;
-
-        if (leftBasket || enteredBasket) {
-            if (this._activeShelfId) this._renderShelfDetail();
-            if (this._activeTab === 'basket') this._renderBasket();
-            else this._patchShelfBadges();
-        } else {
-            this._patchItemNeeded(itemId);
-        }
+        this._patchItemNeeded(itemId);
+        this._updateBasketBadge();
+        this._updateSummaries();
+        if (this._activeTab === 'basket') this._renderBasket();
 
         this._neededPending.set(itemId, next);
         clearTimeout(this._neededTimers.get(itemId));
@@ -1025,10 +1023,10 @@ class ShelfMissingApp {
         } catch (e) {
             const item = this.items.find((i) => i.id === itemId);
             if (item) item.needed = rollbackValue;
-            if (this._activeShelfId) this._renderShelfDetail();
+            this._patchItemNeeded(itemId);
             if (this._activeTab === 'basket') this._renderBasket();
-            this._renderShelvesView();
             this._updateBasketBadge();
+            this._updateSummaries();
             this._toast('Kaydedilemedi', 'error');
         }
     }

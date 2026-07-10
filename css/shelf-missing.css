@@ -466,6 +466,13 @@
     background: linear-gradient(180deg, rgb(255 251 235), white);
     box-shadow: 0 2px 8px rgb(251 191 36 / 0.15);
 }
+.sm-item-card.sm-needed-flash {
+    animation: smNeededFlash 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes smNeededFlash {
+    0% { box-shadow: 0 0 0 0 rgb(251 191 36 / 0.45); }
+    100% { box-shadow: 0 2px 8px rgb(251 191 36 / 0.15); }
+}
 .sm-item-img {
     width: 100%;
     aspect-ratio: 1;
