@@ -189,6 +189,10 @@ class CountingSystem {
         this._activeTableCatchUpQueued = false;
         /** Toplu yapıştırma bittikten sonra kısa catch-up susturma (sayı zıplamasını önler) */
         this._suppressCatchUpUntil = 0;
+        /** Silinen tablolar — DB temizlenene kadar listeden gizlenir */
+        this._deletedTableTombstones = new Set();
+        this._metaSaveTimer = null;
+        this._countingHydratedFromLocal = false;
         /** Per-product debounce timers: { productId: timeoutId } */
         this._productSaveTimers = {};
         /** counting_items tablosu mevcut mu? (yoksa eski blob yoluna düş) */
@@ -226,14 +230,10 @@ class CountingSystem {
             
             // Load all products
             await this.loadProducts();
+
+            const hadLocalCache = this._hydrateFromLocalStorageOnly();
             
-            // Load counting data
-            await this.loadCountingData();
-            
-            // Her gelişte Grid mod öncelik (localStorage okunmaz)
-            this.currentViewMode = 'rapid';
-            
-            // Setup event listeners
+            // Setup event listeners (önce — yerel önbellek varsa anında çizim)
             this.setupEventListeners();
             this.bindCountingTableSearch();
             this.bindSayimSubTabControls();
@@ -241,14 +241,22 @@ class CountingSystem {
             this.bindSayimGeneralTableDropdown();
             this.bindSayimGeneralTableScrollRestore();
             this.initDailyDateControls();
-
-            // Setup tab system
             this.setupTabSystem();
             this._applyFinanceVisualAnalyticsVisibility();
             this.bindSayimAuditLogPanel();
-            
-            // Render based on current tab — her girişte sayım sekmesi
+
+            this.currentViewMode = 'rapid';
             this.currentTab = 'sayim';
+            if (hadLocalCache) {
+                this.renderTable();
+                this.updateStatistics();
+                this.updateTableSelector();
+                this.updateViewMode();
+            }
+
+            // Uzak veriyi arka planda birleştir (aktif tablo odaklı)
+            await this.loadCountingData();
+            
             this.renderTable();
             this.updateViewMode();
             
@@ -308,8 +316,7 @@ class CountingSystem {
             // Sayfa görünür olunca aktif tabloyu hafif catch-up (realtime kaçırılan güncellemeler için)
             this._setupVisibilityRefresh();
 
-            // İlk açılış: aktif tabloyu DB ile hizala (telefon/PC aynı anda girdiğinde)
-            this._scheduleActiveTableCatchUp(800);
+            // İlk açılışta tekrar tam DB çekme yok — loadCountingData + realtime yeterli
 
             // beforeunload: pending save'leri flush et (localStorage'a en azından yaz)
             window.addEventListener('beforeunload', () => {
@@ -748,69 +755,127 @@ class CountingSystem {
         }
     }
 
+    _hydrateFromLocalStorageOnly() {
+        if (!this.currentUser) return false;
+        try {
+            const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
+            const stored = localStorage.getItem(storageKey);
+            if (!stored) return false;
+            const localFull = JSON.parse(stored);
+            const metaBlob = this.migrateToNestedStructure(localFull);
+            if (!localFull?._tables || Object.keys(localFull._tables).length === 0) return false;
+
+            const tables = {};
+            for (const [tName, tData] of Object.entries(localFull._tables)) {
+                if (this._isTableTombstoned(tName)) continue;
+                tables[tName] = this._cloneTableDataSlot(tData);
+            }
+            const fullData = {
+                _api_info: localFull._api_info || {},
+                _auditLog: localFull._auditLog || [],
+                _tableMeta: localFull._tableMeta || metaBlob?._tableMeta || {},
+                _currentTable: localFull._currentTable || metaBlob?._currentTable || null,
+                _tables: tables,
+            };
+            this._finalizeCountingHydration(fullData, tables);
+            this._countingHydratedFromLocal = true;
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     async loadCountingData() {
         try {
-            // ── 1. Meta blob'u yükle (users.counting_data — sadece api_info + auditLog + tableMeta) ──
+            const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
             let metaBlob = null;
+            let localFull = null;
+
+            try {
+                const stored = localStorage.getItem(storageKey);
+                if (stored) {
+                    localFull = JSON.parse(stored);
+                    metaBlob = this.migrateToNestedStructure(localFull);
+                    if (localFull?._tables && Object.keys(localFull._tables).length > 0) {
+                        const tables = { ...localFull._tables };
+                        const fullData = {
+                            _api_info: localFull._api_info || {},
+                            _auditLog: localFull._auditLog || [],
+                            _tableMeta: localFull._tableMeta || {},
+                            _currentTable: localFull._currentTable || metaBlob?._currentTable || null,
+                            _tables: tables,
+                        };
+                        this._finalizeCountingHydration(fullData, tables);
+                        this._countingHydratedFromLocal = true;
+                    }
+                }
+            } catch (e) {
+                /* ignore */
+            }
+
             if (window.supabase && this.currentUser) {
                 const { data, error } = await window.supabase
                     .from('users')
                     .select('counting_data')
                     .eq('username', this.currentUser.username)
                     .maybeSingle();
-                if (!error && data && data.counting_data) {
-                    metaBlob = data.counting_data;
+                if (!error && data?.counting_data) {
+                    metaBlob = this.migrateToNestedStructure(data.counting_data);
                 }
-            }
-            // localStorage yedek — hem meta hem tam blob olabilir
-            if (!metaBlob) {
-                const storageKey = `${this.STORAGE_KEY}_${this.currentUser.username}`;
-                const stored = localStorage.getItem(storageKey);
-                if (stored) {
-                    try { metaBlob = JSON.parse(stored); } catch (e) { /* ignore */ }
-                }
-            }
-            if (metaBlob) {
-                metaBlob = this.migrateToNestedStructure(metaBlob);
             }
 
-            // ── 2. counting_items tablosundan ürünleri çek ──
+            if (!metaBlob && localFull) {
+                metaBlob = this.migrateToNestedStructure(localFull);
+            }
+
+            const deviceTable = this._loadDeviceCurrentTable();
+            const serverTable = metaBlob?._currentTable;
+            let resolvedTable = serverTable || deviceTable || this.currentTableName || 'Ana Sayım';
+            const metaKeys = Object.keys(metaBlob?._tableMeta || {}).filter((n) => !this._isTableTombstoned(n));
+            if (metaKeys.length && !metaKeys.includes(resolvedTable)) {
+                resolvedTable = metaKeys[0];
+            }
+
             let itemRows = null;
             let countingItemsAvailable = false;
             if (window.supabase && this.currentUser) {
                 try {
                     const { data: rows, error: rowErr } = await this._queryCountingItems(
                         this._getCountingItemsSelectColumns(true),
-                        (q) => q.eq('username', this.currentUser.username)
+                        (q) =>
+                            q
+                                .eq('username', this.currentUser.username)
+                                .eq('table_name', resolvedTable)
                     );
                     if (!rowErr) {
                         itemRows = rows || [];
                         countingItemsAvailable = true;
                         this._countingItemsTableReady = true;
-                        console.log(`📦 counting_items yüklendi: ${itemRows.length} ürün`);
                     } else {
-                        // Tablo henüz yok — eski blob yoluna düş
                         this._countingItemsTableReady = false;
-                        console.warn('⚠️ counting_items tablosu bulunamadı, eski blob yöntemi kullanılıyor:', rowErr.message);
                     }
                 } catch (e) {
                     this._countingItemsTableReady = false;
                 }
             }
 
-            // ── 3. Tabloları inşa et ──
             const tables = {};
+            if (this.cachedFullData?._tables) {
+                for (const [tName, tData] of Object.entries(this.cachedFullData._tables)) {
+                    if (this._isTableTombstoned(tName)) continue;
+                    tables[tName] = this._cloneTableDataSlot(tData);
+                }
+            }
 
             if (countingItemsAvailable) {
-                // counting_items'tan ürün verilerini yükle
+                tables[resolvedTable] = tables[resolvedTable] || {};
                 for (const row of itemRows) {
-                    if (!tables[row.table_name]) tables[row.table_name] = {};
                     tables[row.table_name][row.product_id] = this._mapCountingItemRowToEntry(row);
                 }
 
-                // Tablo meta verilerini (sıra, createdAt) ekle
                 const tableMeta = metaBlob?._tableMeta || {};
                 for (const [tName, meta] of Object.entries(tableMeta)) {
+                    if (this._isTableTombstoned(tName)) continue;
                     if (!tables[tName]) tables[tName] = {};
                     if (meta.createdAt || meta.lastActivityAt) {
                         if (!tables[tName]._tableMeta) tables[tName]._tableMeta = {};
@@ -822,21 +887,16 @@ class CountingSystem {
                     }
                 }
 
-                // ── 3a. Eski blob'dan eksik ürünleri kurtarma (counting_items'ta olmayan ürünler) ──
-                // Bu kritik güvenlik adımıdır: counting_items INSERT başarısız olduysa
-                // veya henüz migrate edilmediyse, tam blob'daki ürünleri kullan.
                 if (metaBlob?._tables) {
                     for (const [tName, tData] of Object.entries(metaBlob._tables)) {
+                        if (this._isTableTombstoned(tName)) continue;
                         if (!tables[tName]) tables[tName] = {};
-                        // counting_items'ta olmayan ürünleri blob'dan al (kayıp ürün kurtarma)
                         for (const [pId, pData] of Object.entries(tData)) {
                             if (this.isReservedCountingKey(pId) || typeof pData !== 'object' || !pData) continue;
                             if (this._looksLikeNestedTableBlob(pData)) continue;
                             if (!tables[tName][pId]) {
-                                // Bu ürün counting_items'ta yok → blob'dan al
                                 tables[tName][pId] = { ...pData };
                             } else {
-                                // counting_items'ta var ama blob'da ek alan olabilir (struckPrice vb.)
                                 if (pData.struckPrice != null && tables[tName][pId].struckPrice == null) {
                                     tables[tName][pId].struckPrice = pData.struckPrice;
                                 }
@@ -845,7 +905,6 @@ class CountingSystem {
                                 }
                             }
                         }
-                        // Meta verilerini de tamamla
                         if (!tables[tName]._tableMeta && tData._tableMeta) {
                             tables[tName]._tableMeta = tData._tableMeta;
                         }
@@ -855,75 +914,42 @@ class CountingSystem {
                     }
                 }
 
-                // ── 3b. Mevcut ürünleri migration ettirme: eski blob'da ürün var, counting_items boş ──
                 if (itemRows.length === 0 && metaBlob?._tables) {
-                    // Async migration: blob → counting_items (performans için arka planda)
                     this._migrateOldDataToCountingItems(metaBlob).catch(() => {});
                 }
-            } else {
-                // counting_items yok → eski blob yöntemi (fallback)
-                if (metaBlob?._tables && Object.keys(metaBlob._tables).length > 0) {
-                    // Eski tam blob: _tables içinde ürünler var
-                    for (const [tName, tData] of Object.entries(metaBlob._tables)) {
-                        tables[tName] = { ...tData };
-                    }
-                } else if (metaBlob?._tableMeta) {
-                    // Yeni meta-only format ama counting_items yoksa: tablo listesini _tableMeta'dan çıkar
-                    // Ürünler localStorage'da olabilir
-                    for (const [tName, meta] of Object.entries(metaBlob._tableMeta)) {
-                        if (!tables[tName]) {
-                            tables[tName] = {};
-                            if (meta?.createdAt || meta?.lastActivityAt) {
-                                tables[tName]._tableMeta = {};
-                                if (meta?.createdAt) tables[tName]._tableMeta.createdAt = meta.createdAt;
-                                if (meta?.lastActivityAt) tables[tName]._tableMeta.lastActivityAt = meta.lastActivityAt;
-                            }
-                            if (Array.isArray(meta?._productOrder)) tables[tName]._productOrder = meta._productOrder;
+            } else if (metaBlob?._tables && Object.keys(metaBlob._tables).length > 0) {
+                for (const [tName, tData] of Object.entries(metaBlob._tables)) {
+                    if (this._isTableTombstoned(tName)) continue;
+                    tables[tName] = { ...tData };
+                }
+            } else if (metaBlob?._tableMeta) {
+                for (const [tName, meta] of Object.entries(metaBlob._tableMeta)) {
+                    if (this._isTableTombstoned(tName)) continue;
+                    if (!tables[tName]) {
+                        tables[tName] = {};
+                        if (meta?.createdAt || meta?.lastActivityAt) {
+                            tables[tName]._tableMeta = {};
+                            if (meta?.createdAt) tables[tName]._tableMeta.createdAt = meta.createdAt;
+                            if (meta?.lastActivityAt) tables[tName]._tableMeta.lastActivityAt = meta.lastActivityAt;
                         }
+                        if (Array.isArray(meta?._productOrder)) tables[tName]._productOrder = meta._productOrder;
                     }
                 }
             }
 
-            // ── 4. cachedFullData oluştur ──
             const fullData = {
-                _api_info: metaBlob?._api_info || {},
-                _auditLog: metaBlob?._auditLog || [],
-                _tableMeta: metaBlob?._tableMeta || {},
+                _api_info: metaBlob?._api_info || this.cachedFullData?._api_info || {},
+                _auditLog: metaBlob?._auditLog || this.cachedFullData?._auditLog || [],
+                _tableMeta: metaBlob?._tableMeta || this.cachedFullData?._tableMeta || {},
+                _currentTable: metaBlob?._currentTable || this.cachedFullData?._currentTable || null,
                 _tables: tables,
             };
 
-            if (Object.keys(tables).length === 0) {
-                tables['Ana Sayım'] = {};
-                fullData._tableMeta['Ana Sayım'] = { createdAt: new Date().toISOString() };
-            }
-
-            this.cachedFullData = fullData;
-            this.sanitizeTablesStructure(this.cachedFullData);
-
-            // ── 5. Aktif tabloyu belirle ──
-            const deviceTable = this._loadDeviceCurrentTable();
-            const serverTable = metaBlob?._currentTable;
-            let resolvedTable = serverTable || deviceTable || 'Ana Sayım';
-            if (!tables[resolvedTable]) {
-                resolvedTable = Object.keys(tables)[0] || 'Ana Sayım';
-            }
-            this.currentTableName = resolvedTable;
-            this._saveDeviceCurrentTable(resolvedTable);
-            this._persistCurrentTableToMeta();
-
-            if (!tables[this.currentTableName]) tables[this.currentTableName] = {};
-            this.countingData = tables[this.currentTableName];
-
-            this.auditLog = Array.isArray(fullData._auditLog)
-                ? fullData._auditLog.slice(-this.AUDIT_LOG_MAX)
-                : [];
-
-            // Tablo chip sıralaması: ürün lastUpdated → lastActivityAt
-            for (const tName of Object.keys(tables)) {
-                this.syncTableLastActivityMeta(tName, tables[tName]);
-            }
+            this._finalizeCountingHydration(fullData, tables);
+            this._saveFullBlobToLocalStorage();
 
             console.log('✅ loadCountingData tamamlandı, tablo:', this.currentTableName);
+            void this._warmCountingTablesInBackground();
         } catch (error) {
             console.error('Error loading counting data:', error);
             this.currentTableName = 'Ana Sayım';
@@ -1080,7 +1106,7 @@ class CountingSystem {
         this._fullBackupTimer = setTimeout(() => {
             this._fullBackupTimer = null;
             this._writeFullBlobToSupabase().catch(() => {});
-        }, 3000);
+        }, 1500);
     }
 
     async _writeFullBlobToSupabase() {
@@ -1969,11 +1995,119 @@ class CountingSystem {
         const overlay = document.getElementById('countingBusyOverlay');
         if (overlay) {
             overlay.classList.remove('is-visible');
-            setTimeout(() => {
-                if ((this._busyDepth || 0) === 0) overlay.classList.add('hidden');
-            }, 220);
+            if ((this._busyDepth || 0) === 0) overlay.classList.add('hidden');
         }
         document.documentElement.classList.remove('counting-busy-active');
+    }
+
+    _isTableTombstoned(tableName) {
+        return this._deletedTableTombstones?.has(tableName) === true;
+    }
+
+    _scheduleMetaSave(delay = 450) {
+        if (this._metaSaveTimer) clearTimeout(this._metaSaveTimer);
+        this._metaSaveTimer = setTimeout(() => {
+            this._metaSaveTimer = null;
+            this._saveMetaOnly().catch(() => {});
+        }, delay);
+    }
+
+    _persistTableSlotLocally(tableName) {
+        if (!tableName || !this.cachedFullData) return;
+        if (tableName === this.currentTableName && this.countingData) {
+            this._safeWriteTableSlot(this.cachedFullData._tables, tableName, this.countingData);
+        }
+        this._saveFullBlobToLocalStorage();
+    }
+
+    _finalizeCountingHydration(fullData, tables) {
+        if (Object.keys(tables).length === 0) {
+            tables['Ana Sayım'] = {};
+            fullData._tableMeta = fullData._tableMeta || {};
+            fullData._tableMeta['Ana Sayım'] = fullData._tableMeta['Ana Sayım'] || {
+                createdAt: new Date().toISOString(),
+            };
+        }
+
+        this.cachedFullData = fullData;
+        this.sanitizeTablesStructure(this.cachedFullData);
+
+        const deviceTable = this._loadDeviceCurrentTable();
+        const serverTable = fullData._currentTable;
+        let resolvedTable = serverTable || deviceTable || 'Ana Sayım';
+        if (!tables[resolvedTable]) {
+            resolvedTable = Object.keys(tables).find((n) => !this._isTableTombstoned(n)) || 'Ana Sayım';
+        }
+        this.currentTableName = resolvedTable;
+        this._saveDeviceCurrentTable(resolvedTable);
+        this._persistCurrentTableToMeta();
+
+        if (!tables[this.currentTableName]) tables[this.currentTableName] = {};
+        this.countingData = tables[this.currentTableName];
+
+        this.auditLog = Array.isArray(fullData._auditLog)
+            ? fullData._auditLog.slice(-this.AUDIT_LOG_MAX)
+            : [];
+
+        for (const tName of Object.keys(tables)) {
+            if (this._isTableTombstoned(tName)) continue;
+            this.syncTableLastActivityMeta(tName, tables[tName]);
+        }
+    }
+
+    async _loadTableProductsFromSupabase(tableName) {
+        if (!tableName || !window.supabase || !this.currentUser) return false;
+        if (this._countingItemsTableReady !== true) return false;
+        if (this._isTableTombstoned(tableName)) return false;
+
+        try {
+            const { data: rows, error } = await this._queryCountingItems(
+                this._getCountingItemsSelectColumns(false),
+                (q) => q.eq('username', this.currentUser.username).eq('table_name', tableName)
+            );
+            if (error || !rows) return false;
+
+            if (!this.cachedFullData) this.cachedFullData = { _api_info: {}, _tables: {}, _tableMeta: {} };
+            if (!this.cachedFullData._tables) this.cachedFullData._tables = {};
+            if (!this.cachedFullData._tables[tableName]) {
+                this.cachedFullData._tables[tableName] = {};
+            }
+            const slot = this.cachedFullData._tables[tableName];
+            const meta = this.cachedFullData._tableMeta?.[tableName];
+            if (meta?.createdAt || meta?.lastActivityAt) {
+                if (!slot._tableMeta) slot._tableMeta = {};
+                if (meta.createdAt) slot._tableMeta.createdAt = meta.createdAt;
+                if (meta.lastActivityAt) slot._tableMeta.lastActivityAt = meta.lastActivityAt;
+            }
+            if (Array.isArray(meta?._productOrder)) slot._productOrder = [...meta._productOrder];
+
+            for (const row of rows) {
+                slot[row.product_id] = this._mapCountingItemRowToEntry(row);
+            }
+
+            if (tableName === this.currentTableName) {
+                this.countingData = slot;
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async _warmCountingTablesInBackground() {
+        if (this._countingItemsTableReady !== true || !this.cachedFullData) return;
+        const names = new Set([
+            ...Object.keys(this.cachedFullData._tableMeta || {}),
+            ...Object.keys(this.cachedFullData._tables || {}),
+        ]);
+        for (const tName of names) {
+            if (!this.isValidTableNameKey(tName) || this._isTableTombstoned(tName)) continue;
+            if (tName === this.currentTableName) continue;
+            const slot = this.cachedFullData._tables?.[tName];
+            if (slot && this._countTableProductKeys(slot) > 0) continue;
+            await this._loadTableProductsFromSupabase(tName);
+        }
+        this._scheduleTableSelectorUpdate(80);
     }
 
     _isSheetStockFetchLocked() {
@@ -2701,6 +2835,7 @@ class CountingSystem {
 
             let metaChanged = false;
             for (const [tName, meta] of Object.entries(remoteTableMeta)) {
+                if (this._isTableTombstoned(tName)) continue;
                 if (!this.cachedFullData._tableMeta[tName]) {
                     this.cachedFullData._tableMeta[tName] = {
                         createdAt: meta?.createdAt || new Date(0).toISOString(),
@@ -2804,6 +2939,7 @@ class CountingSystem {
 
             let metaChanged = false;
             for (const [tName, products] of Object.entries(tablesByName)) {
+                if (this._isTableTombstoned(tName)) continue;
                 if (!this.cachedFullData._tables[tName]) {
                     this.cachedFullData._tables[tName] = { ...products };
                     const createdAt = resolveCreatedAt(tName);
@@ -2961,6 +3097,7 @@ class CountingSystem {
         if (!this.cachedFullData._tables) this.cachedFullData._tables = {};
         if (!this.cachedFullData._tableMeta) this.cachedFullData._tableMeta = {};
         if (!this.cachedFullData._tables[tName]) {
+            if (this._isTableTombstoned(tName)) return;
             // Realtime'da yeni tablo geliyor — createdAt'ı item.created_at'tan al (sıralama için kritik)
             const createdAt = item.created_at || new Date().toISOString();
             this.cachedFullData._tables[tName] = { _tableMeta: { createdAt } };
@@ -3071,6 +3208,7 @@ class CountingSystem {
         if (incoming._tables && typeof incoming._tables === 'object') {
             for (const [tName, incomingTableData] of Object.entries(incoming._tables)) {
                 if (!this.isValidTableNameKey(tName)) continue;
+                if (this._isTableTombstoned(tName)) continue;
                 if (!incomingTableData || typeof incomingTableData !== 'object') continue;
 
                 if (!this.cachedFullData._tables[tName]) {
@@ -3203,25 +3341,18 @@ class CountingSystem {
         if (!tableName || tableName === this.currentTableName) {
             return;
         }
+        if (this._isTableTombstoned(tableName)) return;
 
         const skipCatchUp = options.skipCatchUp === true;
         const skipRender = options.skipRender === true;
-        const silent = options.silent === true || this._importInProgress;
-
-        if (!silent) this.showCountingBusy('Tablo yükleniyor…');
-
         const fromTable = this.currentTableName;
 
-        try {
-        // Bekleyen tam blob kaydını ESKİ tablo adıyla flush et (iptal etme — veri kaybı + yanlış tablo yazımı)
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
             this._saveDebounceTimer = null;
-            await this.saveCountingData().catch(() => {});
         }
-
-        // Bekleyen ürün kayıtlarını ESKİ tablo adıyla yaz — currentTableName henüz değişmedi
-        await this._flushPendingProductSaves(fromTable);
+        void this._flushPendingProductSaves(fromTable);
+        this._persistTableSlotLocally(fromTable);
 
         const fullData = this.cachedFullData || { _api_info: {}, _tables: {} };
         if (!fullData._tables) fullData._tables = {};
@@ -3231,37 +3362,17 @@ class CountingSystem {
         }
         this.cachedFullData = fullData;
 
-        // counting_items mevcutsa ve tablo henüz bellekte yoksa yükle
-        if (this._countingItemsTableReady === true && !fullData._tables[tableName]) {
-            const { data: rows } = await this._queryCountingItems(
-                this._getCountingItemsSelectColumns(false),
-                (q) => q.eq('username', this.currentUser.username).eq('table_name', tableName)
-            );
-            fullData._tables[tableName] = {};
-            const tMeta = fullData._tableMeta?.[tableName];
-            if (tMeta?.createdAt || tMeta?.lastActivityAt) {
-                fullData._tables[tableName]._tableMeta = {};
-                if (tMeta?.createdAt) fullData._tables[tableName]._tableMeta.createdAt = tMeta.createdAt;
-                if (tMeta?.lastActivityAt) fullData._tables[tableName]._tableMeta.lastActivityAt = tMeta.lastActivityAt;
-            }
-            if (tMeta?._productOrder) fullData._tables[tableName]._productOrder = tMeta._productOrder;
-            for (const row of rows || []) {
-                fullData._tables[tableName][row.product_id] = this._mapCountingItemRowToEntry(row);
-            }
-        } else if (!fullData._tables[tableName]) {
-            fullData._tables[tableName] = {
-                _tableMeta: { createdAt: new Date().toISOString() }
-            };
+        const cachedSlot = fullData._tables[tableName];
+        const hasCachedProducts = cachedSlot && this._countTableProductKeys(cachedSlot) > 0;
+
+        if (!hasCachedProducts && this._countingItemsTableReady === true && !fullData._tables[tableName]) {
+            fullData._tables[tableName] = { _tableMeta: { createdAt: new Date().toISOString() } };
         }
 
         this._activateCountingTable(tableName, { fromTable, persistFrom: false });
         this._saveDeviceCurrentTable(tableName);
         this._persistCurrentTableToMeta();
-        await this._saveMetaOnly();
-
-        if (!skipCatchUp) {
-            await this._catchUpActiveTableFromSupabase();
-        }
+        this._scheduleMetaSave(300);
 
         this._tableProductSearchQuery = '';
         this._syncCountingTableSearchUi();
@@ -3279,16 +3390,23 @@ class CountingSystem {
             }
         }
 
-        if (skipRender) return;
+        if (!skipRender) {
+            this.renderTable();
+            this.updateStatistics();
+            this.updateTableSelector();
+            this.scrollActiveGeneralTableChipIntoView({ behavior: 'auto' });
+            this.syncSayimSubTabToTable();
+        }
 
-        // Re-render UI
-        this.renderTable();
-        this.updateStatistics();
-        this.updateTableSelector();
-        this.scrollActiveGeneralTableChipIntoView({ behavior: 'auto' });
-        this.syncSayimSubTabToTable();
-        } finally {
-            if (!silent) this.hideCountingBusy();
+        if (!hasCachedProducts && this._countingItemsTableReady === true) {
+            void this._loadTableProductsFromSupabase(tableName).then((loaded) => {
+                if (!loaded || tableName !== this.currentTableName) return;
+                this.renderTable();
+                this.updateStatistics();
+                this.updateTableSelector();
+            });
+        } else if (!skipCatchUp && !hasCachedProducts) {
+            void this._catchUpActiveTableFromSupabase();
         }
     }
 
@@ -4238,9 +4356,9 @@ class CountingSystem {
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
             this._saveDebounceTimer = null;
-            await this.saveCountingData().catch(() => {});
         }
-        await this._flushPendingProductSaves(fromTable);
+        void this._flushPendingProductSaves(fromTable);
+        this._persistTableSlotLocally(fromTable);
 
         if (!options.allowDaily && trimmed.startsWith(this.DAILY_TABLE_PREFIX)) {
             throw new Error('Bu isim günlük sayım için ayrılmıştır; genel tabloda kullanılamaz');
@@ -4279,7 +4397,7 @@ class CountingSystem {
             { cat: 'table', tbl: trimmed }
         );
 
-        await this._saveMetaOnly();
+        this._scheduleMetaSave(250);
 
         if (options.skipRender === true) return;
 
@@ -4293,22 +4411,18 @@ class CountingSystem {
             if (useBusy) this.hideCountingBusy();
         }
     }
-
-    // Delete a table
     async deleteTable(tableName) {
-        if (!tableName) return;
+        if (!tableName || this._isTableTombstoned(tableName)) return;
 
-        const useBusy = !this._importInProgress;
-        if (useBusy) this.showCountingBusy('Tablo siliniyor…');
-
-        try {
         const fullData = this.cachedFullData || { _api_info: {}, _tables: {} };
         if (!fullData._tables) return;
 
-        const tableNames = Object.keys(fullData._tables);
+        const tableNames = Object.keys(fullData._tables).filter((n) => !this._isTableTombstoned(n));
         if (tableNames.length <= 1) {
             throw new Error('En az bir tablo bulunmalıdır');
         }
+
+        this._deletedTableTombstones.add(tableName);
 
         delete fullData._tables[tableName];
         if (fullData._tableMeta) delete fullData._tableMeta[tableName];
@@ -4316,7 +4430,11 @@ class CountingSystem {
         this.pushAuditEntry(`Tablo silindi · ${this.formatTableDisplayName(tableName)}`, { cat: 'table', tbl: tableName });
 
         if (tableName === this.currentTableName) {
-            const newTableName = Object.keys(fullData._tables)[0];
+            const newTableName = Object.keys(fullData._tables).find((n) => !this._isTableTombstoned(n));
+            if (!newTableName) {
+                this._deletedTableTombstones.delete(tableName);
+                throw new Error('En az bir tablo bulunmalıdır');
+            }
             this.currentTableName = newTableName;
             this._saveDeviceCurrentTable(newTableName);
             this._persistCurrentTableToMeta();
@@ -4324,19 +4442,22 @@ class CountingSystem {
         }
 
         this.cachedFullData = fullData;
+        this._saveFullBlobToLocalStorage();
 
-        // counting_items'tan bu tablonun tüm ürünlerini sil (async)
-        this.deleteTableEntries(tableName).catch(() => {});
-        await this._saveMetaOnly();
-
-        // Re-render UI
         this.renderTable();
         this.updateStatistics();
         this.updateTableSelector();
         this.syncSayimSubTabToTable();
-        } finally {
-            if (useBusy) this.hideCountingBusy();
-        }
+        this.syncDeleteTableButtonsVisibility();
+
+        void (async () => {
+            try {
+                await this.deleteTableEntries(tableName);
+                await this._saveMetaOnly();
+            } finally {
+                this._deletedTableTombstones.delete(tableName);
+            }
+        })();
     }
 
     // Get list of all tables
@@ -4347,17 +4468,22 @@ class CountingSystem {
             return [{ name: 'Ana Sayım', isCurrent: true }];
         }
 
-        const tableNames = Object.keys(fullData._tables).filter((name) => this.isValidTableNameKey(name));
+        const tableNames = Object.keys(fullData._tables).filter(
+            (name) => this.isValidTableNameKey(name) && !this._isTableTombstoned(name)
+        );
         const rows = tableNames.map((name) => {
             const tableData = this.resolveTableDataForList(name);
             this.syncTableLastActivityMeta(name, tableData);
             const lastActivityMs = this.resolveLastCountActivityMs(tableData, name) ?? 0;
             const createdAtMs = this.resolveTableCreatedMs(tableData) ?? 0;
             const statusSummary = this.getTableStatusSummary(tableData);
+            const orderLen = Array.isArray(tableData._productOrder)
+                ? tableData._productOrder.length
+                : (this.cachedFullData?._tableMeta?.[name]?._productOrder?.length || 0);
             return {
                 name,
                 isCurrent: name === this.currentTableName,
-                productCount: Object.keys(tableData).filter((k) => !this.isReservedCountingKey(k)).length,
+                productCount: Math.max(this._countTableProductKeys(tableData), orderLen),
                 status: statusSummary.status,
                 _sortLastMs: Math.max(lastActivityMs, createdAtMs),
                 _sortCreatedMs: createdAtMs,
