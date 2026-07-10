@@ -5081,6 +5081,24 @@ class CountingSystem {
         this.countingData._productOrder = [...idsInPasteOrder, ...rest];
     }
 
+    /**
+     * Mevcut sırayı korur; yalnızca tabloda olmayan ürünleri yapıştırma sırasıyla sona ekler.
+     */
+    appendImportedProductOrder(idsInPasteOrder) {
+        if (!Array.isArray(idsInPasteOrder) || idsInPasteOrder.length === 0) return 0;
+        const order = this.getOrderedProductIds();
+        const existingSet = new Set(order);
+        const toAppend = [];
+        for (const id of idsInPasteOrder) {
+            if (existingSet.has(id)) continue;
+            toAppend.push(id);
+            existingSet.add(id);
+        }
+        if (toAppend.length === 0) return 0;
+        this.countingData._productOrder = [...order, ...toAppend];
+        return toAppend.length;
+    }
+
     /** Ürün satırlarının lastUpdated min/max (ms) */
     getProductLastUpdatedBounds(tableData) {
         let minMs = Infinity;
@@ -6345,8 +6363,20 @@ class CountingSystem {
         // Sync stocks button
         const syncStocksBtn = document.getElementById('syncStocksBtn');
         if (syncStocksBtn) {
-            syncStocksBtn.addEventListener('click', () => this.syncSystemStocks());
+            syncStocksBtn.addEventListener('click', () => this.openSyncStocksConfirmModal());
         }
+        document.getElementById('closeSyncStocksConfirmModal')?.addEventListener('click', () =>
+            this.closeSyncStocksConfirmModal()
+        );
+        document.getElementById('cancelSyncStocksConfirmBtn')?.addEventListener('click', () =>
+            this.closeSyncStocksConfirmModal()
+        );
+        document.getElementById('confirmSyncStocksBtn')?.addEventListener('click', () =>
+            void this.confirmSyncStocksFromModal()
+        );
+        document.getElementById('syncStocksConfirmModal')?.addEventListener('click', (e) => {
+            if (e.target?.id === 'syncStocksConfirmModal') this.closeSyncStocksConfirmModal();
+        });
         
         // Reset warehouse stocks button
         const resetWarehouseStocksBtn = document.getElementById('resetWarehouseStocksBtn');
@@ -7732,7 +7762,7 @@ class CountingSystem {
 
     /**
      * Getir CDN ürün görsel URL listesi: eşleşen ürünleri tabloya ekler.
-     * Yapıştırma sırası birebir korunur (mevcut ürünler de bu sıraya göre yeniden dizilir).
+     * Mevcut ürünler korunur; yalnızca yeniler yapıştırma sırasıyla sona eklenir.
      * @param {string[]} urls
      */
     async bulkAddProductsFromGetirCdnPaste(urls) {
@@ -7759,6 +7789,7 @@ class CountingSystem {
         };
 
         const idsInPasteOrder = [];
+        const newProductIds = [];
         const seenInPaste = new Set();
         const unmatchedUrls = [];
         let skippedInTable = 0;
@@ -7779,6 +7810,7 @@ class CountingSystem {
             }
             if (!wasInTable) {
                 this.addProductToCounting(product, { skipSave: true });
+                newProductIds.push(product.id);
                 addedCount++;
             } else {
                 skippedInTable++;
@@ -7813,21 +7845,22 @@ class CountingSystem {
             return { added: 0, skippedInTable, noMatch, unmatchedUrls };
         }
 
-        await this._purgeTableProductsNotInSet(idsInPasteOrder);
-        this.applyImportedProductOrder(idsInPasteOrder, { replaceRest: true });
+        this.appendImportedProductOrder(idsInPasteOrder);
         this._verifyCountingDataTableBinding();
         this._syncProductOrderMeta();
 
         const tn = this.currentTableName || '';
         this.pushAuditEntry(
-            `Getir görselleri · ${addedCount} yeni · ${idsInPasteOrder.length} sıralandı${
+            `Getir görselleri · ${addedCount} yeni${
                 skippedInTable ? ` · ${skippedInTable} zaten vardı` : ''
             }${noMatch ? ` · ${noMatch} eşleşmedi` : ''}`,
             { cat: 'import', tbl: tn }
         );
 
         await this.saveCountingData();
-        await this._bulkSaveProductEntries(idsInPasteOrder, tn);
+        if (newProductIds.length > 0) {
+            await this._bulkSaveProductEntries(newProductIds, tn);
+        }
 
         this._scheduleBackgroundPriceEnrichment(this.currentTableName);
 
@@ -7839,7 +7872,7 @@ class CountingSystem {
         this.updateCountingProgress();
         this._scheduleTableSelectorUpdate();
 
-        let msg = addedCount > 0 ? `${addedCount} ürün eklendi` : `${idsInPasteOrder.length} ürün sıralandı`;
+        let msg = `${addedCount} ürün eklendi`;
         if (skippedInTable) msg += `, ${skippedInTable} zaten tablodaydı`;
         if (noMatch) msg += `, ${noMatch} adres eşleşmedi`;
 
@@ -8494,20 +8527,41 @@ class CountingSystem {
         return div.innerHTML;
     }
 
-    async syncSystemStocks() {
-        // Get products that have no system stock (warehouse stock doesn't matter)
-        // _api_info'yu filtrele (sistem bilgisi, ürün değil)
-            const productsToSync = Object.keys(this.countingData).filter(productId => {
+    _getProductsNeedingSystemSync() {
+        return Object.keys(this.countingData).filter((productId) => {
             if (this.isReservedCountingKey(productId)) return false;
-                const data = this.countingData[productId];
-            // Sistem stoku yoksa sync yap (depo stoku olsun ya da olmasın)
+            const data = this.countingData[productId];
             return data.systemStock === null || data.systemStock === undefined;
-            });
+        });
+    }
 
-            if (productsToSync.length === 0) {
-                this.showToast('Senkronize edilecek ürün bulunamadı', 'info', 3000);
-                return;
-            }
+    openSyncStocksConfirmModal() {
+        const productsToSync = this._getProductsNeedingSystemSync();
+        if (productsToSync.length === 0) {
+            this.showToast('Senkronize edilecek ürün bulunamadı', 'info', 3000);
+            return;
+        }
+        const countEl = document.getElementById('syncStocksConfirmCount');
+        if (countEl) countEl.textContent = String(productsToSync.length);
+        document.getElementById('syncStocksConfirmModal')?.classList.remove('hidden');
+    }
+
+    closeSyncStocksConfirmModal() {
+        document.getElementById('syncStocksConfirmModal')?.classList.add('hidden');
+    }
+
+    async confirmSyncStocksFromModal() {
+        this.closeSyncStocksConfirmModal();
+        await this.syncSystemStocks();
+    }
+
+    async syncSystemStocks() {
+        const productsToSync = this._getProductsNeedingSystemSync();
+
+        if (productsToSync.length === 0) {
+            this.showToast('Senkronize edilecek ürün bulunamadı', 'info', 3000);
+            return;
+        }
 
             // Show loading
             const syncBtn = document.getElementById('syncStocksBtn');

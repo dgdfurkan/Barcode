@@ -2338,6 +2338,36 @@
         </div>
     </div>
 
+    <!-- Sistem stoku senkron — onay -->
+    <div id="syncStocksConfirmModal" class="fixed inset-0 z-[142] flex items-center justify-center bg-black/50 p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="syncStocksConfirmModalTitle">
+        <div class="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div class="flex items-center justify-between border-b border-gray-200 p-4 sm:p-5">
+                <h3 id="syncStocksConfirmModalTitle" class="text-lg font-bold text-gray-900">Sistem stoklarını senkronize et</h3>
+                <button type="button" id="closeSyncStocksConfirmModal" class="rounded-lg p-1 text-gray-500 transition hover:bg-gray-100 hover:text-gray-800" aria-label="Kapat">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="p-4 sm:p-5">
+                <div class="mb-4 flex justify-center">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-full bg-blue-100">
+                        <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="mb-1 text-center text-sm text-gray-700">
+                    <span class="font-semibold text-gray-900" id="syncStocksConfirmCount">0</span>
+                    <span class="block sm:inline"> ürün için sistem stoku çekilecek.</span>
+                </p>
+                <p class="text-center text-xs text-gray-500">Bu işlem Getir API üzerinden stok bilgisi alır; birkaç dakika sürebilir.</p>
+                <div class="mt-5 flex justify-end gap-2 border-t border-gray-100 pt-4">
+                    <button type="button" id="cancelSyncStocksConfirmBtn" class="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100">İptal</button>
+                    <button type="button" id="confirmSyncStocksBtn" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">Senkronize Et</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Günlük gün sil — onay (tarayıcı confirm değil) -->
     <div id="deleteDailyTableModal" class="fixed inset-0 z-[142] flex items-center justify-center bg-black/50 p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="deleteDailyTableModalTitle">
         <div class="w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl">
