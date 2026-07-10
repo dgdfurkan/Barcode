@@ -313,21 +313,21 @@
         .counting-status-overlay.is-visible {
             opacity: 1;
             pointer-events: auto;
-            background: rgb(15 23 42 / 0.26);
-            backdrop-filter: blur(5px);
-            -webkit-backdrop-filter: blur(5px);
+            background: rgb(15 23 42 / 0.1);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
         }
         .counting-status-overlay.is-lock.is-visible {
-            background: rgb(15 23 42 / 0.34);
+            background: rgb(15 23 42 / 0.16);
         }
         .counting-status-card {
-            padding: 1.4rem 1.85rem 1.3rem;
-            background: rgb(255 255 255 / 0.98);
-            border: 1px solid rgb(226 232 240);
-            border-radius: 1rem;
-            box-shadow:
-                0 22px 48px rgb(15 23 42 / 0.16),
-                0 0 0 1px rgb(255 255 255 / 0.65) inset;
+            padding: 1.5rem 2rem 1.35rem;
+            background: rgb(255 255 255 / 0.14);
+            border: 1px solid rgb(255 255 255 / 0.32);
+            border-radius: 1.125rem;
+            backdrop-filter: blur(18px) saturate(1.12);
+            -webkit-backdrop-filter: blur(18px) saturate(1.12);
+            box-shadow: 0 14px 36px rgb(15 23 42 / 0.1);
             transform: scale(0.94) translateY(8px);
             opacity: 0;
             transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.26s ease;
@@ -394,13 +394,15 @@
             color: rgb(15 23 42);
             letter-spacing: -0.01em;
             line-height: 1.35;
+            text-shadow: 0 1px 10px rgb(255 255 255 / 0.9), 0 0 1px rgb(255 255 255 / 0.85);
         }
         .counting-status-detail {
             margin: 0;
             font-size: 0.75rem;
             font-weight: 500;
-            color: rgb(100 116 139);
+            color: rgb(51 65 85);
             line-height: 1.4;
+            text-shadow: 0 1px 8px rgb(255 255 255 / 0.85);
         }
         html.counting-status-lock #sayimTabContent,
         html.counting-status-lock #finansTabContent,
