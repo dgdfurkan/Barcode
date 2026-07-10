@@ -287,6 +287,91 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Sayım — tam ekran işlem kilidi */
+        .counting-busy-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 220;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.25rem;
+            background: rgb(15 23 42 / 0.38);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.22s ease;
+        }
+        .counting-busy-overlay.is-visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .counting-busy-card {
+            width: min(18rem, 100%);
+            border-radius: 1rem;
+            border: 1px solid rgb(226 232 240 / 0.9);
+            background: linear-gradient(180deg, rgb(255 255 255), rgb(248 250 252));
+            box-shadow: 0 24px 48px rgb(15 23 42 / 0.18);
+            padding: 1.35rem 1.25rem 1.15rem;
+            text-align: center;
+        }
+        .counting-busy-loader {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 0.35rem;
+            height: 1.75rem;
+            margin-bottom: 0.85rem;
+        }
+        .counting-busy-loader span {
+            display: block;
+            width: 0.32rem;
+            border-radius: 9999px;
+            background: linear-gradient(180deg, rgb(59 130 246), rgb(37 99 235));
+            animation: countingBusyBar 0.9s ease-in-out infinite;
+        }
+        .counting-busy-loader span:nth-child(1) { height: 0.65rem; animation-delay: 0s; }
+        .counting-busy-loader span:nth-child(2) { height: 1.1rem; animation-delay: 0.12s; }
+        .counting-busy-loader span:nth-child(3) { height: 0.85rem; animation-delay: 0.24s; }
+        @keyframes countingBusyBar {
+            0%, 100% { transform: scaleY(0.55); opacity: 0.55; }
+            50% { transform: scaleY(1.15); opacity: 1; }
+        }
+        .counting-busy-msg {
+            margin: 0;
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: rgb(30 41 59);
+            letter-spacing: 0.01em;
+        }
+        .counting-busy-detail {
+            margin: 0.35rem 0 0;
+            font-size: 0.6875rem;
+            color: rgb(100 116 139);
+            line-height: 1.35;
+        }
+        html.counting-busy-active {
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        /* Ürün kartı — stok çekimi kilidi */
+        #countingSheetStockLock {
+            border-radius: inherit;
+        }
+        #countingSheetStockLock.is-visible {
+            display: flex !important;
+        }
+        .counting-sheet-fetch-spinner {
+            width: 1.75rem;
+            height: 1.75rem;
+            border: 2.5px solid rgb(226 232 240);
+            border-top-color: rgb(37 99 235);
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+        }
         
         /* Sync button spinner */
         .sync-single-product-btn .spinner {
@@ -868,6 +953,7 @@
         }
         
         .counting-bottom-sheet .counting-bottom-sheet-content {
+            position: relative;
             transform: translateY(100%);
             max-height: min(90vh, 100dvh);
             transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
@@ -2698,6 +2784,12 @@
         
         <!-- Bottom Sheet Content: üst sabit, orta scroll, alt (Önceki/Sonraki) asla kaymaz -->
         <div class="counting-bottom-sheet-content bg-white rounded-t-2xl shadow-2xl max-h-[min(90vh,100dvh)] min-h-0 overflow-hidden flex flex-col transform">
+            <div id="countingSheetStockLock" class="hidden absolute inset-0 z-20 flex-col items-center justify-center gap-2.5 bg-white/92 backdrop-blur-[3px] px-5 text-center" aria-live="polite">
+                <div class="counting-sheet-fetch-spinner" aria-hidden="true"></div>
+                <p id="countingSheetStockLockMsg" class="text-sm font-semibold text-slate-700">Stok çekiliyor…</p>
+                <p id="countingSheetStockLockHint" class="text-[11px] text-slate-500 max-w-[14rem] leading-snug hidden"></p>
+                <button type="button" id="countingSheetStockCancelBtn" class="hidden mt-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm hover:bg-slate-50 active:scale-[0.98] transition-all">İptal</button>
+            </div>
             <!-- Drag Handle -->
             <div class="flex shrink-0 justify-center pt-2 pb-1.5">
                 <div class="w-10 h-1 bg-gray-300 rounded-full"></div>
@@ -2911,6 +3003,14 @@
             });
         });
     </script>
+
+    <div id="countingBusyOverlay" class="counting-busy-overlay hidden" role="alertdialog" aria-modal="true" aria-busy="true" aria-labelledby="countingBusyMsg">
+        <div class="counting-busy-card">
+            <div class="counting-busy-loader" aria-hidden="true"><span></span><span></span><span></span></div>
+            <p id="countingBusyMsg" class="counting-busy-msg">İşleniyor…</p>
+            <p id="countingBusyDetail" class="counting-busy-detail"></p>
+        </div>
+    </div>
 </body>
 </html>
 

@@ -83,7 +83,8 @@ class CountingSystem {
         this.skippedProducts = new Set(); // Atlanan ürün ID'leri
         this.autoSaveTimeout = null; // Otomatik kaydetme için timeout
         const _savedTab = localStorage.getItem('counting_active_tab') || 'sayim';
-        this.currentTab = ['sayim', 'finans', 'stokfark'].includes(_savedTab) ? _savedTab : 'sayim'; // 'sayim' | 'finans' | 'stokfark'
+        this.currentTab = 'sayim';
+        void _savedTab;
         /** Stok farkı sekmesi: seçili tablo adları (varsayılan tümü, ilk açılışta doldurulur) */
         this._farkTableSelection = null;
         /** Önceki tablo listesi — yalnızca yeni eklenen tablolar otomatik seçilir (kullanıcı iptalini ezmez) */
@@ -175,6 +176,13 @@ class CountingSystem {
         this.deviceId = 'dev_' + Math.random().toString(36).slice(2) + '_' + Date.now().toString(36);
         /** Toplu yapıştırma / içe aktarma sırasında arka plan sync'i durdurur */
         this._importInProgress = false;
+        this._busyDepth = 0;
+        this._sheetStockFetchInFlight = false;
+        this._sheetStockFetchReject = null;
+        this._sheetStockFetchSlowTimer = null;
+        this._sheetStockFetchTimeoutTimer = null;
+        this.SHEET_STOCK_FETCH_SLOW_MS = 10000;
+        this.SHEET_STOCK_FETCH_TIMEOUT_MS = 45000;
         /** Aktif tablo catch-up debounce (çok cihaz — tek tablo sorgusu) */
         this._activeTableCatchUpTimer = null;
         this._activeTableCatchUpInFlight = false;
@@ -239,17 +247,10 @@ class CountingSystem {
             this._applyFinanceVisualAnalyticsVisibility();
             this.bindSayimAuditLogPanel();
             
-            // Render based on current tab
-            if (this.currentTab === 'finans') {
-                this.renderFinancialTab();
-            } else if (this.currentTab === 'stokfark') {
-                void this.renderFarkTab();
-            } else {
-                // Render table (will render grid if mode is rapid)
+            // Render based on current tab — her girişte sayım sekmesi
+            this.currentTab = 'sayim';
             this.renderTable();
-                // Update view mode display after render
-                this.updateViewMode();
-            }
+            this.updateViewMode();
             
             // Update statistics
             this.updateStatistics();
@@ -902,12 +903,13 @@ class CountingSystem {
             // ── 5. Aktif tabloyu belirle ──
             const deviceTable = this._loadDeviceCurrentTable();
             const serverTable = metaBlob?._currentTable;
-            let resolvedTable = deviceTable || serverTable || 'Ana Sayım';
+            let resolvedTable = serverTable || deviceTable || 'Ana Sayım';
             if (!tables[resolvedTable]) {
                 resolvedTable = Object.keys(tables)[0] || 'Ana Sayım';
             }
             this.currentTableName = resolvedTable;
             this._saveDeviceCurrentTable(resolvedTable);
+            this._persistCurrentTableToMeta();
 
             if (!tables[this.currentTableName]) tables[this.currentTableName] = {};
             this.countingData = tables[this.currentTableName];
@@ -1115,6 +1117,8 @@ class CountingSystem {
             _api_info: this.cachedFullData?._api_info || {},
             _auditLog: this.auditLog.slice(-this.AUDIT_LOG_MAX),
             _tableMeta: tableMeta,
+            _currentTable: this.currentTableName || null,
+            _currentTableAt: Date.now(),
         };
     }
 
@@ -1927,8 +1931,9 @@ class CountingSystem {
         }
     }
 
-    _beginBulkImportLock() {
+    _beginBulkImportLock(message = 'Ürünler işleniyor…') {
         this._importInProgress = true;
+        this.showCountingBusy(message);
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
             this._saveDebounceTimer = null;
@@ -1937,7 +1942,185 @@ class CountingSystem {
 
     _endBulkImportLock() {
         this._importInProgress = false;
-        this._suppressCatchUpUntil = Date.now() + 5000;
+        this._suppressCatchUpUntil = Date.now() + 3000;
+        this.hideCountingBusy();
+    }
+
+    showCountingBusy(message = 'İşleniyor…', detail = '') {
+        this._busyDepth = (this._busyDepth || 0) + 1;
+        const overlay = document.getElementById('countingBusyOverlay');
+        const msgEl = document.getElementById('countingBusyMsg');
+        const detailEl = document.getElementById('countingBusyDetail');
+        if (msgEl) msgEl.textContent = message;
+        if (detailEl) {
+            detailEl.textContent = detail || '';
+            detailEl.style.display = detail ? 'block' : 'none';
+        }
+        if (overlay) {
+            overlay.classList.remove('hidden');
+            requestAnimationFrame(() => overlay.classList.add('is-visible'));
+        }
+        document.documentElement.classList.add('counting-busy-active');
+    }
+
+    hideCountingBusy() {
+        this._busyDepth = Math.max(0, (this._busyDepth || 1) - 1);
+        if (this._busyDepth > 0) return;
+        const overlay = document.getElementById('countingBusyOverlay');
+        if (overlay) {
+            overlay.classList.remove('is-visible');
+            setTimeout(() => {
+                if ((this._busyDepth || 0) === 0) overlay.classList.add('hidden');
+            }, 220);
+        }
+        document.documentElement.classList.remove('counting-busy-active');
+    }
+
+    _isSheetStockFetchLocked() {
+        return this._sheetStockFetchInFlight === true;
+    }
+
+    _applySheetStockFetchLock(locked) {
+        const ids = [
+            'countingPrevBtn',
+            'countingNextBtn',
+            'countingDeleteProductBtn',
+            'countingVerifyBarcodeBtn',
+            'countingDecreaseBtn',
+            'countingIncreaseBtn',
+            'countingCorrectEntryBtn',
+            'countingRefreshSystemStockBtn',
+        ];
+        ids.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = !!locked;
+        });
+        document.querySelectorAll('#countingBottomSheet .keypad-btn, #keypadBackspace').forEach((btn) => {
+            btn.disabled = !!locked;
+            btn.classList.toggle('opacity-40', !!locked);
+            btn.classList.toggle('pointer-events-none', !!locked);
+        });
+        const lock = document.getElementById('countingSheetStockLock');
+        if (lock) lock.classList.toggle('is-visible', !!locked);
+    }
+
+    _clearSheetStockFetchTimers() {
+        if (this._sheetStockFetchSlowTimer) {
+            clearTimeout(this._sheetStockFetchSlowTimer);
+            this._sheetStockFetchSlowTimer = null;
+        }
+        if (this._sheetStockFetchTimeoutTimer) {
+            clearTimeout(this._sheetStockFetchTimeoutTimer);
+            this._sheetStockFetchTimeoutTimer = null;
+        }
+    }
+
+    _updateSheetStockFetchUi(message, hint = '', showCancel = false) {
+        const msgEl = document.getElementById('countingSheetStockLockMsg');
+        const hintEl = document.getElementById('countingSheetStockLockHint');
+        const cancelBtn = document.getElementById('countingSheetStockCancelBtn');
+        if (msgEl && message) msgEl.textContent = message;
+        if (hintEl) {
+            hintEl.textContent = hint || '';
+            hintEl.classList.toggle('hidden', !hint);
+        }
+        if (cancelBtn) cancelBtn.classList.toggle('hidden', !showCancel);
+    }
+
+    _cancelSheetStockFetch() {
+        if (!this._sheetStockFetchInFlight) return;
+        this._sheetStockFetchCancelled = true;
+        if (typeof this._sheetStockFetchReject === 'function') {
+            this._sheetStockFetchReject(new Error('cancelled'));
+            this._sheetStockFetchReject = null;
+        }
+        this._endSheetStockFetch({ cancelled: true });
+        this.showToast('Stok isteği iptal edildi', 'info', 2200);
+    }
+
+    _beginSheetStockFetch() {
+        this._sheetStockFetchInFlight = true;
+        this._sheetStockFetchCancelled = false;
+        this._sheetStockFetchReject = null;
+        this._applySheetStockFetchLock(true);
+        this._updateSheetStockFetchUi('Stok çekiliyor…', '', false);
+
+        this._clearSheetStockFetchTimers();
+        this._sheetStockFetchSlowTimer = setTimeout(() => {
+            this._updateSheetStockFetchUi(
+                'Biraz uzun sürüyor…',
+                'Bağlantı yavaş olabilir. Biraz daha bekleyin veya iptal edin.',
+                true
+            );
+        }, this.SHEET_STOCK_FETCH_SLOW_MS);
+
+        this._sheetStockFetchTimeoutTimer = setTimeout(() => {
+            if (!this._sheetStockFetchInFlight) return;
+            if (typeof this._sheetStockFetchReject === 'function') {
+                this._sheetStockFetchReject(new Error('timeout'));
+                this._sheetStockFetchReject = null;
+            }
+        }, this.SHEET_STOCK_FETCH_TIMEOUT_MS);
+    }
+
+    _endSheetStockFetch({ cancelled = false } = {}) {
+        if (!this._sheetStockFetchInFlight && !cancelled) return;
+        this._sheetStockFetchInFlight = false;
+        this._sheetStockFetchReject = null;
+        this._clearSheetStockFetchTimers();
+        this._applySheetStockFetchLock(false);
+        this._updateSheetStockFetchUi('Stok çekiliyor…', '', false);
+    }
+
+    async _fetchStockForCountingSheet(productId, barcode) {
+        if (this._isSheetStockFetchLocked()) return null;
+        this._beginSheetStockFetch();
+
+        try {
+            const result = await new Promise((resolve, reject) => {
+                this._sheetStockFetchReject = reject;
+                this.requestStockFromExtension(null, barcode, productId, {})
+                    .then(resolve)
+                    .catch(reject);
+            });
+            if (this._sheetStockFetchCancelled) return null;
+            return result;
+        } catch (error) {
+            if (this._sheetStockFetchCancelled || error?.message === 'cancelled') return null;
+            if (error?.message === 'timeout') {
+                this.showToast('Stok isteği zaman aşımına uğradı. Tekrar deneyin.', 'warning', 4000);
+            } else {
+                throw error;
+            }
+            return null;
+        } finally {
+            this._endSheetStockFetch();
+        }
+    }
+
+    _refreshOpenCountingSheetFromData() {
+        const productId = this.currentCountingProduct;
+        if (!productId) return;
+        const data = this.countingData[productId];
+        if (!data) return;
+
+        this.updateCountingBottomSheetSystemStockDisplay(data.systemStock, data.reservedStock);
+        const depoInput = document.getElementById('countingDepoInput');
+        if (depoInput) {
+            depoInput.value =
+                data.warehouseStock !== null && data.warehouseStock !== undefined
+                    ? data.warehouseStock
+                    : '';
+        }
+        const stockIndicator = document.getElementById('countingStockIndicator');
+        this.updateStockIndicator(productId, stockIndicator);
+        this.updateCorrectEntryButtonState();
+    }
+
+    _persistCurrentTableToMeta() {
+        if (!this.cachedFullData || !this.currentTableName) return;
+        this.cachedFullData._currentTable = this.currentTableName;
+        this.cachedFullData._currentTableAt = Date.now();
     }
 
     _syncProductOrderMeta(tableName) {
@@ -1999,7 +2182,7 @@ class CountingSystem {
     }
 
     /** Debounced aktif tablo catch-up — tek counting_items sorgusu, egress dostu */
-    _scheduleActiveTableCatchUp(delay = 350) {
+    _scheduleActiveTableCatchUp(delay = 150) {
         if (this._importInProgress || !this.currentTableName) return;
         if (this._suppressCatchUpUntil && Date.now() < this._suppressCatchUpUntil) return;
         if (this._activeTableCatchUpTimer) clearTimeout(this._activeTableCatchUpTimer);
@@ -2493,7 +2676,7 @@ class CountingSystem {
             if (!this._isCountingRealtimeHealthy()) {
                 tryMetaRefresh({ forceMeta: true });
             }
-        }, 60000);
+        }, 25000);
     }
 
     /**
@@ -2822,6 +3005,9 @@ class CountingSystem {
                 this.scheduleRenderTable();
                 this.updateStatistics();
                 this.updateCountingProgress();
+                if (pId === this.currentCountingProduct && !this._isSheetStockFetchLocked()) {
+                    this._refreshOpenCountingSheetFromData();
+                }
             }
             // Yeni tablo görünürse chip listesi de güncellensin
             if (isNewProduct) this._scheduleTableSelectorUpdate();
@@ -2868,6 +3054,15 @@ class CountingSystem {
             incoming._auditLog.length > (this.auditLog?.length || 0)) {
             this.auditLog = incoming._auditLog.slice(-this.AUDIT_LOG_MAX);
             this.cachedFullData._auditLog = this.auditLog;
+        }
+
+        if (incoming._currentTable && incoming._currentTable !== this.cachedFullData._currentTable) {
+            const incomingAt = Number(incoming._currentTableAt) || 0;
+            const localAt = Number(this.cachedFullData._currentTableAt) || 0;
+            if (incomingAt >= localAt) {
+                this.cachedFullData._currentTable = incoming._currentTable;
+                this.cachedFullData._currentTableAt = incomingAt;
+            }
         }
 
         let tablesChanged = false;
@@ -3011,9 +3206,13 @@ class CountingSystem {
 
         const skipCatchUp = options.skipCatchUp === true;
         const skipRender = options.skipRender === true;
+        const silent = options.silent === true || this._importInProgress;
+
+        if (!silent) this.showCountingBusy('Tablo yükleniyor…');
 
         const fromTable = this.currentTableName;
 
+        try {
         // Bekleyen tam blob kaydını ESKİ tablo adıyla flush et (iptal etme — veri kaybı + yanlış tablo yazımı)
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
@@ -3057,6 +3256,7 @@ class CountingSystem {
 
         this._activateCountingTable(tableName, { fromTable, persistFrom: false });
         this._saveDeviceCurrentTable(tableName);
+        this._persistCurrentTableToMeta();
         await this._saveMetaOnly();
 
         if (!skipCatchUp) {
@@ -3087,6 +3287,9 @@ class CountingSystem {
         this.updateTableSelector();
         this.scrollActiveGeneralTableChipIntoView({ behavior: 'auto' });
         this.syncSayimSubTabToTable();
+        } finally {
+            if (!silent) this.hideCountingBusy();
+        }
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -4025,6 +4228,10 @@ class CountingSystem {
             throw new Error('Tablo adı boş olamaz');
         }
 
+        const useBusy = options.skipRender !== true && !this._importInProgress;
+        if (useBusy) this.showCountingBusy('Tablo oluşturuluyor…');
+
+        try {
         const trimmed = tableName.trim();
         const fromTable = this.currentTableName;
 
@@ -4062,6 +4269,7 @@ class CountingSystem {
 
         this._activateCountingTable(trimmed, { fromTable, persistFrom: false });
         this._saveDeviceCurrentTable(trimmed);
+        this._persistCurrentTableToMeta();
         this.touchTableLastActivity(trimmed, nowIso);
 
         this.pushAuditEntry(
@@ -4081,12 +4289,19 @@ class CountingSystem {
         this.updateActiveTableActivityLine();
         this.updateTableSelector();
         this.syncSayimSubTabToTable();
+        } finally {
+            if (useBusy) this.hideCountingBusy();
+        }
     }
 
     // Delete a table
     async deleteTable(tableName) {
         if (!tableName) return;
 
+        const useBusy = !this._importInProgress;
+        if (useBusy) this.showCountingBusy('Tablo siliniyor…');
+
+        try {
         const fullData = this.cachedFullData || { _api_info: {}, _tables: {} };
         if (!fullData._tables) return;
 
@@ -4104,6 +4319,7 @@ class CountingSystem {
             const newTableName = Object.keys(fullData._tables)[0];
             this.currentTableName = newTableName;
             this._saveDeviceCurrentTable(newTableName);
+            this._persistCurrentTableToMeta();
             this.countingData = fullData._tables[newTableName] || {};
         }
 
@@ -4118,6 +4334,9 @@ class CountingSystem {
         this.updateStatistics();
         this.updateTableSelector();
         this.syncSayimSubTabToTable();
+        } finally {
+            if (useBusy) this.hideCountingBusy();
+        }
     }
 
     // Get list of all tables
@@ -5604,10 +5823,6 @@ class CountingSystem {
             }
 
             // 3. Aşama: Meta blob + counting_items toplu kayıt (sıra korunur)
-            await this.saveCountingData();
-            await this._bulkSaveProductEntries(idsInPasteOrder, this.currentTableName);
-
-            // Grid önbelleğini sıfırla — incremental render eski kartları bırakmasın
             this._rapidRenderedIds = [];
             this._rapidRenderedStates.clear();
 
@@ -5619,6 +5834,9 @@ class CountingSystem {
             this.updateCountingProgress();
             this.updateTableSelector();
             this.syncSayimSubTabToTable();
+
+            await this.saveCountingData();
+            await this._bulkSaveProductEntries(idsInPasteOrder, this.currentTableName);
             this.showToast(
                 `${added} ürün işlendi${skipped ? `, ${skipped} satır eşleşmedi` : ''}`,
                 added ? 'success' : 'warning',
@@ -5964,14 +6182,7 @@ class CountingSystem {
         genBtn.addEventListener('click', () => go('general'));
         dailyBtn.addEventListener('click', () => go('daily'));
 
-        let initial = 'general';
-        try {
-            const saved = sessionStorage.getItem('sayimSubTab');
-            if (saved === 'daily' || saved === 'general') initial = saved;
-        } catch (e) {
-            /* ignore */
-        }
-        go(initial);
+        go('general');
         this.syncSayimSubTabToTable();
     }
 
@@ -6938,7 +7149,7 @@ class CountingSystem {
         // Previous button (go to previous uncounted product)
         if (prevBtn) {
             prevBtn.addEventListener('click', async () => {
-                if (!this.currentCountingProduct) return;
+                if (!this.currentCountingProduct || this._isSheetStockFetchLocked()) return;
 
                 const prevProductId = this.findPreviousUncountedProduct(this.currentCountingProduct);
                 if (prevProductId) {
@@ -6966,7 +7177,7 @@ class CountingSystem {
         const nextBtn = document.getElementById('countingNextBtn');
         if (nextBtn) {
             nextBtn.addEventListener('click', async () => {
-                if (!this.currentCountingProduct) return;
+                if (!this.currentCountingProduct || this._isSheetStockFetchLocked()) return;
 
                 const nextProductId = this.findNextUncountedProduct(this.currentCountingProduct);
                 if (nextProductId) {
@@ -6993,6 +7204,7 @@ class CountingSystem {
         // Backdrop click to close
         if (backdrop) {
             backdrop.addEventListener('click', () => {
+                if (this._isSheetStockFetchLocked()) return;
                 void this.closeCountingBottomSheet().catch((err) =>
                     console.error('closeCountingBottomSheet:', err)
                 );
@@ -7002,6 +7214,7 @@ class CountingSystem {
         // ESC key to close
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                if (this._isSheetStockFetchLocked()) return;
                 const bottomSheet = document.getElementById('countingBottomSheet');
                 if (bottomSheet && !bottomSheet.classList.contains('hidden')) {
                     void this.closeCountingBottomSheet().catch((err) =>
@@ -7032,7 +7245,7 @@ class CountingSystem {
         const refreshSystemStockBtn = document.getElementById('countingRefreshSystemStockBtn');
         if (refreshSystemStockBtn) {
             refreshSystemStockBtn.addEventListener('click', async () => {
-                if (!this.currentCountingProduct) {
+                if (!this.currentCountingProduct || this._isSheetStockFetchLocked()) {
                     return;
                 }
 
@@ -7047,13 +7260,10 @@ class CountingSystem {
                     return;
                 }
 
-                // Disable button and show loading
-                refreshSystemStockBtn.disabled = true;
-                const originalHTML = refreshSystemStockBtn.innerHTML;
-                refreshSystemStockBtn.innerHTML = '<div class="spinner" style="width: 8px; height: 8px; border: 1.5px solid #e5e7eb; border-top: 1.5px solid #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>';
-
                 try {
-                    const result = await this.requestStockFromExtension(null, barcode, this.currentCountingProduct, {});
+                    const result = await this._fetchStockForCountingSheet(this.currentCountingProduct, barcode);
+                    if (!result) return;
+
                     const stock = typeof result === 'number' ? result : (result?.stock ?? null);
                     const price = typeof result === 'object' && result !== null ? result?.price : null;
                     const priceText = typeof result === 'object' && result !== null ? result?.priceText : null;
@@ -7085,11 +7295,14 @@ class CountingSystem {
                 } catch (error) {
                     this.showToast('Stok alınamadı: ' + (error.message || 'Bilinmeyen hata'), 'error', 3000);
                 } finally {
-                    refreshSystemStockBtn.disabled = false;
-                    refreshSystemStockBtn.innerHTML = originalHTML;
                     this.updateCorrectEntryButtonState();
                 }
             });
+        }
+
+        const sheetStockCancelBtn = document.getElementById('countingSheetStockCancelBtn');
+        if (sheetStockCancelBtn) {
+            sheetStockCancelBtn.addEventListener('click', () => this._cancelSheetStockFetch());
         }
 
         const correctEntryBtn = document.getElementById('countingCorrectEntryBtn');
@@ -7857,11 +8070,6 @@ class CountingSystem {
             { cat: 'import', tbl: tn }
         );
 
-        await this.saveCountingData();
-        if (newProductIds.length > 0) {
-            await this._bulkSaveProductEntries(newProductIds, tn);
-        }
-
         this._scheduleBackgroundPriceEnrichment(this.currentTableName);
 
         this.scheduleRenderTable();
@@ -7871,6 +8079,11 @@ class CountingSystem {
         this.updateStatistics();
         this.updateCountingProgress();
         this._scheduleTableSelectorUpdate();
+
+        await this.saveCountingData();
+        if (newProductIds.length > 0) {
+            await this._bulkSaveProductEntries(newProductIds, tn);
+        }
 
         let msg = `${addedCount} ürün eklendi`;
         if (skippedInTable) msg += `, ${skippedInTable} zaten tablodaydı`;
@@ -10582,6 +10795,8 @@ class CountingSystem {
     }
 
     openCountingBottomSheet(productId, options = {}) {
+        if (this._isSheetStockFetchLocked() && productId !== this.currentCountingProduct) return;
+
         if (this.currentCountingProduct && this.currentCountingProduct !== productId) {
             this.flushDeferredStockAuditForProduct(this.currentCountingProduct);
         }
@@ -10769,6 +10984,8 @@ class CountingSystem {
     }
 
     async closeCountingBottomSheet() {
+        if (this._isSheetStockFetchLocked()) return;
+
         const resumeSeriSayarCamera = this.countingBottomSheetFromCameraSeriSayar;
 
         if (this._barcodeVerifyInProgress && window.barcodeScanner) {
