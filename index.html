@@ -69,95 +69,155 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-        .barcode-bg {
-            background: linear-gradient(145deg, #0a0f1d 0%, #0d1428 35%, #132144 70%, #0f1729 100%);
-            position: relative;
+        /* Ana sayfa arka plan — Synapse tarzı ambient orb (marka mavisi) */
+        .landing-ambient-bg {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background: #030303;
             overflow: hidden;
         }
-        .barcode-bg::before {
-            content: '';
-            position: absolute; inset: 0;
-            background: radial-gradient(ellipse 80% 50% at 50% 0%, rgba(19,91,236,0.08) 0%, transparent 50%);
+
+        .landing-ambient-glow {
+            position: absolute;
             pointer-events: none;
+            border-radius: 50%;
         }
-        /* Ana barkod çizgileri: ince/kalın bar ritmi, daha temiz */
-        .barcode-lines {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: repeating-linear-gradient(90deg,
-                transparent 0px,
-                transparent 3px,
-                rgba(255,255,255,0.06) 3px,
-                rgba(255,255,255,0.06) 4px,
-                transparent 4px,
-                transparent 10px,
-                rgba(255,255,255,0.05) 10px,
-                rgba(255,255,255,0.05) 13px,
-                transparent 13px,
-                transparent 18px,
-                rgba(255,255,255,0.07) 18px,
-                rgba(255,255,255,0.07) 19px,
-                transparent 19px,
-                transparent 26px,
-                rgba(255,255,255,0.04) 26px,
-                rgba(255,255,255,0.04) 30px,
-                transparent 30px,
-                transparent 38px,
-                rgba(255,255,255,0.06) 38px,
-                rgba(255,255,255,0.06) 41px,
-                transparent 41px,
-                transparent 52px,
-                rgba(255,255,255,0.05) 52px,
-                rgba(255,255,255,0.05) 55px,
-                transparent 55px,
-                transparent 62px,
-                rgba(255,255,255,0.06) 62px,
-                rgba(255,255,255,0.06) 64px,
-                transparent 64px,
-                transparent 72px
-            );
-            background-size: 72px 100%;
+
+        .landing-ambient-glow--hero {
+            top: -18%;
+            left: 50%;
+            width: min(110rem, 200vw);
+            height: min(52rem, 85vh);
+            transform: translateX(-50%);
+            background: radial-gradient(ellipse 55% 48% at 50% 0%, rgba(0, 82, 255, 0.38) 0%, rgba(19, 91, 236, 0.12) 42%, transparent 72%);
+            filter: blur(48px);
+        }
+
+        .landing-ambient-glow--side {
+            left: -12%;
+            top: 28%;
+            width: min(36rem, 75vw);
+            height: min(36rem, 75vw);
+            background: radial-gradient(circle, rgba(77, 124, 255, 0.22) 0%, rgba(0, 82, 255, 0.06) 45%, transparent 72%);
+            filter: blur(72px);
+        }
+
+        .landing-orb {
+            position: absolute;
+            border-radius: 50%;
             pointer-events: none;
-            opacity: 0.85;
+            filter: blur(56px);
+            will-change: transform;
         }
-        /* İkinci katman: hafif kaydırılmış, derinlik */
-        .barcode-lines::after {
-            content: '';
-            position: absolute; inset: 0;
-            background: repeating-linear-gradient(90deg,
-                transparent 0px,
-                rgba(255,255,255,0.03) 0px,
-                rgba(255,255,255,0.03) 1px,
-                transparent 1px,
-                transparent 9px,
-                rgba(255,255,255,0.025) 9px,
-                rgba(255,255,255,0.025) 11px,
-                transparent 11px,
-                transparent 24px
-            );
-            background-size: 24px 100%;
-            background-position: 12px 0;
+
+        .landing-orb--1 {
+            top: 10%;
+            right: 8%;
+            width: min(26rem, 58vw);
+            height: min(26rem, 58vw);
+            background: rgba(0, 82, 255, 0.42);
+            animation: landingOrbFloatA 13s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+        }
+
+        .landing-orb--2 {
+            bottom: 12%;
+            left: 6%;
+            width: min(20rem, 48vw);
+            height: min(20rem, 48vw);
+            background: rgba(77, 124, 255, 0.34);
+            animation: landingOrbFloatB 10s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+            animation-delay: -2.5s;
+        }
+
+        .landing-orb--3 {
+            top: 42%;
+            left: 38%;
+            width: min(14rem, 34vw);
+            height: min(14rem, 34vw);
+            background: rgba(19, 91, 236, 0.28);
+            animation: landingOrbFloatC 15s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+            animation-delay: -5s;
+        }
+
+        .landing-ambient-vignette {
+            position: absolute;
+            inset: 0;
             pointer-events: none;
-            opacity: 0.6;
+            background:
+                radial-gradient(ellipse 95% 85% at 50% 45%, transparent 22%, rgba(0, 0, 0, 0.42) 100%),
+                linear-gradient(180deg, rgba(0, 0, 0, 0.15) 0%, transparent 28%, transparent 72%, rgba(0, 0, 0, 0.35) 100%);
         }
-        /* Yumuşak kenar karartma */
-        .barcode-overlay {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: radial-gradient(ellipse 100% 80% at 50% 50%, transparent 30%, rgba(0,0,0,0.25) 100%);
+
+        .landing-ambient-dots {
+            position: absolute;
+            inset: 0;
             pointer-events: none;
+            opacity: 0.35;
+            background-image: radial-gradient(circle, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+            background-size: 28px 28px;
+            mask-image: radial-gradient(ellipse 88% 75% at 50% 38%, #000 15%, transparent 78%);
+            -webkit-mask-image: radial-gradient(ellipse 88% 75% at 50% 38%, #000 15%, transparent 78%);
         }
-        /* Hafif hareket eden scanline */
-        .scanline {
-            width: 100%; height: 1px;
-            background: linear-gradient(90deg, transparent 0%, rgba(19,91,236,0.25) 20%, rgba(19,91,236,0.4) 50%, rgba(19,91,236,0.25) 80%, transparent 100%);
-            position: absolute; top: 30%; left: 0;
-            pointer-events: none;
-            box-shadow: 0 0 20px rgba(19,91,236,0.15);
-            animation: scanlineMove 8s ease-in-out infinite;
+
+        @keyframes landingOrbFloatA {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.9; }
+            50% { transform: translate(-18px, -22px) scale(1.06); opacity: 1; }
         }
-        @keyframes scanlineMove {
-            0%, 100% { top: 25%; opacity: 0.9; }
-            50% { top: 75%; opacity: 0.9; }
+
+        @keyframes landingOrbFloatB {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(14px, -18px) scale(1.05); }
         }
+
+        @keyframes landingOrbFloatC {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.75; }
+            50% { transform: translate(-10px, 16px) scale(1.08); opacity: 0.95; }
+        }
+
+        @media (max-width: 767px) {
+            .landing-ambient-glow--hero {
+                top: -22%;
+                height: min(40rem, 70vh);
+                filter: blur(36px);
+            }
+
+            .landing-ambient-glow--side {
+                left: -28%;
+                top: 55%;
+                width: min(28rem, 90vw);
+                height: min(28rem, 90vw);
+                opacity: 0.85;
+            }
+
+            .landing-orb--1 {
+                top: -4%;
+                right: -18%;
+                width: min(18rem, 72vw);
+                height: min(18rem, 72vw);
+            }
+
+            .landing-orb--2 {
+                bottom: 8%;
+                left: -22%;
+                width: min(16rem, 65vw);
+                height: min(16rem, 65vw);
+            }
+
+            .landing-orb--3 {
+                top: 38%;
+                left: 50%;
+                transform: translateX(-50%);
+                width: min(11rem, 50vw);
+                height: min(11rem, 50vw);
+                opacity: 0.7;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .landing-orb { animation: none !important; }
+        }
+
         .glass-card {
             background: rgba(255,255,255,0.06);
             backdrop-filter: blur(16px);
@@ -550,11 +610,15 @@
     </style>
 </head>
 <body class="font-display min-h-screen flex items-center justify-center m-0 p-0 overflow-x-hidden">
-    <!-- Barcode background -->
-    <div class="fixed inset-0 barcode-bg z-0">
-        <div class="barcode-lines"></div>
-        <div class="barcode-overlay"></div>
-        <div class="scanline"></div>
+    <!-- Ambient arka plan -->
+    <div class="landing-ambient-bg" aria-hidden="true">
+        <div class="landing-ambient-glow landing-ambient-glow--hero"></div>
+        <div class="landing-ambient-glow landing-ambient-glow--side"></div>
+        <div class="landing-orb landing-orb--1"></div>
+        <div class="landing-orb landing-orb--2"></div>
+        <div class="landing-orb landing-orb--3"></div>
+        <div class="landing-ambient-dots"></div>
+        <div class="landing-ambient-vignette"></div>
     </div>
 
     <div class="relative z-10 w-full max-w-[1200px] flex flex-col items-center justify-center p-6 fade-in-up" id="loginPageShell">
