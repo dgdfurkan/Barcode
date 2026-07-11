@@ -33,14 +33,20 @@ class AdminPanel {
         }
 
         // Update admin user info
-        document.getElementById('adminUser').textContent = session.username;
+        const adminUserEl = document.getElementById('adminUser');
+        if (adminUserEl) adminUserEl.textContent = session.username;
+        this._setAdminAvatarInitials(session.username);
+
+        this._initAdminShellUI();
 
         // Add logout functionality
-        document.getElementById('logoutBtn').addEventListener('click', () => {
+        const logoutHandler = () => {
             if (confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
                 window.authUtils.logout();
             }
-        });
+        };
+        document.getElementById('logoutBtn')?.addEventListener('click', logoutHandler);
+        document.getElementById('logoutBtnMobile')?.addEventListener('click', logoutHandler);
 
         // Initialize tabs
         this.initTabs();
@@ -306,15 +312,57 @@ class AdminPanel {
         });
     }
 
-    async switchTab(tabName) {
-        // Update button states
-        document.querySelectorAll('.tab-button').forEach(btn => {
-            btn.classList.remove('active', 'border-blue-500', 'text-blue-600');
-            btn.classList.add('border-transparent', 'text-gray-500');
+    _setAdminAvatarInitials(username = '') {
+        const avatar = document.querySelector('.adm-user-avatar');
+        if (!avatar || !username) return;
+        const parts = String(username).split(/[.\s_-]+/).filter(Boolean);
+        const initials = parts.length >= 2
+            ? `${parts[0][0] || ''}${parts[1][0] || ''}`
+            : (username.slice(0, 2) || 'JB');
+        avatar.textContent = initials.toUpperCase();
+    }
+
+    _initAdminShellUI() {
+        const sidebar = document.getElementById('admSidebar');
+        const overlay = document.getElementById('admSidebarOverlay');
+        const menuBtn = document.getElementById('admMenuBtn');
+
+        const closeNav = () => {
+            sidebar?.classList.remove('is-open');
+            overlay?.classList.remove('is-visible');
+            document.body.classList.remove('adm-nav-open');
+            menuBtn?.setAttribute('aria-expanded', 'false');
+        };
+
+        const openNav = () => {
+            sidebar?.classList.add('is-open');
+            overlay?.classList.add('is-visible');
+            document.body.classList.add('adm-nav-open');
+            menuBtn?.setAttribute('aria-expanded', 'true');
+        };
+
+        menuBtn?.addEventListener('click', () => {
+            if (sidebar?.classList.contains('is-open')) closeNav();
+            else openNav();
         });
 
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active', 'border-blue-500', 'text-blue-600');
-        document.querySelector(`[data-tab="${tabName}"]`).classList.remove('border-transparent', 'text-gray-500');
+        overlay?.addEventListener('click', closeNav);
+
+        document.querySelectorAll('.tab-button').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (window.matchMedia('(max-width: 1023px)').matches) closeNav();
+            });
+        });
+
+        window.addEventListener('resize', () => {
+            if (window.matchMedia('(min-width: 1024px)').matches) closeNav();
+        });
+    }
+
+    async switchTab(tabName) {
+        document.querySelectorAll('.tab-button').forEach((btn) => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
 
         // Update content
         document.querySelectorAll('.tab-content').forEach(content => {
@@ -322,6 +370,19 @@ class AdminPanel {
         });
 
         document.getElementById(`${tabName}-tab`).classList.remove('hidden');
+
+        const titles = {
+            users: 'Kullanıcılar',
+            messages: 'Mesajlar',
+            chat: 'Sohbet',
+            ipAnalysis: 'IP Analizi',
+            updates: 'Güncellemeler',
+            config: 'Config',
+            'product-import': 'Ürün İçe Aktarma',
+            settings: 'Ayarlar',
+        };
+        const topTitle = document.querySelector('.adm-topbar-title');
+        if (topTitle) topTitle.textContent = titles[tabName] || 'Admin Panel';
 
         this.currentTab = tabName;
         
@@ -409,13 +470,13 @@ class AdminPanel {
                 'Deaktif';
 
             row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap">
+                <td class="px-6 py-4 whitespace-nowrap" data-label="Kullanıcı">
                     <div class="text-sm font-medium text-gray-900">${user.username}</div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap">
+                <td class="px-6 py-4 whitespace-nowrap" data-label="Şirket">
                     <div class="text-sm text-gray-500">${user.company || '-'}</div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap">
+                <td class="px-6 py-4 whitespace-nowrap" data-label="Test Süresi">
                     <div class="text-sm text-gray-500">${user.trial_end ? new Date(user.trial_end).toLocaleString('tr-TR', {
                         year: 'numeric',
                         month: '2-digit',
@@ -424,18 +485,18 @@ class AdminPanel {
                         minute: '2-digit'
                     }) : '-'}</div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap">
+                <td class="px-6 py-4 whitespace-nowrap" data-label="Durum">
                     <span class="text-sm font-medium ${this.getTrialStatusClass(user.trial_end)}">${this.getTrialStatusText(user.trial_end)}</span>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div class="flex space-x-2">
-                        <button onclick="adminPanel.editUser('${user.username}')" class="text-green-600 hover:text-green-900">Düzenle</button>
-                        <button onclick="adminPanel.extendTrial('${user.username}')" class="text-blue-600 hover:text-blue-900">Uzat</button>
-                        <button onclick="adminPanel.managePremiumFeatures('${user.username}')" class="text-purple-600 hover:text-purple-900">⭐ Premium</button>
-                        <button onclick="adminPanel.toggleUser('${user.username}')" class="text-yellow-600 hover:text-yellow-900">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" data-label="İşlemler">
+                    <div class="flex flex-wrap gap-2">
+                        <button type="button" onclick="adminPanel.editUser('${user.username}')" class="text-green-600 hover:text-green-900">Düzenle</button>
+                        <button type="button" onclick="adminPanel.extendTrial('${user.username}')" class="text-blue-600 hover:text-blue-900">Uzat</button>
+                        <button type="button" onclick="adminPanel.managePremiumFeatures('${user.username}')" class="text-[#0052FF] hover:text-blue-900">Premium</button>
+                        <button type="button" onclick="adminPanel.toggleUser('${user.username}')" class="text-yellow-600 hover:text-yellow-900">
                             ${user.is_active ? 'Deaktif Et' : 'Aktif Et'}
                         </button>
-                        <button onclick="adminPanel.deleteUser('${user.username}')" class="text-red-600 hover:text-red-900">Sil</button>
+                        <button type="button" onclick="adminPanel.deleteUser('${user.username}')" class="text-red-600 hover:text-red-900">Sil</button>
                     </div>
                 </td>
             `;
@@ -1016,17 +1077,12 @@ class AdminPanel {
         this.currentMessageFilter = filter;
         
         // Update filter button states
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-            btn.classList.remove('bg-blue-600', 'text-white');
-            btn.classList.add('bg-gray-300', 'text-gray-700');
+        document.querySelectorAll('.filter-btn').forEach((btn) => {
+            btn.classList.remove('is-active');
         });
-        
-        // Highlight active filter
+
         const activeButton = document.getElementById(`filter${filter.charAt(0).toUpperCase() + filter.slice(1)}Messages`);
-        if (activeButton) {
-            activeButton.classList.remove('bg-gray-300', 'text-gray-700');
-            activeButton.classList.add('bg-blue-600', 'text-white');
-        }
+        if (activeButton) activeButton.classList.add('is-active');
         
         this.renderMessages();
     }
@@ -1179,16 +1235,12 @@ class AdminPanel {
         console.log('Filtering IPs:', filter);
         
         // Update button styles
-        document.querySelectorAll('[id^="filter"]').forEach(btn => {
-            btn.classList.remove('bg-blue-600', 'text-white');
-            btn.classList.add('bg-gray-200', 'text-gray-700');
+        document.querySelectorAll('.ip-filter-btn').forEach((btn) => {
+            btn.classList.remove('is-active');
         });
-        
+
         const activeButton = document.getElementById(`filter${filter.charAt(0).toUpperCase() + filter.slice(1)}IPs`);
-        if (activeButton) {
-            activeButton.classList.remove('bg-gray-200', 'text-gray-700');
-            activeButton.classList.add('bg-blue-600', 'text-white');
-        }
+        if (activeButton) activeButton.classList.add('is-active');
 
         // Filter data based on filter type
         let filteredData = this.ipTrackingData || [];
