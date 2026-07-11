@@ -35,7 +35,6 @@ class AdminPanel {
         // Update admin user info
         const adminUserEl = document.getElementById('adminUser');
         if (adminUserEl) adminUserEl.textContent = session.username;
-        this._setAdminAvatarInitials(session.username);
 
         this._initAdminShellUI();
 
@@ -208,6 +207,7 @@ class AdminPanel {
         // Chat event listeners
         document.getElementById('refreshChat').addEventListener('click', () => this.loadChatUsers());
         document.getElementById('clearChatBtn').addEventListener('click', () => this.clearChat());
+        document.getElementById('chatBackBtn')?.addEventListener('click', () => this.backChatToList());
         document.getElementById('sendAdminMessage').addEventListener('click', () => this.sendAdminMessage());
         document.getElementById('adminMessageInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.sendAdminMessage();
@@ -312,14 +312,15 @@ class AdminPanel {
         });
     }
 
-    _setAdminAvatarInitials(username = '') {
-        const avatar = document.querySelector('.adm-user-avatar');
-        if (!avatar || !username) return;
-        const parts = String(username).split(/[.\s_-]+/).filter(Boolean);
-        const initials = parts.length >= 2
-            ? `${parts[0][0] || ''}${parts[1][0] || ''}`
-            : (username.slice(0, 2) || 'JB');
-        avatar.textContent = initials.toUpperCase();
+    _userActionIcons() {
+        return {
+            edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>',
+            extend: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+            premium: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.8 6.7 18.1l1-5.8-4.2-4.1 5.9-.9L12 3z"/></svg>',
+            toggleOn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="3"/><path d="M22 11l-4 4"/><path d="M18 11l4 4"/></svg>',
+            toggleOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="3"/><path d="M22 11h-4"/><path d="M18 11h4"/></svg>',
+            delete: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>',
+        };
     }
 
     _initAdminShellUI() {
@@ -456,22 +457,17 @@ class AdminPanel {
     renderUsers() {
         const tbody = document.getElementById('usersTable');
         tbody.innerHTML = '';
+        const icons = this._userActionIcons();
 
         this.users.forEach(user => {
             const row = document.createElement('tr');
-            
-            const trialDaysLeft = this.getTrialDaysLeft(user.trial_end);
-            const statusClass = user.is_active ? 
-                (trialDaysLeft > 0 ? 'text-green-600' : 'text-red-600') : 
-                'text-gray-500';
-            
-            const statusText = user.is_active ? 
-                (trialDaysLeft > 0 ? `${trialDaysLeft} gün kaldı` : 'Süre doldu') : 
-                'Deaktif';
+            const safeUser = String(user.username).replace(/'/g, "\\'");
+            const toggleIcon = user.is_active ? icons.toggleOn : icons.toggleOff;
+            const toggleLabel = user.is_active ? 'Deaktif et' : 'Aktif et';
 
             row.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap" data-label="Kullanıcı">
-                    <div class="text-sm font-medium text-gray-900">${user.username}</div>
+                    <div class="adm-user-cell-name text-sm font-medium text-gray-900">${user.username}</div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap" data-label="Şirket">
                     <div class="text-sm text-gray-500">${user.company || '-'}</div>
@@ -489,14 +485,12 @@ class AdminPanel {
                     <span class="text-sm font-medium ${this.getTrialStatusClass(user.trial_end)}">${this.getTrialStatusText(user.trial_end)}</span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" data-label="İşlemler">
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" onclick="adminPanel.editUser('${user.username}')" class="text-green-600 hover:text-green-900">Düzenle</button>
-                        <button type="button" onclick="adminPanel.extendTrial('${user.username}')" class="text-blue-600 hover:text-blue-900">Uzat</button>
-                        <button type="button" onclick="adminPanel.managePremiumFeatures('${user.username}')" class="text-[#0052FF] hover:text-blue-900">Premium</button>
-                        <button type="button" onclick="adminPanel.toggleUser('${user.username}')" class="text-yellow-600 hover:text-yellow-900">
-                            ${user.is_active ? 'Deaktif Et' : 'Aktif Et'}
-                        </button>
-                        <button type="button" onclick="adminPanel.deleteUser('${user.username}')" class="text-red-600 hover:text-red-900">Sil</button>
+                    <div class="adm-action-bar">
+                        <button type="button" onclick="adminPanel.editUser('${safeUser}')" class="adm-action-btn adm-action-edit" title="Düzenle" aria-label="Düzenle">${icons.edit}</button>
+                        <button type="button" onclick="adminPanel.extendTrial('${safeUser}')" class="adm-action-btn adm-action-extend" title="Uzat" aria-label="Uzat">${icons.extend}</button>
+                        <button type="button" onclick="adminPanel.managePremiumFeatures('${safeUser}')" class="adm-action-btn adm-action-premium" title="Premium" aria-label="Premium">${icons.premium}</button>
+                        <button type="button" onclick="adminPanel.toggleUser('${safeUser}')" class="adm-action-btn adm-action-toggle" title="${toggleLabel}" aria-label="${toggleLabel}">${toggleIcon}</button>
+                        <button type="button" onclick="adminPanel.deleteUser('${safeUser}')" class="adm-action-btn adm-action-delete" title="Sil" aria-label="Sil">${icons.delete}</button>
                     </div>
                 </td>
             `;
@@ -2321,17 +2315,13 @@ AdminPanel.prototype.renderChatUsers = async function(users) {
         ` : '';
         
         return `
-            <div class="p-3 border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors" onclick="adminPanel.selectChatUser('${escapedUsername}')">
-                <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-                        ${escapeHtml(username.charAt(0).toUpperCase())}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <h4 class="font-medium text-gray-900 truncate">${escapeHtml(username)}</h4>
-                        <p class="text-xs text-gray-500 truncate">${lastMessage}</p>
-                    </div>
-                    ${badgeHtml}
+            <div class="adm-chat-user-item${this.selectedChatUser === username ? ' is-active' : ''}" onclick="adminPanel.selectChatUser('${escapedUsername}')">
+                <div class="adm-chat-user-avatar">${escapeHtml(username.charAt(0).toUpperCase())}</div>
+                <div class="adm-chat-user-body">
+                    <h4>${escapeHtml(username)}</h4>
+                    <p>${lastMessage}</p>
                 </div>
+                ${badgeHtml}
             </div>
         `;
     }));
@@ -2719,9 +2709,17 @@ AdminPanel.prototype.selectChatUser = function(username) {
     this.loadChatMessages(username);
     this.updateSelectedUserInfo(username);
     this.showChatInput();
+    document.getElementById('admChatLayout')?.classList.add('has-thread');
     
     // Admin is viewing this user's chat - mark user messages as read
     this.markUserMessagesAsReadByAdmin(username);
+};
+
+AdminPanel.prototype.backChatToList = function() {
+    document.getElementById('admChatLayout')?.classList.remove('has-thread');
+    document.getElementById('selectedUserInfo')?.classList.add('hidden');
+    document.getElementById('chatInputArea')?.classList.add('hidden');
+    this.selectedChatUser = null;
 };
 
 AdminPanel.prototype.updateSelectedUserInfo = function(username) {
