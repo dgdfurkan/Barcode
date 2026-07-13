@@ -75,8 +75,16 @@
 
 .skeleton-host.is-loading > .skeleton-placeholder.skeleton-header-user-pill,
 .skeleton-host.is-loading > .skeleton-placeholder.skeleton-premium-nav-chips,
-.skeleton-host.is-loading > .skeleton-placeholder.skeleton-trial-pill {
+.skeleton-host.is-loading > .skeleton-placeholder.skeleton-trial-pill,
+.skeleton-host.is-loading > .skeleton-placeholder.skeleton-agenda-list,
+.skeleton-host.is-loading > .skeleton-placeholder.skeleton-basket-groups {
   display: flex;
+}
+
+.skeleton-host.sm-shelf-grid.is-loading > .skeleton-placeholder.skeleton-shelf-grid {
+  display: grid;
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .skeleton-host.is-loading > .skeleton-content {
@@ -244,7 +252,7 @@
 .skeleton-stat-card .skeleton--text-sm { width: 50%; }
 .skeleton-stat-card .skeleton--text { width: 35%; height: 28px; }
 
-/* Shelf card preset */
+/* Shelf grid — sm-shelf-card ile aynı ölçü */
 .skeleton-shelf-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
@@ -259,43 +267,246 @@
 }
 
 .skeleton-shelf-card {
-  padding: 16px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 1rem 0.65rem;
+  min-height: 7.5rem;
   border-radius: 1rem;
   border: 1px solid var(--skeleton-card-border);
   background: var(--color-surface, #fff);
+}
+
+.skeleton-shelf-card__icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.875rem;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
+}
+
+.skeleton-shelf-card__name {
+  width: 68%;
+  height: 13px;
+  border-radius: 6px;
+}
+
+.skeleton-shelf-card__meta {
+  width: 52%;
+  height: 10px;
+  margin-top: 0.35rem;
+  border-radius: 5px;
+}
+
+.skeleton-shelf-card--add {
+  border-style: dashed;
+  border-color: rgb(191 219 254);
+  background: linear-gradient(180deg, rgb(239 246 255 / 0.45), #fff);
+}
+
+.skeleton-shelf-card--add .skeleton-shelf-card__icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  margin-bottom: 0.35rem;
+}
+
+.skeleton-shelf-card--add .skeleton-shelf-card__name {
+  width: 42%;
+  height: 11px;
+}
+
+/* Sepet — sm-basket-section / sm-basket-row */
+.skeleton-basket-groups {
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.skeleton-basket-section {
+  background: rgb(248 250 252);
+  border: 1px solid rgb(226 232 240);
+  border-radius: 0.75rem;
+  padding: 0.65rem;
+}
+
+.skeleton-basket-section-head {
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid rgb(226 232 240);
+}
+
+.skeleton-basket-section-title {
+  width: 5.5rem;
+  height: 11px;
+  border-radius: 5px;
+}
+
+.skeleton-basket-rows {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-height: 120px;
+  gap: 0.4rem;
 }
 
-.skeleton-shelf-card .skeleton--circle {
-  width: 40px;
-  height: 40px;
-}
-
-/* Agenda horizontal cards */
-.skeleton-agenda-strip {
+.skeleton-basket-row {
   display: flex;
-  gap: 12px;
-  overflow: hidden;
-  padding-bottom: 4px;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 0.5rem 0.55rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(241 245 249);
+  background: #fff;
+}
+
+.skeleton-basket-row__img {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.375rem;
+  flex-shrink: 0;
+}
+
+.skeleton-basket-row__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding-top: 0.1rem;
+}
+
+.skeleton-basket-row__name {
+  width: 78%;
+  height: 13px;
+  border-radius: 5px;
+}
+
+.skeleton-basket-row__barcode {
+  width: 52%;
+  height: 9px;
+  border-radius: 4px;
+}
+
+@media (max-width: 639px) {
+  .skeleton-basket-row__barcode {
+    display: none;
+  }
+}
+
+.skeleton-basket-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.skeleton-basket-row__qty {
+  width: 1.35rem;
+  height: 12px;
+  border-radius: 4px;
+}
+
+.skeleton-basket-row__stepper {
+  width: 3.25rem;
+  height: 1.5rem;
+  border-radius: 0.375rem;
+}
+
+.skeleton-basket-row__pick {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.55rem;
+  flex-shrink: 0;
+}
+
+/* Ajanda — agenda-date-section + agenda-strip */
+.skeleton-agenda-list {
+  flex-direction: column;
+  gap: 1.35rem;
+  width: 100%;
+  padding-bottom: 0.75rem;
+}
+
+.skeleton-agenda-date-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.skeleton-agenda-date-head {
+  padding: 0 0.25rem;
+}
+
+.skeleton-agenda-date-head__label {
+  width: 6.5rem;
+  height: 13px;
+  border-radius: 5px;
+}
+
+.skeleton-agenda-date-head__line {
+  height: 1px;
+  margin-top: 0.4rem;
+  background: rgb(226 232 240);
+}
+
+.skeleton-agenda-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.75rem, 1fr));
+  gap: 0.875rem;
+  padding: 0.25rem 0.25rem 0;
+  align-items: start;
+}
+
+@media (min-width: 640px) {
+  .skeleton-agenda-strip {
+    grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+    gap: 1rem;
+  }
 }
 
 .skeleton-agenda-card {
-  flex: 0 0 140px;
-  padding: 10px;
-  border-radius: 12px;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  padding: 0.625rem;
+  border-radius: 1rem;
   border: 1px solid var(--skeleton-card-border);
   background: var(--color-surface, #fff);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.06), 0 4px 14px rgb(15 23 42 / 0.04);
 }
 
-.skeleton-agenda-card .skeleton--image {
+.skeleton-agenda-card__img-wrap {
+  position: relative;
+}
+
+.skeleton-agenda-card__img {
+  width: 100%;
   aspect-ratio: 1;
-  border-radius: 8px;
+  border-radius: 0.75rem;
+}
+
+.skeleton-agenda-card__badge {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 1.75rem;
+  height: 1.1rem;
+  border-radius: 9999px;
+}
+
+.skeleton-agenda-card__title {
+  margin-top: 0.55rem;
+  width: 88%;
+  height: 12px;
+  border-radius: 5px;
+}
+
+.skeleton-agenda-card__title--short {
+  width: 62%;
+  margin-top: 0.35rem;
+  height: 10px;
 }
 
 .header-user-card-inner {

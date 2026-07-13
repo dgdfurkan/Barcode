@@ -108,12 +108,14 @@
 
                         <div id="shelfGridHost" class="skeleton-host sm-shelf-grid" aria-busy="false">
                             <div class="skeleton-placeholder skeleton-shelf-grid" aria-hidden="true">
-                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
-                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
-                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
-                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
-                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
-                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton-shelf-card__icon"></div><div class="skeleton skeleton-shelf-card__name"></div><div class="skeleton skeleton-shelf-card__meta"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton-shelf-card__icon"></div><div class="skeleton skeleton-shelf-card__name"></div><div class="skeleton skeleton-shelf-card__meta"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton-shelf-card__icon"></div><div class="skeleton skeleton-shelf-card__name"></div><div class="skeleton skeleton-shelf-card__meta"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton-shelf-card__icon"></div><div class="skeleton skeleton-shelf-card__name"></div><div class="skeleton skeleton-shelf-card__meta"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton-shelf-card__icon"></div><div class="skeleton skeleton-shelf-card__name"></div><div class="skeleton skeleton-shelf-card__meta"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton-shelf-card__icon"></div><div class="skeleton skeleton-shelf-card__name"></div><div class="skeleton skeleton-shelf-card__meta"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton-shelf-card__icon"></div><div class="skeleton skeleton-shelf-card__name"></div><div class="skeleton skeleton-shelf-card__meta"></div></div>
+                                <div class="skeleton-shelf-card skeleton-shelf-card--add"><div class="skeleton skeleton-shelf-card__icon"></div><div class="skeleton skeleton-shelf-card__name"></div></div>
                             </div>
                             <div id="shelfGrid" class="skeleton-content contents"></div>
                         </div>
@@ -186,11 +188,42 @@
                     </div>
 
                     <div id="basketHost" class="skeleton-host" aria-busy="false">
-                        <div class="skeleton-placeholder skeleton-content-list" aria-hidden="true">
-                            <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div></div>
-                            <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div></div>
-                            <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div></div>
-                            <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div></div>
+                        <div class="skeleton-placeholder skeleton-basket-groups" aria-hidden="true">
+                            <div class="skeleton-basket-section">
+                                <div class="skeleton-basket-section-head"><div class="skeleton skeleton-basket-section-title"></div></div>
+                                <div class="skeleton-basket-rows">
+                                    <div class="skeleton-basket-row">
+                                        <div class="skeleton skeleton-basket-row__img"></div>
+                                        <div class="skeleton-basket-row__info"><div class="skeleton skeleton-basket-row__name"></div><div class="skeleton skeleton-basket-row__barcode"></div></div>
+                                        <div class="skeleton-basket-row__actions"><div class="skeleton skeleton-basket-row__qty"></div><div class="skeleton skeleton-basket-row__stepper"></div><div class="skeleton skeleton-basket-row__pick"></div></div>
+                                    </div>
+                                    <div class="skeleton-basket-row">
+                                        <div class="skeleton skeleton-basket-row__img"></div>
+                                        <div class="skeleton-basket-row__info"><div class="skeleton skeleton-basket-row__name"></div><div class="skeleton skeleton-basket-row__barcode"></div></div>
+                                        <div class="skeleton-basket-row__actions"><div class="skeleton skeleton-basket-row__qty"></div><div class="skeleton skeleton-basket-row__stepper"></div><div class="skeleton skeleton-basket-row__pick"></div></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="skeleton-basket-section">
+                                <div class="skeleton-basket-section-head"><div class="skeleton skeleton-basket-section-title"></div></div>
+                                <div class="skeleton-basket-rows">
+                                    <div class="skeleton-basket-row">
+                                        <div class="skeleton skeleton-basket-row__img"></div>
+                                        <div class="skeleton-basket-row__info"><div class="skeleton skeleton-basket-row__name"></div><div class="skeleton skeleton-basket-row__barcode"></div></div>
+                                        <div class="skeleton-basket-row__actions"><div class="skeleton skeleton-basket-row__qty"></div><div class="skeleton skeleton-basket-row__stepper"></div><div class="skeleton skeleton-basket-row__pick"></div></div>
+                                    </div>
+                                    <div class="skeleton-basket-row">
+                                        <div class="skeleton skeleton-basket-row__img"></div>
+                                        <div class="skeleton-basket-row__info"><div class="skeleton skeleton-basket-row__name"></div><div class="skeleton skeleton-basket-row__barcode"></div></div>
+                                        <div class="skeleton-basket-row__actions"><div class="skeleton skeleton-basket-row__qty"></div><div class="skeleton skeleton-basket-row__stepper"></div><div class="skeleton skeleton-basket-row__pick"></div></div>
+                                    </div>
+                                    <div class="skeleton-basket-row">
+                                        <div class="skeleton skeleton-basket-row__img"></div>
+                                        <div class="skeleton-basket-row__info"><div class="skeleton skeleton-basket-row__name"></div><div class="skeleton skeleton-basket-row__barcode"></div></div>
+                                        <div class="skeleton-basket-row__actions"><div class="skeleton skeleton-basket-row__qty"></div><div class="skeleton skeleton-basket-row__stepper"></div><div class="skeleton skeleton-basket-row__pick"></div></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div id="basketGroups" class="skeleton-content"></div>
                     </div>
