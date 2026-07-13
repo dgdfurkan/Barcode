@@ -2128,7 +2128,14 @@
                 
                 <!-- Sağ toolbar -->
                 <div class="flex items-center header-user-info header-toolbar">
-                    <nav id="headerPremiumNav" class="header-premium-nav hidden" aria-label="Premium sayfalar">
+                    <div id="headerPremiumNavHost" class="skeleton-host header-premium-nav-host" aria-busy="false">
+                        <div class="skeleton-placeholder skeleton-premium-nav-chips" aria-hidden="true">
+                            <div class="skeleton skeleton-premium-nav-chip"></div>
+                            <div class="skeleton skeleton-premium-nav-chip skeleton-premium-nav-chip--md"></div>
+                            <div class="skeleton skeleton-premium-nav-chip"></div>
+                            <div class="skeleton skeleton-premium-nav-chip skeleton-premium-nav-chip--wide"></div>
+                        </div>
+                        <nav id="headerPremiumNav" class="skeleton-content header-premium-nav hidden" aria-label="Premium sayfalar">
                         <button id="headerCountingPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Sayım Sayfası">
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -2153,7 +2160,8 @@
                             </svg>
                             <span>Raftaki Eksikler</span>
                         </button>
-                    </nav>
+                        </nav>
+                    </div>
 
                     <div id="trialCountdownContainer" class="header-trial-pill" aria-live="polite">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2170,12 +2178,12 @@
 
                     <div class="header-toolbar-divider hidden" id="headerToolbarDivider" aria-hidden="true"></div>
 
-                    <div id="headerUserHost" class="header-user-card skeleton-host skeleton-header-user" aria-busy="false">
-                        <div class="skeleton-placeholder skeleton-profile-header" aria-hidden="true">
-                            <div class="skeleton skeleton--circle skeleton-profile-header__avatar"></div>
-                            <div class="skeleton-profile-header__lines">
-                                <div class="skeleton skeleton--text"></div>
-                                <div class="skeleton skeleton--text-sm"></div>
+                    <div id="headerUserHost" class="header-user-card skeleton-host" aria-busy="false">
+                        <div class="skeleton-placeholder skeleton-header-user-pill" aria-hidden="true">
+                            <div class="skeleton skeleton--circle skeleton-header-user-pill__avatar"></div>
+                            <div class="skeleton-header-user-pill__text">
+                                <div class="skeleton skeleton-header-user-pill__name"></div>
+                                <div class="skeleton skeleton-header-user-pill__company"></div>
                             </div>
                         </div>
                         <div class="skeleton-content header-user-card-inner">
@@ -3626,6 +3634,10 @@
                 if (divider) divider.classList.toggle('hidden', !anyVisible);
             } catch (e) {
                 hideAll();
+            } finally {
+                if (window.SkeletonUI) {
+                    window.SkeletonUI.leave('headerPremiumNavHost');
+                }
             }
         }
         const updateCountingPageButtonsVisibility = updatePremiumNavVisibility;
@@ -10862,7 +10874,7 @@
             }
 
             if (window.SkeletonUI) {
-                window.SkeletonUI.enter('headerUserHost');
+                window.SkeletonUI.enterMany(['headerUserHost', 'headerPremiumNavHost']);
             }
             
             // Prevent admin users from accessing this page
@@ -10919,6 +10931,8 @@
             if (window.SkeletonUI) {
                 window.SkeletonUI.leave('headerUserHost');
             }
+
+            void updatePremiumNavVisibility();
             
             // Update trial countdown
             if (window.updateTrialCountdown) {

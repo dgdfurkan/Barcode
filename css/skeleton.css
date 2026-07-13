@@ -73,6 +73,11 @@
   display: block;
 }
 
+.skeleton-host.is-loading > .skeleton-placeholder.skeleton-header-user-pill,
+.skeleton-host.is-loading > .skeleton-placeholder.skeleton-premium-nav-chips {
+  display: flex;
+}
+
 .skeleton-host.is-loading > .skeleton-content {
   display: none !important;
 }
@@ -307,6 +312,71 @@
 
 .skeleton-header-user {
   min-width: 7rem;
+}
+
+/* Header kullanıcı pill — gerçek header-user-card ölçüsü */
+.skeleton-header-user-pill {
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 7.5rem;
+  max-width: 12rem;
+}
+
+.skeleton-header-user-pill__avatar {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+}
+
+.skeleton-header-user-pill__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.skeleton-header-user-pill__name {
+  height: 12px;
+  width: 72%;
+  border-radius: 6px;
+}
+
+.skeleton-header-user-pill__company {
+  height: 10px;
+  width: 88%;
+  border-radius: 6px;
+}
+
+/* Premium nav chip skeleton */
+.header-premium-nav-host {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: min(100%, 30rem);
+}
+
+.skeleton-premium-nav-chips {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.375rem;
+  overflow: hidden;
+  padding: 0.125rem 0;
+  margin-right: 0.25rem;
+}
+
+.skeleton-premium-nav-chip {
+  height: 34px;
+  flex: 0 0 72px;
+  border-radius: 9999px;
+}
+
+.skeleton-premium-nav-chip--md {
+  flex-basis: 88px;
+}
+
+.skeleton-premium-nav-chip--wide {
+  flex-basis: 108px;
 }
 
 .skeleton-header-user .skeleton-profile-header__avatar {
