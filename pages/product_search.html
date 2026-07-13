@@ -1250,7 +1250,8 @@
                 display: none !important;
             }
 
-            #trialCountdownContainer {
+            #trialCountdownContainer,
+            #trialCountdownHost {
                 display: none !important;
             }
 
@@ -1291,7 +1292,8 @@
                 display: none !important;
             }
 
-            #trialCountdownContainer {
+            #trialCountdownContainer,
+            #trialCountdownHost {
                 display: none !important;
             }
 
@@ -2163,7 +2165,12 @@
                         </nav>
                     </div>
 
-                    <div id="trialCountdownContainer" class="header-trial-pill" aria-live="polite">
+                    <div id="trialCountdownHost" class="skeleton-host header-trial-pill-host" aria-busy="false">
+                        <div class="skeleton-placeholder skeleton-trial-pill" aria-hidden="true">
+                            <div class="skeleton skeleton--circle skeleton-trial-pill__icon"></div>
+                            <div class="skeleton skeleton-trial-pill__text"></div>
+                        </div>
+                        <div id="trialCountdownContainer" class="skeleton-content header-trial-pill" aria-live="polite">
                         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
@@ -2173,6 +2180,7 @@
                             <span id="trialCountdownSeparator" class="text-slate-300 mx-0.5">·</span>
                             <span id="trialCountdownValue2" class="font-bold text-slate-800">--</span>
                             <span id="trialCountdownLabel2" class="text-slate-500">saat</span>
+                        </div>
                         </div>
                     </div>
 
@@ -5271,6 +5279,7 @@
                 
                 // Header trial countdown update function (Her saniye güncellenecek)
                 function updateTrialCountdownHeader(trialEnd) {
+                    try {
                     const value1El = document.getElementById('trialCountdownValue1');
                     const value2El = document.getElementById('trialCountdownValue2');
                     const label1El = document.getElementById('trialCountdownLabel1');
@@ -5445,6 +5454,11 @@
                     
                     // Her saniye güncelle
                     setTimeout(() => updateTrialCountdownHeader(trialEnd), 1000);
+                    } finally {
+                        if (window.SkeletonUI) {
+                            window.SkeletonUI.leave('trialCountdownHost');
+                        }
+                    }
                 }
                 
                 // Make updateTrialCountdownHeader globally available
@@ -10874,7 +10888,7 @@
             }
 
             if (window.SkeletonUI) {
-                window.SkeletonUI.enterMany(['headerUserHost', 'headerPremiumNavHost']);
+                window.SkeletonUI.enterMany(['headerUserHost', 'headerPremiumNavHost', 'trialCountdownHost']);
             }
             
             // Prevent admin users from accessing this page

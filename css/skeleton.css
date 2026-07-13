@@ -74,7 +74,8 @@
 }
 
 .skeleton-host.is-loading > .skeleton-placeholder.skeleton-header-user-pill,
-.skeleton-host.is-loading > .skeleton-placeholder.skeleton-premium-nav-chips {
+.skeleton-host.is-loading > .skeleton-placeholder.skeleton-premium-nav-chips,
+.skeleton-host.is-loading > .skeleton-placeholder.skeleton-trial-pill {
   display: flex;
 }
 
@@ -377,6 +378,33 @@
 
 .skeleton-premium-nav-chip--wide {
   flex-basis: 108px;
+}
+
+/* Trial countdown pill skeleton */
+.header-trial-pill-host {
+  flex-shrink: 0;
+}
+
+.skeleton-trial-pill {
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid var(--skeleton-card-border);
+  background: linear-gradient(135deg, rgb(248 250 252), rgb(241 245 249));
+}
+
+.skeleton-trial-pill__icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.skeleton-trial-pill__text {
+  height: 14px;
+  width: 4.75rem;
+  border-radius: 6px;
 }
 
 .skeleton-header-user .skeleton-profile-header__avatar {
