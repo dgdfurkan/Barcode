@@ -54,8 +54,18 @@ class DispatchAgendaApp {
         this._ready = true;
         this._show('mainContent');
 
-        await this._loadProducts();
-        await this.loadItems();
+        if (window.SkeletonUI) {
+            window.SkeletonUI.enter('agendaHost');
+        }
+
+        try {
+            await this._loadProducts();
+            await this.loadItems();
+        } finally {
+            if (window.SkeletonUI) {
+                window.SkeletonUI.leave('agendaHost');
+            }
+        }
         this._setDefaultDate();
     }
 

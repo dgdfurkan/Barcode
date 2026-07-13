@@ -67,9 +67,19 @@ class ShelfMissingApp {
         this._show('mainContent');
         this._updateChrome();
 
-        await this._loadCatalog();
-        await this.loadShelves();
-        await this.loadItems();
+        if (window.SkeletonUI) {
+            window.SkeletonUI.enterMany(['shelfGridHost', 'basketHost']);
+        }
+
+        try {
+            await this._loadCatalog();
+            await this.loadShelves();
+            await this.loadItems();
+        } finally {
+            if (window.SkeletonUI) {
+                window.SkeletonUI.leaveMany(['shelfGridHost', 'basketHost']);
+            }
+        }
         this._switchTab('shelves');
         this._updateBasketBadge();
         this._initViewPrefs();
@@ -840,6 +850,83 @@ class ShelfMissingApp {
         return false;
     }
 
+    findProductByBarcode(code) {
+        const c = code != null ? String(code).trim() : '';
+        if (!c) return null;
+        const match = (barcode) => {
+            for (const p of this.allProducts || []) {
+                const codes = this._normalizeBarcodes(p);
+                if (codes.some((b) => String(b).trim() === barcode)) return p;
+            }
+            return null;
+        };
+        let product = match(c);
+        if (product) return product;
+        if (c.length === 12) product = match('0' + c);
+        if (!product && c.length === 13 && c.startsWith('0')) product = match(c.slice(1));
+        return product || null;
+    }
+
+    isCameraAddActive() {
+        const bs = window.barcodeScanner;
+        return !!(bs && bs.shelfAddMode && bs.scanning);
+    }
+
+    openCameraAdd() {
+        if (!this._activeShelfId) {
+            this._toast('Ürün eklemek için önce bir raf açın', 'warning');
+            return;
+        }
+        if (!window.barcodeScanner) {
+            this._toast('Barkod okuyucu yüklenemedi', 'error');
+            return;
+        }
+        const toggle = document.getElementById('continuousScanToggle');
+        const continuous = localStorage.getItem('sm_camera_continuous') === '1';
+        if (toggle) toggle.checked = continuous;
+        window.barcodeScanner.setContinuousMode(continuous);
+        void window.barcodeScanner.startScanning({ shelfAdd: true });
+    }
+
+    async handleCameraBarcode(code, result = null) {
+        const bs = window.barcodeScanner;
+        if (!this._activeShelfId) {
+            this._toast('Önce bir raf seçin', 'warning');
+            bs?.stopScanning();
+            return;
+        }
+
+        const product = this.findProductByBarcode(code);
+        if (!product) {
+            this._toast(`Barkod bulunamadı: ${code}`, 'error');
+            bs?.playErrorSound?.();
+            if (result) bs?.showBarcodeFrame?.(result);
+            setTimeout(() => bs?.hideBarcodeFrame?.(), 1000);
+            if (!bs?.continuousMode) bs?.stopScanning();
+            return;
+        }
+
+        const productId = String(this._productId(product));
+        if (this._itemOnShelf(this._activeShelfId, productId)) {
+            this._toast('Ürün zaten bu rafta', 'warning');
+            bs?.playWarningSound?.();
+            if (result) bs?.showBarcodeFrame?.(result);
+            setTimeout(() => bs?.hideBarcodeFrame?.(), 1000);
+            return;
+        }
+
+        bs?.showSuccessFlash?.();
+        if (result) bs?.showBarcodeFrame?.(result);
+
+        await this.upsertItem(this._activeShelfId, product, { silent: true });
+        bs?.playSuccessSound?.();
+        this._toast(`${this._productName(product)} eklendi`, 'success');
+
+        if (!bs?.continuousMode) {
+            bs?.stopScanning();
+        }
+    }
+
     async toggleProductOnShelf(product) {
         if (!this._activeShelfId) return;
         const productId = String(this._productId(product));
@@ -1604,6 +1691,16 @@ class ShelfMissingApp {
             clearTimeout(this._searchDebounce);
             const q = searchInput.value;
             this._searchDebounce = setTimeout(() => this._renderSearchResults(q), 200);
+        });
+
+        document.getElementById('shelfCameraBtn')?.addEventListener('click', () => this.openCameraAdd());
+        document.getElementById('closeCameraScannerModal')?.addEventListener('click', () => {
+            window.barcodeScanner?.stopScanning();
+        });
+        document.getElementById('continuousScanToggle')?.addEventListener('change', (e) => {
+            const on = !!e.target.checked;
+            window.barcodeScanner?.setContinuousMode(on);
+            localStorage.setItem('sm_camera_continuous', on ? '1' : '0');
         });
 
         document.getElementById('shelfSearchResults')?.addEventListener('click', (e) => {

@@ -19,6 +19,7 @@
     <script src="../js/supabase-bootstrap.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <script src="../js/auth.js"></script>
+    <script src="../js/skeleton-ui.js"></script>
     <script src="../js/user-manager.js"></script>
     <script src="../js/premium-features.js"></script>
     <script src="../js/notifications.js"></script>
@@ -93,7 +94,16 @@
                         </button>
                     </div>
                 </div>
-                <div id="lowStockListContainer" class="overflow-x-auto">
+                <div id="lowStockListContainer" class="overflow-x-auto skeleton-host" aria-busy="false">
+                    <div class="skeleton-placeholder px-4 py-3 skeleton-content-list skeleton-table-rows" aria-hidden="true">
+                        <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                        <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                        <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                        <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                        <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                        <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                    </div>
+                    <div class="skeleton-content">
                     <div id="lowStockEmpty" class="px-6 py-12 text-center">
                         <div class="bg-secondary-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                             <svg class="w-8 h-8 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
@@ -113,6 +123,7 @@
                         </thead>
                         <tbody id="lowStockList" class="divide-y divide-border"></tbody>
                     </table>
+                    </div>
                 </div>
             </section>
 
@@ -388,7 +399,12 @@
                 }, '*');
             }
 
+            function hideLowStockSkeleton() {
+                if (window.SkeletonUI) window.SkeletonUI.leave('lowStockListContainer');
+            }
+
             function applyListFromExtension(list, username) {
+                hideLowStockSkeleton();
                 const sess = window.authUtils && window.authUtils.checkAuth && window.authUtils.checkAuth();
                 if (sess && username !== sess.username) return;
                 currentLowStockList = Array.isArray(list) ? list.slice() : [];
@@ -472,6 +488,7 @@
                 noPremium.classList.add('hidden');
                 mainContent.classList.remove('hidden');
                 if (openSettingsBtn) openSettingsBtn.classList.remove('hidden');
+                if (window.SkeletonUI) window.SkeletonUI.enter('lowStockListContainer');
 
                 const prefs = await window.premiumFeatures.loadFeaturePreferences();
                 featureToggle.checked = prefs.lowStockAlert === true;
@@ -480,6 +497,7 @@
                 soundEnabled.checked = settings.soundEnabled;
                 renderOverrides();
                 sendLowStockInitToExtension();
+                setTimeout(hideLowStockSkeleton, 2500);
 
                 featureToggle.addEventListener('change', async () => {
                     await window.premiumFeatures.saveFeaturePreferences('lowStockAlert', featureToggle.checked);

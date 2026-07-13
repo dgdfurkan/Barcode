@@ -219,6 +219,18 @@ class CountingSystem {
         });
     }
 
+    _hideInitSkeleton() {
+        if (window.SkeletonUI) {
+            window.SkeletonUI.leaveMany(['countingStatsHost', 'countingMainDataHost']);
+        }
+    }
+
+    _showInitSkeleton() {
+        if (window.SkeletonUI) {
+            window.SkeletonUI.enterMany(['countingStatsHost', 'countingMainDataHost']);
+        }
+    }
+
     async init() {
         try {
             const session = window.authUtils?.checkAuth();
@@ -227,9 +239,11 @@ class CountingSystem {
             }
             this.currentUser = session;
 
-            this.showCountingStatus('Sayım hazırlanıyor…', 'Veriler yükleniyor', { lock: true });
-
             const hadLocalCache = this._hydrateFromLocalStorageOnly();
+
+            if (!hadLocalCache) {
+                this._showInitSkeleton();
+            }
 
             this.setupEventListeners();
             this.bindCountingTableSearch();
@@ -246,13 +260,10 @@ class CountingSystem {
             this.currentTab = 'sayim';
 
             if (hadLocalCache) {
-                this.updateCountingStatus('Neredeyse hazır', 'Sunucu ile eşitleniyor', { lock: true });
                 this.renderTable();
                 this.updateStatistics();
                 this.updateTableSelector();
                 this.updateViewMode();
-            } else {
-                this.updateCountingStatus('Tablolar yükleniyor…', 'Sayım verisi alınıyor', { lock: true });
             }
 
             await Promise.all([this.loadProducts(), this.loadCountingData()]);
@@ -263,7 +274,7 @@ class CountingSystem {
             this.updateTableSelector();
             this.scheduleScrollActiveGeneralTableChip();
             this.syncDeleteTableButtonsVisibility();
-            this.hideCountingStatus();
+            this._hideInitSkeleton();
             
             // Setup scroll listener for toast positioning
             this.setupToastScrollListener();
@@ -336,7 +347,7 @@ class CountingSystem {
             console.log('✅ Counting system initialized');
         } catch (error) {
             console.error('Error initializing counting system:', error);
-            this.hideCountingStatus();
+            this._hideInitSkeleton();
         }
     }
     

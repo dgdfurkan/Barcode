@@ -7,6 +7,7 @@ class BarcodeScanner {
         this.scanInterval = null;
         this.codeReader = null;
         this.continuousMode = false; // Seri okuma modu
+        this.shelfAddMode = false; // Raf eksik: kamera ile ürün ekleme
         this.lastScannedCode = null; // Son okunan barkod (tekrar okumayı önlemek için)
         this.lastScanTime = 0; // Son okuma zamanı
         this.canvasInitialized = false; // Canvas boyutlandırma optimizasyonu için
@@ -40,6 +41,7 @@ class BarcodeScanner {
 
     async startScanning(options = {}) {
         try {
+            this.shelfAddMode = !!(options && options.shelfAdd);
             if (options && options.mini === true) {
                 this.verificationMiniUi = true;
             }
@@ -1126,6 +1128,11 @@ class BarcodeScanner {
         this.lastScannedCode = code;
         this.lastScanTime = now;
 
+        if (this.shelfAddMode && window.shelfMissingApp) {
+            void window.shelfMissingApp.handleCameraBarcode(code, result);
+            return;
+        }
+
         if (window.countingSystem) {
             if (
                 typeof window.countingSystem.isCameraTableOnlyScanMode === 'function' &&
@@ -1733,6 +1740,7 @@ class BarcodeScanner {
 
     stopScanning() {
         this.scanning = false;
+        this.shelfAddMode = false;
         this.verificationCallback = null;
         this.verificationMiniUi = false;
         this.showVerificationMiniOverlay(false);

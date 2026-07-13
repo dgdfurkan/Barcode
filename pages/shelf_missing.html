@@ -106,7 +106,17 @@
                             </button>
                         </div>
 
-                        <div id="shelfGrid" class="sm-shelf-grid"></div>
+                        <div id="shelfGridHost" class="skeleton-host" aria-busy="false">
+                            <div class="skeleton-placeholder skeleton-shelf-grid" aria-hidden="true">
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
+                                <div class="skeleton-shelf-card"><div class="skeleton skeleton--circle"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
+                            </div>
+                            <div id="shelfGrid" class="skeleton-content sm-shelf-grid"></div>
+                        </div>
                     </section>
                 </div>
 
@@ -127,9 +137,14 @@
                             </div>
                         </div>
 
-                        <div class="sm-search-wrap">
-                            <svg class="sm-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                            <input type="search" id="shelfProductSearch" class="sm-field-input sm-search-input" placeholder="Ürün adı veya barkod ara (min 2 karakter)…" autocomplete="off" />
+                        <div class="sm-search-row">
+                            <div class="sm-search-wrap sm-search-wrap--grow">
+                                <svg class="sm-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                <input type="search" id="shelfProductSearch" class="sm-field-input sm-search-input" placeholder="Ürün adı veya barkod ara (min 2 karakter)…" autocomplete="off" />
+                            </div>
+                            <button type="button" id="shelfCameraBtn" class="sm-icon-btn sm-icon-btn--primary sm-camera-scan-btn" title="Kamera ile ekle" aria-label="Kamera ile ekle">
+                                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            </button>
                         </div>
                         <div id="shelfSearchResults" class="sm-search-results"></div>
 
@@ -170,7 +185,15 @@
                         <button type="button" id="basketGoShelvesBtn" class="sm-btn sm-btn-primary">Raflara Git</button>
                     </div>
 
-                    <div id="basketGroups"></div>
+                    <div id="basketHost" class="skeleton-host" aria-busy="false">
+                        <div class="skeleton-placeholder skeleton-content-list" aria-hidden="true">
+                            <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div></div>
+                            <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div></div>
+                            <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div></div>
+                            <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div></div>
+                        </div>
+                        <div id="basketGroups" class="skeleton-content"></div>
+                    </div>
                 </section>
             </div>
         </div>
@@ -357,6 +380,42 @@
         </div>
     </div>
 
+    <!-- Kamera ile barkod okuma -->
+    <div id="cameraScannerModal" class="sm-camera-modal hidden" aria-hidden="true">
+        <div class="sm-camera-modal-panel">
+            <div class="sm-camera-modal-head">
+                <h3 class="sm-camera-modal-title">Barkod Oku</h3>
+                <button type="button" id="closeCameraScannerModal" class="sm-camera-modal-close" aria-label="Kapat">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="sm-camera-modal-body">
+                <div class="sm-camera-toggle-row">
+                    <div class="sm-camera-toggle-label">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        <span>Seri Okuma</span>
+                    </div>
+                    <label class="sm-camera-toggle">
+                        <input type="checkbox" id="continuousScanToggle" class="sr-only peer" />
+                        <span class="sm-camera-toggle-track"></span>
+                    </label>
+                </div>
+                <div id="cameraVideoStageWrap" class="sm-camera-stage">
+                    <video id="cameraVideo" autoplay playsinline></video>
+                    <canvas id="barcodeOverlayCanvas"></canvas>
+                    <div id="barcodeFrameOverlay" class="absolute pointer-events-none z-10 hidden">
+                        <div class="absolute inset-0 border-[3px] border-green-400 rounded-xl shadow-[0_0_20px_rgba(74,222,128,0.4)] animate-pulse"></div>
+                    </div>
+                    <div class="scanner-overlay"></div>
+                </div>
+                <p class="sm-camera-hint">Barkodu kameraya gösterin — ürün otomatik eklenir</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/html5-qrcode@latest/html5-qrcode.min.js"></script>
+    <script src="../js/barcode-scanner.js"></script>
+    <script src="../js/skeleton-ui.js"></script>
     <script src="../js/shelf-missing.js"></script>
 </body>
 </html>

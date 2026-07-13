@@ -1,0 +1,302 @@
+/**
+ * Jet Barkod — ortak skeleton loading (saf CSS shimmer)
+ * Tema: açık yüzey, marka mavisi shimmer
+ */
+
+:root {
+  --skeleton-base: var(--color-secondary-100, #F1F5F9);
+  --skeleton-shimmer-mid: rgba(37, 99, 235, 0.06);
+  --skeleton-shimmer-peak: rgba(37, 99, 235, 0.10);
+  --skeleton-speed: 1.8s;
+  --skeleton-radius: 8px;
+  --skeleton-card-border: var(--color-border, #E2E8F0);
+  --skeleton-separator: rgba(15, 23, 42, 0.06);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Base shape */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--skeleton-base);
+  border-radius: var(--skeleton-radius);
+  border: none;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--skeleton-shimmer-mid) 35%,
+    var(--skeleton-shimmer-peak) 50%,
+    var(--skeleton-shimmer-mid) 65%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer var(--skeleton-speed) ease-in-out infinite;
+  pointer-events: none;
+}
+
+.skeleton--circle { border-radius: 50%; }
+.skeleton--text { height: 14px; width: 40%; }
+.skeleton--text-sm { height: 11px; width: 65%; }
+.skeleton--image { aspect-ratio: 16 / 9; width: 100%; border-radius: var(--skeleton-radius); }
+
+.skeleton--card {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--skeleton-card-border);
+  background-color: var(--color-surface, #fff);
+}
+
+.skeleton--card > .skeleton--image {
+  margin-bottom: 10px;
+}
+
+/* Host: toggle content vs placeholder */
+.skeleton-host {
+  position: relative;
+}
+
+.skeleton-host > .skeleton-placeholder {
+  display: none;
+}
+
+.skeleton-host > .skeleton-content {
+  display: block;
+}
+
+.skeleton-host.is-loading > .skeleton-placeholder {
+  display: block;
+}
+
+.skeleton-host.is-loading > .skeleton-content {
+  display: none !important;
+}
+
+.skeleton-host[aria-busy="true"] {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Profile header preset */
+.skeleton-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.skeleton-profile-header__avatar {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+
+.skeleton-profile-header__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Card grid preset */
+.skeleton-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .skeleton-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.skeleton-card-grid__item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-card-grid__item .skeleton--text:nth-child(2) { width: 80%; }
+.skeleton-card-grid__item .skeleton--text:nth-child(3) { width: 50%; }
+
+/* Compact card grid (sayım rapid / raf) */
+.skeleton-card-grid--compact {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .skeleton-card-grid--compact { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+@media (min-width: 768px) {
+  .skeleton-card-grid--compact { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .skeleton-card-grid--compact { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .skeleton-card-grid--compact { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+}
+
+.skeleton-card-grid--compact .skeleton-card-grid__item {
+  aspect-ratio: 1;
+  padding: 8px;
+}
+
+.skeleton-card-grid--compact .skeleton--image {
+  aspect-ratio: 1;
+  flex: 1;
+}
+
+/* Content list preset */
+.skeleton-content-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton-content-list__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--skeleton-separator);
+}
+
+.skeleton-content-list__row:last-child {
+  border-bottom: none;
+}
+
+.skeleton-content-list__avatar {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.skeleton-content-list__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.skeleton-content-list__row .skeleton--text { width: 55%; }
+.skeleton-content-list__row .skeleton--text-sm { width: 35%; }
+
+/* Table-row variant (ürün arama / düşük stok) */
+.skeleton-table-rows .skeleton-content-list__avatar {
+  width: 48px;
+  height: 48px;
+}
+
+.skeleton-table-rows .skeleton-content-list__lines {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.skeleton-table-rows .skeleton-content-list__col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeleton-table-rows .skeleton-content-list__col--name { flex: 1; min-width: 0; }
+.skeleton-table-rows .skeleton-content-list__col--name .skeleton--text { width: 70%; }
+.skeleton-table-rows .skeleton-content-list__col--barcode { width: 22%; }
+.skeleton-table-rows .skeleton-content-list__col--barcode .skeleton--text-sm { width: 100%; }
+.skeleton-table-rows .skeleton-content-list__col--stock { width: 12%; }
+.skeleton-table-rows .skeleton-content-list__col--stock .skeleton--text-sm { width: 100%; }
+
+/* Stat cards row */
+.skeleton-stat-row {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .skeleton-stat-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.skeleton-stat-card {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--skeleton-card-border);
+  background: var(--color-surface, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skeleton-stat-card .skeleton--text-sm { width: 50%; }
+.skeleton-stat-card .skeleton--text { width: 35%; height: 28px; }
+
+/* Shelf card preset */
+.skeleton-shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .skeleton-shelf-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.skeleton-shelf-card {
+  padding: 16px;
+  border-radius: 1rem;
+  border: 1px solid var(--skeleton-card-border);
+  background: var(--color-surface, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 120px;
+}
+
+.skeleton-shelf-card .skeleton--circle {
+  width: 40px;
+  height: 40px;
+}
+
+/* Agenda horizontal cards */
+.skeleton-agenda-strip {
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+  padding-bottom: 4px;
+}
+
+.skeleton-agenda-card {
+  flex: 0 0 140px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid var(--skeleton-card-border);
+  background: var(--color-surface, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-agenda-card .skeleton--image {
+  aspect-ratio: 1;
+  border-radius: 8px;
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+    background: transparent;
+  }
+}

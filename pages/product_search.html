@@ -35,6 +35,7 @@
     <script src="../js/getir-cdn-paste.js"></script>
     <script src="../js/guest-access-config.js"></script>
     <script src="../js/auth.js"></script>
+    <script src="../js/skeleton-ui.js"></script>
     <script src="../js/guest-access.js"></script>
     <script src="../js/image-lightbox.js"></script>
     <script src="../js/trial-notifications.js"></script>
@@ -2382,12 +2383,21 @@
             </div>
         </section>
 
-        <!-- Loading State -->
-        <div id="loadingState" class="hidden">
-            <div class="bg-surface rounded-xl border border-border shadow-sm p-8">
-                <div class="flex items-center justify-center space-x-3">
-                    <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                    <span class="text-text-secondary">Ürünler yükleniyor...</span>
+        <!-- Loading State (skeleton) -->
+        <div id="loadingState" class="hidden" aria-busy="false" aria-label="Yükleniyor">
+            <div class="bg-surface rounded-xl border border-border shadow-sm overflow-hidden p-4 md:p-6">
+                <div class="hidden md:block skeleton-content-list skeleton-table-rows" aria-hidden="true">
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                </div>
+                <div class="md:hidden skeleton-card-grid" aria-hidden="true">
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div><div class="skeleton skeleton--text"></div><div class="skeleton skeleton--text-sm"></div></div>
                 </div>
             </div>
         </div>
@@ -7621,10 +7631,12 @@
         function showLoading() {
             hideAllStates();
             loadingState.classList.remove('hidden');
+            loadingState.setAttribute('aria-busy', 'true');
         }
 
         function hideLoading() {
             loadingState.classList.add('hidden');
+            loadingState.setAttribute('aria-busy', 'false');
         }
 
         function showResults() {
@@ -7684,7 +7696,7 @@
         function showSearchLoading() {
             hideAllStates();
             loadingState.classList.remove('hidden');
-            loadingState.querySelector('span').textContent = 'Aranıyor...';
+            loadingState.setAttribute('aria-busy', 'true');
         }
 
         // Show image modal

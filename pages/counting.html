@@ -30,6 +30,7 @@
     <script src="temp_products.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <script src="../js/auth.js"></script>
+    <script src="../js/skeleton-ui.js"></script>
     <script src="../js/user-manager.js"></script>
     <script src="../js/premium-features.js"></script>
     <script src="../js/trial-notifications.js"></script>
@@ -2186,7 +2187,13 @@
                 </div>
 
         <!-- Statistics Section -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6 w-full">
+        <div id="countingStatsHost" class="skeleton-host mb-4 sm:mb-6 w-full" aria-busy="false">
+            <div class="skeleton-placeholder skeleton-stat-row" aria-hidden="true">
+                <div class="skeleton-stat-card"><div class="skeleton skeleton--text-sm"></div><div class="skeleton skeleton--text"></div></div>
+                <div class="skeleton-stat-card"><div class="skeleton skeleton--text-sm"></div><div class="skeleton skeleton--text"></div></div>
+                <div class="skeleton-stat-card"><div class="skeleton skeleton--text-sm"></div><div class="skeleton skeleton--text"></div></div>
+            </div>
+            <div class="skeleton-content grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 w-full">
             <!-- Total Card -->
             <div class="bg-white rounded-2xl shadow-soft p-5 border border-gray-100 stat-card relative overflow-hidden group">
                 <div class="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -2220,6 +2227,7 @@
                     <p class="text-3xl font-bold text-rose-600 tracking-tight" id="negativeDifferenceCount">0</p>
                 </div>
                 <div class="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500 to-rose-300"></div>
+            </div>
             </div>
         </div>
 
@@ -2264,6 +2272,33 @@
                 </div>
                 <p id="countingTableSearchMeta" class="mt-1.5 min-h-[1rem] text-[11px] text-slate-500" aria-live="polite"></p>
             </div>
+
+            <div id="countingMainDataHost" class="skeleton-host" aria-busy="false">
+            <div class="skeleton-placeholder p-3 sm:p-4" aria-hidden="true">
+                <div class="skeleton-card-grid skeleton-card-grid--compact">
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                    <div class="skeleton--card skeleton-card-grid__item"><div class="skeleton skeleton--image"></div></div>
+                </div>
+                <div class="hidden md:block mt-4 skeleton-content-list skeleton-table-rows">
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                    <div class="skeleton-content-list__row"><div class="skeleton skeleton--circle skeleton-content-list__avatar"></div><div class="skeleton-content-list__lines"><div class="skeleton-content-list__col skeleton-content-list__col--name"><div class="skeleton skeleton--text"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--barcode"><div class="skeleton skeleton--text-sm"></div></div><div class="skeleton-content-list__col skeleton-content-list__col--stock"><div class="skeleton skeleton--text-sm"></div></div></div></div>
+                </div>
+            </div>
+            <div class="skeleton-content">
             
             <!-- Rapid Counting Mode Grid View -->
             <div id="rapidCountingGrid" class="hidden p-2 sm:p-4">
@@ -2364,6 +2399,8 @@
                 </svg>
                 <h3 class="mt-2 text-sm font-medium text-gray-900">Henüz ürün eklenmedi</h3>
                 <p class="mt-1 text-sm text-gray-500">Ürün eklemek için yukarıdaki formu kullanın</p>
+            </div>
+            </div>
             </div>
         </div>
         </div>

@@ -461,6 +461,16 @@
                     </div>
                 </div>
                 <div class="p-3 sm:p-4">
+                    <div id="agendaHost" class="skeleton-host" aria-busy="false">
+                        <div class="skeleton-placeholder skeleton-agenda-strip" aria-hidden="true">
+                            <div class="skeleton-agenda-card"><div class="skeleton skeleton--image"></div><div class="skeleton skeleton--text-sm"></div></div>
+                            <div class="skeleton-agenda-card"><div class="skeleton skeleton--image"></div><div class="skeleton skeleton--text-sm"></div></div>
+                            <div class="skeleton-agenda-card"><div class="skeleton skeleton--image"></div><div class="skeleton skeleton--text-sm"></div></div>
+                            <div class="skeleton-agenda-card"><div class="skeleton skeleton--image"></div><div class="skeleton skeleton--text-sm"></div></div>
+                            <div class="skeleton-agenda-card"><div class="skeleton skeleton--image"></div><div class="skeleton skeleton--text-sm"></div></div>
+                            <div class="skeleton-agenda-card"><div class="skeleton skeleton--image"></div><div class="skeleton skeleton--text-sm"></div></div>
+                        </div>
+                        <div class="skeleton-content">
                     <div id="agendaEmpty" class="hidden py-14 text-center">
                         <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100">
                             <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -475,6 +485,8 @@
                         </button>
                     </div>
                     <div id="agendaCardStrip" class="agenda-list" role="list"></div>
+                        </div>
+                    </div>
                 </div>
             </section>
         </div>
@@ -642,6 +654,7 @@
 
     <div id="agendaToast" class="fixed bottom-6 left-1/2 z-[100] hidden -translate-x-1/2 max-w-[90vw] rounded-xl px-4 py-2.5 text-sm font-medium text-white shadow-xl" role="status"></div>
 
+    <script src="../js/skeleton-ui.js"></script>
     <script src="../js/dispatch-agenda.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
