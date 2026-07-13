@@ -221,13 +221,23 @@ class CountingSystem {
 
     _hideInitSkeleton() {
         if (window.SkeletonUI) {
-            window.SkeletonUI.leaveMany(['countingStatsHost', 'countingMainDataHost']);
+            window.SkeletonUI.leaveMany([
+                'sayimActiveTableHost',
+                'sayimGeneralListHost',
+                'countingStatsHost',
+                'countingMainDataHost',
+            ]);
         }
     }
 
     _showInitSkeleton() {
         if (window.SkeletonUI) {
-            window.SkeletonUI.enterMany(['countingStatsHost', 'countingMainDataHost']);
+            window.SkeletonUI.enterMany([
+                'sayimActiveTableHost',
+                'sayimGeneralListHost',
+                'countingStatsHost',
+                'countingMainDataHost',
+            ]);
         }
     }
 
@@ -239,11 +249,9 @@ class CountingSystem {
             }
             this.currentUser = session;
 
-            const hadLocalCache = this._hydrateFromLocalStorageOnly();
+            this._showInitSkeleton();
 
-            if (!hadLocalCache) {
-                this._showInitSkeleton();
-            }
+            const hadLocalCache = this._hydrateFromLocalStorageOnly();
 
             this.setupEventListeners();
             this.bindCountingTableSearch();

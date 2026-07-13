@@ -1509,9 +1509,15 @@
                 
                 <!-- Right Side: User Info + Logout -->
                 <div class="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
-                    <div class="text-right hidden xl:block flex-shrink-0">
-                        <p class="text-sm lg:text-lg font-semibold text-text-primary truncate" id="userName">Yükleniyor...</p>
-                        <p class="text-xs lg:text-sm text-text-secondary truncate" id="userCompany">Yükleniyor...</p>
+                    <div id="countingHeaderUserHost" class="skeleton-host text-right hidden xl:block flex-shrink-0" aria-busy="false">
+                        <div class="skeleton-placeholder" aria-hidden="true">
+                            <div class="skeleton skeleton--text-sm ml-auto" style="width:6rem;margin-bottom:0.4rem;"></div>
+                            <div class="skeleton skeleton--text ml-auto" style="width:4.5rem;"></div>
+                        </div>
+                        <div class="skeleton-content">
+                        <p class="text-sm lg:text-lg font-semibold text-text-primary truncate" id="userName">&nbsp;</p>
+                        <p class="text-xs lg:text-sm text-text-secondary truncate" id="userCompany">&nbsp;</p>
+                        </div>
                     </div>
                     <button id="logoutBtn" class="btn-secondary text-xs sm:text-sm p-1.5 sm:p-2 flex-shrink-0">
                         <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1834,7 +1840,16 @@
         <div id="sayimTabContent" class="tab-content">
             <div class="w-full max-w-full px-4 sm:px-6 lg:px-2">
                 <!-- Aktif tablo + tablo türü (mock hizalı) -->
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 sm:p-5 lg:p-6 mb-6">
+                <div id="sayimActiveTableHost" class="skeleton-host bg-white rounded-2xl shadow-sm border border-slate-200/60 p-4 sm:p-5 lg:p-6 mb-6" aria-busy="false">
+                    <div class="skeleton-placeholder skeleton-sayim-active-card" aria-hidden="true">
+                        <div class="skeleton skeleton--text-sm" style="width:5rem;margin-bottom:0.75rem;"></div>
+                        <div class="skeleton skeleton--text-lg" style="width:70%;max-width:18rem;margin-bottom:1rem;"></div>
+                        <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
+                            <div><div class="skeleton skeleton--text-sm" style="width:4.5rem;margin-bottom:0.35rem;"></div><div class="skeleton skeleton--text" style="width:80%;"></div></div>
+                            <div><div class="skeleton skeleton--text-sm" style="width:4.5rem;margin-bottom:0.35rem;"></div><div class="skeleton skeleton--text" style="width:75%;"></div></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-content">
                     <div class="flex justify-between items-start gap-2 mb-3">
                         <div class="space-y-1 min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -1866,6 +1881,7 @@
                             <span class="text-[10px] text-slate-400 font-medium uppercase">Son Sayım</span>
                             <span id="activeTableLastCount" class="text-xs font-medium text-slate-600 flex items-center gap-1 min-w-0"></span>
                         </div>
+                    </div>
                     </div>
                 </div>
 
@@ -1914,7 +1930,16 @@
                     </div>
                     <p class="text-[10px] text-slate-500 hidden sm:block -mt-1">Sabit liste; isim verir, yeniden adlandırırsınız.</p>
                     <div class="flex items-stretch gap-2 min-w-0">
-                        <div id="generalTableList" class="sayim-general-table-list sayim-general-table-pill-row flex flex-1 min-w-0 gap-2 overflow-x-auto pb-1 -mx-1 px-1 rounded-xl border border-slate-100 bg-slate-50/70 py-2 shadow-inner" role="list" aria-label="Genel Sayım Tabloları"></div>
+                        <div id="sayimGeneralListHost" class="skeleton-host flex flex-1 min-w-0" aria-busy="false">
+                            <div class="skeleton-placeholder skeleton-sayim-table-pills" aria-hidden="true">
+                                <div class="skeleton"></div>
+                                <div class="skeleton"></div>
+                                <div class="skeleton"></div>
+                                <div class="skeleton"></div>
+                                <div class="skeleton"></div>
+                            </div>
+                            <div id="generalTableList" class="skeleton-content sayim-general-table-list sayim-general-table-pill-row flex flex-1 min-w-0 gap-2 overflow-x-auto pb-1 -mx-1 px-1 rounded-xl border border-slate-100 bg-slate-50/70 py-2 shadow-inner" role="list" aria-label="Genel Sayım Tabloları"></div>
+                        </div>
                         <div class="relative shrink-0 self-center">
                             <button
                                 type="button"
@@ -3048,6 +3073,10 @@
                 window.location.replace('../index.html');
                 return;
             }
+
+            if (window.SkeletonUI) {
+                window.SkeletonUI.enter('countingHeaderUserHost');
+            }
             
             // Check premium feature
             if (window.premiumFeatures) {
@@ -3075,6 +3104,9 @@
             if (session) {
                 document.getElementById('userName').textContent = session.username || 'Kullanıcı';
                 document.getElementById('userCompany').textContent = session.company || 'Depo';
+            }
+            if (window.SkeletonUI) {
+                window.SkeletonUI.leave('countingHeaderUserHost');
             }
             
             // Initialize counting system

@@ -2170,13 +2170,22 @@
 
                     <div class="header-toolbar-divider hidden" id="headerToolbarDivider" aria-hidden="true"></div>
 
-                    <div class="header-user-card">
+                    <div id="headerUserHost" class="header-user-card skeleton-host skeleton-header-user" aria-busy="false">
+                        <div class="skeleton-placeholder skeleton-profile-header" aria-hidden="true">
+                            <div class="skeleton skeleton--circle skeleton-profile-header__avatar"></div>
+                            <div class="skeleton-profile-header__lines">
+                                <div class="skeleton skeleton--text"></div>
+                                <div class="skeleton skeleton--text-sm"></div>
+                            </div>
+                        </div>
+                        <div class="skeleton-content header-user-card-inner">
                         <div class="header-user-avatar">
                             <img src="../assets/logo.png" alt="" />
                         </div>
                         <div class="header-user-text">
-                            <p class="header-user-name" id="userName">Yükleniyor...</p>
-                            <p class="header-user-company" id="userCompany">Yükleniyor...</p>
+                            <p class="header-user-name" id="userName">&nbsp;</p>
+                            <p class="header-user-company" id="userCompany">&nbsp;</p>
+                        </div>
                         </div>
                     </div>
 
@@ -10851,6 +10860,10 @@
                 window.location.replace('/index.html');
                 return;
             }
+
+            if (window.SkeletonUI) {
+                window.SkeletonUI.enter('headerUserHost');
+            }
             
             // Prevent admin users from accessing this page
             if (session.isAdmin) {
@@ -10902,7 +10915,10 @@
             
             // Update user info in header
             document.getElementById('userName').textContent = session.username;
-            document.getElementById('userCompany').textContent = session.company;
+            document.getElementById('userCompany').textContent = session.company || '';
+            if (window.SkeletonUI) {
+                window.SkeletonUI.leave('headerUserHost');
+            }
             
             // Update trial countdown
             if (window.updateTrialCountdown) {

@@ -69,10 +69,6 @@
   display: none;
 }
 
-.skeleton-host > .skeleton-content {
-  display: block;
-}
-
 .skeleton-host.is-loading > .skeleton-placeholder {
   display: block;
 }
@@ -245,12 +241,15 @@
 /* Shelf card preset */
 .skeleton-shelf-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.75rem;
 }
 
 @media (min-width: 640px) {
-  .skeleton-shelf-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .skeleton-shelf-grid {
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: 1rem;
+  }
 }
 
 .skeleton-shelf-card {
@@ -293,7 +292,54 @@
   border-radius: 8px;
 }
 
-/* Accessibility */
+.header-user-card-inner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Grid içeriği: skeleton-content display kilidi olmadan çocuklar grid'e katılsın */
+.skeleton-host.sm-shelf-grid > .skeleton-content.contents {
+  display: contents;
+}
+
+.skeleton-header-user {
+  min-width: 7rem;
+}
+
+.skeleton-header-user .skeleton-profile-header__avatar {
+  width: 40px;
+  height: 40px;
+}
+
+.skeleton-header-user .skeleton-profile-header__lines {
+  gap: 8px;
+}
+
+/* Sayım aktif tablo kartı */
+.skeleton-sayim-active-card {
+  padding: 0.25rem 0;
+}
+
+.skeleton-sayim-active-card .skeleton--text-lg {
+  height: 22px;
+  width: 55%;
+}
+
+.skeleton-sayim-table-pills {
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+  padding: 4px 0;
+}
+
+.skeleton-sayim-table-pills .skeleton {
+  height: 36px;
+  flex: 0 0 88px;
+  border-radius: 9999px;
+}
 @media (prefers-reduced-motion: reduce) {
   .skeleton::after {
     animation: none;
