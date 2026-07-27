@@ -1945,10 +1945,10 @@ class CountingSystem {
                 if (k === '_tableMeta' && v && typeof v === 'object') clone._tableMeta = { ...v };
                 else if (k === '_productOrder' && Array.isArray(v)) clone._productOrder = [...v];
             } else if (v && typeof v === 'object') {
-                clone[k] = {
+                clone[k] = this._hydrateProductEntryTimeline({
                     ...v,
                     history: Array.isArray(v.history) ? [...v.history] : [],
-                };
+                });
             }
         }
         return clone;
@@ -1971,10 +1971,10 @@ class CountingSystem {
             const incTs = v.lastUpdated ? new Date(v.lastUpdated).getTime() : 0;
             const locTs = target[k]?.lastUpdated ? new Date(target[k].lastUpdated).getTime() : 0;
             if (!target[k] || incTs >= locTs) {
-                target[k] = {
+                target[k] = this._hydrateProductEntryTimeline({
                     ...v,
                     history: Array.isArray(v.history) ? [...v.history] : [],
-                };
+                });
             }
         }
     }
@@ -2168,6 +2168,7 @@ class CountingSystem {
             'countingPrevBtn',
             'countingNextBtn',
             'countingDeleteProductBtn',
+            'countingProductTimelineBtn',
             'countingVerifyBarcodeBtn',
             'countingDecreaseBtn',
             'countingIncreaseBtn',
@@ -2527,15 +2528,19 @@ class CountingSystem {
 
     _mapCountingItemRowToEntry(row) {
         if (!row) return null;
+        const { stockHist, meta } = this._splitProductHistoryAndTimeline(row.history || []);
         const entry = {
             warehouseStock: row.warehouse_stock ?? null,
             systemStock: row.system_stock ?? null,
             price: row.price ?? null,
             priceText: row.price_text ?? null,
             reservedStock: row.reserved_stock ?? null,
-            history: row.history || [],
+            history: stockHist,
             apiFetchFailed: row.api_fetch_failed || false,
             lastUpdated: row.last_updated || new Date().toISOString(),
+            addedAt: meta.addedAt ?? null,
+            warehouseStockAt: meta.warehouseStockAt ?? null,
+            systemStockAt: meta.systemStockAt ?? null,
         };
         if (row.struck_price != null && row.struck_price !== '') {
             const sp = Number(row.struck_price);
@@ -2549,6 +2554,7 @@ class CountingSystem {
     /** saveProductEntry upsert anı için ürün satırı anlık görüntüsü */
     _snapshotProductEntry(entry) {
         if (!entry || typeof entry !== 'object') return null;
+        const { stockHist } = this._splitProductHistoryAndTimeline(entry.history || []);
         return {
             warehouseStock: entry.warehouseStock ?? null,
             systemStock: entry.systemStock ?? null,
@@ -2558,10 +2564,273 @@ class CountingSystem {
             struckPriceText: entry.struckPriceText ?? null,
             _apiNoStruckPrice: entry._apiNoStruckPrice === true,
             reservedStock: entry.reservedStock ?? null,
-            history: Array.isArray(entry.history) ? entry.history.slice() : [],
+            history: this._embedProductTimelineInHistory(stockHist, entry),
             apiFetchFailed: entry.apiFetchFailed || false,
             lastUpdated: entry.lastUpdated || new Date().toISOString(),
+            addedAt: entry.addedAt ?? null,
+            warehouseStockAt: entry.warehouseStockAt ?? null,
+            systemStockAt: entry.systemStockAt ?? null,
         };
+    }
+
+    /** Stok geçmişi ile timeline meta birlikte history JSON'da — mevcut kayıtları bozmaz */
+    _splitProductHistoryAndTimeline(history) {
+        const stockHist = [];
+        const meta = {};
+        if (!Array.isArray(history)) return { stockHist, meta };
+        for (const item of history) {
+            if (item && item._tl === true) {
+                if (item.addedAt) meta.addedAt = item.addedAt;
+                if (item.warehouseStockAt) meta.warehouseStockAt = item.warehouseStockAt;
+                if (item.systemStockAt) meta.systemStockAt = item.systemStockAt;
+            } else if (item) {
+                stockHist.push(item);
+            }
+        }
+        return { stockHist, meta };
+    }
+
+    _embedProductTimelineInHistory(stockHist, entry) {
+        const out = Array.isArray(stockHist)
+            ? stockHist.filter((h) => !(h && h._tl === true))
+            : [];
+        const tl = {};
+        if (entry?.addedAt) tl.addedAt = entry.addedAt;
+        if (entry?.warehouseStockAt) tl.warehouseStockAt = entry.warehouseStockAt;
+        if (entry?.systemStockAt) tl.systemStockAt = entry.systemStockAt;
+        if (Object.keys(tl).length > 0) out.push({ _tl: true, ...tl });
+        return out;
+    }
+
+    _hydrateProductEntryTimeline(entry) {
+        if (!entry || typeof entry !== 'object') return entry;
+        const { stockHist, meta } = this._splitProductHistoryAndTimeline(entry.history || []);
+        entry.history = stockHist;
+        if (!entry.addedAt && meta.addedAt) entry.addedAt = meta.addedAt;
+        if (!entry.warehouseStockAt && meta.warehouseStockAt) entry.warehouseStockAt = meta.warehouseStockAt;
+        if (!entry.systemStockAt && meta.systemStockAt) entry.systemStockAt = meta.systemStockAt;
+        return entry;
+    }
+
+    _mergeTimelineIso(localVal, incomingVal, mode = 'latest') {
+        const lMs = this._isoToMs(localVal);
+        const iMs = this._isoToMs(incomingVal);
+        if (Number.isNaN(lMs) && Number.isNaN(iMs)) return null;
+        if (Number.isNaN(lMs)) return incomingVal || null;
+        if (Number.isNaN(iMs)) return localVal || null;
+        if (mode === 'earliest') return lMs <= iMs ? localVal : incomingVal;
+        return lMs >= iMs ? localVal : incomingVal;
+    }
+
+    _isoToMs(iso) {
+        if (!iso) return NaN;
+        const ms = new Date(iso).getTime();
+        return Number.isNaN(ms) ? NaN : ms;
+    }
+
+    _localDateKeyFromMs(ms) {
+        if (ms == null || Number.isNaN(ms)) return '';
+        try {
+            const d = new Date(ms);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    _auditEntryMatchesProduct(entry, productId) {
+        if (!entry || productId == null) return false;
+        if (entry.productId != null && String(entry.productId) === String(productId)) return true;
+        const label = this.auditProductLabel(productId);
+        if (label && entry.m && String(entry.m).includes(label)) return true;
+        return false;
+    }
+
+    _findAuditTimestampForProduct(productId, categories, mode = 'earliest') {
+        const cats = new Set(Array.isArray(categories) ? categories : [categories]);
+        let result = NaN;
+        for (const raw of this.auditLog || []) {
+            const entry = this.normalizeAuditEntry(raw);
+            if (!this._auditEntryMatchesProduct(entry, productId)) continue;
+            if (!cats.has(entry.cat)) continue;
+            const t = Number(entry.t);
+            if (Number.isNaN(t)) continue;
+            if (Number.isNaN(result)) {
+                result = t;
+                continue;
+            }
+            result = mode === 'latest' ? Math.max(result, t) : Math.min(result, t);
+        }
+        return result;
+    }
+
+    _ensureProductTimelineFields(productId) {
+        const entry = this.countingData?.[productId];
+        if (!entry) return false;
+        let dirty = false;
+        const nowIso = new Date().toISOString();
+
+        if (!entry.addedAt) {
+            const ms = this._findAuditTimestampForProduct(productId, ['product_new', 'import'], 'earliest');
+            if (!Number.isNaN(ms)) {
+                entry.addedAt = new Date(ms).toISOString();
+                dirty = true;
+            } else if (Array.isArray(entry.history) && entry.history.length > 0) {
+                const histMs = entry.history
+                    .map((h) => (h?.timestamp ? new Date(h.timestamp).getTime() : NaN))
+                    .filter((t) => !Number.isNaN(t));
+                if (histMs.length > 0) {
+                    entry.addedAt = new Date(Math.min(...histMs)).toISOString();
+                    dirty = true;
+                }
+            } else if (entry.lastUpdated) {
+                entry.addedAt = entry.lastUpdated;
+                dirty = true;
+            }
+        }
+
+        const hasWarehouse =
+            entry.warehouseStock !== null && entry.warehouseStock !== undefined;
+        if (hasWarehouse && !entry.warehouseStockAt) {
+            const ms = this._findAuditTimestampForProduct(productId, ['stock'], 'latest');
+            entry.warehouseStockAt = !Number.isNaN(ms)
+                ? new Date(ms).toISOString()
+                : entry.lastUpdated || nowIso;
+            dirty = true;
+        }
+
+        const hasSystem = entry.systemStock !== null && entry.systemStock !== undefined;
+        if (hasSystem && !entry.systemStockAt) {
+            const ms = this._findAuditTimestampForProduct(productId, ['sync', 'stock'], 'latest');
+            entry.systemStockAt = !Number.isNaN(ms)
+                ? new Date(ms).toISOString()
+                : entry.lastUpdated || nowIso;
+            dirty = true;
+        }
+
+        if (dirty) {
+            this._scheduleProductSave(productId, 600);
+        }
+        return dirty;
+    }
+
+    _resolveProductTimelineEvents(productId) {
+        this._ensureProductTimelineFields(productId);
+        const entry = this.countingData?.[productId] || {};
+        const events = [];
+
+        const pushEvent = (type, label, iso, icon, tone) => {
+            const ms = this._isoToMs(iso);
+            if (Number.isNaN(ms)) return;
+            events.push({ type, label, iso, ms, icon, tone });
+        };
+
+        pushEvent('added', 'Tabloya eklendi', entry.addedAt, 'added', 'violet');
+        pushEvent('system', 'Sistem stoku çekildi', entry.systemStockAt, 'system', 'blue');
+        pushEvent('warehouse', 'Depo stoku girildi', entry.warehouseStockAt, 'warehouse', 'orange');
+
+        events.sort((a, b) => a.ms - b.ms);
+        return events;
+    }
+
+    _renderProductTimelineIcon(icon, tone) {
+        const tones = {
+            violet: 'bg-violet-100 text-violet-700 ring-violet-200/80',
+            blue: 'bg-blue-100 text-blue-700 ring-blue-200/80',
+            orange: 'bg-orange-100 text-orange-700 ring-orange-200/80',
+        };
+        const cls = tones[tone] || tones.violet;
+        if (icon === 'added') {
+            return `<span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ${cls}"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></span>`;
+        }
+        if (icon === 'system') {
+            return `<span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ${cls}"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></span>`;
+        }
+        return `<span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ${cls}"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></span>`;
+    }
+
+    renderProductTimelinePanel(productId) {
+        const container = document.getElementById('countingProductTimelineContent');
+        if (!container) return;
+
+        const events = this._resolveProductTimelineEvents(productId);
+        if (events.length === 0) {
+            container.innerHTML =
+                '<p class="text-xs text-slate-500 py-2">Bu ürün için henüz kayıtlı bir geçmiş yok.</p>';
+            return;
+        }
+
+        const byDay = new Map();
+        for (const ev of events) {
+            const key = this._localDateKeyFromMs(ev.ms);
+            if (!byDay.has(key)) byDay.set(key, []);
+            byDay.get(key).push(ev);
+        }
+
+        const dayBlocks = [...byDay.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+        container.innerHTML = dayBlocks
+            .map(([dayKey, dayEvents], dayIdx) => {
+                const dayLabel = this.formatDateOnlyTr(dayEvents[0]?.ms);
+                const blockClass = dayIdx > 0 ? 'counting-timeline-day-block' : '';
+                const rows = dayEvents
+                    .map((ev) => {
+                        const abs = this.formatAbsoluteDateTimeTr(ev.ms);
+                        const rel = this.formatRelativeAgoTr(ev.ms);
+                        const relHtml = rel
+                            ? `<span class="text-[11px] text-slate-400">${this.escapeHtml(rel)}</span>`
+                            : '';
+                        return `
+                            <div class="flex items-start gap-2.5 py-1.5">
+                                ${this._renderProductTimelineIcon(ev.icon, ev.tone)}
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-xs font-semibold text-slate-800">${this.escapeHtml(ev.label)}</p>
+                                    <p class="text-[11px] text-slate-600 mt-0.5">${this.escapeHtml(abs)}</p>
+                                    ${relHtml}
+                                </div>
+                            </div>`;
+                    })
+                    .join('');
+                return `
+                    <div class="${blockClass}">
+                        <p class="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">${this.escapeHtml(dayLabel)}</p>
+                        <div class="space-y-0.5">${rows}</div>
+                    </div>`;
+            })
+            .join('');
+    }
+
+    openProductTimelinePanel() {
+        const productId = this.currentCountingProduct;
+        if (!productId) return;
+        const panel = document.getElementById('countingProductTimelinePanel');
+        const btn = document.getElementById('countingProductTimelineBtn');
+        if (!panel) return;
+        this.renderProductTimelinePanel(productId);
+        panel.classList.remove('hidden');
+        if (btn) {
+            btn.classList.add('ring-2', 'ring-violet-300', 'border-violet-300');
+            btn.setAttribute('aria-expanded', 'true');
+        }
+    }
+
+    closeProductTimelinePanel() {
+        const panel = document.getElementById('countingProductTimelinePanel');
+        const btn = document.getElementById('countingProductTimelineBtn');
+        if (panel) panel.classList.add('hidden');
+        if (btn) {
+            btn.classList.remove('ring-2', 'ring-violet-300', 'border-violet-300');
+            btn.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    toggleProductTimelinePanel() {
+        const panel = document.getElementById('countingProductTimelinePanel');
+        if (!panel) return;
+        if (panel.classList.contains('hidden')) this.openProductTimelinePanel();
+        else this.closeProductTimelinePanel();
     }
 
     _buildCountingItemUpsertRow(tableName, productId, snapshot) {
@@ -5912,7 +6181,12 @@ class CountingSystem {
      */
     _mergeCountingEntryFromRemote(local, incoming) {
         if (!incoming) return local;
-        if (!local) return { ...incoming, history: Array.isArray(incoming.history) ? [...incoming.history] : [] };
+        if (!local) {
+            return this._hydrateProductEntryTimeline({
+                ...incoming,
+                history: Array.isArray(incoming.history) ? [...incoming.history] : [],
+            });
+        }
 
         const localTs = local.lastUpdated ? new Date(local.lastUpdated).getTime() : 0;
         const incomingTs = incoming.lastUpdated ? new Date(incoming.lastUpdated).getTime() : 0;
@@ -5926,6 +6200,11 @@ class CountingSystem {
             if (localUnset && r === 0) return l;
             return r;
         };
+
+        const localHist = this._splitProductHistoryAndTimeline(local.history || []).stockHist;
+        const incomingHist = this._splitProductHistoryAndTimeline(incoming.history || []).stockHist;
+        const stockHist =
+            remoteIsNewer && incomingHist.length >= localHist.length ? incomingHist : localHist;
 
         const merged = {
             ...local,
@@ -5941,8 +6220,11 @@ class CountingSystem {
                 remoteIsNewer && incoming.reservedStock != null ? incoming.reservedStock : local.reservedStock,
             apiFetchFailed: remoteIsNewer ? incoming.apiFetchFailed : local.apiFetchFailed,
             lastUpdated: remoteIsNewer ? incoming.lastUpdated : local.lastUpdated,
-            history: Array.isArray(local.history) ? [...local.history] : [],
+            addedAt: this._mergeTimelineIso(local.addedAt, incoming.addedAt, 'earliest'),
+            warehouseStockAt: this._mergeTimelineIso(local.warehouseStockAt, incoming.warehouseStockAt, 'latest'),
+            systemStockAt: this._mergeTimelineIso(local.systemStockAt, incoming.systemStockAt, 'latest'),
         };
+        merged.history = this._embedProductTimelineInHistory(stockHist, merged);
         if (remoteIsNewer && incoming._apiNoStruckPrice === true) merged._apiNoStruckPrice = true;
         return merged;
     }
@@ -7720,6 +8002,19 @@ class CountingSystem {
             });
         }
 
+        const timelineBtn = document.getElementById('countingProductTimelineBtn');
+        const timelineCloseBtn = document.getElementById('countingProductTimelineCloseBtn');
+        if (timelineBtn) {
+            timelineBtn.addEventListener('click', () => {
+                this.toggleProductTimelinePanel();
+            });
+        }
+        if (timelineCloseBtn) {
+            timelineCloseBtn.addEventListener('click', () => {
+                this.closeProductTimelinePanel();
+            });
+        }
+
         // Setup product image lightbox
         this.setupProductImageLightbox();
 
@@ -8577,6 +8872,7 @@ class CountingSystem {
                 systemStock: null,
                 lastUpdated: now.toISOString(),
                 history: [],
+                addedAt: now.toISOString(),
             };
         }
 
@@ -8718,6 +9014,20 @@ class CountingSystem {
         if (countingChanged) {
             const nowIso = now.toISOString();
             this.countingData[productId].lastUpdated = nowIso;
+            if (
+                warehouseStock !== null &&
+                warehouseStock !== undefined &&
+                normStock(oldWarehouseStock) !== normStock(nextWarehouseStock)
+            ) {
+                this.countingData[productId].warehouseStockAt = nowIso;
+            }
+            if (
+                systemStock !== null &&
+                systemStock !== undefined &&
+                normStock(oldSystemStock) !== normStock(nextSystemStock)
+            ) {
+                this.countingData[productId].systemStockAt = nowIso;
+            }
             this.touchTableLastActivity(this.currentTableName, nowIso);
             this._scheduleTableSelectorUpdate();
             this.updateActiveTableActivityLine();
@@ -8744,6 +9054,10 @@ class CountingSystem {
             const d = this.countingData[productId];
             this.updateCountingBottomSheetSystemStockDisplay(d.systemStock, d.reservedStock);
             this.updateCorrectEntryButtonState();
+            const timelinePanel = document.getElementById('countingProductTimelinePanel');
+            if (timelinePanel && !timelinePanel.classList.contains('hidden')) {
+                this.renderProductTimelinePanel(productId);
+            }
         }
     }
 
@@ -11211,6 +11525,8 @@ class CountingSystem {
         const product = this.productIndex.get(productId);
         if (!product) return;
 
+        this.closeProductTimelinePanel();
+
         const data = this.countingData[productId] || {};
         this.currentCountingProduct = productId;
         this.countingBottomSheetFromCameraSeriSayar = !!options.fromCameraSeriSayar;
@@ -11392,6 +11708,8 @@ class CountingSystem {
 
     async closeCountingBottomSheet() {
         if (this._isSheetStockFetchLocked()) return;
+
+        this.closeProductTimelinePanel();
 
         const resumeSeriSayarCamera = this.countingBottomSheetFromCameraSeriSayar;
 
