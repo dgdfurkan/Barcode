@@ -74,6 +74,9 @@ class CountingSystem {
         this.currentUser = null;
         this.STORAGE_KEY = 'counting_data';
         this.currentTableName = 'Ana Sayım'; // Aktif sayım tablosu
+        /** Genel / günlük alt sekme geçişlerinde son seçilen tablolar */
+        this._lastGeneralTableName = 'Ana Sayım';
+        this._lastDailyTableName = null;
         this.currentSort = null; // { field: 'productName', direction: 'asc' } or null
         this.lastTokenCheckTime = null; // Son token kontrol zamanı (gereksiz çağrıları önlemek için)
         this.lastTokenExpiry = null; // Son kontrol edilen token expiry (değişiklik tespiti için)
@@ -280,6 +283,7 @@ class CountingSystem {
             this.updateViewMode();
             this.updateStatistics();
             this.updateTableSelector();
+            this.syncSayimSubTabToTable();
             this.scheduleScrollActiveGeneralTableChip();
             this.syncDeleteTableButtonsVisibility();
             this._hideInitSkeleton();
@@ -836,10 +840,11 @@ class CountingSystem {
                 if ((this._statusDepth || 0) > 0) {
                     this.updateCountingStatus('Sunucuya bağlanılıyor…', 'Güncel veriler alınıyor', { lock: true });
                 }
+                const deviceTableForFetch = this._loadDeviceCurrentTable();
+                const serverTableForFetch = metaBlob?._currentTable || localFull?._currentTable;
                 const resolvedForFetch =
-                    this.currentTableName ||
-                    metaBlob?._currentTable ||
-                    this._loadDeviceCurrentTable() ||
+                    serverTableForFetch ||
+                    deviceTableForFetch ||
                     'Ana Sayım';
 
                 const [userRes, itemsRes] = await Promise.all([
@@ -872,11 +877,7 @@ class CountingSystem {
 
             const deviceTable = this._loadDeviceCurrentTable();
             const serverTable = metaBlob?._currentTable;
-            let resolvedTable = serverTable || deviceTable || this.currentTableName || 'Ana Sayım';
-            const metaKeys = Object.keys(metaBlob?._tableMeta || {}).filter((n) => !this._isTableTombstoned(n));
-            if (metaKeys.length && !metaKeys.includes(resolvedTable)) {
-                resolvedTable = metaKeys[0];
-            }
+            const resolvedTable = serverTable || deviceTable || 'Ana Sayım';
 
             const tables = {};
             if (this.cachedFullData?._tables) {
@@ -889,7 +890,9 @@ class CountingSystem {
             if (countingItemsAvailable) {
                 tables[resolvedTable] = tables[resolvedTable] || {};
                 for (const row of itemRows) {
-                    tables[row.table_name][row.product_id] = this._mapCountingItemRowToEntry(row);
+                    const rowTable = row.table_name || resolvedTable;
+                    if (!tables[rowTable]) tables[rowTable] = {};
+                    tables[rowTable][row.product_id] = this._mapCountingItemRowToEntry(row);
                 }
 
                 const tableMeta = metaBlob?._tableMeta || {};
@@ -2086,6 +2089,7 @@ class CountingSystem {
         this.currentTableName = resolvedTable;
         this._saveDeviceCurrentTable(resolvedTable);
         this._persistCurrentTableToMeta();
+        this._rememberTableContext(resolvedTable);
 
         if (!tables[this.currentTableName]) tables[this.currentTableName] = {};
         this.countingData = tables[this.currentTableName];
@@ -3414,7 +3418,11 @@ class CountingSystem {
             fullData._tables[tableName] = { _tableMeta: { createdAt: new Date().toISOString() } };
         }
 
+        if (fromTable) {
+            this._rememberTableContext(fromTable);
+        }
         this._activateCountingTable(tableName, { fromTable, persistFrom: false });
+        this._rememberTableContext(tableName);
         this._saveDeviceCurrentTable(tableName);
         this._persistCurrentTableToMeta();
         this._scheduleMetaSave(300);
@@ -5748,6 +5756,139 @@ class CountingSystem {
         }
     }
 
+    /** Son kullanılan genel/günlük tablo bağlamını hatırla */
+    _rememberTableContext(tableName) {
+        if (!tableName) return;
+        if (this.isDailyTableName(tableName)) {
+            this._lastDailyTableName = tableName;
+        } else {
+            this._lastGeneralTableName = tableName;
+        }
+    }
+
+    _getActiveSayimSubTab() {
+        const dailyBtn = document.getElementById('sayimTabDailyBtn');
+        if (dailyBtn?.getAttribute('aria-selected') === 'true') return 'daily';
+        try {
+            const saved = sessionStorage.getItem('sayimSubTab');
+            if (saved === 'daily' || saved === 'general') return saved;
+        } catch (e) {
+            /* ignore */
+        }
+        return this.isDailyTableName(this.currentTableName) ? 'daily' : 'general';
+    }
+
+    _resolveGeneralTableName() {
+        if (this.currentTableName && !this.isDailyTableName(this.currentTableName)) {
+            return this.currentTableName;
+        }
+        const last = this._lastGeneralTableName;
+        if (last && this.getTableList().some((t) => t.name === last && !this.isDailyTableName(t.name))) {
+            return last;
+        }
+        const first = this.getTableList().find((t) => !this.isDailyTableName(t.name));
+        return first?.name || 'Ana Sayım';
+    }
+
+    _resolveDailyTableNameForContext() {
+        if (this.isDailyTableName(this.currentTableName)) {
+            return this.currentTableName;
+        }
+        const iso = this.getDailySelectedIso();
+        const byDate = `${this.DAILY_TABLE_PREFIX}${iso}`;
+        if (this.getTableList().some((t) => t.name === byDate)) return byDate;
+        if (
+            this._lastDailyTableName &&
+            this.getTableList().some((t) => t.name === this._lastDailyTableName)
+        ) {
+            return this._lastDailyTableName;
+        }
+        const dailyTables = this.getTableList()
+            .filter((t) => this.isDailyTableName(t.name))
+            .sort((a, b) => b.name.localeCompare(a.name));
+        return dailyTables[0]?.name || null;
+    }
+
+    async _syncTableToSayimSubTab(subTab) {
+        const target =
+            subTab === 'daily'
+                ? this._resolveDailyTableNameForContext()
+                : this._resolveGeneralTableName();
+        if (target && target !== this.currentTableName) {
+            await this.switchTable(target, { skipCatchUp: subTab === 'daily' });
+        }
+    }
+
+    /** Ürün eklemeden önce UI alt sekmesi ile aktif tablonun uyumunu doğrula */
+    async _ensureAddTargetTableReady() {
+        const subTab = this._getActiveSayimSubTab();
+        if (subTab === 'daily') {
+            if (!this.isDailyTableName(this.currentTableName)) {
+                const target = this._resolveDailyTableNameForContext();
+                if (target) {
+                    await this.switchTable(target);
+                } else {
+                    this.showNotification(
+                        'Ürün eklemek için günlük tablolardan bir gün seçin veya «Gün ekle» ile tablo oluşturun.',
+                        'error'
+                    );
+                    return false;
+                }
+            }
+        } else if (this.isDailyTableName(this.currentTableName)) {
+            await this.switchTable(this._resolveGeneralTableName());
+        }
+        this._verifyCountingDataTableBinding();
+        return true;
+    }
+
+    _normalizeProductName(name) {
+        return String(name || '')
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, ' ');
+    }
+
+    findProductByExactName(name) {
+        const norm = this._normalizeProductName(name);
+        if (!norm) return null;
+        for (const product of this.allProducts) {
+            if (product?.name && this._normalizeProductName(product.name) === norm) {
+                return product;
+            }
+        }
+        return null;
+    }
+
+    _pickBestNameMatch(query, candidates) {
+        const normQ = this._normalizeProductName(query);
+        if (!normQ || !Array.isArray(candidates) || candidates.length === 0) return null;
+
+        const qTokens = this.tokenizeQuery(normQ);
+        if (qTokens.length === 0) return null;
+
+        let best = null;
+        let bestScore = -1;
+        for (const product of candidates) {
+            const normP = this._normalizeProductName(product?.name);
+            if (!normP) continue;
+            if (normP === normQ) return product;
+
+            const matched = qTokens.filter((token) => normP.includes(token)).length;
+            if (matched !== qTokens.length) continue;
+
+            let score = (matched / qTokens.length) * 40;
+            if (normP.startsWith(normQ) || normQ.startsWith(normP)) score += 50;
+            score -= Math.abs(normP.length - normQ.length) * 0.05;
+
+            if (score > bestScore) {
+                bestScore = score;
+                best = product;
+            }
+        }
+        return bestScore >= 35 ? best : null;
+    }
+
     findProductByBarcodeCode(code) {
         const c = code != null ? String(code).trim() : '';
         if (!c) return null;
@@ -5773,7 +5914,15 @@ class CountingSystem {
             if (byBarcode) return byBarcode;
         }
         if (row.name && String(row.name).trim()) {
-            return this.findProduct(String(row.name).trim());
+            const name = String(row.name).trim();
+            const exact = this.findProductByExactName(name);
+            if (exact) return exact;
+            const results = this.advancedProductSearch(name, 10);
+            if (results.length === 1) return results[0];
+            if (results.length > 1) {
+                const best = this._pickBestNameMatch(name, results);
+                if (best) return best;
+            }
         }
         return null;
     }
@@ -5857,6 +6006,15 @@ class CountingSystem {
                 sessionStorage.setItem('sayimDailySelectedIso', dateInput.value);
             } catch (e) {
                 /* ignore */
+            }
+            const iso = dateInput.value;
+            if (
+                iso &&
+                /^\d{4}-\d{2}-\d{2}$/.test(iso) &&
+                this.hasDailyTableForIso(iso) &&
+                this._getActiveSayimSubTab() === 'daily'
+            ) {
+                void this.switchTable(`${this.DAILY_TABLE_PREFIX}${iso}`);
             }
             this.resetSayimDailyPasteUi();
         });
@@ -5944,6 +6102,9 @@ class CountingSystem {
         this._beginBulkImportLock();
         try {
             this._verifyCountingDataTableBinding();
+            if (!this.currentTableName) {
+                throw new Error('Aktif tablo seçili değil');
+            }
             let added = 0;
             let skipped = 0;
             const idsInPasteOrder = [];
@@ -6350,10 +6511,15 @@ class CountingSystem {
         };
         this._sayimSubTabGo = go;
 
-        genBtn.addEventListener('click', () => go('general'));
-        dailyBtn.addEventListener('click', () => go('daily'));
+        genBtn.addEventListener('click', () => {
+            go('general');
+            void this._syncTableToSayimSubTab('general');
+        });
+        dailyBtn.addEventListener('click', () => {
+            go('daily');
+            void this._syncTableToSayimSubTab('daily');
+        });
 
-        go('general');
         this.syncSayimSubTabToTable();
     }
 
@@ -8152,6 +8318,10 @@ class CountingSystem {
     async bulkAddProductsFromGetirCdnPaste(urls) {
         this._beginBulkImportLock();
         try {
+            const ready = await this._ensureAddTargetTableReady();
+            if (!ready) {
+                return { added: 0, skippedInTable: 0, noMatch: 0, unmatchedUrls: [] };
+            }
             this._verifyCountingDataTableBinding();
             const G = typeof window !== 'undefined' ? window.GetirCdnPaste : null;
         const buildIndex = G && typeof G.buildGetirImageProductIndex === 'function' ? G.buildGetirImageProductIndex : null;
@@ -8323,6 +8493,11 @@ class CountingSystem {
         if (!product || !product.id) {
             console.error('Invalid product:', product);
             return;
+        }
+
+        if (!options.skipSave) {
+            const ready = await this._ensureAddTargetTableReady();
+            if (!ready) return;
         }
 
         if (!this._importInProgress) {
