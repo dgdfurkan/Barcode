@@ -1056,12 +1056,18 @@
             }
         }
 
-        /* Ürün geçmişi paneli — sayım bottom sheet içi */
-        #countingProductTimelinePanel {
-            animation: countingTimelineIn 0.22s ease-out;
+        /* Ürün geçmişi — bottom sheet üstünde overlay panel */
+        #countingProductTimelineOverlay {
+            z-index: 115;
+        }
+        #countingProductTimelineOverlay:not(.show) {
+            pointer-events: none;
+        }
+        #countingProductTimelineOverlay.show .counting-timeline-sheet {
+            animation: countingTimelineIn 0.24s cubic-bezier(0.32, 0.72, 0, 1);
         }
         @keyframes countingTimelineIn {
-            from { opacity: 0; transform: translateY(-6px); }
+            from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
         }
         .counting-timeline-day-block + .counting-timeline-day-block {
@@ -2841,6 +2847,30 @@
         </div>
     </div>
 
+    <!-- Ürün geçmişi overlay — sayım sheet üzerinde ayrı panel -->
+    <div id="countingProductTimelineOverlay" class="fixed inset-0 z-[115] hidden items-end justify-center sm:items-center p-0 sm:p-4 bg-slate-900/45 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="countingProductTimelineTitle">
+        <div id="countingProductTimelineBackdrop" class="absolute inset-0" aria-hidden="true"></div>
+        <div class="counting-timeline-sheet relative z-10 w-full sm:max-w-md max-h-[min(82vh,540px)] flex flex-col rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl border border-slate-200/90 overflow-hidden">
+            <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-violet-50/80 to-white shrink-0">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </span>
+                    <div class="min-w-0">
+                        <h5 id="countingProductTimelineTitle" class="text-sm font-semibold text-gray-900 truncate">Ürün geçmişi</h5>
+                        <p id="countingProductTimelineSubtitle" class="text-[11px] text-slate-500 truncate mt-0.5"></p>
+                    </div>
+                </div>
+                <button type="button" id="countingProductTimelineCloseBtn" class="shrink-0 rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors" aria-label="Geçmiş panelini kapat">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="countingProductTimelineContent" class="flex-1 overflow-y-auto overscroll-y-contain px-4 py-3 text-sm text-slate-700"></div>
+        </div>
+    </div>
+
     <!-- Barkod doğrula: minimal, en üst katman; aynı kamera sahnesi (cameraVideoStageWrap) buraya taşınır -->
     <div id="barcodeVerifyMiniOverlay" class="fixed inset-0 hidden flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-[2px]" aria-modal="true" role="dialog" aria-labelledby="barcodeVerifyMiniTitle">
         <div id="barcodeVerifyMiniBackdrop" class="absolute inset-0" aria-hidden="true"></div>
@@ -2975,47 +3005,33 @@
                                     </div>
                                 </div>
                             </div>
-                            <!-- Sil + geçmiş + barkod doğrulama (dikey) -->
-                            <div class="flex flex-col items-center flex-shrink-0 gap-1">
+                            <!-- Sil + geçmiş + barkod doğrulama (dikey, etiketler kendi butonunun altında) -->
+                            <div class="flex flex-col items-center flex-shrink-0 gap-2 py-0.5">
                                 <button id="countingDeleteProductBtn" class="p-2 hover:bg-red-50 text-red-600 rounded-lg transition-colors group" title="Ürünü Sil">
                                     <svg class="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                     </svg>
                                 </button>
-                                <button type="button" id="countingProductTimelineBtn" class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-slate-200/90 bg-gradient-to-b from-white to-slate-50 text-slate-600 shadow-sm hover:border-violet-300 hover:text-violet-700 hover:shadow active:scale-95 transition-all" title="Ürün geçmişini gör (eklenme, sistem stoku, depo stoku)" aria-label="Ürün geçmişi" aria-expanded="false">
-                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                    </svg>
-                                </button>
-                                <button type="button" id="countingVerifyBarcodeBtn" class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-slate-200/90 bg-gradient-to-b from-white to-slate-50 text-slate-600 shadow-sm hover:border-indigo-300 hover:text-indigo-700 hover:shadow active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none" title="Kamerayla okut; açık ürünün kayıtlı barkodlarıyla karşılaştır" aria-label="Barkodu kamerayla doğrula">
-                                    <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    </svg>
-                                </button>
-                                <span class="text-[9px] text-slate-500 text-center leading-tight max-w-[3.25rem]">Geçmiş</span>
-                                <span class="text-[9px] text-slate-500 text-center leading-tight max-w-[3.25rem] -mt-2">Barkod doğrula</span>
+                                <div class="flex flex-col items-center gap-0.5">
+                                    <button type="button" id="countingProductTimelineBtn" class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-slate-200/90 bg-gradient-to-b from-white to-slate-50 text-slate-600 shadow-sm hover:border-violet-300 hover:text-violet-700 hover:shadow active:scale-95 transition-all" title="Ürün geçmişini gör (eklenme, sistem stoku, depo stoku)" aria-label="Ürün geçmişi" aria-expanded="false">
+                                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                        </svg>
+                                    </button>
+                                    <span class="text-[9px] text-slate-500 text-center leading-tight w-9">Geçmiş</span>
+                                </div>
+                                <div class="flex flex-col items-center gap-0.5">
+                                    <button type="button" id="countingVerifyBarcodeBtn" class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-slate-200/90 bg-gradient-to-b from-white to-slate-50 text-slate-600 shadow-sm hover:border-indigo-300 hover:text-indigo-700 hover:shadow active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none" title="Kamerayla okut; açık ürünün kayıtlı barkodlarıyla karşılaştır" aria-label="Barkodu kamerayla doğrula">
+                                        <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        </svg>
+                                    </button>
+                                    <span class="text-[9px] text-slate-500 text-center leading-[1.15] w-9">Barkod<br>doğrula</span>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Ürün geçmişi paneli -->
-                <div id="countingProductTimelinePanel" class="hidden px-3 pb-3 border-b border-gray-100 bg-gradient-to-b from-violet-50/40 to-white">
-                    <div class="flex items-center justify-between gap-2 mb-2.5 pt-1">
-                        <div class="flex items-center gap-2 min-w-0">
-                            <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                </svg>
-                            </span>
-                            <h5 class="text-sm font-semibold text-gray-900 truncate">Ürün geçmişi</h5>
-                        </div>
-                        <button type="button" id="countingProductTimelineCloseBtn" class="shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors" aria-label="Geçmiş panelini kapat">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                    </div>
-                    <div id="countingProductTimelineContent" class="text-sm text-slate-700"></div>
                 </div>
             </div>
             

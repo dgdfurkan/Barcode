@@ -2805,11 +2805,19 @@ class CountingSystem {
     openProductTimelinePanel() {
         const productId = this.currentCountingProduct;
         if (!productId) return;
-        const panel = document.getElementById('countingProductTimelinePanel');
+        const overlay = document.getElementById('countingProductTimelineOverlay');
         const btn = document.getElementById('countingProductTimelineBtn');
-        if (!panel) return;
+        const subtitle = document.getElementById('countingProductTimelineSubtitle');
+        if (!overlay) return;
+
+        const product = this.productIndex.get(productId);
+        if (subtitle) {
+            subtitle.textContent = product?.name ? String(product.name) : '';
+        }
+
         this.renderProductTimelinePanel(productId);
-        panel.classList.remove('hidden');
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex', 'show');
         if (btn) {
             btn.classList.add('ring-2', 'ring-violet-300', 'border-violet-300');
             btn.setAttribute('aria-expanded', 'true');
@@ -2817,9 +2825,12 @@ class CountingSystem {
     }
 
     closeProductTimelinePanel() {
-        const panel = document.getElementById('countingProductTimelinePanel');
+        const overlay = document.getElementById('countingProductTimelineOverlay');
         const btn = document.getElementById('countingProductTimelineBtn');
-        if (panel) panel.classList.add('hidden');
+        if (overlay) {
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex', 'show');
+        }
         if (btn) {
             btn.classList.remove('ring-2', 'ring-violet-300', 'border-violet-300');
             btn.setAttribute('aria-expanded', 'false');
@@ -2827,10 +2838,15 @@ class CountingSystem {
     }
 
     toggleProductTimelinePanel() {
-        const panel = document.getElementById('countingProductTimelinePanel');
-        if (!panel) return;
-        if (panel.classList.contains('hidden')) this.openProductTimelinePanel();
+        const overlay = document.getElementById('countingProductTimelineOverlay');
+        if (!overlay) return;
+        if (overlay.classList.contains('hidden')) this.openProductTimelinePanel();
         else this.closeProductTimelinePanel();
+    }
+
+    isProductTimelinePanelOpen() {
+        const overlay = document.getElementById('countingProductTimelineOverlay');
+        return !!(overlay && !overlay.classList.contains('hidden'));
     }
 
     _buildCountingItemUpsertRow(tableName, productId, snapshot) {
@@ -8004,6 +8020,7 @@ class CountingSystem {
 
         const timelineBtn = document.getElementById('countingProductTimelineBtn');
         const timelineCloseBtn = document.getElementById('countingProductTimelineCloseBtn');
+        const timelineBackdrop = document.getElementById('countingProductTimelineBackdrop');
         if (timelineBtn) {
             timelineBtn.addEventListener('click', () => {
                 this.toggleProductTimelinePanel();
@@ -8011,6 +8028,11 @@ class CountingSystem {
         }
         if (timelineCloseBtn) {
             timelineCloseBtn.addEventListener('click', () => {
+                this.closeProductTimelinePanel();
+            });
+        }
+        if (timelineBackdrop) {
+            timelineBackdrop.addEventListener('click', () => {
                 this.closeProductTimelinePanel();
             });
         }
@@ -9054,8 +9076,7 @@ class CountingSystem {
             const d = this.countingData[productId];
             this.updateCountingBottomSheetSystemStockDisplay(d.systemStock, d.reservedStock);
             this.updateCorrectEntryButtonState();
-            const timelinePanel = document.getElementById('countingProductTimelinePanel');
-            if (timelinePanel && !timelinePanel.classList.contains('hidden')) {
+            if (this.isProductTimelinePanelOpen()) {
                 this.renderProductTimelinePanel(productId);
             }
         }
