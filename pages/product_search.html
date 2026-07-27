@@ -1606,6 +1606,18 @@
         }
 
         /* ===== SEARCH FORM RESPONSIVE STYLES ===== */
+        #searchInput {
+            box-sizing: border-box;
+            width: 100%;
+            /* Sağ: yapıştır (right-12) + temizle (right-4) — metin butonların altına girmesin */
+            padding-right: 5.5rem;
+        }
+
+        #pasteFromClipboard,
+        #clearSearch {
+            z-index: 2;
+        }
+
         @media (max-width: 480px) {
             /* Mobil Küçük - Arama Formu */
             section.mb-8 .bg-surface {
@@ -1616,7 +1628,7 @@
                 height: 48px !important;
                 font-size: 1rem !important;
                 padding-left: 2.5rem !important;
-                padding-right: 2.5rem !important;
+                padding-right: 5.5rem !important;
             }
 
             .search-section-header {
@@ -1661,7 +1673,7 @@
                 height: 52px !important;
                 font-size: 1.125rem !important;
                 padding-left: 3rem !important;
-                padding-right: 3rem !important;
+                padding-right: 5.5rem !important;
             }
 
             .search-section-header {
@@ -1709,6 +1721,7 @@
             #searchInput {
                 height: 56px !important;
                 font-size: 1.125rem !important;
+                padding-right: 5.5rem !important;
             }
 
             .view-toggle-btn svg {
