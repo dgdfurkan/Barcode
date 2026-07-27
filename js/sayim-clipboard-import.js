@@ -72,12 +72,17 @@
                 barcode = barcodes[0];
             }
             var q = raw.quantity;
-            var quantity = q === undefined || q === null ? undefined : Number(q);
+            var hasQty = q !== undefined && q !== null && q !== '';
+            var quantity;
+            if (hasQty) {
+                quantity = Number(q);
+                if (!Number.isFinite(quantity)) hasQty = false;
+            }
             return {
                 name: name,
                 barcode: barcode,
                 barcodes: barcodes && barcodes.length ? barcodes : undefined,
-                quantity: Number.isFinite(quantity) ? quantity : undefined,
+                quantity: hasQty ? quantity : undefined,
             };
         });
     }

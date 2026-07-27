@@ -3095,8 +3095,9 @@ class CountingSystem {
                     const incomingTs = new Date(incoming.lastUpdated).getTime();
                     const localTs = local.lastUpdated ? new Date(local.lastUpdated).getTime() : 0;
                     if (incomingTs > localTs) {
-                        localTable[pId] = incoming;
-                        this.countingData[pId] = incoming;
+                        const merged = this._mergeCountingEntryFromRemote(local, incoming);
+                        localTable[pId] = merged;
+                        this.countingData[pId] = merged;
                         changed = true;
                     }
                 }
@@ -5889,6 +5890,63 @@ class CountingSystem {
         return bestScore >= 35 ? best : null;
     }
 
+    /** Satırda pano/API'den gelen açık miktar var mı (boş string sayılmaz) */
+    _rowHasExplicitQuantity(row) {
+        if (!row || typeof row !== 'object') return false;
+        const q = row.quantity;
+        return q !== undefined && q !== null && q !== '';
+    }
+
+    /** İçe aktarımda eski depo/sistem stok kalıntılarını temizle */
+    _resetCountingEntryStockFields(entry) {
+        if (!entry || typeof entry !== 'object') return;
+        entry.warehouseStock = null;
+        entry.systemStock = null;
+        entry.apiFetchFailed = false;
+        entry.lastUpdated = new Date().toISOString();
+    }
+
+    /**
+     * Uzak (Supabase) satırını yerel ile birleştirir.
+     * Yeni eklenen ürünlerde yerel null iken uzaktan gelen 0 genelde eski/yanlış kayıttır — ezme.
+     */
+    _mergeCountingEntryFromRemote(local, incoming) {
+        if (!incoming) return local;
+        if (!local) return { ...incoming, history: Array.isArray(incoming.history) ? [...incoming.history] : [] };
+
+        const localTs = local.lastUpdated ? new Date(local.lastUpdated).getTime() : 0;
+        const incomingTs = incoming.lastUpdated ? new Date(incoming.lastUpdated).getTime() : 0;
+        const remoteIsNewer = incomingTs > localTs;
+
+        const pickStock = (field) => {
+            const l = local[field];
+            const r = incoming[field];
+            if (!remoteIsNewer) return l;
+            const localUnset = l === null || l === undefined;
+            if (localUnset && r === 0) return l;
+            return r;
+        };
+
+        const merged = {
+            ...local,
+            warehouseStock: pickStock('warehouseStock'),
+            systemStock: pickStock('systemStock'),
+            price: remoteIsNewer && incoming.price != null ? incoming.price : local.price,
+            priceText: remoteIsNewer && incoming.priceText ? incoming.priceText : local.priceText,
+            struckPrice:
+                remoteIsNewer && incoming.struckPrice != null ? incoming.struckPrice : local.struckPrice,
+            struckPriceText:
+                remoteIsNewer && incoming.struckPriceText ? incoming.struckPriceText : local.struckPriceText,
+            reservedStock:
+                remoteIsNewer && incoming.reservedStock != null ? incoming.reservedStock : local.reservedStock,
+            apiFetchFailed: remoteIsNewer ? incoming.apiFetchFailed : local.apiFetchFailed,
+            lastUpdated: remoteIsNewer ? incoming.lastUpdated : local.lastUpdated,
+            history: Array.isArray(local.history) ? [...local.history] : [],
+        };
+        if (remoteIsNewer && incoming._apiNoStruckPrice === true) merged._apiNoStruckPrice = true;
+        return merged;
+    }
+
     findProductByBarcodeCode(code) {
         const c = code != null ? String(code).trim() : '';
         if (!c) return null;
@@ -6109,34 +6167,38 @@ class CountingSystem {
             let skipped = 0;
             const idsInPasteOrder = [];
             const seenPasteIds = new Set();
-            // 1. Aşama: Hızlı önce yereldeki countingData yapısını hazırla (skipSave: true → counting_items'a yazmıyor)
+            const fullReplace = options.fullReplace !== false;
+            // 1. Aşama: Yerel countingData — içe aktarımda eski stok kalıntısı kalmasın
             for (const row of rows) {
                 const product = this.matchDailyImportRow(row);
                 if (!product) {
                     skipped++;
                     continue;
                 }
-                if (!seenPasteIds.has(product.id)) {
-                    seenPasteIds.add(product.id);
+                const pid = product.id;
+                if (!seenPasteIds.has(pid)) {
+                    seenPasteIds.add(pid);
                     idsInPasteOrder.push(product.id);
                 }
-                this.addProductToCounting(product, { skipSave: true });
-                if (
-                    row.quantity !== undefined &&
-                    row.quantity !== null &&
-                    this.countingData[product.id]
-                ) {
+
+                const hadEntry = !!this.countingData[pid];
+                if (!hadEntry) {
+                    this.addProductToCounting(product, { skipSave: true });
+                } else if (fullReplace) {
+                    this._resetCountingEntryStockFields(this.countingData[pid]);
+                }
+
+                if (this._rowHasExplicitQuantity(row) && this.countingData[pid]) {
                     const q = Number(row.quantity);
-                    if (!Number.isNaN(q)) {
-                        this.countingData[product.id].warehouseStock = q;
-                        this.countingData[product.id].lastUpdated = new Date().toISOString();
+                    if (!Number.isNaN(q) && q >= 0) {
+                        this.countingData[pid].warehouseStock = q;
+                        this.countingData[pid].lastUpdated = new Date().toISOString();
                     }
                 }
                 added++;
             }
 
             // 2. Aşama: Yapıştırma = tablonun yeni tam listesi (eski kısmi DB verisi kalmasın)
-            const fullReplace = options.fullReplace !== false;
             if (fullReplace && idsInPasteOrder.length > 0) {
                 await this._purgeTableProductsNotInSet(idsInPasteOrder);
             }
@@ -7564,9 +7626,8 @@ class CountingSystem {
         // Input validation
         if (depoInput) {
             depoInput.addEventListener('input', (e) => {
-                let value = e.target.value.replace(/[^0-9]/g, '');
-                if (value === '') value = '0';
-                e.target.value = value;
+                const clean = e.target.value.replace(/[^0-9]/g, '');
+                if (e.target.value !== clean) e.target.value = clean;
                 this.updateCorrectEntryButtonState();
             });
 
@@ -10352,8 +10413,8 @@ class CountingSystem {
                                         class="warehouse-stock-input flex-1 min-w-0 px-2 sm:px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-sm sm:text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all text-center"
                                         min="0"
                                         step="1"
-                                value="${data.warehouseStock !== null ? data.warehouseStock : ''}"
-                                placeholder="0"
+                                value="${data.warehouseStock !== null && data.warehouseStock !== undefined ? data.warehouseStock : ''}"
+                                placeholder="—"
                                 data-product-id="${productId}"
                             >
                                     <button 
@@ -10537,8 +10598,8 @@ class CountingSystem {
                                             class="warehouse-stock-input flex-1 min-w-[60px] px-1.5 sm:px-2 py-1.5 sm:py-2.5 bg-white border-2 border-orange-200 rounded-lg text-sm sm:text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all text-center"
                                             min="0"
                                             step="1"
-                                            value="${data.warehouseStock !== null ? data.warehouseStock : ''}"
-                                            placeholder="0"
+                                            value="${data.warehouseStock !== null && data.warehouseStock !== undefined ? data.warehouseStock : ''}"
+                                            placeholder="—"
                                             data-product-id="${productId}"
                                         >
                                         <button 
