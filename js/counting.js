@@ -3092,60 +3092,81 @@ class CountingSystem {
     }
 
     _analyzeSktDate(expDays, sktIso) {
-        const remaining = this._daysFromTodayToIso(sktIso);
-        if (remaining == null) return null;
+        const remainingToSkt = this._daysFromTodayToIso(sktIso);
+        if (remainingToSkt == null) return null;
 
         const warning = Number(expDays?.warning);
         const dead = Number(expDays?.dead);
         const allowed = Number(expDays?.allowed);
+        const hasDeadRule = !Number.isNaN(dead) && dead >= 0;
+
+        // Ölü süre = SKT'ye kaç gün kala satış biter — bu limit aşılmamalı
+        const saleLimitIso = hasDeadRule ? this._addDaysToIsoDate(sktIso, -dead) : sktIso;
+        const remainingToLimit = saleLimitIso ? this._daysFromTodayToIso(saleLimitIso) : remainingToSkt;
+        const primaryRemaining = hasDeadRule && dead > 0 ? remainingToLimit : remainingToSkt;
 
         let status = 'ok';
         let statusLabel = 'Satışa uygun';
-        let statusHint = 'SKT uyarı eşiğinin üzerinde.';
+        let statusHint = '';
 
-        if (remaining < 0) {
+        if (remainingToSkt < 0) {
             status = 'expired';
-            statusLabel = 'Süresi dolmuş';
-            statusHint = `SKT ${Math.abs(remaining)} gün önce geçti.`;
-        } else if (!Number.isNaN(dead) && dead > 0 && remaining <= dead) {
+            statusLabel = 'SKT geçmiş';
+            statusHint = `SKT ${Math.abs(remainingToSkt)} gün önce doldu — ürün satılamaz.`;
+        } else if (hasDeadRule && dead > 0 && remainingToLimit < 0) {
             status = 'dead';
-            statusLabel = 'Ölü stok';
-            statusHint = `SKT'ye ${remaining} gün kaldı — ölü stok eşiğinin (${dead} gün) altında.`;
-        } else if (!Number.isNaN(warning) && warning > 0 && remaining <= warning) {
+            statusLabel = 'Ölü süreyi aştınız';
+            statusHint = `Satış limiti ${Math.abs(remainingToLimit)} gün önce doldu. SKT'ye hâlâ ${remainingToSkt} gün var ama ölü süre (${dead} gün) aşıldı — satış yapılmamalı.`;
+        } else if (hasDeadRule && dead > 0 && remainingToLimit === 0) {
+            status = 'dead';
+            statusLabel = 'Bugün son satış günü';
+            statusHint = `Ölü süre limiti bugün doluyor. SKT ${this._formatIsoDateTr(sktIso)} (${remainingToSkt} gün sonra).`;
+        } else if (hasDeadRule && dead > 0 && remainingToLimit <= dead) {
+            status = 'dead';
+            statusLabel = 'Ölü süre içinde';
+            statusHint = `Satış limitine ${remainingToLimit} gün kaldı — ölü süre (${dead} gün) eşiğindesiniz, SKT'yi aşmayın.`;
+        } else if (!Number.isNaN(warning) && warning > 0 && primaryRemaining <= warning) {
             status = 'warning';
             statusLabel = 'Uyarı';
-            statusHint = `SKT'ye ${remaining} gün kaldı — uyarı eşiğinin (${warning} gün) altında.`;
-        } else if (remaining === 0) {
+            statusHint = hasDeadRule && dead > 0
+                ? `Satış limitine ${primaryRemaining} gün kaldı — uyarı eşiği (${warning} gün). Ölü süreyi (${dead} gün) aşma.`
+                : `SKT'ye ${remainingToSkt} gün kaldı — uyarı eşiğinin (${warning} gün) altında.`;
+        } else if (remainingToSkt === 0) {
             status = 'expired';
-            statusLabel = 'Bugün son gün';
+            statusLabel = 'SKT bugün';
             statusHint = 'SKT bugün doluyor.';
+        } else if (hasDeadRule && dead > 0) {
+            statusHint = `Satış limitine ${remainingToLimit} gün kaldı. SKT ${this._formatIsoDateTr(sktIso)} — ölü süre ${dead} gün, aşmayın.`;
         } else {
-            statusHint = `SKT'ye ${remaining} gün kaldı.`;
+            statusHint = `SKT'ye ${remainingToSkt} gün kaldı.`;
         }
 
-        const removeIso = !Number.isNaN(dead) && dead > 0 ? this._addDaysToIsoDate(sktIso, -dead) : null;
-        const removeRemaining = removeIso ? this._daysFromTodayToIso(removeIso) : null;
         const warningStartIso = !Number.isNaN(warning) && warning > 0 ? this._addDaysToIsoDate(sktIso, -warning) : null;
 
         return {
-            remaining,
+            remaining: primaryRemaining,
+            remainingToSkt,
+            remainingToLimit,
             status,
             statusLabel,
             statusHint,
             sktTr: this._formatIsoDateTr(sktIso),
-            removeIso,
-            removeTr: removeIso ? this._formatIsoDateTr(removeIso) : null,
-            removeRemaining,
+            saleLimitIso,
+            saleLimitTr: saleLimitIso ? this._formatIsoDateTr(saleLimitIso) : null,
+            removeIso: saleLimitIso,
+            removeTr: saleLimitIso ? this._formatIsoDateTr(saleLimitIso) : null,
+            removeRemaining: remainingToLimit,
             warningStartTr: warningStartIso ? this._formatIsoDateTr(warningStartIso) : null,
             warning,
             dead,
             allowed,
+            hasDeadRule,
         };
     }
 
     _renderSktDateCheckResultHtml(expDays, sktIso) {
         if (!sktIso) {
-            return `<p class="pd-skt-check-hint">SKT tarihi seçin — kalan gün ve durum burada görünür.</p>`;
+            return `<p class="pd-skt-check-hint">SKT tarihi seçin — ölü süre limitine göre kalan gün burada görünür.</p>`;
         }
 
         const analysis = this._analyzeSktDate(expDays, sktIso);
@@ -3153,26 +3174,30 @@ class CountingSystem {
             return `<p class="pd-skt-check-hint">Geçerli bir tarih seçin.</p>`;
         }
 
-        const remainingAbs = Math.abs(analysis.remaining);
+        const primaryAbs = Math.abs(analysis.remaining);
+        const useLimit = analysis.hasDeadRule && analysis.dead > 0;
         const remainingLabel =
             analysis.remaining > 0
-                ? `${remainingAbs} gün kaldı`
+                ? useLimit
+                    ? `Satış limitine ${primaryAbs} gün`
+                    : `${primaryAbs} gün kaldı`
                 : analysis.remaining < 0
-                  ? `${remainingAbs} gün geçti`
-                  : 'Bugün';
+                  ? useLimit
+                      ? `Limit ${primaryAbs} gün geçti`
+                      : `${primaryAbs} gün geçti`
+                  : useLimit
+                    ? 'Limit bugün'
+                    : 'Bugün';
 
         const extraLines = [];
-        if (analysis.removeTr && analysis.dead > 0) {
-            const remTxt =
-                analysis.removeRemaining == null
-                    ? ''
-                    : analysis.removeRemaining > 0
-                      ? ` · ${analysis.removeRemaining} gün sonra`
-                      : analysis.removeRemaining < 0
-                        ? ` · ${Math.abs(analysis.removeRemaining)} gün önce geçti`
-                        : ' · bugün';
-            extraLines.push(`<div class="pd-skt-check-meta"><span>Satıştan kaldırma</span><strong>${this.escapeHtml(analysis.removeTr)}${this.escapeHtml(remTxt)}</strong></div>`);
+        if (analysis.hasDeadRule && analysis.dead > 0 && analysis.saleLimitTr) {
+            extraLines.push(
+                `<div class="pd-skt-check-meta pd-skt-check-meta--dead"><span>Ölü süre limiti (SKT−${analysis.dead}g)</span><strong>${this.escapeHtml(analysis.saleLimitTr)}</strong></div>`
+            );
         }
+        extraLines.push(
+            `<div class="pd-skt-check-meta"><span>SKT</span><strong>${this.escapeHtml(analysis.sktTr)}${analysis.remainingToSkt != null ? ` · ${analysis.remainingToSkt > 0 ? analysis.remainingToSkt + ' gün sonra' : analysis.remainingToSkt < 0 ? Math.abs(analysis.remainingToSkt) + ' gün geçti' : 'bugün'}` : ''}</strong></div>`
+        );
         if (analysis.warningStartTr && analysis.warning > 0) {
             extraLines.push(`<div class="pd-skt-check-meta"><span>Uyarı başlangıcı</span><strong>${this.escapeHtml(analysis.warningStartTr)}</strong></div>`);
         }
@@ -3184,7 +3209,6 @@ class CountingSystem {
                     <span class="pd-skt-check-badge">${this.escapeHtml(analysis.statusLabel)}</span>
                 </div>
                 <p class="pd-skt-check-desc">${this.escapeHtml(analysis.statusHint)}</p>
-                <p class="pd-skt-check-skt">SKT: <strong>${this.escapeHtml(analysis.sktTr)}</strong></p>
                 ${extraLines.length ? `<div class="pd-skt-check-extras">${extraLines.join('')}</div>` : ''}
             </div>`;
     }
@@ -3259,8 +3283,8 @@ class CountingSystem {
             if (!n || Number.isNaN(n) || n <= 0) return;
             chips.push({ days: n, label });
         };
+        add(expDays?.dead, `Ölü limit +${expDays.dead}g`);
         add(expDays?.warning, `+${expDays.warning}g uyarı`);
-        add(expDays?.dead, `+${expDays.dead}g ölü`);
         add(expDays?.allowed, `+${expDays.allowed}g satış`);
         add(30, '+30 gün');
         add(90, '+90 gün');
@@ -3346,7 +3370,7 @@ class CountingSystem {
             <div class="pd-skt-check">
                 <div class="pd-skt-check-head">
                     <span class="pd-skt-check-title">SKT tarihi kontrol</span>
-                    <span class="pd-skt-check-sub">Takvimden seç veya hızlı ekle</span>
+                    <span class="pd-skt-check-sub">Ölü süre limitine göre — SKT'yi aşma</span>
                 </div>
                 <div class="pd-skt-date-picker" data-product-id="${this.escapeHtml(pid)}">
                     <div class="pd-skt-date-row">
@@ -3987,7 +4011,7 @@ class CountingSystem {
             { key: 'lifetime', label: 'Toplam raf ömrü', value: lifetime, unit: 'gün', tone: 'blue' },
             { key: 'allowed', label: 'Satış süresi', value: allowed, unit: 'gün', tone: 'emerald' },
             { key: 'warning', label: 'Uyarı eşiği', value: warning, unit: 'gün', tone: 'amber' },
-            { key: 'dead', label: 'Ölü stok', value: dead, unit: 'gün', tone: 'rose' },
+            { key: 'dead', label: 'Ölü süre (SKT)', value: dead, unit: 'gün', tone: 'rose' },
         ].filter((m) => !Number.isNaN(m.value));
 
         if (!metrics.length) return '';
@@ -4007,7 +4031,7 @@ class CountingSystem {
                 <div class="pd-exp-bar-legend">
                     <span><i class="pd-exp-dot pd-exp-dot--allowed"></i>Satış</span>
                     <span><i class="pd-exp-dot pd-exp-dot--warning"></i>Uyarı</span>
-                    <span><i class="pd-exp-dot pd-exp-dot--dead"></i>Ölü</span>
+                    <span><i class="pd-exp-dot pd-exp-dot--dead"></i>Ölü süre</span>
                 </div>`;
         }
 
