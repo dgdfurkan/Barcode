@@ -3018,33 +3018,228 @@ class CountingSystem {
         return [...found.values()];
     }
 
-    _extractApiProductMeta(apiRow) {
-        if (!apiRow || typeof apiRow !== 'object') return [];
-        const rows = [];
-        const push = (id, label, value) => {
-            const text = this._formatProductDetailScalar(value);
-            if (text) rows.push({ id, label, value: text, group: 'teknik' });
-        };
+    _formatVatRate(vat) {
+        if (vat == null || vat === '') return '';
+        const n = Number(vat);
+        if (Number.isNaN(n)) return String(vat);
+        const pct = n <= 1 ? n * 100 : n;
+        return `%${pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(1).replace(/\.0$/, '')}`;
+    }
 
-        push('api_sap', 'SAP kodu', apiRow.sapReferenceCode);
-        push('api_total', 'API toplam stok', apiRow.total);
-        push('api_available', 'API mevcut (available)', apiRow.available);
-        push('api_reserve', 'API rezerve (reserve)', apiRow.reserve);
-        push('api_reserved_corporate', 'Kurumsal rezerve', apiRow.reservedForCorporateSales);
-        push('api_reserved_disposal', 'İmha rezerve', apiRow.reservedForDisposal);
-        push('api_reserved_transfer', 'Transfer rezerve', apiRow.reservedForTransfer);
+    _calcDiscountPercent(price, struckPrice) {
+        const p = Number(price);
+        const s = Number(struckPrice);
+        if (!p || !s || s <= p) return null;
+        return Math.round(((s - p) / s) * 100);
+    }
 
-        const nested = apiRow.product && typeof apiRow.product === 'object' ? apiRow.product : null;
-        if (nested) {
-            push('api_product_name', 'API ürün adı', nested.fullName || nested.name);
+    _formatUnitPriceLine(apiRow) {
+        if (!apiRow) return '';
+        const props = apiRow.unitPriceProperties;
+        const unitPrice = apiRow.unitPrice;
+        if (unitPrice == null) return '';
+        const priceText = apiRow.unitPriceText || this.formatCurrency(Number(unitPrice));
+        if (props && props.unit) {
+            const qty = props.quantity != null ? props.quantity : '';
+            const unit = props.unit;
+            const per = props.perUnit != null ? props.perUnit : 1;
+            const qtyPart = qty ? ` (${qty} ${unit})` : '';
+            return `${priceText} / ${per > 1 ? per + ' ' : ''}${unit}${qtyPart}`;
         }
+        return priceText;
+    }
 
-        this._collectDeepApiProductFields(apiRow).forEach((field) => {
-            if (rows.some((r) => r.id === field.id)) return;
-            rows.push({ ...field, group: 'skt' });
+    _buildCategoryBreadcrumb(apiRow) {
+        if (!apiRow) return [];
+        const items = [];
+        const push = (obj) => {
+            const name = this._pickLocalizedName(obj?.name || obj);
+            if (name) items.push(name);
+        };
+        push(apiRow.masterCategoryV2);
+        push(apiRow.category);
+        push(apiRow.level3);
+        push(apiRow.level4);
+        push(apiRow.subCategory);
+        return [...new Set(items)];
+    }
+
+    _buildPackagingCards(packagingInfo) {
+        if (!packagingInfo || typeof packagingInfo !== 'object') return [];
+        return Object.keys(packagingInfo)
+            .filter((key) => key !== 'pickingType')
+            .map((key) => {
+                const pkg = packagingInfo[key];
+                if (!pkg) return null;
+                const codes = Array.isArray(pkg.barcodes) ? pkg.barcodes.filter(Boolean) : [];
+                if (!codes.length) return null;
+                return { type: key, barcodes: codes, pickingType: packagingInfo.pickingType };
+            })
+            .filter(Boolean);
+    }
+
+    _buildProductDetailViewModel(productId) {
+        const product = this.productIndex.get(productId);
+        if (!product) return null;
+
+        const data = this.countingData[productId] || {};
+        const apiRow = this._apiProductRowCache.get(String(productId)) || null;
+        const sktEntries = this._mergeProductDetailExpiryEntries(this._getProductDetailSktEntries(productId));
+        const expiryError = this._productDetailExpiryErrors.get(String(productId)) || null;
+        const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
+
+        const price = apiRow?.price ?? data.price;
+        const struckPrice = apiRow?.struckPrice ?? data.struckPrice;
+        const priceText = apiRow?.priceText || data.priceText || (price != null ? this.formatCurrency(Number(price)) : '');
+        const struckPriceText = apiRow?.struckPriceText || data.struckPriceText || (struckPrice != null ? this.formatCurrency(Number(struckPrice)) : '');
+        const discountPct = this._calcDiscountPercent(price, struckPrice);
+
+        const barcodeLines = (product.barcodes || [])
+            .map((b) => {
+                if (!b?.code) return '';
+                const extras = [b.size, b.variant, b.type].filter(Boolean).join(' · ');
+                return extras ? `${b.code} (${extras})` : String(b.code);
+            })
+            .filter(Boolean);
+
+        const packagingCards = this._buildPackagingCards(apiRow?.packagingInfo);
+
+        let stockDiffText = '—';
+        if (diff.type === 'zero') stockDiffText = 'Eşit';
+        else if (diff.type === 'positive') stockDiffText = `+${diff.value} fazla`;
+        else if (diff.type === 'negative') stockDiffText = `−${diff.value} eksik`;
+
+        const totalStock =
+            data.systemStock != null && data.reservedStock != null
+                ? Number(data.systemStock) + Number(data.reservedStock)
+                : data.systemStock != null
+                  ? Number(data.systemStock)
+                  : null;
+
+        const infoRows = [
+            { id: 'product_id', label: 'Ürün ID', value: product.id, group: 'urun' },
+            { id: 'ingredients', label: 'İçindekiler', value: this._pickLocalizedName(apiRow?.ingredients), group: 'urun' },
+            { id: 'short_desc', label: 'Paket / gramaj', value: this._pickLocalizedName(apiRow?.shortDescription), group: 'urun' },
+            { id: 'brand', label: 'Marka', value: product.brand || apiRow?.brandName, group: 'urun' },
+            { id: 'category_path', label: 'Kategori yolu', value: this._buildCategoryBreadcrumb(apiRow).join(' › '), group: 'urun' },
+            { id: 'shelf', label: 'Raf', value: product.shelf && product.shelf !== '-' ? product.shelf : null, group: 'urun' },
+            { id: 'storage_type', label: 'Depolama', value: apiRow?.storageType, group: 'urun' },
+            {
+                id: 'return_policy',
+                label: 'İade politikası',
+                value: apiRow?.returnPolicy
+                    ? apiRow.returnPolicy.isReturnable
+                        ? `İade edilebilir · ${apiRow.returnPolicy.returnPeriodDays || '?'} gün`
+                        : 'İade edilemez'
+                    : null,
+                group: 'urun',
+            },
+            {
+                id: 'barcodes',
+                label: 'Katalog barkodları',
+                value: barcodeLines.length ? barcodeLines.join('<br>') : null,
+                isHtml: true,
+                group: 'barkod',
+            },
+            { id: 'sap', label: 'SAP kodu', value: apiRow?.sapReferenceCode, group: 'teknik' },
+            { id: 'warehouse', label: 'Depo ID', value: apiRow?.warehouse, group: 'teknik' },
+            { id: 'price_type', label: 'Fiyat tipi', value: apiRow?.priceTypeText || (apiRow?.priceType != null ? String(apiRow.priceType) : null), group: 'teknik' },
+            { id: 'manufacturer', label: 'Üretici ID', value: apiRow?.manufacturer, group: 'teknik' },
+            {
+                id: 'suppliers',
+                label: 'Tedarikçi sayısı',
+                value: Array.isArray(apiRow?.suppliers) ? String(apiRow.suppliers.length) : null,
+                group: 'teknik',
+            },
+            {
+                id: 'last_updated',
+                label: 'Son sayım güncellemesi',
+                value: data.lastUpdated
+                    ? this.formatAbsoluteDateTimeTr(new Date(data.lastUpdated).getTime()) || String(data.lastUpdated)
+                    : null,
+                group: 'teknik',
+            },
+        ];
+
+        const visibleInfoRows = infoRows.filter((row) => {
+            if (this._productDetailHiddenFields.has(row.id)) return false;
+            const v = row.value;
+            return v != null && v !== '' && v !== '—';
         });
 
-        return rows;
+        const flags = [];
+        if (apiRow) {
+            const flagDefs = [
+                { key: 'isVisible', label: 'Görünür', positive: true },
+                { key: 'isShowOutOfStock', label: 'Stokta yok göster', positive: true },
+                { key: 'isShownUnderSpecialOffers', label: 'Kampanyada', positive: true },
+                { key: 'isSensitive', label: 'Hassas ürün', positive: false },
+                { key: 'isAgeRestricted', label: 'Yaş sınırlı', positive: false },
+                { key: 'isBundle', label: 'Paket ürün', positive: true },
+            ];
+            flagDefs.forEach(({ key, label, positive }) => {
+                if (apiRow[key] === true) flags.push({ label, tone: positive ? 'ok' : 'warn' });
+                else if (apiRow[key] === false && (key === 'isVisible' || key === 'isShowOutOfStock')) {
+                    flags.push({ label: `${label} (kapalı)`, tone: 'off' });
+                }
+            });
+            if (apiRow.status != null) {
+                flags.push({ label: `Durum: ${apiRow.status}`, tone: apiRow.status === 1 ? 'ok' : 'neutral' });
+            }
+        }
+
+        return {
+            productId,
+            product,
+            data,
+            apiRow,
+            sktEntries,
+            expiryError,
+            isLoading:
+                this._productDetailLoading &&
+                !this._productDetailExpiryFetched.has(String(productId)) &&
+                !apiRow,
+            isApiLoading: this._productDetailLoading && !apiRow,
+            hero: {
+                name: this._pickLocalizedName(apiRow?.fullName || apiRow?.displayName || apiRow?.name) || product.name,
+                shortName: this._pickLocalizedName(apiRow?.shortName),
+                shortDesc: this._pickLocalizedName(apiRow?.shortDescription),
+                image:
+                    this._pickLocalizedName(apiRow?.picURL || apiRow?.squareThumbnailURL) ||
+                    product.image ||
+                    '../assets/logo.png',
+                storageType: apiRow?.storageType || null,
+            },
+            price: {
+                price,
+                priceText,
+                struckPrice,
+                struckPriceText,
+                discountPct,
+                wholesalePriceText: apiRow?.wholesalePriceText || (apiRow?.wholesalePrice != null ? this.formatCurrency(Number(apiRow.wholesalePrice)) : null),
+                unitPriceLine: this._formatUnitPriceLine(apiRow),
+                vatText: apiRow?.vat != null ? this._formatVatRate(apiRow.vat) : null,
+                currency: apiRow?.currency?.symbol || '₺',
+            },
+            stock: {
+                available: apiRow?.available,
+                reserve: apiRow?.reserve ?? data.reservedStock,
+                systemStock: data.systemStock,
+                warehouseStock: data.warehouseStock,
+                totalStock,
+                stockDiffText,
+                diffType: diff.type,
+            },
+            expDays: apiRow?.expDays || null,
+            categoryBreadcrumb: this._buildCategoryBreadcrumb(apiRow),
+            packagingCards,
+            flags,
+            infoGroups: [
+                { key: 'urun', title: 'Ürün & kategori', tone: 'genel', rows: visibleInfoRows.filter((r) => r.group === 'urun') },
+                { key: 'barkod', title: 'Barkodlar', tone: 'genel', rows: visibleInfoRows.filter((r) => r.group === 'barkod') },
+                { key: 'teknik', title: 'Teknik', tone: 'teknik', rows: visibleInfoRows.filter((r) => r.group === 'teknik') },
+            ].filter((g) => g.rows.length > 0),
+        };
     }
 
     _buildProductDetailSktHtml(sktEntries, expiryError, isLoading) {
@@ -3080,137 +3275,195 @@ class CountingSystem {
         return parts.join('');
     }
 
+    _renderProductDetailHero(vm) {
+        const h = vm.hero;
+        const stock = vm.stock;
+        const price = vm.price;
+        const badges = [];
+
+        if (stock.available != null) {
+            badges.push(`<span class="pd-badge pd-badge--stock">${this.escapeHtml(String(stock.available))} stok</span>`);
+        }
+        if (stock.reserve != null && Number(stock.reserve) > 0) {
+            badges.push(`<span class="pd-badge pd-badge--reserve">${this.escapeHtml(String(stock.reserve))} rezerve</span>`);
+        }
+        if (price.discountPct) {
+            badges.push(`<span class="pd-badge pd-badge--sale">−%${price.discountPct}</span>`);
+        }
+        if (h.storageType) {
+            badges.push(`<span class="pd-badge pd-badge--cold">${this.escapeHtml(h.storageType)}</span>`);
+        }
+
+        const metaParts = [h.shortDesc].filter(Boolean);
+        const subtitle = metaParts.length ? `<p class="pd-hero-meta">${this.escapeHtml(metaParts.join(' · '))}</p>` : '';
+
+        const loadingClass = vm.isApiLoading ? ' pd-hero--loading' : '';
+
+        return `
+            <div class="pd-hero${loadingClass}">
+                <button type="button" class="pd-hero-image-wrap" data-action="open-image" title="Görseli büyüt">
+                    <img src="${this.escapeHtml(h.image)}" alt="" class="pd-hero-image" loading="lazy" onerror="this.src='../assets/logo.png'">
+                </button>
+                <div class="pd-hero-body">
+                    <h6 class="pd-hero-title">${this.escapeHtml(h.name)}</h6>
+                    ${h.shortName && h.shortName !== h.name ? `<p class="pd-hero-sub">${this.escapeHtml(h.shortName)}</p>` : ''}
+                    ${subtitle}
+                    ${badges.length ? `<div class="pd-hero-badges">${badges.join('')}</div>` : ''}
+                </div>
+            </div>`;
+    }
+
+    _renderProductDetailPriceBlock(vm) {
+        const p = vm.price;
+        if (!p.priceText && p.wholesalePriceText == null && !p.unitPriceLine) return '';
+
+        const struck =
+            p.struckPriceText && p.discountPct
+                ? `<span class="pd-price-struck">${this.escapeHtml(p.struckPriceText)}</span>`
+                : '';
+        const discount = p.discountPct ? `<span class="pd-price-discount">−%${p.discountPct}</span>` : '';
+        const mainPrice = p.priceText ? `<span class="pd-price-main">${this.escapeHtml(p.priceText)}</span>` : '';
+
+        const extras = [];
+        if (p.unitPriceLine) extras.push({ label: 'Birim fiyat', value: p.unitPriceLine });
+        if (p.wholesalePriceText) extras.push({ label: 'Toptan', value: p.wholesalePriceText });
+        if (p.vatText) extras.push({ label: 'KDV', value: p.vatText });
+
+        const extrasHtml = extras.length
+            ? `<div class="pd-price-extras">${extras
+                  .map(
+                      (e) =>
+                          `<div class="pd-price-extra"><span class="pd-price-extra-label">${this.escapeHtml(e.label)}</span><span class="pd-price-extra-value">${this.escapeHtml(e.value)}</span></div>`
+                  )
+                  .join('')}</div>`
+            : '';
+
+        return `
+            <section class="pd-price-card">
+                <div class="pd-price-row">${mainPrice}${struck}${discount}</div>
+                ${extrasHtml}
+            </section>`;
+    }
+
+    _renderProductDetailStockGrid(vm) {
+        const s = vm.stock;
+        const cells = [];
+
+        if (s.available != null) {
+            cells.push({ label: 'Mevcut (API)', value: String(s.available), tone: 'emerald' });
+        }
+        if (s.reserve != null) {
+            cells.push({ label: 'Rezerve', value: String(s.reserve), tone: 'amber' });
+        }
+        if (s.systemStock != null) {
+            cells.push({ label: 'Sistem', value: String(s.systemStock), tone: 'sky' });
+        }
+        if (s.warehouseStock != null) {
+            cells.push({ label: 'Depo sayım', value: String(s.warehouseStock), tone: 'violet' });
+        }
+        if (s.stockDiffText && s.stockDiffText !== '—') {
+            const tone = s.diffType === 'positive' ? 'rose' : s.diffType === 'negative' ? 'orange' : 'slate';
+            cells.push({ label: 'Fark', value: s.stockDiffText, tone });
+        }
+
+        if (!cells.length) return '';
+
+        return `
+            <section class="product-detail-group product-detail-group--stok">
+                <div class="product-detail-group-head"><span>Stok durumu</span></div>
+                <div class="product-detail-group-body">
+                    <div class="pd-stat-grid">${cells
+                        .map(
+                            (c) =>
+                                `<div class="pd-stat pd-stat--${c.tone}"><span class="pd-stat-label">${this.escapeHtml(c.label)}</span><span class="pd-stat-value">${this.escapeHtml(c.value)}</span></div>`
+                        )
+                        .join('')}</div>
+                </div>
+            </section>`;
+    }
+
+    _renderProductDetailExpDays(expDays) {
+        if (!expDays || typeof expDays !== 'object') return '';
+
+        const lifetime = Number(expDays.lifetime);
+        const allowed = Number(expDays.allowed);
+        const warning = Number(expDays.warning);
+        const dead = Number(expDays.dead);
+
+        const metrics = [
+            { key: 'lifetime', label: 'Toplam raf ömrü', value: lifetime, unit: 'gün', tone: 'blue' },
+            { key: 'allowed', label: 'Satış süresi', value: allowed, unit: 'gün', tone: 'emerald' },
+            { key: 'warning', label: 'Uyarı eşiği', value: warning, unit: 'gün', tone: 'amber' },
+            { key: 'dead', label: 'Ölü stok', value: dead, unit: 'gün', tone: 'rose' },
+        ].filter((m) => !Number.isNaN(m.value));
+
+        if (!metrics.length) return '';
+
+        let barHtml = '';
+        if (!Number.isNaN(lifetime) && lifetime > 0) {
+            const seg = (val, cls) => {
+                const w = Math.max(0, Math.min(100, (val / lifetime) * 100));
+                return w > 0 ? `<span class="pd-exp-bar-seg ${cls}" style="width:${w}%"></span>` : '';
+            };
+            barHtml = `
+                <div class="pd-exp-bar" title="Toplam ${lifetime} gün">
+                    ${seg(allowed, 'pd-exp-bar-seg--allowed')}
+                    ${seg(warning, 'pd-exp-bar-seg--warning')}
+                    ${seg(dead, 'pd-exp-bar-seg--dead')}
+                </div>
+                <div class="pd-exp-bar-legend">
+                    <span><i class="pd-exp-dot pd-exp-dot--allowed"></i>Satış</span>
+                    <span><i class="pd-exp-dot pd-exp-dot--warning"></i>Uyarı</span>
+                    <span><i class="pd-exp-dot pd-exp-dot--dead"></i>Ölü</span>
+                </div>`;
+        }
+
+        return `
+            <div class="pd-exp-days">
+                <div class="pd-exp-metrics">${metrics
+                    .map(
+                        (m) =>
+                            `<div class="pd-exp-metric pd-exp-metric--${m.tone}"><span class="pd-exp-metric-value">${this.escapeHtml(String(m.value))}</span><span class="pd-exp-metric-unit">${this.escapeHtml(m.unit)}</span><span class="pd-exp-metric-label">${this.escapeHtml(m.label)}</span></div>`
+                    )
+                    .join('')}</div>
+                ${barHtml}
+            </div>`;
+    }
+
+    _renderProductDetailPackaging(cards) {
+        if (!cards?.length) return '';
+        return `
+            <div class="pd-packaging-grid">${cards
+                .map(
+                    (c) =>
+                        `<div class="pd-packaging-card"><span class="pd-packaging-type">Ambalaj ${this.escapeHtml(c.type)}</span>${c.barcodes
+                            .map((b) => `<code class="pd-packaging-code">${this.escapeHtml(String(b))}</code>`)
+                            .join('')}</div>`
+                )
+                .join('')}</div>`;
+    }
+
+    _renderProductDetailFlags(flags) {
+        if (!flags?.length) return '';
+        return `<div class="pd-flags">${flags
+            .map((f) => `<span class="pd-flag pd-flag--${f.tone}">${this.escapeHtml(f.label)}</span>`)
+            .join('')}</div>`;
+    }
+
+    _renderProductDetailCategoryPath(items) {
+        if (!items?.length) return '';
+        return `<nav class="pd-category-path" aria-label="Kategori">${items
+            .map((item, i) => {
+                const sep = i > 0 ? `<span class="pd-category-sep">›</span>` : '';
+                return `${sep}<span class="pd-category-crumb">${this.escapeHtml(item)}</span>`;
+            })
+            .join('')}</nav>`;
+    }
+
     _buildProductDetailFieldRows(productId) {
-        const product = this.productIndex.get(productId);
-        if (!product) return { groups: [], sktBlock: '' };
-
-        const data = this.countingData[productId] || {};
-        const apiRow = this._apiProductRowCache.get(String(productId)) || null;
-        const sktEntries = this._mergeProductDetailExpiryEntries(this._getProductDetailSktEntries(productId));
-        const expiryError = this._productDetailExpiryErrors.get(String(productId)) || null;
-        const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
-        let stockDiffText = '—';
-        if (diff.type === 'zero') stockDiffText = 'Eşit (0)';
-        else if (diff.type === 'positive') stockDiffText = `+${diff.value} fazla (depo > sistem)`;
-        else if (diff.type === 'negative') stockDiffText = `-${diff.value} eksik (depo < sistem)`;
-
-        const apiCategory =
-            this._pickLocalizedName(apiRow?.category?.name || apiRow?.category) ||
-            this._pickLocalizedName(apiRow?.masterCategoryV2?.name);
-        const apiSubCategory = this._pickLocalizedName(apiRow?.subCategory?.name || apiRow?.subCategory);
-
-        const barcodeLines = (product.barcodes || [])
-            .map((b) => {
-                if (!b?.code) return '';
-                const extras = [b.size, b.variant, b.type].filter(Boolean).join(' · ');
-                return extras ? `${b.code} (${extras})` : String(b.code);
-            })
-            .filter(Boolean);
-
-        const packagingLines = [];
-        const packaging = apiRow?.packagingInfo || apiRow?.product?.packagingInfo;
-        if (packaging && typeof packaging === 'object') {
-            Object.keys(packaging).forEach((key) => {
-                if (key === 'pickingType') return;
-                const pkg = packaging[key];
-                if (!pkg) return;
-                const codes = Array.isArray(pkg.barcodes) ? pkg.barcodes.join(', ') : '';
-                if (codes) packagingLines.push(`Tip ${key}: ${codes}`);
-            });
-        }
-
-        const totalStock =
-            data.systemStock != null && data.reservedStock != null
-                ? Number(data.systemStock) + Number(data.reservedStock)
-                : data.systemStock != null
-                  ? Number(data.systemStock)
-                  : null;
-
-        const rows = [
-            { id: 'product_id', label: 'Ürün ID', value: product.id, group: 'genel' },
-            { id: 'brand', label: 'Marka', value: product.brand || apiRow?.brandName, group: 'genel' },
-            { id: 'category', label: 'Kategori', value: product.category || apiCategory, group: 'genel' },
-            { id: 'subcategory', label: 'Alt kategori', value: product.subCategory || apiSubCategory, group: 'genel' },
-            { id: 'shelf', label: 'Raf', value: product.shelf && product.shelf !== '-' ? product.shelf : null, group: 'genel' },
-            { id: 'description', label: 'Açıklama', value: product.description || product.name, group: 'genel' },
-            {
-                id: 'barcodes',
-                label: 'Barkodlar',
-                value: barcodeLines.length ? barcodeLines.join('<br>') : null,
-                isHtml: true,
-                group: 'genel',
-            },
-            {
-                id: 'packaging',
-                label: 'Ambalaj barkodları',
-                value: packagingLines.length ? packagingLines.join('<br>') : null,
-                isHtml: true,
-                group: 'genel',
-            },
-            { id: 'system_stock', label: 'Sistem stoku', value: data.systemStock != null ? String(data.systemStock) : null, group: 'stok' },
-            { id: 'warehouse_stock', label: 'Depo stoku', value: data.warehouseStock != null ? String(data.warehouseStock) : null, group: 'stok' },
-            { id: 'reserved_stock', label: 'Rezerve stok', value: data.reservedStock != null ? String(data.reservedStock) : null, group: 'stok' },
-            { id: 'total_stock', label: 'Toplam (sistem + rezerve)', value: totalStock != null && !Number.isNaN(totalStock) ? String(totalStock) : null, group: 'stok' },
-            { id: 'stock_diff', label: 'Stok farkı', value: stockDiffText !== '—' ? stockDiffText : null, group: 'stok' },
-            {
-                id: 'price',
-                label: 'Satış fiyatı',
-                value: data.priceText || (data.price != null ? this.formatCurrency(data.price) : null),
-                group: 'fiyat',
-            },
-            {
-                id: 'struck_price',
-                label: 'Liste fiyatı',
-                value: data.struckPriceText || (data.struckPrice != null ? this.formatCurrency(data.struckPrice) : null),
-                group: 'fiyat',
-            },
-        ];
-
-        if (data.lastUpdated) {
-            rows.push({
-                id: 'last_updated',
-                label: 'Son güncelleme',
-                value: this.formatAbsoluteDateTimeTr(new Date(data.lastUpdated).getTime()) || String(data.lastUpdated),
-                group: 'stok',
-            });
-        }
-
-        rows.push(...this._extractApiProductMeta(apiRow));
-
-        const visibleRows = rows.filter((row) => {
-            if (this._productDetailHiddenFields.has(row.id)) return false;
-            const v = row.value;
-            return v != null && v !== '' && v !== '—';
-        });
-
-        const groupDefs = [
-            { key: 'genel', title: 'Ürün bilgileri', tone: 'genel' },
-            { key: 'stok', title: 'Stok durumu', tone: 'stok' },
-            { key: 'fiyat', title: 'Fiyat', tone: 'fiyat' },
-            { key: 'skt', title: 'SKT & Raf ömrü', tone: 'skt', always: true },
-            { key: 'teknik', title: 'API / teknik', tone: 'teknik' },
-        ];
-
-        const groups = groupDefs
-            .map((def) => {
-                if (def.key === 'skt') {
-                    return {
-                        ...def,
-                        rows: [],
-                        sktHtml: this._buildProductDetailSktHtml(
-                            sktEntries,
-                            expiryError,
-                            this._productDetailLoading && !this._productDetailExpiryFetched.has(String(productId))
-                        ),
-                    };
-                }
-                const groupRows = visibleRows.filter((r) => r.group === def.key);
-                if (!groupRows.length && !def.always) return null;
-                return { ...def, rows: groupRows, sktHtml: null };
-            })
-            .filter(Boolean);
-
-        return { groups };
+        const vm = this._buildProductDetailViewModel(productId);
+        if (!vm) return { groups: [], vm: null };
+        return { groups: vm.infoGroups, vm };
     }
 
     _renderProductDetailFieldRow(row) {
@@ -3231,24 +3484,15 @@ class CountingSystem {
 
     _renderProductDetailGroupsHtml(groups) {
         return groups
-            .map((group) => {
-                const refreshBtn =
-                    group.key === 'skt'
-                        ? `<button type="button" class="product-detail-refresh-btn" data-action="refresh-skt">Yenile</button>`
-                        : '';
-                const body =
-                    group.key === 'skt'
-                        ? `<div class="product-detail-group-body">${group.sktHtml || ''}</div>`
-                        : `<div class="product-detail-group-body">${(group.rows || []).map((row) => this._renderProductDetailFieldRow(row)).join('')}</div>`;
-                return `
+            .map(
+                (group) => `
                     <section class="product-detail-group product-detail-group--${group.tone}">
                         <div class="product-detail-group-head">
                             <span>${this.escapeHtml(group.title)}</span>
-                            ${refreshBtn}
                         </div>
-                        ${body}
-                    </section>`;
-            })
+                        <div class="product-detail-group-body">${(group.rows || []).map((row) => this._renderProductDetailFieldRow(row)).join('')}</div>
+                    </section>`
+            )
             .join('');
     }
 
@@ -3256,11 +3500,16 @@ class CountingSystem {
         const content = document.getElementById('countingProductDetailContent');
         const hiddenBar = document.getElementById('countingProductDetailHiddenBar');
         const hiddenCount = document.getElementById('countingProductDetailHiddenCount');
+        const subtitle = document.getElementById('countingProductDetailSubtitle');
         if (!content) return;
 
-        const { groups } = this._buildProductDetailFieldRows(productId);
-        const hasVisibleCards = groups.some((g) => g.key !== 'skt' && (g.rows || []).length > 0);
-        const hasSkt = groups.some((g) => g.key === 'skt');
+        const { groups, vm } = this._buildProductDetailFieldRows(productId);
+        if (!vm) {
+            content.innerHTML = `<p class="py-6 text-center text-sm text-slate-500">Ürün bulunamadı.</p>`;
+            return;
+        }
+
+        if (subtitle) subtitle.textContent = vm.hero.name || '';
 
         if (hiddenBar && hiddenCount) {
             const hiddenN = this._productDetailHiddenFields.size;
@@ -3272,12 +3521,45 @@ class CountingSystem {
             }
         }
 
-        if (!hasVisibleCards && !hasSkt) {
-            content.innerHTML = `<p class="py-6 text-center text-sm text-slate-500">Gösterilecek alan kalmadı. Gizlenenleri sıfırlayabilirsiniz.</p>`;
-            return;
-        }
+        const sktHtml = this._buildProductDetailSktHtml(
+            vm.sktEntries,
+            vm.expiryError,
+            vm.isLoading && !this._productDetailExpiryFetched.has(String(productId))
+        );
+        const expDaysHtml = vm.expDays
+            ? this._renderProductDetailExpDays(vm.expDays)
+            : vm.isApiLoading
+              ? '<div class="product-detail-loading"><span class="product-detail-loading-dot"></span> Getir API verisi alınıyor…</div>'
+              : '';
+        const packagingHtml = this._renderProductDetailPackaging(vm.packagingCards);
+        const flagsHtml = this._renderProductDetailFlags(vm.flags);
+        const categoryPathHtml = this._renderProductDetailCategoryPath(vm.categoryBreadcrumb);
 
-        content.innerHTML = `<div class="product-detail-groups">${this._renderProductDetailGroupsHtml(groups)}</div>`;
+        const infoGroupsHtml = groups.length
+            ? `<div class="product-detail-groups">${this._renderProductDetailGroupsHtml(groups)}</div>`
+            : '';
+
+        content.innerHTML = `
+            <div class="pd-panel">
+                ${this._renderProductDetailHero(vm)}
+                ${categoryPathHtml}
+                ${this._renderProductDetailPriceBlock(vm)}
+                ${this._renderProductDetailStockGrid(vm)}
+                <section class="product-detail-group product-detail-group--skt">
+                    <div class="product-detail-group-head">
+                        <span>SKT & Raf ömrü</span>
+                        <button type="button" class="product-detail-refresh-btn" data-action="refresh-skt">Yenile</button>
+                    </div>
+                    <div class="product-detail-group-body">
+                        ${expDaysHtml}
+                        ${expDaysHtml && sktHtml ? '<div class="pd-skt-divider"></div>' : ''}
+                        ${sktHtml || ''}
+                    </div>
+                </section>
+                ${packagingHtml ? `<section class="product-detail-group product-detail-group--genel"><div class="product-detail-group-head"><span>Ambalaj barkodları</span></div><div class="product-detail-group-body">${packagingHtml}</div></section>` : ''}
+                ${flagsHtml ? `<section class="product-detail-group product-detail-group--genel"><div class="product-detail-group-head"><span>Durum</span></div><div class="product-detail-group-body">${flagsHtml}</div></section>` : ''}
+                ${infoGroupsHtml}
+            </div>`;
 
         content.querySelectorAll('.product-detail-hide-btn').forEach((btn) => {
             btn.addEventListener('click', (e) => {
@@ -3292,18 +3574,31 @@ class CountingSystem {
                 void this._refreshProductDetailData(productId, true);
             });
         });
+
+        content.querySelectorAll('[data-action="open-image"]').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const img = btn.querySelector('img');
+                if (img?.src) this.openProductImageLightbox(img.src, vm.hero.name);
+            });
+        });
     }
 
-    async _fetchApiProductRowForDetail(productId) {
-        if (this._apiProductRowCache.has(String(productId))) return;
+    async _fetchApiProductRowForDetail(productId, force = false) {
+        const pid = String(productId);
+        if (!force && this._apiProductRowCache.has(pid)) return;
+
         const product = this.productIndex.get(productId);
         if (!product) return;
-        const barcode = product.barcodes?.[0]?.code;
-        if (!barcode) return;
-        try {
-            await this.requestStockFromExtension(product.name, barcode, productId, { quiet: true });
-        } catch (e) {
-            /* sessiz */
+
+        const barcode = product.barcodes?.[0]?.code || null;
+        const row = await this._fetchApiProductRowByProductId(productId, barcode);
+        if (row) return;
+
+        if (barcode) {
+            try {
+                await this.requestStockFromExtension(product.name, barcode, productId, { quiet: true });
+            } catch (_) { /* sessiz */ }
         }
     }
 
@@ -3351,7 +3646,7 @@ class CountingSystem {
         }
     }
 
-    async _refreshProductDetailData(productId, forceSkt = false) {
+    async _refreshProductDetailData(productId, forceSkt = false, forceApi = false) {
         if (!productId) return;
         this._productDetailLoading = true;
         if (this.isProductDetailPanelOpen() && this.currentCountingProduct === productId) {
@@ -3360,7 +3655,7 @@ class CountingSystem {
 
         await Promise.allSettled([
             this._fetchProductDetailExpiry(productId, forceSkt),
-            this._fetchApiProductRowForDetail(productId),
+            this._fetchApiProductRowForDetail(productId, forceApi || forceSkt),
         ]);
 
         this._productDetailLoading = false;
@@ -3392,11 +3687,7 @@ class CountingSystem {
         overlay.classList.remove('hidden');
         overlay.classList.add('flex', 'show');
 
-        void this._ensureProductDetailExpiry(productId).then(() => {
-            if (this.currentCountingProduct === productId && this.isProductDetailPanelOpen()) {
-                this.renderProductDetailPanel(productId);
-            }
-        });
+        void this._refreshProductDetailData(productId, false, true);
     }
 
     closeProductDetailPanel() {
@@ -9079,6 +9370,17 @@ class CountingSystem {
         });
     }
 
+    openProductImageLightbox(imageSrc, alt = '') {
+        const lightbox = document.getElementById('productImageLightbox');
+        const lightboxImage = document.getElementById('lightboxProductImage');
+        if (!lightbox || !lightboxImage || !imageSrc) return;
+        lightboxImage.src = imageSrc;
+        lightboxImage.alt = alt || '';
+        lightbox.classList.remove('hidden');
+        document.body.classList.add('lightbox-open');
+        requestAnimationFrame(() => lightbox.classList.add('show'));
+    }
+
     closeProductImageLightbox() {
         const lightbox = document.getElementById('productImageLightbox');
         if (!lightbox) return;
@@ -10543,120 +10845,240 @@ class CountingSystem {
         });
     }
 
-    // API'den direkt stok getir (Direkt fetch ile - Extension'a gerek yok)
-    // Test function to see full API response
-    async testAPIRequest(barcode) {
+    /** console-quiet.js log'u kapatsa bile konsolda görünür çıktı */
+    _devOut(...args) {
+        console.warn('[JetBarkod]', ...args);
+    }
+
+    async _resolveApiInfoForDebug() {
+        if (this.countingData?._api_info?.token) return this.countingData._api_info;
+
         try {
-            // Get API info
-            let apiInfo = null;
-            if (this.countingData._api_info) {
-                apiInfo = this.countingData._api_info;
-            } else if (window.supabase) {
-                const session = window.authUtils?.checkAuth();
-                if (session && session.username) {
-                    const { data: userData } = await window.supabase
-                        .from('users')
-                        .select('counting_data')
-                        .eq('username', session.username)
-                        .maybeSingle();
-                    if (userData?.counting_data) {
-                        const cd = typeof userData.counting_data === 'string' 
-                            ? JSON.parse(userData.counting_data) 
-                            : userData.counting_data;
-                        apiInfo = cd._api_info;
-                    }
+            const raw = localStorage.getItem('getir_api_info');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed?.token) return parsed;
+            }
+        } catch (_) { /* ignore */ }
+
+        if (window.getirExtensionHelper?.getAPIInfo) {
+            try {
+                const info = await window.getirExtensionHelper.getAPIInfo();
+                if (info?.token) return info;
+            } catch (_) { /* ignore */ }
+        }
+
+        if (window.supabase) {
+            const session = window.authUtils?.checkAuth();
+            if (session?.username) {
+                const { data: userData } = await window.supabase
+                    .from('users')
+                    .select('counting_data')
+                    .eq('username', session.username)
+                    .maybeSingle();
+                if (userData?.counting_data) {
+                    const cd = typeof userData.counting_data === 'string'
+                        ? JSON.parse(userData.counting_data)
+                        : userData.counting_data;
+                    if (cd?._api_info?.token) return cd._api_info;
                 }
             }
-            
-            if (!apiInfo || !apiInfo.token) {
-                console.error('❌ API bilgisi bulunamadı');
+        }
+
+        return null;
+    }
+
+    _findProductRowInApiData(data, { productId, barcode } = {}) {
+        if (!data?.data || !Array.isArray(data.data)) return null;
+
+        if (productId) {
+            const byId = data.data.find((item) => {
+                const itemProductId = item._id || item.id || item.product?._id || item.product?.id || item.product;
+                return itemProductId === productId || String(itemProductId) === String(productId);
+            });
+            if (byId) return byId;
+        }
+
+        if (barcode) {
+            const code = String(barcode);
+            return data.data.find((item) => {
+                if (item.packagingInfo) {
+                    for (const key in item.packagingInfo) {
+                        if (item.packagingInfo[key]?.barcodes?.includes(code)) return true;
+                    }
+                }
+                return item.barcode === code;
+            }) || null;
+        }
+
+        return null;
+    }
+
+    _summarizeApiProductRow(row) {
+        if (!row || typeof row !== 'object') return null;
+        const name = row.fullName?.tr || row.displayName?.tr || row.name || row.productName || '—';
+        const productId = row._id || row.id || row.product?._id || row.product?.id || row.product || '—';
+        const barcodes = [];
+        if (row.barcode) barcodes.push(String(row.barcode));
+        if (row.packagingInfo) {
+            Object.values(row.packagingInfo).forEach((pkg) => {
+                (pkg?.barcodes || []).forEach((b) => {
+                    if (b && !barcodes.includes(String(b))) barcodes.push(String(b));
+                });
+            });
+        }
+        return {
+            productId,
+            name,
+            barcodes,
+            available: row.available,
+            reserve: row.reserve ?? row.reservedStock ?? row.reserved,
+            price: row.price,
+            priceText: row.priceText,
+            struckPrice: row.struckPrice,
+            struckPriceText: row.struckPriceText,
+            wholesalePrice: row.wholesalePrice,
+            expDays: row.expDays || null,
+            categories: row.categories,
+            categoryName: row.category?.name?.tr || row.category?.name || null,
+        };
+    }
+
+    /**
+     * Konsoldan barkod ile API ürün satırını incele.
+     * Kullanım: await testBarkod('8690103292390')
+     */
+    async inspectProductByBarcode(barcode) {
+        const code = String(barcode || '').trim();
+        if (!code) {
+            this._devOut('❌ Barkod girin. Örnek: await testBarkod("8690103292390")');
+            return null;
+        }
+
+        try {
+            const apiInfo = await this._resolveApiInfoForDebug();
+            if (!apiInfo?.token) {
+                this._devOut('❌ API bilgisi yok. Getir franchise sayfasını açıp sayfayı yenileyin.');
                 return null;
             }
-            
-            // Find product by barcode
-            const product = this.findProductByBarcode(barcode);
-            const productId = product?.id || product?.productId;
-            
-            console.log('🧪 Test API Request:', { barcode, productId, productName: product?.name });
-            
-            // Make API request
+
+            const catalogProduct = this.findProductByBarcode(code);
+            const productId = catalogProduct?.id || catalogProduct?.productId || null;
+
+            this._devOut('🧪 Barkod testi', {
+                barcode: code,
+                productId,
+                catalogName: catalogProduct?.name || null,
+            });
+
             const endpoint = apiInfo.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks';
             const warehouseId = apiInfo.warehouseId || '5dcafe6ae2c61b1e52cf1704';
-            
             let authToken = apiInfo.token;
-            if (!authToken.startsWith('Bearer ')) {
-                authToken = 'Bearer ' + authToken.trim();
-            }
-            
+            if (!authToken.startsWith('Bearer ')) authToken = 'Bearer ' + authToken.trim();
+
             const requestBody = {
                 warehouseIds: [warehouseId],
                 productIds: productId ? [productId] : [],
-                sort: { available: 1 }
+                sort: { available: 1 },
             };
-            
-            // If no productId, search by barcode in response
-            if (!productId && barcode) {
-                requestBody.productIds = [];
-            }
-            
-            console.log('📤 Request:', {
-                url: `${endpoint}?limit=100&offset=0`,
-                method: 'POST',
-                body: requestBody
-            });
-            
+
             const response = await fetch(`${endpoint}?limit=100&offset=0`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': authToken,
-                    'Origin': 'https://franchise.getir.com',
-                    'Referer': 'https://franchise.getir.com/',
-                    'Accept': '*/*'
+                    Authorization: authToken,
+                    Origin: 'https://franchise.getir.com',
+                    Referer: 'https://franchise.getir.com/',
+                    Accept: '*/*',
                 },
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify(requestBody),
             });
-            
+
             const responseText = await response.text();
-            const data = JSON.parse(responseText);
-            
-            console.log('📥 FULL API RESPONSE:', JSON.stringify(data, null, 2));
-            
-            // If productId, find the specific product
-            if (productId && data.data && Array.isArray(data.data)) {
-                const foundProduct = data.data.find(item => {
-                    const itemProductId = item._id || item.id || item.product?._id || item.product?.id;
-                    return itemProductId === productId || String(itemProductId) === String(productId);
-                });
-                if (foundProduct) {
-                    console.log('📦 FOUND PRODUCT:', JSON.stringify(foundProduct, null, 2));
-                    return foundProduct;
-                }
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseErr) {
+                this._devOut('❌ API yanıtı JSON değil', response.status, responseText.slice(0, 300));
+                return null;
             }
-            
-            // If barcode, search in response
-            if (barcode && data.data && Array.isArray(data.data)) {
-                const foundProduct = data.data.find(item => {
-                    if (item.packagingInfo) {
-                        for (const key in item.packagingInfo) {
-                            if (item.packagingInfo[key]?.barcodes?.includes(String(barcode))) {
-                                return true;
-                            }
-                        }
-                    }
-                    return item.barcode === String(barcode);
-                });
-                if (foundProduct) {
-                    console.log('📦 FOUND PRODUCT BY BARCODE:', JSON.stringify(foundProduct, null, 2));
-                    return foundProduct;
-                }
+
+            if (!response.ok) {
+                this._devOut('❌ API hatası', response.status, data);
+                return data;
             }
-            
+
+            const foundProduct = this._findProductRowInApiData(data, { productId, barcode: code });
+            if (foundProduct) {
+                const pid = foundProduct._id || foundProduct.id || foundProduct.product;
+                if (pid) this._apiProductRowCache.set(String(pid), foundProduct);
+
+                const summary = this._summarizeApiProductRow(foundProduct);
+                this._devOut('📦 Özet:', summary);
+                this._devOut('📦 Tam ürün satırı:', foundProduct);
+                if (summary?.expDays) {
+                    this._devOut('⏳ Raf ömrü (expDays):', summary.expDays);
+                }
+                return foundProduct;
+            }
+
+            this._devOut('⚠️ Ürün bulunamadı — ham yanıt:', data);
             return data;
         } catch (error) {
-            console.error('❌ Test API Error:', error);
+            this._devOut('❌ Test hatası:', error);
             return null;
         }
+    }
+
+    async _fetchApiProductRowByProductId(productId, barcode = null) {
+        const pid = String(productId || '').trim();
+        if (!pid) return null;
+
+        try {
+            const apiInfo = await this._resolveApiInfoForDebug();
+            if (!apiInfo?.token) return null;
+
+            const endpoint = apiInfo.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks';
+            const warehouseId = apiInfo.warehouseId || '5dcafe6ae2c61b1e52cf1704';
+            let authToken = apiInfo.token;
+            if (!authToken.startsWith('Bearer ')) authToken = 'Bearer ' + authToken.trim();
+
+            const response = await fetch(`${endpoint}?limit=100&offset=0`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: authToken,
+                    Origin: 'https://franchise.getir.com',
+                    Referer: 'https://franchise.getir.com/',
+                    Accept: '*/*',
+                },
+                body: JSON.stringify({
+                    warehouseIds: [warehouseId],
+                    productIds: [pid],
+                    sort: { available: 1 },
+                }),
+            });
+
+            const data = JSON.parse(await response.text());
+            if (!response.ok) return null;
+
+            const foundProduct = this._findProductRowInApiData(data, {
+                productId: pid,
+                barcode: barcode ? String(barcode) : null,
+            });
+            if (foundProduct) {
+                const cacheId = foundProduct._id || foundProduct.id || foundProduct.product || pid;
+                this._apiProductRowCache.set(String(cacheId), foundProduct);
+                return foundProduct;
+            }
+            return null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    async testAPIRequest(barcode) {
+        return this.inspectProductByBarcode(barcode);
     }
 
     /**
@@ -14765,4 +15187,7 @@ class CountingSystem {
 // Global instance
 window.countingSystem = new CountingSystem();
 
+/** Konsol: await testBarkod('8690103292390') */
+window.testBarkod = (barcode) => window.countingSystem.inspectProductByBarcode(barcode);
+window.testAPIRequest = window.testBarkod;
 
