@@ -1527,6 +1527,140 @@
             margin: 0.625rem 0;
             background: rgb(254 215 170 / 0.55);
         }
+        .pd-skt-check {
+            margin-top: 0.75rem;
+            padding: 0.625rem;
+            border-radius: 0.75rem;
+            border: 1px solid rgb(254 215 170 / 0.55);
+            background: linear-gradient(to bottom, rgb(255 247 237 / 0.65), rgb(255 255 255));
+        }
+        .pd-skt-check-head {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            margin-bottom: 0.5rem;
+        }
+        .pd-skt-check-title {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: rgb(194 65 12);
+        }
+        .pd-skt-check-sub {
+            font-size: 10px;
+            color: rgb(100 116 139);
+        }
+        .pd-skt-check-input {
+            width: 100%;
+            border-radius: 0.625rem;
+            border: 1px solid rgb(254 215 170 / 0.75);
+            background: rgb(255 255 255);
+            padding: 0.45rem 0.625rem;
+            font-size: 13px;
+            font-weight: 600;
+            color: rgb(15 23 42);
+        }
+        .pd-skt-check-input:focus {
+            outline: none;
+            border-color: rgb(251 146 60);
+            box-shadow: 0 0 0 2px rgb(251 146 60 / 0.2);
+        }
+        .pd-skt-check-result {
+            margin-top: 0.5rem;
+        }
+        .pd-skt-check-hint {
+            margin: 0;
+            font-size: 11px;
+            color: rgb(100 116 139);
+            font-style: italic;
+        }
+        .pd-skt-check-result-inner {
+            border-radius: 0.625rem;
+            padding: 0.55rem 0.625rem;
+            border: 1px solid rgb(226 232 240);
+            background: rgb(248 250 252 / 0.7);
+        }
+        .pd-skt-check-result--ok {
+            border-color: rgb(167 243 208 / 0.65);
+            background: rgb(236 253 245 / 0.65);
+        }
+        .pd-skt-check-result--warning {
+            border-color: rgb(253 230 138 / 0.75);
+            background: rgb(255 251 235 / 0.75);
+        }
+        .pd-skt-check-result--dead,
+        .pd-skt-check-result--expired {
+            border-color: rgb(254 205 211 / 0.75);
+            background: rgb(255 241 242 / 0.75);
+        }
+        .pd-skt-check-main {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .pd-skt-check-days {
+            font-size: 1.125rem;
+            font-weight: 800;
+            color: rgb(15 23 42);
+            font-variant-numeric: tabular-nums;
+        }
+        .pd-skt-check-badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 9999px;
+            padding: 0.15rem 0.5rem;
+            font-size: 10px;
+            font-weight: 700;
+            border: 1px solid transparent;
+        }
+        .pd-skt-check-result--ok .pd-skt-check-badge {
+            background: rgb(209 250 229);
+            color: rgb(4 120 87);
+            border-color: rgb(167 243 208 / 0.7);
+        }
+        .pd-skt-check-result--warning .pd-skt-check-badge {
+            background: rgb(254 243 199);
+            color: rgb(180 83 9);
+            border-color: rgb(253 230 138 / 0.75);
+        }
+        .pd-skt-check-result--dead .pd-skt-check-badge,
+        .pd-skt-check-result--expired .pd-skt-check-badge {
+            background: rgb(254 226 226);
+            color: rgb(190 18 60);
+            border-color: rgb(254 205 211 / 0.75);
+        }
+        .pd-skt-check-desc,
+        .pd-skt-check-skt {
+            margin: 0.35rem 0 0;
+            font-size: 11px;
+            color: rgb(71 85 105);
+            line-height: 1.45;
+        }
+        .pd-skt-check-extras {
+            margin-top: 0.45rem;
+            padding-top: 0.45rem;
+            border-top: 1px dashed rgb(226 232 240 / 0.85);
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+        .pd-skt-check-meta {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 0.5rem;
+            font-size: 10px;
+            color: rgb(100 116 139);
+        }
+        .pd-skt-check-meta strong {
+            font-size: 11px;
+            color: rgb(15 23 42);
+            font-weight: 700;
+            text-align: right;
+        }
         .pd-packaging-grid {
             display: flex;
             flex-direction: column;

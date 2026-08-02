@@ -272,6 +272,8 @@ class CountingSystem {
         this._productDetailLoading = false;
         this._productDetailExpiryErrors = new Map();
         this._productDetailExpiryFetched = new Set();
+        /** Ürün detay — SKT tarih kontrolü productId → YYYY-MM-DD */
+        this._productDetailSktCheckDates = new Map();
     }
 
     _applyFinanceVisualAnalyticsVisibility() {
@@ -3044,6 +3046,193 @@ class CountingSystem {
         return sanitized || this.escapeHtml(String(raw).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
     }
 
+    _startOfLocalDay(date) {
+        const d = date instanceof Date ? date : new Date(date);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+
+    _parseIsoDateParts(iso) {
+        if (!iso || typeof iso !== 'string') return null;
+        const parts = iso.trim().split('-');
+        if (parts.length !== 3) return null;
+        const year = Number(parts[0]);
+        const month = Number(parts[1]);
+        const day = Number(parts[2]);
+        if (!year || !month || !day) return null;
+        return new Date(year, month - 1, day);
+    }
+
+    _formatIsoDateTr(iso) {
+        const d = this._parseIsoDateParts(iso);
+        if (!d) return iso || '';
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        return `${dd}.${mm}.${d.getFullYear()}`;
+    }
+
+    _addDaysToIsoDate(iso, days) {
+        const d = this._parseIsoDateParts(iso);
+        if (!d) return null;
+        d.setDate(d.getDate() + days);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    _daysFromTodayToIso(iso) {
+        const target = this._parseIsoDateParts(iso);
+        if (!target) return null;
+        const today = this._startOfLocalDay(new Date());
+        return Math.round((target.getTime() - today.getTime()) / 86400000);
+    }
+
+    _analyzeSktDate(expDays, sktIso) {
+        const remaining = this._daysFromTodayToIso(sktIso);
+        if (remaining == null) return null;
+
+        const warning = Number(expDays?.warning);
+        const dead = Number(expDays?.dead);
+        const allowed = Number(expDays?.allowed);
+
+        let status = 'ok';
+        let statusLabel = 'Satışa uygun';
+        let statusHint = 'SKT uyarı eşiğinin üzerinde.';
+
+        if (remaining < 0) {
+            status = 'expired';
+            statusLabel = 'Süresi dolmuş';
+            statusHint = `SKT ${Math.abs(remaining)} gün önce geçti.`;
+        } else if (!Number.isNaN(dead) && dead > 0 && remaining <= dead) {
+            status = 'dead';
+            statusLabel = 'Ölü stok';
+            statusHint = `SKT'ye ${remaining} gün kaldı — ölü stok eşiğinin (${dead} gün) altında.`;
+        } else if (!Number.isNaN(warning) && warning > 0 && remaining <= warning) {
+            status = 'warning';
+            statusLabel = 'Uyarı';
+            statusHint = `SKT'ye ${remaining} gün kaldı — uyarı eşiğinin (${warning} gün) altında.`;
+        } else if (remaining === 0) {
+            status = 'expired';
+            statusLabel = 'Bugün son gün';
+            statusHint = 'SKT bugün doluyor.';
+        } else {
+            statusHint = `SKT'ye ${remaining} gün kaldı.`;
+        }
+
+        const removeIso = !Number.isNaN(dead) && dead > 0 ? this._addDaysToIsoDate(sktIso, -dead) : null;
+        const removeRemaining = removeIso ? this._daysFromTodayToIso(removeIso) : null;
+        const warningStartIso = !Number.isNaN(warning) && warning > 0 ? this._addDaysToIsoDate(sktIso, -warning) : null;
+
+        return {
+            remaining,
+            status,
+            statusLabel,
+            statusHint,
+            sktTr: this._formatIsoDateTr(sktIso),
+            removeIso,
+            removeTr: removeIso ? this._formatIsoDateTr(removeIso) : null,
+            removeRemaining,
+            warningStartTr: warningStartIso ? this._formatIsoDateTr(warningStartIso) : null,
+            warning,
+            dead,
+            allowed,
+        };
+    }
+
+    _renderSktDateCheckResultHtml(expDays, sktIso) {
+        if (!sktIso) {
+            return `<p class="pd-skt-check-hint">SKT tarihi seçin — kalan gün ve durum burada görünür.</p>`;
+        }
+
+        const analysis = this._analyzeSktDate(expDays, sktIso);
+        if (!analysis) {
+            return `<p class="pd-skt-check-hint">Geçerli bir tarih seçin.</p>`;
+        }
+
+        const remainingAbs = Math.abs(analysis.remaining);
+        const remainingLabel =
+            analysis.remaining > 0
+                ? `${remainingAbs} gün kaldı`
+                : analysis.remaining < 0
+                  ? `${remainingAbs} gün geçti`
+                  : 'Bugün';
+
+        const extraLines = [];
+        if (analysis.removeTr && analysis.dead > 0) {
+            const remTxt =
+                analysis.removeRemaining == null
+                    ? ''
+                    : analysis.removeRemaining > 0
+                      ? ` · ${analysis.removeRemaining} gün sonra`
+                      : analysis.removeRemaining < 0
+                        ? ` · ${Math.abs(analysis.removeRemaining)} gün önce geçti`
+                        : ' · bugün';
+            extraLines.push(`<div class="pd-skt-check-meta"><span>Satıştan kaldırma</span><strong>${this.escapeHtml(analysis.removeTr)}${this.escapeHtml(remTxt)}</strong></div>`);
+        }
+        if (analysis.warningStartTr && analysis.warning > 0) {
+            extraLines.push(`<div class="pd-skt-check-meta"><span>Uyarı başlangıcı</span><strong>${this.escapeHtml(analysis.warningStartTr)}</strong></div>`);
+        }
+
+        return `
+            <div class="pd-skt-check-result-inner pd-skt-check-result--${analysis.status}">
+                <div class="pd-skt-check-main">
+                    <span class="pd-skt-check-days">${this.escapeHtml(remainingLabel)}</span>
+                    <span class="pd-skt-check-badge">${this.escapeHtml(analysis.statusLabel)}</span>
+                </div>
+                <p class="pd-skt-check-desc">${this.escapeHtml(analysis.statusHint)}</p>
+                <p class="pd-skt-check-skt">SKT: <strong>${this.escapeHtml(analysis.sktTr)}</strong></p>
+                ${extraLines.length ? `<div class="pd-skt-check-extras">${extraLines.join('')}</div>` : ''}
+            </div>`;
+    }
+
+    _renderProductDetailSktDateChecker(expDays, productId) {
+        if (!expDays || typeof expDays !== 'object') return '';
+
+        const pid = String(productId);
+        const saved = this._productDetailSktCheckDates.get(pid) || '';
+        const resultHtml = saved ? this._renderSktDateCheckResultHtml(expDays, saved) : this._renderSktDateCheckResultHtml(expDays, null);
+
+        return `
+            <div class="pd-skt-check" data-product-id="${this.escapeHtml(pid)}">
+                <div class="pd-skt-check-head">
+                    <span class="pd-skt-check-title">SKT tarihi kontrol</span>
+                    <span class="pd-skt-check-sub">Seçilen tarihe göre kalan gün</span>
+                </div>
+                <input
+                    type="date"
+                    class="pd-skt-check-input"
+                    data-action="skt-date-check"
+                    data-product-id="${this.escapeHtml(pid)}"
+                    value="${this.escapeHtml(saved)}"
+                    aria-label="SKT tarihi seç"
+                />
+                <div class="pd-skt-check-result" data-skt-result="${this.escapeHtml(pid)}">${resultHtml}</div>
+            </div>`;
+    }
+
+    _bindProductDetailSktDateChecker(content, productId, expDays) {
+        if (!content || !expDays) return;
+
+        content.querySelectorAll('[data-action="skt-date-check"]').forEach((input) => {
+            const update = () => {
+                const pid = input.getAttribute('data-product-id') || String(productId);
+                const iso = input.value || '';
+                if (iso) this._productDetailSktCheckDates.set(pid, iso);
+                else this._productDetailSktCheckDates.delete(pid);
+
+                const resultEl = content.querySelector(`[data-skt-result="${pid}"]`);
+                if (resultEl) {
+                    resultEl.innerHTML = iso
+                        ? this._renderSktDateCheckResultHtml(expDays, iso)
+                        : this._renderSktDateCheckResultHtml(expDays, null);
+                }
+            };
+
+            input.addEventListener('change', update);
+            input.addEventListener('input', update);
+        });
+    }
+
     _parseTrDateParts(dateStr) {
         if (!dateStr || typeof dateStr !== 'string') return null;
         const parts = dateStr.trim().split('.');
@@ -3568,7 +3757,7 @@ class CountingSystem {
             </section>`;
     }
 
-    _renderProductDetailExpDays(expDays) {
+    _renderProductDetailExpDays(expDays, productId) {
         if (!expDays || typeof expDays !== 'object') return '';
 
         const lifetime = Number(expDays.lifetime);
@@ -3604,6 +3793,8 @@ class CountingSystem {
                 </div>`;
         }
 
+        const dateCheckerHtml = productId ? this._renderProductDetailSktDateChecker(expDays, productId) : '';
+
         return `
             <div class="pd-exp-days">
                 <div class="pd-exp-metrics">${metrics
@@ -3613,7 +3804,8 @@ class CountingSystem {
                     )
                     .join('')}</div>
                 ${barHtml}
-            </div>`;
+            </div>
+            ${dateCheckerHtml}`;
     }
 
     _renderProductDetailPackaging(cards) {
@@ -3712,7 +3904,7 @@ class CountingSystem {
             vm.isLoading && !this._productDetailExpiryFetched.has(String(productId))
         );
         const expDaysHtml = vm.expDays
-            ? this._renderProductDetailExpDays(vm.expDays)
+            ? this._renderProductDetailExpDays(vm.expDays, productId)
             : vm.isApiLoading
               ? '<div class="product-detail-loading"><span class="product-detail-loading-dot"></span> Getir API verisi alınıyor…</div>'
               : '';
@@ -3774,6 +3966,8 @@ class CountingSystem {
                 this._unhideProductDetailField(btn.getAttribute('data-unhide-field'));
             });
         });
+
+        this._bindProductDetailSktDateChecker(content, productId, vm.expDays);
 
         content.querySelectorAll('[data-action="refresh-skt"]').forEach((btn) => {
             btn.addEventListener('click', (e) => {
