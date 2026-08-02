@@ -212,6 +212,12 @@ class CountingSystem {
         /** Son Getir yapıştırmada eşleşmeyen görsel URL'leri */
         this._lastUnmatchedGetirUrls = [];
         this._unmatchedGetirModalIndex = 0;
+        /** Ürün detay paneli — gizli alan tercihleri (localStorage) */
+        this._productDetailHiddenFields = this._loadProductDetailHiddenFields();
+        /** Ürün detay — SKT önbelleği productId → [{ date, qty, removeDate? }] */
+        this._productDetailExpiryCache = new Map();
+        /** Stok API yanıtı önbelleği — detay paneli için */
+        this._apiProductRowCache = new Map();
     }
 
     _applyFinanceVisualAnalyticsVisibility() {
@@ -2819,7 +2825,7 @@ class CountingSystem {
         overlay.classList.remove('hidden');
         overlay.classList.add('flex', 'show');
         if (btn) {
-            btn.classList.add('ring-2', 'ring-violet-300', 'border-violet-300');
+            btn.classList.add('is-active');
             btn.setAttribute('aria-expanded', 'true');
         }
     }
@@ -2832,7 +2838,7 @@ class CountingSystem {
             overlay.classList.remove('flex', 'show');
         }
         if (btn) {
-            btn.classList.remove('ring-2', 'ring-violet-300', 'border-violet-300');
+            btn.classList.remove('is-active');
             btn.setAttribute('aria-expanded', 'false');
         }
     }
@@ -2847,6 +2853,347 @@ class CountingSystem {
     isProductTimelinePanelOpen() {
         const overlay = document.getElementById('countingProductTimelineOverlay');
         return !!(overlay && !overlay.classList.contains('hidden'));
+    }
+
+    _loadProductDetailHiddenFields() {
+        try {
+            const raw = localStorage.getItem('counting_product_detail_hidden_v1');
+            const parsed = raw ? JSON.parse(raw) : [];
+            return new Set(Array.isArray(parsed) ? parsed.filter(Boolean) : []);
+        } catch (e) {
+            return new Set();
+        }
+    }
+
+    _saveProductDetailHiddenFields() {
+        try {
+            localStorage.setItem(
+                'counting_product_detail_hidden_v1',
+                JSON.stringify([...this._productDetailHiddenFields])
+            );
+        } catch (e) {
+            /* storage dolu olabilir */
+        }
+    }
+
+    _hideProductDetailField(fieldId) {
+        if (!fieldId) return;
+        this._productDetailHiddenFields.add(String(fieldId));
+        this._saveProductDetailHiddenFields();
+        if (this.currentCountingProduct) {
+            this.renderProductDetailPanel(this.currentCountingProduct);
+        }
+    }
+
+    _resetProductDetailHiddenFields() {
+        this._productDetailHiddenFields.clear();
+        this._saveProductDetailHiddenFields();
+        if (this.currentCountingProduct) {
+            this.renderProductDetailPanel(this.currentCountingProduct);
+        }
+    }
+
+    _parseTrDateParts(dateStr) {
+        if (!dateStr || typeof dateStr !== 'string') return null;
+        const parts = dateStr.trim().split('.');
+        if (parts.length !== 3) return null;
+        const day = Number(parts[0]);
+        const month = Number(parts[1]);
+        const year = Number(parts[2]);
+        if (!day || !month || !year) return null;
+        return new Date(year, month - 1, day);
+    }
+
+    _daysBetweenTrDates(laterStr, earlierStr) {
+        const later = this._parseTrDateParts(laterStr);
+        const earlier = this._parseTrDateParts(earlierStr);
+        if (!later || !earlier) return null;
+        return Math.round((later.getTime() - earlier.getTime()) / 86400000);
+    }
+
+    _getProductDetailSktEntries(productId) {
+        const pid = String(productId);
+        if (this._productDetailExpiryCache.has(pid)) {
+            return this._productDetailExpiryCache.get(pid) || [];
+        }
+        const fromGuide = this._getFinancePasteGuideSktEntries(pid);
+        if (fromGuide.length) return fromGuide;
+        return [];
+    }
+
+    _mergeProductDetailExpiryEntries(entries) {
+        const map = new Map();
+        (entries || []).forEach((entry) => {
+            if (!entry?.date) return;
+            const key = `${entry.date}|${entry.removeDate || ''}`;
+            const prev = map.get(key);
+            if (prev) prev.qty += Number(entry.qty) || 0;
+            else map.set(key, { date: entry.date, qty: Number(entry.qty) || 0, removeDate: entry.removeDate || null });
+        });
+        return [...map.values()].sort((a, b) => {
+            const da = this._parseTrDateParts(a.date);
+            const db = this._parseTrDateParts(b.date);
+            if (!da || !db) return 0;
+            return da - db;
+        });
+    }
+
+    _buildProductDetailFieldRows(productId) {
+        const product = this.productIndex.get(productId);
+        if (!product) return [];
+
+        const data = this.countingData[productId] || {};
+        const apiRow = this._apiProductRowCache.get(String(productId)) || null;
+        const sktEntries = this._mergeProductDetailExpiryEntries(this._getProductDetailSktEntries(productId));
+        const diff = this.calculateDifference(data.warehouseStock, data.systemStock);
+        let stockDiffText = '—';
+        if (diff.type === 'zero') stockDiffText = 'Eşit (0)';
+        else if (diff.type === 'positive') stockDiffText = `+${diff.value} fazla (depo > sistem)`;
+        else if (diff.type === 'negative') stockDiffText = `-${diff.value} eksik (depo < sistem)`;
+
+        const barcodeLines = (product.barcodes || [])
+            .map((b) => {
+                if (!b?.code) return '';
+                const extras = [b.size, b.variant, b.type].filter(Boolean).join(' · ');
+                return extras ? `${b.code} (${extras})` : String(b.code);
+            })
+            .filter(Boolean);
+
+        const packagingLines = [];
+        const packaging = apiRow?.packagingInfo || apiRow?.product?.packagingInfo;
+        if (packaging && typeof packaging === 'object') {
+            Object.keys(packaging).forEach((key) => {
+                if (key === 'pickingType') return;
+                const pkg = packaging[key];
+                if (!pkg) return;
+                const codes = Array.isArray(pkg.barcodes) ? pkg.barcodes.join(', ') : '';
+                if (codes) packagingLines.push(`Tip ${key}: ${codes}`);
+            });
+        }
+
+        let sktHtml = '';
+        let removalHtml = '';
+        let pullOffHtml = '';
+        if (sktEntries.length) {
+            sktHtml = sktEntries
+                .map((e) => `<span class="inline-flex items-center rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-900 mr-1 mb-1">${this.escapeHtml(String(e.qty))} ad · SKT ${this.escapeHtml(e.date)}</span>`)
+                .join('');
+            const removalItems = sktEntries.filter((e) => e.removeDate);
+            if (removalItems.length) {
+                removalHtml = removalItems
+                    .map((e) => `<span class="inline-flex items-center rounded-full border border-rose-200/80 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-900 mr-1 mb-1">${this.escapeHtml(String(e.qty))} ad · ${this.escapeHtml(e.removeDate)}</span>`)
+                    .join('');
+            }
+            const pullOffParts = sktEntries
+                .filter((e) => e.removeDate)
+                .map((e) => {
+                    const days = this._daysBetweenTrDates(e.date, e.removeDate);
+                    if (days == null) return null;
+                    return `${e.qty} ad: SKT'den ${days} gün önce (${e.removeDate})`;
+                })
+                .filter(Boolean);
+            if (pullOffParts.length) {
+                pullOffHtml = pullOffParts.map((p) => this.escapeHtml(p)).join('<br>');
+            }
+        }
+
+        const rows = [
+            { id: 'product_id', label: 'Ürün ID', value: product.id || '—' },
+            { id: 'brand', label: 'Marka', value: product.brand || '—' },
+            { id: 'category', label: 'Kategori', value: product.category || '—' },
+            { id: 'subcategory', label: 'Alt kategori', value: product.subCategory || '—' },
+            { id: 'shelf', label: 'Raf', value: (product.shelf && product.shelf !== '-') ? product.shelf : '—' },
+            { id: 'description', label: 'Açıklama', value: product.description || product.name || '—' },
+            { id: 'barcodes', label: 'Barkodlar', value: barcodeLines.length ? barcodeLines.join('<br>') : '—', isHtml: true },
+            { id: 'packaging', label: 'Ambalaj / paket barkodları', value: packagingLines.length ? packagingLines.join('<br>') : '—', isHtml: true },
+            { id: 'system_stock', label: 'Sistem stoku', value: data.systemStock != null ? String(data.systemStock) : '—' },
+            { id: 'warehouse_stock', label: 'Depo stoku', value: data.warehouseStock != null ? String(data.warehouseStock) : '—' },
+            { id: 'reserved_stock', label: 'Rezerve stok', value: data.reservedStock != null ? String(data.reservedStock) : '—' },
+            {
+                id: 'stock_diff',
+                label: 'Stok farkı',
+                value: stockDiffText,
+            },
+            {
+                id: 'price',
+                label: 'Satış fiyatı',
+                value: data.priceText || (data.price != null ? this.formatCurrency(data.price) : '—'),
+            },
+            {
+                id: 'struck_price',
+                label: 'Liste fiyatı',
+                value: data.struckPriceText || (data.struckPrice != null ? this.formatCurrency(data.struckPrice) : '—'),
+            },
+            { id: 'skt_entries', label: 'SKT dağılımı', value: sktHtml || '—', isHtml: !!sktHtml },
+            { id: 'removal_entries', label: 'Satıştan kaldırma', value: removalHtml || '—', isHtml: !!removalHtml },
+            { id: 'pull_off_days', label: 'SKT\'den kaç gün önce çıkmalı', value: pullOffHtml || '—', isHtml: !!pullOffHtml },
+        ];
+
+        if (data.lastUpdated) {
+            rows.push({
+                id: 'last_updated',
+                label: 'Son güncelleme',
+                value: this.formatAbsoluteDateTimeTr(new Date(data.lastUpdated).getTime()) || String(data.lastUpdated),
+            });
+        }
+
+        return rows.filter((row) => {
+            const v = row.value;
+            if (v === '—' || v === '' || v == null) return false;
+            return true;
+        });
+    }
+
+    _renderProductDetailFieldRow(row) {
+        const valueHtml = row.isHtml
+            ? row.value
+            : this.escapeHtml(String(row.value));
+        return `
+            <div class="product-detail-row" data-field-id="${this.escapeHtml(row.id)}">
+                <div class="flex items-center justify-between gap-2 mb-0.5">
+                    <span class="text-[11px] font-bold uppercase tracking-wide text-slate-400">${this.escapeHtml(row.label)}</span>
+                    <button type="button" class="product-detail-hide-btn p-1 rounded-md text-slate-400 hover:bg-slate-100" data-field-id="${this.escapeHtml(row.id)}" title="Bu alanı gizle" aria-label="${this.escapeHtml(row.label)} alanını gizle">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858 5.858a3 3 0 104.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="text-xs text-slate-800 leading-relaxed break-words [overflow-wrap:anywhere]">${valueHtml}</div>
+            </div>`;
+    }
+
+    renderProductDetailPanel(productId) {
+        const content = document.getElementById('countingProductDetailContent');
+        const hiddenBar = document.getElementById('countingProductDetailHiddenBar');
+        const hiddenCount = document.getElementById('countingProductDetailHiddenCount');
+        if (!content) return;
+
+        const rows = this._buildProductDetailFieldRows(productId).filter(
+            (row) => !this._productDetailHiddenFields.has(row.id)
+        );
+
+        if (hiddenBar && hiddenCount) {
+            const hiddenN = this._productDetailHiddenFields.size;
+            if (hiddenN > 0) {
+                hiddenBar.classList.remove('hidden');
+                hiddenCount.textContent = `${hiddenN} alan gizli · diğer ürünlerde de gizli kalır`;
+            } else {
+                hiddenBar.classList.add('hidden');
+            }
+        }
+
+        if (!rows.length) {
+            content.innerHTML = `<p class="py-6 text-center text-sm text-slate-500">Gösterilecek alan kalmadı. Gizlenenleri sıfırlayabilirsiniz.</p>`;
+            return;
+        }
+
+        content.innerHTML = rows.map((row) => this._renderProductDetailFieldRow(row)).join('');
+
+        content.querySelectorAll('.product-detail-hide-btn').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const fieldId = btn.getAttribute('data-field-id');
+                this._hideProductDetailField(fieldId);
+            });
+        });
+    }
+
+    async _ensureProductDetailExpiry(productId) {
+        const pid = String(productId);
+        if (this._productDetailExpiryCache.has(pid)) return;
+        const fromGuide = this._getFinancePasteGuideSktEntries(pid);
+        if (fromGuide.length) {
+            this._productDetailExpiryCache.set(pid, fromGuide);
+            return;
+        }
+        const helper = window.getirExtensionHelper;
+        if (!helper?.fetchExpiryProducts) return;
+        try {
+            const result = await helper.fetchExpiryProducts([pid]);
+            const entries = result?.byProductId?.[pid] || [];
+            if (entries.length) {
+                this._productDetailExpiryCache.set(pid, entries);
+            }
+        } catch (e) {
+            /* SKT opsiyonel — sessizce geç */
+        }
+    }
+
+    openProductDetailPanel() {
+        const productId = this.currentCountingProduct;
+        if (!productId) return;
+
+        this.closeProductTimelinePanel();
+
+        const overlay = document.getElementById('countingProductDetailOverlay');
+        const subtitle = document.getElementById('countingProductDetailSubtitle');
+        if (!overlay) return;
+
+        const product = this.productIndex.get(productId);
+        if (subtitle) {
+            subtitle.textContent = product?.name ? String(product.name) : '';
+        }
+
+        this.renderProductDetailPanel(productId);
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex', 'show');
+
+        void this._ensureProductDetailExpiry(productId).then(() => {
+            if (this.currentCountingProduct === productId && this.isProductDetailPanelOpen()) {
+                this.renderProductDetailPanel(productId);
+            }
+        });
+    }
+
+    closeProductDetailPanel() {
+        const overlay = document.getElementById('countingProductDetailOverlay');
+        if (overlay) {
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex', 'show');
+        }
+    }
+
+    toggleProductDetailPanel() {
+        const overlay = document.getElementById('countingProductDetailOverlay');
+        if (!overlay) return;
+        if (overlay.classList.contains('hidden')) this.openProductDetailPanel();
+        else this.closeProductDetailPanel();
+    }
+
+    isProductDetailPanelOpen() {
+        const overlay = document.getElementById('countingProductDetailOverlay');
+        return !!(overlay && !overlay.classList.contains('hidden'));
+    }
+
+    setupProductDetailPanel() {
+        const productName = document.getElementById('countingProductName');
+        const closeBtn = document.getElementById('countingProductDetailCloseBtn');
+        const backdrop = document.getElementById('countingProductDetailBackdrop');
+        const resetBtn = document.getElementById('countingProductDetailResetHiddenBtn');
+
+        const openDetail = (e) => {
+            e?.stopPropagation?.();
+            if (!this.currentCountingProduct) return;
+            this.openProductDetailPanel();
+        };
+
+        if (productName) {
+            productName.addEventListener('click', openDetail);
+            productName.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openDetail(e);
+                }
+            });
+        }
+        if (closeBtn) closeBtn.addEventListener('click', () => this.closeProductDetailPanel());
+        if (backdrop) backdrop.addEventListener('click', () => this.closeProductDetailPanel());
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                this._resetProductDetailHiddenFields();
+                this.showToast('Gizli alanlar sıfırlandı', 'success', 2000);
+            });
+        }
     }
 
     _buildCountingItemUpsertRow(tableName, productId, snapshot) {
@@ -8039,6 +8386,7 @@ class CountingSystem {
 
         // Setup product image lightbox
         this.setupProductImageLightbox();
+        this.setupProductDetailPanel();
 
         // Delegation tabanlı event listener'ları kur (tek seferlik)
         this.setupTableEventListeners();
@@ -8462,7 +8810,16 @@ class CountingSystem {
 
         // Close lightbox on ESC key
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && lightbox && !lightbox.classList.contains('hidden')) {
+            if (e.key !== 'Escape') return;
+            if (this.isProductDetailPanelOpen()) {
+                this.closeProductDetailPanel();
+                return;
+            }
+            if (this.isProductTimelinePanelOpen()) {
+                this.closeProductTimelinePanel();
+                return;
+            }
+            if (lightbox && !lightbox.classList.contains('hidden')) {
                 this.closeProductImageLightbox();
             }
         });
@@ -10274,6 +10631,9 @@ class CountingSystem {
                 }
                 
                 if (foundProduct) {
+                    if (productId) {
+                        this._apiProductRowCache.set(String(productId), foundProduct);
+                    }
                     const picked = this.pickSystemStockFromProductRow(foundProduct);
                     stock = picked.stock;
                     stockSourceField = picked.sourceField;
@@ -10305,6 +10665,9 @@ class CountingSystem {
                         return false;
                     });
                 if (foundProduct) {
+                    if (productId) {
+                        this._apiProductRowCache.set(String(productId), foundProduct);
+                    }
                     const picked = this.pickSystemStockFromProductRow(foundProduct);
                     stock = picked.stock;
                     stockSourceField = picked.sourceField;
@@ -11547,6 +11910,7 @@ class CountingSystem {
         if (!product) return;
 
         this.closeProductTimelinePanel();
+        this.closeProductDetailPanel();
 
         const data = this.countingData[productId] || {};
         this.currentCountingProduct = productId;
@@ -11731,6 +12095,7 @@ class CountingSystem {
         if (this._isSheetStockFetchLocked()) return;
 
         this.closeProductTimelinePanel();
+        this.closeProductDetailPanel();
 
         const resumeSeriSayarCamera = this.countingBottomSheetFromCameraSeriSayar;
 

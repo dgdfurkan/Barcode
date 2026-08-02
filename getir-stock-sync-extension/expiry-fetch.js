@@ -151,14 +151,16 @@ async function fetchExpiryBatchInWarehouseTab(tabId, warehouseId, endDateStr, pr
             (requestedIds.length === 1 ? requestedIds[0] : null);
           if (!pid || !requestedIds.includes(String(pid))) continue;
           const exp = item.expiryDate || item.expirationDate;
+          const removeRaw = item.removeFromSaleDate || item.removeFromSaleDateTime;
           const count = Number(item.count ?? item.quantity ?? 0);
           if (!exp || !count) continue;
           const dateStr = formatTrDate(exp);
+          const removeDateStr = removeRaw ? formatTrDate(removeRaw) : null;
           const sid = String(pid);
           if (!byProductId[sid]) byProductId[sid] = [];
-          const existing = byProductId[sid].find((e) => e.date === dateStr);
+          const existing = byProductId[sid].find((e) => e.date === dateStr && e.removeDate === removeDateStr);
           if (existing) existing.qty += count;
-          else byProductId[sid].push({ date: dateStr, qty: count });
+          else byProductId[sid].push({ date: dateStr, qty: count, removeDate: removeDateStr });
         }
 
         Object.keys(byProductId).forEach((pid) => {

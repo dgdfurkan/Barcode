@@ -38,3 +38,6 @@ supabaseden_csv/
 
 # Local storage backups
 *.backup
+
+# İhale monitor — bu repoya dahil edilmez
+ihale-monitor/
