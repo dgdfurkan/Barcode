@@ -1551,20 +1551,199 @@
             font-size: 10px;
             color: rgb(100 116 139);
         }
-        .pd-skt-check-input {
-            width: 100%;
-            border-radius: 0.625rem;
+        .pd-skt-date-row {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .pd-skt-date-segments {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.2rem;
+            padding: 0.35rem 0.5rem;
+            border-radius: 0.75rem;
             border: 1px solid rgb(254 215 170 / 0.75);
             background: rgb(255 255 255);
-            padding: 0.45rem 0.625rem;
-            font-size: 13px;
-            font-weight: 600;
-            color: rgb(15 23 42);
+            box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.03);
         }
-        .pd-skt-check-input:focus {
+        .pd-skt-date-seg {
+            width: 2rem;
+            border: none;
+            background: transparent;
+            padding: 0.2rem 0;
+            font-size: 15px;
+            font-weight: 800;
+            color: rgb(15 23 42);
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .pd-skt-date-seg--year {
+            width: 3.25rem;
+            font-size: 14px;
+        }
+        .pd-skt-date-seg:focus {
             outline: none;
+            background: rgb(255 247 237 / 0.8);
+            border-radius: 0.375rem;
+        }
+        .pd-skt-date-seg::placeholder {
+            color: rgb(203 213 225);
+            font-weight: 600;
+        }
+        .pd-skt-date-sep {
+            color: rgb(251 146 60 / 0.85);
+            font-weight: 800;
+            font-size: 14px;
+            user-select: none;
+        }
+        .pd-skt-date-cal-btn {
+            flex-shrink: 0;
+            width: 2.25rem;
+            height: 2.25rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.75rem;
+            border: 1px solid rgb(254 215 170 / 0.75);
+            background: linear-gradient(to bottom, rgb(255 255 255), rgb(255 247 237 / 0.85));
+            color: rgb(194 65 12);
+            box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+            transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+        }
+        .pd-skt-date-cal-btn:hover,
+        .pd-skt-date-cal-btn.is-active {
             border-color: rgb(251 146 60);
-            box-shadow: 0 0 0 2px rgb(251 146 60 / 0.2);
+            background: rgb(255 247 237);
+            color: rgb(154 52 18);
+        }
+        .pd-skt-date-cal-btn.is-active {
+            box-shadow: inset 0 1px 3px rgb(251 146 60 / 0.15);
+        }
+        .pd-skt-date-clear {
+            flex-shrink: 0;
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 9999px;
+            border: 1px solid rgb(254 215 170 / 0.55);
+            background: rgb(255 255 255 / 0.9);
+            color: rgb(100 116 139);
+            font-size: 16px;
+            line-height: 1;
+            font-weight: 400;
+        }
+        .pd-skt-date-clear:hover {
+            color: rgb(220 38 38);
+            border-color: rgb(254 205 211);
+            background: rgb(254 242 242);
+        }
+        .pd-skt-quick {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-top: 0.5rem;
+        }
+        .pd-skt-quick-chip {
+            border-radius: 9999px;
+            padding: 0.2rem 0.55rem;
+            font-size: 10px;
+            font-weight: 700;
+            color: rgb(154 52 18);
+            background: rgb(255 255 255 / 0.85);
+            border: 1px solid rgb(254 215 170 / 0.7);
+            transition: background 0.12s ease, border-color 0.12s ease;
+        }
+        .pd-skt-quick-chip:hover {
+            background: rgb(255 247 237);
+            border-color: rgb(251 146 60 / 0.75);
+        }
+        .pd-skt-cal-wrap {
+            margin-top: 0.5rem;
+            animation: pdSktCalIn 0.18s ease-out;
+        }
+        @keyframes pdSktCalIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .pd-skt-cal {
+            border-radius: 0.75rem;
+            border: 1px solid rgb(254 215 170 / 0.55);
+            background: rgb(255 255 255);
+            padding: 0.5rem;
+            box-shadow: 0 4px 14px rgb(15 23 42 / 0.06);
+        }
+        .pd-skt-cal-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.45rem;
+        }
+        .pd-skt-cal-month {
+            font-size: 12px;
+            font-weight: 800;
+            color: rgb(154 52 18);
+        }
+        .pd-skt-cal-nav-btn {
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid rgb(241 245 249);
+            background: rgb(248 250 252);
+            color: rgb(71 85 105);
+            font-size: 16px;
+            line-height: 1;
+            font-weight: 700;
+        }
+        .pd-skt-cal-nav-btn:hover {
+            background: rgb(255 247 237);
+            border-color: rgb(254 215 170 / 0.75);
+            color: rgb(194 65 12);
+        }
+        .pd-skt-cal-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 0.15rem;
+            margin-bottom: 0.25rem;
+        }
+        .pd-skt-cal-weekdays span {
+            text-align: center;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: rgb(148 163 184);
+        }
+        .pd-skt-cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 0.15rem;
+        }
+        .pd-skt-cal-cell--empty {
+            aspect-ratio: 1;
+        }
+        .pd-skt-cal-day {
+            aspect-ratio: 1;
+            border-radius: 0.5rem;
+            border: 1px solid transparent;
+            background: transparent;
+            font-size: 11px;
+            font-weight: 700;
+            color: rgb(51 65 85);
+            transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease;
+        }
+        .pd-skt-cal-day:hover {
+            background: rgb(255 247 237);
+            border-color: rgb(254 215 170 / 0.65);
+        }
+        .pd-skt-cal-day--today {
+            border-color: rgb(251 146 60 / 0.55);
+            color: rgb(194 65 12);
+        }
+        .pd-skt-cal-day--selected {
+            background: linear-gradient(to bottom, rgb(251 146 60), rgb(234 88 12));
+            color: #fff;
+            border-color: rgb(234 88 12);
+            box-shadow: 0 2px 6px rgb(234 88 12 / 0.25);
         }
         .pd-skt-check-result {
             margin-top: 0.5rem;

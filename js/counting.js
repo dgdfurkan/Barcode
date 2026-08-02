@@ -274,6 +274,10 @@ class CountingSystem {
         this._productDetailExpiryFetched = new Set();
         /** Ürün detay — SKT tarih kontrolü productId → YYYY-MM-DD */
         this._productDetailSktCheckDates = new Map();
+        /** Açık mini takvim productId set */
+        this._productDetailSktCalOpen = new Set();
+        /** Mini takvim görünen ay productId → { year, month } */
+        this._productDetailSktCalMonth = new Map();
     }
 
     _applyFinanceVisualAnalyticsVisibility() {
@@ -3185,27 +3189,184 @@ class CountingSystem {
             </div>`;
     }
 
+    _isoToSegmentValues(iso) {
+        const d = this._parseIsoDateParts(iso);
+        if (!d) return { day: '', month: '', year: '' };
+        return {
+            day: String(d.getDate()).padStart(2, '0'),
+            month: String(d.getMonth() + 1).padStart(2, '0'),
+            year: String(d.getFullYear()),
+        };
+    }
+
+    _segmentsToIso(dayStr, monthStr, yearStr) {
+        const day = Number(dayStr);
+        const month = Number(monthStr);
+        const year = Number(yearStr);
+        if (!day || !month || !year || yearStr.length < 4) return null;
+        const d = new Date(year, month - 1, day);
+        if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+
+    _getSktCalViewMonth(productId, selectedIso) {
+        const pid = String(productId);
+        if (this._productDetailSktCalMonth.has(pid)) return this._productDetailSktCalMonth.get(pid);
+        const ref = selectedIso ? this._parseIsoDateParts(selectedIso) : new Date();
+        const view = { year: ref.getFullYear(), month: ref.getMonth() + 1 };
+        this._productDetailSktCalMonth.set(pid, view);
+        return view;
+    }
+
+    _renderSktMiniCalendarHtml(productId, year, month, selectedIso) {
+        const pid = String(productId);
+        const monthNames = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+        const weekdays = ['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pz'];
+        const first = new Date(year, month - 1, 1);
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const startOffset = (first.getDay() + 6) % 7;
+        const today = this._startOfLocalDay(new Date());
+        const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        let cells = '';
+        for (let i = 0; i < startOffset; i++) {
+            cells += `<span class="pd-skt-cal-cell pd-skt-cal-cell--empty"></span>`;
+        }
+        for (let day = 1; day <= daysInMonth; day++) {
+            const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const classes = ['pd-skt-cal-cell', 'pd-skt-cal-day'];
+            if (iso === todayIso) classes.push('pd-skt-cal-day--today');
+            if (iso === selectedIso) classes.push('pd-skt-cal-day--selected');
+            cells += `<button type="button" class="${classes.join(' ')}" data-action="skt-cal-pick" data-product-id="${this.escapeHtml(pid)}" data-iso="${iso}">${day}</button>`;
+        }
+
+        return `
+            <div class="pd-skt-cal" data-skt-calendar="${this.escapeHtml(pid)}">
+                <div class="pd-skt-cal-nav">
+                    <button type="button" class="pd-skt-cal-nav-btn" data-action="skt-cal-prev" data-product-id="${this.escapeHtml(pid)}" aria-label="Önceki ay">‹</button>
+                    <span class="pd-skt-cal-month">${this.escapeHtml(monthNames[month - 1] || '')} ${year}</span>
+                    <button type="button" class="pd-skt-cal-nav-btn" data-action="skt-cal-next" data-product-id="${this.escapeHtml(pid)}" aria-label="Sonraki ay">›</button>
+                </div>
+                <div class="pd-skt-cal-weekdays">${weekdays.map((w) => `<span>${w}</span>`).join('')}</div>
+                <div class="pd-skt-cal-grid">${cells}</div>
+            </div>`;
+    }
+
+    _renderSktDateQuickChips(expDays) {
+        const chips = [];
+        const add = (days, label) => {
+            const n = Number(days);
+            if (!n || Number.isNaN(n) || n <= 0) return;
+            chips.push({ days: n, label });
+        };
+        add(expDays?.warning, `+${expDays.warning}g uyarı`);
+        add(expDays?.dead, `+${expDays.dead}g ölü`);
+        add(expDays?.allowed, `+${expDays.allowed}g satış`);
+        add(30, '+30 gün');
+        add(90, '+90 gün');
+        add(180, '+180 gün');
+
+        const seen = new Set();
+        const unique = chips.filter((c) => {
+            if (seen.has(c.days)) return false;
+            seen.add(c.days);
+            return true;
+        });
+
+        if (!unique.length) return '';
+
+        return `<div class="pd-skt-quick">${unique
+            .slice(0, 5)
+            .map(
+                (c) =>
+                    `<button type="button" class="pd-skt-quick-chip" data-action="skt-quick-days" data-days="${c.days}">${this.escapeHtml(c.label)}</button>`
+            )
+            .join('')}</div>`;
+    }
+
+    _setProductDetailSktDate(content, productId, expDays, iso, options = {}) {
+        const pid = String(productId);
+        const picker = content.querySelector(`.pd-skt-date-picker[data-product-id="${pid}"]`);
+        if (!picker) return;
+
+        if (iso) this._productDetailSktCheckDates.set(pid, iso);
+        else this._productDetailSktCheckDates.delete(pid);
+
+        const segs = this._isoToSegmentValues(iso || '');
+        picker.querySelectorAll('[data-skt-part]').forEach((el) => {
+            const part = el.getAttribute('data-skt-part');
+            if (part === 'day') el.value = segs.day;
+            if (part === 'month') el.value = segs.month;
+            if (part === 'year') el.value = segs.year;
+        });
+
+        const clearBtn = picker.querySelector('[data-action="skt-date-clear"]');
+        if (clearBtn) clearBtn.classList.toggle('hidden', !iso);
+
+        const calWrap = picker.querySelector('[data-skt-cal-wrap]');
+        const isOpen = options.forceCalOpen != null ? options.forceCalOpen : this._productDetailSktCalOpen.has(pid);
+        if (options.forceCalOpen != null) {
+            if (options.forceCalOpen) this._productDetailSktCalOpen.add(pid);
+            else this._productDetailSktCalOpen.delete(pid);
+        }
+        if (calWrap) {
+            calWrap.classList.toggle('hidden', !isOpen);
+            if (isOpen && iso) {
+                const d = this._parseIsoDateParts(iso);
+                if (d) this._productDetailSktCalMonth.set(pid, { year: d.getFullYear(), month: d.getMonth() + 1 });
+            }
+            const view = this._getSktCalViewMonth(pid, iso);
+            calWrap.innerHTML = this._renderSktMiniCalendarHtml(pid, view.year, view.month, iso || '');
+        }
+
+        const toggleBtn = picker.querySelector('[data-action="toggle-skt-cal"]');
+        if (toggleBtn) toggleBtn.classList.toggle('is-active', isOpen);
+
+        const resultEl = content.querySelector(`[data-skt-result="${pid}"]`);
+        if (resultEl) {
+            resultEl.innerHTML = iso
+                ? this._renderSktDateCheckResultHtml(expDays, iso)
+                : this._renderSktDateCheckResultHtml(expDays, null);
+        }
+    }
+
     _renderProductDetailSktDateChecker(expDays, productId) {
         if (!expDays || typeof expDays !== 'object') return '';
 
         const pid = String(productId);
         const saved = this._productDetailSktCheckDates.get(pid) || '';
-        const resultHtml = saved ? this._renderSktDateCheckResultHtml(expDays, saved) : this._renderSktDateCheckResultHtml(expDays, null);
+        const segs = this._isoToSegmentValues(saved);
+        const calOpen = this._productDetailSktCalOpen.has(pid);
+        const view = this._getSktCalViewMonth(pid, saved);
+        const resultHtml = saved
+            ? this._renderSktDateCheckResultHtml(expDays, saved)
+            : this._renderSktDateCheckResultHtml(expDays, null);
 
         return `
-            <div class="pd-skt-check" data-product-id="${this.escapeHtml(pid)}">
+            <div class="pd-skt-check">
                 <div class="pd-skt-check-head">
                     <span class="pd-skt-check-title">SKT tarihi kontrol</span>
-                    <span class="pd-skt-check-sub">Seçilen tarihe göre kalan gün</span>
+                    <span class="pd-skt-check-sub">Takvimden seç veya hızlı ekle</span>
                 </div>
-                <input
-                    type="date"
-                    class="pd-skt-check-input"
-                    data-action="skt-date-check"
-                    data-product-id="${this.escapeHtml(pid)}"
-                    value="${this.escapeHtml(saved)}"
-                    aria-label="SKT tarihi seç"
-                />
+                <div class="pd-skt-date-picker" data-product-id="${this.escapeHtml(pid)}">
+                    <div class="pd-skt-date-row">
+                        <div class="pd-skt-date-segments" role="group" aria-label="SKT tarihi">
+                            <input type="text" inputmode="numeric" maxlength="2" placeholder="GG" class="pd-skt-date-seg" data-skt-part="day" data-product-id="${this.escapeHtml(pid)}" value="${this.escapeHtml(segs.day)}" aria-label="Gün">
+                            <span class="pd-skt-date-sep">·</span>
+                            <input type="text" inputmode="numeric" maxlength="2" placeholder="AA" class="pd-skt-date-seg" data-skt-part="month" data-product-id="${this.escapeHtml(pid)}" value="${this.escapeHtml(segs.month)}" aria-label="Ay">
+                            <span class="pd-skt-date-sep">·</span>
+                            <input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY" class="pd-skt-date-seg pd-skt-date-seg--year" data-skt-part="year" data-product-id="${this.escapeHtml(pid)}" value="${this.escapeHtml(segs.year)}" aria-label="Yıl">
+                        </div>
+                        <button type="button" class="pd-skt-date-cal-btn${calOpen ? ' is-active' : ''}" data-action="toggle-skt-cal" data-product-id="${this.escapeHtml(pid)}" aria-label="Takvimi aç">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                        </button>
+                        <button type="button" class="pd-skt-date-clear${saved ? '' : ' hidden'}" data-action="skt-date-clear" data-product-id="${this.escapeHtml(pid)}" aria-label="Tarihi temizle">×</button>
+                    </div>
+                    ${this._renderSktDateQuickChips(expDays)}
+                    <div class="pd-skt-cal-wrap${calOpen ? '' : ' hidden'}" data-skt-cal-wrap="${this.escapeHtml(pid)}">${calOpen ? this._renderSktMiniCalendarHtml(pid, view.year, view.month, saved) : ''}</div>
+                </div>
                 <div class="pd-skt-check-result" data-skt-result="${this.escapeHtml(pid)}">${resultHtml}</div>
             </div>`;
     }
@@ -3213,23 +3374,80 @@ class CountingSystem {
     _bindProductDetailSktDateChecker(content, productId, expDays) {
         if (!content || !expDays) return;
 
-        content.querySelectorAll('[data-action="skt-date-check"]').forEach((input) => {
-            const update = () => {
-                const pid = input.getAttribute('data-product-id') || String(productId);
-                const iso = input.value || '';
-                if (iso) this._productDetailSktCheckDates.set(pid, iso);
-                else this._productDetailSktCheckDates.delete(pid);
+        const pid = String(productId);
+        const picker = content.querySelector(`.pd-skt-date-picker[data-product-id="${pid}"]`);
+        if (!picker) return;
 
-                const resultEl = content.querySelector(`[data-skt-result="${pid}"]`);
-                if (resultEl) {
-                    resultEl.innerHTML = iso
-                        ? this._renderSktDateCheckResultHtml(expDays, iso)
-                        : this._renderSktDateCheckResultHtml(expDays, null);
+        const readSegmentsAndApply = () => {
+            const day = picker.querySelector('[data-skt-part="day"]')?.value || '';
+            const month = picker.querySelector('[data-skt-part="month"]')?.value || '';
+            const year = picker.querySelector('[data-skt-part="year"]')?.value || '';
+            if (!day && !month && !year) {
+                this._setProductDetailSktDate(content, pid, expDays, null);
+                return;
+            }
+            const iso = this._segmentsToIso(day, month, year);
+            if (iso) this._setProductDetailSktDate(content, pid, expDays, iso);
+        };
+
+        picker.querySelectorAll('[data-skt-part]').forEach((input, idx, arr) => {
+            input.addEventListener('input', () => {
+                input.value = input.value.replace(/\D/g, '').slice(0, input.maxLength);
+                const max = Number(input.maxLength);
+                if (input.value.length >= max && idx < arr.length - 1) arr[idx + 1].focus();
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    readSegmentsAndApply();
                 }
-            };
+            });
+            input.addEventListener('blur', readSegmentsAndApply);
+        });
 
-            input.addEventListener('change', update);
-            input.addEventListener('input', update);
+        picker.addEventListener('click', (e) => {
+            const t = e.target.closest('[data-action]');
+            if (!t) return;
+
+            const action = t.getAttribute('data-action');
+            if (action === 'toggle-skt-cal') {
+                e.stopPropagation();
+                const open = !this._productDetailSktCalOpen.has(pid);
+                this._setProductDetailSktDate(content, pid, expDays, this._productDetailSktCheckDates.get(pid) || null, {
+                    forceCalOpen: open,
+                });
+            } else if (action === 'skt-date-clear') {
+                e.stopPropagation();
+                this._productDetailSktCalOpen.delete(pid);
+                this._setProductDetailSktDate(content, pid, expDays, null, { forceCalOpen: false });
+            } else if (action === 'skt-quick-days') {
+                e.stopPropagation();
+                const days = Number(t.getAttribute('data-days'));
+                if (!days) return;
+                const today = this._startOfLocalDay(new Date());
+                const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                const iso = this._addDaysToIsoDate(todayIso, days);
+                this._setProductDetailSktDate(content, pid, expDays, iso, { forceCalOpen: true });
+            } else if (action === 'skt-cal-pick') {
+                e.stopPropagation();
+                this._setProductDetailSktDate(content, pid, expDays, t.getAttribute('data-iso'), { forceCalOpen: true });
+            } else if (action === 'skt-cal-prev') {
+                e.stopPropagation();
+                const view = this._getSktCalViewMonth(pid, this._productDetailSktCheckDates.get(pid));
+                let m = view.month - 1;
+                let y = view.year;
+                if (m < 1) { m = 12; y -= 1; }
+                this._productDetailSktCalMonth.set(pid, { year: y, month: m });
+                this._setProductDetailSktDate(content, pid, expDays, this._productDetailSktCheckDates.get(pid) || null, { forceCalOpen: true });
+            } else if (action === 'skt-cal-next') {
+                e.stopPropagation();
+                const view = this._getSktCalViewMonth(pid, this._productDetailSktCheckDates.get(pid));
+                let m = view.month + 1;
+                let y = view.year;
+                if (m > 12) { m = 1; y += 1; }
+                this._productDetailSktCalMonth.set(pid, { year: y, month: m });
+                this._setProductDetailSktDate(content, pid, expDays, this._productDetailSktCheckDates.get(pid) || null, { forceCalOpen: true });
+            }
         });
     }
 
