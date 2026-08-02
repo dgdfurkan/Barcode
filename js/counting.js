@@ -19,6 +19,35 @@ const COUNTING_PRODUCT_DETAIL_API_FIELD_LABELS = {
     sapReferenceCode: 'SAP kodu',
 };
 
+/** Ürün detay — gizlenebilir bölüm ve alan etiketleri */
+const COUNTING_PRODUCT_DETAIL_FIELD_LABELS = {
+    section_hero: 'Üst özet',
+    section_category: 'Kategori yolu',
+    section_price: 'Fiyat',
+    section_stock: 'Stok durumu',
+    section_skt: 'SKT & Raf ömrü',
+    section_packaging: 'Ambalaj barkodları',
+    section_flags: 'Durum',
+    section_group_urun: 'Ürün & kategori',
+    section_group_barkod: 'Barkodlar',
+    section_group_teknik: 'Teknik',
+    product_id: 'Ürün ID',
+    description: 'Açıklama',
+    short_desc: 'Paket / gramaj',
+    brand: 'Marka',
+    category_path: 'Kategori yolu',
+    shelf: 'Raf',
+    storage_type: 'Depolama',
+    return_policy: 'İade politikası',
+    barcodes: 'Katalog barkodları',
+    sap: 'SAP kodu',
+    warehouse: 'Depo ID',
+    price_type: 'Fiyat tipi',
+    manufacturer: 'Üretici ID',
+    suppliers: 'Tedarikçi sayısı',
+    last_updated: 'Son sayım güncellemesi',
+};
+
 // Counting System for Stock Management
 
 /** Alt kategori listesi — tablo oluşturma combobox için */
@@ -2884,7 +2913,12 @@ class CountingSystem {
         try {
             const raw = localStorage.getItem('counting_product_detail_hidden_v1');
             const parsed = raw ? JSON.parse(raw) : [];
-            return new Set(Array.isArray(parsed) ? parsed.filter(Boolean) : []);
+            const set = new Set(Array.isArray(parsed) ? parsed.filter(Boolean) : []);
+            if (set.has('ingredients')) {
+                set.delete('ingredients');
+                set.add('description');
+            }
+            return set;
         } catch (e) {
             return new Set();
         }
@@ -2916,6 +2950,98 @@ class CountingSystem {
         if (this.currentCountingProduct) {
             this.renderProductDetailPanel(this.currentCountingProduct);
         }
+    }
+
+    _getProductDetailFieldLabel(fieldId) {
+        return COUNTING_PRODUCT_DETAIL_FIELD_LABELS[fieldId] || fieldId;
+    }
+
+    _isProductDetailHidden(fieldId) {
+        return this._productDetailHiddenFields.has(String(fieldId));
+    }
+
+    _unhideProductDetailField(fieldId) {
+        if (!fieldId) return;
+        this._productDetailHiddenFields.delete(String(fieldId));
+        this._saveProductDetailHiddenFields();
+        if (this.currentCountingProduct) {
+            this.renderProductDetailPanel(this.currentCountingProduct);
+        }
+    }
+
+    _renderProductDetailHideBtn(fieldId, title) {
+        const label = title || this._getProductDetailFieldLabel(fieldId);
+        return `<button type="button" class="pd-section-hide-btn product-detail-hide-btn" data-field-id="${this.escapeHtml(fieldId)}" title="${this.escapeHtml(label + ' gizle')}" aria-label="${this.escapeHtml(label + ' gizle')}">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858 5.858a3 3 0 104.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18"/>
+            </svg>
+        </button>`;
+    }
+
+    _renderProductDetailHiddenChips() {
+        const chipsEl = document.getElementById('countingProductDetailHiddenChips');
+        const hiddenBar = document.getElementById('countingProductDetailHiddenBar');
+        if (!chipsEl || !hiddenBar) return;
+
+        const hiddenIds = [...this._productDetailHiddenFields].sort((a, b) =>
+            this._getProductDetailFieldLabel(a).localeCompare(this._getProductDetailFieldLabel(b), 'tr')
+        );
+
+        if (!hiddenIds.length) {
+            hiddenBar.classList.add('hidden');
+            chipsEl.innerHTML = '';
+            return;
+        }
+
+        hiddenBar.classList.remove('hidden');
+        chipsEl.innerHTML = hiddenIds
+            .map(
+                (id) =>
+                    `<button type="button" class="pd-hidden-chip" data-unhide-field="${this.escapeHtml(id)}" title="Göster: ${this.escapeHtml(this._getProductDetailFieldLabel(id))}">
+                        <span class="truncate max-w-[9rem]">${this.escapeHtml(this._getProductDetailFieldLabel(id))}</span>
+                        <span class="pd-hidden-chip-x" aria-hidden="true">×</span>
+                    </button>`
+            )
+            .join('');
+    }
+
+    _decodeHtmlEntities(text) {
+        if (!text) return '';
+        const ta = document.createElement('textarea');
+        ta.innerHTML = String(text);
+        return ta.value;
+    }
+
+    _sanitizeDetailHtml(raw) {
+        if (!raw) return '';
+        let html = this._decodeHtmlEntities(String(raw).trim());
+        if (!html) return '';
+
+        const allowed = new Set(['B', 'STRONG', 'I', 'EM', 'BR', 'P', 'UL', 'OL', 'LI', 'SPAN']);
+        const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+        const root = doc.body.firstElementChild;
+        if (!root) return this.escapeHtml(html);
+
+        const walk = (node) => {
+            [...node.childNodes].forEach((child) => {
+                if (child.nodeType !== Node.ELEMENT_NODE) return;
+                if (!allowed.has(child.tagName)) {
+                    const text = doc.createTextNode(child.textContent || '');
+                    child.replaceWith(text);
+                    return;
+                }
+                [...child.attributes].forEach((attr) => child.removeAttribute(attr.name));
+                walk(child);
+            });
+        };
+        walk(root);
+        return root.innerHTML;
+    }
+
+    _formatRichDescription(raw) {
+        if (!raw) return '';
+        const sanitized = this._sanitizeDetailHtml(raw);
+        return sanitized || this.escapeHtml(String(raw).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
     }
 
     _parseTrDateParts(dateStr) {
@@ -3092,7 +3218,16 @@ class CountingSystem {
         const struckPrice = apiRow?.struckPrice ?? data.struckPrice;
         const priceText = apiRow?.priceText || data.priceText || (price != null ? this.formatCurrency(Number(price)) : '');
         const struckPriceText = apiRow?.struckPriceText || data.struckPriceText || (struckPrice != null ? this.formatCurrency(Number(struckPrice)) : '');
-        const discountPct = this._calcDiscountPercent(price, struckPrice);
+        const priceNum = Number(price);
+        const struckNum = Number(struckPrice);
+        const hasDiscount =
+            !Number.isNaN(priceNum) && !Number.isNaN(struckNum) && struckNum > priceNum + 0.001;
+        const discountPct = hasDiscount ? this._calcDiscountPercent(price, struckPrice) : null;
+
+        const richDescription =
+            (product.description && String(product.description).trim()) ||
+            this._pickLocalizedName(apiRow?.ingredients) ||
+            null;
 
         const barcodeLines = (product.barcodes || [])
             .map((b) => {
@@ -3118,7 +3253,13 @@ class CountingSystem {
 
         const infoRows = [
             { id: 'product_id', label: 'Ürün ID', value: product.id, group: 'urun' },
-            { id: 'ingredients', label: 'İçindekiler', value: this._pickLocalizedName(apiRow?.ingredients), group: 'urun' },
+            {
+                id: 'description',
+                label: 'Açıklama',
+                value: richDescription,
+                isRichHtml: true,
+                group: 'urun',
+            },
             { id: 'short_desc', label: 'Paket / gramaj', value: this._pickLocalizedName(apiRow?.shortDescription), group: 'urun' },
             { id: 'brand', label: 'Marka', value: product.brand || apiRow?.brandName, group: 'urun' },
             { id: 'category_path', label: 'Kategori yolu', value: this._buildCategoryBreadcrumb(apiRow).join(' › '), group: 'urun' },
@@ -3215,6 +3356,7 @@ class CountingSystem {
                 priceText,
                 struckPrice,
                 struckPriceText,
+                hasDiscount,
                 discountPct,
                 wholesalePriceText: apiRow?.wholesalePriceText || (apiRow?.wholesalePrice != null ? this.formatCurrency(Number(apiRow.wholesalePrice)) : null),
                 unitPriceLine: this._formatUnitPriceLine(apiRow),
@@ -3235,10 +3377,10 @@ class CountingSystem {
             packagingCards,
             flags,
             infoGroups: [
-                { key: 'urun', title: 'Ürün & kategori', tone: 'genel', rows: visibleInfoRows.filter((r) => r.group === 'urun') },
-                { key: 'barkod', title: 'Barkodlar', tone: 'genel', rows: visibleInfoRows.filter((r) => r.group === 'barkod') },
-                { key: 'teknik', title: 'Teknik', tone: 'teknik', rows: visibleInfoRows.filter((r) => r.group === 'teknik') },
-            ].filter((g) => g.rows.length > 0),
+                { key: 'urun', sectionId: 'section_group_urun', title: 'Ürün & kategori', tone: 'genel', rows: visibleInfoRows.filter((r) => r.group === 'urun') },
+                { key: 'barkod', sectionId: 'section_group_barkod', title: 'Barkodlar', tone: 'genel', rows: visibleInfoRows.filter((r) => r.group === 'barkod') },
+                { key: 'teknik', sectionId: 'section_group_teknik', title: 'Teknik', tone: 'teknik', rows: visibleInfoRows.filter((r) => r.group === 'teknik') },
+            ].filter((g) => g.rows.length > 0 && !this._isProductDetailHidden(g.sectionId)),
         };
     }
 
@@ -3276,6 +3418,8 @@ class CountingSystem {
     }
 
     _renderProductDetailHero(vm) {
+        if (this._isProductDetailHidden('section_hero')) return '';
+
         const h = vm.hero;
         const stock = vm.stock;
         const price = vm.price;
@@ -3287,7 +3431,7 @@ class CountingSystem {
         if (stock.reserve != null && Number(stock.reserve) > 0) {
             badges.push(`<span class="pd-badge pd-badge--reserve">${this.escapeHtml(String(stock.reserve))} rezerve</span>`);
         }
-        if (price.discountPct) {
+        if (price.hasDiscount && price.discountPct) {
             badges.push(`<span class="pd-badge pd-badge--sale">−%${price.discountPct}</span>`);
         }
         if (h.storageType) {
@@ -3305,24 +3449,57 @@ class CountingSystem {
                     <img src="${this.escapeHtml(h.image)}" alt="" class="pd-hero-image" loading="lazy" onerror="this.src='../assets/logo.png'">
                 </button>
                 <div class="pd-hero-body">
-                    <h6 class="pd-hero-title">${this.escapeHtml(h.name)}</h6>
-                    ${h.shortName && h.shortName !== h.name ? `<p class="pd-hero-sub">${this.escapeHtml(h.shortName)}</p>` : ''}
-                    ${subtitle}
+                    <div class="flex items-start gap-1">
+                        <div class="min-w-0 flex-1">
+                            <h6 class="pd-hero-title">${this.escapeHtml(h.name)}</h6>
+                            ${h.shortName && h.shortName !== h.name ? `<p class="pd-hero-sub">${this.escapeHtml(h.shortName)}</p>` : ''}
+                            ${subtitle}
+                        </div>
+                        ${this._renderProductDetailHideBtn('section_hero')}
+                    </div>
                     ${badges.length ? `<div class="pd-hero-badges">${badges.join('')}</div>` : ''}
                 </div>
             </div>`;
     }
 
     _renderProductDetailPriceBlock(vm) {
+        if (this._isProductDetailHidden('section_price')) return '';
+
         const p = vm.price;
         if (!p.priceText && p.wholesalePriceText == null && !p.unitPriceLine) return '';
 
-        const struck =
-            p.struckPriceText && p.discountPct
-                ? `<span class="pd-price-struck">${this.escapeHtml(p.struckPriceText)}</span>`
-                : '';
-        const discount = p.discountPct ? `<span class="pd-price-discount">−%${p.discountPct}</span>` : '';
-        const mainPrice = p.priceText ? `<span class="pd-price-main">${this.escapeHtml(p.priceText)}</span>` : '';
+        const priceLines = [];
+        if (p.hasDiscount) {
+            priceLines.push(`
+                <div class="pd-price-line">
+                    <span class="pd-price-line-label">İndirimli fiyat</span>
+                    <span class="pd-price-line-value pd-price-line-value--sale">${this.escapeHtml(p.priceText || '')}</span>
+                </div>
+                <div class="pd-price-line">
+                    <span class="pd-price-line-label">Liste fiyatı</span>
+                    <span class="pd-price-line-value pd-price-line-value--list">${this.escapeHtml(p.struckPriceText || '')}</span>
+                </div>`);
+            if (p.discountPct) {
+                priceLines.push(`
+                <div class="pd-price-line">
+                    <span class="pd-price-line-label">İndirim</span>
+                    <span class="pd-price-line-value" style="color:rgb(220 38 38);font-size:0.9375rem">−%${p.discountPct}</span>
+                </div>`);
+            }
+        } else if (p.priceText) {
+            priceLines.push(`
+                <div class="pd-price-line">
+                    <span class="pd-price-line-label">Satış fiyatı</span>
+                    <span class="pd-price-line-value pd-price-line-value--sale" style="color:rgb(180 83 9)">${this.escapeHtml(p.priceText)}</span>
+                </div>`);
+            if (p.struckPriceText && p.struckPriceText !== p.priceText) {
+                priceLines.push(`
+                <div class="pd-price-line">
+                    <span class="pd-price-line-label">Liste fiyatı</span>
+                    <span class="pd-price-line-value pd-price-line-value--list">${this.escapeHtml(p.struckPriceText)}</span>
+                </div>`);
+            }
+        }
 
         const extras = [];
         if (p.unitPriceLine) extras.push({ label: 'Birim fiyat', value: p.unitPriceLine });
@@ -3340,12 +3517,18 @@ class CountingSystem {
 
         return `
             <section class="pd-price-card">
-                <div class="pd-price-row">${mainPrice}${struck}${discount}</div>
+                <div class="pd-price-card-head">
+                    <span class="pd-price-card-head-title">Fiyat</span>
+                    ${this._renderProductDetailHideBtn('section_price')}
+                </div>
+                <div class="pd-price-labeled">${priceLines.join('')}</div>
                 ${extrasHtml}
             </section>`;
     }
 
     _renderProductDetailStockGrid(vm) {
+        if (this._isProductDetailHidden('section_stock')) return '';
+
         const s = vm.stock;
         const cells = [];
 
@@ -3370,7 +3553,10 @@ class CountingSystem {
 
         return `
             <section class="product-detail-group product-detail-group--stok">
-                <div class="product-detail-group-head"><span>Stok durumu</span></div>
+                <div class="product-detail-group-head">
+                    <span>Stok durumu</span>
+                    ${this._renderProductDetailHideBtn('section_stock')}
+                </div>
                 <div class="product-detail-group-body">
                     <div class="pd-stat-grid">${cells
                         .map(
@@ -3451,13 +3637,16 @@ class CountingSystem {
     }
 
     _renderProductDetailCategoryPath(items) {
-        if (!items?.length) return '';
-        return `<nav class="pd-category-path" aria-label="Kategori">${items
-            .map((item, i) => {
-                const sep = i > 0 ? `<span class="pd-category-sep">›</span>` : '';
-                return `${sep}<span class="pd-category-crumb">${this.escapeHtml(item)}</span>`;
-            })
-            .join('')}</nav>`;
+        if (this._isProductDetailHidden('section_category') || !items?.length) return '';
+        return `<div class="pd-category-wrap">
+            <nav class="pd-category-path" aria-label="Kategori">${items
+                .map((item, i) => {
+                    const sep = i > 0 ? `<span class="pd-category-sep">›</span>` : '';
+                    return `${sep}<span class="pd-category-crumb">${this.escapeHtml(item)}</span>`;
+                })
+                .join('')}</nav>
+            ${this._renderProductDetailHideBtn('section_category')}
+        </div>`;
     }
 
     _buildProductDetailFieldRows(productId) {
@@ -3467,18 +3656,23 @@ class CountingSystem {
     }
 
     _renderProductDetailFieldRow(row) {
-        const valueHtml = row.isHtml ? row.value : this.escapeHtml(String(row.value));
+        let valueHtml;
+        let valueClass = 'product-detail-value';
+        if (row.isRichHtml) {
+            valueHtml = this._formatRichDescription(row.value);
+            valueClass += ' product-detail-value--rich';
+        } else if (row.isHtml) {
+            valueHtml = row.value;
+        } else {
+            valueHtml = this.escapeHtml(String(row.value));
+        }
         return `
             <div class="product-detail-card" data-field-id="${this.escapeHtml(row.id)}">
                 <div class="flex items-center justify-between gap-2">
                     <span class="product-detail-label">${this.escapeHtml(row.label)}</span>
-                    <button type="button" class="product-detail-hide-btn p-1 rounded-md text-slate-400 hover:bg-slate-100" data-field-id="${this.escapeHtml(row.id)}" title="Bu alanı gizle" aria-label="${this.escapeHtml(row.label)} alanını gizle">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858 5.858a3 3 0 104.243 4.243M9.878 9.878l4.242 4.242M3 3l18 18"/>
-                        </svg>
-                    </button>
+                    ${this._renderProductDetailHideBtn(row.id, row.label)}
                 </div>
-                <div class="product-detail-value">${valueHtml}</div>
+                <div class="${valueClass}">${valueHtml}</div>
             </div>`;
     }
 
@@ -3489,6 +3683,7 @@ class CountingSystem {
                     <section class="product-detail-group product-detail-group--${group.tone}">
                         <div class="product-detail-group-head">
                             <span>${this.escapeHtml(group.title)}</span>
+                            ${this._renderProductDetailHideBtn(group.sectionId || `section_group_${group.key}`, group.title)}
                         </div>
                         <div class="product-detail-group-body">${(group.rows || []).map((row) => this._renderProductDetailFieldRow(row)).join('')}</div>
                     </section>`
@@ -3498,8 +3693,6 @@ class CountingSystem {
 
     renderProductDetailPanel(productId) {
         const content = document.getElementById('countingProductDetailContent');
-        const hiddenBar = document.getElementById('countingProductDetailHiddenBar');
-        const hiddenCount = document.getElementById('countingProductDetailHiddenCount');
         const subtitle = document.getElementById('countingProductDetailSubtitle');
         if (!content) return;
 
@@ -3511,15 +3704,7 @@ class CountingSystem {
 
         if (subtitle) subtitle.textContent = vm.hero.name || '';
 
-        if (hiddenBar && hiddenCount) {
-            const hiddenN = this._productDetailHiddenFields.size;
-            if (hiddenN > 0) {
-                hiddenBar.classList.remove('hidden');
-                hiddenCount.textContent = `${hiddenN} alan gizli · diğer ürünlerde de gizli kalır`;
-            } else {
-                hiddenBar.classList.add('hidden');
-            }
-        }
+        this._renderProductDetailHiddenChips();
 
         const sktHtml = this._buildProductDetailSktHtml(
             vm.sktEntries,
@@ -3539,25 +3724,40 @@ class CountingSystem {
             ? `<div class="product-detail-groups">${this._renderProductDetailGroupsHtml(groups)}</div>`
             : '';
 
-        content.innerHTML = `
-            <div class="pd-panel">
-                ${this._renderProductDetailHero(vm)}
-                ${categoryPathHtml}
-                ${this._renderProductDetailPriceBlock(vm)}
-                ${this._renderProductDetailStockGrid(vm)}
-                <section class="product-detail-group product-detail-group--skt">
+        const sktSectionHtml = this._isProductDetailHidden('section_skt')
+            ? ''
+            : `<section class="product-detail-group product-detail-group--skt">
                     <div class="product-detail-group-head">
                         <span>SKT & Raf ömrü</span>
                         <button type="button" class="product-detail-refresh-btn" data-action="refresh-skt">Yenile</button>
+                        ${this._renderProductDetailHideBtn('section_skt')}
                     </div>
                     <div class="product-detail-group-body">
                         ${expDaysHtml}
                         ${expDaysHtml && sktHtml ? '<div class="pd-skt-divider"></div>' : ''}
                         ${sktHtml || ''}
                     </div>
-                </section>
-                ${packagingHtml ? `<section class="product-detail-group product-detail-group--genel"><div class="product-detail-group-head"><span>Ambalaj barkodları</span></div><div class="product-detail-group-body">${packagingHtml}</div></section>` : ''}
-                ${flagsHtml ? `<section class="product-detail-group product-detail-group--genel"><div class="product-detail-group-head"><span>Durum</span></div><div class="product-detail-group-body">${flagsHtml}</div></section>` : ''}
+                </section>`;
+
+        const packagingSectionHtml =
+            packagingHtml && !this._isProductDetailHidden('section_packaging')
+                ? `<section class="product-detail-group product-detail-group--genel"><div class="product-detail-group-head"><span>Ambalaj barkodları</span>${this._renderProductDetailHideBtn('section_packaging')}</div><div class="product-detail-group-body">${packagingHtml}</div></section>`
+                : '';
+
+        const flagsSectionHtml =
+            flagsHtml && !this._isProductDetailHidden('section_flags')
+                ? `<section class="product-detail-group product-detail-group--genel"><div class="product-detail-group-head"><span>Durum</span>${this._renderProductDetailHideBtn('section_flags')}</div><div class="product-detail-group-body">${flagsHtml}</div></section>`
+                : '';
+
+        content.innerHTML = `
+            <div class="pd-panel">
+                ${this._renderProductDetailHero(vm)}
+                ${categoryPathHtml}
+                ${this._renderProductDetailPriceBlock(vm)}
+                ${this._renderProductDetailStockGrid(vm)}
+                ${sktSectionHtml}
+                ${packagingSectionHtml}
+                ${flagsSectionHtml}
                 ${infoGroupsHtml}
             </div>`;
 
@@ -3565,6 +3765,13 @@ class CountingSystem {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this._hideProductDetailField(btn.getAttribute('data-field-id'));
+            });
+        });
+
+        document.querySelectorAll('#countingProductDetailHiddenChips [data-unhide-field]').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._unhideProductDetailField(btn.getAttribute('data-unhide-field'));
             });
         });
 
