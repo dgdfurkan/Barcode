@@ -10166,6 +10166,24 @@ class CountingSystem {
         }
 
         const G = typeof window !== 'undefined' ? window.GetirCdnPaste : null;
+
+        if (
+            G &&
+            typeof G.isGetirStyleProductHtml === 'function' &&
+            G.isGetirStyleProductHtml(value) &&
+            typeof G.resolveProductsFromGetirHtml === 'function'
+        ) {
+            const resolved = G.resolveProductsFromGetirHtml(value, this.allProducts);
+            if (resolved.length > 0) {
+                await this.bulkAddResolvedProductsFromGetirPaste(resolved);
+                if (clearInput) {
+                    const input = document.getElementById('manualProductInput');
+                    if (input) input.value = '';
+                }
+                return;
+            }
+        }
+
         if (G && typeof G.extractGetirCdnProductImageUrlsFromText === 'function') {
             const urls = G.extractGetirCdnProductImageUrlsFromText(value);
             if (urls.length > 0) {
@@ -10224,6 +10242,18 @@ class CountingSystem {
                 return;
             }
 
+            if (
+                typeof G.isGetirStyleProductHtml === 'function' &&
+                G.isGetirStyleProductHtml(raw) &&
+                typeof G.resolveProductsFromGetirHtml === 'function'
+            ) {
+                const resolved = G.resolveProductsFromGetirHtml(raw, this.allProducts);
+                if (resolved.length > 0) {
+                    await this.bulkAddResolvedProductsFromGetirPaste(resolved);
+                    return;
+                }
+            }
+
             const urls =
                 typeof G.extractGetirCdnProductImageUrlsFromText === 'function'
                     ? G.extractGetirCdnProductImageUrlsFromText(raw)
@@ -10241,6 +10271,87 @@ class CountingSystem {
         } finally {
             this._getirPasteInProgress = false;
             if (btn) btn.disabled = false;
+        }
+    }
+
+    /**
+     * Getir HTML parse sonucu ürün listesini tabloya ekler (satır sırası korunur).
+     * @param {object[]} resolvedProducts
+     */
+    async bulkAddResolvedProductsFromGetirPaste(resolvedProducts) {
+        this._beginBulkImportLock();
+        try {
+            const ready = await this._ensureAddTargetTableReady();
+            if (!ready) {
+                return { added: 0, skippedInTable: 0, noMatch: 0, unmatchedUrls: [] };
+            }
+            this._verifyCountingDataTableBinding();
+
+            if (!Array.isArray(resolvedProducts) || resolvedProducts.length === 0) {
+                return { added: 0, skippedInTable: 0, noMatch: 0, unmatchedUrls: [] };
+            }
+
+            const idsInPasteOrder = [];
+            const newProductIds = [];
+            const seenInPaste = new Set();
+            let skippedInTable = 0;
+            let addedCount = 0;
+
+            for (let i = 0; i < resolvedProducts.length; i++) {
+                const product = resolvedProducts[i];
+                if (!product || !product.id) continue;
+                const wasInTable = !!this.countingData[product.id];
+                if (!seenInPaste.has(product.id)) {
+                    seenInPaste.add(product.id);
+                    idsInPasteOrder.push(product.id);
+                }
+                if (!wasInTable) {
+                    this.addProductToCounting(product, { skipSave: true });
+                    newProductIds.push(product.id);
+                    addedCount++;
+                } else {
+                    skippedInTable++;
+                }
+            }
+
+            this._lastUnmatchedGetirUrls = [];
+
+            if (idsInPasteOrder.length === 0) {
+                if (skippedInTable > 0) {
+                    this.showToast('Yapıştırılan ürünler zaten tabloda', 'info', 5000);
+                }
+                return { added: 0, skippedInTable, noMatch: 0, unmatchedUrls: [] };
+            }
+
+            this.appendImportedProductOrder(idsInPasteOrder);
+            this._verifyCountingDataTableBinding();
+            this._syncProductOrderMeta();
+
+            const tn = this.currentTableName || '';
+            this.pushAuditEntry(
+                `Getir HTML · ${addedCount} yeni${
+                    skippedInTable ? ` · ${skippedInTable} zaten vardı` : ''
+                }`,
+                { cat: 'import', tbl: tn }
+            );
+
+            this._scheduleBackgroundPriceEnrichment(this.currentTableName);
+
+            const toastMsg =
+                addedCount > 0
+                    ? `${addedCount} ürün eklendi${
+                          skippedInTable ? ` · ${skippedInTable} zaten vardı` : ''
+                      }`
+                    : skippedInTable > 0
+                      ? 'Yapıştırılan ürünler zaten tablodaydı'
+                      : 'Ürün eklenemedi';
+            this.showToast(toastMsg, addedCount > 0 ? 'success' : 'info', 4500);
+
+            await this.saveCountingData();
+            this.renderCountingTable();
+            return { added: addedCount, skippedInTable, noMatch: 0, unmatchedUrls: [] };
+        } finally {
+            this._endBulkImportLock();
         }
     }
 

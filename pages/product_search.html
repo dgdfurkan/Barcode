@@ -5811,6 +5811,16 @@
         function parseTableData(input) {
             if (!input || typeof input !== 'string') return input;
 
+            const isGetirHtmlPaste =
+                typeof window.GetirCdnPaste !== 'undefined' &&
+                typeof window.GetirCdnPaste.isGetirStyleProductHtml === 'function' &&
+                window.GetirCdnPaste.isGetirStyleProductHtml(input);
+
+            // Getir depo HTML: satır sırası + isim fallback (toplu yapıştırmada 4/4 ürün)
+            if (isGetirHtmlPaste) {
+                return parseHtmlTableWithImages(input);
+            }
+
             // Getir CDN ürün görselleri (virgül/satır, toplu yapıştırma) → barkod listesi
             if (typeof window.GetirCdnPaste !== 'undefined') {
                 var getirUrls = window.GetirCdnPaste.extractGetirCdnProductImageUrlsFromText(input);
@@ -6015,6 +6025,34 @@
             try {
                 // Clear previous map
                 productImageMap.clear();
+
+                // Getir depo HTML: satır sırası + görsel/isim fallback (toplu yapıştırma)
+                if (
+                    typeof window.GetirCdnPaste !== 'undefined' &&
+                    typeof window.GetirCdnPaste.resolveProductsFromGetirHtml === 'function'
+                ) {
+                    const resolved = window.GetirCdnPaste.resolveProductsFromGetirHtml(htmlContent, products);
+                    if (resolved.length > 0) {
+                        const getirRows =
+                            typeof window.GetirCdnPaste.extractGetirRowsFromHtml === 'function'
+                                ? window.GetirCdnPaste.extractGetirRowsFromHtml(htmlContent)
+                                : [];
+                        getirRows.forEach((row) => {
+                            if (row.name && row.imageUrl) {
+                                productImageMap.set(row.name.toLowerCase().trim(), row.imageUrl);
+                            }
+                        });
+                        const barcodeSet = new Set();
+                        resolved.forEach((p) => {
+                            if (!p.barcodes || !p.barcodes.length) return;
+                            const bc = p.barcodes.find((b) => b.code);
+                            if (bc && bc.code) barcodeSet.add(bc.code);
+                        });
+                        if (barcodeSet.size > 0) {
+                            return Array.from(barcodeSet).join(', ');
+                        }
+                    }
+                }
                 
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(htmlContent, 'text/html');
