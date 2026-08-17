@@ -120,9 +120,84 @@
         return null;
     }
 
+    var _imageIndexCache = new WeakMap();
+    var _nameIndexCache = new WeakMap();
+
+    function getOrBuildGetirImageProductIndex(products) {
+        if (!products || !products.length) {
+            return buildGetirImageProductIndex(products);
+        }
+        var cached = _imageIndexCache.get(products);
+        if (cached) return cached;
+        cached = buildGetirImageProductIndex(products);
+        _imageIndexCache.set(products, cached);
+        return cached;
+    }
+
+    function buildProductNameLookupIndex(products) {
+        var exact = new Map();
+        var exactClean = new Map();
+        if (!products || !products.length) {
+            return { exact: exact, exactClean: exactClean, products: products || [] };
+        }
+        for (var i = 0; i < products.length; i++) {
+            var p = products[i];
+            if (!p || !p.name) continue;
+            var n = normalizeNameForMatch(p.name);
+            var nc = stripParens(n);
+            if (n && !exact.has(n)) exact.set(n, p);
+            if (nc && !exactClean.has(nc)) exactClean.set(nc, p);
+        }
+        return { exact: exact, exactClean: exactClean, products: products };
+    }
+
+    function getOrBuildProductNameLookupIndex(products) {
+        if (!products || !products.length) {
+            return buildProductNameLookupIndex(products);
+        }
+        var cached = _nameIndexCache.get(products);
+        if (cached) return cached;
+        cached = buildProductNameLookupIndex(products);
+        _nameIndexCache.set(products, cached);
+        return cached;
+    }
+
+    function findProductByNameFromLookupIndex(nameIndex, name) {
+        if (!nameIndex || !name) return null;
+        var normalizedName = normalizeNameForMatch(name);
+        var normalizedNameClean = stripParens(normalizedName);
+        if (!normalizedName) return null;
+
+        var hit =
+            nameIndex.exact.get(normalizedName) ||
+            nameIndex.exactClean.get(normalizedName) ||
+            nameIndex.exact.get(normalizedNameClean) ||
+            nameIndex.exactClean.get(normalizedNameClean);
+        if (hit) return hit;
+
+        if (normalizedNameClean.length <= 3) return null;
+        var generic = ['ekmek', 'süt', 'su', 'peynir', 'yumurta'];
+        if (generic.indexOf(normalizedNameClean) !== -1) return null;
+
+        var products = nameIndex.products || [];
+        return (
+            products.find(function (p) {
+                if (!p || !p.name) return false;
+                var pName = normalizeNameForMatch(p.name);
+                var pNameClean = stripParens(pName);
+                return (
+                    pName.indexOf(normalizedNameClean) !== -1 ||
+                    normalizedNameClean.indexOf(pNameClean) !== -1 ||
+                    pNameClean.indexOf(normalizedNameClean) !== -1 ||
+                    normalizedNameClean.indexOf(pName) !== -1
+                );
+            }) || null
+        );
+    }
+
     function findProductByGetirImageUrl(products, imageUrl) {
         if (!products || !imageUrl || typeof imageUrl !== 'string') return null;
-        return findProductByGetirImageUrlFromIndex(buildGetirImageProductIndex(products), imageUrl);
+        return findProductByGetirImageUrlFromIndex(getOrBuildGetirImageProductIndex(products), imageUrl);
     }
 
     function cleanUiNoiseFromProductName(text) {
@@ -191,48 +266,37 @@
             .trim();
     }
 
-    /**
-     * Görsel eşleşmezse ürün adıyla bul (tek satır yapıştırmada çalışan yol).
-     * @param {Array} products
-     * @param {string} name
-     * @returns {object|null}
-     */
-    function findProductByNameForGetirPaste(products, name) {
+    function findProductByNameForGetirPaste(products, name, nameIndex) {
         if (!products || !name) return null;
-        var normalizedName = normalizeNameForMatch(name);
-        var normalizedNameClean = stripParens(normalizedName);
-        if (!normalizedName) return null;
+        var idx = nameIndex || getOrBuildProductNameLookupIndex(products);
+        return findProductByNameFromLookupIndex(idx, name);
+    }
 
-        var exact = products.find(function (p) {
-            if (!p || !p.name) return false;
-            var pName = normalizeNameForMatch(p.name);
-            var pNameClean = stripParens(pName);
-            return (
-                pName === normalizedName ||
-                pNameClean === normalizedName ||
-                pName === normalizedNameClean ||
-                pNameClean === normalizedNameClean
-            );
+    function resolveProductsFromGetirHtmlDetailed(html, products) {
+        var rows = extractGetirRowsFromHtml(html);
+        if (!rows.length || !products || !products.length) {
+            return { products: [], rows: rows || [] };
+        }
+
+        var imageIndex = getOrBuildGetirImageProductIndex(products);
+        var nameIndex = getOrBuildProductNameLookupIndex(products);
+        var resolved = [];
+        var seenIds = new Set();
+
+        rows.forEach(function (row) {
+            var product = null;
+            if (row.imageUrl) {
+                product = findProductByGetirImageUrlFromIndex(imageIndex, row.imageUrl);
+            }
+            if (!product && row.name) {
+                product = findProductByNameFromLookupIndex(nameIndex, row.name);
+            }
+            if (!product || !product.id || seenIds.has(product.id)) return;
+            seenIds.add(product.id);
+            resolved.push(product);
         });
-        if (exact) return exact;
 
-        if (normalizedNameClean.length <= 3) return null;
-        var generic = ['ekmek', 'süt', 'su', 'peynir', 'yumurta'];
-        if (generic.indexOf(normalizedNameClean) !== -1) return null;
-
-        return (
-            products.find(function (p) {
-                if (!p || !p.name) return false;
-                var pName = normalizeNameForMatch(p.name);
-                var pNameClean = stripParens(pName);
-                return (
-                    pName.indexOf(normalizedNameClean) !== -1 ||
-                    normalizedNameClean.indexOf(pNameClean) !== -1 ||
-                    pNameClean.indexOf(normalizedNameClean) !== -1 ||
-                    normalizedNameClean.indexOf(pName) !== -1
-                );
-            }) || null
-        );
+        return { products: resolved, rows: rows };
     }
 
     /**
@@ -242,27 +306,7 @@
      * @returns {object[]}
      */
     function resolveProductsFromGetirHtml(html, products) {
-        var rows = extractGetirRowsFromHtml(html);
-        if (!rows.length || !products || !products.length) return [];
-
-        var index = buildGetirImageProductIndex(products);
-        var resolved = [];
-        var seenIds = new Set();
-
-        rows.forEach(function (row) {
-            var product = null;
-            if (row.imageUrl) {
-                product = findProductByGetirImageUrlFromIndex(index, row.imageUrl);
-            }
-            if (!product && row.name) {
-                product = findProductByNameForGetirPaste(products, row.name);
-            }
-            if (!product || !product.id || seenIds.has(product.id)) return;
-            seenIds.add(product.id);
-            resolved.push(product);
-        });
-
-        return resolved;
+        return resolveProductsFromGetirHtmlDetailed(html, products).products;
     }
 
     /**
@@ -309,6 +353,8 @@
     global.GetirCdnPaste = {
         extractGetirCdnProductImageUrlsFromText: extractGetirCdnProductImageUrlsFromText,
         buildGetirImageProductIndex: buildGetirImageProductIndex,
+        getOrBuildGetirImageProductIndex: getOrBuildGetirImageProductIndex,
+        getOrBuildProductNameLookupIndex: getOrBuildProductNameLookupIndex,
         findProductByGetirImageUrlFromIndex: findProductByGetirImageUrlFromIndex,
         findProductByGetirImageUrl: findProductByGetirImageUrl,
         readClipboardTextForImport: readClipboardTextForImport,
@@ -317,5 +363,6 @@
         extractGetirRowsFromHtml: extractGetirRowsFromHtml,
         findProductByNameForGetirPaste: findProductByNameForGetirPaste,
         resolveProductsFromGetirHtml: resolveProductsFromGetirHtml,
+        resolveProductsFromGetirHtmlDetailed: resolveProductsFromGetirHtmlDetailed,
     };
 })(typeof window !== 'undefined' ? window : globalThis);

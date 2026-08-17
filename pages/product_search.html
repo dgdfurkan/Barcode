@@ -2981,6 +2981,70 @@
     <script>
         // Global variables
         let products = [];
+        /** Barkod / dedup / Getir indeksleri — katalog yüklendiğinde bir kez kurulur */
+        let catalogSearchIndexes = {
+            barcodeToProduct: new Map(),
+            dedupedProducts: [],
+            productsRef: null,
+        };
+
+        function buildCatalogSearchIndexes(catalog) {
+            const list = catalog || products;
+            if (!list || !list.length) {
+                catalogSearchIndexes = {
+                    barcodeToProduct: new Map(),
+                    dedupedProducts: [],
+                    productsRef: list || null,
+                };
+                return catalogSearchIndexes;
+            }
+
+            const barcodeToProduct = new Map();
+            const seen = new Map();
+            const dedupedProducts = [];
+
+            for (let i = 0; i < list.length; i++) {
+                const product = list[i];
+                if (!product) continue;
+                if (product.barcodes && product.barcodes.length) {
+                    for (let j = 0; j < product.barcodes.length; j++) {
+                        const bc = product.barcodes[j];
+                        if (!bc || !bc.code) continue;
+                        const code = String(bc.code).trim();
+                        if (code && !barcodeToProduct.has(code)) {
+                            barcodeToProduct.set(code, product);
+                        }
+                    }
+                }
+                const key = `${(product.name || '').toLowerCase()}_${product.barcodes?.[0]?.code || ''}`;
+                if (!seen.has(key)) {
+                    seen.set(key, product);
+                    dedupedProducts.push(product);
+                }
+            }
+
+            catalogSearchIndexes = {
+                barcodeToProduct,
+                dedupedProducts,
+                productsRef: list,
+            };
+            return catalogSearchIndexes;
+        }
+
+        function lookupProductByBarcodeTerm(term) {
+            if (!term) return null;
+            const trimmed = String(term).replace(/\s+/g, '');
+            if (!trimmed || !catalogSearchIndexes.barcodeToProduct.size) return null;
+            return catalogSearchIndexes.barcodeToProduct.get(trimmed) || null;
+        }
+
+        function areAllBarcodeLikeTerms(terms) {
+            if (!terms || !terms.length) return false;
+            return terms.every((t) => {
+                const x = String(t || '').replace(/\s+/g, '');
+                return x.length >= 2 && x.length <= 40 && /^[A-Za-z0-9\-]+$/.test(x);
+            });
+        }
         /** Otomatik yapıştırma pageshow ile init'ten önce çalışınca products=[] kalıyordu; HTML→barkod bu yüzden isme düşüyordu. */
         let _resolveProductsHydratedForClipboard = null;
         const whenProductsHydratedForClipboard = new Promise((resolve) => {
@@ -5028,6 +5092,8 @@
                 // Load products from JSON
                 products = await loadProducts();
                 console.log(`Loaded ${products.length} products`);
+                buildCatalogSearchIndexes(products);
+                markProductsHydratedForClipboard();
                 
                 // Trial countdown function - FIXED VERSION
                 function updateTrialCountdown(trialEnd) {
@@ -5827,8 +5893,13 @@
                 if (getirUrls.length > 0) {
                     var codes = [];
                     var seenBc = new Set();
+                    var imageIndex =
+                        typeof window.GetirCdnPaste.getOrBuildGetirImageProductIndex === 'function'
+                            ? window.GetirCdnPaste.getOrBuildGetirImageProductIndex(products)
+                            : window.GetirCdnPaste.buildGetirImageProductIndex(products);
+                    var findFromIndex = window.GetirCdnPaste.findProductByGetirImageUrlFromIndex;
                     for (var gi = 0; gi < getirUrls.length; gi++) {
-                        var gp = window.GetirCdnPaste.findProductByGetirImageUrl(products, getirUrls[gi]);
+                        var gp = findFromIndex(imageIndex, getirUrls[gi]);
                         if (gp && gp.barcodes && gp.barcodes.length > 0 && gp.barcodes[0].code) {
                             var bc = String(gp.barcodes[0].code).trim();
                             if (bc && !seenBc.has(bc)) {
@@ -6028,6 +6099,29 @@
 
                 // Getir depo HTML: satır sırası + görsel/isim fallback (toplu yapıştırma)
                 if (
+                    typeof window.GetirCdnPaste !== 'undefined' &&
+                    typeof window.GetirCdnPaste.resolveProductsFromGetirHtmlDetailed === 'function'
+                ) {
+                    const detailed = window.GetirCdnPaste.resolveProductsFromGetirHtmlDetailed(htmlContent, products);
+                    const resolved = detailed.products || [];
+                    const getirRows = detailed.rows || [];
+                    if (resolved.length > 0) {
+                        getirRows.forEach((row) => {
+                            if (row.name && row.imageUrl) {
+                                productImageMap.set(row.name.toLowerCase().trim(), row.imageUrl);
+                            }
+                        });
+                        const barcodeSet = new Set();
+                        resolved.forEach((p) => {
+                            if (!p.barcodes || !p.barcodes.length) return;
+                            const bc = p.barcodes.find((b) => b.code);
+                            if (bc && bc.code) barcodeSet.add(bc.code);
+                        });
+                        if (barcodeSet.size > 0) {
+                            return Array.from(barcodeSet).join(', ');
+                        }
+                    }
+                } else if (
                     typeof window.GetirCdnPaste !== 'undefined' &&
                     typeof window.GetirCdnPaste.resolveProductsFromGetirHtml === 'function'
                 ) {
@@ -6648,20 +6742,38 @@
             }
             
             // Filter products - remove duplicates (keep first occurrence)
-            let filteredProducts = products;
-            const seen = new Map();
-            filteredProducts = products.filter(product => {
-                const key = `${product.name.toLowerCase()}_${product.barcodes[0]?.code || ''}`;
-                if (seen.has(key)) {
-                    return false; // Skip duplicate
-                }
-                seen.set(key, product);
-                return true;
-            });
+            let filteredProducts = catalogSearchIndexes.dedupedProducts.length
+                ? catalogSearchIndexes.dedupedProducts
+                : products;
+            if (filteredProducts === products) {
+                const seen = new Map();
+                filteredProducts = products.filter(product => {
+                    const key = `${product.name.toLowerCase()}_${product.barcodes[0]?.code || ''}`;
+                    if (seen.has(key)) {
+                        return false;
+                    }
+                    seen.set(key, product);
+                    return true;
+                });
+            }
             
             // If multiple search terms (comma-separated), group results by term
             if (searchTerms.length > 1) {
+                if (areAllBarcodeLikeTerms(searchTerms) && catalogSearchIndexes.barcodeToProduct.size > 0) {
+                    return performGroupedBarcodeLookup(searchTerms);
+                }
                 return performGroupedSearch(filteredProducts, searchTerms, isTableData);
+            }
+            
+            // Single term — barkod hızlı yolu
+            if (searchTerms.length === 1) {
+                const barcodeHit = lookupProductByBarcodeTerm(searchTerms[0]);
+                if (barcodeHit) {
+                    if (outOfStockProducts.has(barcodeHit.id)) {
+                        return { active: [], outOfStock: [barcodeHit] };
+                    }
+                    return { active: [barcodeHit], outOfStock: [] };
+                }
             }
             
             // Single term search - original logic
@@ -6972,6 +7084,29 @@
             return catalogYieldsSearchResultsForPlainLine(line);
         }
 
+        // O(1) barkod lookup — çoklu yapıştırma (20+ barkod) için
+        function performGroupedBarcodeLookup(searchTerms) {
+            const groupedResults = [];
+            for (let termIndex = 0; termIndex < searchTerms.length; termIndex++) {
+                const searchTerm = searchTerms[termIndex];
+                const termResults = {
+                    term: searchTerm,
+                    active: [],
+                    outOfStock: []
+                };
+                const hit = lookupProductByBarcodeTerm(searchTerm);
+                if (hit) {
+                    if (outOfStockProducts.has(hit.id)) {
+                        termResults.outOfStock.push(hit);
+                    } else {
+                        termResults.active.push(hit);
+                    }
+                }
+                groupedResults.push(termResults);
+            }
+            return { grouped: groupedResults };
+        }
+
         // Optimized grouped search for comma-separated terms
         function performGroupedSearch(products, searchTerms, isTableData = false) {
             const groupedResults = [];
@@ -6987,6 +7122,17 @@
                 
                 const termTokens = tokenizeQuery(searchTerm);
                 if (termTokens.length === 0) {
+                    groupedResults.push(termResults);
+                    continue;
+                }
+
+                const barcodeHit = lookupProductByBarcodeTerm(searchTerm);
+                if (barcodeHit) {
+                    if (outOfStockProducts.has(barcodeHit.id)) {
+                        termResults.outOfStock.push(barcodeHit);
+                    } else {
+                        termResults.active.push(barcodeHit);
+                    }
                     groupedResults.push(termResults);
                     continue;
                 }
@@ -7937,7 +8083,10 @@
                 }
                 
                 shouldScrollAfterSearch = true;
-                copyResolvedTableQueryToClipboard(pastedText, parsedQuery).catch(() => {});
+                const scheduleClipboardWrite = window.requestIdleCallback || ((fn) => setTimeout(fn, 0));
+                scheduleClipboardWrite(() => {
+                    copyResolvedTableQueryToClipboard(pastedText, parsedQuery).catch(() => {});
+                });
                 performSearch(parsedQuery);
             })();
         });

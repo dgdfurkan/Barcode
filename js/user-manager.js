@@ -4,6 +4,11 @@ class UserDataManager {
         this.currentUser = null;
         this.userData = null;
         this._saveUserDataPromise = null;
+        this._allProductsCache = null;
+    }
+
+    _invalidateAllProductsCache() {
+        this._allProductsCache = null;
     }
 
     // Initialize user data
@@ -39,6 +44,7 @@ class UserDataManager {
                         products: data.custom_products || [],
                         settings: data.settings || {}
                     };
+                    this._invalidateAllProductsCache();
                     
                     // Clean default products if any exist (they should come from PRODUCTS_DATA)
                     if (this.userData.products && Array.isArray(this.userData.products)) {
@@ -188,6 +194,16 @@ class UserDataManager {
     // Get ALL products (custom + default from PRODUCTS_DATA)
     // Use this when you need both custom and default products merged
     getAllProducts(showDefaultProducts = null) {
+        if (showDefaultProducts === null) {
+            showDefaultProducts = this.userData?.settings?.showDefaultProducts;
+        }
+        const cacheKey = `${showDefaultProducts ? 1 : 0}_${this.userData?.products?.length || 0}_${
+            typeof PRODUCTS_DATA !== 'undefined' ? PRODUCTS_DATA.products?.length || 0 : 0
+        }`;
+        if (this._allProductsCache && this._allProductsCache.key === cacheKey) {
+            return this._allProductsCache.list;
+        }
+
         const customProducts = this.userData.products || [];
         const defaultProducts = [];
         
@@ -196,18 +212,15 @@ class UserDataManager {
             defaultProducts.push(...PRODUCTS_DATA.products.map(p => ({ ...p, isDefault: true })));
         }
         
-        // Use setting if no parameter provided
-        if (showDefaultProducts === null) {
-            showDefaultProducts = this.userData.settings.showDefaultProducts;
-        }
-        
+        let merged;
         if (showDefaultProducts) {
-            // Merge custom + default products
-            return [...customProducts, ...defaultProducts];
+            merged = [...customProducts, ...defaultProducts];
         } else {
-            // Only custom products
-            return customProducts;
+            merged = customProducts;
         }
+
+        this._allProductsCache = { key: cacheKey, list: merged };
+        return merged;
     }
 
     // Add product to user data (only custom products, NOT default products)
@@ -238,6 +251,7 @@ class UserDataManager {
             this.userData.products.push(product);
         }
         
+        this._invalidateAllProductsCache();
         this.saveUserData();
     }
 
@@ -246,6 +260,7 @@ class UserDataManager {
         if (!this.userData.products) return;
         
         this.userData.products = this.userData.products.filter(p => p.id !== productId);
+        this._invalidateAllProductsCache();
         this.saveUserData();
     }
 
@@ -254,12 +269,14 @@ class UserDataManager {
         if (!this.userData.products) return;
         
         this.userData.products = this.userData.products.filter(p => !productIds.includes(p.id));
+        this._invalidateAllProductsCache();
         this.saveUserData();
     }
 
     // Toggle default products visibility
     toggleDefaultProducts() {
         this.userData.settings.showDefaultProducts = !this.userData.settings.showDefaultProducts;
+        this._invalidateAllProductsCache();
         this.saveUserData();
         return this.userData.settings.showDefaultProducts;
     }
@@ -406,6 +423,7 @@ class UserDataManager {
                     // Merge with existing data
                     this.userData.products = [...this.userData.products, ...importData.data.products];
                     
+                    this._invalidateAllProductsCache();
                     this.saveUserData();
                     resolve('Veriler başarıyla içe aktarıldı');
                 } catch (error) {

@@ -785,6 +785,11 @@ class CountingSystem {
                 this.allProducts = PRODUCTS_DATA.products || [];
             }
             this.productIndex = new Map(this.allProducts.map(p => [p.id, p]));
+            const G = typeof window !== 'undefined' ? window.GetirCdnPaste : null;
+            this._getirImageIndex =
+                G && typeof G.getOrBuildGetirImageProductIndex === 'function'
+                    ? G.getOrBuildGetirImageProductIndex(this.allProducts)
+                    : null;
             console.log(`📦 Loaded ${this.allProducts.length} products`);
         } catch (error) {
             console.error('Error loading products:', error);
@@ -10386,7 +10391,9 @@ class CountingSystem {
             return { added: 0, skippedInTable: 0, noMatch: 0, unmatchedUrls: [] };
         }
 
-        const imageIndex = buildIndex ? buildIndex(this.allProducts) : null;
+        const imageIndex =
+            this._getirImageIndex ||
+            (buildIndex ? buildIndex(this.allProducts) : null);
         const resolveProduct = (url) => {
             if (imageIndex && findFromIndex) return findFromIndex(imageIndex, url);
             return findLegacy ? findLegacy(this.allProducts, url) : null;
