@@ -3051,21 +3051,38 @@
             _resolveProductsHydratedForClipboard = resolve;
         });
         function markProductsHydratedForClipboard() {
+            if (products.length > 0) {
+                buildCatalogSearchIndexes(products);
+            }
             if (typeof _resolveProductsHydratedForClipboard === 'function') {
                 _resolveProductsHydratedForClipboard();
                 _resolveProductsHydratedForClipboard = null;
             }
         }
-        async function waitForProductCatalogIfNeededForParse(raw) {
-            if (!raw || typeof raw !== 'string') return;
-            const needsCatalog =
-                (typeof isGetirStyleProductHtml === 'function' && isGetirStyleProductHtml(raw)) ||
-                (typeof isStandaloneProductImageUrl === 'function' && isStandaloneProductImageUrl(raw));
-            if (!needsCatalog) return;
+
+        function ensureCatalogSearchIndexesReady() {
+            if (!products || !products.length) return false;
+            if (
+                catalogSearchIndexes.productsRef !== products ||
+                catalogSearchIndexes.barcodeToProduct.size === 0
+            ) {
+                buildCatalogSearchIndexes(products);
+            }
+            return catalogSearchIndexes.barcodeToProduct.size > 0;
+        }
+
+        /** Otomatik yapıştır / pano — katalog + barkod indeksi hazır olana kadar bekle */
+        async function waitForProductCatalogReady() {
             await Promise.race([
                 whenProductsHydratedForClipboard,
-                new Promise((r) => setTimeout(r, 25000))
+                new Promise((r) => setTimeout(r, 25000)),
             ]);
+            ensureCatalogSearchIndexesReady();
+        }
+
+        async function waitForProductCatalogIfNeededForParse(raw) {
+            if (!raw || typeof raw !== 'string') return;
+            await waitForProductCatalogReady();
         }
         let currentResults = [];
         let randomProductsInterval;
@@ -5094,7 +5111,7 @@
                 console.log(`Loaded ${products.length} products`);
                 buildCatalogSearchIndexes(products);
                 markProductsHydratedForClipboard();
-                
+
                 // Trial countdown function - FIXED VERSION
                 function updateTrialCountdown(trialEnd) {
                     if (!trialEnd) {
@@ -6736,6 +6753,8 @@
 
         // Advanced search algorithm with grouped results for comma-separated terms
         function performOptimizedSearch(products, searchTerms, isTableData = false) {
+            ensureCatalogSearchIndexesReady();
+
             // Return empty results if no search terms
             if (!searchTerms || searchTerms.length === 0) {
                 return { active: [], outOfStock: [] };
