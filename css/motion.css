@@ -1,0 +1,141 @@
+/**
+ * Jet Barkod — merkezi motion sistemi
+ * Yalnızca süre/easing iyileştirmesi; JS veya layout mantığına dokunmaz.
+ */
+
+:root {
+    --motion-micro: 100ms;
+    --motion-fast: 140ms;
+    --motion-normal: 180ms;
+    --motion-panel: 220ms;
+    --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Tailwind utility hızlandırma (tüm sayfalar) */
+.duration-200 {
+    transition-duration: var(--motion-fast) !important;
+}
+
+.duration-300 {
+    transition-duration: var(--motion-normal) !important;
+}
+
+.transition,
+.transition-all,
+.transition-colors,
+.transition-transform {
+    transition-timing-function: var(--motion-ease-standard);
+}
+
+/* ── Ürün arama sayfası ── */
+.mobile-menu-overlay {
+    transition-duration: var(--motion-normal) !important;
+    transition-timing-function: var(--motion-ease-out) !important;
+}
+
+.mobile-menu-panel {
+    transition-duration: var(--motion-panel) !important;
+    transition-timing-function: var(--motion-ease-out) !important;
+}
+
+.changelog-modal-overlay {
+    animation-duration: var(--motion-fast) !important;
+}
+
+.changelog-modal {
+    animation-duration: var(--motion-normal) !important;
+}
+
+.loader span,
+.loader::before,
+.loader::after {
+    transition-duration: var(--motion-panel) !important;
+}
+
+.changelog-block {
+    transition-property: opacity, transform !important;
+    transition-duration: var(--motion-normal) !important;
+    transition-timing-function: var(--motion-ease-out) !important;
+}
+
+.changelog-step {
+    transition-property: opacity, transform !important;
+    transition-duration: var(--motion-fast) !important;
+    transition-timing-function: var(--motion-ease-out) !important;
+}
+
+/* ── Sayım sayfası ── */
+.stat-card,
+.product-card-modern {
+    transition-property: transform, box-shadow, opacity !important;
+    transition-duration: var(--motion-normal) !important;
+    transition-timing-function: var(--motion-ease-out) !important;
+}
+
+.product-card,
+.product-row-modern {
+    transition-property: transform, box-shadow, background, background-color, opacity !important;
+    transition-duration: var(--motion-fast) !important;
+    transition-timing-function: var(--motion-ease-out) !important;
+}
+
+.modern-action-btn::before {
+    transition-duration: 0.35s !important;
+}
+
+.counting-bottom-sheet .counting-bottom-sheet-content {
+    transition-duration: var(--motion-panel) !important;
+    transition-timing-function: var(--motion-ease-out) !important;
+}
+
+.counting-bottom-sheet #countingBottomSheetBackdrop {
+    transition-duration: var(--motion-normal) !important;
+    transition-timing-function: var(--motion-ease-out) !important;
+}
+
+#countingProductTimelineOverlay.show .counting-timeline-sheet {
+    animation-duration: var(--motion-normal) !important;
+}
+
+#productImageLightbox {
+    transition-duration: var(--motion-normal) !important;
+    transition-timing-function: var(--motion-ease-out) !important;
+}
+
+#productImageLightbox #lightboxProductImage {
+    transition-duration: var(--motion-panel) !important;
+    transition-timing-function: var(--motion-ease-out) !important;
+}
+
+.pd-skt-cal-wrap {
+    animation-duration: var(--motion-fast) !important;
+}
+
+/* Dokunma / tıklama anında geri bildirim */
+button:active:not(:disabled),
+[role='button']:active:not(:disabled),
+.keypad-btn:active,
+.modern-action-btn:active,
+.sync-btn:active,
+.reset-btn:active {
+    transition-duration: 60ms !important;
+}
+
+/* Erişilebilirlik + düşük cihaz */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .loader span,
+    .loader::before,
+    .loader::after {
+        animation: none !important;
+    }
+}
