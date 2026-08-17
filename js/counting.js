@@ -10337,18 +10337,23 @@ class CountingSystem {
 
             this._scheduleBackgroundPriceEnrichment(this.currentTableName);
 
-            const toastMsg =
-                addedCount > 0
-                    ? `${addedCount} ürün eklendi${
-                          skippedInTable ? ` · ${skippedInTable} zaten vardı` : ''
-                      }`
-                    : skippedInTable > 0
-                      ? 'Yapıştırılan ürünler zaten tablodaydı'
-                      : 'Ürün eklenemedi';
-            this.showToast(toastMsg, addedCount > 0 ? 'success' : 'info', 4500);
+            this.scheduleRenderTable();
+            if (this.currentViewMode === 'rapid') {
+                this.renderRapidCountingMode();
+            }
+            this.updateStatistics();
+            this.updateCountingProgress();
+            this._scheduleTableSelectorUpdate();
 
             await this.saveCountingData();
-            this.renderCountingTable();
+            if (newProductIds.length > 0) {
+                await this._bulkSaveProductEntries(newProductIds, tn);
+            }
+
+            let msg = `${addedCount} ürün eklendi`;
+            if (skippedInTable) msg += `, ${skippedInTable} zaten tablodaydı`;
+            this.showToast(msg, 'success', 5500);
+
             return { added: addedCount, skippedInTable, noMatch: 0, unmatchedUrls: [] };
         } finally {
             this._endBulkImportLock();
