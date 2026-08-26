@@ -1,0 +1,718 @@
+/**
+ * Jet Barkod — Ayarlar paneli
+ * Header'daki pill/slate dilini modal'a taşır. Tailwind CDN'e bağımlı değildir;
+ * renkler css/tailwind.css içindeki token'lardan gelir.
+ */
+
+#settingsModal {
+    --set-ink: var(--color-text-primary, #0f172a);
+    --set-muted: #64748b;
+    --set-faint: #94a3b8;
+    --set-line: var(--color-border, #e2e8f0);
+    --set-line-soft: #f1f5f9;
+    --set-track: #f8fafc;
+    --set-accent: var(--color-primary, #2563eb);
+    --set-accent-soft: #eff6ff;
+    --set-danger: #dc2626;
+    --set-danger-soft: #fef2f2;
+
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgb(15 23 42 / 0.5);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    animation: setOverlayIn 160ms ease-out both;
+}
+
+#settingsModal.hidden {
+    display: none;
+}
+
+/* Sohbet balonu (z-9999) panelin alt barına biniyor — panel açıkken gizle.
+   chat.js display'i inline yazdığı için !important şart. */
+body:has(#settingsModal:not(.hidden)) #openChat {
+    display: none !important;
+}
+
+@keyframes setOverlayIn {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes setPanelIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.985);
+    }
+}
+
+/* ---------- Kabuk ---------- */
+
+.settings-panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 46rem;
+    max-height: min(88vh, 46rem);
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid var(--set-line);
+    border-radius: 1.25rem;
+    box-shadow:
+        0 32px 64px -28px rgb(15 23 42 / 0.32),
+        0 8px 20px -12px rgb(15 23 42 / 0.16);
+    animation: setPanelIn 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.settings-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1.35rem 1rem;
+    border-bottom: 1px solid var(--set-line-soft);
+}
+
+.settings-head__icon {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex-shrink: 0;
+    border-radius: 0.85rem;
+    background: var(--set-accent-soft);
+    color: var(--set-accent);
+}
+
+.settings-head__icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.settings-head__text {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-head__title {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--set-ink);
+}
+
+.settings-head__sub {
+    margin: 0.15rem 0 0;
+    font-size: 0.78rem;
+    color: var(--set-faint);
+}
+
+.settings-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--set-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.settings-close:hover {
+    background: var(--set-line-soft);
+    color: var(--set-ink);
+}
+
+.settings-close:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.2);
+}
+
+.settings-close svg {
+    width: 1.15rem;
+    height: 1.15rem;
+}
+
+/* ---------- Sekmeler ---------- */
+
+.settings-tabs {
+    display: flex;
+    gap: 0.2rem;
+    margin: 0.85rem 1.35rem 0;
+    padding: 0.25rem;
+    border: 1px solid var(--set-line);
+    border-radius: 9999px;
+    background: var(--set-track);
+}
+
+.settings-tab {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-width: 0;
+    padding: 0.45rem 0.65rem;
+    border: none;
+    border-radius: 9999px;
+    background: transparent;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--set-muted);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.settings-tab svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+}
+
+.settings-tab:hover {
+    color: var(--set-ink);
+}
+
+.settings-tab[aria-selected='true'] {
+    background: #fff;
+    color: var(--set-ink);
+    box-shadow: 0 1px 4px rgb(15 23 42 / 0.1);
+}
+
+.settings-tab:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.2);
+}
+
+/* Parlama önleme admin tarafından kapalıysa sekme de gizlenir */
+#settingsModal:has(#antiGlareSettingsSection.hidden) .settings-tab--display-only {
+    display: none;
+}
+
+/* ---------- Gövde ---------- */
+
+.settings-body {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 1.1rem 1.35rem 1.35rem;
+}
+
+.settings-pane[hidden] {
+    display: none;
+}
+
+.settings-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    animation: setPaneIn 180ms ease-out both;
+}
+
+@keyframes setPaneIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+}
+
+.settings-group__label {
+    display: block;
+    margin: 0 0 0.55rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--set-faint);
+}
+
+.settings-card {
+    border: 1px solid var(--set-line);
+    border-radius: 0.9rem;
+    background: #fff;
+    overflow: hidden;
+}
+
+/* ---------- Satır ---------- */
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.8rem 0.9rem;
+}
+
+.settings-row + .settings-row {
+    border-top: 1px solid var(--set-line-soft);
+}
+
+.settings-row__body {
+    flex: 1;
+    min-width: 0;
+}
+
+.settings-row__title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--set-ink);
+}
+
+.settings-row__desc {
+    margin: 0.15rem 0 0;
+    font-size: 0.74rem;
+    line-height: 1.45;
+    color: var(--set-muted);
+}
+
+.settings-row__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.settings-row__icon {
+    display: grid;
+    place-items: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    flex-shrink: 0;
+    border-radius: 0.65rem;
+    background: var(--set-track);
+    border: 1px solid var(--set-line);
+    font-size: 0.95rem;
+    line-height: 1;
+}
+
+/* ---------- Anahtar (switch) ---------- */
+
+.settings-switch {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.settings-switch input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.settings-switch__track {
+    display: block;
+    width: 2.4rem;
+    height: 1.35rem;
+    border-radius: 9999px;
+    background: #cbd5e1;
+    transition: background 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.settings-switch__track::after {
+    content: '';
+    display: block;
+    width: 1.05rem;
+    height: 1.05rem;
+    margin: 0.15rem;
+    border-radius: 9999px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgb(15 23 42 / 0.25);
+    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.settings-switch input:checked + .settings-switch__track {
+    background: var(--set-accent);
+}
+
+.settings-switch input:checked + .settings-switch__track::after {
+    transform: translateX(1.05rem);
+}
+
+.settings-switch input:focus-visible + .settings-switch__track {
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.2);
+}
+
+.settings-switch input:disabled + .settings-switch__track {
+    background: #e2e8f0;
+}
+
+.settings-switch:has(input:disabled) {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* ---------- Butonlar ---------- */
+
+.settings-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.42rem 0.8rem;
+    border: 1px solid var(--set-line);
+    border-radius: 0.6rem;
+    background: #fff;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--set-muted);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.settings-btn svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    flex-shrink: 0;
+}
+
+.settings-btn:hover {
+    border-color: #cbd5e1;
+    background: var(--set-track);
+    color: var(--set-ink);
+}
+
+.settings-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.2);
+}
+
+.settings-btn--primary {
+    border-color: transparent;
+    background: var(--set-accent);
+    color: #fff;
+}
+
+.settings-btn--primary:hover {
+    border-color: transparent;
+    background: #1d4ed8;
+    color: #fff;
+}
+
+.settings-btn--danger:hover {
+    border-color: #fecaca;
+    background: var(--set-danger-soft);
+    color: var(--set-danger);
+}
+
+.settings-btn--block {
+    width: 100%;
+}
+
+.settings-btn--lg {
+    padding: 0.6rem 0.9rem;
+    font-size: 0.8rem;
+}
+
+/* ---------- İstatistik ---------- */
+
+.settings-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+}
+
+.settings-stat {
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--set-line);
+    border-radius: 0.9rem;
+    background: var(--set-track);
+}
+
+.settings-stat__value {
+    display: block;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--set-ink);
+}
+
+.settings-stat__label {
+    display: block;
+    margin-top: 0.1rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--set-muted);
+}
+
+/* ---------- Premium liste ---------- */
+
+.settings-feature-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.settings-feature {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.9rem;
+    background: #fff;
+    transition: background 0.15s;
+}
+
+.settings-feature + .settings-feature {
+    border-top: 1px solid var(--set-line-soft);
+}
+
+.settings-feature__main {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+}
+
+.settings-feature__main:hover .settings-feature__name {
+    color: var(--set-accent);
+}
+
+.settings-feature__main:focus-visible {
+    outline: none;
+}
+
+.settings-feature__main:focus-visible .settings-feature__name {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.settings-feature__emoji {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    border-radius: 0.6rem;
+    background: var(--set-track);
+    border: 1px solid var(--set-line);
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.settings-feature__name {
+    display: block;
+    font-size: 0.83rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--set-ink);
+    overflow-wrap: anywhere;
+    transition: color 0.15s;
+}
+
+.settings-feature__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+}
+
+.settings-feature--locked {
+    background: var(--set-track);
+}
+
+.settings-feature--locked .settings-feature__emoji {
+    filter: grayscale(1);
+    opacity: 0.65;
+}
+
+.settings-feature--locked .settings-feature__name {
+    color: var(--set-faint);
+}
+
+.settings-lock {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 9999px;
+    background: #e2e8f0;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #64748b;
+    flex-shrink: 0;
+}
+
+.settings-lock svg {
+    width: 0.65rem;
+    height: 0.65rem;
+}
+
+.settings-empty {
+    padding: 1.25rem 0.9rem;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--set-faint);
+}
+
+/* ---------- Alt bar ---------- */
+
+.settings-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 1.35rem;
+    border-top: 1px solid var(--set-line-soft);
+    background: var(--set-track);
+}
+
+.settings-btn--ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--set-muted);
+}
+
+.settings-btn--ghost:hover {
+    border-color: var(--set-line);
+    background: #fff;
+}
+
+.settings-foot .settings-btn--primary {
+    min-width: 6rem;
+}
+
+/* ---------- Not kutusu ---------- */
+
+.settings-note {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid var(--set-line);
+    border-radius: 0.9rem;
+    background: var(--set-track);
+    font-size: 0.74rem;
+    line-height: 1.5;
+    color: var(--set-muted);
+}
+
+.settings-note svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+    margin-top: 0.12rem;
+    color: var(--set-faint);
+}
+
+.settings-note code {
+    padding: 0.05rem 0.3rem;
+    border-radius: 0.3rem;
+    background: #e2e8f0;
+    font-size: 0.7rem;
+    color: var(--set-ink);
+}
+
+/* ---------- Mobil: alttan açılan sayfa ---------- */
+
+@media (max-width: 640px) {
+    #settingsModal {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .settings-panel {
+        max-width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border: none;
+        border-radius: 0;
+        animation-name: setSheetIn;
+    }
+
+    .settings-head {
+        padding: 1rem 1rem 0.85rem;
+        padding-top: max(1rem, env(safe-area-inset-top));
+    }
+
+    .settings-tabs {
+        margin: 0.75rem 1rem 0;
+    }
+
+    .settings-tab {
+        padding: 0.5rem 0.5rem;
+        font-size: 0.74rem;
+    }
+
+    .settings-tab svg {
+        display: none;
+    }
+
+    .settings-body {
+        padding: 1rem 1rem 1.25rem;
+    }
+
+    .settings-foot {
+        padding: 0.75rem 1rem;
+        padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+
+    .settings-close {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    .settings-row__actions {
+        gap: 0.4rem;
+    }
+}
+
+@keyframes setSheetIn {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+}
+
+/* Dar ekranda aksiyon butonlarını alt satıra al */
+@media (max-width: 420px) {
+    .settings-row--stack {
+        flex-wrap: wrap;
+    }
+
+    .settings-row--stack .settings-row__actions {
+        width: 100%;
+    }
+
+    .settings-row--stack .settings-btn {
+        flex: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #settingsModal,
+    .settings-panel,
+    .settings-pane {
+        animation: none;
+    }
+
+    .settings-switch__track,
+    .settings-switch__track::after {
+        transition: none;
+    }
+}
