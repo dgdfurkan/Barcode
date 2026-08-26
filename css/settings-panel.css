@@ -1,10 +1,24 @@
 /**
- * Jet Barkod — Ayarlar paneli
- * Header'daki pill/slate dilini modal'a taşır. Tailwind CDN'e bağımlı değildir;
+ * Jet Barkod — Ayarlar paneli + ondan açılan modallar
+ * Header'daki pill/slate dilini modal'lara taşır. Tailwind CDN'e bağımlı değildir;
  * renkler css/tailwind.css içindeki token'lardan gelir.
+ *
+ * ANİMASYON KURALI — bozulmaması şart:
+ * Dinlenme hâli DAİMA görünür durumdur. Geçici "görünmez" hâl yalnızca
+ * .is-enter / .is-leave sınıfı varken uygulanır ve bu sınıflar bir sonraki
+ * karede kaldırılır. Böylece animasyon hiç çalışmasa bile içerik görünür kalır.
+ * (Eskiden keyframe + fill-mode kullanılıyordu; display:none bir ancestor içinde
+ * başlatılan animasyon donup içeriği kalıcı olarak opacity:0'da bırakıyordu.)
+ *
+ * PERFORMANS — yalnızca opacity ve transform animate edilir (compositor'da çalışır).
+ * Layout tetikleyen (height/width/top/margin) veya boya maliyeti yüksek
+ * (box-shadow/filter/backdrop-filter) özellikler asla animate edilmez.
  */
 
-#settingsModal {
+/* Token'lar :root'ta — hem #settingsModal hem .jb-modal alt ağaçları kullanıyor.
+   (Daha önce yalnızca #settingsModal içinde tanımlıydı; .jb-modal'lar miras
+   alamadığı için kenarlık/ikon zemini görünmüyordu.) */
+:root {
     --set-ink: var(--color-text-primary, #0f172a);
     --set-muted: #64748b;
     --set-faint: #94a3b8;
@@ -15,7 +29,10 @@
     --set-accent-soft: #eff6ff;
     --set-danger: #dc2626;
     --set-danger-soft: #fef2f2;
+    --set-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
 
+#settingsModal {
     position: fixed;
     inset: 0;
     z-index: 50;
@@ -24,17 +41,64 @@
     justify-content: center;
     padding: 1.5rem;
     background: rgb(15 23 42 / 0.5);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    opacity: 1;
+    transition: opacity 150ms ease-out;
 }
 
-#settingsModal.hidden {
+#settingsModal.hidden,
+.jb-modal.hidden {
     display: none;
+}
+
+/* Ayarlar dışındaki modallar da aynı kabuğu kullanır */
+.jb-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgb(15 23 42 / 0.5);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    opacity: 1;
+    transition: opacity 150ms ease-out;
+}
+
+/* --- Giriş / çıkış. Dinlenme hâli görünür; bu sınıflar geçicidir. --- */
+#settingsModal.is-enter,
+#settingsModal.is-leave,
+.jb-modal.is-enter,
+.jb-modal.is-leave {
+    opacity: 0;
+}
+
+#settingsModal.is-enter .settings-panel,
+.jb-modal.is-enter .jb-modal__panel {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.985);
+}
+
+#settingsModal.is-leave .settings-panel,
+.jb-modal.is-leave .jb-modal__panel {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0) scale(0.99);
+}
+
+/* will-change yalnızca geçiş sürerken — kalıcı bırakmak bellek israfı */
+#settingsModal.is-enter .settings-panel,
+#settingsModal.is-leave .settings-panel,
+.jb-modal.is-enter .jb-modal__panel,
+.jb-modal.is-leave .jb-modal__panel {
+    will-change: transform, opacity;
 }
 
 /* Sohbet balonu (z-9999) panelin alt barına biniyor — panel açıkken gizle.
    chat.js display'i inline yazdığı için !important şart. */
-body:has(#settingsModal:not(.hidden)) #openChat {
+body:has(#settingsModal:not(.hidden)) #openChat,
+body:has(.jb-modal:not(.hidden)) #openChat {
     display: none !important;
 }
 
@@ -42,7 +106,8 @@ body:has(#settingsModal:not(.hidden)) #openChat {
 
 /* ---------- Kabuk ---------- */
 
-.settings-panel {
+.settings-panel,
+.jb-modal__panel {
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -55,9 +120,23 @@ body:has(#settingsModal:not(.hidden)) #openChat {
     box-shadow:
         0 32px 64px -28px rgb(15 23 42 / 0.32),
         0 8px 20px -12px rgb(15 23 42 / 0.16);
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    transition:
+        opacity 170ms ease-out,
+        transform 220ms var(--set-ease);
 }
 
-.settings-head {
+.jb-modal__panel--sm {
+    max-width: 34rem;
+}
+
+.jb-modal__panel--lg {
+    max-width: 56rem;
+}
+
+.settings-head,
+.jb-modal__head {
     display: flex;
     align-items: flex-start;
     gap: 1rem;
@@ -65,7 +144,8 @@ body:has(#settingsModal:not(.hidden)) #openChat {
     border-bottom: 1px solid var(--set-line-soft);
 }
 
-.settings-head__icon {
+.settings-head__icon,
+.jb-modal__icon {
     display: grid;
     place-items: center;
     width: 2.5rem;
@@ -76,17 +156,20 @@ body:has(#settingsModal:not(.hidden)) #openChat {
     color: var(--set-accent);
 }
 
-.settings-head__icon svg {
+.settings-head__icon svg,
+.jb-modal__icon svg {
     width: 1.25rem;
     height: 1.25rem;
 }
 
-.settings-head__text {
+.settings-head__text,
+.jb-modal__headtext {
     flex: 1;
     min-width: 0;
 }
 
-.settings-head__title {
+.settings-head__title,
+.jb-modal__title {
     margin: 0;
     font-size: 1.0625rem;
     font-weight: 600;
@@ -94,13 +177,15 @@ body:has(#settingsModal:not(.hidden)) #openChat {
     color: var(--set-ink);
 }
 
-.settings-head__sub {
+.settings-head__sub,
+.jb-modal__sub {
     margin: 0.15rem 0 0;
     font-size: 0.78rem;
     color: var(--set-faint);
 }
 
-.settings-close {
+.settings-close,
+.jb-modal__close {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -115,17 +200,20 @@ body:has(#settingsModal:not(.hidden)) #openChat {
     transition: background 0.15s, color 0.15s;
 }
 
-.settings-close:hover {
+.settings-close:hover,
+.jb-modal__close:hover {
     background: var(--set-line-soft);
     color: var(--set-ink);
 }
 
-.settings-close:focus-visible {
+.settings-close:focus-visible,
+.jb-modal__close:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px rgb(37 99 235 / 0.2);
 }
 
-.settings-close svg {
+.settings-close svg,
+.jb-modal__close svg {
     width: 1.15rem;
     height: 1.15rem;
 }
@@ -133,6 +221,7 @@ body:has(#settingsModal:not(.hidden)) #openChat {
 /* ---------- Sekmeler ---------- */
 
 .settings-tabs {
+    position: relative;
     display: flex;
     gap: 0.2rem;
     margin: 0.85rem 1.35rem 0;
@@ -171,10 +260,41 @@ body:has(#settingsModal:not(.hidden)) #openChat {
     color: var(--set-ink);
 }
 
-.settings-tab[aria-selected='true'] {
+/* Gösterge kurulamadıysa (ölçüm 0 döndüyse) klasik arka plan devreye girer */
+.settings-tabs:not(.has-indicator) .settings-tab[aria-selected='true'] {
     background: #fff;
-    color: var(--set-ink);
     box-shadow: 0 1px 4px rgb(15 23 42 / 0.1);
+}
+
+.settings-tab[aria-selected='true'] {
+    color: var(--set-ink);
+}
+
+.settings-tabs__indicator {
+    position: absolute;
+    top: 0.25rem;
+    left: 0;
+    height: calc(100% - 0.5rem);
+    border-radius: 9999px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgb(15 23 42 / 0.1);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate3d(0, 0, 0);
+    transition:
+        transform 260ms var(--set-ease),
+        width 260ms var(--set-ease),
+        opacity 140ms ease-out;
+}
+
+.settings-tabs.has-indicator .settings-tabs__indicator {
+    opacity: 1;
+}
+
+/* Sekme yazısı göstergenin üstünde kalmalı */
+.settings-tab {
+    position: relative;
+    z-index: 1;
 }
 
 .settings-tab:focus-visible {
@@ -189,11 +309,19 @@ body:has(#settingsModal:not(.hidden)) #openChat {
 
 /* ---------- Gövde ---------- */
 
-.settings-body {
+.settings-body,
+.jb-modal__body {
     flex: 1;
     overflow-y: auto;
     overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding: 1.1rem 1.35rem 1.35rem;
+}
+
+.jb-modal__body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
 }
 
 .settings-pane[hidden] {
@@ -204,6 +332,16 @@ body:has(#settingsModal:not(.hidden)) #openChat {
     display: flex;
     flex-direction: column;
     gap: 1.1rem;
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    transition:
+        opacity 160ms ease-out,
+        transform 200ms var(--set-ease);
+}
+
+.settings-pane.is-enter {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
 }
 
 
@@ -314,7 +452,7 @@ body:has(#settingsModal:not(.hidden)) #openChat {
     border-radius: 9999px;
     background: #fff;
     box-shadow: 0 1px 3px rgb(15 23 42 / 0.25);
-    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .settings-switch input:checked + .settings-switch__track {
@@ -354,7 +492,12 @@ body:has(#settingsModal:not(.hidden)) #openChat {
     color: var(--set-muted);
     white-space: nowrap;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        border-color 0.15s,
+        box-shadow 0.15s,
+        transform 0.12s var(--set-ease);
 }
 
 .settings-btn svg {
@@ -367,6 +510,10 @@ body:has(#settingsModal:not(.hidden)) #openChat {
     border-color: #cbd5e1;
     background: var(--set-track);
     color: var(--set-ink);
+}
+
+.settings-btn:active {
+    transform: scale(0.97);
 }
 
 .settings-btn:focus-visible {
@@ -553,7 +700,8 @@ body:has(#settingsModal:not(.hidden)) #openChat {
 
 /* ---------- Alt bar ---------- */
 
-.settings-foot {
+.settings-foot,
+.jb-modal__foot {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -611,12 +759,19 @@ body:has(#settingsModal:not(.hidden)) #openChat {
 /* ---------- Mobil: alttan açılan sayfa ---------- */
 
 @media (max-width: 640px) {
-    #settingsModal {
+    /* Panel zaten tüm ekranı kapladığı için arka planı bulanıklaştırmak
+       tamamen boşa harcanan GPU işi — mobilde kapat. */
+    #settingsModal,
+    .jb-modal {
         align-items: flex-end;
         padding: 0;
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        background: rgb(15 23 42 / 0.6);
     }
 
-    .settings-panel {
+    .settings-panel,
+    .jb-modal__panel {
         max-width: 100%;
         height: 100%;
         max-height: 100%;
@@ -624,7 +779,8 @@ body:has(#settingsModal:not(.hidden)) #openChat {
         border-radius: 0;
     }
 
-    .settings-head {
+    .settings-head,
+    .jb-modal__head {
         padding: 1rem 1rem 0.85rem;
         padding-top: max(1rem, env(safe-area-inset-top));
     }
@@ -642,18 +798,32 @@ body:has(#settingsModal:not(.hidden)) #openChat {
         display: none;
     }
 
-    .settings-body {
+    .settings-body,
+    .jb-modal__body {
         padding: 1rem 1rem 1.25rem;
     }
 
-    .settings-foot {
+    .settings-foot,
+    .jb-modal__foot {
         padding: 0.75rem 1rem;
         padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
     }
 
-    .settings-close {
+    .settings-close,
+    .jb-modal__close {
         width: 2.5rem;
         height: 2.5rem;
+    }
+
+    /* Mobilde panel alttan kayar */
+    #settingsModal.is-enter .settings-panel,
+    .jb-modal.is-enter .jb-modal__panel {
+        transform: translate3d(0, 18px, 0) scale(1);
+    }
+
+    #settingsModal.is-leave .settings-panel,
+    .jb-modal.is-leave .jb-modal__panel {
+        transform: translate3d(0, 12px, 0) scale(1);
     }
 
     .settings-row__actions {
@@ -677,9 +847,465 @@ body:has(#settingsModal:not(.hidden)) #openChat {
     }
 }
 
+/* ---------- İçerik primitifleri (alt modallar) ---------- */
+
+/* Dinamik doldurulan detay gövdesi — tek sarmalayıcı olduğu için
+   .jb-modal__body gap'i işlemiyor; akışı burada kuruyoruz. */
+#featureDetailContent {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.jb-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.jb-chip--ok {
+    background: #dcfce7;
+    color: #15803d;
+}
+
+.jb-chip--locked {
+    background: #e2e8f0;
+    color: #64748b;
+}
+
+.jb-chip--accent {
+    background: var(--set-accent-soft);
+    color: var(--set-accent);
+}
+
+.jb-chip--warn {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.jb-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+}
+
+.jb-callout__strong {
+    margin: 0;
+    font-weight: 600;
+}
+
+.jb-callout__note {
+    margin: 0.15rem 0 0;
+    font-size: 0.72rem;
+    opacity: 0.85;
+}
+
+.settings-btn.is-copied,
+.settings-btn.is-copied:hover {
+    border-color: transparent;
+    background: #16a34a;
+    color: #fff;
+}
+
+.jb-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.jb-section__title {
+    margin: 0 0 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--set-ink);
+}
+
+.jb-prose {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--set-muted);
+}
+
+.jb-callout {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.75rem 0.85rem;
+    border: 1px solid var(--set-line);
+    border-radius: 0.9rem;
+    background: var(--set-track);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    color: var(--set-muted);
+}
+
+.jb-callout strong {
+    color: var(--set-ink);
+    font-weight: 600;
+}
+
+.jb-callout--ok {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.jb-callout--ok strong {
+    color: #14532d;
+}
+
+.jb-callout--warn {
+    border-color: #fed7aa;
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+.jb-callout__icon {
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    margin-top: 0.15rem;
+}
+
+/* Callout iki satırlı metin içeriyorsa dikey akış */
+.jb-callout:has(.jb-callout__strong) {
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.jb-stepsbox {
+    padding: 0.7rem 0.85rem;
+    border: 1px solid var(--set-line);
+    border-radius: 0.75rem;
+    background: var(--set-track);
+}
+
+.jb-stepsbox__title {
+    margin: 0 0 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--set-faint);
+}
+
+.jb-code {
+    padding: 0.05rem 0.3rem;
+    border-radius: 0.3rem;
+    background: #e2e8f0;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.68rem;
+    color: var(--set-ink);
+}
+
+/* Sıralı kurulum adımları */
+.jb-steps {
+    counter-reset: jbstep;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+}
+
+.jb-steps li {
+    counter-increment: jbstep;
+    position: relative;
+    padding-left: 1.85rem;
+    font-size: 0.78rem;
+    line-height: 1.55;
+    color: var(--set-muted);
+}
+
+.jb-steps li::before {
+    content: counter(jbstep);
+    position: absolute;
+    left: 0;
+    top: 0.02rem;
+    display: grid;
+    place-items: center;
+    width: 1.3rem;
+    height: 1.3rem;
+    border-radius: 9999px;
+    background: var(--set-accent-soft);
+    color: var(--set-accent);
+    font-size: 0.66rem;
+    font-weight: 700;
+}
+
+.jb-listrow--muted {
+    background: var(--set-track);
+}
+
+.jb-listrow--muted .jb-listrow__title {
+    color: var(--set-faint);
+}
+
+.jb-kbd {
+    display: inline-block;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--set-line);
+    border-bottom-width: 2px;
+    border-radius: 0.35rem;
+    background: #fff;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.72rem;
+    color: var(--set-ink);
+}
+
+.jb-kbd--lg {
+    flex-shrink: 0;
+    min-width: 2.4rem;
+    padding: 0.3rem 0.5rem;
+    text-align: center;
+    font-size: 0.76rem;
+    font-weight: 600;
+}
+
+.jb-input {
+    width: 100%;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--set-line);
+    border-radius: 0.6rem;
+    background: #fff;
+    font-size: 0.82rem;
+    color: var(--set-ink);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.jb-input::placeholder {
+    color: var(--set-faint);
+}
+
+.jb-input:focus {
+    outline: none;
+    border-color: var(--set-accent);
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.14);
+}
+
+.jb-label {
+    display: block;
+    margin-bottom: 0.3rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--set-ink);
+}
+
+.jb-hint {
+    margin: 0.3rem 0 0;
+    font-size: 0.7rem;
+    line-height: 1.5;
+    color: var(--set-faint);
+}
+
+.jb-error {
+    padding: 0.5rem 0.7rem;
+    border: 1px solid #fecaca;
+    border-radius: 0.6rem;
+    background: var(--set-danger-soft);
+    font-size: 0.75rem;
+    color: var(--set-danger);
+}
+
+.jb-empty {
+    padding: 1.1rem 0.9rem;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--set-faint);
+}
+
+/* Liste satırları (kısayollar, ürün yönetimi) */
+.jb-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.jb-list > * + * {
+    border-top: 1px solid var(--set-line-soft);
+}
+
+.jb-listrow {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.6rem 0.85rem;
+    background: #fff;
+    transition: background 0.15s;
+}
+
+.jb-listrow:hover {
+    background: var(--set-track);
+}
+
+.jb-listrow__body {
+    flex: 1;
+    min-width: 0;
+}
+
+.jb-listrow__title {
+    margin: 0;
+    font-size: 0.81rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--set-ink);
+    overflow-wrap: anywhere;
+}
+
+.jb-listrow__meta {
+    margin: 0.1rem 0 0;
+    font-size: 0.71rem;
+    color: var(--set-muted);
+}
+
+.jb-listrow__thumb {
+    width: 2.2rem;
+    height: 2.2rem;
+    flex-shrink: 0;
+    border-radius: 0.5rem;
+    border: 1px solid var(--set-line);
+    background: var(--set-track);
+    object-fit: contain;
+}
+
+.jb-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    flex-shrink: 0;
+    border: 1px solid var(--set-line);
+    border-radius: 0.5rem;
+    background: #fff;
+    color: var(--set-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.12s var(--set-ease);
+}
+
+.jb-iconbtn svg {
+    width: 0.9rem;
+    height: 0.9rem;
+}
+
+.jb-iconbtn:hover {
+    background: var(--set-track);
+    color: var(--set-ink);
+}
+
+.jb-iconbtn:active {
+    transform: scale(0.94);
+}
+
+.jb-iconbtn--danger:hover {
+    border-color: #fecaca;
+    background: var(--set-danger-soft);
+    color: var(--set-danger);
+}
+
+.jb-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.3rem 0.25rem 0.55rem;
+    border: 1px solid var(--set-line);
+    border-radius: 9999px;
+    background: #fff;
+    font-size: 0.74rem;
+    color: var(--set-ink);
+}
+
+.jb-tag__x {
+    display: grid;
+    place-items: center;
+    width: 1.05rem;
+    height: 1.05rem;
+    border: none;
+    border-radius: 9999px;
+    background: var(--set-line-soft);
+    color: var(--set-muted);
+    font-size: 0.8rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.jb-tag__x:hover {
+    background: var(--set-danger-soft);
+    color: var(--set-danger);
+}
+
+.jb-check {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+    accent-color: var(--set-accent);
+    cursor: pointer;
+}
+
+.settings-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.settings-btn:disabled:hover {
+    border-color: var(--set-line);
+    background: #fff;
+    color: var(--set-muted);
+}
+
+.settings-btn:disabled:active {
+    transform: none;
+}
+
+.jb-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.jb-toolbar__group {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+.jb-count {
+    font-size: 0.74rem;
+    color: var(--set-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Hareket azaltma ---------- */
+
 @media (prefers-reduced-motion: reduce) {
+    #settingsModal,
+    .jb-modal,
+    .settings-panel,
+    .jb-modal__panel,
+    .settings-pane,
+    .settings-tabs__indicator,
     .settings-switch__track,
-    .settings-switch__track::after {
-        transition: none;
+    .settings-switch__track::after,
+    .settings-btn,
+    .jb-iconbtn {
+        transition: none !important;
+    }
+
+    #settingsModal.is-enter .settings-panel,
+    #settingsModal.is-leave .settings-panel,
+    .jb-modal.is-enter .jb-modal__panel,
+    .jb-modal.is-leave .jb-modal__panel,
+    .settings-pane.is-enter {
+        transform: none;
     }
 }
