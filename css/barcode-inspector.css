@@ -1,0 +1,202 @@
+/**
+ * Jet Barkod — bilinmeyen kod kartı
+ *
+ * Ana sitenin `--color-*` değişkenlerini kullanır; ayrı bir palet uydurmaz.
+ * "Sonuç bulunamadı" ekranında, o ekranın üstünde durur: aranan şey bir
+ * ürün değil bir KOD ise, kullanıcının asıl istediği budur.
+ */
+
+.bk-alan {
+    margin-bottom: 1rem;
+}
+
+.bk-alan[hidden] { display: none; }
+
+.bk-baslik {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-bottom: 0.75rem;
+    padding: 0 0.25rem;
+}
+
+.bk-baslik > svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+    color: var(--color-primary, #2563eb);
+}
+
+.bk-baslik__ad {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--color-text-primary, #0f172a);
+}
+
+.bk-baslik__alt {
+    margin: 0.1rem 0 0;
+    font-size: 0.78rem;
+    color: var(--color-text-secondary, #475569);
+}
+
+.bk-liste {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+    gap: 0.75rem;
+}
+
+/* ---------- Kart ---------- */
+
+.bk-kart {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 1rem;
+    background: var(--color-surface, #fff);
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+    overflow: hidden;
+}
+
+.bk-kart__ust {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    /* Uzun kodlar (SSCC-18) rozetle aynı satıra sığmıyor; rozet alta düşsün */
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    padding: 0.85rem 1rem 0.7rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.bk-kart__kimlik { min-width: 0; }
+
+.bk-kart__tip {
+    margin: 0;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.bk-kart__deger {
+    margin: 0.15rem 0 0;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.94rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--color-text-primary, #0f172a);
+    word-break: break-all;
+}
+
+.bk-kart__aciklama {
+    margin: 0.2rem 0 0;
+    font-size: 0.72rem;
+    color: #94a3b8;
+}
+
+/* Doğrulama rozeti — renk tek başına anlam taşımasın diye metinli */
+.bk-rozet {
+    flex: none;
+    margin-left: auto;
+    max-width: 12rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: center;
+}
+
+.bk-rozet--ok { background: #ecfdf5; color: #047857; }
+.bk-rozet--uyari { background: #fef2f2; color: #b91c1c; cursor: help; }
+
+/* ---------- Görsel ---------- */
+
+.bk-kart__gorsel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.9rem 1rem;
+    background: #fff;
+}
+
+.bk-barkod {
+    max-width: 100%;
+    height: auto;
+}
+
+.bk-qr {
+    display: grid;
+    place-items: center;
+    padding: 0.4rem;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 0.6rem;
+    background: #fff;
+}
+
+.bk-qr[hidden] { display: none; }
+.bk-qr img, .bk-qr canvas { display: block; }
+
+.bk-kart__yok {
+    margin: 0;
+    padding: 1.25rem 0;
+    font-size: 0.78rem;
+    color: #94a3b8;
+    text-align: center;
+}
+
+/* ---------- Eylemler ---------- */
+
+.bk-kart__eylem {
+    display: flex;
+    gap: 0.4rem;
+    padding: 0.6rem 0.7rem;
+    border-top: 1px solid #f1f5f9;
+    background: #f8fafc;
+}
+
+.bk-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    flex: 1;
+    height: 2.2rem;
+    padding: 0 0.55rem;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 0.6rem;
+    background: #fff;
+    color: var(--color-text-secondary, #475569);
+    font-size: 0.74rem;
+    font-weight: 650;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background 140ms, color 140ms, border-color 140ms;
+}
+
+.bk-btn:hover {
+    background: #f8fafc;
+    color: var(--color-text-primary, #0f172a);
+    border-color: #cbd5e1;
+}
+
+.bk-btn:active { transform: scale(0.97); }
+.bk-btn svg { width: 0.9rem; height: 0.9rem; flex: none; }
+
+@media (max-width: 480px) {
+    .bk-liste { grid-template-columns: 1fr; }
+    .bk-btn span { display: none; }
+    .bk-btn { flex: 1; }
+    .bk-rozet { max-width: 8rem; }
+}
+
+/* Baskıda yalnızca barkod çıksın */
+@media print {
+    .bk-kart__eylem, .bk-baslik { display: none; }
+    .bk-kart { border: none; box-shadow: none; break-inside: avoid; }
+}

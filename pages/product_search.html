@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <script src="../js/console-quiet.js?v=20260828e"></script>
+    <script src="../js/console-quiet.js?v=20260828f"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,37 +18,39 @@
     <link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
     <link rel="shortcut icon" href="../assets/logo.png?v=2">
     
-    <link rel="stylesheet" href="../css/main.css?v=20260828e" />
-    <link rel="stylesheet" href="../css/tailwind.css?v=20260828e" />
-    <link rel="stylesheet" href="../css/settings-panel.css?v=20260828e" />
-    <link rel="stylesheet" href="../css/app-boot.css?v=20260828e" />
+    <link rel="stylesheet" href="../css/main.css?v=20260828f" />
+    <link rel="stylesheet" href="../css/tailwind.css?v=20260828f" />
+    <link rel="stylesheet" href="../css/settings-panel.css?v=20260828f" />
+    <link rel="stylesheet" href="../css/barcode-inspector.css?v=20260828f" />
+    <link rel="stylesheet" href="../css/app-boot.css?v=20260828f" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <script src="../js/auth-token.js?v=20260828e"></script>
-    <script src="../js/db-config.js?v=20260828e"></script>
-    <script src="../js/jb-db.js?v=20260828e"></script>
+    <script src="../js/vendor/JsBarcode.all.min.js?v=20260828f"></script>
+    <script src="../js/auth-token.js?v=20260828f"></script>
+    <script src="../js/db-config.js?v=20260828f"></script>
+    <script src="../js/jb-db.js?v=20260828f"></script>
     <!-- QR Code Library - Using QRCode.js (more reliable) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onload="console.log('✅ QRCode.js library loaded')" onerror="console.error('❌ QRCode.js failed to load')"></script>
+    <script src="../js/vendor/qrcode.min.js?v=20260828f"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="temp_products.js"></script>
-    <script src="../js/getir-cdn-paste.js?v=20260828e"></script>
-    <script src="../js/guest-access-config.js?v=20260828e"></script>
-    <script src="../js/auth.js?v=20260828e"></script>
-    <script src="../js/skeleton-ui.js?v=20260828e"></script>
-    <script src="../js/app-boot.js?v=20260828e"></script>
-    <script src="../js/guest-access.js?v=20260828e"></script>
-    <script src="../js/image-lightbox.js?v=20260828e"></script>
-    <script src="../js/trial-notifications.js?v=20260828e"></script>
-    <script src="../js/user-manager.js?v=20260828e"></script>
-    <script src="../js/premium-features.js?v=20260828e"></script>
-    <script src="../js/notifications.js?v=20260828e"></script>
-    <script src="../js/feature-definitions.js?v=20260828e"></script>
-    <script src="../js/feature-manager.js?v=20260828e"></script>
-    <script src="../js/feature-checker.js?v=20260828e"></script>
-    <script src="../js/update-notifications.js?v=20260828e"></script>
-    <script src="../js/ip-ban-checker.js?v=20260828e"></script>
-    <script src="../js/changelog.js?v=20260828e"></script>
+    <script src="../js/getir-cdn-paste.js?v=20260828f"></script>
+    <script src="../js/barcode-inspector.js?v=20260828f"></script>
+    <script src="../js/guest-access-config.js?v=20260828f"></script>
+    <script src="../js/auth.js?v=20260828f"></script>
+    <script src="../js/skeleton-ui.js?v=20260828f"></script>
+    <script src="../js/app-boot.js?v=20260828f"></script>
+    <script src="../js/guest-access.js?v=20260828f"></script>
+    <script src="../js/image-lightbox.js?v=20260828f"></script>
+    <script src="../js/trial-notifications.js?v=20260828f"></script>
+    <script src="../js/user-manager.js?v=20260828f"></script>
+    <script src="../js/premium-features.js?v=20260828f"></script>
+    <script src="../js/notifications.js?v=20260828f"></script>
+    <script src="../js/feature-definitions.js?v=20260828f"></script>
+    <script src="../js/feature-manager.js?v=20260828f"></script>
+    <script src="../js/feature-checker.js?v=20260828f"></script>
+    <script src="../js/update-notifications.js?v=20260828f"></script>
+    <script src="../js/ip-ban-checker.js?v=20260828f"></script>
+    <script src="../js/changelog.js?v=20260828f"></script>
     <script>
         // ===== SCAN EFFECT VISIBILITY FUNCTION - MUST BE DEFINED BEFORE feature-manager.js LOADS =====
         // Load and update scan effect visibility (DEFINED AT TOP LEVEL SO IT'S ALWAYS AVAILABLE)
@@ -1974,7 +1976,7 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="../css/motion.css?v=20260828e" />
+    <link rel="stylesheet" href="../css/motion.css?v=20260828f" />
 </head>
 <body class="bg-background min-h-screen">
     <!-- Açılış perdesi. İlk karede boyanır; JS hiç çalışmasa bile
@@ -2390,6 +2392,8 @@
 
         <!-- No Results State -->
         <div id="noResultsState" class="hidden">
+            <!-- Katalogda yok ama bir KOD olabilir: barkod/QR çözümü buraya gelir -->
+            <div id="barkodInceleyiciAlan" class="bk-alan" hidden></div>
             <div class="bg-surface rounded-xl border border-border shadow-sm p-12 text-center">
                 <div class="bg-secondary-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                     <svg class="w-8 h-8 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7831,9 +7835,39 @@
             stopRandomProductsRotation();
         }
 
+        /**
+         * Arama katalogda karşılık bulamadıysa, aranan şey bir KOD olabilir:
+         * palet etiketi (KP…), koli GTIN'i, SSCC, elle yazılmış bir EAN…
+         * Bunlar "Sonuç bulunamadı" ekranında kaybolmak yerine tanınıp
+         * okunabilir bir barkoda/QR'a çevriliyor.
+         */
+        function gosterBarkodCozumu() {
+            const alan = document.getElementById('barkodInceleyiciAlan');
+            if (!alan) return;
+            if (!window.BarkodInceleyici || typeof window.BarkodInceleyici.ciz !== 'function') {
+                alan.hidden = true;
+                return;
+            }
+            const sorgu = (document.getElementById('searchInput')?.value || '').trim();
+            try {
+                window.BarkodInceleyici.ciz(alan, sorgu);
+            } catch (err) {
+                console.warn('Barkod çözümü çizilemedi:', err);
+                alan.hidden = true;
+            }
+        }
+
+        function temizleBarkodCozumu() {
+            const alan = document.getElementById('barkodInceleyiciAlan');
+            if (!alan) return;
+            alan.innerHTML = '';
+            alan.hidden = true;
+        }
+
         function showNoResults() {
             hideAllStates();
             noResultsState.classList.remove('hidden');
+            gosterBarkodCozumu();
             stopRandomProductsRotation();
             // Update result count to 0 when no results found
             if (resultCount) {
@@ -7876,6 +7910,9 @@
             resultsSection.classList.add('hidden');
             noResultsState.classList.add('hidden');
             initialState.classList.add('hidden');
+            // Barkod kartı yalnızca "sonuç yok" ekranına aittir; her durum
+            // değişiminde temizlenir ki eski bir koda ait kart takılı kalmasın.
+            temizleBarkodCozumu();
         }
 
         // Show search loading state
@@ -8511,22 +8548,33 @@
                 Kilitli
             </span>`;
 
-        async function renderPremiumFeatures() {
+        /**
+         * Ayarlar > Özellikler listesi.
+         *
+         * ÖNEMLİ: Liste ÖNCE elde olanla çiziliyor, ağ turu SONRA.
+         *
+         * Eskiden ilk satır `await premiumFeatures.init()` idi; o çağrı da
+         * veritabanı istemcisini bekliyordu. İstemci gelmeyince (unpkg
+         * engelli bir makinede tam olarak bu oldu) bekleme 10 saniye
+         * sürüyor, bu sırada ayarlar paneli BOMBOŞ duruyordu. Kullanıcı
+         * "ayarlara girince bir şey gelmiyor" diyordu — haklıydı.
+         *
+         * Artık özellik adları, kilit durumu ve tercihler önbellekten
+         * anında çiziliyor; taze veri gelince liste sessizce yenileniyor.
+         * Ağ hiç gelmezse bile panel dolu ve kullanılabilir kalıyor.
+         */
+        let _premiumTazelemeSurugu = false;
+
+        async function renderPremiumFeatures(options) {
             const container = document.getElementById('premiumFeaturesSettings');
             if (!container) return;
 
-            // Wait for premium features to be initialized
-            if (window.premiumFeatures && window.authUtils?.checkAuth()) {
-                await window.premiumFeatures.init();
-            }
+            const tazelemeTuru = !options || options.refresh !== false;
 
             container.innerHTML = '';
 
-            // Load feature preferences from database (with cache) - do this once before loop
-            let featurePreferences = {};
-            if (window.premiumFeatures) {
-                featurePreferences = await window.premiumFeatures.loadFeaturePreferences();
-            }
+            // Tercihler: önbellekte varsa anında, yoksa boş — ağ beklenmiyor
+            let featurePreferences = window.premiumFeatures?.featurePreferencesCache || {};
 
             // Açık özellikler üstte; kilitliler listenin sonunda toplanır
             const featureKeys = Object.keys(PREMIUM_FEATURES_CONFIG).sort((a, b) => {
@@ -8616,6 +8664,36 @@
 
                 container.appendChild(featureItem);
             }
+
+            // ---- Arka planda taze veriyi al, değiştiyse listeyi yenile ----
+            if (!tazelemeTuru || _premiumTazelemeSurugu) return;
+            _premiumTazelemeSurugu = true;
+
+            (async () => {
+                try {
+                    const oncekiHaklar = JSON.stringify(window.premiumFeatures?.premiumFeatures || {});
+                    const oncekiTercih = JSON.stringify(window.premiumFeatures?.featurePreferencesCache || {});
+
+                    if (window.premiumFeatures && window.authUtils?.checkAuth()) {
+                        await window.premiumFeatures.init();
+                    }
+                    if (window.premiumFeatures) {
+                        await window.premiumFeatures.loadFeaturePreferences();
+                    }
+
+                    const yeniHaklar = JSON.stringify(window.premiumFeatures?.premiumFeatures || {});
+                    const yeniTercih = JSON.stringify(window.premiumFeatures?.featurePreferencesCache || {});
+
+                    if (yeniHaklar !== oncekiHaklar || yeniTercih !== oncekiTercih) {
+                        renderPremiumFeatures({ refresh: false });
+                    }
+                } catch (err) {
+                    // Ağ yoksa elde ne varsa o kalır — panel asla boşalmaz
+                    console.warn('Premium listesi tazelenemedi, önbellek gösteriliyor:', err?.message || err);
+                } finally {
+                    _premiumTazelemeSurugu = false;
+                }
+            })();
         }
 
         // Show premium feature detail modal
@@ -11558,7 +11636,7 @@
     </button>
 
     <!-- Chat System Script -->
-    <script src="../js/chat.js?v=20260828e"></script>
+    <script src="../js/chat.js?v=20260828f"></script>
     
     <!-- Debug Script for Chat Button -->
     <script>
