@@ -2702,10 +2702,8 @@ AdminPanel.prototype.sendTelegramTestMessage = async function() {
 
         const cfg = window.JETBARKOD_VPS_API || {};
         const baseUrl = (cfg.baseUrl || '').replace(/\/$/, '');
-        const legacyUrl = 'https://ytekbbxvfdheiexsojpx.functions.supabase.co/telegram-notify';
-        const endpoint = cfg.enabled && baseUrl
-            ? `${baseUrl}/api/telegram/notify`
-            : legacyUrl;
+        if (!baseUrl) throw new Error('API adresi tanımlı değil.');
+        const endpoint = `${baseUrl}/api/telegram/notify`;
 
         const headers = { 'Content-Type': 'application/json' };
         const adminToken = window.jetbarkodAuth?.get?.();

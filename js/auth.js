@@ -1,6 +1,4 @@
-// Supabase Configuration
-const SUPABASE_URL = 'https://ytekbbxvfdheiexsojpx.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg';
+// Eski Supabase projesine ait URL ve anon key kaldırıldı (proje terk edildi).
 
 // Initialize Supabase (client is initialized in index.html, this just verifies it's ready)
 function initSupabase() {

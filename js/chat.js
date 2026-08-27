@@ -616,10 +616,8 @@ class ChatSystem {
         try {
             const cfg = window.JETBARKOD_VPS_API || {};
             const baseUrl = (cfg.baseUrl || '').replace(/\/$/, '');
-            const legacyUrl = 'https://ytekbbxvfdheiexsojpx.functions.supabase.co/telegram-notify';
-            const endpoint = cfg.enabled && baseUrl
-                ? `${baseUrl}/api/telegram/notify`
-                : legacyUrl;
+            if (!baseUrl) return;
+            const endpoint = `${baseUrl}/api/telegram/notify`;
 
             // Telegram bildirimi artık kimlik doğrulaması istiyor: eskiden
             // internetteki herkes bu uçtan bot'a mesaj gönderebiliyordu.

@@ -1,13 +1,14 @@
 /**
- * Merkezi Supabase / VPS API yapılandırması.
+ * Merkezi API yapılandırması.
  * Tüm sayfalar bu dosyayı yükler.
+ *
+ * NOT: Eski Supabase projesi (ytekbbxvfdheiexsojpx) tamamen terk edildi.
+ * URL ve anon key repodan kaldırıldı. Veriler kendi VPS'imizde,
+ * PostgREST + JWT + RLS ile korunuyor.
+ *
+ * @supabase/supabase-js kütüphanesi hâlâ yükleniyor ama yalnızca PostgREST
+ * sorgu kurucusu olarak kullanılıyor — Supabase servisiyle ilgisi yok.
  */
-window.JETBARKOD_SUPABASE_LEGACY = {
-    url: 'https://ytekbbxvfdheiexsojpx.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0ZWtiYnh2ZmRoZWlleHNvanB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTgzMDcsImV4cCI6MjA3Mzg5NDMwN30.J4jvfRg2j6UOumDSqOyvYs3Iza8VX0SnNU_7wE41Tdg',
-};
-
 if (!window.JETBARKOD_VPS_API) {
     window.JETBARKOD_VPS_API = {
         enabled: true,

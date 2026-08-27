@@ -3,18 +3,11 @@
 
     function getConfig() {
         const vps = window.JETBARKOD_VPS_API || {};
-        const legacy = window.JETBARKOD_SUPABASE_LEGACY || {};
-        if (vps.enabled) {
-            return {
-                url: (vps.baseUrl || '').replace(/\/$/, ''),
-                key: 'vps-public-anon-key',
-                mode: 'vps',
-            };
-        }
+        // Tek veri kaynağı kendi VPS'imiz. Eski Supabase geri dönüşü kaldırıldı.
         return {
-            url: legacy.url,
-            key: legacy.anonKey,
-            mode: 'supabase',
+            url: (vps.baseUrl || '').replace(/\/$/, ''),
+            key: 'vps-public-anon-key',
+            mode: 'vps',
         };
     }
 
