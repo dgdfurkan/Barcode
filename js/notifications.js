@@ -14,7 +14,7 @@ class NotificationSystem {
     async init() {
         const session = window.authUtils?.checkAuth();
         if (!session) {
-            console.warn('No user session found for notifications');
+            // Misafir sayfalarında beklenen durum — sessiz geç.
             return;
         }
         
@@ -670,8 +670,7 @@ async function initializeNotificationSystem() {
             window.notificationSystem.init();
         } else if (attempts >= maxAttempts) {
             clearInterval(checkAuth);
-            console.warn('⚠️ Auth not ready after 10 seconds, initializing anyway...');
-            // Try to init anyway - maybe auth will be ready later
+            // Giriş yapmamış ziyaretçide bu normal — uyarı basma.
             window.notificationSystem.init();
         }
     }, 500);

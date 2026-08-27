@@ -2554,9 +2554,6 @@ AdminPanel.prototype.getAdminSettingsRow = async function(forceRefresh = false) 
         console.error('Admin ayarları alınamadı:', e);
         return emptyAdminSettingsRow();
     }
-
-    this.adminSettings = data;
-    return data;
 };
 
 AdminPanel.prototype.getGeminiApiKey = function() {
@@ -2628,9 +2625,16 @@ AdminPanel.prototype.loadAdminSettings = async function() {
             uploadPresetInput.value = settings?.cloudinary_upload_preset || '';
         }
 
+        // Sırlar sunucudan geri GELMEZ. Alanı boş bırakıp "kayıtlı" bilgisini
+        // placeholder ile gösteriyoruz; boş kaydedilirse mevcut değer korunur.
+        const cfg = settings?._configured || {};
+
         const telegramTokenInput = document.getElementById('telegramBotToken');
         if (telegramTokenInput) {
-            telegramTokenInput.value = settings?.telegram_bot_token || '';
+            telegramTokenInput.value = '';
+            telegramTokenInput.placeholder = cfg.telegram_bot_token
+                ? '•••••••• kayıtlı — değiştirmek için yeni token girin'
+                : 'Bot token girin';
         }
 
         const telegramChatInput = document.getElementById('telegramChatId');
@@ -2638,14 +2642,32 @@ AdminPanel.prototype.loadAdminSettings = async function() {
             telegramChatInput.value = settings?.telegram_chat_id || '';
         }
 
+        applySecretPlaceholder('geminiApiKey', cfg.gemini_api_key);
+        applySecretPlaceholder('cloudinaryApiKey', cfg.cloudinary_api_key);
+
+        // DİKKAT: token değeri hiç dönmediği için "dolu mu" kontrolü
+        // _configured bayrağına bakmalı, alanın kendisine değil.
         const testBtn = document.getElementById('sendTelegramTestBtn');
         if (testBtn) {
-            testBtn.disabled = !(settings?.telegram_bot_token && settings?.telegram_chat_id);
+            testBtn.disabled = !(cfg.telegram_bot_token && settings?.telegram_chat_id);
         }
+
+        return settings;
     } catch (error) {
         console.error('Admin ayarları yüklenirken hata:', error);
+        return null;
     }
 };
+
+/** Kayıtlı bir sır alanını boş bırakıp durumunu placeholder'da gösterir. */
+function applySecretPlaceholder(elementId, isConfigured) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    el.value = '';
+    el.placeholder = isConfigured
+        ? '•••••••• kayıtlı — değiştirmek için yeni değer girin'
+        : '';
+}
 
 AdminPanel.prototype.saveAdminSettings = async function() {
     try {
@@ -2677,16 +2699,11 @@ AdminPanel.prototype.saveAdminSettings = async function() {
             return;
         }
 
-        // Kaydettikten sonra sunucudan tazele (sırlar geri gelmez)
-        const fresh = await this.loadAdminSettings(true);
+        // Önbelleği düşür ki tazeleme sunucuya gitsin
+        this.adminSettings = null;
+        await this.loadAdminSettings();
 
-        const testBtn = document.getElementById('sendTelegramTestBtn');
-        if (testBtn) {
-            const cfg = fresh?._configured || {};
-            testBtn.disabled = !(cfg.telegram_bot_token && fresh?.telegram_chat_id);
-        }
-
-        console.log('✅ Admin ayarları kaydedildi')
+        alert('Ayarlar kaydedildi.');
     } catch (error) {
         console.error('Admin ayarları kaydedilirken hata:', error);
     }
@@ -2695,8 +2712,9 @@ AdminPanel.prototype.saveAdminSettings = async function() {
 AdminPanel.prototype.sendTelegramTestMessage = async function() {
     try {
         const settings = await this.getAdminSettingsRow(true);
-        if (!settings?.telegram_bot_token || !settings?.telegram_chat_id) {
-            alert('Önce Telegram Bot Token ve Chat ID girin.');
+        // Token değeri sunucudan hiç dönmez; kayıtlı olup olmadığına bakılır.
+        if (!settings?._configured?.telegram_bot_token || !settings?.telegram_chat_id) {
+            alert('Önce Telegram Bot Token ve Chat ID girip kaydedin.');
             return;
         }
 

@@ -189,30 +189,12 @@ class ChatSystem {
             return;
         }
 
-        // Öncelik 2: IP'ye göre en son giriş yapılan kayıtlı kullanıcıyı bul
-        if (window.supabase && window.guestUserManager) {
-            try {
-                const clientIP = await window.guestUserManager.getClientIP();
-                
-                // users.tracked_ips içinde bu IP olan kullanıcıyı bul
-                const { data: usersList, error: ipError } = await window.supabase
-                    .from('users')
-                    .select('username')
-                    .contains('tracked_ips', [clientIP])
-                    .limit(1);
-
-                const usersWithIP = Array.isArray(usersList) && usersList.length ? usersList[0] : null;
-                if (!ipError && usersWithIP && usersWithIP.username) {
-                    this.currentUser = usersWithIP.username;
-                    this.isGuest = false;
-                    this.updateChatHeader();
-                    console.log('🔍 Using registered user from tracked_ips:', this.currentUser, 'for IP:', clientIP);
-                    return;
-                }
-            } catch (error) {
-                console.error('❌ Error checking IP tracking:', error);
-            }
-        }
+        // KALDIRILDI — "IP'ye göre kayıtlı kullanıcıyı bul":
+        // Giriş yapmamış bir ziyaretçi, IP'sine bakarak hangi kayıtlı
+        // kullanıcının o IP'yi kullandığını öğrenebiliyordu (kimlik sızıntısı).
+        // Ayrıca users tablosu artık misafire kapalı olduğu için bu sorgu her
+        // ziyaretçide 401 üretiyordu. Giriş yapmamış ziyaretçi = misafir;
+        // aşağıdaki misafir akışı doğru davranış.
 
         // Öncelik 3: localStorage'dan geçici kullanıcı bilgileri
             const storedUsername = localStorage.getItem('currentUser') || localStorage.getItem('username');
@@ -1305,7 +1287,17 @@ class ChatSystem {
             console.warn('⚠️ Supabase client channel method not available');
             return;
         }
-        
+
+        // Giriş yapmamış ziyaretçide (misafir) users tablosuna abone OLMA.
+        // Eskiden currentUser null iken bile abone olunuyordu; shim bunu
+        // 4 saniyede bir "username=eq.null" ile yokluyor ve her seferinde
+        // 401 alıyordu — her ziyaretçinin konsolu hata akıyordu.
+        // Misafir sohbeti zaten API üzerinden yoklanıyor.
+        if (!this.currentUser || this.isGuest ||
+            (window.guestUserManager && window.guestUserManager.isGuestUser(this.currentUser))) {
+            return;
+        }
+
         console.log('🔔 Setting up chat realtime subscription for user:', this.currentUser);
         
         // Remove existing subscription if any

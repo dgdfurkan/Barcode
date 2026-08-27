@@ -78,7 +78,7 @@ class PremiumFeatures {
     async init() {
         const session = window.authUtils?.checkAuth();
         if (!session) {
-            console.warn('No user session found for premium features');
+            // Misafir sayfalarında beklenen durum — sessiz geç.
             return;
         }
 
