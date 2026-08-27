@@ -278,13 +278,13 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 
 .counting-v2 .v2-token-btn.is-bad .v2-token-btn__label { color: #b91c1c; }
 
-/* --- Popover --- */
+/* --- Popover: sade. Tek bakışta durum, tek düğmeyle çözüm. --- */
 .counting-v2 .v2-token-pop {
     position: absolute;
     right: 0;
     top: calc(100% + 0.55rem);
     z-index: 120;
-    width: min(22rem, calc(100vw - 1.5rem));
+    width: min(19rem, calc(100vw - 1.5rem));
     border: 1px solid var(--v2-line);
     border-radius: var(--v2-r-lg);
     background: var(--v2-surface);
@@ -304,41 +304,82 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 .counting-v2 .v2-token-pop__head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.6rem;
-    padding: 0.85rem 0.95rem;
+    gap: 0.55rem;
+    padding: 0.75rem 0.6rem 0.75rem 0.9rem;
     border-bottom: 1px solid var(--v2-soft);
 }
 
+.counting-v2 .v2-token-pop__head .v2-token-dot { margin-top: 1px; }
+.counting-v2 .v2-token-pop__text { flex: 1; min-width: 0; }
+
 .counting-v2 .v2-token-pop__title {
     margin: 0;
-    font-size: 0.85rem;
+    font-size: 0.83rem;
     font-weight: 700;
     color: var(--v2-ink);
+    line-height: 1.25;
 }
 
-.counting-v2 .v2-token-pop__sub {
-    margin: 0.1rem 0 0;
+.counting-v2 .v2-token-pop__depo {
+    margin: 0;
     font-size: 0.7rem;
     color: var(--v2-faint);
-    min-height: 1rem;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.counting-v2 .v2-token-pop__body { padding: 0.85rem 0.95rem 0.95rem; }
+.counting-v2 .v2-token-pop__depo:empty { display: none; }
 
-/* Tek tıkla panodan yapıştırma — popover'ın birincil eylemi */
+.counting-v2 .v2-token-pop__araclar {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+    flex: none;
+}
+
+.counting-v2 .v2-token-pop__araclar .v2-iconbtn { width: 1.9rem; height: 1.9rem; }
+.counting-v2 .v2-token-pop__araclar .v2-iconbtn svg { width: 1rem; height: 1rem; }
+
+.counting-v2 .v2-token-pop__body { padding: 0.75rem 0.9rem 0.85rem; }
+
+/* Kalan süre / bitiş — iki satır, fazlası değil */
+.counting-v2 .v2-token-facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.25rem 0.75rem;
+    margin: 0 0 0.75rem;
+    font-size: 0.74rem;
+}
+
+.counting-v2 .v2-token-facts[hidden] { display: none; }
+.counting-v2 .v2-token-facts dt { color: var(--v2-faint); font-weight: 500; }
+
+.counting-v2 .v2-token-facts dd {
+    margin: 0;
+    text-align: right;
+    color: var(--v2-ink);
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Tek tıkla panodan yapıştırma — panelin tek birincil eylemi */
 .counting-v2 .v2-paste {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     width: 100%;
-    height: 2.6rem;
+    height: 2.5rem;
     border: none;
     border-radius: var(--v2-r-md);
     background: var(--v2-primary);
     color: #fff;
-    font-size: 0.82rem;
+    font-size: 0.81rem;
     font-weight: 650;
     cursor: pointer;
     box-shadow: var(--v2-shadow-1);
@@ -352,71 +393,55 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 .counting-v2 .v2-paste.is-bad { background: var(--v2-eksik); }
 
 .counting-v2 .v2-token-hint {
-    margin: 0.55rem 0 0;
-    font-size: 0.7rem;
+    margin: 0.5rem 0 0;
+    font-size: 0.68rem;
     line-height: 1.45;
     color: var(--v2-faint);
     text-align: center;
 }
 
-.counting-v2 .v2-token-hint kbd {
-    padding: 0.05rem 0.3rem;
-    border: 1px solid var(--v2-line);
-    border-bottom-width: 2px;
-    border-radius: 0.3rem;
-    background: var(--v2-track);
-    font-family: inherit;
-    font-size: 0.65rem;
-    font-weight: 650;
-    color: var(--v2-muted);
-}
-
-/* Token bilgi satırları */
-.counting-v2 .v2-token-facts {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.3rem 0.75rem;
-    margin-top: 0.85rem;
-    padding-top: 0.75rem;
+/*
+ * Elle girme yolu KATLI duruyor. Panelin ilk hâlinde kocaman bir
+ * "Bearer eyJ..." kutusu vardı; kimsenin elle token yazması beklenmiyor,
+ * o kutu sadece paneli korkutucu gösteriyordu. Pano izni reddedilirse
+ * kendiliğinden açılıyor.
+ */
+.counting-v2 .v2-token-elle {
+    margin-top: 0.6rem;
     border-top: 1px solid var(--v2-soft);
-    font-size: 0.74rem;
+    padding-top: 0.5rem;
 }
 
-.counting-v2 .v2-token-facts dt { color: var(--v2-faint); font-weight: 500; }
-
-.counting-v2 .v2-token-facts dd {
-    margin: 0;
-    color: var(--v2-ink);
+.counting-v2 .v2-token-elle > summary {
+    list-style: none;
+    cursor: pointer;
+    font-size: 0.68rem;
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    color: var(--v2-faint);
+    text-align: center;
+    padding: 0.15rem 0;
+    transition: color var(--v2-fast);
 }
 
-/* v1'in API durum kartı popover içinde düzleşsin */
-.counting-v2 .v2-token-pop #apiStatusCard {
-    margin: 0.85rem 0 0 !important;
-    padding: 0.7rem 0.75rem !important;
-    border-radius: var(--v2-r-md) !important;
-    background: var(--v2-track) !important;
-    border: 1px solid var(--v2-soft) !important;
-    box-shadow: none !important;
-    background-image: none !important;
-}
+.counting-v2 .v2-token-elle > summary::-webkit-details-marker { display: none; }
+.counting-v2 .v2-token-elle > summary:hover { color: var(--v2-muted); }
+.counting-v2 .v2-token-elle > summary::after { content: ' ▾'; }
+.counting-v2 .v2-token-elle[open] > summary::after { content: ' ▴'; }
 
-.counting-v2 .v2-token-pop #apiStatusCard h4 { font-size: 0.72rem; }
-.counting-v2 .v2-token-pop #apiStatusCard svg { width: 0.9rem; height: 0.9rem; }
-.counting-v2 .v2-token-pop #apiStatusIcon { width: 1.85rem; height: 1.85rem; }
-.counting-v2 .v2-token-pop #apiStatusIcon svg { width: 1rem; height: 1rem; }
+/*
+ * v1'in API durum kartı DOM'da kalıyor (motor oraya yazıyor ve biz onu
+ * yedek kaynak olarak okuyoruz) ama gösterilmiyor: aynı bilgiyi yukarıdaki
+ * iki satır zaten veriyor.
+ */
+.counting-v2 .v2-token-pop #apiStatusCard { display: none !important; }
 
-/* Elle yapıştırma formu — açılır kapanır ama içerik daima erişilebilir */
-.counting-v2 .v2-token-form { margin-top: 0.85rem; }
+/* Elle yapıştırma formu */
+.counting-v2 .v2-token-form { margin-top: 0.5rem; }
 
 .counting-v2 .v2-token-form__label {
     display: block;
-    margin-bottom: 0.35rem;
-    font-size: 0.68rem;
+    margin-bottom: 0.3rem;
+    font-size: 0.64rem;
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
@@ -425,12 +450,12 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 
 .counting-v2 .v2-token-form__input {
     width: 100%;
-    padding: 0.5rem 0.6rem;
+    padding: 0.45rem 0.55rem;
     border: 1px solid var(--v2-line);
     border-radius: var(--v2-r-sm);
     background: var(--v2-track);
     font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 0.7rem;
+    font-size: 0.66rem;
     line-height: 1.5;
     color: var(--v2-ink);
     resize: vertical;
@@ -446,13 +471,13 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 .counting-v2 .v2-token-form__row {
     display: flex;
     gap: 0.4rem;
-    margin-top: 0.45rem;
+    margin-top: 0.4rem;
 }
 
 .counting-v2 .v2-token-form__preview {
-    margin: 0.45rem 0 0;
-    min-height: 1rem;
-    font-size: 0.68rem;
+    margin: 0.4rem 0 0;
+    min-height: 0.9rem;
+    font-size: 0.65rem;
     color: var(--v2-muted);
     word-break: break-all;
 }
@@ -1496,7 +1521,15 @@ body.v2-drawer-open { overflow: hidden; }
     .counting-v2 .v2-chip__eyebrow { display: none; }
     .counting-v2 .v2-token-btn__label { display: none; }
     .counting-v2 .v2-token-btn { width: 2.15rem; padding: 0; justify-content: center; }
-    .counting-v2 .v2-token-pop { width: calc(100vw - 1.25rem); right: -0.35rem; }
+    /* Dar ekranda popover'ı sağ kenara yaslamak solundan taşırıyordu.
+       Sabit konumla iki kenardan da hizalanıyor. */
+    .counting-v2 .v2-token-pop {
+        position: fixed;
+        top: calc(var(--v2-header-h) + 0.4rem);
+        left: 0.6rem;
+        right: 0.6rem;
+        width: auto;
+    }
 }
 
 /* Geniş ekranda içerik okunur bir genişlikte kalsın, kenarlara yapışmasın */

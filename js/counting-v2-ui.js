@@ -497,38 +497,63 @@
         var wrap = yap('div', 'v2-token');
         wrap.id = 'v2Token';
         wrap.innerHTML =
-            '<button type="button" class="v2-token-btn" id="v2TokenBtn" aria-expanded="false" aria-haspopup="dialog" title="Franchise token durumu">' +
+            '<button type="button" class="v2-token-btn" id="v2TokenBtn" aria-expanded="false" aria-haspopup="dialog" title="Token durumu">' +
             '  <span class="v2-token-dot" id="v2TokenDot" aria-hidden="true"></span>' +
             '  <span class="v2-token-btn__label" id="v2TokenHint">Token</span>' +
             '</button>' +
-            '<div class="v2-token-pop" id="v2TokenPop" role="dialog" aria-label="Franchise token" hidden>' +
+            '<div class="v2-token-pop" id="v2TokenPop" role="dialog" aria-label="Token durumu" hidden>' +
             '  <div class="v2-token-pop__head">' +
-            '    <div>' +
-            '      <p class="v2-token-pop__title">Franchise token</p>' +
-            '      <p class="v2-token-pop__sub" id="v2TokenSub">Durum kontrol ediliyor…</p>' +
+            '    <span class="v2-token-dot" id="v2TokenPopDot" aria-hidden="true"></span>' +
+            '    <div class="v2-token-pop__text">' +
+            '      <p class="v2-token-pop__title" id="v2TokenSub">Kontrol ediliyor</p>' +
+            '      <p class="v2-token-pop__depo" id="v2TokenWarehouse"></p>' +
             '    </div>' +
-            '    <button type="button" class="v2-iconbtn" id="v2TokenClose" aria-label="Kapat">' + ikon.kapat + '</button>' +
+            '    <div class="v2-token-pop__araclar" id="v2TokenTools"></div>' +
             '  </div>' +
             '  <div class="v2-token-pop__body">' +
-            '    <button type="button" class="v2-paste" id="v2TokenPasteBtn">' + ikon.pano + '<span id="v2TokenPasteLabel">Panodan yapıştır</span></button>' +
-            '    <p class="v2-token-hint">Sayfanın herhangi bir yerinde <kbd>Ctrl</kbd>+<kbd>V</kbd> de çalışır.</p>' +
-            '    <dl class="v2-token-facts">' +
-            '      <dt>Depo</dt><dd id="v2TokenWarehouse">—</dd>' +
+            '    <dl class="v2-token-facts" id="v2TokenFacts">' +
+            '      <dt>Kalan süre</dt><dd id="v2TokenLeft">—</dd>' +
             '      <dt>Bitiş</dt><dd id="v2TokenExpiry">—</dd>' +
             '    </dl>' +
-            '    <div id="v2TokenPopBody"></div>' +
+            '    <button type="button" class="v2-paste" id="v2TokenPasteBtn">' + ikon.pano +
+            '      <span id="v2TokenPasteLabel">Panodan yapıştır</span></button>' +
+            '    <p class="v2-token-hint" id="v2TokenIpucu">Getir sayfasındaki token’ı kopyala, buraya bas.</p>' +
+            '    <details class="v2-token-elle" id="v2TokenElle">' +
+            '      <summary>Elle gir</summary>' +
+            '      <div id="v2TokenPopBody"></div>' +
+            '    </details>' +
             '  </div>' +
             '</div>';
 
-        // Kullanıcı bloğunun soluna — çıkış düğmesinden uzakta dursun
         var kullanici = header.querySelector('#countingHeaderUserHost');
         var sagBlok = kullanici ? kullanici.parentNode : null;
         if (sagBlok) sagBlok.insertBefore(wrap, kullanici);
         else header.appendChild(wrap);
 
-        // v1'in token kutuları popover'a taşınır (ID'ler korunur)
+        /*
+         * v1'in API durum kartı popover'a taşınıyor ama GÖRÜNMÜYOR (CSS'te
+         * gizli). İki nedenle DOM'da duruyor:
+         *   1. counting.js oraya yazmaya devam ediyor — kaldırsak motor kırılır.
+         *   2. Aynı bilgiyi bizim satırlarımız zaten gösteriyor; iki kez
+         *      göstermek paneli kalabalıklaştırıyordu.
+         * Ayrıca güvenilir bir YEDEK KAYNAK: cachedFullData._api_info bir
+         * sebeple boş kalırsa durumu bu karttan okuyoruz.
+         */
         tasi('apiStatusCard', el('v2TokenPopBody'));
         tasi('manualTokenPanel', el('v2TokenPopBody'));
+        // Yenile düğmesi kartın içinde kalırsa gizlenir; başlığa alınıyor
+        var yenile = tasi('refreshTokenBtn', el('v2TokenTools'));
+        if (yenile) {
+            yenile.className = 'v2-iconbtn';
+            yenile.addEventListener('click', function () { setTimeout(durumuTazele, 1200); });
+        }
+
+        var kapatBtn = yap('button', 'v2-iconbtn');
+        kapatBtn.type = 'button';
+        kapatBtn.id = 'v2TokenClose';
+        kapatBtn.setAttribute('aria-label', 'Kapat');
+        kapatBtn.innerHTML = ikon.kapat;
+        el('v2TokenTools').appendChild(kapatBtn);
 
         var btn = el('v2TokenBtn');
         var pop = el('v2TokenPop');
@@ -541,13 +566,15 @@
         function kapat() {
             pop.hidden = true;
             btn.setAttribute('aria-expanded', 'false');
+            var d = el('v2TokenElle');
+            if (d) d.open = false;
         }
 
         btn.addEventListener('click', function (e) {
             e.stopPropagation();
             if (pop.hidden) ac(); else kapat();
         });
-        el('v2TokenClose').addEventListener('click', kapat);
+        kapatBtn.addEventListener('click', kapat);
         document.addEventListener('click', function (e) {
             if (!pop.hidden && !wrap.contains(e.target)) kapat();
         });
@@ -557,9 +584,29 @@
 
         el('v2TokenPasteBtn').addEventListener('click', panodanTokenAl);
         genelYapistirmayiDinle();
+        motoraBaglan();
 
         durumuTazele();
         setInterval(durumuTazele, 20000);
+    }
+
+    /**
+     * counting.js token durumunu her tazelediğinde biz de tazeleyelim.
+     * Yoklamaya güvenmek yetmiyordu: motor kartı 500 ms'de bir kez, sonra
+     * 30 sn'de bir güncelliyor; bizim 20 sn'lik turumuzla kayıyordu ve
+     * rozet "Token yok" derken kart "9 saat kaldı" diyebiliyordu.
+     */
+    function motoraBaglan() {
+        var cs = sistem();
+        if (!cs || cs.__v2TokenWrapped || typeof cs.updateAPIStatusCard !== 'function') return false;
+        var orijinal = cs.updateAPIStatusCard.bind(cs);
+        cs.__v2TokenWrapped = true;
+        cs.updateAPIStatusCard = function () {
+            var sonuc = orijinal();
+            Promise.resolve(sonuc).then(durumuTazele, durumuTazele);
+            return sonuc;
+        };
+        return true;
     }
 
     /** Metin içinden JWT'yi ayıklar (Bearer öneki / tırnak / boşluk toleranslı). */
@@ -570,7 +617,7 @@
         return m ? m[0] : '';
     }
 
-    /** Bulunan token'ı motora verir. Ortak yol: hem düğme hem Ctrl+V buradan geçer. */
+    /** Bulunan token'ı motora verir. Hem düğme hem Ctrl+V buradan geçer. */
     async function tokenUygula(token) {
         var cs = sistem();
         var input = el('manualTokenInput');
@@ -584,7 +631,6 @@
         var btn = el('v2TokenPasteBtn');
         var lbl = el('v2TokenPasteLabel');
         if (!btn || !lbl) return;
-        var eski = lbl.textContent;
         lbl.textContent = metin;
         btn.classList.remove('is-ok', 'is-bad');
         if (sinif) btn.classList.add(sinif);
@@ -592,11 +638,9 @@
             lbl.textContent = 'Panodan yapıştır';
             btn.classList.remove('is-ok', 'is-bad');
         }, 2200);
-        return eski;
     }
 
     async function panodanTokenAl() {
-        var input = el('manualTokenInput');
         try {
             var pano = await navigator.clipboard.readText();
             var token = tokenAyikla(pano);
@@ -607,9 +651,11 @@
             await tokenUygula(token);
             pasteDurumu('Kaydedildi', 'is-ok');
         } catch (e) {
-            // Tarayıcı pano iznini vermedi — elle yapıştırma yoluna yönlendir
+            // Tarayıcı pano iznini vermedi — elle girme yolunu aç
             pasteDurumu('Panoya erişilemedi', 'is-bad');
-            if (input) { input.focus(); input.select?.(); }
+            var d = el('v2TokenElle');
+            if (d) d.open = true;
+            el('manualTokenInput')?.focus();
         }
     }
 
@@ -633,54 +679,114 @@
         });
     }
 
-    /** Rozet + popover başlığındaki durum metinlerini tazeler. */
+    function sureMetni(ms) {
+        if (!ms || ms <= 0) return null;
+        var dk = Math.floor(ms / 60000);
+        var sa = Math.floor(dk / 60);
+        var gun = Math.floor(sa / 24);
+        if (gun > 0) return gun + ' gün ' + (sa % 24) + ' sa';
+        if (sa > 0) return sa + ' sa ' + (dk % 60) + ' dk';
+        return dk + ' dk';
+    }
+
+    /**
+     * Token durumunu çözer.
+     *
+     * Birincil kaynak motorun `cachedFullData._api_info` nesnesi. O bir
+     * sebeple boşsa (tablo değişiminde cache yenilenebiliyor) v1'in durum
+     * kartından okuyoruz — motor oraya yazmayı hiç bırakmıyor, dolayısıyla
+     * ekranda görünen doğru bilgiyle rozet asla çelişmiyor.
+     */
+    function tokenDurumu() {
+        var cs = sistem();
+        var info = cs && cs.cachedFullData && cs.cachedFullData._api_info;
+
+        if (info && info.token) {
+            var son = 0;
+            try { son = cs.getEffectiveExpiryMs(info) || 0; } catch (e) { son = 0; }
+            var kalan = son ? son - Date.now() : null;
+            return {
+                varMi: true,
+                depo: info.warehouseName || (info.warehouseId ? String(info.warehouseId).slice(0, 8) + '…' : ''),
+                kalanMs: kalan,
+                bitis: son ? new Date(son).toLocaleString('tr-TR', {
+                    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                }) : null
+            };
+        }
+
+        // --- Yedek: v1 durum kartı ---
+        var kart = el('apiStatusCard');
+        if (!kart || kart.classList.contains('hidden')) return { varMi: false };
+
+        var metin = (el('apiStatusText')?.textContent || '').trim();
+        var depoHam = (el('apiWarehouseName')?.textContent || '').replace(/^Depo:\s*/, '').trim();
+        var sureHam = (el('apiExpiryTime')?.textContent || '').replace(/\s+/g, ' ').trim();
+
+        var kalanEsl = sureHam.match(/Kalan süre:\s*([^S]+?)(?:\s*Son kullanma|$)/);
+        var bitisEsl = sureHam.match(/Son kullanma:\s*(.+)$/);
+
+        return {
+            varMi: true,
+            suresizMi: metin === 'Token bilgisi eksik',
+            doldu: metin === 'Token süresi dolmuş',
+            bitmekUzere: metin === 'Token yakında dolacak',
+            depo: depoHam && depoHam !== 'Depo bilgisi yok' ? depoHam : '',
+            kalanMetin: kalanEsl ? kalanEsl[1].trim() : null,
+            bitis: bitisEsl ? bitisEsl[1].trim() : null
+        };
+    }
+
+    /** Rozet + popover metinlerini tazeler. */
     function durumuTazele() {
         var dot = el('v2TokenDot');
         var hint = el('v2TokenHint');
         if (!dot || !hint) return;
 
-        var cs = sistem();
-        var btn = el('v2TokenBtn');
-        var info = cs && cs.cachedFullData && cs.cachedFullData._api_info;
-        var sonMs = 0;
-        try { sonMs = (cs && cs.getEffectiveExpiryMs) ? cs.getEffectiveExpiryMs(info || {}) : 0; } catch (e) { sonMs = 0; }
+        var d = tokenDurumu();
+        var durum, etiket, baslik;
 
-        var durum, etiket, ozet;
-        if (!info || !info.token) {
+        if (!d.varMi) {
             durum = 'is-bad'; etiket = 'Token yok';
-            ozet = 'Token bulunamadı — sistem stokları çekilemez.';
-        } else if (sonMs && sonMs < Date.now()) {
+            baslik = 'Token yok';
+        } else if (d.doldu || (d.kalanMs != null && d.kalanMs <= 0)) {
             durum = 'is-bad'; etiket = 'Süresi doldu';
-            ozet = 'Token süresi doldu — yenisini yapıştır.';
-        } else if (sonMs && (sonMs - Date.now()) < 30 * 60000) {
+            baslik = 'Süresi doldu';
+        } else if (d.suresizMi) {
+            durum = 'is-warn'; etiket = 'Süre yok';
+            baslik = 'Süre bilgisi okunamadı';
+        } else if (d.bitmekUzere || (d.kalanMs != null && d.kalanMs < 30 * 60000)) {
             durum = 'is-warn';
-            etiket = Math.max(1, Math.round((sonMs - Date.now()) / 60000)) + ' dk';
-            ozet = 'Token birazdan dolacak.';
+            etiket = d.kalanMs != null ? sureMetni(d.kalanMs) : (d.kalanMetin || 'Az kaldı');
+            baslik = 'Yakında dolacak';
         } else {
             durum = 'is-ok'; etiket = 'Token';
-            ozet = 'Token geçerli.';
+            baslik = 'Token geçerli';
         }
 
         dot.className = 'v2-token-dot ' + durum;
         if (hint.textContent !== etiket) hint.textContent = etiket;
-        if (btn) btn.classList.toggle('is-bad', durum === 'is-bad');
+        el('v2TokenBtn')?.classList.toggle('is-bad', durum === 'is-bad');
 
-        var sub = el('v2TokenSub');
-        if (sub && sub.textContent !== ozet) sub.textContent = ozet;
+        var popDot = el('v2TokenPopDot');
+        if (popDot) popDot.className = 'v2-token-dot ' + durum;
 
-        var depo = el('v2TokenWarehouse');
-        if (depo) {
-            var ad = (info && (info.warehouseName || info.warehouse_name)) || '—';
-            if (depo.textContent !== ad) depo.textContent = ad;
-        }
+        yazDegistiyse('v2TokenSub', baslik);
+        yazDegistiyse('v2TokenWarehouse', d.depo || '');
+        yazDegistiyse('v2TokenLeft', d.kalanMs != null ? (sureMetni(d.kalanMs) || 'doldu') : (d.kalanMetin || '—'));
+        yazDegistiyse('v2TokenExpiry', d.bitis || '—');
 
-        var bitis = el('v2TokenExpiry');
-        if (bitis) {
-            var metin = sonMs ? new Date(sonMs).toLocaleString('tr-TR', {
-                day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
-            }) : '—';
-            if (bitis.textContent !== metin) bitis.textContent = metin;
-        }
+        var facts = el('v2TokenFacts');
+        if (facts) facts.hidden = !d.varMi;
+
+        yazDegistiyse('v2TokenIpucu', d.varMi
+            ? 'Yeni token için Getir sayfasındaki değeri kopyalayıp buraya bas.'
+            : 'Getir franchise sayfasındaki token’ı kopyala, buraya bas.');
+    }
+
+    function yazDegistiyse(id, metin) {
+        var n = el(id);
+        if (n && n.textContent !== metin) n.textContent = metin;
     }
 
     // ==================================================================
@@ -968,9 +1074,11 @@
         var deneme = 0;
         var t = setInterval(function () {
             deneme++;
+            motoraBaglan();
             if (farkEtiketleriniKur() || deneme > 40) {
                 clearInterval(t);
                 ilerlemeyiTazele();
+                durumuTazele();
             }
         }, 250);
     }
