@@ -258,6 +258,49 @@ RAISE NOTICE '=== 9) is_admin claim''i FALSE ise web_admin bos donuyor mu? ===';
     RESET role;
 END $$;
 
+DO $$
+DECLARE n bigint; bypass boolean;
+BEGIN
+RAISE NOTICE '';
+RAISE NOTICE '=== 10) API rolu (jetbarkod) verisini gorebiliyor mu? ===';
+-- Bu test ilk seferde ATLANMISTI ve uretimde login''i 500''e dusurdu:
+-- tablolar postgres''e ait oldugu icin jetbarkod sahip degil ve BYPASSRLS
+-- olmadan RLS ona da uygulaniyor. Bir daha kacmasin diye buraya sabitlendi.
+
+    SELECT rolbypassrls INTO bypass FROM pg_roles WHERE rolname = 'jetbarkod';
+    IF bypass IS NOT TRUE THEN
+        RAISE EXCEPTION 'TEST BASARISIZ: jetbarkod rolunde BYPASSRLS YOK — API veriyi goremez!';
+    END IF;
+    RAISE NOTICE '  [GECTI] jetbarkod rolunde BYPASSRLS var';
+
+    SET LOCAL role = jetbarkod;
+    SELECT count(*) INTO n FROM users;
+    IF n = 0 THEN
+        RAISE EXCEPTION 'TEST BASARISIZ: API rolu HIC kullanici goremiyor — login kirilir!';
+    END IF;
+    RAISE NOTICE '  [GECTI] API rolu % kullanici goruyor', n;
+    RESET role;
+END $$;
+
+DO $$
+BEGIN
+RAISE NOTICE '';
+RAISE NOTICE '=== 11) Parola kolonlari API icin hazir mi? ===';
+
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_schema='public' AND table_name='users' AND column_name='password_hash') THEN
+        RAISE EXCEPTION 'TEST BASARISIZ: password_hash kolonu YOK — login sorgusu patlar!';
+    END IF;
+    RAISE NOTICE '  [GECTI] password_hash kolonu var';
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema='public' AND table_name='users'
+                 AND column_name='password' AND is_nullable='NO') THEN
+        RAISE EXCEPTION 'TEST BASARISIZ: password kolonu hala NOT NULL — bcrypt gecisi patlar!';
+    END IF;
+    RAISE NOTICE '  [GECTI] password kolonu NULL kabul ediyor (bcrypt gecisi icin sart)';
+END $$;
+
 -- ---------------------------------------------------------------------
 -- Temizlik
 -- ---------------------------------------------------------------------

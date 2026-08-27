@@ -10,9 +10,11 @@
 -- oluşturur ama PostgREST hâlâ eski 'jetbarkod' anon rolüyle çalıştığı
 -- sürece davranış değişmez. Geçiş, Aşama 3'te postgrest.env değişince olur.
 --
--- ÖNEMLİ: Tablo sahibi (jetbarkod) RLS'i BYPASS eder. Node API bu rolle
--- bağlandığı için login/admin işlemleri etkilenmez. RLS yalnızca
--- PostgREST'in geçtiği web_anon / web_user / web_admin rolleri için geçerlidir.
+-- ÖNEMLİ: Node API'nin bağlandığı rol (jetbarkod) bu script tarafından
+-- BYPASSRLS alır — bkz. bölüm 1b. Tablolar `postgres`'e ait olduğu için
+-- jetbarkod sahip DEĞİLDİR ve bu olmadan RLS ona da uygulanır.
+-- RLS asıl olarak PostgREST'in geçtiği web_anon / web_user / web_admin
+-- rolleri için geçerlidir.
 -- =====================================================================
 
 BEGIN;
@@ -56,6 +58,47 @@ REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM web_anon, web_user, web_admin;
 -- Gelecekte eklenecek tablolar da otomatik açılmasın
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
     REVOKE ALL ON TABLES FROM web_anon, web_user, web_admin;
+
+-- ---------------------------------------------------------------------
+-- 1b) API rolü RLS'i baypas etmeli
+-- ---------------------------------------------------------------------
+-- ÖNEMLİ DERS: "tablo sahibi RLS'i baypas eder" doğrudur AMA bu kurulumda
+-- tablolar `postgres` kullanıcısına ait, API ise `jetbarkod` rolüyle
+-- bağlanıyor. Yani jetbarkod SAHİP DEĞİL ve RLS ona da uygulanıyor.
+-- Bu fark edilmezse API hiçbir satırı göremez ve yazma işlemleri
+-- "new row violates row-level security policy" ile patlar.
+--
+-- Çözüm: API rolüne açıkça BYPASSRLS ver. Bu güvenliği zayıflatmaz —
+-- tarayıcının kullandığı web_anon/web_user/web_admin rolleri BYPASSRLS
+-- ALMAZ, RLS onlara aynen uygulanır. jetbarkod yalnızca sunucu tarafı
+-- bağlantısıdır ve her endpoint kendi yetki kontrolünü yapar.
+DO $$
+DECLARE
+    api_role text := 'jetbarkod';
+    owner_name text;
+BEGIN
+    SELECT tableowner INTO owner_name FROM pg_tables
+    WHERE schemaname = 'public' AND tablename = 'users';
+
+    RAISE NOTICE 'users tablosunun sahibi: %, API rolu: %', owner_name, api_role;
+
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = api_role) THEN
+        EXECUTE format('ALTER ROLE %I BYPASSRLS', api_role);
+        RAISE NOTICE 'API rolune BYPASSRLS verildi: %', api_role;
+    ELSE
+        RAISE WARNING 'API rolu bulunamadi: % — API RLS''e takilabilir!', api_role;
+    END IF;
+END
+$$;
+
+-- ---------------------------------------------------------------------
+-- 1c) Parola kolonları
+-- ---------------------------------------------------------------------
+-- password_hash: API ilk girişte düz metin parolayı bcrypt'e taşıyıp
+-- buraya yazar ve password kolonunu NULL'lar. Bu yüzden password'ün
+-- NOT NULL kısıtı kaldırılmalı.
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE public.users ALTER COLUMN password DROP NOT NULL;
 
 -- ---------------------------------------------------------------------
 -- 2) JWT claim yardımcıları
@@ -286,6 +329,16 @@ SELECT table_name, privilege_type
 FROM information_schema.role_table_grants
 WHERE grantee = 'web_anon'
 ORDER BY table_name, privilege_type;
+
+\echo ''
+\echo '=== API rolu (jetbarkod) BYPASSRLS almis mi? (t olmali) ==='
+SELECT rolname, rolbypassrls FROM pg_roles WHERE rolname = 'jetbarkod';
+
+\echo ''
+\echo '=== API rolu verileri gorebiliyor mu? (0 OLMAMALI) ==='
+SET ROLE jetbarkod;
+SELECT count(*) AS api_rolunun_gordugu_kullanici FROM users;
+RESET ROLE;
 
 \echo ''
 \echo '=== web_user users kolonlarinda password gorunuyor mu? (BOŞ olmalı) ==='
