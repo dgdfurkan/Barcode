@@ -982,21 +982,60 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 .counting-v2 #rapidCountingGrid { padding: 0.6rem !important; }
 
 /*
- * SÜTUN SAYISI — v1'de telefonda 5 sütun vardı, ürün görseli 40px'e
- * düşüyordu ve ne olduğu anlaşılmıyordu. Sayımda kartın işi ÜRÜNÜ
- * TANITMAK; o yüzden sütun sayısı düşürüldü, kart dikey uzatıldı.
+ * SÜTUN SAYISI — "sihirli sayı" tablosu
+ * ---------------------------------------------------------------------------
+ * Kullanıcı tek bir SEVİYE seçer (kartlar ne kadar büyük olsun); o seviyenin
+ * her ekran genişliğindeki sütun karşılığı buradan gelir. Tek bir sabit sayı
+ * tutmak yanlış olurdu: telefonda 4 sütun doğruyken masaüstünde 4 sütun
+ * kartları devleştirir, masaüstünde 10 doğruyken telefonda okunmaz.
+ *
+ * Seviye 0 Çok büyük · 1 Büyük · 2 Orta (varsayılan) · 3 Küçük
+ * Kırılımlar: xs <480 · sm 480 · md 768 · lg 1024 · xl 1440 · xxl 1920
+ *
+ * Seviye cihaz başına localStorage'da saklanır (jb_v2_grid_yogunluk).
  */
-.counting-v2 #rapidCountingGridContainer {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 0.5rem !important;
+
+.counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 0.5rem !important; }
+
+.counting-v2 #rapidCountingGridContainer[data-yogunluk="0"] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.counting-v2 #rapidCountingGridContainer[data-yogunluk="1"] { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.counting-v2 #rapidCountingGridContainer[data-yogunluk="2"] { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+.counting-v2 #rapidCountingGridContainer[data-yogunluk="3"] { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+
+@media (min-width: 480px) {
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="0"] { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="1"] { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="2"] { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="3"] { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; }
 }
 
-@media (min-width: 480px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
-@media (min-width: 640px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; } }
-@media (min-width: 768px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; } }
-@media (min-width: 1024px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; } }
-@media (min-width: 1280px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(8, minmax(0, 1fr)) !important; } }
-@media (min-width: 1600px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(9, minmax(0, 1fr)) !important; } }
+@media (min-width: 768px) {
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="0"] { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="1"] { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="2"] { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="3"] { grid-template-columns: repeat(9, minmax(0, 1fr)) !important; }
+}
+
+@media (min-width: 1024px) {
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="0"] { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="1"] { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="2"] { grid-template-columns: repeat(9, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="3"] { grid-template-columns: repeat(12, minmax(0, 1fr)) !important; }
+}
+
+@media (min-width: 1440px) {
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="0"] { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="1"] { grid-template-columns: repeat(8, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="2"] { grid-template-columns: repeat(10, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="3"] { grid-template-columns: repeat(14, minmax(0, 1fr)) !important; }
+}
+
+@media (min-width: 1920px) {
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="0"] { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="1"] { grid-template-columns: repeat(9, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="2"] { grid-template-columns: repeat(12, minmax(0, 1fr)) !important; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="3"] { grid-template-columns: repeat(16, minmax(0, 1fr)) !important; }
+}
 
 .counting-v2 #rapidCountingGridContainer .rapid-product-card {
     /* Kare değil, dikey: görsele nefes, ada tam satır, etikete sabit yer */
@@ -1007,7 +1046,7 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
     background: var(--v2-surface) !important;
     box-shadow: var(--v2-shadow-1) !important;
     /* Kayma yok: oran sabit, alt etiket için yer baştan ayrılır */
-    padding-bottom: 1rem;
+    padding-bottom: 1.1rem;
     transition: transform var(--v2-fast) var(--v2-ease), box-shadow var(--v2-fast), border-color var(--v2-fast);
 }
 
@@ -1036,27 +1075,27 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
     top: 0;
     left: 0;
     right: 0;
-    height: 2px;
+    height: 3px;
     background: var(--v2-line);
     z-index: 5;
 }
 
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="zero"],
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"] { background: #fbfefc !important; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"] { background: var(--v2-tam-soft) !important; border-color: rgba(5, 150, 105, 0.30) !important; }
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="zero"]::after,
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"]::after { background: var(--v2-tam); }
 
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="positive"],
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"] { background: #fbfdff !important; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"] { background: var(--v2-fazla-soft) !important; border-color: rgba(37, 99, 235, 0.30) !important; }
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="positive"]::after,
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"]::after { background: var(--v2-fazla); }
 
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="negative"],
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"] { background: #fffbfb !important; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"] { background: var(--v2-eksik-soft) !important; border-color: rgba(220, 38, 38, 0.30) !important; }
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="negative"]::after,
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"]::after { background: var(--v2-eksik); }
 
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"] { background: #fffdf8 !important; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"] { background: var(--v2-yarim-soft) !important; border-color: rgba(217, 119, 6, 0.32) !important; }
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"]::after { background: var(--v2-yarim); }
 
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"] { background: var(--v2-surface) !important; }
@@ -1091,12 +1130,12 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
     left: 0;
     right: 0;
     bottom: 0;
-    height: 1rem;
+    height: 1.1rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.63rem;
-    font-weight: 700;
+    font-size: 0.66rem;
+    font-weight: 750;
     line-height: 1;
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
@@ -1110,11 +1149,13 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
    etiketler gri kalır. */
 /* Dolgu renk yerine yumuşak zemin + renkli yazı: aynı okunurluk, çok daha
    sakin bir ekran. Değiştiriciler taban kuralla AYNI özgüllükte olmalı. */
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--tam { background: var(--v2-tam-soft); color: var(--v2-tam); }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--fazla { background: var(--v2-fazla-soft); color: var(--v2-fazla); }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--eksik { background: var(--v2-eksik-soft); color: var(--v2-eksik); }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--yarim { background: var(--v2-yarim-soft); color: #b45309; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--bekleyen { background: var(--v2-track); color: var(--v2-faint); }
+/* Dolgu renk (bağırıyordu) ile silik ton (kayboluyordu) arasında orta yol:
+   belirgin bir zemin + koyu, kalın renkli yazı. */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--tam { background: #d1fae5; color: #047857; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--fazla { background: #dbeafe; color: #1d4ed8; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--eksik { background: #fee2e2; color: #b91c1c; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--yarim { background: #fef3c7; color: #b45309; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--bekleyen { background: var(--v2-soft); color: var(--v2-faint); }
 
 /* ==========================================================================
    9) TABLO / KART GÖRÜNÜMÜ — aynı anlam renkleri
@@ -1461,6 +1502,289 @@ body.v2-drawer-open { overflow: hidden; }
 /* Geniş ekranda içerik okunur bir genişlikte kalsın, kenarlara yapışmasın */
 @media (min-width: 1536px) {
     .counting-v2 main { max-width: 108rem; margin-inline: auto; }
+}
+
+/* ==========================================================================
+   14) YOĞUNLUK DÜĞMESİ — kart boyutu anahtarı
+   ========================================================================== */
+
+.counting-v2 .v2-yogunluk {
+    display: none;
+    align-items: center;
+    gap: 0.3rem;
+    height: 2.2rem;
+    flex: none;
+    padding: 0 0.6rem;
+    border: 1px solid var(--v2-line);
+    border-radius: var(--v2-r-md);
+    background: var(--v2-track);
+    color: var(--v2-muted);
+    font-size: 0.76rem;
+    font-weight: 650;
+    cursor: pointer;
+    transition: background var(--v2-fast), color var(--v2-fast), border-color var(--v2-fast);
+}
+
+/* Yalnızca grid modunda anlamlı. `.counting-v2` ile `.grid-mode-active`
+   AYNI body üzerinde duruyor — aralarına boşluk koymak seçiciyi bozar. */
+.counting-v2.grid-mode-active .v2-yogunluk { display: inline-flex; }
+
+.counting-v2 .v2-yogunluk:hover {
+    background: var(--v2-soft);
+    color: var(--v2-ink);
+    border-color: #cbd5e1;
+}
+
+.counting-v2 .v2-yogunluk:active { transform: scale(0.96); }
+.counting-v2 .v2-yogunluk__ikon { width: 1rem; height: 1rem; flex: none; }
+.counting-v2 .v2-yogunluk__sayi { font-variant-numeric: tabular-nums; min-width: 1ch; text-align: center; }
+
+/* ==========================================================================
+   15) FİNANS SEKMESİ
+   --------------------------------------------------------------------------
+   İçeriği counting.js üretiyor; v2 yalnızca kabı ve sınıf kancalarını
+   sayım sekmesiyle aynı dile çeviriyor. Amaç: sekme değiştirince başka bir
+   uygulamaya geçmiş hissi olmasın.
+   ========================================================================== */
+
+.counting-v2 #finansTabContent > div,
+.counting-v2 #finansTabContent > section > div,
+.counting-v2 #stokfarkTabContent > div {
+    border: 1px solid var(--v2-line) !important;
+    border-radius: var(--v2-r-lg) !important;
+    box-shadow: var(--v2-shadow-1) !important;
+    background: var(--v2-surface) !important;
+    margin-bottom: 0.85rem !important;
+}
+
+.counting-v2 #finansTabContent h3,
+.counting-v2 #stokfarkTabContent h3,
+.counting-v2 #finansTabContent h4 {
+    font-size: 0.95rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.015em;
+    color: var(--v2-ink) !important;
+}
+
+/* --- Özet kartları: sayım şeridiyle aynı kutu dili --- */
+.counting-v2 #financialSummaryCards {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 0.6rem !important;
+    margin-bottom: 0.85rem !important;
+}
+
+.counting-v2 .financial-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 4.5rem;
+    margin: 0 !important;
+    padding: 0.7rem 0.85rem !important;
+    border: 1px solid var(--v2-line) !important;
+    border-radius: var(--v2-r-lg) !important;
+    background: var(--v2-surface) !important;
+    box-shadow: var(--v2-shadow-1) !important;
+    overflow: hidden;
+}
+
+/* Filigran ikon kutusu gürültü yapıyordu; ölçüsü küçültülüp yana alındı */
+.counting-v2 .financial-card .w-10 {
+    width: 1.9rem !important;
+    height: 1.9rem !important;
+    border-radius: var(--v2-r-sm) !important;
+}
+
+.counting-v2 .financial-card .w-10 svg { width: 1rem !important; height: 1rem !important; }
+.counting-v2 .financial-card > div { margin-bottom: 0 !important; }
+
+.counting-v2 .financial-card .text-xs {
+    font-size: 0.66rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--v2-faint) !important;
+}
+
+.counting-v2 .financial-card .text-xl {
+    font-size: 1.35rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em;
+    line-height: 1.2 !important;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Sol renk çubuğu — anlam sayım sekmesiyle aynı */
+.counting-v2 .financial-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.85rem;
+    bottom: 0.85rem;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--v2-line);
+}
+
+.counting-v2 .financial-card.warehouse::before { background: var(--v2-tam); }
+.counting-v2 .financial-card.system::before { background: var(--v2-fazla); }
+.counting-v2 .financial-card.profit::before { background: var(--v2-tam); }
+.counting-v2 .financial-card.loss::before { background: var(--v2-eksik); }
+.counting-v2 .financial-card.count::before { background: var(--v2-bekleyen); }
+
+/* --- Grafik karuseli --- */
+.counting-v2 #chartPrevBtn,
+.counting-v2 #chartNextBtn {
+    width: 2.15rem !important;
+    height: 2.15rem !important;
+    padding: 0 !important;
+    border: 1px solid var(--v2-line) !important;
+    border-radius: 999px !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    color: var(--v2-muted) !important;
+    box-shadow: var(--v2-shadow-2) !important;
+    backdrop-filter: blur(6px);
+}
+
+.counting-v2 #chartPrevBtn:hover,
+.counting-v2 #chartNextBtn:hover { color: var(--v2-ink) !important; border-color: #cbd5e1 !important; }
+
+.counting-v2 #chartDotsContainer button,
+.counting-v2 #chartDotsContainer > span {
+    width: 0.45rem !important;
+    height: 0.45rem !important;
+    border-radius: 999px !important;
+    transition: width var(--v2-base) var(--v2-ease), background var(--v2-fast);
+}
+
+/* --- Finans tabloları --- */
+.counting-v2 #finansTabContent table { font-variant-numeric: tabular-nums; }
+
+.counting-v2 #finansTabContent thead th {
+    background: var(--v2-track) !important;
+    color: var(--v2-faint) !important;
+    font-size: 0.64rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--v2-line) !important;
+}
+
+.counting-v2 #finansTabContent tbody tr { transition: background var(--v2-fast); }
+.counting-v2 #finansTabContent tbody tr:hover { background: var(--v2-track) !important; }
+
+/* --- Tablo seçici --- */
+.counting-v2 #financialTableSelectorBtn {
+    height: 2.4rem !important;
+    border-radius: var(--v2-r-md) !important;
+    border-color: var(--v2-line) !important;
+    background: var(--v2-surface) !important;
+    box-shadow: var(--v2-shadow-1) !important;
+}
+
+.counting-v2 #financialTableSelectorBtn:hover { background: var(--v2-track) !important; }
+
+.counting-v2 #financialTableSelectorDropdown {
+    border-radius: var(--v2-r-md) !important;
+    border-color: var(--v2-line) !important;
+    box-shadow: var(--v2-shadow-3) !important;
+}
+
+/* ==========================================================================
+   16) STOK FARKI SEKMESİ
+   ========================================================================== */
+
+.counting-v2 #farkSelectAllBtn,
+.counting-v2 #farkSelectNoneBtn,
+.counting-v2 #farkHideDailyBtn {
+    height: 2.1rem !important;
+    padding: 0 0.7rem !important;
+    border-radius: var(--v2-r-md) !important;
+    border: 1px solid var(--v2-line) !important;
+    background: var(--v2-surface) !important;
+    color: var(--v2-muted) !important;
+    font-size: 0.74rem !important;
+    font-weight: 650 !important;
+    box-shadow: none !important;
+}
+
+.counting-v2 #farkSelectAllBtn:hover,
+.counting-v2 #farkSelectNoneBtn:hover,
+.counting-v2 #farkHideDailyBtn:hover {
+    background: var(--v2-track) !important;
+    color: var(--v2-ink) !important;
+    border-color: #cbd5e1 !important;
+}
+
+/*
+ * Tablo seçim listesi: v1'de 40'a yakın kutucuk 10rem'lik bir alanda
+ * sıkışıp iç kaydırmaya giriyordu; hangi tabloların seçili olduğu
+ * görünmüyordu. Alan büyütüldü, kutucuklar sakinleştirildi.
+ */
+.counting-v2 #farkTableCheckboxes {
+    max-height: min(38vh, 20rem) !important;
+    gap: 0.4rem !important;
+    padding: 0.6rem !important;
+    border: 1px solid var(--v2-line);
+    border-radius: var(--v2-r-md);
+    background: var(--v2-track);
+    overscroll-behavior: contain;
+}
+
+.counting-v2 #farkTableCheckboxes > label {
+    padding: 0.4rem 0.7rem !important;
+    border-radius: var(--v2-r-md) !important;
+    background: var(--v2-surface) !important;
+    box-shadow: none !important;
+    font-size: 0.75rem !important;
+}
+
+.counting-v2 #farkTableCheckboxes > label:hover { border-color: #cbd5e1 !important; }
+
+/* Seçili olan belirgin dursun — asıl bilgi bu */
+.counting-v2 #farkTableCheckboxes > label:has(.fark-table-cb:checked) {
+    background: var(--v2-primary-50) !important;
+    border-color: rgba(37, 99, 235, 0.35) !important;
+    color: var(--v2-primary-700) !important;
+}
+
+.counting-v2 #farkOzetiSection table { font-variant-numeric: tabular-nums; }
+
+.counting-v2 #farkOzetiSection thead th {
+    background: var(--v2-track) !important;
+    color: var(--v2-faint) !important;
+    font-size: 0.64rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.counting-v2 #farkOzetiSection tbody tr:hover { background: var(--v2-track) !important; }
+
+/* Boş durum kutuları tek dile gelsin */
+.counting-v2 #finansTabContent .border-dashed,
+.counting-v2 #stokfarkTabContent .border-dashed {
+    border-color: var(--v2-line) !important;
+    border-radius: var(--v2-r-md) !important;
+    background: var(--v2-track) !important;
+    color: var(--v2-faint) !important;
+}
+
+@media (max-width: 1023px) {
+    .counting-v2 #financialSummaryCards { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+
+@media (max-width: 767px) {
+    .counting-v2 .financial-card { min-height: 3.9rem; padding: 0.55rem 0.7rem !important; }
+    .counting-v2 .financial-card .text-xl { font-size: 1.15rem !important; }
+    .counting-v2 #farkTableCheckboxes { max-height: 45vh !important; }
+
+    /* Yapışkan şeritte üç kontrol var; telefonda yazılar simgeye inip
+       yeri aramaya bırakır. */
+    .counting-v2 #viewModeToggle span { display: none !important; }
+    .counting-v2 #viewModeToggle { width: 2.2rem; padding: 0 !important; justify-content: center; }
+    .counting-v2 .v2-listhead #countingTableSearchWrapper { min-width: 8rem; }
 }
 
 /* ==========================================================================

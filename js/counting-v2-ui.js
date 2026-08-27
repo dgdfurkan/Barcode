@@ -300,6 +300,7 @@
         // ---- Ana alan
         tasi('countingTableContainer', govde);
         listeBasligiSikistir();
+        yogunlukKontroluKur();
         renkAnahtariKur();
 
         // ---- Üst bar
@@ -763,6 +764,108 @@
         ustSatir.insertBefore(arama, ustSatir.lastElementChild);
     }
 
+    // ==================================================================
+    // GRID YOĞUNLUĞU — kart boyutu / sütun sayısı
+    // ------------------------------------------------------------------
+    // Tek bir "sütun sayısı" ayarı her ekranda çalışmaz: telefonda 4 iyi
+    // gelirken masaüstünde 4 sütun kartları devleştirir. O yüzden kullanıcı
+    // bir SEVİYE seçiyor ("kartlar ne kadar büyük olsun"), o seviyenin her
+    // ekran genişliğindeki sütun karşılığını CSS'teki tablo veriyor.
+    // Seviye cihaz başına localStorage'da kalıyor.
+    // ==================================================================
+
+    var YOGUNLUK_KEY = 'jb_v2_grid_yogunluk';
+    var YOGUNLUK_ADLARI = ['Çok büyük', 'Büyük', 'Orta', 'Küçük'];
+    var YOGUNLUK_VARSAYILAN = 2; // "Orta"
+
+    function yogunlukOku() {
+        var v = parseInt(localStorage.getItem(YOGUNLUK_KEY), 10);
+        return (v >= 0 && v < YOGUNLUK_ADLARI.length) ? v : YOGUNLUK_VARSAYILAN;
+    }
+
+    function yogunlukYaz(v) {
+        try { localStorage.setItem(YOGUNLUK_KEY, String(v)); } catch (e) { /* özel mod */ }
+    }
+
+    /**
+     * O anki gerçek sütun sayısı.
+     *
+     * Grid görünürken tarayıcı `gridTemplateColumns`'ı piksellere çözer ve
+     * parça saymak yeterlidir. Ama grid GİZLİYKEN (tablo görünümündeyken)
+     * çözmez, yazdığımız `repeat(4, minmax(0, 1fr))` metnini aynen döner —
+     * onu boşluktan bölünce 3 çıkıyordu. Bu yüzden önce repeat() okunuyor.
+     */
+    function sutunSayisi() {
+        var kap = el('rapidCountingGridContainer');
+        if (!kap) return 0;
+        var sablon = getComputedStyle(kap).gridTemplateColumns || '';
+        if (!sablon || sablon === 'none') return 0;
+        var m = sablon.match(/repeat\(\s*(\d+)/);
+        if (m) return parseInt(m[1], 10);
+        return sablon.trim().split(/\s+/).length;
+    }
+
+    function yogunlukUygula(v, bildirsin) {
+        var kap = el('rapidCountingGridContainer');
+        if (kap) kap.setAttribute('data-yogunluk', String(v));
+        yogunlukYaz(v);
+        // Sütun sayısı bir sonraki düzen hesabından sonra okunmalı
+        requestAnimationFrame(function () {
+            yogunlukEtiketiTazele();
+            if (bildirsin) bildir(YOGUNLUK_ADLARI[v] + ' · ' + sutunSayisi() + ' sütun', 'info', 1600);
+        });
+    }
+
+    function yogunlukEtiketiTazele() {
+        var sayi = el('v2YogunlukSayi');
+        var btn = el('v2YogunlukBtn');
+        if (!sayi || !btn) return;
+        var n = sutunSayisi();
+        var metin = n ? String(n) : '—';
+        if (sayi.textContent !== metin) sayi.textContent = metin;
+        btn.title = 'Kart boyutu: ' + YOGUNLUK_ADLARI[yogunlukOku()] + ' (' + metin + ' sütun) — değiştirmek için tıkla';
+    }
+
+    function yogunlukKontroluKur() {
+        if (el('v2YogunlukBtn')) return;
+        var baslik = document.querySelector('.v2-listhead');
+        if (!baslik) return;
+
+        var btn = yap('button', 'v2-yogunluk');
+        btn.type = 'button';
+        btn.id = 'v2YogunlukBtn';
+        btn.innerHTML =
+            '<svg class="v2-yogunluk__ikon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">' +
+            '  <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>' +
+            '  <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>' +
+            '<span class="v2-yogunluk__sayi" id="v2YogunlukSayi">—</span>';
+
+        btn.addEventListener('click', function () {
+            var sonraki = (yogunlukOku() + 1) % YOGUNLUK_ADLARI.length;
+            yogunlukUygula(sonraki, true);
+        });
+
+        // Görünüm anahtarının soluna
+        var anahtar = baslik.lastElementChild;
+        baslik.insertBefore(btn, anahtar);
+
+        yogunlukUygula(yogunlukOku(), false);
+
+        // Ekran döndüğünde / pencere boyu değiştiğinde sayı güncel kalsın
+        var zamanlayici;
+        window.addEventListener('resize', function () {
+            clearTimeout(zamanlayici);
+            zamanlayici = setTimeout(yogunlukEtiketiTazele, 160);
+        }, { passive: true });
+
+        // Grid moduna girip çıkınca da: gizliyken sayı okunamıyor
+        if ('MutationObserver' in window) {
+            new MutationObserver(function () {
+                requestAnimationFrame(yogunlukEtiketiTazele);
+            }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        }
+    }
+
     function renkAnahtariKur() {
         if (el('v2Legend')) return;
         var grid = el('rapidCountingGrid');
@@ -884,6 +987,7 @@
         durumuTazele: durumuTazele,
         ilerlemeyiTazele: ilerlemeyiTazele,
         etiketleriYaz: etiketleriYaz,
+        yogunlukUygula: yogunlukUygula,
         tokenAyikla: tokenAyikla
     };
 })();
