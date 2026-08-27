@@ -201,27 +201,34 @@
     }
 
     /**
-     * Tablo seçilince çekmece kapansın — iş bitti, ekranı işgal etmesin.
-     * Yakalama aşamasında dinliyoruz ki counting.js'in kendi işleyicisi
-     * çalışmadan önce kapanış animasyonu başlasın (algılanan hız).
+     * Tablo seçilince çekmece KENDİ KAPANIR.
+     *
+     * Tıklamayı dinlemek kırılgandı: liste öğelerinin işaretlemesi tabloya
+     * göre değişiyor ve bazı tıklamalar seçim sayılmıyordu. Bunun yerine
+     * sonucu izliyoruz — aktif tablo başlığı değiştiyse seçim OLMUŞTUR.
+     * Ayrıca seçimin görüldüğünü belli etmek için başlık kısa bir an
+     * vurgulanıyor, sonra çekmece kapanıyor.
      */
     function cekmeceOtomatikKapanma() {
-        var body = el('v2DrawerBody');
-        if (!body) return;
-        body.addEventListener('click', function (e) {
-            var hedef = e.target;
-            if (!(hedef instanceof Element)) return;
+        var kaynak = el('sayimActiveTableTitle');
+        if (!kaynak || !('MutationObserver' in window)) return;
 
-            // Tablo seçimi: pill / liste satırı / günlük tarih
-            var secim = hedef.closest('#generalTableList [role="listitem"], #generalTableList button, ' +
-                '#sayimGeneralTableDropdownList button, #dailyTableList button');
-            if (!secim) return;
+        var sonAd = (kaynak.textContent || '').trim();
 
-            // Silme/menü düğmeleri seçim değildir; çekmece açık kalsın
-            if (hedef.closest('[data-sayim-menu-action], [data-action="delete"], .sayim-chip__delete')) return;
+        new MutationObserver(function () {
+            var ad = (kaynak.textContent || '').trim();
+            if (ad === sonAd) return;
+            sonAd = ad;
+            cipiTazele();
+            if (!document.body.classList.contains('v2-drawer-open')) return;
 
-            setTimeout(cekmeceKapat, 120);
-        });
+            var kart = el('sayimActiveTableHost');
+            if (kart) {
+                kart.classList.add('is-secildi');
+                setTimeout(function () { kart.classList.remove('is-secildi'); }, 600);
+            }
+            setTimeout(cekmeceKapat, 260);
+        }).observe(kaynak, { childList: true, characterData: true, subtree: true });
     }
 
     // ==================================================================
@@ -267,14 +274,15 @@
         var giris = el('manualProductInputWrapper');
         if (giris) arama.appendChild(giris);
 
+        // Dört araç da AYNI kutuda, aynı ölçüde: kamera, terminal, pano, senkron.
+        // Senkron eskiden yazılı ve iri bir düğmeydi; sırıtıyordu.
         var araclar = yap('div', 'v2-cmd__tools');
-        ['cameraScanBtn', 'terminalScanBtn', 'getirCdnPasteBtn'].forEach(function (id) {
+        ['cameraScanBtn', 'terminalScanBtn', 'getirCdnPasteBtn', 'syncStocksBtn'].forEach(function (id) {
             var b = tasi(id, araclar);
             if (b) b.classList.add('v2-tool');
         });
 
         var anaEylem = yap('div', 'v2-cmd__main');
-        tasi('syncStocksBtn', anaEylem);
         anaEylem.appendChild(tasmaMenusuKur());
 
         komut.appendChild(arama);
@@ -291,6 +299,7 @@
 
         // ---- Ana alan
         tasi('countingTableContainer', govde);
+        listeBasligiSikistir();
         renkAnahtariKur();
 
         // ---- Üst bar
@@ -300,6 +309,7 @@
         // ---- Boşalan v1 kabuklarını kaldır
         bosalanlariTemizle();
         bosKabuklariGizle();
+        sekmeGorunurluguIzle();
     }
 
     /** Yıkıcı sıfırlama işlemleri taşma menüsüne — tek tık uzaklıkta olmasınlar. */
@@ -353,6 +363,29 @@
         });
 
         return sarmal;
+    }
+
+    /**
+     * Sayım sekmesinin içeriği v2'de `#v2Shell` içinde yaşıyor. counting.js
+     * sekme değişiminde yalnızca `#sayimTabContent`'e `hidden` ekliyor; kabuk
+     * onun DIŞINDA olduğu için Finans / Stok farkı sekmelerine geçildiğinde
+     * sayım tablosu ekranda kalıyor ve diğer sekme onun altına düşüyordu.
+     * Motorun bayrağını izleyip kabuğu birlikte gizliyoruz.
+     */
+    function sekmeGorunurluguIzle() {
+        var kaynak = el('sayimTabContent');
+        var shell = el('v2Shell');
+        if (!kaynak || !shell) return;
+
+        function esitle() {
+            var sayimda = !kaynak.classList.contains('hidden');
+            shell.classList.toggle('v2-hidden', !sayimda);
+        }
+
+        if ('MutationObserver' in window) {
+            new MutationObserver(esitle).observe(kaynak, { attributes: true, attributeFilter: ['class'] });
+        }
+        esitle();
     }
 
     /** v1'in artık içi boşalmış dekoratif kutularını DOM'da bırakıp gizler. */
@@ -477,7 +510,7 @@
             '  </div>' +
             '  <div class="v2-token-pop__body">' +
             '    <button type="button" class="v2-paste" id="v2TokenPasteBtn">' + ikon.pano + '<span id="v2TokenPasteLabel">Panodan yapıştır</span></button>' +
-            '    <p class="v2-token-hint">Token’ı kopyaladıysan bu düğme yeter. Sayfanın herhangi bir yerinde <kbd>Ctrl</kbd>+<kbd>V</kbd> de çalışır.</p>' +
+            '    <p class="v2-token-hint">Sayfanın herhangi bir yerinde <kbd>Ctrl</kbd>+<kbd>V</kbd> de çalışır.</p>' +
             '    <dl class="v2-token-facts">' +
             '      <dt>Depo</dt><dd id="v2TokenWarehouse">—</dd>' +
             '      <dt>Bitiş</dt><dd id="v2TokenExpiry">—</dd>' +
@@ -706,6 +739,29 @@
     // ==================================================================
     // 7) GRID MODU — renk anahtarı + kart üstünde fark sayısı
     // ==================================================================
+
+    /**
+     * Liste başlığını tek satıra indirir.
+     *
+     * Bu şerit yapışkan; üç satır yüksekliğinde olması telefonda ekranın
+     * beşte birini yiyordu. "Sayım Tablosu" başlığı zaten bilinen bir şeyi
+     * söylüyor (CSS'te gizleniyor); arama ile görünüm anahtarı aynı satıra
+     * alınıyor.
+     */
+    function listeBasligiSikistir() {
+        var kap = el('countingTableContainer');
+        if (!kap) return;
+        var serit = kap.firstElementChild;
+        if (!serit) return;
+
+        var ustSatir = serit.querySelector('.flex.items-center.justify-between');
+        var arama = el('countingTableSearchWrapper');
+        if (!ustSatir || !arama) return;
+
+        ustSatir.classList.add('v2-listhead');
+        // Arama, görünüm anahtarının SOLUNA girsin
+        ustSatir.insertBefore(arama, ustSatir.lastElementChild);
+    }
 
     function renkAnahtariKur() {
         if (el('v2Legend')) return;

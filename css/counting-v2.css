@@ -718,19 +718,13 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
     flex: none;
 }
 
-/* v1'in senkron düğmesini komut çubuğu diline çevir */
-.counting-v2 #syncStocksBtn {
-    height: 2.4rem !important;
-    padding: 0 0.9rem !important;
-    border-radius: var(--v2-r-md) !important;
-    font-size: 0.78rem !important;
-    font-weight: 650 !important;
-    box-shadow: var(--v2-shadow-1) !important;
-    background: var(--v2-primary) !important;
+/* Senkron artık diğer üç araçla aynı kutu: yazısı gizlenir, simge kalır */
+.counting-v2 #syncStocksBtn > span { display: none !important; }
+.counting-v2 #syncStocksBtn { color: var(--v2-primary) !important; }
+.counting-v2 #syncStocksBtn:hover {
+    border-color: #bfdbfe !important;
+    background: var(--v2-primary-50) !important;
 }
-
-.counting-v2 #syncStocksBtn:hover { background: var(--v2-primary-700) !important; }
-.counting-v2 #syncStocksBtn svg { width: 1rem !important; height: 1rem !important; }
 
 /* ==========================================================================
    6) ÖZET ŞERİT — 4 metrik tek satırda
@@ -866,10 +860,52 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
     background: var(--v2-surface) !important;
 }
 
+/*
+ * v1'deki `overflow: hidden` bu kutuyu bir kaydırma kabına çeviriyordu;
+ * içindeki yapışkan arama şeridi de sayfaya değil BU kutuya göre
+ * hizalanıp 56px aşağı itiliyor, sayfa kaydırılınca da yapışmıyordu.
+ * `clip` köşeleri aynı şekilde kırpar ama kaydırma kabı oluşturmaz.
+ */
+@supports (overflow: clip) {
+    .counting-v2 .v2-body #countingTableContainer { overflow: clip !important; }
+}
+
+/*
+ * Ürün listesinin başlığı (tabloda arama + görünüm anahtarı) YAPIŞKAN ve
+ * komut çubuğuyla AYNI hizada duruyor. Sonuç: listeye girdiğin an, üstteki
+ * "ürün ekle" araması yerini "tabloda ara"ya bırakıyor — çünkü artık
+ * yaptığın iş odur. Yukarı dönünce komut çubuğu geri geliyor.
+ * Yapışma alanı `#countingTableContainer` ile sınırlı olduğu için liste
+ * bitince şerit de kendiliğinden bırakıyor.
+ */
 .counting-v2 #countingTableContainer > .p-3:first-child,
 .counting-v2 #countingTableContainer > .p-4:first-child {
-    padding: 0.75rem !important;
-    border-bottom: 1px solid var(--v2-soft) !important;
+    position: sticky;
+    top: var(--v2-header-h);
+    z-index: 61;
+    padding: 0.7rem 0.75rem !important;
+    border-bottom: 1px solid var(--v2-line) !important;
+    border-radius: var(--v2-r-lg) var(--v2-r-lg) 0 0;
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+}
+
+/* Yapışkan şerit tek satır: başlık gizli, arama + görünüm anahtarı yan yana */
+.counting-v2 .v2-listhead {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 !important;
+}
+
+.counting-v2 .v2-listhead > h3 { display: none !important; }
+.counting-v2 .v2-listhead #countingTableSearchWrapper { flex: 1 1 auto; min-width: 0; }
+.counting-v2 .v2-listhead > div:last-child { flex: none; }
+
+.counting-v2 #countingTableSearchMeta {
+    margin-top: 0.35rem !important;
+    margin-bottom: 0 !important;
 }
 
 .counting-v2 #countingTableSearchInput {
@@ -945,19 +981,41 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 
 .counting-v2 #rapidCountingGrid { padding: 0.6rem !important; }
 
+/*
+ * SÜTUN SAYISI — v1'de telefonda 5 sütun vardı, ürün görseli 40px'e
+ * düşüyordu ve ne olduğu anlaşılmıyordu. Sayımda kartın işi ÜRÜNÜ
+ * TANITMAK; o yüzden sütun sayısı düşürüldü, kart dikey uzatıldı.
+ */
 .counting-v2 #rapidCountingGridContainer {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 0.5rem !important;
 }
 
+@media (min-width: 480px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
+@media (min-width: 640px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; } }
+@media (min-width: 768px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; } }
+@media (min-width: 1024px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; } }
+@media (min-width: 1280px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(8, minmax(0, 1fr)) !important; } }
+@media (min-width: 1600px) { .counting-v2 #rapidCountingGridContainer { grid-template-columns: repeat(9, minmax(0, 1fr)) !important; } }
+
 .counting-v2 #rapidCountingGridContainer .rapid-product-card {
+    /* Kare değil, dikey: görsele nefes, ada tam satır, etikete sabit yer */
+    aspect-ratio: 0.8 !important;
     border-width: 1px !important;
     border-color: var(--v2-line) !important;
     border-radius: var(--v2-r-md) !important;
     background: var(--v2-surface) !important;
     box-shadow: var(--v2-shadow-1) !important;
-    /* Kayma yok: kart oranı sabit, alt etiket için yer baştan ayrılır */
-    padding-bottom: 1.05rem;
+    /* Kayma yok: oran sabit, alt etiket için yer baştan ayrılır */
+    padding-bottom: 1rem;
     transition: transform var(--v2-fast) var(--v2-ease), box-shadow var(--v2-fast), border-color var(--v2-fast);
+}
+
+/* Görsel kartın büyük kısmını alsın */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 .counting-v2 #rapidCountingGridContainer .rapid-product-card:hover {
@@ -967,78 +1025,61 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 
 .counting-v2 #rapidCountingGridContainer .rapid-product-card:active { transform: scale(0.96); }
 
-/* Üst şerit — durumun ilk sinyali */
+/*
+ * DURUM RENGİ — ölçülü. Kartın kenarlığı nötr kalır; renk yalnızca ince
+ * üst şeritte ve alt etikette görünür. Arka plan yıkaması neredeyse
+ * görünmez seviyede: yüzlerce kart yan yana geldiğinde ekran yorulmasın.
+ */
 .counting-v2 #rapidCountingGridContainer .rapid-product-card::after {
     content: '';
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
+    height: 2px;
     background: var(--v2-line);
     z-index: 5;
 }
 
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="zero"],
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"] {
-    border-color: rgba(5, 150, 105, 0.35) !important;
-    background: var(--v2-tam-soft) !important;
-}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"] { background: #fbfefc !important; }
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="zero"]::after,
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"]::after { background: var(--v2-tam); }
 
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="positive"],
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"] {
-    border-color: rgba(37, 99, 235, 0.35) !important;
-    background: var(--v2-fazla-soft) !important;
-}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"] { background: #fbfdff !important; }
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="positive"]::after,
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"]::after { background: var(--v2-fazla); }
 
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="negative"],
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"] {
-    border-color: rgba(220, 38, 38, 0.35) !important;
-    background: var(--v2-eksik-soft) !important;
-}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"] { background: #fffbfb !important; }
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="negative"]::after,
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"]::after { background: var(--v2-eksik); }
 
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"] {
-    border-color: rgba(217, 119, 6, 0.4) !important;
-    background: var(--v2-yarim-soft) !important;
-}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"] { background: #fffdf8 !important; }
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"]::after { background: var(--v2-yarim); }
 
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"] {
-    border-color: var(--v2-line) !important;
-    background: var(--v2-surface) !important;
-}
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"]::after {
-    background: repeating-linear-gradient(90deg, var(--v2-faint) 0 4px, transparent 4px 8px);
-}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"] { background: var(--v2-surface) !important; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"]::after { background: var(--v2-line); }
 
 /* v1'in renkli gölgesi kapatılır — 200 karttaki neon etkisi buradan geliyordu */
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state] {
     box-shadow: var(--v2-shadow-1) !important;
 }
 
-/* Köşe rozeti */
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .product-status-icon {
-    top: 0.25rem !important;
-    right: 0.25rem !important;
-    width: 1.15rem !important;
-    height: 1.15rem !important;
-    background: rgba(255, 255, 255, 0.9) !important;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1) !important;
-    backdrop-filter: blur(2px);
-}
+/*
+ * Köşe rozeti (yukarı ok / aşağı ok / saat / boş halka) kaldırıldı.
+ * Aynı bilgiyi alttaki etiket zaten SAYIYLA veriyordu; rozet görselin
+ * üstünü kapatmaktan başka bir iş yapmıyordu.
+ */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .product-status-icon { display: none !important; }
 
 /* v1'in alt ince çubuğu artık gerekmiyor; yerini sayı etiketi aldı */
 .counting-v2 #rapidCountingGridContainer .rapid-product-card .stock-indicator { display: none !important; }
 
 /* Ürün adı */
 .counting-v2 #rapidCountingGridContainer .rapid-product-card p {
-    font-size: 0.6rem !important;
+    font-size: 0.66rem !important;
     font-weight: 600 !important;
     color: var(--v2-muted) !important;
     letter-spacing: -0.005em;
@@ -1050,12 +1091,11 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
     left: 0;
     right: 0;
     bottom: 0;
-    height: 1.05rem;
+    height: 1rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.15rem;
-    font-size: 0.62rem;
+    font-size: 0.63rem;
     font-weight: 700;
     line-height: 1;
     font-variant-numeric: tabular-nums;
@@ -1068,11 +1108,13 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 /* Değiştiriciler taban kuralla aynı ID kapsamında olmak ZORUNDA — aksi hâlde
    `#rapidCountingGridContainer` taşıyan taban kural özgüllükte kazanır ve
    etiketler gri kalır. */
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--tam { background: var(--v2-tam); color: #fff; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--fazla { background: var(--v2-fazla); color: #fff; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--eksik { background: var(--v2-eksik); color: #fff; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--yarim { background: var(--v2-yarim); color: #fff; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--bekleyen { background: var(--v2-soft); color: var(--v2-faint); }
+/* Dolgu renk yerine yumuşak zemin + renkli yazı: aynı okunurluk, çok daha
+   sakin bir ekran. Değiştiriciler taban kuralla AYNI özgüllükte olmalı. */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--tam { background: var(--v2-tam-soft); color: var(--v2-tam); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--fazla { background: var(--v2-fazla-soft); color: var(--v2-fazla); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--eksik { background: var(--v2-eksik-soft); color: var(--v2-eksik); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--yarim { background: var(--v2-yarim-soft); color: #b45309; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--bekleyen { background: var(--v2-track); color: var(--v2-faint); }
 
 /* ==========================================================================
    9) TABLO / KART GÖRÜNÜMÜ — aynı anlam renkleri
@@ -1213,6 +1255,12 @@ body.v2-drawer-open { overflow: hidden; }
     border: 1px solid var(--v2-line) !important;
     background: var(--v2-surface) !important;
     box-shadow: var(--v2-shadow-1) !important;
+}
+
+/* Tablo seçildi geri bildirimi — çekmece kapanmadan önceki kısa onay */
+.counting-v2 .v2-drawer #sayimActiveTableHost.is-secildi {
+    border-color: var(--v2-tam) !important;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.14) !important;
 }
 
 /* --- Tür anahtarı: Genel / Günlük --- */
@@ -1364,8 +1412,14 @@ body.v2-drawer-open { overflow: hidden; }
 
     .counting-v2 .v2-shell { gap: 0.65rem; }
 
-    /* Arama tam satır; araçlar ve senkron altına iner */
+    /*
+     * Arama tam satır; araçlar altına iner. Telefonda komut çubuğu YAPIŞKAN
+     * DEĞİL: iki satır olduğu için yapışkan tablo şeridi onu tam örtemiyor
+     * ve altından sırıtıyordu. Zaten istenen davranış da bu — listeye
+     * indiğinde yanında "tabloda ara" kalsın, "ürün ekle" değil.
+     */
     .counting-v2 .v2-cmd {
+        position: static;
         flex-wrap: wrap;
         padding: 0.5rem;
         border-radius: var(--v2-r-md);
