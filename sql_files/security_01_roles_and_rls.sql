@@ -25,8 +25,9 @@ BEGIN;
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticator') THEN
-        -- Parola Aşama 3'te set edilir (ALTER ROLE ... PASSWORD)
-        CREATE ROLE authenticator NOINHERIT LOGIN;
+        -- NOLOGIN olarak oluşturulur: parolası set edilene kadar (Aşama 3)
+        -- bu rolle bağlanmak mümkün olmasın.
+        CREATE ROLE authenticator NOINHERIT NOLOGIN;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'web_anon') THEN
         CREATE ROLE web_anon NOLOGIN;
