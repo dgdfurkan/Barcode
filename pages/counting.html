@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <script src="../js/console-quiet.js?v=20260827h"></script>
+    <script src="../js/console-quiet.js?v=20260827i"></script>
+    <script src="../js/app-boot.js?v=20260827i"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,36 +18,37 @@
     <link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
     <link rel="shortcut icon" href="../assets/logo.png?v=2">
     
-    <link rel="stylesheet" href="../css/main.css?v=20260827h" />
-    <link rel="stylesheet" href="../css/tailwind.css?v=20260827h" />
+    <link rel="stylesheet" href="../css/main.css?v=20260827i" />
+    <link rel="stylesheet" href="../css/app-boot.css?v=20260827i" />
+    <link rel="stylesheet" href="../css/tailwind.css?v=20260827i" />
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js for Financial Charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Supabase Client Library -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="../js/auth-token.js?v=20260827h"></script>
-    <script src="../js/supabase-config.js?v=20260827h"></script>
-    <script src="../js/vps-supabase-shim.js?v=20260827h"></script>
-    <script src="../js/supabase-bootstrap.js?v=20260827h"></script>
+    <script src="../js/auth-token.js?v=20260827i"></script>
+    <script src="../js/supabase-config.js?v=20260827i"></script>
+    <script src="../js/vps-supabase-shim.js?v=20260827i"></script>
+    <script src="../js/supabase-bootstrap.js?v=20260827i"></script>
     <script src="temp_products.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <script src="../js/auth.js?v=20260827h"></script>
-    <script src="../js/skeleton-ui.js?v=20260827h"></script>
-    <script src="../js/user-manager.js?v=20260827h"></script>
-    <script src="../js/premium-features.js?v=20260827h"></script>
-    <script src="../js/trial-notifications.js?v=20260827h"></script>
-    <script src="../js/notifications.js?v=20260827h"></script>
-    <script src="../js/test-counting-supabase.js?v=20260827h"></script>
+    <script src="../js/auth.js?v=20260827i"></script>
+    <script src="../js/skeleton-ui.js?v=20260827i"></script>
+    <script src="../js/user-manager.js?v=20260827i"></script>
+    <script src="../js/premium-features.js?v=20260827i"></script>
+    <script src="../js/trial-notifications.js?v=20260827i"></script>
+    <script src="../js/notifications.js?v=20260827i"></script>
+    <script src="../js/test-counting-supabase.js?v=20260827i"></script>
     <!-- Html5-Qrcode (Barkod tarama için fallback) -->
     <script src="https://unpkg.com/html5-qrcode@latest/html5-qrcode.min.js"></script>
-    <script src="../js/daily-count-import.js?v=20260827h"></script>
-    <script src="../js/sayim-clipboard-import.js?v=20260827h"></script>
+    <script src="../js/daily-count-import.js?v=20260827i"></script>
+    <script src="../js/sayim-clipboard-import.js?v=20260827i"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <script src="../js/barcode-visual.js?v=20260827h"></script>
-    <script src="../js/getir-cdn-paste.js?v=20260827h"></script>
-    <script src="../js/barcode-scanner.js?v=20260827h"></script>
-    <script src="../js/counting.js?v=20260827h"></script>
-    <script src="../js/terminal-scanner.js?v=20260827h"></script>
+    <script src="../js/barcode-visual.js?v=20260827i"></script>
+    <script src="../js/getir-cdn-paste.js?v=20260827i"></script>
+    <script src="../js/barcode-scanner.js?v=20260827i"></script>
+    <script src="../js/counting.js?v=20260827i"></script>
+    <script src="../js/terminal-scanner.js?v=20260827i"></script>
     
     <style>
         /* Prevent horizontal scroll on mobile */
@@ -304,9 +306,9 @@
             inset: 0;
             z-index: 215;
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: center;
-            padding: 1.5rem;
+            padding: 1.5rem calc(1.5rem + env(safe-area-inset-right)) calc(2rem + env(safe-area-inset-bottom));
             pointer-events: none;
             opacity: 0;
             background: transparent;
@@ -314,97 +316,79 @@
         }
         .counting-status-overlay.is-visible {
             opacity: 1;
-            pointer-events: auto;
-            background: rgb(15 23 42 / 0.1);
-            backdrop-filter: blur(2px);
-            -webkit-backdrop-filter: blur(2px);
+            pointer-events: none;
+            background: transparent;
         }
+        /* Yalnızca gerçekten kilitleyen işlemlerde ekranı karart */
         .counting-status-overlay.is-lock.is-visible {
-            background: rgb(15 23 42 / 0.16);
+            pointer-events: auto;
+            background: rgb(15 23 42 / 0.12);
+            -webkit-backdrop-filter: blur(1.5px);
+            backdrop-filter: blur(1.5px);
         }
         .counting-status-card {
-            padding: 1.5rem 2rem 1.35rem;
-            background: rgb(255 255 255 / 0.14);
-            border: 1px solid rgb(255 255 255 / 0.32);
-            border-radius: 1.125rem;
-            backdrop-filter: blur(18px) saturate(1.12);
-            -webkit-backdrop-filter: blur(18px) saturate(1.12);
-            box-shadow: 0 14px 36px rgb(15 23 42 / 0.1);
-            transform: scale(0.94) translateY(8px);
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            padding: 0.95rem 1.15rem;
+            background: #fff;
+            border: 1px solid rgb(226 232 240);
+            border-radius: 1rem;
+            box-shadow:
+                0 20px 40px -20px rgb(15 23 42 / 0.28),
+                0 4px 12px -6px rgb(15 23 42 / 0.12);
+            transform: translateY(10px) scale(0.98);
             opacity: 0;
-            transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.26s ease;
+            transition:
+                transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                opacity 0.24s ease;
         }
         .counting-status-overlay.is-visible .counting-status-card {
-            transform: scale(1) translateY(0);
+            transform: translateY(0) scale(1);
             opacity: 1;
         }
         .counting-status-center {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 0.2rem;
+            align-items: flex-start;
+            gap: 0.1rem;
             min-width: 0;
-            width: min(16.5rem, 72vw);
-            text-align: center;
+            text-align: left;
         }
+        /* Sakin, sürekli dönen ince halka — zıplayan kare yerine */
         .counting-jump-loader {
-            width: 44px;
-            height: 44px;
-            margin: 0 auto;
             position: relative;
+            width: 1.55rem;
+            height: 1.55rem;
+            flex-shrink: 0;
+            border-radius: 9999px;
+            border: 2px solid rgb(226 232 240);
+            border-top-color: rgb(37 99 235);
+            animation: countingSpin 0.75s linear infinite;
         }
-        .counting-jump-loader::before {
-            content: '';
-            width: 44px;
-            height: 4px;
-            background: rgb(37 99 235 / 0.28);
-            position: absolute;
-            top: 52px;
-            left: 0;
-            border-radius: 50%;
-            animation: countingJumpShadow 0.5s linear infinite;
-        }
-        .counting-jump-loader::after {
-            content: '';
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(145deg, rgb(59 130 246), rgb(37 99 235));
-            position: absolute;
-            top: 0;
-            left: 0;
-            border-radius: 4px;
-            animation: countingJumpBox 0.5s linear infinite;
-        }
-        @keyframes countingJumpBox {
-            15% { border-bottom-right-radius: 3px; }
-            25% { transform: translateY(8px) rotate(22.5deg); }
-            50% {
-                transform: translateY(16px) scale(1, 0.9) rotate(45deg);
-                border-bottom-right-radius: 38px;
-            }
-            75% { transform: translateY(8px) rotate(67.5deg); }
-            100% { transform: translateY(0) rotate(90deg); }
-        }
-        @keyframes countingJumpShadow {
-            0%, 100% { transform: scale(1, 1); }
-            50% { transform: scale(1.15, 1); }
+        @keyframes countingSpin {
+            to { transform: rotate(360deg); }
         }
         .counting-status-msg {
-            margin: 0.75rem 0 0;
-            font-size: 0.875rem;
-            font-weight: 700;
+            margin: 0;
+            font-size: 0.85rem;
+            font-weight: 600;
             color: rgb(15 23 42);
             letter-spacing: -0.01em;
-            line-height: 1.35;
-            text-shadow: 0 1px 10px rgb(255 255 255 / 0.9), 0 0 1px rgb(255 255 255 / 0.85);
+            line-height: 1.3;
+            white-space: nowrap;
         }
         .counting-status-detail {
             margin: 0;
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: rgb(51 65 85);
+            font-size: 0.72rem;
+            font-weight: 400;
+            color: rgb(100 116 139);
             line-height: 1.4;
-            text-shadow: 0 1px 8px rgb(255 255 255 / 0.85);
+            white-space: nowrap;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .counting-jump-loader { animation-duration: 1.6s; }
+            .counting-status-card { transition: none; }
         }
         html.counting-status-lock #sayimTabContent,
         html.counting-status-lock #finansTabContent,
@@ -2425,9 +2409,33 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="../css/motion.css?v=20260827h" />
+    <link rel="stylesheet" href="../css/motion.css?v=20260827i" />
 </head>
 <body class="bg-gray-50">
+    <div id="appBoot" class="app-boot app-boot--active" data-boot-steps="auth,data,ui" role="status" aria-live="polite" aria-label="Sayfa yükleniyor">
+        <div class="app-boot__inner">
+            <span class="app-boot__mark">
+                <img src="../assets/logo.png" alt="" class="app-boot__logo" decoding="async" />
+            </span>
+            <h1 class="app-boot__title">Jet Barkod</h1>
+            <span class="app-boot__track"><span class="app-boot__bar"></span></span>
+            <p class="app-boot__status">Başlatılıyor</p>
+        </div>
+    </div>
+    <script>
+        /* GÜVENLİK AĞI — app-boot.js yüklenemese bile perde en fazla 9sn durur. */
+        (function () {
+            document.documentElement.classList.add('boot-locked');
+            setTimeout(function () {
+                var p = document.getElementById('appBoot');
+                if (p) {
+                    p.classList.remove('app-boot--active');
+                    setTimeout(function () { if (p.parentNode) p.parentNode.removeChild(p); }, 500);
+                }
+                document.documentElement.classList.remove('boot-locked');
+            }, 9000);
+        })();
+    </script>
     <!-- Header -->
     <header class="bg-surface border-b border-border shadow-sm sticky top-0 z-40">
         <div class="w-full mx-auto px-2 sm:px-4 lg:px-8">
@@ -4100,6 +4108,8 @@
                 await window.premiumFeatures.init();
                 const hasCountingFeature = window.premiumFeatures.checkPremiumFeature('stokSayimi');
                 if (!hasCountingFeature) {
+                    // Uyarıyı perdenin üstünde göstermeyelim
+                    window.AppBoot?.dismiss('yetki-yok');
                     alert('Bu özellik premium üyeler için. Lütfen premium üyelik satın alın.');
                     window.location.replace('product_search.html');
                     return;

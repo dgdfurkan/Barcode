@@ -16,12 +16,42 @@
 (function (global) {
     'use strict';
 
-    var ASAMALAR = [
-        { ad: 'auth', yuzde: 22, metin: 'Oturum doğrulanıyor' },
-        { ad: 'catalog', yuzde: 58, metin: 'Ürün kataloğu hazırlanıyor' },
-        { ad: 'premium', yuzde: 82, metin: 'Özellikler yükleniyor' },
-        { ad: 'ui', yuzde: 100, metin: 'Neredeyse hazır' },
-    ];
+    /**
+     * Bilinen yükleme aşamaları. Her sayfa hangilerini kullandığını
+     * #appBoot üzerindeki data-boot-steps ile bildirir; bildirilmezse
+     * ürün arama sayfasının varsayılan seti kullanılır.
+     *
+     * Sayfa kendi kullanmadığı bir aşamayı listelemezse o aşama beklenmez —
+     * aksi hâlde perde boşuna zaman aşımına kadar açık kalırdı.
+     */
+    var ASAMA_TANIMLARI = {
+        auth: 'Oturum doğrulanıyor',
+        catalog: 'Ürün kataloğu hazırlanıyor',
+        premium: 'Özellikler yükleniyor',
+        data: 'Veriler getiriliyor',
+        ui: 'Neredeyse hazır',
+    };
+
+    var VARSAYILAN_ASAMALAR = ['auth', 'catalog', 'premium', 'ui'];
+
+    var ASAMALAR = [];
+
+    function asamalariKur(perde) {
+        var liste = VARSAYILAN_ASAMALAR;
+        var attr = perde && perde.getAttribute('data-boot-steps');
+        if (attr) {
+            var parcalar = attr.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+            if (parcalar.length) liste = parcalar;
+        }
+        // Yüzdeler aşama sayısına göre eşit dağıtılır; son aşama daima %100.
+        ASAMALAR = liste.map(function (ad, i) {
+            return {
+                ad: ad,
+                yuzde: Math.round(((i + 1) / liste.length) * 100),
+                metin: ASAMA_TANIMLARI[ad] || 'Yükleniyor',
+            };
+        });
+    }
 
     var SERT_ZAMAN_ASIMI_MS = 8000;
     var MIN_GOSTERIM_MS = 550; // göz kırpması gibi görünmesin
@@ -46,6 +76,7 @@
         durum.el = el('appBoot');
         if (!durum.el) return;
 
+        asamalariKur(durum.el);
         durum.bar = durum.el.querySelector('.app-boot__bar');
         durum.status = durum.el.querySelector('.app-boot__status');
         durum.baslangic = Date.now();
@@ -94,6 +125,9 @@
     /** Bir yükleme aşamasının bittiğini bildirir. */
     function step(ad) {
         if (durum.kapandi || durum.tamamlanan[ad]) return;
+        // Bu sayfanın beklemediği bir aşama bildirildiyse yok say
+        var taniniyor = ASAMALAR.some(function (a) { return a.ad === ad; });
+        if (!taniniyor) return;
         durum.tamamlanan[ad] = true;
 
         for (var i = 0; i < ASAMALAR.length; i++) {
@@ -154,10 +188,28 @@
      * eleman görünür kalır.
      */
     function revealHeader() {
+        /*
+         * Sayfa başına ortaya çıkma sırası. Var olmayan id'ler sessizce
+         * atlanır, bu yüzden tek liste tüm sayfalarda güvenle kullanılabilir.
+         * Sıra bilinçli: önce kimlik (kullanıcı/depo), sonra gezinme,
+         * sonra sayaç, en son içerik blokları.
+         */
         var sira = [
+            // ürün arama
             { id: 'headerUserHost', gecikme: 0 },
             { id: 'headerPremiumNavHost', gecikme: 90 },
             { id: 'trialCountdownHost', gecikme: 170 },
+            // sayım
+            { id: 'countingHeaderUserHost', gecikme: 0 },
+            { id: 'countingStatsHost', gecikme: 90 },
+            { id: 'sayimActiveTableHost', gecikme: 150 },
+            { id: 'sayimGeneralListHost', gecikme: 210 },
+            { id: 'countingMainDataHost', gecikme: 260 },
+            // ajanda
+            { id: 'agendaHost', gecikme: 90 },
+            // raftaki eksikler
+            { id: 'shelfGridHost', gecikme: 90 },
+            { id: 'basketHost', gecikme: 160 },
         ];
 
         sira.forEach(function (item) {

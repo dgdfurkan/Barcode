@@ -39,10 +39,13 @@ class ShelfMissingApp {
         if (!session) {
             this._updateHeaderUser(null);
             this._show('noAuth');
+            // Perdeyi bekletme: kullanıcı "giriş yapın" mesajını hemen görmeli
+            window.AppBoot?.dismiss('oturum-yok');
             return;
         }
         this._username = session.username;
         this._updateHeaderUser(session);
+        window.AppBoot?.step('auth');
 
         await this._waitForDb();
 
@@ -60,6 +63,8 @@ class ShelfMissingApp {
 
         if (!window.premiumFeatures?.checkPremiumFeature('raftakiEksikler')) {
             this._show('noPremium');
+            // Perdeyi bekletme: yetki yoksa mesaj anında görünmeli
+            window.AppBoot?.dismiss('yetki-yok');
             return;
         }
 
@@ -79,10 +84,13 @@ class ShelfMissingApp {
             if (window.SkeletonUI) {
                 window.SkeletonUI.leaveMany(['shelfGridHost', 'basketHost']);
             }
+            // Veri gelmese bile perde kalksın — hata mesajı görünsün
+            window.AppBoot?.step('data');
         }
         this._switchTab('shelves');
         this._updateBasketBadge();
         this._initViewPrefs();
+        window.AppBoot?.step('ui');
     }
 
     async _waitForDb(maxWait = 10000) {

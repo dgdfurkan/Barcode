@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <script src="../js/console-quiet.js?v=20260827h"></script>
+    <script src="../js/console-quiet.js?v=20260827i"></script>
+    <script src="../js/app-boot.js?v=20260827i"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -10,23 +11,48 @@
     <link rel="manifest" href="../manifest.json">
     <title>Raftaki Eksikler - Jet Barkod</title>
     <link rel="icon" type="image/png" sizes="32x32" href="../assets/logo.png?v=2">
-    <link rel="stylesheet" href="../css/main.css?v=20260827h" />
-    <link rel="stylesheet" href="../css/tailwind.css?v=20260827h" />
-    <link rel="stylesheet" href="../css/shelf-missing.css?v=20260827h" />
+    <link rel="stylesheet" href="../css/main.css?v=20260827i" />
+    <link rel="stylesheet" href="../css/app-boot.css?v=20260827i" />
+    <link rel="stylesheet" href="../css/tailwind.css?v=20260827i" />
+    <link rel="stylesheet" href="../css/shelf-missing.css?v=20260827i" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <script src="../js/auth-token.js?v=20260827h"></script>
-    <script src="../js/supabase-config.js?v=20260827h"></script>
-    <script src="../js/vps-supabase-shim.js?v=20260827h"></script>
-    <script src="../js/supabase-bootstrap.js?v=20260827h"></script>
+    <script src="../js/auth-token.js?v=20260827i"></script>
+    <script src="../js/supabase-config.js?v=20260827i"></script>
+    <script src="../js/vps-supabase-shim.js?v=20260827i"></script>
+    <script src="../js/supabase-bootstrap.js?v=20260827i"></script>
     <script src="temp_products.js"></script>
-    <script src="../js/auth.js?v=20260827h"></script>
-    <script src="../js/user-manager.js?v=20260827h"></script>
-    <script src="../js/premium-features.js?v=20260827h"></script>
+    <script src="../js/auth.js?v=20260827i"></script>
+    <script src="../js/user-manager.js?v=20260827i"></script>
+    <script src="../js/premium-features.js?v=20260827i"></script>
 </head>
 <body class="min-h-screen bg-background sm-page">
+    <div id="appBoot" class="app-boot app-boot--active" data-boot-steps="auth,data,ui" role="status" aria-live="polite" aria-label="Sayfa yükleniyor">
+        <div class="app-boot__inner">
+            <span class="app-boot__mark">
+                <img src="../assets/logo.png" alt="" class="app-boot__logo" decoding="async" />
+            </span>
+            <h1 class="app-boot__title">Jet Barkod</h1>
+            <span class="app-boot__track"><span class="app-boot__bar"></span></span>
+            <p class="app-boot__status">Başlatılıyor</p>
+        </div>
+    </div>
+    <script>
+        /* GÜVENLİK AĞI — app-boot.js yüklenemese bile perde en fazla 9sn durur. */
+        (function () {
+            document.documentElement.classList.add('boot-locked');
+            setTimeout(function () {
+                var p = document.getElementById('appBoot');
+                if (p) {
+                    p.classList.remove('app-boot--active');
+                    setTimeout(function () { if (p.parentNode) p.parentNode.removeChild(p); }, 500);
+                }
+                document.documentElement.classList.remove('boot-locked');
+            }, 9000);
+        })();
+    </script>
     <header class="sm-header sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
             <div class="flex items-center justify-between h-14 sm:h-16 gap-3">
@@ -449,8 +475,8 @@
     </div>
 
     <script src="https://unpkg.com/html5-qrcode@latest/html5-qrcode.min.js"></script>
-    <script src="../js/barcode-scanner.js?v=20260827h"></script>
-    <script src="../js/skeleton-ui.js?v=20260827h"></script>
-    <script src="../js/shelf-missing.js?v=20260827h"></script>
+    <script src="../js/barcode-scanner.js?v=20260827i"></script>
+    <script src="../js/skeleton-ui.js?v=20260827i"></script>
+    <script src="../js/shelf-missing.js?v=20260827i"></script>
 </body>
 </html>

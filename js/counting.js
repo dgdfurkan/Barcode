@@ -317,6 +317,7 @@ class CountingSystem {
                 throw new Error('User not authenticated');
             }
             this.currentUser = session;
+            window.AppBoot?.step('auth');
 
             this._showInitSkeleton();
 
@@ -344,6 +345,7 @@ class CountingSystem {
             }
 
             await Promise.all([this.loadProducts(), this.loadCountingData()]);
+            window.AppBoot?.step('data');
 
             this.renderTable();
             this.updateViewMode();
@@ -353,6 +355,7 @@ class CountingSystem {
             this.scheduleScrollActiveGeneralTableChip();
             this.syncDeleteTableButtonsVisibility();
             this._hideInitSkeleton();
+            window.AppBoot?.step('ui');
             
             // Setup scroll listener for toast positioning
             this.setupToastScrollListener();
@@ -2050,9 +2053,9 @@ class CountingSystem {
         }
     }
 
-    _beginBulkImportLock(message = 'Ürünler işleniyor…') {
+    _beginBulkImportLock(message = 'Ürünler işleniyor') {
         this._importInProgress = true;
-        this.showCountingStatus(message, 'Lütfen bekleyin', { lock: true });
+        this.showCountingStatus(message, 'Tablo değiştirmeyin', { lock: true });
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
             this._saveDebounceTimer = null;
@@ -2474,6 +2477,51 @@ class CountingSystem {
     }
 
     /** countingData ile cachedFullData slotunun aynı tabloya bağlı olduğunu doğrular */
+    /**
+     * Toplu işlem (içe aktarma/temizleme) sürerken tablo değiştirmeyi engeller.
+     *
+     * NEDEN: applyImportedRows gibi işlemler birkaç `await` sınırı boyunca
+     * this.currentTableName / this.countingData üzerinden yazıyor. Kullanıcı
+     * bu sırada başka tabloya geçerse satırlar YANLIŞ TABLOYA düşüyordu.
+     * _importInProgress bayrağı realtime işleyicilerini koruyordu ama
+     * switchTable/createTable'ı korumuyordu — asıl delik buydu.
+     */
+    _tableChangeBlocked(action = 'değiştir') {
+        if (!this._importInProgress) return false;
+        this.showToast(
+            'Ürünler işlenirken tablo ' + action + 'ilemez. Lütfen işlem bitene kadar bekleyin.',
+            'warning',
+            3000
+        );
+        return true;
+    }
+
+    /**
+     * Uzun bir işlem boyunca hedef tablonun aktif kaldığını GARANTİ eder.
+     *
+     * Her `await` sonrasında çağrılır. Aktif tablo bir şekilde kaymışsa
+     * (realtime, catch-up, kullanıcı) hedef tabloyu geri aktive eder ve
+     * uyarı yazar — böylece veri asla yanlış tabloya yazılmaz.
+     *
+     * @returns {boolean} kayma tespit edilip düzeltildiyse true
+     */
+    _ensureActiveTable(tableName, context = '') {
+        if (!tableName) return false;
+        if (this.currentTableName === tableName) {
+            this._verifyCountingDataTableBinding();
+            return false;
+        }
+        console.warn(
+            `[sayım] Aktif tablo işlem sırasında kaydı (${context}): ` +
+            `"${this.currentTableName}" -> hedef "${tableName}". Geri alınıyor.`
+        );
+        this._activateCountingTable(tableName, {
+            fromTable: this.currentTableName,
+            persistFrom: true,
+        });
+        return true;
+    }
+
     _verifyCountingDataTableBinding() {
         const name = this.currentTableName;
         if (!name) return;
@@ -5217,6 +5265,9 @@ class CountingSystem {
             return;
         }
         if (this._isTableTombstoned(tableName)) return;
+        // İçe aktarma sürerken tablo değiştirilemez (options.internal ile
+        // işlemin kendi çağrıları muaf tutulur).
+        if (options.internal !== true && this._tableChangeBlocked('değiştir')) return;
 
         const skipCatchUp = options.skipCatchUp === true;
         const skipRender = options.skipRender === true;
@@ -6224,6 +6275,9 @@ class CountingSystem {
         if (!tableName || tableName.trim() === '') {
             throw new Error('Tablo adı boş olamaz');
         }
+        if (options.internal !== true && this._tableChangeBlocked('oluşturul')) {
+            throw new Error('İşlem sürüyor');
+        }
 
         const useBusy = options.skipRender !== true && !this._importInProgress;
         if (useBusy) this.showCountingStatus('Tablo oluşturuluyor…', 'Kısa sürecek', { lock: true });
@@ -6291,6 +6345,7 @@ class CountingSystem {
         }
     }
     async deleteTable(tableName) {
+        if (this._tableChangeBlocked('silin')) return;
         if (!tableName || this._isTableTombstoned(tableName)) return;
 
         const fullData = this.cachedFullData || { _api_info: {}, _tables: {} };
@@ -7646,13 +7701,20 @@ class CountingSystem {
     }
 
     /** Ürün eklemeden önce UI alt sekmesi ile aktif tablonun uyumunu doğrula */
+    /**
+     * Ekleme yapılacak doğru tabloyu seçer (genel / günlük sekmesine göre).
+     *
+     * NOT: Bu fonksiyon toplu işlem kilidi TUTULURKEN çağrılıyor, bu yüzden
+     * switchTable'a { internal: true } geçiliyor — kilit korumasından muaf.
+     * Aksi hâlde koruma kendi işlemimizi engellerdi.
+     */
     async _ensureAddTargetTableReady() {
         const subTab = this._getActiveSayimSubTab();
         if (subTab === 'daily') {
             if (!this.isDailyTableName(this.currentTableName)) {
                 const target = this._resolveDailyTableNameForContext();
                 if (target) {
-                    await this.switchTable(target);
+                    await this.switchTable(target, { internal: true });
                 } else {
                     this.showNotification(
                         'Ürün eklemek için günlük tablolardan bir gün seçin veya «Gün ekle» ile tablo oluşturun.',
@@ -7662,7 +7724,7 @@ class CountingSystem {
                 }
             }
         } else if (this.isDailyTableName(this.currentTableName)) {
-            await this.switchTable(this._resolveGeneralTableName());
+            await this.switchTable(this._resolveGeneralTableName(), { internal: true });
         }
         this._verifyCountingDataTableBinding();
         return true;
@@ -8001,6 +8063,10 @@ class CountingSystem {
             if (!this.currentTableName) {
                 throw new Error('Aktif tablo seçili değil');
             }
+            // HEDEF TABLO burada sabitlenir. Aşağıdaki her `await` sonrası
+            // bu isim yeniden doğrulanır; aktif tablo kaymışsa geri alınır.
+            // Böylece satırlar hiçbir koşulda başka tabloya düşmez.
+            const targetTable = this.currentTableName;
             let added = 0;
             let skipped = 0;
             const idsInPasteOrder = [];
@@ -8039,6 +8105,7 @@ class CountingSystem {
             // 2. Aşama: Yapıştırma = tablonun yeni tam listesi (eski kısmi DB verisi kalmasın)
             if (fullReplace && idsInPasteOrder.length > 0) {
                 await this._purgeTableProductsNotInSet(idsInPasteOrder);
+                this._ensureActiveTable(targetTable, 'purge sonrası');
             }
             this.applyImportedProductOrder(idsInPasteOrder, { replaceRest: fullReplace });
 
@@ -8067,8 +8134,11 @@ class CountingSystem {
             this.updateTableSelector();
             this.syncSayimSubTabToTable();
 
+            this._ensureActiveTable(targetTable, 'kayıt öncesi');
             await this.saveCountingData();
-            await this._bulkSaveProductEntries(idsInPasteOrder, this.currentTableName);
+            this._ensureActiveTable(targetTable, 'kayıt sonrası');
+            // targetTable AÇIKÇA geçiliyor — this.currentTableName değil.
+            await this._bulkSaveProductEntries(idsInPasteOrder, targetTable);
             this.showToast(
                 `${added} ürün işlendi${skipped ? `, ${skipped} satır eşleşmedi` : ''}`,
                 added ? 'success' : 'warning',
@@ -10350,6 +10420,7 @@ class CountingSystem {
             this.updateCountingProgress();
             this._scheduleTableSelectorUpdate();
 
+            this._ensureActiveTable(tn, 'toplu ekleme kaydı');
             await this.saveCountingData();
             if (newProductIds.length > 0) {
                 await this._bulkSaveProductEntries(newProductIds, tn);
@@ -10478,6 +10549,7 @@ class CountingSystem {
         this.updateCountingProgress();
         this._scheduleTableSelectorUpdate();
 
+        this._ensureActiveTable(tn, 'CDN toplu ekleme kaydı');
         await this.saveCountingData();
         if (newProductIds.length > 0) {
             await this._bulkSaveProductEntries(newProductIds, tn);
