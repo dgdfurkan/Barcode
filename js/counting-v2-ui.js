@@ -988,31 +988,43 @@
             ['bekleyen', 'Sayılmadı']
         ].map(function (p) {
             return '<span class="v2-legend__item"><span class="v2-legend__swatch v2-legend__swatch--' + p[0] + '"></span>' + p[1] + '</span>';
-        }).join('');
+        }).join('') +
+            '<span class="v2-legend__anahtar">Kart altı: <b>depo</b> · fark · <b>sistem</b></span>';
 
         grid.insertBefore(legend, grid.firstChild);
     }
 
-    /** Bir ürünün durumunu etikete çevirir. */
+    /**
+     * Bir ürünün sayım durumunu kartın alt şeridine çevirir.
+     *
+     * Şerit üç bölmeli: SOL depo (elle sayılan), ORTA sonuç, SAĞ sistem.
+     * Böylece stoklar çekildiği anda kart açmadan üç şeyi birden görüyorsun:
+     * ne saydın, sistem ne diyor, arada ne var.
+     */
     function farkEtiketi(cs, data) {
-        var varDepo = data && data.warehouseStock !== null && data.warehouseStock !== undefined;
-        var varSistem = data && data.systemStock !== null && data.systemStock !== undefined;
+        var d = data || {};
+        var varDepo = d.warehouseStock !== null && d.warehouseStock !== undefined;
+        var varSistem = d.systemStock !== null && d.systemStock !== undefined;
 
-        if (!varDepo && !varSistem) return { metin: '—', sinif: 'bekleyen' };
-        if (!varDepo || !varSistem) return { metin: 'Yarım', sinif: 'yarim' };
+        var depo = varDepo ? String(d.warehouseStock) : '·';
+        var sistem = varSistem ? String(d.systemStock) : '·';
 
-        var fark = cs.calculateDifference(data.warehouseStock, data.systemStock);
-        if (fark.type === 'positive') return { metin: '+' + fark.value, sinif: 'fazla' };
-        if (fark.type === 'negative') return { metin: '−' + fark.value, sinif: 'eksik' };
-        return { metin: '✓', sinif: 'tam' };
+        if (!varDepo && !varSistem) return { depo: depo, orta: '—', sistem: sistem, sinif: 'bekleyen' };
+        if (!varDepo || !varSistem) return { depo: depo, orta: '?', sistem: sistem, sinif: 'yarim' };
+
+        var fark = cs.calculateDifference(d.warehouseStock, d.systemStock);
+        if (fark.type === 'positive') return { depo: depo, orta: '+' + fark.value, sistem: sistem, sinif: 'fazla' };
+        if (fark.type === 'negative') return { depo: depo, orta: '−' + fark.value, sistem: sistem, sinif: 'eksik' };
+        return { depo: depo, orta: '✓', sistem: sistem, sinif: 'tam' };
     }
 
     /**
-     * Grid kartlarının altına fark sayısını yazar.
+     * Grid kartlarının altına depo · fark · sistem şeridini yazar.
      *
      * counting.js'e dokunmamak için `renderRapidCountingMode`'u ÖRNEK ÜZERİNDE
      * sarmalıyoruz (dosya değişmiyor, v1 etkilenmiyor). Her render'dan sonra
-     * yalnızca DEĞİŞEN etiketler yazılır; kartın son çocuğuna bakmak O(1).
+     * yalnızca DEĞİŞEN şeritler yeniden yazılıyor; kartın son çocuğuna bakmak
+     * O(1), değişiklik kontrolü de tek bir dizge karşılaştırması.
      */
     function farkEtiketleriniKur() {
         var cs = sistem();
@@ -1022,7 +1034,7 @@
         cs.__v2DiffWrapped = true;
         cs.renderRapidCountingMode = function () {
             orijinal();
-            try { etiketleriYaz(); } catch (e) { /* etiket kozmetiktir, render'ı düşürmesin */ }
+            try { etiketleriYaz(); } catch (e) { /* şerit kozmetiktir, render'ı düşürmesin */ }
         };
 
         try { etiketleriYaz(); } catch (e) {}
@@ -1040,18 +1052,27 @@
             var pid = kart.dataset && kart.dataset.productId;
             if (!pid) continue;
 
-            var etiket = farkEtiketi(cs, cs.countingData[pid]);
-            var son = kart.lastElementChild;
+            var e = farkEtiketi(cs, cs.countingData[pid]);
+            var imza = e.depo + '|' + e.orta + '|' + e.sistem + '|' + e.sinif;
 
-            if (!son || !son.classList.contains('v2-diff')) {
-                son = yap('div', 'v2-diff');
-                son.setAttribute('aria-hidden', 'true');
-                kart.appendChild(son);
+            var serit = kart.lastElementChild;
+            if (!serit || !serit.classList.contains('v2-diff')) {
+                serit = yap('div', 'v2-diff');
+                serit.innerHTML =
+                    '<span class="v2-diff__yan v2-diff__depo"></span>' +
+                    '<span class="v2-diff__orta"></span>' +
+                    '<span class="v2-diff__yan v2-diff__sistem"></span>';
+                kart.appendChild(serit);
+            } else if (serit.dataset.imza === imza) {
+                continue;
             }
 
-            var sinif = 'v2-diff v2-diff--' + etiket.sinif;
-            if (son.className !== sinif) son.className = sinif;
-            if (son.textContent !== etiket.metin) son.textContent = etiket.metin;
+            serit.className = 'v2-diff v2-diff--' + e.sinif;
+            serit.dataset.imza = imza;
+            serit.title = 'Depo ' + e.depo + ' · Sistem ' + e.sistem;
+            serit.children[0].textContent = e.depo;
+            serit.children[1].textContent = e.orta;
+            serit.children[2].textContent = e.sistem;
         }
     }
 

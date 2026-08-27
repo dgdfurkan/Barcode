@@ -1071,15 +1071,30 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
     background: var(--v2-surface) !important;
     box-shadow: var(--v2-shadow-1) !important;
     /* Kayma yok: oran sabit, alt etiket için yer baştan ayrılır */
-    padding-bottom: 1.1rem;
+    padding-bottom: 1.4rem;
     transition: transform var(--v2-fast) var(--v2-ease), box-shadow var(--v2-fast), border-color var(--v2-fast);
 }
 
-/* Görsel kartın büyük kısmını alsın */
+/*
+ * Ürün görselleri Getir CDN'inden beyaz zeminli JPEG geliyor. v1'de kartın
+ * içi de beyaz olduğu için görseller PNG gibi kartla kaynaşıyordu; v2'de
+ * kart zemini hafif renkli olunca görselin beyaz dikdörtgeni sırıtmaya
+ * başladı. Çözüm: görseli kendi beyaz "tabağına" oturtmak ve köşelerini
+ * dış çerçeveyle aynı oranda yuvarlamak — sırıtma yerine kasıtlı bir kat.
+ */
 .counting-v2 #rapidCountingGridContainer .rapid-product-card img {
     width: 100%;
     height: 100%;
     object-fit: contain;
+    border-radius: calc(var(--v2-r-md) - 0.2rem);
+    background: #fff;
+}
+
+/* Görsel kabı da aynı yuvarlaklıkta olsun ki kenarda beyaz köşe kalmasın */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card > div > div:first-child {
+    border-radius: calc(var(--v2-r-md) - 0.2rem);
+    background: #fff;
+    overflow: hidden;
 }
 
 .counting-v2 #rapidCountingGridContainer .rapid-product-card:hover {
@@ -1149,38 +1164,81 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
     letter-spacing: -0.005em;
 }
 
-/* --- Alt durum etiketi: fark sayısı (v2 ekler) --- */
+/* --- Alt şerit: DEPO · FARK · SİSTEM (v2 ekler) ---------------------------
+ * Sayımın üç sayısı da kartın üstünde. Stok çekildiği an, kart açmadan
+ * "ne saydım / sistem ne diyor / arada ne var" üçü birden okunuyor.
+ * Kenarlar sakin ve nötr, orta bölme renkli — göz doğrudan sonuca gidiyor.
+ */
 .counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff {
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    height: 1.1rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.66rem;
-    font-weight: 750;
-    line-height: 1;
+    height: 1.4rem;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: stretch;
+    background: var(--v2-surface);
+    border-top: 1px solid var(--v2-line);
     font-variant-numeric: tabular-nums;
-    letter-spacing: -0.01em;
-    background: var(--v2-soft);
-    color: var(--v2-bekleyen);
+    letter-spacing: -0.02em;
     z-index: 6;
 }
 
-/* Değiştiriciler taban kuralla aynı ID kapsamında olmak ZORUNDA — aksi hâlde
-   `#rapidCountingGridContainer` taşıyan taban kural özgüllükte kazanır ve
-   etiketler gri kalır. */
-/* Dolgu renk yerine yumuşak zemin + renkli yazı: aynı okunurluk, çok daha
-   sakin bir ekran. Değiştiriciler taban kuralla AYNI özgüllükte olmalı. */
-/* Dolgu renk (bağırıyordu) ile silik ton (kayboluyordu) arasında orta yol:
-   belirgin bir zemin + koyu, kalın renkli yazı. */
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--tam { background: #d1fae5; color: #047857; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--fazla { background: #dbeafe; color: #1d4ed8; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--eksik { background: #fee2e2; color: #b91c1c; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--yarim { background: #fef3c7; color: #b45309; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--bekleyen { background: var(--v2-soft); color: var(--v2-faint); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff__yan {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    padding: 0 0.15rem;
+    font-size: 0.63rem;
+    font-weight: 600;
+    color: var(--v2-muted);
+    overflow: hidden;
+}
+
+/* Orta bölme sonucun kendisi: renkli zemin, koyu kalın yazı */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff__orta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.1rem;
+    padding: 0 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 750;
+    line-height: 1;
+    background: var(--v2-soft);
+    color: var(--v2-bekleyen);
+    border-left: 1px solid var(--v2-line);
+    border-right: 1px solid var(--v2-line);
+}
+
+/* Değiştiriciler taban kuralla AYNI özgüllükte olmak zorunda */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--tam .v2-diff__orta { background: #d1fae5; color: #047857; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--fazla .v2-diff__orta { background: #dbeafe; color: #1d4ed8; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--eksik .v2-diff__orta { background: #fee2e2; color: #b91c1c; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--yarim .v2-diff__orta { background: #fef3c7; color: #b45309; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--bekleyen .v2-diff__orta { background: var(--v2-soft); color: var(--v2-faint); }
+
+/*
+ * En yoğun seviyede telefonda kart ~55px kalıyor; üç sayı oraya sığmaz.
+ * O durumda yan sayılar çekiliyor, ortadaki sonuç tüm şeridi alıyor —
+ * okunmayan üç rakam yerine okunan bir tane.
+ */
+@media (max-width: 767px) {
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="3"] .v2-diff { grid-template-columns: 1fr; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="3"] .v2-diff__yan { display: none; }
+    .counting-v2 #rapidCountingGridContainer[data-yogunluk="3"] .v2-diff__orta { border: none; }
+}
+
+/* Şeridin ne anlattığını söyleyen anahtar satırı */
+.counting-v2 .v2-legend__anahtar {
+    margin-left: auto;
+    font-size: 0.66rem;
+    color: var(--v2-faint);
+}
+
+.counting-v2 .v2-legend__anahtar b { font-weight: 700; color: var(--v2-muted); }
 
 /* ==========================================================================
    9) TABLO / KART GÖRÜNÜMÜ — aynı anlam renkleri
@@ -1609,6 +1667,7 @@ body.v2-drawer-open { overflow: hidden; }
 
 .counting-v2 .financial-card {
     position: relative;
+    border-width: 1px !important;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -1649,13 +1708,22 @@ body.v2-drawer-open { overflow: hidden; }
 }
 
 /* Sol renk çubuğu — anlam sayım sekmesiyle aynı */
+/*
+ * v1'in kuralı bu sözde-öğeyi kartın ÜSTÜNE 4px'lik tam genişlikte bir
+ * çizgi olarak konumlandırıyor (top/left/right: 0; height: 4px). Yalnızca
+ * left/top/bottom/width vermek yetmiyordu: kalan `right: 0` ile `height: 4px`
+ * yaşamaya devam edip çubuğu 3x4px'lik bir NOKTAYA çeviriyordu.
+ * Bu yüzden ikisi de açıkça sıfırlanıyor.
+ */
 .counting-v2 .financial-card::before {
     content: '';
     position: absolute;
     left: 0;
-    top: 0.85rem;
-    bottom: 0.85rem;
-    width: 3px;
+    right: auto !important;
+    top: 0.85rem !important;
+    bottom: 0.85rem !important;
+    height: auto !important;
+    width: 3px !important;
     border-radius: 0 3px 3px 0;
     background: var(--v2-line);
 }
