@@ -63,6 +63,44 @@
     --v2-bekleyen: #64748b;
     --v2-bekleyen-soft: #f8fafc;
 
+    /*
+     * SAYIM FARKI PALETİ
+     * ---------------------------------------------------------------
+     * Sayımda göz yalnızca SAPMAYA bakmalı. Doğru sayılmış ürün zaten
+     * yapılacak iş bırakmıyor; onu renklendirmek ekranı yoruyor ve asıl
+     * bakılması gerekenleri boğuyordu.
+     *
+     *   fazla     → yeşil    (+N, beklenenden çok)
+     *   eksik     → kırmızı  (−N, kayıp)
+     *   fark yok  → gri      (✓, işi bitti — bakmaya gerek yok)
+     *   yarım     → amber    (sayım tamamlanmadı)
+     *   sayılmadı → soluk    (henüz dokunulmadı)
+     *
+     * Bu palet yalnızca fark göstergeleri içindir; `--v2-tam` gibi genel
+     * başarı renkleri (token, ilerleme çubuğu) ayrı durur.
+     */
+    --v2-fark-fazla: #059669;
+    --v2-fark-fazla-soft: #ecfdf5;
+    --v2-fark-fazla-etiket: #d1fae5;
+    --v2-fark-fazla-yazi: #047857;
+
+    --v2-fark-eksik: #dc2626;
+    --v2-fark-eksik-soft: #fef2f2;
+    --v2-fark-eksik-etiket: #fee2e2;
+    --v2-fark-eksik-yazi: #b91c1c;
+
+    --v2-fark-yok: #94a3b8;
+    --v2-fark-yok-soft: #fbfcfd;
+    --v2-fark-yok-etiket: #f1f5f9;
+    --v2-fark-yok-yazi: #64748b;
+
+    --v2-fark-yarim: #d97706;
+    --v2-fark-yarim-soft: #fffdf8;
+    --v2-fark-yarim-etiket: #fef3c7;
+    --v2-fark-yarim-yazi: #b45309;
+
+    --v2-fark-bekleyen: #cbd5e1;
+
     /* Yükselti — tek bir gölge dili */
     --v2-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05);
     --v2-shadow-2: 0 2px 8px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
@@ -856,8 +894,8 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 
 /* Anlam renkleri — grid ve tablo ile birebir aynı */
 .counting-v2 #totalProductsCount { color: var(--v2-ink) !important; }
-.counting-v2 #positiveDifferenceCount { color: var(--v2-fazla) !important; }
-.counting-v2 #negativeDifferenceCount { color: var(--v2-eksik) !important; }
+.counting-v2 #positiveDifferenceCount { color: var(--v2-fark-fazla) !important; }
+.counting-v2 #negativeDifferenceCount { color: var(--v2-fark-eksik) !important; }
 
 .counting-v2 .v2-summary .stat-card::before,
 .counting-v2 .v2-tile::before {
@@ -872,8 +910,8 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 }
 
 .counting-v2 .v2-summary .stat-card:nth-of-type(1)::before { background: var(--v2-bekleyen); }
-.counting-v2 .v2-summary .stat-card:nth-of-type(2)::before { background: var(--v2-fazla); }
-.counting-v2 .v2-summary .stat-card:nth-of-type(3)::before { background: var(--v2-eksik); }
+.counting-v2 .v2-summary .stat-card:nth-of-type(2)::before { background: var(--v2-fark-fazla); }
+.counting-v2 .v2-summary .stat-card:nth-of-type(3)::before { background: var(--v2-fark-eksik); }
 .counting-v2 .v2-tile--progress::before { background: var(--v2-tam); }
 
 /* İlerleme kutusu (v2'nin eklediği 4. metrik) */
@@ -1020,11 +1058,11 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
     border-radius: 0.2rem;
 }
 
-.counting-v2 .v2-legend__swatch--tam { background: var(--v2-tam); }
-.counting-v2 .v2-legend__swatch--fazla { background: var(--v2-fazla); }
-.counting-v2 .v2-legend__swatch--eksik { background: var(--v2-eksik); }
-.counting-v2 .v2-legend__swatch--yarim { background: var(--v2-yarim); }
-.counting-v2 .v2-legend__swatch--bekleyen { background: var(--v2-surface); box-shadow: inset 0 0 0 2px var(--v2-faint); }
+.counting-v2 .v2-legend__swatch--tam { background: var(--v2-fark-yok); }
+.counting-v2 .v2-legend__swatch--fazla { background: var(--v2-fark-fazla); }
+.counting-v2 .v2-legend__swatch--eksik { background: var(--v2-fark-eksik); }
+.counting-v2 .v2-legend__swatch--yarim { background: var(--v2-fark-yarim); }
+.counting-v2 .v2-legend__swatch--bekleyen { background: var(--v2-surface); box-shadow: inset 0 0 0 2px var(--v2-fark-bekleyen); }
 
 /* ==========================================================================
    8) GRID MODU — sayım kartları
@@ -1151,26 +1189,48 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
     z-index: 5;
 }
 
+/* fark yok → gri. Doğru sayılmış; ekranda dursun ama dikkat çekmesin. */
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="zero"],
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"] { background: var(--v2-tam-soft) !important; border-color: rgba(5, 150, 105, 0.30) !important; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"] {
+    background: var(--v2-fark-yok-soft) !important;
+    border-color: var(--v2-line) !important;
+}
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="zero"]::after,
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"]::after { background: var(--v2-tam); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"]::after { background: var(--v2-fark-yok); }
 
+/* fazla → yeşil */
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="positive"],
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"] { background: var(--v2-fazla-soft) !important; border-color: rgba(37, 99, 235, 0.30) !important; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"] {
+    background: var(--v2-fark-fazla-soft) !important;
+    border-color: rgba(5, 150, 105, 0.30) !important;
+}
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="positive"]::after,
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"]::after { background: var(--v2-fazla); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"]::after { background: var(--v2-fark-fazla); }
 
+/* eksik → kırmızı */
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="negative"],
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"] { background: var(--v2-eksik-soft) !important; border-color: rgba(220, 38, 38, 0.30) !important; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"] {
+    background: var(--v2-fark-eksik-soft) !important;
+    border-color: rgba(220, 38, 38, 0.30) !important;
+}
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="negative"]::after,
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"]::after { background: var(--v2-eksik); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"]::after { background: var(--v2-fark-eksik); }
 
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"] { background: var(--v2-yarim-soft) !important; border-color: rgba(217, 119, 6, 0.32) !important; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"]::after { background: var(--v2-yarim); }
+/* yarım → amber */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"] {
+    background: var(--v2-fark-yarim-soft) !important;
+    border-color: rgba(217, 119, 6, 0.32) !important;
+}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"]::after { background: var(--v2-fark-yarim); }
 
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"] { background: var(--v2-surface) !important; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"]::after { background: var(--v2-line); }
+/* sayılmadı → nötr, kesik şerit */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"] {
+    background: var(--v2-surface) !important;
+    border-color: var(--v2-line) !important;
+}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"]::after {
+    background: repeating-linear-gradient(90deg, var(--v2-fark-bekleyen) 0 5px, transparent 5px 10px);
+}
 
 /* v1'in renkli gölgesi kapatılır — 200 karttaki neon etkisi buradan geliyordu */
 .counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state] {
@@ -1245,11 +1305,11 @@ body.v2-drawer-open .counting-v2 .v2-chip__caret,
 }
 
 /* Değiştiriciler taban kuralla AYNI özgüllükte olmak zorunda */
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--tam .v2-diff__orta { background: #d1fae5; color: #047857; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--fazla .v2-diff__orta { background: #dbeafe; color: #1d4ed8; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--eksik .v2-diff__orta { background: #fee2e2; color: #b91c1c; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--yarim .v2-diff__orta { background: #fef3c7; color: #b45309; }
-.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--bekleyen .v2-diff__orta { background: var(--v2-soft); color: var(--v2-faint); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--tam .v2-diff__orta { background: var(--v2-fark-yok-etiket); color: var(--v2-fark-yok-yazi); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--fazla .v2-diff__orta { background: var(--v2-fark-fazla-etiket); color: var(--v2-fark-fazla-yazi); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--eksik .v2-diff__orta { background: var(--v2-fark-eksik-etiket); color: var(--v2-fark-eksik-yazi); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--yarim .v2-diff__orta { background: var(--v2-fark-yarim-etiket); color: var(--v2-fark-yarim-yazi); }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--bekleyen .v2-diff__orta { background: var(--v2-track); color: var(--v2-faint); }
 
 /*
  * En yoğun seviyede telefonda kart ~55px kalıyor; üç sayı oraya sığmaz.

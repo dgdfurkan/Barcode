@@ -999,11 +999,12 @@
         var legend = yap('div', 'v2-legend');
         legend.id = 'v2Legend';
         legend.setAttribute('aria-label', 'Renk anahtarı');
+        // Sıra bilinçli: ilgi isteyenler önde, işi bitmişler arkada.
         legend.innerHTML = [
-            ['tam', 'Fark yok'],
             ['fazla', 'Fazla'],
             ['eksik', 'Eksik'],
             ['yarim', 'Yarım'],
+            ['tam', 'Fark yok'],
             ['bekleyen', 'Sayılmadı']
         ].map(function (p) {
             return '<span class="v2-legend__item"><span class="v2-legend__swatch v2-legend__swatch--' + p[0] + '"></span>' + p[1] + '</span>';
