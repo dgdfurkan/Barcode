@@ -47,6 +47,20 @@ GRANT web_anon  TO authenticator;
 GRANT web_user  TO authenticator;
 GRANT web_admin TO authenticator;
 
+-- Geçiş dönemi: PostgREST henüz `jetbarkod` ile bağlanıyor (Aşama 5'te
+-- `authenticator`'a çevrilecek). JWT'deki role claim'ine geçebilmesi için
+-- bu rollerin ÜYESİ olmalı, yoksa her sorgu
+-- "permission denied to set role web_user" ile 403 döner.
+-- SET ROLE sonrası etkin rol web_user olur ve RLS ona aynen uygulanır;
+-- jetbarkod'un BYPASSRLS'i geçmez, izolasyon korunur.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'jetbarkod') THEN
+        EXECUTE 'GRANT web_anon, web_user, web_admin TO jetbarkod';
+    END IF;
+END
+$$;
+
 -- Şemayı görebilsinler (tablo yetkisi ayrıca veriliyor)
 GRANT USAGE ON SCHEMA public TO web_anon, web_user, web_admin;
 

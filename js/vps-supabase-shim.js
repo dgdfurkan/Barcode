@@ -3,6 +3,14 @@
 
     let broadcastApiAvailable = true;
 
+    /** Oturum token'ını Authorization başlığına ekler. */
+    function authHeaders(base) {
+        const h = Object.assign({}, base || {});
+        const t = window.jetbarkodAuth?.get?.();
+        if (t) h.Authorization = 'Bearer ' + t;
+        return h;
+    }
+
     /** Kanal yoklamasında tablo başına çekilecek kolonlar. */
     const POLL_COLUMNS = {
         users: 'id,username,premium_features,chat_messages,last_chat_update,counting_data,trial_end,is_active,is_admin',
@@ -40,7 +48,7 @@
             if (payload?.event === 'refresh-page' && payload?.payload?.username) {
                 await fetch(`${this.baseUrl}/api/broadcast/refresh`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: authHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify({ username: payload.payload.username }),
                 });
             }
@@ -107,8 +115,12 @@
             const m = this.name.match(/^user-refresh-(.+)$/);
             if (!m) return;
             const username = m[1];
-            const res = await fetch(`${this.baseUrl}/api/broadcast/refresh/${encodeURIComponent(username)}`);
-            if (res.status === 404) {
+            const res = await fetch(
+                `${this.baseUrl}/api/broadcast/refresh/${encodeURIComponent(username)}`,
+                { headers: authHeaders() }
+            );
+            if (res.status === 404 || res.status === 401 || res.status === 403) {
+                // Uç yok ya da oturum yok — yoklamayı durdur, konsolu kirletme.
                 broadcastApiAvailable = false;
                 return;
             }
