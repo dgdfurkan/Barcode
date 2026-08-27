@@ -1,591 +1,304 @@
 /**
  * Jet Barkod — Sayım sayfası v2
+ * ============================================================================
  *
- * v1'in motorunu (counting.js) aynen kullanır; yalnızca sunumu değiştirir.
- * Bu dosya en son yüklendiği için v1 stillerini geçersiz kılabilir.
- * Tüm kurallar .counting-v2 altında — v1 asla etkilenmez.
+ * v1'in motorunu (counting.js) aynen kullanır; yalnızca SUNUMU değiştirir.
+ * Tüm kurallar `.counting-v2` altında toplandığı için v1 asla etkilenmez.
  *
- * ÖNCELİK: kullanıcı deneyimi. Renk tek başına anlam taşımaz; her durum
- * ayrıca ikon ve/veya metinle de ayrılır (renk körlüğü + hızlı tarama).
+ * ---------------------------------------------------------------------------
+ * TASARIM İLKELERİ
+ * ---------------------------------------------------------------------------
+ * 1. TEK KAYNAK: Renkler ve tipografi ana sitenin `css/main.css` içindeki
+ *    `--color-*` değişkenlerinden gelir. v2 kendi paletini uydurmaz; sadece
+ *    onlara anlam yükler. Böylece sayım sayfası siteden kopmaz.
+ *
+ * 2. ANLAM RENGİ: Yeşil "her şey yolunda" demektir — yani FARK YOK.
+ *    v1'de yeşil "fazla" anlamına geliyordu; sayımda asıl istenen sonuç
+ *    fark olmamasıdır, bu yüzden düzeltildi:
+ *      fark yok  → yeşil   (accent)
+ *      fazla     → mavi    (primary)
+ *      eksik     → kırmızı (error)
+ *      yarım     → amber   (warning)
+ *      sayılmadı → gri     (secondary)
+ *    Renk TEK BAŞINA anlam taşımaz: her durumun ayrıca ikonu ve yazısı vardır
+ *    (renk körlüğü + hızlı tarama).
+ *
+ * 3. KAYMA YOK: Yalnızca `opacity` ve `transform` animate edilir. Sayı
+ *    gösteren her alan `tabular-nums` ve sabit yükseklik kullanır; kartların
+ *    `aspect-ratio`'su sabittir. Çekmece ve popover `position: fixed/absolute`
+ *    olduğu için açılıp kapanırken sayfayı itmez.
+ *
+ * 4. TEK İŞ: Ekranda aynı anda tek bir iş vardır. Tablo yönetimi çekmecede,
+ *    token popover'da, yıkıcı işlemler taşma menüsünde durur.
+ * ============================================================================
  */
 
+/* ==========================================================================
+   0) BELİRTEÇLER
+   ========================================================================== */
+
 .counting-v2 {
-    --v2-ink: #0f172a;
-    --v2-muted: #64748b;
+    /* Ana siteden devralınan çekirdek */
+    --v2-primary: var(--color-primary, #2563eb);
+    --v2-primary-700: var(--color-primary-700, #1d4ed8);
+    --v2-primary-50: var(--color-primary-50, #eff6ff);
+    --v2-ink: var(--color-text-primary, #0f172a);
+    --v2-muted: var(--color-text-secondary, #475569);
     --v2-faint: #94a3b8;
-    --v2-line: #e2e8f0;
+    --v2-line: var(--color-border, #e2e8f0);
     --v2-soft: #f1f5f9;
     --v2-track: #f8fafc;
-    --v2-accent: #2563eb;
-    --v2-accent-soft: #eff6ff;
-    --v2-ok: #059669;
-    --v2-ok-soft: #ecfdf5;
-    --v2-warn: #d97706;
-    --v2-warn-soft: #fffbeb;
-    --v2-bad: #dc2626;
-    --v2-bad-soft: #fef2f2;
+    --v2-surface: var(--color-surface, #ffffff);
+    --v2-bg: var(--color-background, #f8fafc);
+
+    /* Sayım durum paleti (anlam renkleri) */
+    --v2-tam: var(--color-accent-600, #059669);
+    --v2-tam-soft: var(--color-accent-50, #ecfdf5);
+    --v2-fazla: var(--color-primary-600, #2563eb);
+    --v2-fazla-soft: var(--color-primary-50, #eff6ff);
+    --v2-eksik: #dc2626;
+    --v2-eksik-soft: #fef2f2;
+    --v2-yarim: #d97706;
+    --v2-yarim-soft: #fffbeb;
+    --v2-bekleyen: #64748b;
+    --v2-bekleyen-soft: #f8fafc;
+
+    /* Yükselti — tek bir gölge dili */
+    --v2-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.05);
+    --v2-shadow-2: 0 2px 8px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+    --v2-shadow-3: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+    --v2-shadow-4: -18px 0 48px rgba(15, 23, 42, 0.16);
+
+    --v2-r-sm: 0.5rem;
+    --v2-r-md: 0.75rem;
+    --v2-r-lg: 1rem;
+    --v2-r-xl: 1.25rem;
+
     --v2-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --v2-fast: 140ms;
+    --v2-base: 220ms;
+
+    /* Üst bar yüksekliği — yapışkan katmanların hizası buradan hesaplanır */
+    --v2-header-h: 3.5rem;
 }
 
-/* ================================================================
-   1) SEKMELER — ayırt edilebilir segment kontrolü
-   Sorun: alt çizgili sekmeler birbirine benziyordu, hangisi aktif
-   bakmadan anlaşılmıyordu.
-   ================================================================ */
-
-.counting-v2 .tab-button {
-    position: relative;
-    border-bottom: none !important;
-    border-radius: 0.75rem;
-    margin: 0.3rem;
-    padding: 0.6rem 0.75rem !important;
-    color: var(--v2-muted) !important;
-    font-weight: 600;
-    transition: background 0.16s, color 0.16s, box-shadow 0.16s;
+@media (min-width: 640px) {
+    .counting-v2 { --v2-header-h: 4rem; }
 }
 
-.counting-v2 .tab-button:hover {
-    background: var(--v2-soft);
-    color: var(--v2-ink) !important;
+.counting-v2 {
+    background: var(--v2-bg);
 }
 
-.counting-v2 .tab-button.active {
-    background: #fff !important;
-    color: var(--v2-accent) !important;
-    box-shadow:
-        0 1px 3px rgb(15 23 42 / 0.1),
-        0 0 0 1px rgb(37 99 235 / 0.18);
-}
-
-/* Aktif sekmenin altında ince vurgu — ikinci bir ipucu */
-.counting-v2 .tab-button.active::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    bottom: 0.28rem;
-    width: 1.4rem;
-    height: 2px;
-    border-radius: 9999px;
-    background: var(--v2-accent);
-    transform: translateX(-50%);
-}
-
-.counting-v2 .tab-button > div {
-    gap: 0.45rem;
-}
-
-.counting-v2 .tab-button svg {
-    width: 1.05rem;
-    height: 1.05rem;
-}
-
-/* Sekme şeridi: kutu değil, hap şeklinde bir raylık */
-.counting-v2 main > .bg-white:first-of-type {
-    border-radius: 1rem;
-    background: var(--v2-track) !important;
-    border: 1px solid var(--v2-line) !important;
-    box-shadow: none !important;
-}
-
-.counting-v2 main > .bg-white:first-of-type > .flex {
-    border-bottom: none !important;
-}
-
-/* ================================================================
-   2) İSTATİSTİK KARTLARI — sade, anlamı renkten bağımsız
-   ================================================================ */
-
-.counting-v2 .stat-card {
-    padding: 0.9rem 1rem !important;
-    border-radius: 1rem !important;
-    border: 1px solid var(--v2-line) !important;
-    box-shadow: none !important;
-    transition: border-color 0.16s, box-shadow 0.16s;
-}
-
-.counting-v2 .stat-card:hover {
-    border-color: #cbd5e1 !important;
-    box-shadow: 0 2px 8px rgb(15 23 42 / 0.06) !important;
-}
-
-/* Dev dekoratif ikon ve alt gradyan şeridi kaldır — gürültü */
-.counting-v2 .stat-card > .absolute {
-    display: none !important;
-}
-
-.counting-v2 .stat-card p:first-child {
-    font-size: 0.72rem !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    color: var(--v2-faint) !important;
-    margin-bottom: 0.15rem !important;
-}
-
-.counting-v2 .stat-card p:last-child {
-    font-size: 1.7rem !important;
-    line-height: 1.1;
+/* Sayılar asla zıplamasın */
+.counting-v2 [id$="Count"],
+.counting-v2 .v2-num,
+.counting-v2 .v2-stat__value,
+.counting-v2 .rapid-product-card {
     font-variant-numeric: tabular-nums;
 }
 
-/* Sol kenarda anlam şeridi — sayıya bakmadan hangi kart olduğu belli */
-.counting-v2 .stat-card {
-    border-left-width: 3px !important;
+/* Odak halkası tek dil */
+.counting-v2 :focus-visible {
+    outline: 2px solid var(--v2-primary);
+    outline-offset: 2px;
+    border-radius: var(--v2-r-sm);
 }
 
-.counting-v2 .stat-card:nth-of-type(1) { border-left-color: var(--v2-accent) !important; }
-.counting-v2 .stat-card:nth-of-type(2) { border-left-color: var(--v2-ok) !important; }
-.counting-v2 .stat-card:nth-of-type(3) { border-left-color: var(--v2-bad) !important; }
+/* ==========================================================================
+   1) ÜST BAR — kimlik + aktif tablo + token
+   ========================================================================== */
 
-/* ================================================================
-   3) GRID KARTLARI — durum ayrımı netleşiyor
-   Sorun: gri/turuncu/mavi/yeşil tonları birbirine karışıyordu.
-   Çözüm: her durum için sol şerit + hafif zemin + belirgin ikon.
-   ================================================================ */
-
-.counting-v2 .product-card,
-.counting-v2 .rapid-card {
-    position: relative;
-    border-radius: 0.9rem;
-    border: 1px solid var(--v2-line);
-    transition: border-color 0.16s, box-shadow 0.16s, transform 0.16s var(--v2-ease);
-    overflow: hidden;
+.counting-v2 header {
+    /* v1'de header z-40, komut çubuğu ise z-60. header konumlandırılmış
+       olduğu için kendi yığın bağlamını kuruyor; token popover'ı içeride
+       kaldığından komut çubuğunun ALTINDA çiziliyordu. Header komut
+       çubuğunun üstüne alınıyor. */
+    z-index: 80 !important;
+    background: rgba(255, 255, 255, 0.86) !important;
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    border-bottom: 1px solid var(--v2-line) !important;
+    box-shadow: none !important;
 }
 
-.counting-v2 .product-card:hover,
-.counting-v2 .rapid-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px -8px rgb(15 23 42 / 0.18);
+/* Marka bloğu biraz nefes alsın */
+.counting-v2 header h1 {
+    letter-spacing: -0.015em;
 }
 
-/* Sol durum şeridi — renkten bağımsız kalınlık farkı da var */
-.counting-v2 .product-card::before,
-.counting-v2 .rapid-card::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: var(--v2-line);
-}
-
-/* SAYILMAMIŞ — nötr, dikkat çekmez */
-.counting-v2 .rapid-card:not(:has(.product-status-icon--positive)):not(:has(.product-status-icon--negative)):not(:has(.product-status-icon--zero))::before {
-    background: #cbd5e1;
-}
-
-/* FAZLA */
-.counting-v2 .rapid-card:has(.product-status-icon--positive)::before { background: var(--v2-ok); }
-.counting-v2 .rapid-card:has(.product-status-icon--positive) { background: var(--v2-ok-soft); }
-
-/* EKSİK */
-.counting-v2 .rapid-card:has(.product-status-icon--negative)::before { background: var(--v2-bad); }
-.counting-v2 .rapid-card:has(.product-status-icon--negative) { background: var(--v2-bad-soft); }
-
-/* EŞİT — sayılmış ve tutuyor: sakin ama net */
-.counting-v2 .rapid-card:has(.product-status-icon--zero)::before { background: var(--v2-accent); }
-.counting-v2 .rapid-card:has(.product-status-icon--zero) { background: #fff; }
-
-/* Durum ikonu daha okunur */
-.counting-v2 .product-status-icon {
-    width: 1.35rem;
-    height: 1.35rem;
-    border-radius: 9999px;
-    display: grid;
-    place-items: center;
-    background: var(--v2-soft);
-    border: 1px solid var(--v2-line);
-}
-
-.counting-v2 .product-status-icon--positive {
-    background: var(--v2-ok-soft);
-    border-color: #a7f3d0;
-}
-
-.counting-v2 .product-status-icon--negative {
-    background: var(--v2-bad-soft);
-    border-color: #fecaca;
-}
-
-.counting-v2 .product-status-icon--zero {
-    background: var(--v2-accent-soft);
-    border-color: #bfdbfe;
-}
-
-/* İnce üst çizgi (stock-indicator) artık gereksiz — şerit onu karşılıyor */
-.counting-v2 .stock-indicator {
-    display: none;
-}
-
-/* ================================================================
-   4) TOKEN PANELİ — varsayılan olarak katlanmış
-   Sorun: sürekli açık durup çok yer kaplıyordu.
-   ================================================================ */
-
-.counting-v2 .v2-token-panel {
-    border: 1px solid var(--v2-line);
-    border-radius: 0.9rem;
-    background: #fff;
-    overflow: hidden;
-}
-
-.counting-v2 .v2-token-summary {
-    display: flex;
+/* --- Aktif tablo çipi: üst barın merkezindeki tek gerçek gezinme noktası --- */
+.counting-v2 .v2-chip {
+    display: inline-flex;
     align-items: center;
-    gap: 0.6rem;
-    width: 100%;
-    padding: 0.6rem 0.85rem;
-    background: transparent;
-    border: none;
+    gap: 0.55rem;
+    min-width: 0;
+    max-width: 22rem;
+    padding: 0.35rem 0.6rem 0.35rem 0.55rem;
+    border: 1px solid var(--v2-line);
+    border-radius: 0.85rem;
+    background: var(--v2-surface);
+    box-shadow: var(--v2-shadow-1);
     cursor: pointer;
     text-align: left;
-    font: inherit;
+    transition: border-color var(--v2-fast), box-shadow var(--v2-fast), transform var(--v2-fast);
 }
 
-.counting-v2 .v2-token-summary:hover {
-    background: var(--v2-track);
+.counting-v2 .v2-chip:hover {
+    border-color: #cbd5e1;
+    box-shadow: var(--v2-shadow-2);
 }
 
-.counting-v2 .v2-token-dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 9999px;
-    background: #cbd5e1;
-    flex-shrink: 0;
+.counting-v2 .v2-chip:active { transform: scale(0.985); }
+
+.counting-v2 .v2-chip__mark {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex: none;
+    border-radius: 0.55rem;
+    background: var(--v2-primary-50);
+    color: var(--v2-primary);
 }
 
-.counting-v2 .v2-token-dot--ok { background: var(--v2-ok); }
-.counting-v2 .v2-token-dot--warn { background: var(--v2-warn); }
-.counting-v2 .v2-token-dot--bad { background: var(--v2-bad); }
-
-.counting-v2 .v2-token-label {
-    flex: 1;
-    min-width: 0;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--v2-ink);
+.counting-v2 .v2-chip.is-daily .v2-chip__mark {
+    background: #f5f3ff;
+    color: #7c3aed;
 }
 
-.counting-v2 .v2-token-hint {
-    font-size: 0.72rem;
-    color: var(--v2-faint);
-    font-weight: 400;
-}
+.counting-v2 .v2-chip__mark svg { width: 1rem; height: 1rem; }
 
-.counting-v2 .v2-token-chevron {
-    width: 0.9rem;
-    height: 0.9rem;
-    color: var(--v2-faint);
-    transition: transform 0.2s var(--v2-ease);
-    flex-shrink: 0;
-}
-
-.counting-v2 .v2-token-panel.is-open .v2-token-chevron {
-    transform: rotate(180deg);
-}
-
-.counting-v2 .v2-token-body {
-    display: none;
-    padding: 0 0.85rem 0.85rem;
-    border-top: 1px solid var(--v2-soft);
-}
-
-.counting-v2 .v2-token-panel.is-open .v2-token-body {
-    display: block;
-    padding-top: 0.75rem;
-}
-
-/* Panodan al butonu öne çıksın */
-.counting-v2 .v2-token-paste {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.4rem 0.7rem;
-    border-radius: 0.6rem;
-    border: none;
-    background: var(--v2-accent);
-    color: #fff;
-    font-size: 0.76rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s, transform 0.12s var(--v2-ease);
-}
-
-.counting-v2 .v2-token-paste:hover { background: #1d4ed8; }
-.counting-v2 .v2-token-paste:active { transform: scale(0.97); }
-
-.counting-v2 .v2-token-paste svg { width: 0.85rem; height: 0.85rem; }
-
-/* ================================================================
-   5) GENEL / GÜNLÜK ayrımı ve aktif tablo
-   ================================================================ */
-
-.counting-v2 .v2-scope {
-    display: inline-flex;
-    padding: 0.2rem;
-    border-radius: 9999px;
-    background: var(--v2-track);
-    border: 1px solid var(--v2-line);
-    gap: 0.15rem;
-}
-
-.counting-v2 .v2-scope button {
-    padding: 0.35rem 0.85rem;
-    border: none;
-    border-radius: 9999px;
-    background: transparent;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--v2-muted);
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-}
-
-.counting-v2 .v2-scope button[aria-selected='true'] {
-    background: #fff;
-    color: var(--v2-ink);
-    box-shadow: 0 1px 3px rgb(15 23 42 / 0.12);
-}
-
-/* Aktif tablo kartı — sayfanın çapası */
-.counting-v2 .v2-active-table {
+.counting-v2 .v2-chip__text {
     display: flex;
-    align-items: center;
-    gap: 0.85rem;
-    padding: 0.85rem 1rem;
-    border: 1px solid var(--v2-line);
-    border-left: 3px solid var(--v2-accent);
-    border-radius: 1rem;
-    background: #fff;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.15;
 }
 
-.counting-v2 .v2-active-table__label {
-    font-size: 0.66rem;
+.counting-v2 .v2-chip__eyebrow {
+    white-space: nowrap;
+    font-size: 0.58rem;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: var(--v2-faint);
 }
 
-.counting-v2 .v2-active-table__name {
-    font-size: 1rem;
-    font-weight: 700;
+.counting-v2 .v2-chip__name {
+    font-size: 0.83rem;
+    font-weight: 650;
     color: var(--v2-ink);
-    line-height: 1.25;
-    overflow-wrap: anywhere;
-}
-
-.counting-v2 .v2-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.1rem 0.45rem;
-    border-radius: 9999px;
-    font-size: 0.64rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-}
-
-.counting-v2 .v2-badge--genel { background: var(--v2-accent-soft); color: var(--v2-accent); }
-.counting-v2 .v2-badge--gunluk { background: #f5f3ff; color: #7c3aed; }
-
-/* ================================================================
-   6) Genel sadeleştirme — gölge ve köşe yumuşatma
-   ================================================================ */
-
-.counting-v2 .shadow-md,
-.counting-v2 .shadow-lg,
-.counting-v2 .shadow-soft {
-    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04) !important;
-}
-
-.counting-v2 main > div,
-.counting-v2 main > section {
-    border-color: var(--v2-line) !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .counting-v2 * {
-        transition: none !important;
-    }
-}
-
-/* ================================================================
-   v2 YERLEŞİM — yeniden düzenlenmiş kabuk
-   ================================================================ */
-
-.counting-v2 .v2-shell {
-    display: flex;
-    flex-direction: column;
-    gap: 0.85rem;
-}
-
-/* --- Özet şerit: 4 metrik tek satır --- */
-.counting-v2 .v2-summary .skeleton-content {
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0 !important;
-    border: 1px solid var(--v2-line);
-    border-radius: 1rem;
-    background: #fff;
-    overflow: hidden;
-}
-
-.counting-v2 .v2-summary .stat-card {
-    border: none !important;
-    border-left: none !important;
-    border-radius: 0 !important;
-    padding: 0.7rem 0.9rem !important;
-    box-shadow: none !important;
-}
-
-.counting-v2 .v2-summary .stat-card + .stat-card {
-    border-left: 1px solid var(--v2-soft) !important;
-}
-
-.counting-v2 .v2-summary .stat-card p:last-child {
-    font-size: 1.45rem !important;
-}
-
-/* --- Eylem çubuğu --- */
-.counting-v2 .v2-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    flex-wrap: wrap;
-    padding: 0.6rem 0.7rem;
-    border: 1px solid var(--v2-line);
-    border-radius: 1rem;
-    background: #fff;
-}
-
-.counting-v2 .v2-actions__left {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: 1;
-    min-width: 15rem;
-    position: relative;
-}
-
-.counting-v2 .v2-actions__left #manualProductInputWrapper {
-    flex: 1;
-    min-width: 0;
-    margin: 0 !important;
-}
-
-.counting-v2 .v2-actions__right {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-}
-
-.counting-v2 .v2-actions button {
-    white-space: nowrap;
-}
-
-/* --- Ana alan --- */
-.counting-v2 .v2-body #countingTableContainer {
-    border-radius: 1rem !important;
-    border: 1px solid var(--v2-line) !important;
-    box-shadow: none !important;
-    margin: 0 !important;
-}
-
-/* --- Üst bar: aktif tablo çipi --- */
-.counting-v2 .v2-table-chip {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0;
-    padding: 0.3rem 0.7rem;
-    margin-left: 0.5rem;
-    border: 1px solid var(--v2-line);
-    border-left: 3px solid var(--v2-accent);
-    border-radius: 0.7rem;
-    background: #fff;
-    cursor: pointer;
-    text-align: left;
-    max-width: 14rem;
-    position: relative;
-    transition: border-color 0.15s, background 0.15s;
-}
-
-.counting-v2 .v2-table-chip.is-daily { border-left-color: #7c3aed; }
-.counting-v2 .v2-table-chip:hover { background: var(--v2-track); }
-
-.counting-v2 .v2-table-chip__eyebrow {
-    font-size: 0.56rem;
-    font-weight: 700;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    color: var(--v2-faint);
-    line-height: 1.2;
-}
-
-.counting-v2 .v2-table-chip__name {
-    font-size: 0.82rem;
-    font-weight: 700;
-    color: var(--v2-ink);
-    line-height: 1.25;
-    max-width: 11rem;
+    max-width: 13rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.counting-v2 .v2-table-chip__caret {
-    position: absolute;
-    right: 0.45rem;
-    top: 50%;
-    width: 0.8rem;
-    height: 0.8rem;
+.counting-v2 .v2-chip__caret {
+    width: 0.85rem;
+    height: 0.85rem;
+    flex: none;
     color: var(--v2-faint);
-    transform: translateY(-50%);
+    transition: transform var(--v2-base) var(--v2-ease);
 }
 
-/* --- Token: üst bar düğmesi + popover --- */
-.counting-v2 .v2-token { position: relative; }
+body.v2-drawer-open .counting-v2 .v2-chip__caret,
+.counting-v2 .v2-chip[aria-expanded="true"] .v2-chip__caret {
+    transform: rotate(180deg);
+}
+
+/* ==========================================================================
+   2) TOKEN — üst sağda durum rozeti + popover
+   ========================================================================== */
+
+.counting-v2 .v2-token { position: relative; flex: none; }
 
 .counting-v2 .v2-token-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    padding: 0.35rem 0.6rem;
+    gap: 0.4rem;
+    height: 2.15rem;
+    padding: 0 0.65rem;
     border: 1px solid var(--v2-line);
-    border-radius: 9999px;
-    background: #fff;
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--v2-muted);
+    border-radius: 999px;
+    background: var(--v2-surface);
+    box-shadow: var(--v2-shadow-1);
     cursor: pointer;
+    transition: border-color var(--v2-fast), background var(--v2-fast);
 }
 
 .counting-v2 .v2-token-btn:hover { background: var(--v2-track); }
 
+.counting-v2 .v2-token-btn__label {
+    font-size: 0.72rem;
+    font-weight: 650;
+    color: var(--v2-muted);
+    /* Metin "Token"/"42 dk"/"Süresi doldu" arasında gezerken bar zıplamasın */
+    min-width: 3.4rem;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+}
+
 .counting-v2 .v2-token-dot {
     width: 0.5rem;
     height: 0.5rem;
-    border-radius: 9999px;
-    background: #cbd5e1;
+    flex: none;
+    border-radius: 999px;
+    background: var(--v2-faint);
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
 }
 
-.counting-v2 .v2-token-dot.is-ok { background: var(--v2-ok); }
-.counting-v2 .v2-token-dot.is-warn { background: var(--v2-warn); }
-.counting-v2 .v2-token-dot.is-bad { background: var(--v2-bad); }
+.counting-v2 .v2-token-dot.is-ok {
+    background: var(--v2-tam);
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.14);
+}
 
+.counting-v2 .v2-token-dot.is-warn {
+    background: var(--v2-yarim);
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.16);
+}
+
+.counting-v2 .v2-token-dot.is-bad {
+    background: var(--v2-eksik);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.16);
+    animation: v2-pulse 2.4s var(--v2-ease) infinite;
+}
+
+@keyframes v2-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.16); }
+    50%      { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.06); }
+}
+
+/* Token yoksa rozet dikkat çeksin ama bağırmasın */
+.counting-v2 .v2-token-btn.is-bad {
+    border-color: #fecaca;
+    background: var(--v2-eksik-soft);
+}
+
+.counting-v2 .v2-token-btn.is-bad .v2-token-btn__label { color: #b91c1c; }
+
+/* --- Popover --- */
 .counting-v2 .v2-token-pop {
     position: absolute;
     right: 0;
-    top: calc(100% + 0.45rem);
+    top: calc(100% + 0.55rem);
     z-index: 120;
-    width: min(23rem, 90vw);
-    padding: 0.75rem;
+    width: min(22rem, calc(100vw - 1.5rem));
     border: 1px solid var(--v2-line);
-    border-radius: 0.9rem;
-    background: #fff;
-    box-shadow: 0 18px 40px -20px rgb(15 23 42 / 0.3);
+    border-radius: var(--v2-r-lg);
+    background: var(--v2-surface);
+    box-shadow: var(--v2-shadow-3);
+    overflow: hidden;
+    transform-origin: top right;
+    animation: v2-pop-in var(--v2-base) var(--v2-ease);
+}
+
+.counting-v2 .v2-token-pop[hidden] { display: none; }
+
+@keyframes v2-pop-in {
+    from { opacity: 0; transform: translate3d(0, -4px, 0) scale(0.98); }
+    to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
 .counting-v2 .v2-token-pop__head {
@@ -593,76 +306,858 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.6rem;
-    margin-bottom: 0.5rem;
-    font-size: 0.82rem;
+    padding: 0.85rem 0.95rem;
+    border-bottom: 1px solid var(--v2-soft);
 }
 
-.counting-v2 .v2-token-paste {
-    padding: 0.3rem 0.6rem;
+.counting-v2 .v2-token-pop__title {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--v2-ink);
+}
+
+.counting-v2 .v2-token-pop__sub {
+    margin: 0.1rem 0 0;
+    font-size: 0.7rem;
+    color: var(--v2-faint);
+    min-height: 1rem;
+}
+
+.counting-v2 .v2-token-pop__body { padding: 0.85rem 0.95rem 0.95rem; }
+
+/* Tek tıkla panodan yapıştırma — popover'ın birincil eylemi */
+.counting-v2 .v2-paste {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    height: 2.6rem;
     border: none;
-    border-radius: 0.5rem;
-    background: var(--v2-accent);
+    border-radius: var(--v2-r-md);
+    background: var(--v2-primary);
     color: #fff;
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: 0.82rem;
+    font-weight: 650;
     cursor: pointer;
+    box-shadow: var(--v2-shadow-1);
+    transition: background var(--v2-fast), transform var(--v2-fast);
 }
 
-.counting-v2 .v2-token-paste:hover { background: #1d4ed8; }
+.counting-v2 .v2-paste:hover { background: var(--v2-primary-700); }
+.counting-v2 .v2-paste:active { transform: scale(0.985); }
+.counting-v2 .v2-paste svg { width: 1.05rem; height: 1.05rem; flex: none; }
+.counting-v2 .v2-paste.is-ok { background: var(--v2-tam); }
+.counting-v2 .v2-paste.is-bad { background: var(--v2-eksik); }
 
+.counting-v2 .v2-token-hint {
+    margin: 0.55rem 0 0;
+    font-size: 0.7rem;
+    line-height: 1.45;
+    color: var(--v2-faint);
+    text-align: center;
+}
+
+.counting-v2 .v2-token-hint kbd {
+    padding: 0.05rem 0.3rem;
+    border: 1px solid var(--v2-line);
+    border-bottom-width: 2px;
+    border-radius: 0.3rem;
+    background: var(--v2-track);
+    font-family: inherit;
+    font-size: 0.65rem;
+    font-weight: 650;
+    color: var(--v2-muted);
+}
+
+/* Token bilgi satırları */
+.counting-v2 .v2-token-facts {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.3rem 0.75rem;
+    margin-top: 0.85rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--v2-soft);
+    font-size: 0.74rem;
+}
+
+.counting-v2 .v2-token-facts dt { color: var(--v2-faint); font-weight: 500; }
+
+.counting-v2 .v2-token-facts dd {
+    margin: 0;
+    color: var(--v2-ink);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* v1'in API durum kartı popover içinde düzleşsin */
 .counting-v2 .v2-token-pop #apiStatusCard {
+    margin: 0.85rem 0 0 !important;
+    padding: 0.7rem 0.75rem !important;
+    border-radius: var(--v2-r-md) !important;
     background: var(--v2-track) !important;
+    border: 1px solid var(--v2-soft) !important;
+    box-shadow: none !important;
+    background-image: none !important;
+}
+
+.counting-v2 .v2-token-pop #apiStatusCard h4 { font-size: 0.72rem; }
+.counting-v2 .v2-token-pop #apiStatusCard svg { width: 0.9rem; height: 0.9rem; }
+.counting-v2 .v2-token-pop #apiStatusIcon { width: 1.85rem; height: 1.85rem; }
+.counting-v2 .v2-token-pop #apiStatusIcon svg { width: 1rem; height: 1rem; }
+
+/* Elle yapıştırma formu — açılır kapanır ama içerik daima erişilebilir */
+.counting-v2 .v2-token-form { margin-top: 0.85rem; }
+
+.counting-v2 .v2-token-form__label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--v2-faint);
+}
+
+.counting-v2 .v2-token-form__input {
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--v2-line);
+    border-radius: var(--v2-r-sm);
+    background: var(--v2-track);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.7rem;
+    line-height: 1.5;
+    color: var(--v2-ink);
+    resize: vertical;
+}
+
+.counting-v2 .v2-token-form__input:focus {
+    outline: none;
+    border-color: var(--v2-primary);
+    background: var(--v2-surface);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.counting-v2 .v2-token-form__row {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.45rem;
+}
+
+.counting-v2 .v2-token-form__preview {
+    margin: 0.45rem 0 0;
+    min-height: 1rem;
+    font-size: 0.68rem;
+    color: var(--v2-muted);
+    word-break: break-all;
+}
+
+/* ==========================================================================
+   3) DÜĞME DİLİ
+   ========================================================================== */
+
+.counting-v2 .v2-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    height: 2.4rem;
+    padding: 0 0.85rem;
+    border: 1px solid transparent;
+    border-radius: var(--v2-r-md);
+    font-size: 0.78rem;
+    font-weight: 650;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--v2-fast), border-color var(--v2-fast), transform var(--v2-fast);
+}
+
+.counting-v2 .v2-btn:active { transform: scale(0.97); }
+.counting-v2 .v2-btn svg { width: 1rem; height: 1rem; flex: none; }
+.counting-v2 .v2-btn--sm { height: 2rem; padding: 0 0.65rem; font-size: 0.73rem; }
+
+.counting-v2 .v2-btn--primary {
+    background: var(--v2-primary);
+    color: #fff;
+    box-shadow: var(--v2-shadow-1);
+}
+
+.counting-v2 .v2-btn--primary:hover { background: var(--v2-primary-700); }
+
+.counting-v2 .v2-btn--ghost {
+    background: var(--v2-surface);
+    border-color: var(--v2-line);
+    color: var(--v2-muted);
+}
+
+.counting-v2 .v2-btn--ghost:hover { background: var(--v2-track); color: var(--v2-ink); }
+
+/* Simge düğmeleri (kamera / terminal / pano) */
+.counting-v2 .v2-tool {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem !important;
+    height: 2.4rem !important;
+    padding: 0 !important;
     border: 1px solid var(--v2-line) !important;
-    border-radius: 0.7rem !important;
+    border-radius: var(--v2-r-md) !important;
+    background: var(--v2-surface) !important;
+    color: var(--v2-muted) !important;
+    box-shadow: none !important;
+    cursor: pointer;
+    transition: background var(--v2-fast), color var(--v2-fast), border-color var(--v2-fast), transform var(--v2-fast);
+}
+
+.counting-v2 .v2-tool:hover {
+    background: var(--v2-track) !important;
+    border-color: #cbd5e1 !important;
+}
+
+.counting-v2 .v2-tool:active { transform: scale(0.94); }
+.counting-v2 .v2-tool svg { width: 1.1rem !important; height: 1.1rem !important; }
+
+/*
+ * Araç kimliği yalnızca İKON renginde yaşar; kutu sakin kalır.
+ * Dokunmatikte hover yok — bu yüzden renk dinlenme hâlinde de duruyor,
+ * yoksa üç düğme birbirinin aynısı gri kutuya dönüşürdü.
+ */
+.counting-v2 #cameraScanBtn { color: #7c3aed !important; }
+.counting-v2 #terminalScanBtn { color: #b45309 !important; }
+.counting-v2 #getirCdnPasteBtn { color: #047857 !important; }
+
+.counting-v2 #cameraScanBtn:hover { border-color: #ddd6fe !important; background: #f5f3ff !important; }
+.counting-v2 #terminalScanBtn:hover { border-color: #fde68a !important; background: var(--v2-yarim-soft) !important; }
+.counting-v2 #getirCdnPasteBtn:hover { border-color: #a7f3d0 !important; background: var(--v2-tam-soft) !important; }
+
+.counting-v2 .v2-tool:disabled { opacity: 0.45; pointer-events: none; }
+
+/* Taşma menüsü */
+.counting-v2 .v2-more { position: relative; flex: none; }
+
+.counting-v2 .v2-more__menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.4rem);
+    z-index: 110;
+    min-width: 13.5rem;
+    padding: 0.3rem;
+    border: 1px solid var(--v2-line);
+    border-radius: var(--v2-r-md);
+    background: var(--v2-surface);
+    box-shadow: var(--v2-shadow-3);
+    animation: v2-pop-in var(--v2-fast) var(--v2-ease);
+}
+
+.counting-v2 .v2-more__menu[hidden] { display: none; }
+
+.counting-v2 .v2-more__label {
+    padding: 0.4rem 0.55rem 0.25rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--v2-faint);
+}
+
+/* Menüye taşınan v1 düğmeleri tek satır hâline gelsin */
+.counting-v2 .v2-more__menu > button {
+    display: flex !important;
+    align-items: center;
+    gap: 0.55rem !important;
+    width: 100%;
+    padding: 0.5rem 0.55rem !important;
+    border: none !important;
+    border-radius: var(--v2-r-sm) !important;
+    background: transparent !important;
+    color: var(--v2-muted) !important;
+    font-size: 0.78rem !important;
+    font-weight: 550 !important;
+    text-align: left;
+    box-shadow: none !important;
+}
+
+.counting-v2 .v2-more__menu > button:hover {
+    background: var(--v2-track) !important;
+    color: var(--v2-ink) !important;
+}
+
+.counting-v2 .v2-more__menu > #resetWarehouseStocksBtn:hover,
+.counting-v2 .v2-more__menu > #resetSystemStocksBtn:hover {
+    background: var(--v2-eksik-soft) !important;
+    color: #b91c1c !important;
+}
+
+.counting-v2 .v2-more__menu > button svg { width: 1rem !important; height: 1rem !important; color: currentColor; }
+
+/* ==========================================================================
+   4) SEKME ŞERİDİ — Sayım / Finans / Stok Farkı
+   ========================================================================== */
+
+.counting-v2 main > .bg-white:first-of-type {
+    border: 1px solid var(--v2-line) !important;
+    border-radius: var(--v2-r-lg) !important;
+    box-shadow: var(--v2-shadow-1) !important;
+    background: var(--v2-surface) !important;
+    margin-bottom: 1rem !important;
+    overflow: hidden;
+}
+
+.counting-v2 main > .bg-white:first-of-type > .flex {
+    border-bottom: none !important;
+    padding: 0.3rem;
+    gap: 0.25rem;
+}
+
+.counting-v2 .tab-button {
+    position: relative;
+    border-bottom: none !important;
+    border-radius: var(--v2-r-md);
+    padding: 0.6rem 0.75rem !important;
+    color: var(--v2-muted) !important;
+    font-weight: 600;
+    transition: background var(--v2-fast), color var(--v2-fast);
+}
+
+.counting-v2 .tab-button:hover { background: var(--v2-track); color: var(--v2-ink) !important; }
+
+.counting-v2 .tab-button.active {
+    background: var(--v2-primary-50) !important;
+    color: var(--v2-primary-700) !important;
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.18);
+}
+
+.counting-v2 .tab-button svg { width: 1.05rem; height: 1.05rem; }
+
+/* ==========================================================================
+   5) KOMUT ÇUBUĞU — ürün ekleme + araçlar + senkron
+   ========================================================================== */
+
+.counting-v2 .v2-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    width: 100%;
+}
+
+.counting-v2 .v2-cmd {
+    position: sticky;
+    top: var(--v2-header-h);
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem;
+    border: 1px solid var(--v2-line);
+    border-radius: var(--v2-r-lg);
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    box-shadow: var(--v2-shadow-2);
+}
+
+/* Arama alanı çubuğun taşıyıcı öğesi */
+.counting-v2 .v2-cmd__search {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.counting-v2 .v2-cmd__search #manualProductInputWrapper {
+    margin: 0 !important;
+    width: 100%;
+}
+
+.counting-v2 .v2-cmd__search #manualProductInput {
+    height: 2.4rem;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-radius: var(--v2-r-md) !important;
+    background: var(--v2-track) !important;
+    border-color: var(--v2-line) !important;
+    font-size: 0.83rem !important;
+}
+
+.counting-v2 .v2-cmd__search #manualProductInput:focus {
+    background: var(--v2-surface) !important;
+    border-color: var(--v2-primary) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+}
+
+.counting-v2 .v2-cmd__search #manualProductInputClear { height: 1.9rem; width: 1.9rem; }
+
+.counting-v2 .v2-cmd__search #manualInputResults {
+    border-radius: var(--v2-r-md) !important;
+    border-color: var(--v2-line) !important;
+    box-shadow: var(--v2-shadow-3) !important;
+}
+
+.counting-v2 .v2-cmd__tools {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: none;
+}
+
+/* Araçlarla birincil eylem arasına ince bir ayraç */
+.counting-v2 .v2-cmd__sep {
+    width: 1px;
+    height: 1.6rem;
+    flex: none;
+    background: var(--v2-line);
+}
+
+.counting-v2 .v2-cmd__main {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: none;
+}
+
+/* v1'in senkron düğmesini komut çubuğu diline çevir */
+.counting-v2 #syncStocksBtn {
+    height: 2.4rem !important;
+    padding: 0 0.9rem !important;
+    border-radius: var(--v2-r-md) !important;
+    font-size: 0.78rem !important;
+    font-weight: 650 !important;
+    box-shadow: var(--v2-shadow-1) !important;
+    background: var(--v2-primary) !important;
+}
+
+.counting-v2 #syncStocksBtn:hover { background: var(--v2-primary-700) !important; }
+.counting-v2 #syncStocksBtn svg { width: 1rem !important; height: 1rem !important; }
+
+/* ==========================================================================
+   6) ÖZET ŞERİT — 4 metrik tek satırda
+   ========================================================================== */
+
+.counting-v2 .v2-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.6rem;
+    width: 100%;
+}
+
+.counting-v2 .v2-summary #countingStatsHost {
+    display: contents;
     margin: 0 !important;
 }
 
-/* --- Çekmece --- */
+.counting-v2 .v2-summary #countingStatsHost > .skeleton-content {
+    display: contents !important;
+    gap: 0 !important;
+}
+
+/* İskelet yalnızca `.is-loading` varken görünür — görünürlüğü skeleton.css
+   yönetir, biz sadece 4'lü ızgaraya oturtuyoruz. */
+.counting-v2 .v2-summary #countingStatsHost.is-loading > .skeleton-placeholder {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.6rem;
+}
+
+/* Tek bir metrik kutusu */
+.counting-v2 .v2-summary .stat-card,
+.counting-v2 .v2-tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.15rem;
+    min-height: 4.5rem;
+    margin: 0 !important;
+    padding: 0.7rem 0.85rem !important;
+    border: 1px solid var(--v2-line) !important;
+    border-radius: var(--v2-r-lg) !important;
+    background: var(--v2-surface) !important;
+    box-shadow: var(--v2-shadow-1) !important;
+    overflow: hidden;
+}
+
+/* v1 kartındaki dev filigran ikon ve alt gradyan şerit — gürültü, kaldırıldı */
+.counting-v2 .v2-summary .stat-card > .absolute { display: none !important; }
+
+.counting-v2 .v2-summary .stat-card p:first-child,
+.counting-v2 .v2-tile__label {
+    margin: 0 !important;
+    font-size: 0.66rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--v2-faint) !important;
+    line-height: 1.3;
+}
+
+.counting-v2 .v2-summary .stat-card p:last-child,
+.counting-v2 .v2-tile__value {
+    margin: 0 !important;
+    font-size: 1.6rem !important;
+    font-weight: 700 !important;
+    line-height: 1.15 !important;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Anlam renkleri — grid ve tablo ile birebir aynı */
+.counting-v2 #totalProductsCount { color: var(--v2-ink) !important; }
+.counting-v2 #positiveDifferenceCount { color: var(--v2-fazla) !important; }
+.counting-v2 #negativeDifferenceCount { color: var(--v2-eksik) !important; }
+
+.counting-v2 .v2-summary .stat-card::before,
+.counting-v2 .v2-tile::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.85rem;
+    bottom: 0.85rem;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--v2-line);
+}
+
+.counting-v2 .v2-summary .stat-card:nth-of-type(1)::before { background: var(--v2-bekleyen); }
+.counting-v2 .v2-summary .stat-card:nth-of-type(2)::before { background: var(--v2-fazla); }
+.counting-v2 .v2-summary .stat-card:nth-of-type(3)::before { background: var(--v2-eksik); }
+.counting-v2 .v2-tile--progress::before { background: var(--v2-tam); }
+
+/* İlerleme kutusu (v2'nin eklediği 4. metrik) */
+.counting-v2 .v2-tile__value { color: var(--v2-tam); }
+
+.counting-v2 .v2-tile__meter {
+    height: 0.3rem;
+    margin-top: 0.35rem;
+    border-radius: 999px;
+    background: var(--v2-soft);
+    overflow: hidden;
+}
+
+.counting-v2 .v2-tile__bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: var(--v2-tam);
+    transition: width 420ms var(--v2-ease);
+}
+
+.counting-v2 .v2-tile__sub {
+    margin: 0.2rem 0 0;
+    font-size: 0.66rem;
+    color: var(--v2-faint);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   7) ÜRÜN ALANI — arama, görünüm anahtarı, renk anahtarı
+   ========================================================================== */
+
+.counting-v2 .v2-body { width: 100%; }
+
+.counting-v2 .v2-body #countingTableContainer {
+    margin: 0 !important;
+    border: 1px solid var(--v2-line) !important;
+    border-radius: var(--v2-r-lg) !important;
+    box-shadow: var(--v2-shadow-1) !important;
+    background: var(--v2-surface) !important;
+}
+
+.counting-v2 #countingTableContainer > .p-3:first-child,
+.counting-v2 #countingTableContainer > .p-4:first-child {
+    padding: 0.75rem !important;
+    border-bottom: 1px solid var(--v2-soft) !important;
+}
+
+.counting-v2 #countingTableSearchInput {
+    height: 2.4rem;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-radius: var(--v2-r-md) !important;
+    background: var(--v2-track) !important;
+    font-size: 0.83rem !important;
+}
+
+.counting-v2 #countingTableSearchInput:focus {
+    background: var(--v2-surface) !important;
+    border-color: var(--v2-primary) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+}
+
+.counting-v2 #viewModeToggle {
+    height: 2.2rem;
+    border-radius: var(--v2-r-md) !important;
+    background: var(--v2-track) !important;
+    border: 1px solid var(--v2-line);
+    color: var(--v2-muted) !important;
+    font-size: 0.76rem;
+    font-weight: 650;
+}
+
+.counting-v2 #viewModeToggle:hover { background: var(--v2-soft) !important; color: var(--v2-ink) !important; }
+
+/* --- Renk anahtarı: grid modunda ne hangi renk, tek bakışta --- */
+.counting-v2 .v2-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3rem 0.65rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--v2-soft);
+    background: var(--v2-track);
+}
+
+.counting-v2 .v2-legend[hidden] { display: none; }
+
+.counting-v2 .v2-legend__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--v2-muted);
+}
+
+.counting-v2 .v2-legend__swatch {
+    width: 0.65rem;
+    height: 0.65rem;
+    flex: none;
+    border-radius: 0.2rem;
+}
+
+.counting-v2 .v2-legend__swatch--tam { background: var(--v2-tam); }
+.counting-v2 .v2-legend__swatch--fazla { background: var(--v2-fazla); }
+.counting-v2 .v2-legend__swatch--eksik { background: var(--v2-eksik); }
+.counting-v2 .v2-legend__swatch--yarim { background: var(--v2-yarim); }
+.counting-v2 .v2-legend__swatch--bekleyen { background: var(--v2-surface); box-shadow: inset 0 0 0 2px var(--v2-faint); }
+
+/* ==========================================================================
+   8) GRID MODU — sayım kartları
+   --------------------------------------------------------------------------
+   v1'de her kart 3px renkli çerçeve + renkli gölge taşıyordu; 200 kart yan
+   yana gelince ekran neon bir duvara dönüyordu. v2'de renk üç yerde ve
+   ölçülü kullanılır: ince çerçeve, üst şerit, alt durum etiketi.
+   Alt etiketteki SAYI v2'nin eklediği bilgidir — kart açmadan farkı görürsün.
+   ========================================================================== */
+
+.counting-v2 #rapidCountingGrid { padding: 0.6rem !important; }
+
+.counting-v2 #rapidCountingGridContainer {
+    gap: 0.5rem !important;
+}
+
+.counting-v2 #rapidCountingGridContainer .rapid-product-card {
+    border-width: 1px !important;
+    border-color: var(--v2-line) !important;
+    border-radius: var(--v2-r-md) !important;
+    background: var(--v2-surface) !important;
+    box-shadow: var(--v2-shadow-1) !important;
+    /* Kayma yok: kart oranı sabit, alt etiket için yer baştan ayrılır */
+    padding-bottom: 1.05rem;
+    transition: transform var(--v2-fast) var(--v2-ease), box-shadow var(--v2-fast), border-color var(--v2-fast);
+}
+
+.counting-v2 #rapidCountingGridContainer .rapid-product-card:hover {
+    transform: translate3d(0, -2px, 0);
+    box-shadow: var(--v2-shadow-2) !important;
+}
+
+.counting-v2 #rapidCountingGridContainer .rapid-product-card:active { transform: scale(0.96); }
+
+/* Üst şerit — durumun ilk sinyali */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--v2-line);
+    z-index: 5;
+}
+
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="zero"],
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"] {
+    border-color: rgba(5, 150, 105, 0.35) !important;
+    background: var(--v2-tam-soft) !important;
+}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="zero"]::after,
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="gray"]::after { background: var(--v2-tam); }
+
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="positive"],
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"] {
+    border-color: rgba(37, 99, 235, 0.35) !important;
+    background: var(--v2-fazla-soft) !important;
+}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="positive"]::after,
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="green"]::after { background: var(--v2-fazla); }
+
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="negative"],
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"] {
+    border-color: rgba(220, 38, 38, 0.35) !important;
+    background: var(--v2-eksik-soft) !important;
+}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="negative"]::after,
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="red"]::after { background: var(--v2-eksik); }
+
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"] {
+    border-color: rgba(217, 119, 6, 0.4) !important;
+    background: var(--v2-yarim-soft) !important;
+}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"]::after { background: var(--v2-yarim); }
+
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"] {
+    border-color: var(--v2-line) !important;
+    background: var(--v2-surface) !important;
+}
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"]::after {
+    background: repeating-linear-gradient(90deg, var(--v2-faint) 0 4px, transparent 4px 8px);
+}
+
+/* v1'in renkli gölgesi kapatılır — 200 karttaki neon etkisi buradan geliyordu */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card[data-rapid-state] {
+    box-shadow: var(--v2-shadow-1) !important;
+}
+
+/* Köşe rozeti */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .product-status-icon {
+    top: 0.25rem !important;
+    right: 0.25rem !important;
+    width: 1.15rem !important;
+    height: 1.15rem !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1) !important;
+    backdrop-filter: blur(2px);
+}
+
+/* v1'in alt ince çubuğu artık gerekmiyor; yerini sayı etiketi aldı */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .stock-indicator { display: none !important; }
+
+/* Ürün adı */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card p {
+    font-size: 0.6rem !important;
+    font-weight: 600 !important;
+    color: var(--v2-muted) !important;
+    letter-spacing: -0.005em;
+}
+
+/* --- Alt durum etiketi: fark sayısı (v2 ekler) --- */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1.05rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    background: var(--v2-soft);
+    color: var(--v2-bekleyen);
+    z-index: 6;
+}
+
+/* Değiştiriciler taban kuralla aynı ID kapsamında olmak ZORUNDA — aksi hâlde
+   `#rapidCountingGridContainer` taşıyan taban kural özgüllükte kazanır ve
+   etiketler gri kalır. */
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--tam { background: var(--v2-tam); color: #fff; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--fazla { background: var(--v2-fazla); color: #fff; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--eksik { background: var(--v2-eksik); color: #fff; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--yarim { background: var(--v2-yarim); color: #fff; }
+.counting-v2 #rapidCountingGridContainer .rapid-product-card .v2-diff--bekleyen { background: var(--v2-soft); color: var(--v2-faint); }
+
+/* ==========================================================================
+   9) TABLO / KART GÖRÜNÜMÜ — aynı anlam renkleri
+   ========================================================================== */
+
+.counting-v2 #desktopTableView table { font-variant-numeric: tabular-nums; }
+
+.counting-v2 #desktopTableView thead th {
+    background: var(--v2-track) !important;
+    color: var(--v2-faint) !important;
+    font-size: 0.66rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--v2-line) !important;
+}
+
+.counting-v2 #desktopTableView tbody tr { transition: background var(--v2-fast); }
+.counting-v2 #desktopTableView tbody tr:hover { background: var(--v2-track) !important; }
+
+.counting-v2 .product-card {
+    border-radius: var(--v2-r-md) !important;
+    border: 1px solid var(--v2-line) !important;
+    box-shadow: var(--v2-shadow-1) !important;
+}
+
+/* Ağır gölgeleri tek dile indir */
+.counting-v2 .shadow-md,
+.counting-v2 .shadow-lg,
+.counting-v2 .shadow-soft { box-shadow: var(--v2-shadow-1) !important; }
+
+/* ==========================================================================
+   10) ÇEKMECE — tablo yönetimi
+   --------------------------------------------------------------------------
+   131 tablo bir şeritte yatay kaydırmayla aranamaz. Çekmecede: önce aktif
+   tablo kartı, sonra tür anahtarı, sonra arama, sonra sarmalayan liste.
+   ========================================================================== */
+
 .counting-v2 .v2-drawer-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 210;
-    background: rgb(15 23 42 / 0.4);
+    z-index: 130;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.22s ease-out;
+    transition: opacity var(--v2-base) var(--v2-ease);
 }
 
-body.v2-drawer-open .v2-drawer-backdrop {
-    opacity: 1;
-    pointer-events: auto;
-}
+body.v2-drawer-open .v2-drawer-backdrop { opacity: 1; pointer-events: auto; }
 
-.counting-v2 .v2-drawer {
+.counting-v2 .v2-drawer,
+body > .v2-drawer {
     position: fixed;
     top: 0;
     right: 0;
     bottom: 0;
-    z-index: 220;
-    width: min(30rem, 100vw);
+    z-index: 131;
     display: flex;
     flex-direction: column;
-    background: #fff;
-    border-left: 1px solid var(--v2-line);
-    box-shadow: -24px 0 48px -24px rgb(15 23 42 / 0.3);
-    transform: translate3d(100%, 0, 0);
-    transition: transform 0.28s var(--v2-ease);
+    width: min(30rem, 100vw);
+    background: var(--v2-bg, #f8fafc);
+    box-shadow: var(--v2-shadow-4, -18px 0 48px rgba(15, 23, 42, 0.16));
+    transform: translate3d(101%, 0, 0);
+    transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
 }
 
 body.v2-drawer-open .v2-drawer { transform: translate3d(0, 0, 0); }
 
 .counting-v2 .v2-drawer__head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 1rem 1.1rem 0.75rem;
-    border-bottom: 1px solid var(--v2-soft);
+    flex: none;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--v2-line);
+    background: var(--v2-surface);
 }
 
 .counting-v2 .v2-drawer__eyebrow {
     margin: 0;
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     font-weight: 700;
     letter-spacing: 0.09em;
     text-transform: uppercase;
@@ -671,44 +1166,261 @@ body.v2-drawer-open .v2-drawer { transform: translate3d(0, 0, 0); }
 
 .counting-v2 .v2-drawer__title {
     margin: 0.1rem 0 0;
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 700;
+    letter-spacing: -0.015em;
     color: var(--v2-ink);
 }
 
-.counting-v2 .v2-drawer__scope { padding: 0.75rem 1.1rem 0; }
-.counting-v2 .v2-drawer__scope .v2-scope { width: 100%; }
-.counting-v2 .v2-drawer__scope .v2-scope button { flex: 1; }
-
 .counting-v2 .v2-drawer__body {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: 0.85rem 1.1rem 1.25rem;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.9rem 1rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
 }
 
 .counting-v2 .v2-iconbtn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 2rem;
-    height: 2rem;
+    width: 2.15rem;
+    height: 2.15rem;
+    flex: none;
     border: none;
-    border-radius: 0.5rem;
+    border-radius: var(--v2-r-sm);
     background: transparent;
     color: var(--v2-muted);
     cursor: pointer;
+    transition: background var(--v2-fast), color var(--v2-fast);
 }
 
 .counting-v2 .v2-iconbtn:hover { background: var(--v2-soft); color: var(--v2-ink); }
-.counting-v2 .v2-iconbtn svg { width: 1.1rem; height: 1.1rem; }
+.counting-v2 .v2-iconbtn svg { width: 1.15rem; height: 1.15rem; }
 
 body.v2-drawer-open { overflow: hidden; }
 
-@media (max-width: 640px) {
-    .counting-v2 .v2-table-chip { max-width: 9rem; margin-left: 0.35rem; }
-    .counting-v2 .v2-table-chip__name { max-width: 7rem; }
-    .counting-v2 .v2-summary .skeleton-content { grid-template-columns: repeat(3, 1fr); }
-    .counting-v2 .v2-actions { padding: 0.5rem; }
-    .counting-v2 .v2-drawer { width: 100vw; }
+/* --- Çekmece içi: aktif tablo kartı en üstte --- */
+.counting-v2 .v2-drawer #sayimActiveTableHost {
+    order: -1;
+    margin: 0 !important;
+    padding: 0.9rem 1rem !important;
+    border-radius: var(--v2-r-lg) !important;
+    border: 1px solid var(--v2-line) !important;
+    background: var(--v2-surface) !important;
+    box-shadow: var(--v2-shadow-1) !important;
+}
+
+/* --- Tür anahtarı: Genel / Günlük --- */
+.counting-v2 .v2-scope {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border-radius: var(--v2-r-md);
+    background: var(--v2-soft);
+}
+
+.counting-v2 .v2-scope button {
+    flex: 1;
+    height: 2.15rem;
+    border: none;
+    border-radius: var(--v2-r-sm);
+    background: transparent;
+    color: var(--v2-muted);
+    font-size: 0.8rem;
+    font-weight: 650;
+    cursor: pointer;
+    transition: background var(--v2-fast), color var(--v2-fast), box-shadow var(--v2-fast);
+}
+
+.counting-v2 .v2-scope button[aria-selected='true'] {
+    background: var(--v2-surface);
+    color: var(--v2-ink);
+    box-shadow: var(--v2-shadow-1);
+}
+
+/* --- Paneller çekmecede düz kutu olsun --- */
+.counting-v2 .v2-drawer .sayim-panel > div {
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+/* Arama kutusu çekmecenin birincil girişi */
+.counting-v2 .v2-drawer #generalTableSearch {
+    height: 2.5rem;
+    font-size: 0.85rem !important;
+}
+
+.counting-v2 .v2-drawer #generalTableSearch:focus {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+}
+
+/* En kritik düzeltme: pill şeridi yatay kaydırma yerine sarmalayan liste */
+.counting-v2 .v2-drawer #generalTableList {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-content: flex-start;
+    overflow-x: visible !important;
+    overflow-y: auto;
+    max-height: min(46vh, 26rem);
+    overscroll-behavior: contain;
+    margin: 0 !important;
+    padding: 0.6rem !important;
+    border-radius: var(--v2-r-md) !important;
+    border: 1px solid var(--v2-line) !important;
+    background: var(--v2-surface) !important;
+    box-shadow: none !important;
+    gap: 0.4rem !important;
+}
+
+.counting-v2 .v2-drawer #sayimGeneralListHost { display: block !important; }
+
+/* Çekmecede liste zaten görünür — "Liste" açılır düğmesi gereksiz */
+.counting-v2 .v2-drawer #sayimGeneralTableDropdownBtn { display: none !important; }
+
+/* Günlük panel sadeleşsin */
+.counting-v2 .v2-drawer #dailyTableList {
+    max-height: min(40vh, 22rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+/* Tablo eylemleri: çekmecenin altında sabit bir şerit gibi dursun */
+.counting-v2 .v2-drawer__actions {
+    display: flex;
+    gap: 0.4rem;
+    flex: none;
+    padding: 0.7rem 1rem;
+    border-top: 1px solid var(--v2-line);
+    background: var(--v2-surface);
+}
+
+.counting-v2 .v2-drawer__actions > button {
+    flex: 1;
+    height: 2.5rem !important;
+    justify-content: center;
+    margin: 0 !important;
+    padding: 0 0.6rem !important;
+    border-radius: var(--v2-r-md) !important;
+    border: 1px solid var(--v2-line) !important;
+    background: var(--v2-surface) !important;
+    font-size: 0.76rem !important;
+    font-weight: 650 !important;
+    box-shadow: none !important;
+}
+
+.counting-v2 .v2-drawer__actions > #createTableBtn {
+    background: var(--v2-primary) !important;
+    border-color: var(--v2-primary) !important;
+    color: #fff !important;
+}
+
+.counting-v2 .v2-drawer__actions > #createTableBtn:hover { background: var(--v2-primary-700) !important; }
+.counting-v2 .v2-drawer__actions > #deleteTableBtn:hover { background: var(--v2-eksik-soft) !important; }
+
+/* ==========================================================================
+   11) BOŞ KABUKLAR
+   ========================================================================== */
+
+.counting-v2 .v2-hidden { display: none !important; }
+
+/* ==========================================================================
+   12) DUYARLILIK
+   --------------------------------------------------------------------------
+   Mobil: komut çubuğu iki satıra iner (arama üstte, araçlar altta), metrikler
+   2x2, çekmece tam ekran. Tablet: metrikler 4'lü kalır, araçlar tek satır.
+   ========================================================================== */
+
+@media (max-width: 1023px) {
+    /* Dar ekranda üst barın en değerli bilgisi HANGİ TABLOYA saydığındır.
+       Marka yazısı logoyla zaten anlaşılıyor; yerini aktif tablo çipine bırakır. */
+    .counting-v2 header h1,
+    .counting-v2 header h1 + p { display: none; }
+    .counting-v2 header .flex-1 { display: none; }
+    .counting-v2 .v2-chip {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: none;
+        margin-left: 0.35rem;
+    }
+    .counting-v2 .v2-chip__name { max-width: none; }
+}
+
+/* Dört metrik tek satırda ancak ~900px'den sonra rahat okunuyor; altında 2x2 */
+@media (max-width: 899px) {
+    .counting-v2 .v2-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .counting-v2 .v2-summary #countingStatsHost.is-loading > .skeleton-placeholder { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 767px) {
+    .counting-v2 main { padding-left: 0.65rem !important; padding-right: 0.65rem !important; }
+
+
+    .counting-v2 .v2-shell { gap: 0.65rem; }
+
+    /* Arama tam satır; araçlar ve senkron altına iner */
+    .counting-v2 .v2-cmd {
+        flex-wrap: wrap;
+        padding: 0.5rem;
+        border-radius: var(--v2-r-md);
+    }
+
+    .counting-v2 .v2-cmd__search { flex: 1 0 100%; order: 1; }
+    .counting-v2 .v2-cmd__tools { order: 2; flex: 1 1 auto; }
+    .counting-v2 .v2-cmd__sep { display: none; }
+    .counting-v2 .v2-cmd__main { order: 3; margin-left: auto; }
+    .counting-v2 #syncStocksBtn { padding: 0 0.7rem !important; }
+
+    .counting-v2 .v2-summary { gap: 0.45rem; }
+    .counting-v2 .v2-summary .stat-card,
+    .counting-v2 .v2-tile { min-height: 3.9rem; padding: 0.55rem 0.7rem !important; }
+    .counting-v2 .v2-summary .stat-card p:last-child,
+    .counting-v2 .v2-tile__value { font-size: 1.3rem !important; }
+
+    .counting-v2 .v2-drawer { width: 100vw; border-radius: 0; }
+
+    .counting-v2 .tab-button { padding: 0.55rem 0.4rem !important; font-size: 0.78rem !important; }
+
+    .counting-v2 #rapidCountingGridContainer { gap: 0.4rem !important; }
+    .counting-v2 #rapidCountingGrid { padding: 0.45rem !important; }
+}
+
+/* Çok dar telefonlarda üst bardaki çip kısalsın, token rozeti simgeye insin */
+@media (max-width: 480px) {
+    /* Geri düğmesi simgeye insin — kazanılan yer aktif tablo adına gider */
+    .counting-v2 #backToSearchBtn span { display: none !important; }
+    .counting-v2 #backToSearchBtn { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+
+    .counting-v2 .v2-chip { padding-right: 0.45rem; }
+    .counting-v2 .v2-chip__eyebrow { display: none; }
+    .counting-v2 .v2-token-btn__label { display: none; }
+    .counting-v2 .v2-token-btn { width: 2.15rem; padding: 0; justify-content: center; }
+    .counting-v2 .v2-token-pop { width: calc(100vw - 1.25rem); right: -0.35rem; }
+}
+
+/* Geniş ekranda içerik okunur bir genişlikte kalsın, kenarlara yapışmasın */
+@media (min-width: 1536px) {
+    .counting-v2 main { max-width: 108rem; margin-inline: auto; }
+}
+
+/* ==========================================================================
+   13) HAREKET TERCİHİ
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .counting-v2 *,
+    .counting-v2 *::before,
+    .counting-v2 *::after,
+    body > .v2-drawer,
+    body > .v2-drawer-backdrop {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
 }
