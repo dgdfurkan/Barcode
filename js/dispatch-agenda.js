@@ -79,13 +79,13 @@ class DispatchAgendaApp {
     }
 
     async _waitForDb(maxWait = 10000) {
-        if (typeof window.jetbarkodWaitForSupabase === 'function') {
-            await window.jetbarkodWaitForSupabase(maxWait);
+        if (typeof window.jetbarkodWaitForDb === 'function') {
+            await window.jetbarkodWaitForDb(maxWait);
             return;
         }
         const start = Date.now();
         while (Date.now() - start < maxWait) {
-            if (window.supabase?.from) return;
+            if (window.jbDb?.from) return;
             await new Promise((r) => setTimeout(r, 100));
         }
     }
@@ -193,7 +193,7 @@ class DispatchAgendaApp {
         const emptyEl = document.getElementById('agendaEmpty');
         const countEl = document.getElementById('agendaCountBadge');
         if (!this._username) return;
-        if (!window.supabase?.from) {
+        if (!window.jbDb?.from) {
             if (retry < 3) {
                 await this._waitForDb(3000);
                 return this.loadItems(retry + 1);
@@ -203,7 +203,7 @@ class DispatchAgendaApp {
         }
 
         try {
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('dispatch_agenda_items')
                 .select('*')
                 .eq('username', this._username)
@@ -623,7 +623,7 @@ class DispatchAgendaApp {
         if (saveBtn) saveBtn.disabled = true;
 
         try {
-            const { error } = await window.supabase.from('dispatch_agenda_items').insert(row);
+            const { error } = await window.jbDb.from('dispatch_agenda_items').insert(row);
             if (error) throw error;
             this._toast('Kayıt eklendi', 'success');
             this.closeAddModal();
@@ -714,7 +714,7 @@ class DispatchAgendaApp {
         if (confirmBtn) confirmBtn.disabled = true;
 
         try {
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('dispatch_agenda_items')
                 .delete()
                 .eq('id', this.detailItem.id)

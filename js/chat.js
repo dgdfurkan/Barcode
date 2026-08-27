@@ -409,7 +409,7 @@ class ChatSystem {
         }
         
         // Save ONLY to Supabase - it's the single source of truth
-        await this.saveMessageToSupabase(message);
+        await this.saveMessageToDb(message);
     }
 
     showEmptyState() {
@@ -638,20 +638,20 @@ class ChatSystem {
         }
     }
 
-    async saveMessageToSupabase(message) {
+    async saveMessageToDb(message) {
         try {
-            if (window.supabase) {
+            if (window.jbDb) {
                 console.log('💬 Saving user message to Supabase:', message);
                 
                 // Check if guest user
                 if (this.isGuest || (window.guestUserManager && window.guestUserManager.isGuestUser(this.currentUser))) {
                     // Save guest user message
-                    await this.saveGuestMessageToSupabase(message);
+                    await this.saveGuestMessageToDb(message);
                     return;
                 }
                 
                 // Get current user's chat messages
-                const { data: userData, error: userError } = await window.supabase
+                const { data: userData, error: userError } = await window.jbDb
                     .from('users')
                     .select('chat_messages')
                     .eq('username', this.currentUser)
@@ -677,7 +677,7 @@ class ChatSystem {
                 });
 
                 // Update user's chat messages
-                const { error: updateError } = await window.supabase
+                const { error: updateError } = await window.jbDb
                     .from('users')
                     .update({ 
                         chat_messages: JSON.stringify(chatMessages),
@@ -714,7 +714,7 @@ class ChatSystem {
      * Artık ziyaretçi imzalı bir misafir token'ı taşır ve API yalnızca o
      * token'ın sahibi olan konuşmaya yazar. Tablo tarayıcıya tamamen kapalı.
      */
-    async saveGuestMessageToSupabase(message) {
+    async saveGuestMessageToDb(message) {
         try {
             const api = window.jetbarkodAuth;
             const guest = window.guestUserManager;
@@ -936,7 +936,7 @@ class ChatSystem {
     async loadChatHistory() {
         try {
             console.log('🔄 LOADING CHAT HISTORY - Current user:', this.currentUser, 'isGuest:', this.isGuest);
-            console.log('🔄 Supabase available:', !!window.supabase);
+            console.log('🔄 Supabase available:', !!window.jbDb);
             
             // Check if guest user
             if (this.isGuest || (window.guestUserManager && window.guestUserManager.isGuestUser(this.currentUser))) {
@@ -944,11 +944,11 @@ class ChatSystem {
                 return;
             }
             
-            if (window.supabase && this.currentUser) {
+            if (window.jbDb && this.currentUser) {
                 console.log('💬 Loading chat history from Supabase ONLY for user:', this.currentUser);
                 
                 // Get user's chat messages from Supabase - ONLY SOURCE OF TRUTH
-                const { data: userData, error: userError } = await window.supabase
+                const { data: userData, error: userError } = await window.jbDb
                     .from('users')
                     .select('username, chat_messages')
                     .eq('username', this.currentUser)
@@ -1149,13 +1149,13 @@ class ChatSystem {
 
     async markUserMessagesAsRead() {
         // Admin opened chat - mark all user messages as read (green tick)
-        if (!window.supabase || !this.currentUser) return;
+        if (!window.jbDb || !this.currentUser) return;
         
         try {
             console.log('✅ Admin viewing chat - marking user messages as read');
             
             // Get current messages
-            const { data: userData, error: userError } = await window.supabase
+            const { data: userData, error: userError } = await window.jbDb
                 .from('users')
                 .select('chat_messages')
                 .eq('username', this.currentUser)
@@ -1172,7 +1172,7 @@ class ChatSystem {
                 });
                 
                 // Update in Supabase
-                await window.supabase
+                await window.jbDb
                     .from('users')
                     .update({ 
                         chat_messages: JSON.stringify(chatMessages),
@@ -1282,14 +1282,14 @@ class ChatSystem {
     }
 
     setupChatRealtime() {
-        if (!window.supabase) {
+        if (!window.jbDb) {
             console.warn('⚠️ Supabase not available for realtime');
             return;
         }
 
         // Check if supabase is a client instance (has channel method)
-        let supabaseClient = window.supabase;
-        if (typeof supabaseClient.channel !== 'function') {
+        let dbClient = window.jbDb;
+        if (typeof dbClient.channel !== 'function') {
             console.warn('⚠️ Supabase client channel method not available');
             return;
         }
@@ -1307,12 +1307,12 @@ class ChatSystem {
         console.log('🔔 Setting up chat realtime subscription for user:', this.currentUser);
         
         // Remove existing subscription if any
-        if (this.chatSubscription && typeof supabaseClient.removeChannel === 'function') {
-            supabaseClient.removeChannel(this.chatSubscription);
+        if (this.chatSubscription && typeof dbClient.removeChannel === 'function') {
+            dbClient.removeChannel(this.chatSubscription);
         }
         
         // Subscribe to users table changes for this specific user
-        this.chatSubscription = supabaseClient
+        this.chatSubscription = dbClient
             .channel('user-chat-updates')
             .on('postgres_changes', {
                 event: 'UPDATE',
@@ -1481,7 +1481,7 @@ class ChatSystem {
 
     async checkForNewMessages() {
         try {
-            if (window.supabase && this.currentUser) {
+            if (window.jbDb && this.currentUser) {
                 // Check if guest user
                 const isGuest = this.isGuest || (window.guestUserManager && window.guestUserManager.isGuestUser(this.currentUser));
                 
@@ -1511,7 +1511,7 @@ class ChatSystem {
                     }
                 } else {
                     // Kayıtlı kullanıcı için users tablosunu kontrol et
-                    const { data: userData, error: userError } = await window.supabase
+                    const { data: userData, error: userError } = await window.jbDb
                     .from('users')
                     .select('chat_messages, last_chat_update')
                     .eq('username', this.currentUser)
@@ -1735,10 +1735,10 @@ class ChatSystem {
             }
             
             // Regular user
-            if (!window.supabase) return;
+            if (!window.jbDb) return;
             
             // Get current messages
-            const { data: userData, error: userError } = await window.supabase
+            const { data: userData, error: userError } = await window.jbDb
                 .from('users')
                 .select('chat_messages')
                 .eq('username', this.currentUser)
@@ -1758,7 +1758,7 @@ class ChatSystem {
                 
                 if (hasChanges) {
                     // Update in Supabase
-                    await window.supabase
+                    await window.jbDb
                         .from('users')
                         .update({ 
                             chat_messages: JSON.stringify(chatMessages),

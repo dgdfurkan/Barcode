@@ -24,7 +24,7 @@ class NotificationSystem {
 
     // Setup Supabase Realtime subscription for premium features changes
     setupRealtimeSubscription() {
-        if (!window.supabase || !this.currentUser) {
+        if (!window.jbDb || !this.currentUser) {
             console.warn('⚠️ Supabase or user not available for realtime');
             // Fallback to polling
             this.setupPollingFallback();
@@ -46,7 +46,7 @@ class NotificationSystem {
 
         try {
             // Subscribe to users table changes for this specific user's premium_features
-            this.subscription = window.supabase
+            this.subscription = window.jbDb
                 .channel('premium-features-updates')
                 .on('postgres_changes', {
                     event: 'UPDATE',
@@ -102,9 +102,9 @@ class NotificationSystem {
     // Load initial premium features state
     async loadInitialPremiumFeatures() {
         try {
-            if (!window.supabase || !this.currentUser) return;
+            if (!window.jbDb || !this.currentUser) return;
             
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('users')
                 .select('premium_features')
                 .eq('username', this.currentUser.username)
@@ -135,9 +135,9 @@ class NotificationSystem {
     // Check for premium features changes (polling)
     async checkPremiumFeaturesChanges() {
         try {
-            if (!window.supabase || !this.currentUser) return;
+            if (!window.jbDb || !this.currentUser) return;
             
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('users')
                 .select('premium_features')
                 .eq('username', this.currentUser.username)
@@ -638,7 +638,7 @@ class NotificationSystem {
     // Cleanup subscription
     cleanup() {
         if (this.subscription) {
-            window.supabase?.removeChannel(this.subscription);
+            window.jbDb?.removeChannel(this.subscription);
             this.subscription = null;
         }
         if (this.pollingInterval) {

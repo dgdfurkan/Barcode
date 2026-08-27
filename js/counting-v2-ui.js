@@ -304,6 +304,7 @@
         renkAnahtariKur();
 
         // ---- Üst bar
+        surumAnahtariKur();
         aktifTabloCipiKur();
         tokenRozetiKur();
 
@@ -412,6 +413,24 @@
     // ==================================================================
     // 4) ÜST BAR — aktif tablo çipi
     // ==================================================================
+
+    /**
+     * v1 ↔ v2 geçişi.
+     *
+     * v2 sayfası counting.html'den türediği için aynı bağlantı burada da var;
+     * hedefi ve yazısı ters çevriliyor. Ayrı bir düğme üretmiyoruz — üst bar
+     * zaten dolu, bir tane daha koymak kalabalık ederdi.
+     */
+    function surumAnahtariKur() {
+        var a = el('countingVersionSwitch');
+        if (!a) return;
+        a.setAttribute('href', 'counting.html');
+        a.setAttribute('title', 'Sayım sayfasının eski tasarımına dön');
+        a.className = 'v2-surum';
+        var yazi = a.lastChild;
+        if (yazi && yazi.nodeType === 3) yazi.textContent = 'Eski tasarım';
+        else a.append('Eski tasarım');
+    }
 
     function ustBar() {
         return document.querySelector('header .max-w-7xl > div, header > div > div');

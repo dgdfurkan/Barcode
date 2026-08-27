@@ -27,9 +27,9 @@ class UserDataManager {
     async loadUserData() {
         try {
             // Try to load from Supabase first
-            if (window.supabase) {
+            if (window.jbDb) {
                 // Load from new structure (custom_products + settings columns)
-                const { data, error } = await window.supabase
+                const { data, error } = await window.jbDb
                     .from('user_data')
                     .select('custom_products, settings')
                     .eq('username', this.currentUser.username)
@@ -131,14 +131,14 @@ class UserDataManager {
             const customProducts = (this.userData.products || []).filter((p) => !p.isDefault);
             const settings = this.userData.settings || {};
 
-            if (window.supabase && this.currentUser?.username) {
+            if (window.jbDb && this.currentUser?.username) {
                 const updateData = {
                     custom_products: customProducts,
                     settings,
                     updated_at: new Date().toISOString(),
                 };
 
-                const { data: updatedRows, error: updateError } = await window.supabase
+                const { data: updatedRows, error: updateError } = await window.jbDb
                     .from('user_data')
                     .update(updateData)
                     .eq('username', this.currentUser.username)
@@ -156,7 +156,7 @@ class UserDataManager {
                 }
 
                 if (!updatedRows || updatedRows.length === 0) {
-                    const { error: insertError } = await window.supabase.from('user_data').insert({
+                    const { error: insertError } = await window.jbDb.from('user_data').insert({
                         username: this.currentUser.username,
                         ...updateData,
                     });
@@ -165,7 +165,7 @@ class UserDataManager {
                     const keepId = updatedRows[0].id;
                     const extraIds = updatedRows.slice(1).map((r) => r.id).filter(Boolean);
                     if (extraIds.length) {
-                        await window.supabase.from('user_data').delete().in('id', extraIds);
+                        await window.jbDb.from('user_data').delete().in('id', extraIds);
                         console.warn(`🧹 user_data duplicate temizlendi (${this.currentUser.username}): ${extraIds.length} satır`);
                     }
                 }

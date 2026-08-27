@@ -26,12 +26,12 @@
                 }
 
                 // Supabase'den yükle
-                if (!window.supabase) {
+                if (!window.jbDb) {
                     console.warn('Supabase not available, using default value');
                     return this.getDefaultValue(featureKey);
                 }
 
-                const { data, error } = await window.supabase
+                const { data, error } = await window.jbDb
                     .from('system_features')
                     .select('current_value')
                     .eq('feature_key', featureKey)
@@ -66,12 +66,12 @@
         // Tüm özellikleri yükle ve cache'le
         async loadAllFeatures() {
             try {
-                if (!window.supabase) {
+                if (!window.jbDb) {
                     console.warn('Supabase not available');
                     return {};
                 }
 
-                const { data, error } = await window.supabase
+                const { data, error } = await window.jbDb
                     .from('system_features')
                     .select('*')
                     .eq('is_active', true);
@@ -99,12 +99,12 @@
         // Özellik değerini ayarla
         async setFeatureValue(featureKey, newValue, updateNumber = null, changedBy = null) {
             try {
-                if (!window.supabase) {
+                if (!window.jbDb) {
                     throw new Error('Supabase not available');
                 }
 
                 // Mevcut değeri al
-                const { data: currentFeature } = await window.supabase
+                const { data: currentFeature } = await window.jbDb
                     .from('system_features')
                     .select('current_value')
                     .eq('feature_key', featureKey)
@@ -140,7 +140,7 @@
                     is_active: true
                 };
 
-                const { error: upsertError } = await window.supabase
+                const { error: upsertError } = await window.jbDb
                     .from('system_features')
                     .upsert(featureData, {
                         onConflict: 'feature_key'
@@ -190,10 +190,10 @@
         // ÖNEMLİ: Eğer aynı feature_key + aynı update_number varsa, sadece tarihi güncelle (yeni kayıt ekleme)
         async saveFeatureHistory(featureKey, oldValue, newValue, updateNumber, changedBy) {
             try {
-                if (!window.supabase) return;
+                if (!window.jbDb) return;
 
                 // Önce aynı feature_key + aynı update_number'a sahip kaydı kontrol et
-                const { data: existingHistory } = await window.supabase
+                const { data: existingHistory } = await window.jbDb
                     .from('feature_history')
                     .select('id, new_value, update_number')
                     .eq('feature_key', featureKey)
@@ -205,7 +205,7 @@
                 // Eğer aynı feature_key + aynı update_number varsa, sadece tarihi güncelle
                 if (existingHistory) {
                     console.log(`🔄 Feature ${featureKey} history: Same feature_key + update_number (${updateNumber}) exists, updating timestamp only`);
-                    await window.supabase
+                    await window.jbDb
                         .from('feature_history')
                         .update({
                             old_value: oldValue,
@@ -218,7 +218,7 @@
                 }
 
                 // Aynı feature_key + update_number yoksa, yeni kayıt ekle
-                await window.supabase
+                await window.jbDb
                     .from('feature_history')
                     .insert({
                         feature_key: featureKey,
@@ -232,7 +232,7 @@
                 if (error.code === 'PGRST116') {
                     // Kayıt bulunamadı, yeni kayıt ekle
                     try {
-                        await window.supabase
+                        await window.jbDb
                             .from('feature_history')
                             .insert({
                                 feature_key: featureKey,
@@ -276,7 +276,7 @@
 
         async checkAndApplyFeatureChanges() {
             try {
-                if (!window.supabase) {
+                if (!window.jbDb) {
                     console.warn('Supabase not available for feature changes');
                     return;
                 }
@@ -284,7 +284,7 @@
                 const nowUTC = new Date().toISOString();
 
                 // Zamanlanmış ve aktif güncellemeleri getir
-                const { data: updates, error } = await window.supabase
+                const { data: updates, error } = await window.jbDb
                     .from('updates')
                     .select('id, update_number, feature_changes, scheduled_at, is_active')
                     .eq('is_active', true)
@@ -449,9 +449,9 @@
         // Özellik geçmişini getir
         async getFeatureHistory(featureKey, limit = 50) {
             try {
-                if (!window.supabase) return [];
+                if (!window.jbDb) return [];
 
-                const { data, error } = await window.supabase
+                const { data, error } = await window.jbDb
                     .from('feature_history')
                     .select('*')
                     .eq('feature_key', featureKey)
@@ -496,18 +496,18 @@
         // Supabase realtime subscription başlat
         async setupRealtimeSubscription() {
             try {
-                if (!window.supabase) {
+                if (!window.jbDb) {
                     console.warn('Supabase not available for realtime subscription');
                     return;
                 }
 
                 // Önceki subscription'ı kapat
                 if (this.realtimeSubscription) {
-                    await window.supabase.removeChannel(this.realtimeSubscription);
+                    await window.jbDb.removeChannel(this.realtimeSubscription);
                 }
 
                 // Yeni subscription oluştur
-                this.realtimeSubscription = window.supabase
+                this.realtimeSubscription = window.jbDb
                     .channel('system_features_changes')
                     .on('postgres_changes', {
                         event: '*', // INSERT, UPDATE, DELETE
@@ -546,8 +546,8 @@
 
         // Realtime subscription'ı kapat
         async cleanupRealtimeSubscription() {
-            if (this.realtimeSubscription && window.supabase) {
-                await window.supabase.removeChannel(this.realtimeSubscription);
+            if (this.realtimeSubscription && window.jbDb) {
+                await window.jbDb.removeChannel(this.realtimeSubscription);
                 this.realtimeSubscription = null;
             }
         }
@@ -562,20 +562,20 @@
             await window.featureManager.loadAllFeatures();
             
             // Realtime subscription başlat (Supabase hazır olduğunda)
-            if (window.supabase) {
+            if (window.jbDb) {
                 await window.featureManager.setupRealtimeSubscription();
             } else {
                 // Supabase henüz hazır değilse bekle
-                const checkSupabase = setInterval(() => {
-                    if (window.supabase) {
-                        clearInterval(checkSupabase);
+                const checkDb = setInterval(() => {
+                    if (window.jbDb) {
+                        clearInterval(checkDb);
                         window.featureManager.setupRealtimeSubscription();
                     }
                 }, 500);
                 
                 // 10 saniye sonra timeout
                 setTimeout(() => {
-                    clearInterval(checkSupabase);
+                    clearInterval(checkDb);
                 }, 10000);
             }
         }

@@ -127,6 +127,37 @@
     letter-spacing: -0.015em;
 }
 
+/* --- Sürüm anahtarı: v1'e dönüş. Sessiz dursun, üst barı yormasın. --- */
+.counting-v2 .v2-surum {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: none;
+    height: 2.15rem;
+    padding: 0 0.6rem;
+    border: 1px solid var(--v2-line);
+    border-radius: var(--v2-r-md);
+    background: var(--v2-surface);
+    color: var(--v2-faint);
+    font-size: 0.72rem;
+    font-weight: 650;
+    text-decoration: none;
+    transition: color var(--v2-fast), background var(--v2-fast), border-color var(--v2-fast);
+}
+
+.counting-v2 .v2-surum:hover {
+    background: var(--v2-track);
+    color: var(--v2-muted);
+    border-color: #cbd5e1;
+}
+
+.counting-v2 .v2-surum svg { width: 0.85rem; height: 0.85rem; flex: none; }
+
+/* Dar ekranda yer yok — çip ve token rozeti önceliğe sahip */
+@media (max-width: 1023px) {
+    .counting-v2 .v2-surum { display: none; }
+}
+
 /* --- Aktif tablo çipi: üst barın merkezindeki tek gerçek gezinme noktası --- */
 .counting-v2 .v2-chip {
     display: inline-flex;

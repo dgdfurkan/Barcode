@@ -1,11 +1,11 @@
 // Test script for Counting Data Supabase Integration
 // Bu script'i browser console'da çalıştırarak Supabase entegrasyonunu test edebilirsiniz
 
-async function testCountingDataSupabase() {
+async function testCountingDataDb() {
     console.log('🧪 Counting Data Supabase Test Başlatılıyor...\n');
     
     const results = {
-        supabaseConnection: false,
+        dbConnection: false,
         userAuthenticated: false,
         countingDataColumnExists: false,
         canReadCountingData: false,
@@ -17,12 +17,12 @@ async function testCountingDataSupabase() {
     try {
         // 1. Supabase bağlantısını kontrol et
         console.log('1️⃣ Supabase bağlantısı kontrol ediliyor...');
-        if (typeof window.supabase === 'undefined' || !window.supabase) {
+        if (typeof window.jbDb === 'undefined' || !window.jbDb) {
             results.errors.push('Supabase client bulunamadı');
             console.error('❌ Supabase client bulunamadı');
             return results;
         }
-        results.supabaseConnection = true;
+        results.dbConnection = true;
         console.log('✅ Supabase client mevcut');
 
         // 2. Kullanıcı authentication kontrolü
@@ -45,7 +45,7 @@ async function testCountingDataSupabase() {
         // 3. counting_data kolonunun varlığını kontrol et (users tablosunda)
         console.log('\n3️⃣ counting_data kolonu kontrol ediliyor (users tablosunda)...');
         try {
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('users')
                 .select('counting_data')
                 .eq('username', session.username)
@@ -101,7 +101,7 @@ async function testCountingDataSupabase() {
             };
 
             // Test verisi yaz (users tablosuna)
-            const { error: writeError } = await window.supabase
+            const { error: writeError } = await window.jbDb
                 .from('users')
                 .update({ counting_data: testCountingData })
                 .eq('username', session.username);
@@ -121,7 +121,7 @@ async function testCountingDataSupabase() {
                     delete cleanedCountingData.test_product_123;
                 }
 
-                await window.supabase
+                await window.jbDb
                     .from('users')
                     .update({ counting_data: cleanedCountingData })
                     .eq('username', session.username);
@@ -143,7 +143,7 @@ async function testCountingDataSupabase() {
     console.log('\n' + '='.repeat(50));
     console.log('📊 TEST SONUÇLARI');
     console.log('='.repeat(50));
-    console.log('Supabase Bağlantısı:', results.supabaseConnection ? '✅' : '❌');
+    console.log('Veritabanı bağlantısı:', results.dbConnection ? '✅' : '❌');
     console.log('Kullanıcı Girişi:', results.userAuthenticated ? '✅' : '❌');
     console.log('counting_data Kolonu:', results.countingDataColumnExists ? '✅' : '❌');
     console.log('Okuma Yetkisi:', results.canReadCountingData ? '✅' : '❌');
@@ -167,7 +167,7 @@ async function testCountingDataSupabase() {
 
     // Final durum
     const allTestsPassed = 
-        results.supabaseConnection &&
+        results.dbConnection &&
         results.userAuthenticated &&
         results.countingDataColumnExists &&
         results.canReadCountingData &&
@@ -189,14 +189,14 @@ async function testCountingDataSupabase() {
 // Otomatik çalıştır (eğer counting.html sayfasındaysak)
 if (window.location.pathname.includes('counting.html')) {
     console.log('🔍 Counting sayfası tespit edildi, test otomatik çalıştırılıyor...');
-    testCountingDataSupabase().then(results => {
+    testCountingDataDb().then(results => {
         window.testCountingResults = results;
         console.log('\n💡 Sonuçlar window.testCountingResults değişkeninde saklandı');
     });
 }
 
 // Global olarak erişilebilir yap
-window.testCountingDataSupabase = testCountingDataSupabase;
+window.testCountingDataDb = testCountingDataDb;
 
-console.log('✅ Test fonksiyonu yüklendi. Kullanım: testCountingDataSupabase()');
+console.log('✅ Test fonksiyonu yüklendi. Kullanım: testCountingDataDb()');
 

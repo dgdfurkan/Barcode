@@ -177,7 +177,7 @@
         // Kullanıcının birden fazla IP ile giriş yapıp yapmadığını kontrol et
         async checkUserHasMultipleIPs(username) {
             try {
-                if (!window.supabase) {
+                if (!window.jbDb) {
                     // Supabase yoksa localStorage'dan kontrol et
                     const ipLogs = JSON.parse(localStorage.getItem('ipLogs') || '[]');
                     const userIPs = new Set();
@@ -198,7 +198,7 @@
                 // Eğer username bir ID ise direkt kullan
                 // Değilse users tablosundan ID'yi bul
                 try {
-                    const { data: userData, error: userError } = await window.supabase
+                    const { data: userData, error: userError } = await window.jbDb
                         .from('users')
                         .select('id')
                         .eq('username', username)
@@ -216,7 +216,7 @@
                 }
 
                 // users.tracked_ips'ten bu kullanıcının IP sayısını al
-                const { data: userRow, error } = await window.supabase
+                const { data: userRow, error } = await window.jbDb
                     .from('users')
                     .select('tracked_ips')
                     .eq('id', userId)
@@ -247,8 +247,8 @@
         async setupRealtimeSubscription() {
             try {
                 // Wait for Supabase to be ready
-                let supabaseClient = window.supabase;
-                if (!supabaseClient) {
+                let dbClient = window.jbDb;
+                if (!dbClient) {
                     return;
                 }
 
@@ -301,20 +301,20 @@
         // Sayfa yüklendiğinde realtime subscription başlat
         async function initializeIPBanChecker() {
             // Realtime subscription başlat (Supabase hazır olduğunda)
-            if (window.supabase) {
+            if (window.jbDb) {
                 await window.ipBanChecker.setupRealtimeSubscription();
             } else {
                 // Supabase henüz hazır değilse bekle
                 let attempts = 0;
                 const maxAttempts = 20; // 10 saniye (20 * 500ms)
-                const checkSupabase = setInterval(() => {
+                const checkDb = setInterval(() => {
                     attempts++;
                     
-                    if (window.supabase) {
-                        clearInterval(checkSupabase);
+                    if (window.jbDb) {
+                        clearInterval(checkDb);
                         window.ipBanChecker.setupRealtimeSubscription();
                     } else if (attempts >= maxAttempts) {
-                        clearInterval(checkSupabase);
+                        clearInterval(checkDb);
                     }
                 }, 500);
             }

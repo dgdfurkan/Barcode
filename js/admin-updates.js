@@ -39,13 +39,13 @@ const AVAILABLE_COLORS = [
 
 AdminPanel.prototype.loadUpdates = async function() {
     try {
-        if (!window.supabase) {
+        if (!window.jbDb) {
             console.warn('Supabase not available');
             document.getElementById('updatesTable').innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Supabase bağlantısı yok</td></tr>';
             return;
         }
 
-        const { data, error } = await window.supabase
+        const { data, error } = await window.jbDb
             .from('updates')
             .select('*')
             .order('created_at', { ascending: false });
@@ -72,8 +72,8 @@ AdminPanel.prototype.renderUpdates = async function() {
     // Get statistics for all updates
     const updateStats = {};
     try {
-        if (window.supabase) {
-            const { data: statuses } = await window.supabase
+        if (window.jbDb) {
+            const { data: statuses } = await window.jbDb
                 .from('user_update_status')
                 .select('*');
             
@@ -377,7 +377,7 @@ AdminPanel.prototype.uploadStepImage = async function(stepIndex) {
         if (!file) return;
 
         try {
-            if (!window.supabase) {
+            if (!window.jbDb) {
                 alert('Supabase bağlantısı yok!');
                 return;
             }
@@ -426,11 +426,11 @@ AdminPanel.prototype.uploadStepImage = async function(stepIndex) {
                 path: filePath,
                 fileSize: file.size,
                 fileType: file.type,
-                supabaseUrl: window.supabase?.supabaseUrl,
-                hasAnonKey: !!window.supabase?.supabaseKey
+                dbUrl: window.jbDb?.baseUrl,
+                hasClient: !!window.jbDb
             });
 
-            const { data, error } = await window.supabase.storage
+            const { data, error } = await window.jbDb.storage
                 .from('update-images')
                 .upload(filePath, file, {
                     cacheControl: '3600',
@@ -471,7 +471,7 @@ AdminPanel.prototype.uploadStepImage = async function(stepIndex) {
             console.log('✅ File uploaded successfully:', data);
 
             // Get public URL
-            const { data: { publicUrl } } = window.supabase.storage
+            const { data: { publicUrl } } = window.jbDb.storage
                 .from('update-images')
                 .getPublicUrl(filePath);
 
@@ -527,7 +527,7 @@ AdminPanel.prototype.saveUpdate = async function() {
             return;
         }
 
-        if (!window.supabase) {
+        if (!window.jbDb) {
             alert('Supabase bağlantısı yok!');
             return;
         }
@@ -572,7 +572,7 @@ AdminPanel.prototype.saveUpdate = async function() {
         let result;
         if (this.editingUpdateId) {
             // Update existing
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('updates')
                 .update(updateData)
                 .eq('id', this.editingUpdateId)
@@ -582,7 +582,7 @@ AdminPanel.prototype.saveUpdate = async function() {
             result = data[0];
         } else {
             // Check if update_number already exists
-            const { data: existing } = await window.supabase
+            const { data: existing } = await window.jbDb
                 .from('updates')
                 .select('id')
                 .eq('update_number', updateNumber)
@@ -594,7 +594,7 @@ AdminPanel.prototype.saveUpdate = async function() {
             }
 
             // Create new
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('updates')
                 .insert(updateData)
                 .select();
@@ -618,12 +618,12 @@ AdminPanel.prototype.editUpdate = function(updateId) {
 
 AdminPanel.prototype.toggleUpdateStatus = async function(updateId, newStatus) {
     try {
-        if (!window.supabase) {
+        if (!window.jbDb) {
             alert('Supabase bağlantısı yok!');
             return;
         }
 
-        const { error } = await window.supabase
+        const { error } = await window.jbDb
             .from('updates')
             .update({ is_active: newStatus })
             .eq('id', updateId);
@@ -643,13 +643,13 @@ AdminPanel.prototype.deleteUpdate = async function(updateId) {
     }
 
     try {
-        if (!window.supabase) {
+        if (!window.jbDb) {
             alert('Supabase bağlantısı yok!');
             return;
         }
 
         // Önce silinecek güncellemeyi al (update_number ve feature_changes bilgisi için)
-        const { data: updateToDelete, error: fetchError } = await window.supabase
+        const { data: updateToDelete, error: fetchError } = await window.jbDb
             .from('updates')
             .select('id, update_number, feature_changes')
             .eq('id', updateId)
@@ -683,7 +683,7 @@ AdminPanel.prototype.deleteUpdate = async function(updateId) {
                     let revertValue = null;
                     
                     try {
-                        const { data: previousHistoryList, error: historyError } = await window.supabase
+                        const { data: previousHistoryList, error: historyError } = await window.jbDb
                             .from('feature_history')
                             .select('new_value, update_number, old_value')
                             .eq('feature_key', change.feature_key)
@@ -725,7 +725,7 @@ AdminPanel.prototype.deleteUpdate = async function(updateId) {
                     if (revertValue !== null) {
                         const definition = window.getFeatureDefinition?.(change.feature_key);
                         if (definition) {
-                            const { error: updateError } = await window.supabase
+                            const { error: updateError } = await window.jbDb
                                 .from('system_features')
                                 .update({
                                     current_value: revertValue,
@@ -753,7 +753,7 @@ AdminPanel.prototype.deleteUpdate = async function(updateId) {
             
             try {
                 // Önce tüm kayıtları getir
-                const { data: historyRecords, error: fetchError } = await window.supabase
+                const { data: historyRecords, error: fetchError } = await window.jbDb
                     .from('feature_history')
                     .select('id, feature_key, update_number')
                     .eq('update_number', updateNumber);
@@ -768,7 +768,7 @@ AdminPanel.prototype.deleteUpdate = async function(updateId) {
                         // Her kaydı tek tek sil (RLS policy sorunlarını önlemek için)
                         let deletedCount = 0;
                         for (const record of historyRecords) {
-                            const { error: deleteError } = await window.supabase
+                            const { error: deleteError } = await window.jbDb
                                 .from('feature_history')
                                 .delete()
                                 .eq('id', record.id);
@@ -804,7 +804,7 @@ AdminPanel.prototype.deleteUpdate = async function(updateId) {
             
             try {
                 // Önce tüm kayıtları getir (RLS policy sorunlarını önlemek için)
-                const { data: statusRecords, error: fetchError } = await window.supabase
+                const { data: statusRecords, error: fetchError } = await window.jbDb
                     .from('user_update_status')
                     .select('id, username, update_number, is_seen, is_completed')
                     .eq('update_number', updateNumber);
@@ -822,7 +822,7 @@ AdminPanel.prototype.deleteUpdate = async function(updateId) {
                         let failedRecords = [];
                         
                         for (const record of statusRecords) {
-                            const { error: deleteError } = await window.supabase
+                            const { error: deleteError } = await window.jbDb
                                 .from('user_update_status')
                                 .delete()
                                 .eq('id', record.id);
@@ -840,7 +840,7 @@ AdminPanel.prototype.deleteUpdate = async function(updateId) {
                             console.warn(`⚠️ ${failedRecords.length} user_update_status records could not be deleted, resetting is_seen and is_completed to false`);
                             
                             for (const record of failedRecords) {
-                                const { error: updateError } = await window.supabase
+                                const { error: updateError } = await window.jbDb
                                     .from('user_update_status')
                                     .update({
                                         is_seen: false,
@@ -877,7 +877,7 @@ AdminPanel.prototype.deleteUpdate = async function(updateId) {
 
         // 4. Son olarak güncellemeyi sil
         console.log('🗑️ Deleting update from updates table...');
-        const { error } = await window.supabase
+        const { error } = await window.jbDb
             .from('updates')
             .delete()
             .eq('id', updateId);
@@ -900,13 +900,13 @@ AdminPanel.prototype.filterUpdates = function(filter) {
 
 AdminPanel.prototype.showUpdateStats = async function(updateId, updateNumber) {
     try {
-        if (!window.supabase) {
+        if (!window.jbDb) {
             alert('Supabase bağlantısı yok!');
             return;
         }
 
         // Get all user statuses for this update
-        const { data: statuses, error } = await window.supabase
+        const { data: statuses, error } = await window.jbDb
             .from('user_update_status')
             .select('*')
             .eq('update_number', updateNumber)
@@ -2519,7 +2519,7 @@ AdminPanel.prototype.getAdminSettingsRow = async function(forceRefresh = false) 
         return this.adminSettings;
     }
 
-    if (!window.supabase) {
+    if (!window.jbDb) {
         return null;
     }
 

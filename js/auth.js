@@ -1,20 +1,20 @@
 // Eski Supabase projesine ait URL ve anon key kaldırıldı (proje terk edildi).
 
 // Initialize Supabase (client is initialized in index.html, this just verifies it's ready)
-function initSupabase() {
+function initDb() {
     try {
         // Wait for Supabase client to be ready (initialized in index.html)
-        const checkSupabase = setInterval(() => {
-            if (window.supabase && typeof window.supabase.from === 'function') {
-                clearInterval(checkSupabase);
+        const checkDb = setInterval(() => {
+            if (window.jbDb && typeof window.jbDb.from === 'function') {
+                clearInterval(checkDb);
                 console.log('Supabase initialized successfully');
             }
         }, 100);
         
         // Timeout after 5 seconds
         setTimeout(() => {
-            clearInterval(checkSupabase);
-            if (!window.supabase || typeof window.supabase.from !== 'function') {
+            clearInterval(checkDb);
+            if (!window.jbDb || typeof window.jbDb.from !== 'function') {
                 console.error('Supabase initialization failed: Supabase client not ready');
                 console.log('Running in demo mode - Supabase not configured');
         }
@@ -233,10 +233,10 @@ async function login(username, password) {
         let user = null;
         
         // Try Supabase first
-        if (window.supabase && typeof window.supabase.from === 'function') {
+        if (window.jbDb && typeof window.jbDb.from === 'function') {
             try {
                 // Try to get user with password first
-                const { data, error } = await window.supabase
+                const { data, error } = await window.jbDb
                     .from('users')
                     .select('id, username, password, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, max_ip_count, ip_tracking_enabled, allowed_ips, tracked_ips')
                     .eq('username', username)
@@ -249,7 +249,7 @@ async function login(username, password) {
                     // If query fails (possibly due to RLS or password protection), try without password
                     console.warn('First query failed, trying without password:', error);
                     
-                    const { data: userData, error: userError } = await window.supabase
+                    const { data: userData, error: userError } = await window.jbDb
                         .from('users')
                         .select('id, username, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, max_ip_count, ip_tracking_enabled, allowed_ips, tracked_ips')
                         .eq('username', username)
@@ -258,7 +258,7 @@ async function login(username, password) {
                     if (!userError && userData) {
                         // Password is protected by RLS, try to get it separately
                         try {
-                            const { data: pwdData, error: pwdError } = await window.supabase
+                            const { data: pwdData, error: pwdError } = await window.jbDb
                                 .from('users')
                                 .select('password')
                                 .eq('username', username)
@@ -300,7 +300,7 @@ async function login(username, password) {
         if (user.password === null) {
             // Password is protected by RLS, try to get it via a direct query with all fields
             try {
-                const { data: fullUser, error: fullError } = await window.supabase
+                const { data: fullUser, error: fullError } = await window.jbDb
                     .from('users')
                     .select('password')
                     .eq('username', username)
@@ -396,10 +396,10 @@ async function login(username, password) {
             }
         }
         
-        // Log IP (if Supabase available)
-        if (supabase && user.id) {
+        // IP kaydı (veritabanı erişilebilirse)
+        if (window.jbDb && user.id) {
             try {
-                await supabase
+                await window.jbDb
                     .from('ip_logs')
                     .insert({
                         user_id: user.id,
@@ -685,8 +685,8 @@ function logout() {
                 localStorage.setItem('ipLogs', JSON.stringify(ipLogs));
                 
                 // Also update Supabase if available
-                if (window.supabase && lastLog.id) {
-                    window.supabase
+                if (window.jbDb && lastLog.id) {
+                    window.jbDb
                         .from('ip_logs')
                         .update({
                             logout_time: logoutTime.toISOString(),
@@ -765,7 +765,7 @@ window.authUtils = {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    initSupabase();
+    initDb();
     
     // Check if already logged in (only on index.html)
     if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/') {
@@ -881,9 +881,9 @@ async function checkIPTracking(userId, clientIP, maxIPCount, username, tracked_i
             };
         }
 
-        if (window.supabase && username) {
+        if (window.jbDb && username) {
             const newList = [...list, clientIP];
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('users')
                 .update({ tracked_ips: newList })
                 .eq('username', username);
@@ -909,9 +909,9 @@ async function checkIPTracking(userId, clientIP, maxIPCount, username, tracked_i
 // Function to check if trial expired message exists in chat history
 async function checkTrialExpiredMessageInHistory(username) {
     try {
-        if (window.supabase && username) {
+        if (window.jbDb && username) {
             // Get user's chat messages from Supabase
-            const { data: userData, error } = await window.supabase
+            const { data: userData, error } = await window.jbDb
                 .from('users')
                 .select('chat_messages')
                 .eq('username', username)

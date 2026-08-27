@@ -437,7 +437,7 @@ class CountingSystem {
     // Her zaman eklentiden en güncel token'ı alıp Supabase'e yazarız (böylece Supabase hep en uzun süreli token'a sahip olur).
     async checkAndSaveAPIInfoFromExtension() {
         try {
-            if (!window.supabase || !this.currentUser) {
+            if (!window.jbDb || !this.currentUser) {
                 return;
             }
             
@@ -446,9 +446,9 @@ class CountingSystem {
             let existingTimestamp = 0;
             let existingExpiry = null;
             let existingApiInfo = null;
-            if (window.supabase && this.currentUser) {
+            if (window.jbDb && this.currentUser) {
                 try {
-                    const { data: userData } = await window.supabase
+                    const { data: userData } = await window.jbDb
                         .from('users')
                         .select('counting_data')
                         .eq('username', this.currentUser.username)
@@ -534,7 +534,7 @@ class CountingSystem {
                 if (best && best.token) {
                     const merged = this.mergeApiInfoForSave(best, prevCandidate || {});
                     if (this.apiInfoSignature(merged) !== this.apiInfoSignature(prevCandidate)) {
-                        await this.saveAPIInfoToSupabase(merged);
+                        await this.saveApiInfoToDb(merged);
                         if (merged.tokenExpiry) this.lastTokenExpiry = merged.tokenExpiry;
                     }
                 }
@@ -641,7 +641,7 @@ class CountingSystem {
      */
     async _protectApiInfoInFullBlob(fullData) {
         if (!fullData || typeof fullData !== 'object') return fullData;
-        const remote = await this.fetchSupabaseApiInfo();
+        const remote = await this.fetchDbApiInfo();
         const local = fullData._api_info || this.cachedFullData?._api_info || null;
         const best = this.pickBestApiInfo([remote, local].filter(Boolean));
         if (best && best.token) {
@@ -662,10 +662,10 @@ class CountingSystem {
         return this.mergeApiInfoForSave(best, prev);
     }
 
-    async fetchSupabaseApiInfo() {
-        if (!window.supabase || !this.currentUser) return null;
+    async fetchDbApiInfo() {
+        if (!window.jbDb || !this.currentUser) return null;
         try {
-            const { data: userData } = await window.supabase
+            const { data: userData } = await window.jbDb
                 .from('users')
                 .select('counting_data')
                 .eq('username', this.currentUser.username)
@@ -751,7 +751,7 @@ class CountingSystem {
             this.showToast('Token girin', 'warning', 3000);
             return;
         }
-        if (!window.supabase || !this.currentUser) {
+        if (!window.jbDb || !this.currentUser) {
             this.showToast('Oturum gerekli', 'error', 3000);
             return;
         }
@@ -762,17 +762,17 @@ class CountingSystem {
             tokenExpiry: jwtExp || null,
             timestamp: Date.now()
         };
-        const supabaseSnap = await this.fetchSupabaseApiInfo();
+        const dbSnap = await this.fetchDbApiInfo();
         const extensionApiInfo = await this.fetchExtensionApiInfo();
         const best = this.pickBestApiInfo(
-            [supabaseSnap, extensionApiInfo, manualCandidate].filter(Boolean)
+            [dbSnap, extensionApiInfo, manualCandidate].filter(Boolean)
         );
         if (!best || !best.token) {
             this.showToast('Geçerli token oluşturulamadı', 'error', 3000);
             return;
         }
-        const merged = this.mergeApiInfoForSave(best, supabaseSnap || {});
-        await this.saveAPIInfoToSupabase(merged);
+        const merged = this.mergeApiInfoForSave(best, dbSnap || {});
+        await this.saveApiInfoToDb(merged);
         if (input) input.value = '';
         const pv = document.getElementById('manualTokenPreview');
         if (pv) pv.textContent = '';
@@ -807,8 +807,8 @@ class CountingSystem {
 
             let fullData = null;
             
-            if (window.supabase && this.currentUser) {
-                const { data, error } = await window.supabase
+            if (window.jbDb && this.currentUser) {
+                const { data, error } = await window.jbDb
                     .from('users')
                     .select('counting_data')
                     .eq('username', this.currentUser.username)
@@ -910,7 +910,7 @@ class CountingSystem {
             let itemRows = null;
             let countingItemsAvailable = false;
 
-            if (window.supabase && this.currentUser) {
+            if (window.jbDb && this.currentUser) {
                 if ((this._statusDepth || 0) > 0) {
                     this.updateCountingStatus('Sunucuya bağlanılıyor…', 'Güncel veriler alınıyor', { lock: true });
                 }
@@ -922,7 +922,7 @@ class CountingSystem {
                     'Ana Sayım';
 
                 const [userRes, itemsRes] = await Promise.all([
-                    window.supabase
+                    window.jbDb
                         .from('users')
                         .select('counting_data')
                         .eq('username', this.currentUser.username)
@@ -1059,7 +1059,7 @@ class CountingSystem {
      * Tek seferlik — counting_items henüz boşken çalışır.
      */
     async _migrateOldDataToCountingItems(metaBlob) {
-        if (!window.supabase || !this.currentUser || !metaBlob?._tables) return;
+        if (!window.jbDb || !this.currentUser || !metaBlob?._tables) return;
         const rows = [];
         for (const [tName, tData] of Object.entries(metaBlob._tables)) {
             for (const [pId, pData] of Object.entries(tData)) {
@@ -1087,13 +1087,13 @@ class CountingSystem {
         const CHUNK = 50;
         for (let i = 0; i < rows.length; i += CHUNK) {
             const slice = rows.slice(i, i + CHUNK);
-            let { error } = await window.supabase.from('counting_items').upsert(slice, {
+            let { error } = await window.jbDb.from('counting_items').upsert(slice, {
                 onConflict: 'username,table_name,product_id',
             });
             if (error && this._isMissingDbColumnError(error) && this._countingItemsPriceExtension !== false) {
                 this._countingItemsPriceExtension = false;
                 const fallbackSlice = slice.map(({ struck_price, struck_price_text, no_struck_price, ...rest }) => rest);
-                ({ error } = await window.supabase.from('counting_items').upsert(fallbackSlice, {
+                ({ error } = await window.jbDb.from('counting_items').upsert(fallbackSlice, {
                     onConflict: 'username,table_name,product_id',
                 }));
             } else if (!error) {
@@ -1201,19 +1201,19 @@ class CountingSystem {
         if (this._fullBackupTimer) clearTimeout(this._fullBackupTimer);
         this._fullBackupTimer = setTimeout(() => {
             this._fullBackupTimer = null;
-            this._writeFullBlobToSupabase().catch(() => {});
+            this._writeFullBlobToDb().catch(() => {});
         }, 1200);
     }
 
-    async _writeFullBlobToSupabase() {
-        if (!window.supabase || !this.currentUser) return;
+    async _writeFullBlobToDb() {
+        if (!window.jbDb || !this.currentUser) return;
         try {
             const payload =
                 this._countingItemsTableReady === true ? this._buildMetaBlob() : this._buildFullBlob();
             await this._protectApiInfoInFullBlob(payload);
             payload._writerDeviceId = this.deviceId;
             payload._writerAt = Date.now();
-            await window.supabase
+            await window.jbDb
                 .from('users')
                 .update({ counting_data: payload })
                 .eq('username', this.currentUser.username);
@@ -1257,13 +1257,13 @@ class CountingSystem {
             fullData._writerAt = Date.now();
             this.cachedFullData = fullData;
 
-            if (window.supabase && this.currentUser) {
+            if (window.jbDb && this.currentUser) {
                 const remotePayload =
                     this._countingItemsTableReady === true ? this._buildMetaBlob() : fullData;
                 await this._protectApiInfoInFullBlob(remotePayload);
                 remotePayload._writerDeviceId = this.deviceId;
                 remotePayload._writerAt = Date.now();
-                const { error } = await window.supabase
+                const { error } = await window.jbDb
                     .from('users')
                     .update({ counting_data: remotePayload })
                     .eq('username', this.currentUser.username);
@@ -1993,13 +1993,13 @@ class CountingSystem {
         const CHUNK = 50;
         for (let i = 0; i < rows.length; i += CHUNK) {
             const slice = rows.slice(i, i + CHUNK);
-            let { error } = await window.supabase.from('counting_items').upsert(slice, {
+            let { error } = await window.jbDb.from('counting_items').upsert(slice, {
                 onConflict: 'username,table_name,product_id',
             });
             if (error && this._isMissingDbColumnError(error) && this._countingItemsPriceExtension !== false) {
                 this._countingItemsPriceExtension = false;
                 const fallbackSlice = slice.map(({ struck_price, struck_price_text, no_struck_price, ...rest }) => rest);
-                ({ error } = await window.supabase.from('counting_items').upsert(fallbackSlice, {
+                ({ error } = await window.jbDb.from('counting_items').upsert(fallbackSlice, {
                     onConflict: 'username,table_name,product_id',
                 }));
             } else if (!error) {
@@ -2178,8 +2178,8 @@ class CountingSystem {
         }
     }
 
-    async _loadTableProductsFromSupabase(tableName) {
-        if (!tableName || !window.supabase || !this.currentUser) return false;
+    async _loadTableProductsFromDb(tableName) {
+        if (!tableName || !window.jbDb || !this.currentUser) return false;
         if (this._countingItemsTableReady !== true) return false;
         if (this._isTableTombstoned(tableName)) return false;
 
@@ -2228,7 +2228,7 @@ class CountingSystem {
             if (tName === this.currentTableName) continue;
             const slot = this.cachedFullData._tables?.[tName];
             if (slot && this._countTableProductKeys(slot) > 0) continue;
-            await this._loadTableProductsFromSupabase(tName);
+            await this._loadTableProductsFromDb(tName);
         }
         this._scheduleTableSelectorUpdate(80);
     }
@@ -2446,12 +2446,12 @@ class CountingSystem {
         if (this._activeTableCatchUpTimer) clearTimeout(this._activeTableCatchUpTimer);
         this._activeTableCatchUpTimer = setTimeout(() => {
             this._activeTableCatchUpTimer = null;
-            this._catchUpActiveTableFromSupabase().catch(() => {});
+            this._catchUpActiveTableFromDb().catch(() => {});
         }, delay);
     }
 
     /** Aktif tablonun ürünlerini + sırasını Supabase ile hizalar (realtime güvenlik ağı) */
-    async _catchUpActiveTableFromSupabase() {
+    async _catchUpActiveTableFromDb() {
         if (this._importInProgress || !this.currentTableName) return;
         if (this._suppressCatchUpUntil && Date.now() < this._suppressCatchUpUntil) return;
         if (this._activeTableCatchUpInFlight) {
@@ -2460,7 +2460,7 @@ class CountingSystem {
         }
         this._activeTableCatchUpInFlight = true;
         try {
-            await this.refreshCurrentTableFromSupabase();
+            await this.refreshCurrentTableFromDb();
             const orderChanged = this._applyRemoteProductOrderForTable(this.currentTableName);
             if (orderChanged) {
                 this.scheduleRenderTable();
@@ -4461,7 +4461,7 @@ class CountingSystem {
     }
 
     async _queryCountingItems(selectCols, applyFilters) {
-        let query = window.supabase.from('counting_items').select(selectCols);
+        let query = window.jbDb.from('counting_items').select(selectCols);
         query = applyFilters(query);
         let { data, error } = await query;
         if (
@@ -4474,7 +4474,7 @@ class CountingSystem {
                 .replace(', struck_price, struck_price_text, no_struck_price', '')
                 .replace('struck_price, struck_price_text, no_struck_price, ', '')
                 .replace('struck_price, struck_price_text, no_struck_price', '');
-            let q2 = window.supabase.from('counting_items').select(fallbackCols);
+            let q2 = window.jbDb.from('counting_items').select(fallbackCols);
             q2 = applyFilters(q2);
             ({ data, error } = await q2);
         } else if (!error && selectCols.includes('struck_price')) {
@@ -4504,13 +4504,13 @@ class CountingSystem {
 
         try {
             const row = this._buildCountingItemUpsertRow(tableName, productId, snapshot);
-            let { error } = await window.supabase.from('counting_items').upsert(row, {
+            let { error } = await window.jbDb.from('counting_items').upsert(row, {
                 onConflict: 'username,table_name,product_id',
             });
             if (error && this._isMissingDbColumnError(error) && this._countingItemsPriceExtension !== false) {
                 this._countingItemsPriceExtension = false;
                 const fallbackRow = this._buildCountingItemUpsertRow(tableName, productId, snapshot);
-                ({ error } = await window.supabase.from('counting_items').upsert(fallbackRow, {
+                ({ error } = await window.jbDb.from('counting_items').upsert(fallbackRow, {
                     onConflict: 'username,table_name,product_id',
                 }));
             } else if (!error && row.struck_price !== undefined) {
@@ -4533,10 +4533,10 @@ class CountingSystem {
      * Tek bir ürünü counting_items tablosundan siler.
      */
     async deleteProductEntry(productId, tableName) {
-        if (!productId || !window.supabase || !this.currentUser) return;
+        if (!productId || !window.jbDb || !this.currentUser) return;
         if (this._countingItemsTableReady !== true) return;
         try {
-            await window.supabase.from('counting_items')
+            await window.jbDb.from('counting_items')
                 .delete()
                 .eq('username', this.currentUser.username)
                 .eq('table_name', tableName || this.currentTableName)
@@ -4550,10 +4550,10 @@ class CountingSystem {
      * Bir tablonun tüm ürünlerini counting_items tablosundan siler.
      */
     async deleteTableEntries(tableName) {
-        if (!tableName || !window.supabase || !this.currentUser) return;
+        if (!tableName || !window.jbDb || !this.currentUser) return;
         if (this._countingItemsTableReady !== true) return;
         try {
-            await window.supabase.from('counting_items')
+            await window.jbDb.from('counting_items')
                 .delete()
                 .eq('username', this.currentUser.username)
                 .eq('table_name', tableName);
@@ -4614,11 +4614,11 @@ class CountingSystem {
      * Her iki durumda da users tablosunu meta değişiklikleri (tablo ekleme/silme) için dinliyoruz.
      */
     _setupRealtimeSync() {
-        if (!window.supabase || !this.currentUser) return;
+        if (!window.jbDb || !this.currentUser) return;
         try {
             if (this._countingItemsTableReady === true) {
                 // ── YENİ YÖNTEM: per-product realtime ──
-                this._realtimeItemsChannel = window.supabase
+                this._realtimeItemsChannel = window.jbDb
                     .channel(`ci-${this.currentUser.username}`)
                     .on(
                         'postgres_changes',
@@ -4643,7 +4643,7 @@ class CountingSystem {
             }
 
             // Her iki yöntemde de meta değişikliklerini (tablo oluşturma/silme) dinle
-            this._realtimeMetaChannel = window.supabase
+            this._realtimeMetaChannel = window.jbDb
                 .channel(`meta-${this.currentUser.username}`)
                 .on(
                     'postgres_changes',
@@ -4697,9 +4697,9 @@ class CountingSystem {
             lastMetaRefresh = now;
 
             if (forceMeta || !realtimeOk) {
-                this._refreshAllTablesMetaFromSupabase().catch(() => {});
+                this._refreshAllTablesMetaFromDb().catch(() => {});
             } else {
-                this._refreshTableMetaOnlyFromSupabase().catch(() => {});
+                this._refreshTableMetaOnlyFromDb().catch(() => {});
             }
             this.updateAPIStatusCard();
         };
@@ -4738,13 +4738,13 @@ class CountingSystem {
     /**
      * Hafif meta sync — tüm counting_items çekmeden tablo listesi / _tableMeta günceller (egress tasarrufu).
      */
-    async _refreshTableMetaOnlyFromSupabase() {
-        if (!window.supabase || !this.currentUser) return;
+    async _refreshTableMetaOnlyFromDb() {
+        if (!window.jbDb || !this.currentUser) return;
         if (this._countingItemsTableReady !== true) return;
         if (this._importInProgress) return;
 
         try {
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('users')
                 .select('counting_data')
                 .eq('username', this.currentUser.username)
@@ -4786,8 +4786,8 @@ class CountingSystem {
      * Yeni tablolar veya başka cihazlardan gelen ürün ekleme/silme'yi yakalar.
      * Sıralama bozulmaması için tablo createdAt'ı her zaman users.counting_data._tableMeta'dan alınır.
      */
-    async _refreshAllTablesMetaFromSupabase() {
-        if (!window.supabase || !this.currentUser) return;
+    async _refreshAllTablesMetaFromDb() {
+        if (!window.jbDb || !this.currentUser) return;
         if (this._countingItemsTableReady !== true) return;
         if (this._importInProgress) return;
 
@@ -4797,7 +4797,7 @@ class CountingSystem {
                 this._queryCountingItems(this._getCountingItemsMetaSyncColumns(), (q) =>
                     q.eq('username', this.currentUser.username)
                 ),
-                window.supabase
+                window.jbDb
                     .from('users')
                     .select('counting_data')
                     .eq('username', this.currentUser.username)
@@ -4896,7 +4896,7 @@ class CountingSystem {
                     metaChanged = true;
                     continue;
                 }
-                // Aktif tablo değilse merge et (aktif tablo refreshCurrentTableFromSupabase'da işleniyor)
+                // Aktif tablo değilse merge et (aktif tablo refreshCurrentTableFromDb'da işleniyor)
                 if (tName !== this.currentTableName) {
                     const local = this.cachedFullData._tables[tName];
                     for (const [pId, incoming] of Object.entries(products)) {
@@ -4930,8 +4930,8 @@ class CountingSystem {
      * Aktif tablonun ürünlerini counting_items'tan yeniden çeker; tüm tabloların metasını da günceller.
      * Realtime gelmeyen senaryolar için kritik güvenlik ağı.
      */
-    async refreshCurrentTableFromSupabase() {
-        if (!window.supabase || !this.currentUser) return;
+    async refreshCurrentTableFromDb() {
+        if (!window.jbDb || !this.currentUser) return;
         if (this._countingItemsTableReady !== true) return;
         if (!this.currentTableName) return;
         if (this._importInProgress) return;
@@ -5329,14 +5329,14 @@ class CountingSystem {
         }
 
         if (!hasCachedProducts && this._countingItemsTableReady === true) {
-            void this._loadTableProductsFromSupabase(tableName).then((loaded) => {
+            void this._loadTableProductsFromDb(tableName).then((loaded) => {
                 if (!loaded || tableName !== this.currentTableName) return;
                 this.renderTable();
                 this.updateStatistics();
                 this.updateTableSelector();
             });
         } else if (!skipCatchUp && !hasCachedProducts) {
-            void this._catchUpActiveTableFromSupabase();
+            void this._catchUpActiveTableFromDb();
         }
     }
 
@@ -8708,15 +8708,15 @@ class CountingSystem {
     }
 
     // API bilgilerini Supabase'e kaydet (telefondan erişim için)
-    async saveAPIInfoToSupabase(incomingApiInfo) {
+    async saveApiInfoToDb(incomingApiInfo) {
         try {
-            if (!window.supabase || !this.currentUser) {
+            if (!window.jbDb || !this.currentUser) {
                 console.warn('⚠️ Supabase veya kullanıcı yok, API bilgileri kaydedilemedi');
                 return;
             }
             if (!incomingApiInfo || !incomingApiInfo.token) return;
 
-            const { data: userData, error: fetchError } = await window.supabase
+            const { data: userData, error: fetchError } = await window.jbDb
                 .from('users')
                 .select('counting_data')
                 .eq('username', this.currentUser.username)
@@ -8775,7 +8775,7 @@ class CountingSystem {
                 timestamp: merged.timestamp || Date.now(),
             };
 
-            const { error: updateError } = await window.supabase
+            const { error: updateError } = await window.jbDb
                 .from('users')
                 .update({ counting_data: countingData })
                 .eq('username', this.currentUser.username);
@@ -11465,7 +11465,7 @@ class CountingSystem {
             console.log('  - chrome.runtime.id:', typeof chrome !== 'undefined' && chrome.runtime ? chrome.runtime.id : 'yok');
             
             // ÖNCE SUPABASE'DEN OKU (Mobil için)
-            if (!apiInfo && window.supabase) {
+            if (!apiInfo && window.jbDb) {
                 try {
                     // currentUser yoksa auth'dan al
                     let username = null;
@@ -11482,7 +11482,7 @@ class CountingSystem {
                         console.warn('⚠️ Kullanıcı adı bulunamadı, Supabase\'den okuma yapılamıyor');
                     } else {
                         console.log('🔍 Supabase\'den API bilgileri okunuyor (kullanıcı:', username, ')...');
-                        const { data: userData, error } = await window.supabase
+                        const { data: userData, error } = await window.jbDb
                             .from('users')
                             .select('counting_data')
                             .eq('username', username)
@@ -11570,7 +11570,7 @@ class CountingSystem {
                         });
                         
                         // API bilgilerini Supabase'e kaydet (kullanıcıya özel)
-                        await this.saveAPIInfoToSupabase(apiInfo);
+                        await this.saveApiInfoToDb(apiInfo);
                     } else if (response && !response.success) {
                         console.warn('⚠️ Background script API bilgileri döndürmedi:', response.error);
                     } else if (!response) {
@@ -11593,7 +11593,7 @@ class CountingSystem {
                     
                     // API bilgilerini Supabase'e kaydet (kullanıcıya özel)
                     if (apiInfo) {
-                        await this.saveAPIInfoToSupabase(apiInfo);
+                        await this.saveApiInfoToDb(apiInfo);
                     }
                 } catch (error) {
                     console.warn('⚠️ window.getirExtensionHelper hatası:', error.message);
@@ -11612,7 +11612,7 @@ class CountingSystem {
                         
                         // API bilgilerini Supabase'e kaydet (kullanıcıya özel)
                         if (apiInfo) {
-                            await this.saveAPIInfoToSupabase(apiInfo);
+                            await this.saveApiInfoToDb(apiInfo);
                         }
                     } catch (e) {
                         console.warn('⚠️ localStorage parse hatası:', e);
@@ -11659,7 +11659,7 @@ class CountingSystem {
                 }
                 
                 // API bilgilerini Supabase'e kaydet (telefondan erişim için)
-                await this.saveAPIInfoToSupabase(apiInfo);
+                await this.saveApiInfoToDb(apiInfo);
                 
                 try {
                     const result = await this.fetchStockFromAPI(apiInfo, barcode, productName, productId, options);
@@ -11706,10 +11706,10 @@ class CountingSystem {
             } catch (_) { /* ignore */ }
         }
 
-        if (window.supabase) {
+        if (window.jbDb) {
             const session = window.authUtils?.checkAuth();
             if (session?.username) {
-                const { data: userData } = await window.supabase
+                const { data: userData } = await window.jbDb
                     .from('users')
                     .select('counting_data')
                     .eq('username', session.username)
@@ -14532,22 +14532,22 @@ class CountingSystem {
                 return;
             }
             
-            let apiInfo = await this.fetchSupabaseApiInfo();
+            let apiInfo = await this.fetchDbApiInfo();
             const extensionApiInfo = await this.fetchExtensionApiInfo();
             
             // Supabase (manuel + önceki kayıt) + eklenti: en geç bitecek token kazanır
-            const supabaseSnapshot = apiInfo && apiInfo.token ? { ...apiInfo } : null;
-            const best = this.pickBestApiInfo([supabaseSnapshot, extensionApiInfo].filter(Boolean));
+            const dbSnapshot = apiInfo && apiInfo.token ? { ...apiInfo } : null;
+            const best = this.pickBestApiInfo([dbSnapshot, extensionApiInfo].filter(Boolean));
             if (best && best.token) {
-                const mergedForSave = this.mergeApiInfoForSave(best, supabaseSnapshot || {});
+                const mergedForSave = this.mergeApiInfoForSave(best, dbSnapshot || {});
                 if (!this.cachedFullData) this.cachedFullData = { _tables: {} };
                 this.cachedFullData._api_info = mergedForSave;
-                if (this.apiInfoSignature(mergedForSave) !== this.apiInfoSignature(supabaseSnapshot)) {
-                    await this.saveAPIInfoToSupabase(mergedForSave);
+                if (this.apiInfoSignature(mergedForSave) !== this.apiInfoSignature(dbSnapshot)) {
+                    await this.saveApiInfoToDb(mergedForSave);
                 }
                 apiInfo = mergedForSave;
             } else {
-                apiInfo = supabaseSnapshot;
+                apiInfo = dbSnapshot;
             }
             
             // Update card based on API info

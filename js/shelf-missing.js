@@ -94,13 +94,13 @@ class ShelfMissingApp {
     }
 
     async _waitForDb(maxWait = 10000) {
-        if (typeof window.jetbarkodWaitForSupabase === 'function') {
-            await window.jetbarkodWaitForSupabase(maxWait);
+        if (typeof window.jetbarkodWaitForDb === 'function') {
+            await window.jetbarkodWaitForDb(maxWait);
             return;
         }
         const start = Date.now();
         while (Date.now() - start < maxWait) {
-            if (window.supabase?.from) return;
+            if (window.jbDb?.from) return;
             await new Promise((r) => setTimeout(r, 100));
         }
     }
@@ -388,7 +388,7 @@ class ShelfMissingApp {
 
     async loadShelves(retry = 0) {
         if (!this._username) return;
-        if (!window.supabase?.from) {
+        if (!window.jbDb?.from) {
             if (retry < 3) {
                 await this._waitForDb(3000);
                 return this.loadShelves(retry + 1);
@@ -397,7 +397,7 @@ class ShelfMissingApp {
             return;
         }
         try {
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('shelf_missing_shelves')
                 .select('*')
                 .eq('username', this._username)
@@ -415,7 +415,7 @@ class ShelfMissingApp {
 
     async loadItems(retry = 0) {
         if (!this._username) return;
-        if (!window.supabase?.from) {
+        if (!window.jbDb?.from) {
             if (retry < 3) {
                 await this._waitForDb(3000);
                 return this.loadItems(retry + 1);
@@ -424,7 +424,7 @@ class ShelfMissingApp {
             return;
         }
         try {
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('shelf_missing_items')
                 .select('*')
                 .eq('username', this._username)
@@ -747,11 +747,11 @@ class ShelfMissingApp {
             this._toast('Raf adı girin', 'warning');
             return false;
         }
-        if (!window.supabase || !this._username) return false;
+        if (!window.jbDb || !this._username) return false;
 
         const maxOrder = this.shelves.reduce((m, s) => Math.max(m, s.sort_order || 0), -1);
         try {
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('shelf_missing_shelves')
                 .insert({ username: this._username, name: trimmed, sort_order: maxOrder + 1 })
                 .select('*')
@@ -770,9 +770,9 @@ class ShelfMissingApp {
 
     async saveShelfEdit(shelfId, name) {
         const trimmed = (name || '').trim();
-        if (!trimmed || !window.supabase) return false;
+        if (!trimmed || !window.jbDb) return false;
         try {
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('shelf_missing_shelves')
                 .update({ name: trimmed })
                 .eq('id', shelfId)
@@ -811,7 +811,7 @@ class ShelfMissingApp {
 
     async _executeDeleteItem(itemId) {
         const item = this.items.find((i) => i.id === itemId);
-        if (!item || !window.supabase) return false;
+        if (!item || !window.jbDb) return false;
 
         const productId = String(item.product_id);
         const shelfId = item.shelf_id;
@@ -829,7 +829,7 @@ class ShelfMissingApp {
         this._updateBasketBadge();
 
         try {
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('shelf_missing_items')
                 .delete()
                 .eq('id', itemId)
@@ -948,9 +948,9 @@ class ShelfMissingApp {
     }
 
     async deleteShelf(shelfId) {
-        if (!window.supabase) return false;
+        if (!window.jbDb) return false;
         try {
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('shelf_missing_shelves')
                 .delete()
                 .eq('id', shelfId)
@@ -973,7 +973,7 @@ class ShelfMissingApp {
 
     async upsertItem(shelfId, product, opts = {}) {
         const productId = String(this._productId(product));
-        if (!productId || !window.supabase) return;
+        if (!productId || !window.jbDb) return;
 
         const existing = this.items.find((i) => i.shelf_id === shelfId && i.product_id === productId);
         if (existing) {
@@ -1012,7 +1012,7 @@ class ShelfMissingApp {
         };
 
         try {
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('shelf_missing_items')
                 .insert(row)
                 .select('*')
@@ -1132,7 +1132,7 @@ class ShelfMissingApp {
         if (this._activeTab === 'basket' && restoreValue > 0) this._renderBasket();
 
         try {
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('shelf_missing_items')
                 .update({ needed: restoreValue })
                 .eq('id', itemId)
@@ -1150,7 +1150,7 @@ class ShelfMissingApp {
 
     async _persistNeededPick(itemId, prev, next) {
         const item = this.items.find((i) => i.id === itemId);
-        if (!item || !window.supabase) return;
+        if (!item || !window.jbDb) return;
 
         clearTimeout(this._neededTimers.get(itemId));
         this._neededPending.delete(itemId);
@@ -1158,7 +1158,7 @@ class ShelfMissingApp {
         const msg = this._neededPickMessage(prev, next);
 
         try {
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('shelf_missing_items')
                 .update({ needed: next })
                 .eq('id', itemId)
@@ -1203,10 +1203,10 @@ class ShelfMissingApp {
     async _flushNeeded(itemId, rollbackValue) {
         const needed = this._neededPending.get(itemId);
         this._neededPending.delete(itemId);
-        if (needed === undefined || !window.supabase) return;
+        if (needed === undefined || !window.jbDb) return;
 
         try {
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('shelf_missing_items')
                 .update({ needed })
                 .eq('id', itemId)
@@ -1267,12 +1267,12 @@ class ShelfMissingApp {
             if (item) item.sort_order = idx;
         });
 
-        if (!window.supabase) return;
+        if (!window.jbDb) return;
 
         this._reorderSaving = true;
         try {
             await Promise.all(orderedIds.map((id, idx) =>
-                window.supabase
+                window.jbDb
                     .from('shelf_missing_items')
                     .update({ sort_order: idx })
                     .eq('id', id)
@@ -1535,11 +1535,11 @@ class ShelfMissingApp {
         this._updateBasketBadge();
         this._patchShelfBadges();
 
-        if (!window.supabase) return;
+        if (!window.jbDb) return;
 
         try {
             await Promise.all(targets.map((item) =>
-                window.supabase
+                window.jbDb
                     .from('shelf_missing_items')
                     .update({ needed: 0 })
                     .eq('id', item.id)

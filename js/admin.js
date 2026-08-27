@@ -194,8 +194,8 @@ class AdminPanel {
         document.getElementById('refreshIPTrackingBtn').addEventListener('click', () => {
             console.log('🔍 Debug: Current IP tracking data:', this.ipTrackingData);
             console.log('🔍 Debug: Current IP analysis:', this.ipAnalysis);
-            console.log('🔍 Debug: Supabase status:', !!window.supabase);
-            this.testSupabaseConnection();
+            console.log('🔍 Debug: Supabase status:', !!window.jbDb);
+            this.testDbConnection();
             this.loadIPTracking();
         });
 
@@ -408,8 +408,8 @@ class AdminPanel {
     async loadUsers() {
         try {
             // Try Supabase first
-            if (window.supabase) {
-                const { data, error } = await window.supabase
+            if (window.jbDb) {
+                const { data, error } = await window.jbDb
                     .from('users')
                     // password/password_hash BİLEREK yok: parolalar artık kimseye okunmuyor
                     .select('id, username, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, chat_messages, last_chat_update, max_ip_count, ip_tracking_enabled')
@@ -548,8 +548,8 @@ class AdminPanel {
             };
 
             // Try Supabase first
-            if (window.supabase) {
-                const { error } = await window.supabase
+            if (window.jbDb) {
+                const { error } = await window.jbDb
                     .from('users')
                     .insert([newUser]);
                 
@@ -570,7 +570,7 @@ class AdminPanel {
                     );
                 }
 
-                const { error: userDataError } = await window.supabase.from('user_data').insert({
+                const { error: userDataError } = await window.jbDb.from('user_data').insert({
                     username,
                     custom_products: [],
                     settings: {
@@ -689,8 +689,8 @@ class AdminPanel {
             if (!user) return;
 
             // Update in Supabase
-            if (window.supabase) {
-                await window.supabase
+            if (window.jbDb) {
+                await window.jbDb
                     .from('users')
                     .update({ trial_end: newEnd.toISOString() })
                     .eq('username', username);
@@ -764,7 +764,7 @@ class AdminPanel {
         }
 
         try {
-            if (!window.supabase) {
+            if (!window.jbDb) {
                 alert('❌ Supabase bağlantısı yok!');
                 return;
             }
@@ -772,7 +772,7 @@ class AdminPanel {
             // Use Supabase Broadcast channel to send refresh command to user
             // This is more reliable than updating database fields
             const channelName = `user-refresh-${username}`;
-            const channel = window.supabase.channel(channelName);
+            const channel = window.jbDb.channel(channelName);
             
             // Subscribe to channel first (required for broadcast)
             channel.subscribe((status) => {
@@ -791,16 +791,16 @@ class AdminPanel {
                         
                         // Cleanup channel after sending
                         setTimeout(() => {
-                            window.supabase.removeChannel(channel);
+                            window.jbDb.removeChannel(channel);
                         }, 1000);
                     }).catch((error) => {
                         console.error('❌ Error sending refresh command:', error);
-                        window.supabase.removeChannel(channel);
+                        window.jbDb.removeChannel(channel);
                         alert('❌ Sayfa yenileme komutu gönderilirken hata oluştu: ' + error.message);
                     });
                 } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
                     console.error('❌ Channel subscription failed:', status);
-                    window.supabase.removeChannel(channel);
+                    window.jbDb.removeChannel(channel);
                     alert('❌ Sayfa yenileme komutu gönderilirken hata oluştu: Channel bağlantı hatası');
                 }
             });
@@ -845,8 +845,8 @@ class AdminPanel {
             // Parola BURADA güncellenmiyor — aşağıda API üzerinden bcrypt'lenir.
 
             // Update in Supabase
-            if (window.supabase) {
-                const { error } = await window.supabase
+            if (window.jbDb) {
+                const { error } = await window.jbDb
                     .from('users')
                     .update(updatedUser)
                     .eq('username', username);
@@ -940,8 +940,8 @@ class AdminPanel {
             const newStatus = !user.is_active;
 
             // Update in Supabase
-            if (window.supabase) {
-                await window.supabase
+            if (window.jbDb) {
+                await window.jbDb
                     .from('users')
                     .update({ is_active: newStatus })
                     .eq('username', username);
@@ -969,8 +969,8 @@ class AdminPanel {
 
         try {
             // Delete from Supabase
-            if (window.supabase) {
-                await window.supabase
+            if (window.jbDb) {
+                await window.jbDb
                     .from('users')
                     .delete()
                     .eq('username', username);
@@ -1070,8 +1070,8 @@ class AdminPanel {
     async updateMessageStatus(messageId, status) {
         try {
             // Update in Supabase
-            if (window.supabase) {
-                await window.supabase
+            if (window.jbDb) {
+                await window.jbDb
                     .from('messages')
                     .update({ status: status })
                     .eq('id', messageId);
@@ -1445,7 +1445,7 @@ class AdminPanel {
     async addTestIPData() {
         console.log('🧪 Adding test IP data (users.tracked_ips)...');
         try {
-            const { data: users, error: usersError } = await window.supabase
+            const { data: users, error: usersError } = await window.jbDb
                 .from('users')
                 .select('id, username, tracked_ips')
                 .limit(1);
@@ -1459,7 +1459,7 @@ class AdminPanel {
             const added = testIPs.filter(ip => !current.includes(ip));
             const newList = [...current];
             added.forEach(ip => newList.push(ip));
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('users')
                 .update({ tracked_ips: newList })
                 .eq('id', u.id);
@@ -1472,10 +1472,10 @@ class AdminPanel {
         }
     }
 
-    async testSupabaseConnection() {
+    async testDbConnection() {
         console.log('🧪 Testing Supabase connection...');
         
-        if (!window.supabase) {
+        if (!window.jbDb) {
             console.error('❌ Supabase not available!');
             return;
         }
@@ -1483,7 +1483,7 @@ class AdminPanel {
         try {
             // Test 1: Check users table
             console.log('🔍 Test 1: Checking users table...');
-            const { data: users, error: usersError } = await window.supabase
+            const { data: users, error: usersError } = await window.jbDb
                 .from('users')
                 .select('id, username')
                 .limit(1);
@@ -1496,7 +1496,7 @@ class AdminPanel {
             
             // Test 2: Check blocked_ips table
             console.log('🔍 Test 2: Checking blocked_ips table...');
-            const { data: blockedCheck, error: blockedError } = await window.supabase
+            const { data: blockedCheck, error: blockedError } = await window.jbDb
                 .from('blocked_ips')
                 .select('id')
                 .limit(1);
@@ -1508,7 +1508,7 @@ class AdminPanel {
             
             // Test 3: Users.tracked_ips (read-only check)
             console.log('🔍 Test 3: Checking users.tracked_ips...');
-            const { data: usersWithIPs, error: usersIPError } = await window.supabase
+            const { data: usersWithIPs, error: usersIPError } = await window.jbDb
                 .from('users')
                 .select('id, username, tracked_ips')
                 .limit(1);
@@ -1722,12 +1722,12 @@ class AdminPanel {
     async loadIPTracking() {
         try {
             console.log('🔄 Loading IP tracking data (users.tracked_ips)...');
-            if (!window.supabase) {
+            if (!window.jbDb) {
                 this.ipTrackingData = [];
                 this.renderIPTracking();
                 return;
             }
-            const { data: usersData, error: usersError } = await window.supabase
+            const { data: usersData, error: usersError } = await window.jbDb
                 .from('users')
                 .select('id, username, tracked_ips');
             if (usersError) {
@@ -1736,7 +1736,7 @@ class AdminPanel {
                 this.renderIPTracking();
                 return;
             }
-            const { data: blockedRows } = await window.supabase
+            const { data: blockedRows } = await window.jbDb
                 .from('blocked_ips')
                 .select('ip_address');
             const blockedSet = new Set((blockedRows || []).map(r => r.ip_address));
@@ -1827,7 +1827,7 @@ class AdminPanel {
     async blockIPTracking(ipAddress) {
         if (!ipAddress || !confirm('Bu IP adresini engellemek istediğinizden emin misiniz?')) return;
         try {
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('blocked_ips')
                 .upsert({ ip_address: ipAddress }, { onConflict: 'ip_address' });
             if (error) throw error;
@@ -1842,7 +1842,7 @@ class AdminPanel {
 
     async unblockIP(blockedId) {
         try {
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('blocked_ips')
                 .delete()
                 .eq('id', blockedId);
@@ -1859,7 +1859,7 @@ class AdminPanel {
     async unblockIPByAddress(ipAddress) {
         if (!ipAddress) return;
         try {
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('blocked_ips')
                 .delete()
                 .eq('ip_address', ipAddress);
@@ -1875,8 +1875,8 @@ class AdminPanel {
 
     async loadBlockedIPs() {
         try {
-            if (!window.supabase) return;
-            const { data, error } = await window.supabase
+            if (!window.jbDb) return;
+            const { data, error } = await window.jbDb
                 .from('blocked_ips')
                 .select('id, ip_address, created_at')
                 .order('created_at', { ascending: false });
@@ -1929,7 +1929,7 @@ class AdminPanel {
     async deleteIPTracking(userId, ipAddress) {
         if (!userId || !ipAddress || !confirm('Bu IP kaydını kullanıcıdan kaldırmak istediğinizden emin misiniz?')) return;
         try {
-            const { data: u, error: fetchErr } = await window.supabase
+            const { data: u, error: fetchErr } = await window.jbDb
                 .from('users')
                 .select('tracked_ips')
                 .eq('id', userId)
@@ -1939,7 +1939,7 @@ class AdminPanel {
             }
             const current = Array.isArray(u.tracked_ips) ? u.tracked_ips : [];
             const updated = current.filter(ip => ip !== ipAddress);
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('users')
                 .update({ tracked_ips: updated })
                 .eq('id', userId);
@@ -2019,12 +2019,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Chat Functions for AdminPanel
 AdminPanel.prototype.setupChatRealtime = function() {
-    if (!window.supabase) return;
+    if (!window.jbDb) return;
     
     console.log('🔔 Setting up chat realtime subscription');
     
     // Subscribe to users table changes for chat_messages
-    this.chatSubscription = window.supabase
+    this.chatSubscription = window.jbDb
         .channel('chat-updates')
         .on('postgres_changes', {
             event: 'UPDATE',
@@ -2071,9 +2071,9 @@ AdminPanel.prototype.handleChatUpdate = function(payload) {
 AdminPanel.prototype.triggerRealtimeUpdate = function(username) {
     console.log('🔔 Triggering realtime update for user:', username);
     
-    if (window.supabase) {
+    if (window.jbDb) {
         // Update last_chat_update to trigger realtime
-        window.supabase
+        window.jbDb
             .from('users')
             .update({ 
                 last_chat_update: new Date().toISOString()
@@ -2094,11 +2094,11 @@ AdminPanel.prototype.loadChatUsers = async function() {
     try {
         const allUsers = [];
         
-        if (window.supabase) {
+        if (window.jbDb) {
             console.log('💬 Using Supabase for chat users');
             
             // Load regular users with chat messages
-            const { data: usersData, error: usersError } = await window.supabase
+            const { data: usersData, error: usersError } = await window.jbDb
                 .from('users')
                 .select('username, chat_messages, last_chat_update')
                 .not('chat_messages', 'is', null);
@@ -2125,7 +2125,7 @@ AdminPanel.prototype.loadChatUsers = async function() {
             
             // Load guest users with chat messages
             try {
-                const { data: guestChatsData, error: guestError } = await window.supabase
+                const { data: guestChatsData, error: guestError } = await window.jbDb
                     .from('guest_chats')
                     .select('username, chat_messages, last_chat_update')
                     .not('chat_messages', 'is', null)
@@ -2183,9 +2183,9 @@ AdminPanel.prototype.getAllUsersForChat = async function() {
         const usersWithChat = new Set();
         
         // Get usernames of users who already have chat messages
-        if (window.supabase) {
+        if (window.jbDb) {
             // Get registered users with chat messages
-            const { data: usersWithChatData } = await window.supabase
+            const { data: usersWithChatData } = await window.jbDb
                 .from('users')
                 .select('username, chat_messages')
                 .not('chat_messages', 'is', null);
@@ -2205,7 +2205,7 @@ AdminPanel.prototype.getAllUsersForChat = async function() {
             
             // Get guest users with chat messages
             try {
-                const { data: guestChatsData } = await window.supabase
+                const { data: guestChatsData } = await window.jbDb
                     .from('guest_chats')
                     .select('username, chat_messages')
                     .not('chat_messages', 'is', null);
@@ -2227,7 +2227,7 @@ AdminPanel.prototype.getAllUsersForChat = async function() {
             }
             
             // Get all registered users (excluding those with chat)
-            const { data: allRegisteredUsers, error: regError } = await window.supabase
+            const { data: allRegisteredUsers, error: regError } = await window.jbDb
                 .from('users')
                 .select('username, company, is_active')
                 .eq('is_active', true)
@@ -2248,7 +2248,7 @@ AdminPanel.prototype.getAllUsersForChat = async function() {
             
             // Get all guest users (excluding those with chat)
             try {
-                const { data: allGuestUsers, error: guestError } = await window.supabase
+                const { data: allGuestUsers, error: guestError } = await window.jbDb
                     .from('guest_chats')
                     .select('username, ip_address, created_at')
                     .order('username', { ascending: true });
@@ -2518,12 +2518,12 @@ AdminPanel.prototype.getLastMessagePreview = async function(username) {
     try {
         const isGuest = username && (username.startsWith('Kullanıcı') || /^Guest/.test(username));
         
-        if (window.supabase) {
+        if (window.jbDb) {
             let chatMessages = [];
             
             if (isGuest) {
                 // Load guest chat messages
-                const { data: guestChatData, error: guestError } = await window.supabase
+                const { data: guestChatData, error: guestError } = await window.jbDb
                     .from('guest_chats')
                     .select('chat_messages')
                     .eq('username', username)
@@ -2534,7 +2534,7 @@ AdminPanel.prototype.getLastMessagePreview = async function(username) {
                 }
             } else {
                 // Load regular user chat messages
-                const { data, error } = await window.supabase
+                const { data, error } = await window.jbDb
                     .from('users')
                     .select('chat_messages')
                     .eq('username', username)
@@ -2676,9 +2676,9 @@ AdminPanel.prototype.clearChat = async function() {
         console.log('🗑️ Clearing chat for user:', this.selectedChatUser);
         
         // Delete from Supabase first
-        if (window.supabase) {
+        if (window.jbDb) {
             console.log('🗑️ Deleting messages from Supabase for:', this.selectedChatUser);
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('messages')
                 .delete()
                 .eq('username', this.selectedChatUser);
@@ -2780,12 +2780,12 @@ AdminPanel.prototype.loadChatMessages = async function(username) {
         // Check if guest user
         const isGuest = username && username.startsWith('Kullanıcı') && /^\d+$/.test(username.replace('Kullanıcı', ''));
         
-        if (window.supabase) {
+        if (window.jbDb) {
             console.log('💬 Using Supabase for chat messages');
             
             if (isGuest) {
                 // Load guest chat messages
-                const { data: guestChatData, error: guestError } = await window.supabase
+                const { data: guestChatData, error: guestError } = await window.jbDb
                     .from('guest_chats')
                     .select('chat_messages')
                     .eq('username', username)
@@ -2804,7 +2804,7 @@ AdminPanel.prototype.loadChatMessages = async function(username) {
                 }
             } else {
                 // Load regular user chat messages
-                const { data, error } = await window.supabase
+                const { data, error } = await window.jbDb
                     .from('users')
                     .select('chat_messages')
                     .eq('username', username)
@@ -2813,7 +2813,7 @@ AdminPanel.prototype.loadChatMessages = async function(username) {
                 if (error && error.code === '42703') {
                     console.log('⚠️ chat_messages column does not exist, using messages table');
                     // Fallback to messages table
-                    const { data: messagesData, error: messagesError } = await window.supabase
+                    const { data: messagesData, error: messagesError } = await window.jbDb
                         .from('messages')
                         .select('*')
                         .eq('username', username)
@@ -3194,9 +3194,9 @@ AdminPanel.prototype.deleteMessage = async function(messageIndex) {
         console.log('🗑️ Message to delete:', messageToDelete);
         
         // Delete from Supabase first
-        if (window.supabase && messageToDelete.id) {
+        if (window.jbDb && messageToDelete.id) {
             console.log('🗑️ Deleting message from Supabase with ID:', messageToDelete.id);
-            const { error } = await window.supabase
+            const { error } = await window.jbDb
                 .from('messages')
                 .delete()
                 .eq('id', messageToDelete.id);
@@ -3344,7 +3344,7 @@ AdminPanel.prototype.sendAdminMessage = async function() {
     }
 
     // Save to Supabase
-    await this.saveAdminMessageToSupabase(message);
+    await this.saveAdminMessageToDb(message);
 };
 
 AdminPanel.prototype.addAdminMessageToUI = function(message) {
@@ -3391,9 +3391,9 @@ AdminPanel.prototype.addAdminMessageToUI = function(message) {
     chatMessagesArea.scrollTop = chatMessagesArea.scrollHeight;
 };
 
-AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
+AdminPanel.prototype.saveAdminMessageToDb = async function(message) {
     try {
-        if (window.supabase) {
+        if (window.jbDb) {
             console.log('💬 Saving admin message to Supabase:', message);
             
             // Check if guest user
@@ -3401,7 +3401,7 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
             
             if (isGuest) {
                 // Save to guest_chats table
-                const { data: guestChatData, error: guestError } = await window.supabase
+                const { data: guestChatData, error: guestError } = await window.jbDb
                     .from('guest_chats')
                     .select('chat_messages')
                     .eq('username', this.selectedChatUser)
@@ -3419,7 +3419,7 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
                         userStatus: 'unread'
                     }];
                     
-                    const { error: insertError } = await window.supabase
+                    const { error: insertError } = await window.jbDb
                         .from('guest_chats')
                         .insert([{
                             username: this.selectedChatUser,
@@ -3449,7 +3449,7 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
                         userStatus: 'unread'
                     });
 
-                    const { error: updateError } = await window.supabase
+                    const { error: updateError } = await window.jbDb
                         .from('guest_chats')
                         .update({
                             chat_messages: JSON.stringify(chatMessages),
@@ -3471,7 +3471,7 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
             
             // Regular user
             // Get current user's chat messages
-            const { data: userData, error: userError } = await window.supabase
+            const { data: userData, error: userError } = await window.jbDb
                 .from('users')
                 .select('chat_messages')
                 .eq('username', this.selectedChatUser)
@@ -3495,7 +3495,7 @@ AdminPanel.prototype.saveAdminMessageToSupabase = async function(message) {
             });
 
             // Update user's chat messages
-            const { error: updateError } = await window.supabase
+            const { error: updateError } = await window.jbDb
                 .from('users')
                 .update({ 
                     chat_messages: JSON.stringify(chatMessages),
@@ -3581,8 +3581,8 @@ AdminPanel.prototype.markUserMessagesAsReadByAdmin = async function(username) {
         
         if (isGuest) {
             // Handle guest user
-            if (window.supabase) {
-                const { data: guestChatData, error: guestError } = await window.supabase
+            if (window.jbDb) {
+                const { data: guestChatData, error: guestError } = await window.jbDb
                     .from('guest_chats')
                     .select('chat_messages')
                     .eq('username', username)
@@ -3602,7 +3602,7 @@ AdminPanel.prototype.markUserMessagesAsReadByAdmin = async function(username) {
                     
                     if (hasChanges) {
                         // Update in Supabase
-                        await window.supabase
+                        await window.jbDb
                             .from('guest_chats')
                             .update({ 
                                 chat_messages: JSON.stringify(chatMessages),
@@ -3643,10 +3643,10 @@ AdminPanel.prototype.markUserMessagesAsReadByAdmin = async function(username) {
         }
         
         // Regular user
-        if (!window.supabase) return;
+        if (!window.jbDb) return;
         
         // Get current messages
-        const { data: userData, error: userError } = await window.supabase
+        const { data: userData, error: userError } = await window.jbDb
             .from('users')
             .select('chat_messages')
             .eq('username', username)
@@ -3666,7 +3666,7 @@ AdminPanel.prototype.markUserMessagesAsReadByAdmin = async function(username) {
             
             if (hasChanges) {
                 // Update in Supabase
-                await window.supabase
+                await window.jbDb
                     .from('users')
                     .update({ 
                         chat_messages: JSON.stringify(chatMessages),
@@ -3787,8 +3787,8 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
         let premiumFeatures = {};
         
         // Try Supabase first
-        if (window.supabase) {
-            const { data, error } = await window.supabase
+        if (window.jbDb) {
+            const { data, error } = await window.jbDb
                 .from('users')
                 .select('premium_features')
                 .eq('username', username)
@@ -3964,8 +3964,8 @@ AdminPanel.prototype.savePremiumFeatures = async function() {
         });
         
         // Update in Supabase
-        if (window.supabase) {
-            const { data, error } = await window.supabase
+        if (window.jbDb) {
+            const { data, error } = await window.jbDb
                 .from('users')
                 .update({ 
                     premium_features: premiumFeatures,
@@ -4000,7 +4000,7 @@ AdminPanel.prototype.savePremiumFeatures = async function() {
 };
 
 AdminPanel.prototype.triggerPremiumFeaturesRealtimeUpdate = async function(username) {
-    if (!window.supabase) return;
+    if (!window.jbDb) return;
     
     console.log('🔔 Triggering premium features realtime update for:', username);
     
@@ -4008,7 +4008,7 @@ AdminPanel.prototype.triggerPremiumFeaturesRealtimeUpdate = async function(usern
     // Since we're updating premium_features, the realtime subscription should catch it
     // But we can also update updated_at to ensure the change is detected
     try {
-        const { error } = await window.supabase
+        const { error } = await window.jbDb
             .from('users')
             .update({ 
                 updated_at: new Date().toISOString()
@@ -4032,10 +4032,10 @@ AdminPanel.prototype.loadConfigTab = async function() {
         console.log('🔄 Loading config tab...');
         
         // ÖNCE: feature-definitions.js'deki tüm özellikleri Supabase'e ekle (eksik olanlar)
-        await this.syncFeatureDefinitionsToSupabase();
+        await this.syncFeatureDefinitionsToDb();
         
         // Load system features
-        const { data: features, error: featuresError } = await window.supabase
+        const { data: features, error: featuresError } = await window.jbDb
             .from('system_features')
             .select('*')
             .eq('is_active', true)
@@ -4062,9 +4062,9 @@ AdminPanel.prototype.loadConfigTab = async function() {
     }
 };
 
-AdminPanel.prototype.syncFeatureDefinitionsToSupabase = async function() {
+AdminPanel.prototype.syncFeatureDefinitionsToDb = async function() {
     try {
-        if (!window.supabase) {
+        if (!window.jbDb) {
             console.warn('⚠️ Supabase not available, cannot sync feature definitions');
             return;
         }
@@ -4078,7 +4078,7 @@ AdminPanel.prototype.syncFeatureDefinitionsToSupabase = async function() {
         console.log('🔄 Syncing feature definitions to Supabase...', Object.keys(definitions).length, 'features');
 
         // Mevcut özellikleri getir
-        const { data: existingFeatures, error: fetchError } = await window.supabase
+        const { data: existingFeatures, error: fetchError } = await window.jbDb
             .from('system_features')
             .select('feature_key');
 
@@ -4109,7 +4109,7 @@ AdminPanel.prototype.syncFeatureDefinitionsToSupabase = async function() {
 
         // Eksik özellikleri ekle
         if (featuresToInsert.length > 0) {
-            const { error: insertError } = await window.supabase
+            const { error: insertError } = await window.jbDb
                 .from('system_features')
                 .insert(featuresToInsert);
 
@@ -4132,7 +4132,7 @@ AdminPanel.prototype.getScheduledFeatureChanges = async function() {
         const now = new Date().toISOString();
         
         // Get scheduled updates (is_active = false, scheduled_at > now)
-        const { data: scheduledUpdates, error } = await window.supabase
+        const { data: scheduledUpdates, error } = await window.jbDb
             .from('updates')
             .select('update_number, scheduled_at, feature_changes')
             .eq('is_active', false)
@@ -4191,7 +4191,7 @@ AdminPanel.prototype.renderConfigTable = function() {
             : '<span class="text-gray-400">-</span>';
 
         // Eğer Supabase'de yoksa, uyarı göster
-        const notInSupabase = feature._from_definition ? '<div class="text-xs text-orange-600 font-medium mt-1">⚠️ Supabase\'de yok</div>' : '';
+        const notInDb = feature._from_definition ? '<div class="text-xs text-orange-600 font-medium mt-1">⚠️ Supabase\'de yok</div>' : '';
 
         // Format value based on type
         const formatValue = (value, type) => {
@@ -4217,7 +4217,7 @@ AdminPanel.prototype.renderConfigTable = function() {
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm font-medium text-gray-900">${feature.feature_name}</div>
                     ${feature.description ? `<div class="text-xs text-gray-500">${feature.description}</div>` : ''}
-                    ${notInSupabase}
+                    ${notInDb}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <span class="px-2 py-1 text-xs font-medium rounded-full ${
@@ -4252,16 +4252,16 @@ AdminPanel.prototype.renderConfigTable = function() {
 
 AdminPanel.prototype.mergeFeaturesWithDefinitions = function() {
     // Supabase'deki özellikler
-    const supabaseFeatures = this.configFeatures || [];
-    const supabaseKeys = new Set(supabaseFeatures.map(f => f.feature_key));
+    const dbFeatures = this.configFeatures || [];
+    const dbKeys = new Set(dbFeatures.map(f => f.feature_key));
 
     // feature-definitions.js'deki tüm özellikler
     const definitions = window.getAllFeatureDefinitions?.() || {};
-    const allFeatures = [...supabaseFeatures];
+    const allFeatures = [...dbFeatures];
 
     // feature-definitions.js'de olup Supabase'de olmayanları ekle
     for (const [featureKey, definition] of Object.entries(definitions)) {
-        if (!supabaseKeys.has(featureKey)) {
+        if (!dbKeys.has(featureKey)) {
             // Supabase'de yok, definition'dan oluştur
             allFeatures.push({
                 feature_key: featureKey,
@@ -4329,7 +4329,7 @@ AdminPanel.prototype.openEditFeatureModal = async function(featureKey) {
         // Eğer Supabase'de yoksa, önce ekle
         if (feature._from_definition) {
             console.log(`➕ Feature ${featureKey} not in Supabase, inserting...`);
-            await this.syncFeatureDefinitionsToSupabase();
+            await this.syncFeatureDefinitionsToDb();
             // Reload to get the newly inserted feature
             await this.loadConfigTab();
             // Find again after reload
@@ -4440,7 +4440,7 @@ AdminPanel.prototype.updateFeatureValue = async function() {
         }
 
         // Update system_features
-        const { error: updateError } = await window.supabase
+        const { error: updateError } = await window.jbDb
             .from('system_features')
             .update({
                 default_value: newDefaultValue,

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <script src="js/console-quiet.js?v=20260827i"></script>
+    <script src="js/console-quiet.js?v=20260828d"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -64,11 +64,10 @@
             }
         };
     </script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/app-boot.css?v=20260827i" />
+    <link rel="stylesheet" href="css/app-boot.css?v=20260828d" />
     <style>
         * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
         /* Ana sayfa arka plan — Synapse tarzı ambient orb (marka mavisi) */
@@ -912,21 +911,19 @@
         </svg>
     </button>
 
-    <!-- DB client (VPS PostgREST veya Supabase) -->
-    <script src="js/auth-token.js?v=20260827i"></script>
-    <script src="js/supabase-config.js?v=20260827i"></script>
-    <script src="js/vps-supabase-shim.js?v=20260827i"></script>
-    <script src="js/supabase-bootstrap.js?v=20260827i"></script>
-    <script src="js/guest-access-config.js?v=20260827i"></script>
-    <script src="js/auth.js?v=20260827i"></script>
-    <script src="js/guest-access.js?v=20260827i"></script>
-    <script src="js/image-lightbox.js?v=20260827i"></script>
-    <script src="js/ip-ban-checker.js?v=20260827i"></script>
-    <script src="js/guest-user-manager.js?v=20260827i"></script>
-    <script src="js/trial-notifications.js?v=20260827i"></script>
-    <script src="js/premium-features.js?v=20260827i"></script>
-    <script src="js/notifications.js?v=20260827i"></script>
-    <script src="js/chat.js?v=20260827i"></script>
+    <script src="js/auth-token.js?v=20260828d"></script>
+    <script src="js/db-config.js?v=20260828d"></script>
+    <script src="js/jb-db.js?v=20260828d"></script>
+    <script src="js/guest-access-config.js?v=20260828d"></script>
+    <script src="js/auth.js?v=20260828d"></script>
+    <script src="js/guest-access.js?v=20260828d"></script>
+    <script src="js/image-lightbox.js?v=20260828d"></script>
+    <script src="js/ip-ban-checker.js?v=20260828d"></script>
+    <script src="js/guest-user-manager.js?v=20260828d"></script>
+    <script src="js/trial-notifications.js?v=20260828d"></script>
+    <script src="js/premium-features.js?v=20260828d"></script>
+    <script src="js/notifications.js?v=20260828d"></script>
+    <script src="js/chat.js?v=20260828d"></script>
     
     <script>
         // Support chat button handlers (Destek Alın, header Destek, Bize Ulaşın)
@@ -1022,9 +1019,9 @@
             }
             
             // If user has a session, setup refresh subscription
-            if (username && window.supabase) {
+            if (username && window.jbDb) {
                 const refreshChannelName = `user-refresh-${username}`;
-                window.refreshSubscriptionIndex = window.supabase
+                window.refreshSubscriptionIndex = window.jbDb
                     .channel(refreshChannelName)
                     .on('broadcast', { event: 'refresh-page' }, (payload) => {
                         console.log('🔄 Admin requested page refresh via broadcast (index.html)');
@@ -1045,8 +1042,8 @@
                 
                 // Cleanup on page unload
                 window.addEventListener('beforeunload', () => {
-                    if (window.refreshSubscriptionIndex && window.supabase) {
-                        window.supabase.removeChannel(window.refreshSubscriptionIndex);
+                    if (window.refreshSubscriptionIndex && window.jbDb) {
+                        window.jbDb.removeChannel(window.refreshSubscriptionIndex);
                     }
                 });
             }

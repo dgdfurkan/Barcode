@@ -62,16 +62,16 @@ class PremiumFeatures {
         } catch (e) { /* ignore */ }
     }
 
-    async _waitForSupabase(maxWait = 10000) {
-        if (typeof window.jetbarkodWaitForSupabase === 'function') {
-            return window.jetbarkodWaitForSupabase(maxWait);
+    async _waitForDb(maxWait = 10000) {
+        if (typeof window.jetbarkodWaitForDb === 'function') {
+            return window.jetbarkodWaitForDb(maxWait);
         }
         const start = Date.now();
         while (Date.now() - start < maxWait) {
-            if (window.supabase?.from) return window.supabase;
+            if (window.jbDb?.from) return window.jbDb;
             await new Promise((r) => setTimeout(r, 100));
         }
-        return window.supabase || null;
+        return window.jbDb || null;
     }
 
     // Initialize premium features for current user
@@ -99,7 +99,7 @@ class PremiumFeatures {
                 void this._refreshPremiumInBackground();
                 return;
             }
-            await this._waitForSupabase();
+            await this._waitForDb();
             await this.loadPremiumFeatures();
             if (Object.keys(this.premiumFeatures).length) {
                 this._writePremiumCache(session.username, this.premiumFeatures);
@@ -111,7 +111,7 @@ class PremiumFeatures {
             return;
         }
 
-        await this._waitForSupabase();
+        await this._waitForDb();
         await this.loadPremiumFeatures();
         if (Object.keys(this.premiumFeatures).length) {
             this._writePremiumCache(session.username, this.premiumFeatures);
@@ -120,7 +120,7 @@ class PremiumFeatures {
 
     async _refreshPremiumInBackground() {
         try {
-            await this._waitForSupabase(8000);
+            await this._waitForDb(8000);
             await this.loadPremiumFeatures();
             if (this.currentUser && Object.keys(this.premiumFeatures).length) {
                 this._writePremiumCache(this.currentUser.username, this.premiumFeatures);
@@ -134,7 +134,7 @@ class PremiumFeatures {
     async loadPremiumFeatures() {
         if (this._loadPromise) return this._loadPromise;
 
-        this._loadPromise = this._fetchPremiumFeaturesFromSupabase();
+        this._loadPromise = this._fetchPremiumFeaturesFromDb();
         try {
             await this._loadPromise;
         } finally {
@@ -153,13 +153,13 @@ class PremiumFeatures {
      *
      * @returns {Promise<boolean>} taze veri alındı mı
      */
-    async _fetchPremiumFeaturesFromSupabase() {
+    async _fetchPremiumFeaturesFromDb() {
         try {
-            if (!window.supabase || !this.currentUser) {
+            if (!window.jbDb || !this.currentUser) {
                 return false;
             }
 
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('users')
                 .select('premium_features')
                 .eq('username', this.currentUser.username)
@@ -201,8 +201,8 @@ class PremiumFeatures {
             return true;
         }
 
-        await this._waitForSupabase(8000);
-        return this._fetchPremiumFeaturesFromSupabase();
+        await this._waitForDb(8000);
+        return this._fetchPremiumFeaturesFromDb();
     }
 
     // Check if a specific premium feature is enabled
@@ -265,13 +265,13 @@ class PremiumFeatures {
         }
 
         try {
-            if (!window.supabase || !this.currentUser) {
+            if (!window.jbDb || !this.currentUser) {
                 return false;
             }
 
             // Try RPC function first (more secure)
             try {
-                const { data: rpcData, error: rpcError } = await window.supabase
+                const { data: rpcData, error: rpcError } = await window.jbDb
                     .rpc('check_premium_feature', {
                         p_username: this.currentUser.username,
                         p_feature_name: featureName
@@ -288,7 +288,7 @@ class PremiumFeatures {
             }
 
             // Fallback: Fetch fresh data from backend
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('users')
                 .select('premium_features')
                 .eq('username', this.currentUser.username)
@@ -336,11 +336,11 @@ class PremiumFeatures {
             if (this.featurePreferencesCache && this.cacheTimestamp && (now - this.cacheTimestamp) < this.CACHE_DURATION) {
                 return this.featurePreferencesCache;
             }
-            if (!window.supabase || !this.currentUser) {
+            if (!window.jbDb || !this.currentUser) {
                 return {};
             }
             // user_data'da aynı kullanıcı için birden fazla satır olabilir; en günceli al (user-manager ile uyumlu)
-            const { data, error } = await window.supabase
+            const { data, error } = await window.jbDb
                 .from('user_data')
                 .select('settings')
                 .eq('username', this.currentUser.username)

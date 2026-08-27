@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <script src="../js/console-quiet.js?v=20260827i"></script>
-    <script src="../js/app-boot.js?v=20260827i"></script>
+    <script src="../js/console-quiet.js?v=20260828d"></script>
+    <script src="../js/app-boot.js?v=20260828d"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,38 +18,35 @@
     <link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
     <link rel="shortcut icon" href="../assets/logo.png?v=2">
     
-    <link rel="stylesheet" href="../css/main.css?v=20260827i" />
-    <link rel="stylesheet" href="../css/app-boot.css?v=20260827i" />
-    <link rel="stylesheet" href="../css/tailwind.css?v=20260827i" />
+    <link rel="stylesheet" href="../css/main.css?v=20260828d" />
+    <link rel="stylesheet" href="../css/app-boot.css?v=20260828d" />
+    <link rel="stylesheet" href="../css/tailwind.css?v=20260828d" />
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js for Financial Charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <!-- Supabase Client Library -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="../js/auth-token.js?v=20260827i"></script>
-    <script src="../js/supabase-config.js?v=20260827i"></script>
-    <script src="../js/vps-supabase-shim.js?v=20260827i"></script>
-    <script src="../js/supabase-bootstrap.js?v=20260827i"></script>
+    <script src="../js/auth-token.js?v=20260828d"></script>
+    <script src="../js/db-config.js?v=20260828d"></script>
+    <script src="../js/jb-db.js?v=20260828d"></script>
     <script src="temp_products.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <script src="../js/auth.js?v=20260827i"></script>
-    <script src="../js/skeleton-ui.js?v=20260827i"></script>
-    <script src="../js/user-manager.js?v=20260827i"></script>
-    <script src="../js/premium-features.js?v=20260827i"></script>
-    <script src="../js/trial-notifications.js?v=20260827i"></script>
-    <script src="../js/notifications.js?v=20260827i"></script>
-    <script src="../js/test-counting-supabase.js?v=20260827i"></script>
+    <script src="../js/auth.js?v=20260828d"></script>
+    <script src="../js/skeleton-ui.js?v=20260828d"></script>
+    <script src="../js/user-manager.js?v=20260828d"></script>
+    <script src="../js/premium-features.js?v=20260828d"></script>
+    <script src="../js/trial-notifications.js?v=20260828d"></script>
+    <script src="../js/notifications.js?v=20260828d"></script>
+    <script src="../js/test-counting-db.js?v=20260828d"></script>
     <!-- Html5-Qrcode (Barkod tarama için fallback) -->
     <script src="https://unpkg.com/html5-qrcode@latest/html5-qrcode.min.js"></script>
-    <script src="../js/daily-count-import.js?v=20260827i"></script>
-    <script src="../js/sayim-clipboard-import.js?v=20260827i"></script>
+    <script src="../js/daily-count-import.js?v=20260828d"></script>
+    <script src="../js/sayim-clipboard-import.js?v=20260828d"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <script src="../js/barcode-visual.js?v=20260827i"></script>
-    <script src="../js/getir-cdn-paste.js?v=20260827i"></script>
-    <script src="../js/barcode-scanner.js?v=20260827i"></script>
-    <script src="../js/counting.js?v=20260827i"></script>
-    <script src="../js/terminal-scanner.js?v=20260827i"></script>
-    <script src="../js/counting-v2-ui.js?v=20260828c"></script>
+    <script src="../js/barcode-visual.js?v=20260828d"></script>
+    <script src="../js/getir-cdn-paste.js?v=20260828d"></script>
+    <script src="../js/barcode-scanner.js?v=20260828d"></script>
+    <script src="../js/counting.js?v=20260828d"></script>
+    <script src="../js/terminal-scanner.js?v=20260828d"></script>
+    <script src="../js/counting-v2-ui.js?v=20260828d"></script>
     
     <style>
         /* Prevent horizontal scroll on mobile */
@@ -2423,8 +2420,8 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="../css/motion.css?v=20260827i" />
-    <link rel="stylesheet" href="../css/counting-v2.css?v=20260828c" />
+    <link rel="stylesheet" href="../css/motion.css?v=20260828d" />
+    <link rel="stylesheet" href="../css/counting-v2.css?v=20260828d" />
 </head>
 <body class="bg-gray-50 counting-v2">
     <div id="appBoot" class="app-boot app-boot--active" data-boot-steps="auth,data,ui" role="status" aria-live="polite" aria-label="Sayfa yükleniyor">
@@ -2464,6 +2461,12 @@
                         <span class="hidden sm:inline">Barkod Aramaya Dön</span>
                         <span class="sm:hidden">Arama</span>
                     </button>
+                    <a id="countingVersionSwitch" href="counting.html" class="v2-surum" title="Sayım sayfasının eski tasarımına dön">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h13m0 0l-3-3m3 3l-3 3M20 17H7m0 0l3 3m-3-3l3-3"/>
+                        </svg>
+                        Eski tasarım
+                    </a>
                     <a id="lowStockPageBtn" href="low_stock_products.html" class="hidden flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg transition-colors text-xs sm:text-sm font-medium flex-shrink-0" title="Stoğu Düşük Ürünler">
                         <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>

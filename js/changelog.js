@@ -14,16 +14,16 @@
             console.log('📋 Changelog System initialized');
             
             // Wait for Supabase to be ready
-            await this.waitForSupabase();
+            await this.waitForDb();
             
             // Load updates
             await this.loadUpdates();
         }
 
-        async waitForSupabase(maxWait = 5000) {
+        async waitForDb(maxWait = 5000) {
             const startTime = Date.now();
             while (Date.now() - startTime < maxWait) {
-                if (window.supabase) {
+                if (window.jbDb) {
                     console.log('✅ Supabase ready for changelog');
                     return true;
                 }
@@ -35,12 +35,12 @@
 
         async loadUpdates() {
             try {
-                if (!window.supabase) {
+                if (!window.jbDb) {
                     console.warn('Supabase not available');
                     return;
                 }
 
-                const { data, error } = await window.supabase
+                const { data, error } = await window.jbDb
                     .from('updates')
                     .select('*')
                     .eq('is_active', true)

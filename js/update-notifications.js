@@ -60,7 +60,7 @@
         async waitForDependencies(maxWait = 5000) {
             const startTime = Date.now();
             while (Date.now() - startTime < maxWait) {
-                if (window.supabase && window.authUtils) {
+                if (window.jbDb && window.authUtils) {
                     const session = window.authUtils?.checkAuth();
                     if (session && session.username) {
                         console.log('✅ Dependencies ready, checking updates immediately');
@@ -76,7 +76,7 @@
 
         async checkForUpdates() {
             try {
-                if (!window.supabase) {
+                if (!window.jbDb) {
                     console.log('⏳ Supabase not available yet');
                     return;
                 }
@@ -98,7 +98,7 @@
                 let error = null;
                 
                 // Try with is_active filter first
-                const { data: activeUpdatesData, error: activeError } = await window.supabase
+                const { data: activeUpdatesData, error: activeError } = await window.jbDb
                     .from('updates')
                     .select('*')
                     .eq('is_active', true)
@@ -107,7 +107,7 @@
                 if (activeError) {
                     console.error('❌ Error fetching active updates:', activeError);
                     // Try without filter as fallback
-                    const { data: allUpdatesData, error: allError } = await window.supabase
+                    const { data: allUpdatesData, error: allError } = await window.jbDb
                         .from('updates')
                         .select('*')
                         .order('created_at', { ascending: false });
@@ -128,7 +128,7 @@
                 if (error) {
                     console.error('❌ Error fetching updates:', error);
                     // Don't throw, try to get version number anyway (only for time-passed updates)
-                    const { data: allUpdatesData } = await window.supabase
+                    const { data: allUpdatesData } = await window.jbDb
                         .from('updates')
                         .select('update_number, scheduled_at')
                         .eq('is_active', true)
@@ -188,7 +188,7 @@
                 }
 
                 // Check which updates user hasn't completed
-                const { data: userStatuses, error: statusError } = await window.supabase
+                const { data: userStatuses, error: statusError } = await window.jbDb
                     .from('user_update_status')
                     .select('*')
                     .eq('username', session.username);
@@ -284,7 +284,7 @@
                             console.log(`🔄 Auto-completing previous update ${prevUpdate.update_number} (latest ${latestUpdate.update_number} is completed)`);
                             
                             // Önceki güncellemeyi otomatik tamamlanmış olarak işaretle
-                            const { data: existingPrevStatus } = await window.supabase
+                            const { data: existingPrevStatus } = await window.jbDb
                                 .from('user_update_status')
                                 .select('id')
                                 .eq('username', session.username)
@@ -292,7 +292,7 @@
                                 .single();
                             
                             if (existingPrevStatus) {
-                                await window.supabase
+                                await window.jbDb
                                     .from('user_update_status')
                                     .update({
                                         is_completed: true,
@@ -302,7 +302,7 @@
                                     })
                                     .eq('id', existingPrevStatus.id);
                             } else {
-                                await window.supabase
+                                await window.jbDb
                                     .from('user_update_status')
                                     .insert({
                                         username: session.username,
@@ -404,13 +404,13 @@
 
         async markUpdateAsSeen(updateNumber) {
             try {
-                if (!window.supabase) return;
+                if (!window.jbDb) return;
 
                 const session = window.authUtils?.checkAuth();
                 if (!session || !session.username) return;
 
                 // Check if status already exists
-                const { data: existing } = await window.supabase
+                const { data: existing } = await window.jbDb
                     .from('user_update_status')
                     .select('id, is_seen, seen_at')
                     .eq('username', session.username)
@@ -421,7 +421,7 @@
                     // Only update if not already seen (preserve first seen_at time)
                     if (!existing.is_seen) {
                         // First time seeing - record the exact time
-                        await window.supabase
+                        await window.jbDb
                             .from('user_update_status')
                             .update({
                                 is_seen: true,
@@ -432,7 +432,7 @@
                     // If already seen, don't update seen_at - keep the original first time
                 } else {
                     // Create new
-                    await window.supabase
+                    await window.jbDb
                         .from('user_update_status')
                         .insert({
                             username: session.username,
@@ -1511,7 +1511,7 @@
                     if (this.currentUpdate) {
                         const session = window.authUtils?.checkAuth();
                         if (session && session.username) {
-                            const { data: userStatus } = await window.supabase
+                            const { data: userStatus } = await window.jbDb
                                 .from('user_update_status')
                                 .select('is_completed, is_seen')
                                 .eq('username', session.username)
@@ -1564,7 +1564,7 @@
 
         async completeUpdate() {
             try {
-                if (!window.supabase) {
+                if (!window.jbDb) {
                     alert('Supabase bağlantısı yok!');
                     return;
                 }
@@ -1576,7 +1576,7 @@
                 }
 
                 // Update user_update_status
-                const { data: existing } = await window.supabase
+                const { data: existing } = await window.jbDb
                     .from('user_update_status')
                     .select('id')
                     .eq('username', session.username)
@@ -1584,7 +1584,7 @@
                     .single();
 
                 if (existing) {
-                    await window.supabase
+                    await window.jbDb
                         .from('user_update_status')
                         .update({
                             is_completed: true,
@@ -1592,7 +1592,7 @@
                         })
                         .eq('id', existing.id);
                 } else {
-                    await window.supabase
+                    await window.jbDb
                         .from('user_update_status')
                         .insert({
                             username: session.username,
