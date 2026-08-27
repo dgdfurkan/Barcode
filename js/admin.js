@@ -411,7 +411,8 @@ class AdminPanel {
             if (window.supabase) {
                 const { data, error } = await window.supabase
                     .from('users')
-                    .select('id, username, password, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, chat_messages, last_chat_update, max_ip_count, ip_tracking_enabled')
+                    // password/password_hash BİLEREK yok: parolalar artık kimseye okunmuyor
+                    .select('id, username, company, contact_email, trial_end, is_active, is_admin, premium_features, created_at, updated_at, chat_messages, last_chat_update, max_ip_count, ip_tracking_enabled')
                     .order('created_at', { ascending: false });
                 
                 if (!error && data) {
@@ -532,9 +533,11 @@ class AdminPanel {
                 trialEnd.setDate(trialEnd.getDate() + trialDays);
             }
 
+            // password BURADA YOK: düz metin parola veritabanına yazılmıyor.
+            // Kullanıcı oluşturulduktan sonra API üzerinden bcrypt'lenip
+            // password_hash'e konuyor (aşağıda).
             const newUser = {
                 username: username,
-                password: password,
                 company: company,
                 contact_email: email,
                 trial_end: trialEnd.toISOString(),
@@ -551,6 +554,21 @@ class AdminPanel {
                     .insert([newUser]);
                 
                 if (error) throw error;
+
+                // Parolayı API üzerinden bcrypt'le. Düz metin hiçbir zaman
+                // veritabanına yazılmıyor.
+                const pwRes = await window.jetbarkodAuth.apiFetch('/api/admin/users/password', {
+                    method: 'POST',
+                    body: JSON.stringify({ username, password })
+                });
+                if (!pwRes.ok) {
+                    const d = await pwRes.json().catch(() => ({}));
+                    throw new Error(
+                        d.error === 'password_too_short'
+                            ? 'Şifre en az 6 karakter olmalı.'
+                            : 'Kullanıcı oluşturuldu ama şifre kaydedilemedi. Düzenle ekranından şifre belirleyin.'
+                    );
+                }
 
                 const { error: userDataError } = await window.supabase.from('user_data').insert({
                     username,
@@ -569,7 +587,6 @@ class AdminPanel {
                 // Fallback: Save to localStorage for demo
                 const localUsers = JSON.parse(localStorage.getItem('LOCAL_USERS') || '{}');
                 localUsers[username] = {
-                    password: password,
                     company: company,
                     trialEnd: trialEnd.toISOString(),
                     allowedIPs: ips.length > 0 ? ips : ['*'],
@@ -710,7 +727,12 @@ class AdminPanel {
 
         // Fill form with user data
         document.getElementById('editUsername').value = user.username;
-        document.getElementById('editPassword').value = user.password || '';
+        // Parola artık okunamıyor (bcrypt hash'i). Boş bırakılırsa değişmez.
+        const editPasswordEl = document.getElementById('editPassword');
+        if (editPasswordEl) {
+            editPasswordEl.value = '';
+            editPasswordEl.placeholder = 'Değiştirmek için yeni şifre girin';
+        }
         document.getElementById('editCompany').value = user.company || '';
         document.getElementById('editEmail').value = user.contact_email || '';
         
@@ -820,10 +842,7 @@ class AdminPanel {
                 ip_tracking_enabled: ipTrackingEnabled,
                 is_active: isActive
             };
-            // Şifre boş değilse güncelle (boş gönderirsek NOT NULL/constraint hatası veya yanlışlıkla silinir)
-            if (password && String(password).trim() !== '') {
-                updatedUser.password = password.trim();
-            }
+            // Parola BURADA güncellenmiyor — aşağıda API üzerinden bcrypt'lenir.
 
             // Update in Supabase
             if (window.supabase) {
@@ -843,12 +862,27 @@ class AdminPanel {
                 }
             }
 
+            // Parola girildiyse API üzerinden bcrypt'le (boşsa değişmez)
+            if (password && String(password).trim() !== '') {
+                const pwRes = await window.jetbarkodAuth.apiFetch('/api/admin/users/password', {
+                    method: 'POST',
+                    body: JSON.stringify({ username, password: String(password).trim() })
+                });
+                if (!pwRes.ok) {
+                    const d = await pwRes.json().catch(() => ({}));
+                    throw new Error(
+                        d.error === 'password_too_short'
+                            ? 'Şifre en az 6 karakter olmalı.'
+                            : 'Şifre güncellenemedi.'
+                    );
+                }
+            }
+
             // Update local
             const localUsers = JSON.parse(localStorage.getItem('LOCAL_USERS') || '{}');
             if (localUsers[username]) {
                 localUsers[username] = {
                     ...localUsers[username],
-                    password: password,
                     company: company,
                     trialEnd: trialEnd.toISOString(),
                     allowedIPs: ips.length > 0 ? ips : ['*'],

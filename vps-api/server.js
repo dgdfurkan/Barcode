@@ -788,6 +788,38 @@ app.post('/api/admin/settings', requireAdmin, async (req, res) => {
     }
 });
 
+/**
+ * Admin: kullanıcı parolası belirleme.
+ *
+ * Parolalar artık tarayıcıya HİÇ gitmiyor (admin bile okuyamıyor) ve
+ * veritabanına düz metin yazılmıyor — burada bcrypt'lenip password_hash'e
+ * konuyor. Admin panelinin eskiden yaptığı "düz metin parolayı users
+ * tablosuna yaz" işi bu uçla değiştirildi.
+ */
+app.post('/api/admin/users/password', requireAdmin, async (req, res) => {
+    const username = String(req.body?.username || '').trim().slice(0, 64);
+    const password = String(req.body?.password || '');
+
+    if (!username) return res.status(400).json({ ok: false, error: 'username_required' });
+    if (password.length < 6) {
+        return res.status(400).json({ ok: false, error: 'password_too_short', minLength: 6 });
+    }
+
+    try {
+        const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+        const r = await pool.query(
+            'UPDATE users SET password_hash = $1, password = NULL, updated_at = NOW() WHERE username = $2',
+            [hash, username]
+        );
+        if (r.rowCount === 0) return res.status(404).json({ ok: false, error: 'user_not_found' });
+        console.log(`admin ${req.auth.username} parolayi degistirdi: ${username}`);
+        return res.json({ ok: true });
+    } catch (e) {
+        console.error('admin password set error:', e);
+        return res.status(500).json({ ok: false, error: 'server_error' });
+    }
+});
+
 // =====================================================================
 // Depolama — kimlik doğrulamalı, dizin dışına çıkış imkânsız
 // =====================================================================
