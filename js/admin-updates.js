@@ -2523,39 +2523,36 @@ AdminPanel.prototype.getAdminSettingsRow = async function(forceRefresh = false) 
         return null;
     }
 
-    const { data, error } = await window.supabase
-        .from('admin_settings')
-        .select('*')
-        .eq('id', ADMIN_SETTINGS_ID)
-        .maybeSingle();
-
-    if (error) {
-        if (error.code === 'PGRST205') {
-            this._adminSettingsTableMissing = true;
-            return emptyAdminSettingsRow();
-        }
-        console.error('Admin ayarları alınamadı:', error);
-        return null;
+    // admin_settings tablosu tarayıcıya TAMAMEN kapalı (içinde Telegram bot
+    // token'ı, Gemini ve Cloudinary anahtarları var). API üzerinden okunur ve
+    // API sırların DEĞERİNİ döndürmez — yalnızca "tanımlı mı" bilgisini verir.
+    const _api = window.jetbarkodAuth;
+    if (!_api || !_api.apiBase()) {
+        return emptyAdminSettingsRow();
     }
 
-    if (!data) {
-        const { data: inserted, error: insertError } = await window.supabase
-            .from('admin_settings')
-            .insert({ id: ADMIN_SETTINGS_ID })
-            .select('*')
-            .maybeSingle();
-
-        if (insertError) {
-            if (insertError.code === 'PGRST205') {
-                this._adminSettingsTableMissing = true;
-                return emptyAdminSettingsRow();
-            }
-            console.error('Admin ayarları oluşturulamadı:', insertError);
-            return null;
+    try {
+        const _res = await _api.apiFetch('/api/admin/settings', { method: 'GET' });
+        if (!_res.ok) {
+            console.error('Admin ayarları alınamadı:', _res.status);
+            return emptyAdminSettingsRow();
         }
-
-        this.adminSettings = inserted || emptyAdminSettingsRow();
+        const _d = await _res.json();
+        this.adminSettings = {
+            id: ADMIN_SETTINGS_ID,
+            telegram_chat_id: _d.telegram_chat_id || '',
+            cloudinary_cloud_name: _d.cloudinary_cloud_name || '',
+            cloudinary_upload_preset: _d.cloudinary_upload_preset || '',
+            // Sırlar geri gelmez; yalnızca tanımlı olup olmadıkları bilinir.
+            _configured: _d.configured || {},
+            telegram_bot_token: '',
+            gemini_api_key: '',
+            cloudinary_api_key: ''
+        };
         return this.adminSettings;
+    } catch (e) {
+        console.error('Admin ayarları alınamadı:', e);
+        return emptyAdminSettingsRow();
     }
 
     this.adminSettings = data;
@@ -2652,47 +2649,44 @@ AdminPanel.prototype.loadAdminSettings = async function() {
 
 AdminPanel.prototype.saveAdminSettings = async function() {
     try {
-        if (!window.supabase) {
-            alert('Supabase yapılandırması bulunamadı.');
+        const api = window.jetbarkodAuth;
+        if (!api || !api.apiBase()) {
+            alert('API yapılandırması bulunamadı.');
             return;
         }
 
+        // Sır alanları BOŞ bırakılırsa sunucu mevcut değeri korur; böylece
+        // admin, token'ı ekranda görmeden diğer ayarları kaydedebilir.
         const payload = {
-            id: ADMIN_SETTINGS_ID,
-            gemini_api_key: document.getElementById('geminiApiKey')?.value.trim() || null,
-            cloudinary_cloud_name: document.getElementById('cloudinaryCloudName')?.value.trim() || null,
-            cloudinary_api_key: document.getElementById('cloudinaryApiKey')?.value.trim() || null,
-            cloudinary_upload_preset: document.getElementById('cloudinaryUploadPreset')?.value.trim() || null,
-            telegram_bot_token: document.getElementById('telegramBotToken')?.value.trim() || null,
-            telegram_chat_id: document.getElementById('telegramChatId')?.value.trim() || null,
-            updated_at: new Date().toISOString()
+            gemini_api_key: document.getElementById('geminiApiKey')?.value.trim() || '',
+            cloudinary_cloud_name: document.getElementById('cloudinaryCloudName')?.value.trim() || '',
+            cloudinary_api_key: document.getElementById('cloudinaryApiKey')?.value.trim() || '',
+            cloudinary_upload_preset: document.getElementById('cloudinaryUploadPreset')?.value.trim() || '',
+            telegram_bot_token: document.getElementById('telegramBotToken')?.value.trim() || '',
+            telegram_chat_id: document.getElementById('telegramChatId')?.value.trim() || ''
         };
 
-        const { data, error } = await window.supabase
-            .from('admin_settings')
-            .upsert(payload, { onConflict: 'id' })
-            .select('*')
-            .single();
+        const res = await api.apiFetch('/api/admin/settings', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
 
-        if (error) {
-            if (error.code === 'PGRST205') {
-                this._adminSettingsTableMissing = true;
-                alert('admin_settings tablosu VPS\'te yok. vps_schema_patch.sql dosyasını çalıştırın.');
-                return;
-            }
-            console.error('Admin ayarları kaydedilemedi:', error);
+        if (!res.ok) {
+            console.error('Admin ayarları kaydedilemedi:', res.status);
             alert('Ayarlar kaydedilemedi, lütfen tekrar deneyin.');
             return;
         }
 
-        this.adminSettings = data;
+        // Kaydettikten sonra sunucudan tazele (sırlar geri gelmez)
+        const fresh = await this.loadAdminSettings(true);
 
         const testBtn = document.getElementById('sendTelegramTestBtn');
         if (testBtn) {
-            testBtn.disabled = !(data.telegram_bot_token && data.telegram_chat_id);
+            const cfg = fresh?._configured || {};
+            testBtn.disabled = !(cfg.telegram_bot_token && fresh?.telegram_chat_id);
         }
 
-        console.log('✅ Admin ayarları Supabase\'e kaydedildi');
+        console.log('✅ Admin ayarları kaydedildi')
     } catch (error) {
         console.error('Admin ayarları kaydedilirken hata:', error);
     }
@@ -2714,15 +2708,13 @@ AdminPanel.prototype.sendTelegramTestMessage = async function() {
             : legacyUrl;
 
         const headers = { 'Content-Type': 'application/json' };
-        if (!cfg.enabled || !baseUrl) {
-            headers.Authorization = `Bearer ${window.JETBARKOD_SUPABASE_LEGACY?.anonKey || ''}`;
-        }
+        const adminToken = window.jetbarkodAuth?.get?.();
+        if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
 
         const response = await fetch(endpoint, {
             method: 'POST',
             headers,
             body: JSON.stringify({
-                username: 'Admin',
                 message: 'Test başarılı!',
                 isTest: true
             })

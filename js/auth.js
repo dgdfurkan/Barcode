@@ -118,10 +118,13 @@ async function loginViaVpsApi(username, password, clientIP) {
         throw new Error('VPS API adresi tanımlı değil.');
     }
 
+    // clientIP GÖNDERİLMİYOR: sunucu gerçek IP'yi bağlantıdan okur.
+    // Eskiden istemci kendi IP'sini yazabildiği için IP whitelist, oran
+    // sınırlama ve IP yasağı üçü birden atlatılabiliyordu.
     const response = await fetch(`${baseUrl}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, clientIP }),
+        body: JSON.stringify({ username, password }),
     });
 
     let payload = null;
@@ -156,6 +159,13 @@ async function loginViaVpsApi(username, password, clientIP) {
         clientIP: payload.session.clientIP || clientIP,
     };
 
+    // İmzalı JWT — asıl yetki taşıyıcısı. Her veritabanı isteğine eklenir.
+    if (payload.token) {
+        window.jetbarkodAuth?.set?.(payload.token);
+    }
+
+    // authToken yalnızca ARAYÜZ için (isim, şirket, kalan süre gösterimi).
+    // Yetki kararı asla buradan verilmez.
     localStorage.setItem('userSession', JSON.stringify(sessionData));
     localStorage.setItem(
         'authToken',
@@ -453,6 +463,21 @@ function checkAuth() {
             return sessionData;
         }
 
+        // İmzalı JWT'nin süresi dolduysa oturum bitmiştir. Bu kontrol,
+        // "süre dolmuş ama tarayıcıda hâlâ girili görünüyor" durumunu
+        // önler; token olmadan zaten hiçbir veri isteği çalışmaz.
+        if (window.jetbarkodAuth) {
+            if (!window.jetbarkodAuth.get()) {
+                logout();
+                return false;
+            }
+            if (window.jetbarkodAuth.isExpired()) {
+                console.warn('Oturum süresi doldu — çıkış yapılıyor.');
+                logout();
+                return false;
+            }
+        }
+
         const loginTime = new Date(sessionData.loginTime);
         
         // Check if session is older than 24 hours
@@ -567,6 +592,10 @@ async function checkAuthAsync() {
 
 // Logout function
 function logout() {
+    // İmzalı token'ı ilk iş olarak temizle — sonrasında hata çıksa bile
+    // yetkisiz bir token ortada kalmasın.
+    window.jetbarkodAuth?.clear?.();
+
     // Get current session for logging
     const session = JSON.parse(localStorage.getItem('userSession') || '{}');
     
@@ -663,7 +692,9 @@ window.authUtils = {
     checkAuthAsync: checkAuthAsync,
     logout: logout,
     getClientIP: getClientIP,
-    openChatForBlockedIP: openChatForBlockedIP
+    openChatForBlockedIP: openChatForBlockedIP,
+    getToken: () => window.jetbarkodAuth?.get?.() || '',
+    validateSession: () => window.jetbarkodAuth?.validateWithServer?.() || Promise.resolve({ ok: true })
 };
 
 // Initialize on page load
@@ -674,8 +705,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/') {
         const session = checkAuth();
         if (session && !session.isGuest) {
-            // Show user info instead of login form
+            // Yerelde oturum görünüyor — ama GERÇEKTEN geçerli mi?
+            // Trial bitmiş, hesap kapatılmış veya token süresi geçmiş olabilir.
+            // Sunucuya sormadan "Uygulamaya Git" göstermek, kullanıcıyı
+            // hiçbir veriyi göremeyeceği bir sayfaya yollar.
             showUserInfo(session);
+            if (window.jetbarkodAuth) {
+                window.jetbarkodAuth.validateWithServer().then((r) => {
+                    if (r.ok) return;
+                    console.warn('Oturum sunucuda geçersiz:', r.code);
+                    if (r.code === 'trial_expired' && window.showTrialExpiredNotification) {
+                        window.showTrialExpiredNotification();
+                    }
+                    logout();
+                });
+            }
             return;
         }
         if (window.JETBARKOD_GUEST_ACCESS?.enabled) {
@@ -689,14 +733,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutFromIndexBtn = document.getElementById('logoutFromIndex');
     
     if (goToAppBtn) {
-        goToAppBtn.addEventListener('click', () => {
+        goToAppBtn.addEventListener('click', async () => {
             const session = checkAuth();
-            if (session) {
-                if (session.isAdmin) {
-                    window.location.replace('admin.html');
-                } else {
-                    window.location.replace('pages/product_search.html');
+            if (!session) return;
+
+            // Yönlendirmeden önce oturumu sunucuya doğrulat: süresi dolmuş
+            // bir oturumla uygulamaya girip boş ekranla karşılaşmayı önler.
+            if (window.jetbarkodAuth) {
+                const r = await window.jetbarkodAuth.validateWithServer();
+                if (!r.ok) {
+                    if (r.code === 'trial_expired' && window.showTrialExpiredNotification) {
+                        window.showTrialExpiredNotification();
+                    }
+                    logout();
+                    return;
                 }
+            }
+
+            if (session.isAdmin) {
+                window.location.replace('admin.html');
+            } else {
+                window.location.replace('pages/product_search.html');
             }
         });
     }

@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Akıllı Raf Yönetimi</title>
+    
+    <!-- PWA & Mobile Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f1f5f9">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="logo.png">
+    <link rel="apple-touch-icon" href="logo.png">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Dexie.js (Cihaz İçi Veritabanı) -->
+    <script src="https://unpkg.com/dexie@3.2.4/dist/dexie.js"></script>
+
+    <!-- JsBarcode (Barkod Çizimi) -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+
+    <!-- products.js (Lokal JSON yedeği) -->
+    <script src="products.js"></script>
+
+    <!-- SortableJS (Sürükle bırak) -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'] },
+                    colors: { brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' } }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root { --sat: env(safe-area-inset-top); --sab: env(safe-area-inset-bottom); }
+        body { background-color: #cbd5e1; -webkit-tap-highlight-color: transparent; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .glass-nav { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-top: 1px solid rgba(0,0,0,0.05); }
+        .nav-item.active { color: #2563eb; }
+        .nav-item.active .nav-icon { transform: translateY(-4px) scale(1.1); color: #2563eb; }
+        .nav-icon { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+        .fade-in { animation: fadeIn 0.3s ease-in-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .pop-out { animation: popOut 0.3s ease-in forwards; }
+        @keyframes popOut { to { opacity: 0; transform: scale(0.9); height: 0; padding: 0; margin: 0; overflow: hidden; } }
+
+        #toast-container { transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .toast-show { transform: translateY(0) !important; }
+
+        #app-container { width: 100%; height: 100dvh; max-width: 480px; margin: 0 auto; background-color: #f1f5f9; position: relative; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+        @media (min-width: 481px) { #app-container { height: 90vh; max-height: 850px; margin-top: 5vh; border-radius: 40px; border: 8px solid #0f172a; } }
+        
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        /* Dropdown okunu güzelleştir */
+        select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-position: right 1rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen text-slate-800 antialiased selection:bg-brand-100">
+
+    <div id="app-container">
+        
+        <!-- Header -->
+        <header class="pt-[calc(1rem+var(--sat))] pb-3 px-5 bg-white shadow-sm relative z-20">
+            <div class="flex items-center justify-between">
+                <h1 id="header-title" class="text-2xl font-extrabold tracking-tight text-slate-900">Raflar & Gruplar</h1>
+                <div id="header-action"></div>
+            </div>
+            
+            <div id="search-box" class="mt-4 relative hidden">
+                <i class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                <input type="text" id="input-search" oninput="app.handleSearch(this.value)" placeholder="Ürün ara..." class="w-full bg-slate-100 border-none rounded-2xl pl-12 pr-4 py-3 text-[15px] font-medium focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all">
+                <button onclick="app.clearSearch()" id="btn-clear-search" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hidden">
+                    <i class="ph-fill ph-x-circle text-lg"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Scrollable Area -->
+        <main class="flex-1 overflow-y-auto hide-scroll pb-[calc(100px+var(--sab))] relative" id="main-content">
+            
+            <div id="view-shelves" class="p-4 space-y-4"></div>
+            <div id="view-basket" class="p-4 space-y-4 hidden"></div>
+            <div id="view-catalog" class="p-4 space-y-4 hidden"></div>
+
+            <div id="view-settings" class="p-5 space-y-6 hidden">
+                
+                <!-- SİZİN KONTROLÜNÜZDEKİ RAF YÖNETİM ALANI -->
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+                    <div class="flex items-center space-x-3 mb-4 text-slate-800">
+                        <i class="ph-fill ph-books text-2xl text-brand-500"></i>
+                        <h2 class="text-lg font-bold">Raf (Grup) Yönetimi</h2>
+                    </div>
+                    <div id="settings-shelves-list" class="flex flex-wrap gap-2 max-h-40 overflow-y-auto hide-scroll pt-2"></div>
+                </div>
+
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 text-center">
+                    <div class="w-20 h-20 bg-brand-50 rounded-full flex items-center justify-center text-brand-600 mx-auto mb-4">
+                        <i class="ph-fill ph-hard-drives text-4xl"></i>
+                    </div>
+                    <h2 class="text-xl font-bold">Veritabanı Durumu</h2>
+                    <p id="stats-text" class="text-sm text-slate-500 mt-2 font-medium">Hesaplanıyor...</p>
+                    
+                    <div class="flex flex-col space-y-3 mt-6 pt-6 border-t border-slate-100">
+                        <button onclick="app.copyDataToClipboard()" class="w-full bg-slate-100 text-slate-700 font-bold text-[13px] rounded-xl py-3 active:scale-[0.98] transition-transform flex justify-center items-center">
+                            <i class="ph-bold ph-copy mr-2 text-lg"></i> Verileri JSON Olarak Kopyala
+                        </button>
+                        <button onclick="app.pasteDataFromClipboard()" class="w-full bg-slate-800 text-white font-bold text-[13px] rounded-xl py-3 active:scale-[0.98] transition-transform flex justify-center items-center shadow-md">
+                            <i class="ph-bold ph-clipboard-text mr-2 text-lg"></i> JSON Yapıştırarak İçe Aktar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-brand-600 rounded-3xl p-6 shadow-lg shadow-brand-500/30 text-white relative overflow-hidden">
+                    <div class="relative z-10">
+                        <div class="flex items-center space-x-3 mb-2">
+                            <i class="ph-fill ph-file-json text-2xl"></i>
+                            <h2 class="text-lg font-bold">JSON'dan Manuel Yükle</h2>
+                        </div>
+                        <p class="text-brand-100 text-sm mb-5 leading-relaxed">Binlerce ürünü cihazınıza yükleyin. Eski verilerin üstüne yazar.</p>
+                        <label class="cursor-pointer flex items-center justify-center bg-white text-brand-700 font-bold text-sm rounded-xl px-5 py-3.5 active:scale-95 transition-transform w-full shadow-sm">
+                            <i class="ph-bold ph-upload-simple mr-2 text-lg"></i>
+                            Dosya Seç (.json)
+                            <input type="file" accept=".json" class="hidden" onchange="app.importJSON(event)">
+                        </label>
+                    </div>
+                </div>
+
+                <button onclick="app.resetDatabase()" class="w-full bg-white border border-red-100 flex items-center justify-between p-5 rounded-3xl text-red-600 active:bg-red-50 transition-colors shadow-sm">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center"><i class="ph-fill ph-trash text-xl"></i></div>
+                        <div class="text-left"><p class="font-bold">Sistemi Sıfırla</p><p class="text-xs text-red-400">Tüm ürünler ve raflar silinir.</p></div>
+                    </div>
+                    <i class="ph-bold ph-caret-right text-red-300"></i>
+                </button>
+            </div>
+        </main>
+
+        <!-- Floating Add Button for Catalog -->
+        <button id="fab-add" onclick="app.openAddProductModal()" class="hidden absolute bottom-[calc(90px+var(--sab))] right-5 w-14 h-14 bg-emerald-500 text-white rounded-2xl shadow-lg shadow-emerald-500/40 flex items-center justify-center active:scale-90 transition-transform z-30">
+            <i class="ph-bold ph-plus text-2xl"></i>
+        </button>
+
+        <!-- Bottom Navigation -->
+        <nav class="glass-nav absolute bottom-0 w-full pb-[var(--sab)] px-2 pt-2 z-40 rounded-t-[2rem]">
+            <ul class="flex justify-around items-center h-[72px]">
+                <li class="w-1/4 h-full"><button onclick="app.switchTab('shelves')" class="nav-item active w-full h-full flex flex-col items-center justify-center text-slate-400"><i class="ph-fill ph-books nav-icon text-2xl mb-1"></i><span class="text-[10px] font-bold tracking-wide">Raflar</span></button></li>
+                <li class="w-1/4 h-full relative"><button onclick="app.switchTab('basket')" class="nav-item w-full h-full flex flex-col items-center justify-center text-slate-400"><div class="relative mb-1 nav-icon"><i class="ph-fill ph-shopping-cart text-2xl"></i><span id="badge-basket" class="hidden absolute -top-1.5 -right-2 bg-red-500 text-white text-[10px] font-extrabold h-4.5 min-w-[18px] px-1.5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">0</span></div><span class="text-[10px] font-bold tracking-wide">Sepet</span></button></li>
+                <li class="w-1/4 h-full"><button onclick="app.switchTab('catalog')" class="nav-item w-full h-full flex flex-col items-center justify-center text-slate-400"><i class="ph-fill ph-magnifying-glass nav-icon text-2xl mb-1"></i><span class="text-[10px] font-bold tracking-wide">Katalog</span></button></li>
+                <li class="w-1/4 h-full"><button onclick="app.switchTab('settings')" class="nav-item w-full h-full flex flex-col items-center justify-center text-slate-400"><i class="ph-fill ph-gear-six nav-icon text-2xl mb-1"></i><span class="text-[10px] font-bold tracking-wide">Ayarlar</span></button></li>
+            </ul>
+        </nav>
+
+        <!-- Raf Değiştirme Modalı -->
+        <div id="modal-shelf" class="fixed inset-0 z-50 flex items-end justify-center pointer-events-none sm:absolute hidden">
+            <div id="modal-shelf-backdrop" onclick="app.closeModal('shelf')" class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+            <div id="modal-shelf-sheet" class="bg-white w-full max-w-[480px] rounded-t-[2rem] p-6 pb-[calc(2rem+var(--sab))] transform translate-y-full transition-transform duration-300 pointer-events-auto flex flex-col shadow-2xl relative z-10">
+                <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
+                <h2 class="text-xl font-bold mb-1 text-slate-800">Raf (Kategori) Belirle</h2>
+                <p id="modal-product-name" class="text-[13px] font-semibold text-slate-400 mb-6 line-clamp-1 truncate"></p>
+                
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-[11px] font-extrabold text-brand-500 uppercase tracking-wider mb-2 ml-1">Hedef Rafı Seçin</label>
+                        <select id="input-shelf-name" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all font-bold text-slate-700 appearance-none">
+                        </select>
+                    </div>
+                </div>
+                <button onclick="app.saveShelfChange()" class="w-full bg-brand-600 text-white font-bold text-lg rounded-2xl py-4 mt-8 active:scale-[0.98] transition-transform shadow-lg shadow-brand-500/30 flex justify-center items-center"><i class="ph-bold ph-floppy-disk mr-2 text-xl"></i> Kaydet</button>
+            </div>
+        </div>
+
+        <!-- Barkod Gösterim Modalı -->
+        <div id="modal-barcode" class="fixed inset-0 z-[60] flex items-end justify-center pointer-events-none sm:absolute hidden">
+            <div id="modal-barcode-backdrop" onclick="app.closeModal('barcode')" class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+            <div id="modal-barcode-sheet" class="bg-white w-full max-w-[400px] rounded-t-[2rem] p-5 pb-[calc(1.5rem+var(--sab))] transform translate-y-full transition-transform duration-300 pointer-events-auto flex flex-col items-center text-center shadow-2xl relative z-10">
+                <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4"></div>
+                <h2 class="text-lg font-bold mb-1 text-slate-800">Barkod Bilgisi</h2>
+                <p id="barcode-product-name" class="text-[12px] font-semibold text-slate-400 mb-5 w-full break-words leading-snug"></p>
+                
+                <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm mb-5 w-full flex justify-center items-center overflow-x-auto">
+                    <svg id="barcode-svg" class="mx-auto"></svg>
+                </div>
+                
+                <p id="barcode-number-text" class="text-base font-mono font-bold text-slate-700 mb-5 tracking-widest"></p>
+                <button onclick="app.copyBarcode()" class="w-full bg-slate-800 text-white font-bold text-[13px] rounded-xl py-3 active:scale-[0.98] transition-transform shadow-md flex justify-center items-center"><i class="ph-bold ph-copy mr-2 text-lg"></i> Barkodu Kopyala</button>
+            </div>
+        </div>
+
+        <!-- Yeni Raf Ekleme Modalı -->
+        <div id="modal-new-shelf" class="fixed inset-0 z-50 flex items-end justify-center pointer-events-none sm:absolute hidden">
+            <div id="modal-new-shelf-backdrop" onclick="app.closeModal('new-shelf')" class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+            <div id="modal-new-shelf-sheet" class="bg-white w-full max-w-[400px] rounded-t-[2rem] p-5 pb-[calc(1.5rem+var(--sab))] transform translate-y-full transition-transform duration-300 pointer-events-auto flex flex-col shadow-2xl relative z-10">
+                <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4 flex-shrink-0"></div>
+                <h2 class="text-lg font-bold mb-4 text-slate-800 flex-shrink-0 text-center">Yeni Raf Ekle</h2>
+                
+                <input type="text" id="new-shelf-name" placeholder="Raf Adı (Örn: Sütlük)" class="w-full bg-slate-100 border-none rounded-2xl px-4 py-3 focus:ring-2 focus:ring-brand-500 font-bold text-slate-700 mb-4 text-center text-[15px]">
+                
+                <div class="flex space-x-2 mt-1">
+                    <button onclick="app.closeModal('new-shelf')" class="flex-1 bg-slate-100 text-slate-700 font-bold text-[13px] rounded-xl py-3 active:scale-[0.98] transition-transform">İptal</button>
+                    <button onclick="app.saveNewShelf()" class="flex-[2] bg-brand-500 text-white font-bold text-[13px] rounded-xl py-3 active:scale-[0.98] transition-transform shadow-md shadow-brand-500/20">Oluştur</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toplu Adet Seçimi Modalı -->
+        <div id="modal-pick-qty" class="fixed inset-0 z-50 flex items-end justify-center pointer-events-none sm:absolute hidden">
+            <div id="modal-pick-qty-backdrop" onclick="app.closeModal('pick-qty')" class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+            <div id="modal-pick-qty-sheet" class="bg-white w-full max-w-[400px] rounded-t-[2rem] p-5 pb-[calc(1.5rem+var(--sab))] transform translate-y-full transition-transform duration-300 pointer-events-auto flex flex-col shadow-2xl relative z-10 text-center">
+                <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4 flex-shrink-0"></div>
+                <h2 class="text-lg font-bold mb-1 text-slate-800">Ürün Aldın Mı?</h2>
+                <p id="pick-qty-name" class="text-[12px] font-semibold text-slate-400 mb-5 line-clamp-2"></p>
+                
+                <div class="flex items-center justify-center space-x-4 mb-6">
+                    <button onclick="app.adjustPickQty(-1)" class="w-12 h-12 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center active:scale-90 transition-transform"><i class="ph-bold ph-minus text-xl"></i></button>
+                    <div class="text-3xl font-black text-brand-600 w-12" id="pick-qty-input">1</div>
+                    <button onclick="app.adjustPickQty(1)" class="w-12 h-12 bg-slate-100 text-brand-600 rounded-2xl flex items-center justify-center active:scale-90 transition-transform"><i class="ph-bold ph-plus text-xl"></i></button>
+                </div>
+                
+                <div class="flex space-x-2">
+                    <button onclick="app.confirmPickQty()" class="flex-1 bg-emerald-500 text-white font-bold text-[13px] rounded-xl py-3 active:scale-[0.98] transition-transform shadow-md shadow-emerald-500/20">Kaydet</button>
+                    <button onclick="app.pickAllQty()" class="flex-1 bg-brand-600 text-white font-bold text-[13px] rounded-xl py-3 active:scale-[0.98] transition-transform shadow-md shadow-brand-500/20">Hepsini Aldım</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Ürün Detay Modalı -->
+        <div id="modal-product-details" class="fixed inset-0 z-50 flex items-end justify-center pointer-events-none sm:absolute hidden">
+            <div id="modal-product-details-backdrop" onclick="app.closeModal('product-details')" class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+            <div id="modal-product-details-sheet" class="bg-white w-full max-w-[480px] rounded-t-[2rem] p-6 pb-[calc(2rem+var(--sab))] transform translate-y-full transition-transform duration-300 pointer-events-auto flex flex-col shadow-2xl relative z-10 max-h-[85vh] overflow-y-auto hide-scroll">
+                <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 flex-shrink-0"></div>
+                <div class="w-full aspect-square bg-slate-50 rounded-3xl mb-6 flex items-center justify-center p-4 border border-slate-100">
+                    <img id="detail-image" src="" class="max-w-full max-h-full object-contain mix-blend-multiply">
+                </div>
+                <h2 id="detail-name" class="text-xl font-bold mb-4 text-slate-800 leading-tight"></h2>
+                
+                <div class="bg-brand-50 p-4 rounded-2xl border border-brand-100 mb-6">
+                    <h3 class="text-[11px] font-extrabold text-brand-500 uppercase tracking-wider mb-3">Barkodlar</h3>
+                    <div id="detail-barcodes" class="flex flex-col space-y-2">
+                        <!-- JS fill -->
+                    </div>
+                </div>
+                
+                <button onclick="app.closeModal('product-details')" class="w-full bg-slate-100 text-slate-700 font-bold text-[13px] rounded-xl py-3 active:scale-[0.98] transition-transform">Kapat</button>
+            </div>
+        </div>
+
+        <!-- Rafa Ürün Ekleme (Arama) Modalı -->
+        <div id="modal-shelf-add" class="fixed inset-0 z-50 flex items-end justify-center pointer-events-none sm:absolute hidden">
+            <div id="modal-shelf-add-backdrop" onclick="app.closeModal('shelf-add')" class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+            <div id="modal-shelf-add-sheet" class="bg-white w-full max-w-[480px] rounded-t-[2rem] p-6 pb-[calc(2rem+var(--sab))] transform translate-y-full transition-transform duration-300 pointer-events-auto flex flex-col shadow-2xl relative z-10 max-h-[85vh]">
+                <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 flex-shrink-0"></div>
+                <h2 class="text-xl font-bold mb-6 text-slate-800 flex-shrink-0">Rafa Ürün Ekle</h2>
+                
+                <div class="relative flex-shrink-0">
+                    <i class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+                    <input type="text" id="shelf-add-search" autocomplete="off" oninput="app.searchForShelfAdd(this.value)" placeholder="Katalogda ara (örn: süt)..." class="w-full bg-slate-100 border-none rounded-2xl pl-12 pr-4 py-3 focus:ring-2 focus:ring-brand-500 font-medium text-slate-700">
+                </div>
+                
+                <div id="shelf-add-results" class="mt-4 flex-1 overflow-y-auto hide-scroll border border-slate-200 rounded-xl hidden bg-white">
+                    <!-- JS ile dolacak -->
+                </div>
+                
+                <button onclick="app.closeModal('shelf-add')" class="w-full bg-slate-100 text-slate-700 font-bold text-[13px] rounded-xl py-3 mt-4 active:scale-[0.98] transition-transform">Kapat</button>
+            </div>
+        </div>
+
+        <!-- Yeni Ürün Ekleme / Hızlı Raf Atama Modalı -->
+        <div id="modal-add" class="fixed inset-0 z-50 flex items-end justify-center pointer-events-none sm:absolute hidden">
+            <div id="modal-add-backdrop" onclick="app.closeModal('add')" class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+            <div id="modal-add-sheet" class="bg-white w-full max-w-[480px] rounded-t-[2rem] p-6 pb-[calc(2rem+var(--sab))] transform translate-y-full transition-transform duration-300 pointer-events-auto flex flex-col shadow-2xl relative z-10 max-h-[85vh] overflow-y-auto hide-scroll">
+                <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 flex-shrink-0"></div>
+                <h2 class="text-xl font-bold mb-6 text-slate-800 flex-shrink-0">Ürün Bul veya Ekle</h2>
+                
+                <div class="space-y-4 relative">
+                    <div class="relative">
+                        <label class="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-2 ml-1">Ürün Adı *</label>
+                        <!-- Arama (Autocomplete) için oninput tetikleyicisi -->
+                        <input type="text" id="add-name" autocomplete="off" oninput="app.searchCatalogForAdd(this.value)" placeholder="Katalogdan ara veya yenisini yaz..." class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 font-medium text-slate-700">
+                        
+                        <!-- Otomatik Tamamlama (Autocomplete) Sonuç Bölümü -->
+                        <div id="add-autocomplete-results" class="absolute z-50 left-0 right-0 top-[70px] bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto hidden">
+                            <!-- JS ile dolacak -->
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-2 ml-1">Raf / Grup Adı *</label>
+                        <select id="add-category" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 font-bold text-brand-700 appearance-none">
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-2 ml-1">Barkod Numarası</label>
+                        <input type="number" id="add-barcode" placeholder="Otomatik üretilir veya katalogdan dolar" class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 font-medium font-mono text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-2 ml-1">Görsel URL</label>
+                        <input type="url" id="add-image" placeholder="https://..." class="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 font-medium text-xs">
+                    </div>
+                </div>
+                <button onclick="app.saveNewProduct()" class="w-full bg-emerald-500 text-white font-bold text-lg rounded-2xl py-4 mt-8 active:scale-[0.98] transition-transform shadow-lg flex justify-center items-center"><i class="ph-bold ph-check mr-2 text-xl"></i> Kaydet / Rafa At</button>
+            </div>
+        </div>
+
+        <!-- Loading & Toast -->
+        <div id="loading-overlay" class="absolute inset-0 z-[60] bg-slate-900/70 backdrop-blur-md hidden flex-col items-center justify-center text-white">
+            <i class="ph-bold ph-spinner-gap animate-spin text-5xl mb-4 text-brand-400"></i>
+            <h3 id="loading-text" class="text-xl font-bold">İşleniyor...</h3>
+        </div>
+        <div id="toast-container" class="absolute top-[calc(1rem+var(--sat))] left-4 right-4 z-[70] transform -translate-y-32 flex justify-center pointer-events-none">
+            <div class="bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl flex items-center space-x-3 font-medium text-sm">
+                <i id="toast-icon" class="ph-fill ph-check-circle text-emerald-400 text-lg"></i>
+                <span id="toast-msg">İşlem başarılı.</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const UI = {
+            vibrate(pattern) { if (navigator.vibrate) navigator.vibrate(pattern); },
+            fallbackImg: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='2' ry='2'%3E%3C/rect%3E%3Ccircle cx='8.5' cy='8.5' r='1.5'%3E%3C/circle%3E%3Cpolyline points='21 15 16 10 5 21'%3E%3C/polyline%3E%3C/svg%3E",
+            
+            showToast(msg, isError = false) {
+                const toast = document.getElementById('toast-container');
+                document.getElementById('toast-msg').innerText = msg;
+                const icon = document.getElementById('toast-icon');
+                icon.className = isError ? 'ph-fill ph-warning-circle text-red-400 text-lg' : 'ph-fill ph-check-circle text-emerald-400 text-lg';
+                toast.classList.add('toast-show');
+                setTimeout(() => toast.classList.remove('toast-show'), 2500);
+            },
+
+            setLoading(show, text = 'İşleniyor...') {
+                const el = document.getElementById('loading-overlay');
+                document.getElementById('loading-text').innerText = text;
+                if(show) el.classList.remove('hidden'); else el.classList.add('hidden');
+            }
+        };
+
+        const db = new Dexie("AkilliRafDB_V3");
+        db.version(1).stores({ products: 'id, name, category, barcode', basket: 'id, category, needed', shelves: 'name' });
+
+        window.app = {
+            currentTab: 'shelves',
+            searchQuery: '',
+            activeGroup: null, 
+            editingProductId: null,
+            currentBarcodeValue: '',
+            selectedCatalogProductId: null, // Autocomplete (arama) üzerinden seçilen ürün id'si
+            
+            cache: { products: [], basket: {}, categories: [] },
+
+            async init() {
+                UI.setLoading(true, "Hazırlanıyor...");
+                await this.loadCache();
+                
+                if (this.cache.products.length === 0) {
+                    await this.fetchDefaultJSON();
+                }
+
+                this.renderAll();
+                this.setupInputs();
+                UI.setLoading(false);
+            },
+
+            async loadCache() {
+                this.cache.products = await db.products.toArray();
+                
+                const dbShelves = await db.shelves.toArray();
+                this.cache.categories = dbShelves.map(s => s.name).sort();
+
+                const basketItems = await db.basket.toArray();
+                this.cache.basket = {};
+                basketItems.forEach(item => { this.cache.basket[item.id] = item.needed; });
+                
+                this.updateBadge();
+            },
+
+            extractDataFromJSON(item) {
+                if (!item || !item.name) return null;
+                let exactBarcode = "";
+                if (item.barcodes && Array.isArray(item.barcodes) && item.barcodes.length > 0 && item.barcodes[0].code) {
+                    exactBarcode = item.barcodes[0].code;
+                } else {
+                    exactBarcode = item.barcode || item.code || item.barkod || item.ean || "";
+                }
+
+                const fakeBarcode = Math.floor(1000000000000 + Math.random() * 9000000000000).toString();
+
+                return {
+                    id: item.id || 'p_' + Math.random().toString(36).substr(2, 9),
+                    name: String(item.name).trim(),
+                    image: item.image ? String(item.image) : '',
+                    category: item.category && String(item.category).trim() !== '' ? String(item.category).trim() : 'Kategorisiz',
+                    barcode: exactBarcode ? String(exactBarcode).trim() : fakeBarcode
+                };
+            },
+
+            async fetchDefaultJSON() {
+                try {
+                    if (typeof defaultProducts !== 'undefined') {
+                        const items = defaultProducts.products || defaultProducts;
+                        if (Array.isArray(items)) {
+                            const cleaned = [];
+                            items.forEach(item => {
+                                const parsed = this.extractDataFromJSON(item);
+                                if(parsed) cleaned.push(parsed);
+                            });
+                            if (cleaned.length > 0) {
+                                await db.products.bulkAdd(cleaned);
+                                await this.loadCache();
+                            }
+                        }
+                        return;
+                    }
+
+                    const res = await fetch('./products.json');
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const items = data.products || data;
+                    if (!Array.isArray(items)) return;
+
+                    const cleaned = [];
+                    items.forEach(item => {
+                        const parsed = this.extractDataFromJSON(item);
+                        if(parsed) cleaned.push(parsed);
+                    });
+
+                    if (cleaned.length > 0) {
+                        await db.products.bulkAdd(cleaned);
+                        await this.loadCache();
+                    }
+                } catch(e) {
+                    console.log("JSON bulunamadı.");
+                }
+            },
+
+            switchTab(tabId) {
+                UI.vibrate(10);
+                this.currentTab = tabId;
+                
+                if (tabId === 'shelves') {
+                    this.activeGroup = null;
+                }
+                
+                const titles = { 'shelves': 'Raflar & Gruplar', 'basket': 'Toplama Sepeti', 'catalog': 'Tüm Katalog', 'settings': 'Ayarlar' };
+                document.getElementById('header-title').innerText = titles[tabId];
+
+                const searchBox = document.getElementById('search-box');
+                const fab = document.getElementById('fab-add');
+                
+                if (tabId === 'catalog') {
+                    searchBox.classList.remove('hidden');
+                    fab.classList.remove('hidden');
+                } else {
+                    searchBox.classList.add('hidden');
+                    fab.classList.add('hidden');
+                    this.clearSearch();
+                }
+
+                ['shelves', 'basket', 'catalog', 'settings'].forEach(id => {
+                    document.getElementById(`view-${id}`).classList.add('hidden');
+                });
+                document.getElementById(`view-${tabId}`).classList.remove('hidden');
+
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                event.currentTarget.classList.add('active');
+
+                if (tabId === 'settings') this.renderSettings();
+                else this.renderAll();
+            },
+
+            updateBadge() {
+                const count = Object.keys(this.cache.basket).length;
+                const badge = document.getElementById('badge-basket');
+                if (count > 0) { badge.innerText = count; badge.classList.remove('hidden'); } 
+                else { badge.classList.add('hidden'); }
+            },
+
+            renderAll() {
+                if (this.currentTab === 'shelves') this.renderShelves();
+                if (this.currentTab === 'basket') this.renderBasket();
+                if (this.currentTab === 'catalog') this.renderCatalog();
+            },
+
+            renderShelves() {
+                const container = document.getElementById('view-shelves');
+                if (this.activeGroup) return this.renderActiveShelf(container);
+
+                let html = `
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-bold text-slate-800 ml-2">Mevcut Raflar</h2>
+                        <button onclick="app.promptAddShelf()" class="bg-brand-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-brand-500/30 flex items-center active:scale-95 transition-transform">
+                            <i class="ph-bold ph-plus mr-2 text-lg"></i> Raf Ekle
+                        </button>
+                    </div>
+                `;
+
+                if (this.cache.categories.length === 0) {
+                    html += this.emptyState('ph-books', 'Raf Bulunamadı', 'Raf Ekle butonuna basarak kendi rafınızı oluşturun. Ardından ürünleri bu rafa atayabilirsiniz.');
+                    container.innerHTML = html;
+                    return;
+                }
+
+                html += '<div class="grid grid-cols-2 gap-4">';
+                this.cache.categories.forEach(cat => {
+                    const count = this.cache.products.filter(p => p.category === cat).length;
+                    const basketCount = Object.keys(this.cache.basket).filter(id => {
+                        const p = this.cache.products.find(x => x.id === id);
+                        return p && p.category === cat;
+                    }).length;
+
+                    html += `
+                        <button onclick="app.openShelf('${cat}')" class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 text-left active:scale-95 transition-transform relative overflow-hidden group">
+                            <div class="absolute top-0 right-0 p-4 opacity-10"><i class="ph-fill ph-folder text-6xl text-brand-500"></i></div>
+                            <div class="w-12 h-12 bg-brand-50 text-brand-600 rounded-2xl flex items-center justify-center text-2xl mb-4 relative z-10"><i class="ph-bold ph-package"></i></div>
+                            <h3 class="font-bold text-slate-800 text-sm leading-tight relative z-10 line-clamp-2">${cat}</h3>
+                            <p class="text-[11px] font-semibold text-slate-400 mt-2 relative z-10">${count} Ürün</p>
+                            ${basketCount > 0 ? `<div class="absolute top-4 right-4 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full z-10 shadow-sm">${basketCount} Eksik</div>` : ''}
+                        </button>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            },
+
+            renderActiveShelf(container) {
+                const cat = this.activeGroup;
+                const products = this.cache.products.filter(p => p.category === cat).sort((a, b) => (a.shelfOrder || 0) - (b.shelfOrder || 0));
+                
+                let html = `
+                    <div class="flex items-center justify-between mb-4 bg-white p-2 pl-4 rounded-2xl shadow-sm border border-slate-100">
+                        <h2 class="font-bold text-slate-800 flex-1 truncate pr-2"><i class="ph-fill ph-folder-open text-brand-500 mr-2"></i>${cat}</h2>
+                        <button onclick="app.openShelfAddModal()" class="bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl text-xs font-bold mr-2 active:scale-95"><i class="ph-bold ph-plus"></i> Ürün Ekle</button>
+                        <button onclick="app.closeShelf()" class="bg-slate-100 text-slate-600 px-4 py-2 rounded-xl text-xs font-bold active:bg-slate-200"><i class="ph-bold ph-arrow-left"></i> Geri</button>
+                    </div>
+                    <div id="shelf-products-list" class="bg-white rounded-3xl p-2 shadow-sm border border-slate-100 space-y-1 min-h-[100px]">
+                `;
+
+                if (products.length === 0) {
+                    html += `<p class="text-center text-sm text-slate-400 py-6 pointer-events-none">Bu rafa henüz ürün atanmamış. Yukarıdan ekleyebilirsiniz.</p>`;
+                }
+
+                products.forEach(p => {
+                    const needed = this.cache.basket[p.id] || 0;
+                    html += `
+                        <div data-id="${p.id}" class="flex items-center p-3 rounded-2xl ${needed > 0 ? 'bg-brand-50/50' : 'bg-white'} border border-transparent">
+                            <div class="mr-2 text-slate-300 cursor-grab active:cursor-grabbing handle touch-none flex-shrink-0"><i class="ph-bold ph-dots-six-vertical text-2xl"></i></div>
+                            <img src="${p.image}" onerror="this.src='${UI.fallbackImg}'" class="w-12 h-12 sm:w-14 sm:h-14 rounded-xl object-cover border border-slate-100 bg-slate-50 flex-shrink-0 pointer-events-none">
+                            <div class="ml-3 flex-1 pr-1 overflow-hidden">
+                                <h4 class="font-bold text-slate-800 text-[12px] sm:text-[13px] leading-snug break-words">${p.name}</h4>
+                                <button onclick="app.removeFromShelf('${p.id}')" class="mt-2 flex items-center text-[10px] font-bold text-red-500 bg-red-50 px-2.5 py-1.5 rounded-md active:bg-red-100 transition-colors w-max"><i class="ph-bold ph-trash mr-1 text-[11px]"></i> Raftan Çıkar</button>
+                            </div>
+                            <div class="flex items-center bg-slate-100 rounded-xl p-1 shadow-inner flex-shrink-0 ml-1">
+                                <button onclick="app.updateNeeded('${p.id}', -1)" class="w-8 h-8 flex items-center justify-center text-slate-600 bg-white rounded-lg shadow-sm active:scale-90 transition-transform"><i class="ph-bold ph-minus"></i></button>
+                                <div class="w-7 text-center font-extrabold text-brand-700 text-sm">${needed}</div>
+                                <button onclick="app.updateNeeded('${p.id}', 1)" class="w-8 h-8 flex items-center justify-center text-brand-600 bg-white rounded-lg shadow-sm active:scale-90 transition-transform"><i class="ph-bold ph-plus"></i></button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+                
+                setTimeout(() => this.initSortable(), 50);
+            },
+
+            openShelf(category) { this.activeGroup = category; this.renderShelves(); },
+            closeShelf() { this.activeGroup = null; this.renderShelves(); },
+
+            initSortable() {
+                const el = document.getElementById('shelf-products-list');
+                if (!el) return;
+                Sortable.create(el, {
+                    handle: '.handle',
+                    animation: 150,
+                    ghostClass: 'opacity-50',
+                    onEnd: async (evt) => {
+                        const itemEls = el.querySelectorAll('[data-id]');
+                        const updates = [];
+                        itemEls.forEach((itemEl, index) => {
+                            const id = itemEl.getAttribute('data-id');
+                            const p = this.cache.products.find(x => x.id === id);
+                            if (p) {
+                                p.shelfOrder = index;
+                                updates.push({ id, shelfOrder: index });
+                            }
+                        });
+                        
+                        for (let update of updates) {
+                            await db.products.update(update.id, { shelfOrder: update.shelfOrder });
+                        }
+                    }
+                });
+            },
+
+            promptAddShelf() {
+                UI.vibrate(10);
+                document.getElementById('new-shelf-name').value = '';
+                this.openModal('new-shelf');
+                setTimeout(() => document.getElementById('new-shelf-name').focus(), 300);
+            },
+
+            async saveNewShelf() {
+                const input = document.getElementById('new-shelf-name');
+                const name = input.value.trim();
+                if(name) {
+                    await db.shelves.put({ name: name });
+                    await this.loadCache();
+                    this.renderShelves();
+                    UI.showToast("Yeni Raf eklendi!");
+                    this.closeModal('new-shelf');
+                } else {
+                    input.focus();
+                }
+            },
+
+            async removeFromShelf(id) {
+                UI.vibrate(15);
+                const p = this.cache.products.find(x => x.id === id);
+                if (!p) return;
+                p.category = 'Kategorisiz';
+                p.shelfOrder = 0;
+                await db.products.update(id, { category: 'Kategorisiz', shelfOrder: 0 });
+                if (this.cache.basket[id] !== undefined) await db.basket.update(id, { category: 'Kategorisiz' });
+                
+                this.renderShelves();
+                UI.showToast("Ürün raftan çıkarıldı!");
+            },
+
+            openShelfAddModal() {
+                UI.vibrate(10);
+                document.getElementById('shelf-add-search').value = '';
+                document.getElementById('shelf-add-results').innerHTML = '';
+                document.getElementById('shelf-add-results').classList.add('hidden');
+                this.openModal('shelf-add');
+            },
+
+            searchForShelfAdd(val) {
+                const container = document.getElementById('shelf-add-results');
+                const q = val.toLocaleLowerCase('tr-TR').trim();
+                
+                if (q.length < 2) {
+                    container.classList.add('hidden');
+                    return;
+                }
+
+                const terms = q.split(/\s+/);
+                const results = this.cache.products.filter(p => {
+                    const targetText = `${p.name} ${p.barcode || ''}`.toLocaleLowerCase('tr-TR');
+                    return terms.every(term => targetText.includes(term));
+                }).sort((a, b) => {
+                    const textA = a.name.toLocaleLowerCase('tr-TR');
+                    const textB = b.name.toLocaleLowerCase('tr-TR');
+                    let scoreA = 0; let scoreB = 0;
+                    if (textA.includes(q)) scoreA += 50;
+                    if (textB.includes(q)) scoreB += 50;
+                    if (textA.startsWith(q)) scoreA += 50;
+                    if (textB.startsWith(q)) scoreB += 50;
+                    terms.forEach(term => {
+                        const wordMatch = ` ${term} `;
+                        if ((' ' + textA + ' ').includes(wordMatch)) scoreA += 10;
+                        if ((' ' + textB + ' ').includes(wordMatch)) scoreB += 10;
+                    });
+                    if (scoreA === scoreB) return textA.length - textB.length;
+                    return scoreB - scoreA;
+                }).slice(0, 15);
+
+                if (results.length === 0) {
+                    container.innerHTML = '<div class="p-4 text-center text-sm text-slate-500">Sonuç bulunamadı.</div>';
+                    container.classList.remove('hidden');
+                    return;
+                }
+
+                container.innerHTML = results.map(p => {
+                    const isAdded = p.category === this.activeGroup;
+                    return `
+                    <div onclick="app.toggleProductShelf('${p.id}')" class="flex items-center p-3 border-b border-slate-100 cursor-pointer transition-colors ${isAdded ? 'bg-emerald-50 hover:bg-emerald-100' : 'hover:bg-slate-50 active:bg-slate-100'}">
+                        <img src="${p.image}" onerror="this.src='${UI.fallbackImg}'" class="w-10 h-10 rounded-lg object-cover bg-slate-100 flex-shrink-0">
+                        <div class="ml-3 flex-1 pr-1 overflow-hidden">
+                            <p class="text-[12px] leading-snug break-words font-bold ${isAdded ? 'text-emerald-900' : 'text-slate-700'}">${p.name}</p>
+                            <p class="text-[10px] ${isAdded ? 'text-emerald-600 font-bold' : 'text-slate-400'} mt-1">Raf: ${p.category}</p>
+                        </div>
+                        ${isAdded 
+                            ? `<div class="bg-emerald-200 text-emerald-700 p-1 rounded-full"><i class="ph-bold ph-check text-xl"></i></div>` 
+                            : `<button class="bg-brand-50 text-brand-600 px-3 py-1 rounded-lg text-xs font-bold">Ekle</button>`
+                        }
+                    </div>
+                `}).join('');
+                
+                container.classList.remove('hidden');
+            },
+
+            async toggleProductShelf(id) {
+                UI.vibrate(10);
+                const p = this.cache.products.find(x => x.id === id);
+                if (!p) return;
+                
+                if (p.category === this.activeGroup) {
+                    p.category = 'Kategorisiz';
+                    p.shelfOrder = 0;
+                    await db.products.update(id, { category: 'Kategorisiz', shelfOrder: 0 });
+                    if (this.cache.basket[id] !== undefined) await db.basket.update(id, { category: 'Kategorisiz' });
+                    UI.showToast("Ürün raftan çıkarıldı!");
+                } else {
+                    p.category = this.activeGroup;
+                    const existingProducts = this.cache.products.filter(x => x.category === this.activeGroup);
+                    p.shelfOrder = existingProducts.length;
+                    await db.products.update(id, { category: this.activeGroup, shelfOrder: p.shelfOrder });
+                    if (this.cache.basket[id] !== undefined) await db.basket.update(id, { category: this.activeGroup });
+                    UI.showToast("Ürün rafa eklendi!");
+                }
+                
+                this.searchForShelfAdd(document.getElementById('shelf-add-search').value);
+                this.renderShelves();
+            },
+
+            renderBasket() {
+                const container = document.getElementById('view-basket');
+                const basketIds = Object.keys(this.cache.basket);
+
+                if (basketIds.length === 0) {
+                    container.innerHTML = this.emptyState('ph-check-circle', 'Sepet Boş', 'Alınması gereken eksik ürün yok.');
+                    document.getElementById('header-action').innerHTML = '';
+                    return;
+                }
+
+                document.getElementById('header-action').innerHTML = `<button onclick="app.clearBasket()" class="text-xs font-bold text-red-600 bg-red-50 px-4 py-2 rounded-xl active:bg-red-100">Sepeti Boşalt</button>`;
+
+                const itemsByCat = {};
+                basketIds.forEach(id => {
+                    const p = this.cache.products.find(x => x.id === id);
+                    if (p) {
+                        if (!itemsByCat[p.category]) itemsByCat[p.category] = [];
+                        itemsByCat[p.category].push({ ...p, needed: this.cache.basket[id] });
+                    }
+                });
+
+                let html = '<div class="space-y-6 pb-6">';
+                for (const [cat, items] of Object.entries(itemsByCat)) {
+                    html += `
+                        <div>
+                            <h3 class="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest mb-3 ml-2 flex items-center">
+                                <i class="ph-bold ph-map-pin mr-2 text-brand-400"></i> ${cat} Reyonu
+                            </h3>
+                            <div class="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                                ${items.map(p => `
+                                    <div id="basket-item-${p.id}" class="flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm transition-all duration-300 relative">
+                                        <div class="absolute top-1.5 left-1.5 bg-brand-50 text-brand-600 text-[10px] font-black px-1.5 py-0.5 rounded-lg z-10 border border-brand-100/50">
+                                            x${p.needed}
+                                        </div>
+                                        <div class="relative h-24 p-2 flex items-center justify-center">
+                                            <img src="${p.image}" onerror="this.src='${UI.fallbackImg}'" onclick="app.openProductDetails('${p.id}')" class="cursor-pointer max-h-full max-w-full object-contain mix-blend-multiply transition-transform active:scale-90">
+                                        </div>
+                                        <div class="px-2 pb-2 flex-1 flex flex-col">
+                                            <h4 class="font-semibold text-slate-700 text-[11px] leading-tight mb-2 flex-1 break-words text-center">${p.name}</h4>
+                                            <button onclick="app.pickItem('${p.id}')" class="w-full bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100 font-bold py-1.5 rounded-xl active:scale-95 flex items-center justify-center transition-colors mt-auto">
+                                                <i class="ph-bold ph-check text-sm mr-1"></i><span class="text-[9px] uppercase tracking-wider">Aldım</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+                container.innerHTML = html;
+            },
+
+            renderCatalog() {
+                const container = document.getElementById('view-catalog');
+                
+                let results = this.cache.products;
+                if (this.searchQuery) {
+                    const queryStr = this.searchQuery.toLocaleLowerCase('tr-TR');
+                    const terms = queryStr.split(/\s+/).filter(t => t.length > 0);
+
+                    results = results.filter(p => {
+                        const targetText = `${p.name} ${p.category} ${p.barcode || ''}`.toLocaleLowerCase('tr-TR');
+                        return terms.every(term => targetText.includes(term));
+                    });
+                }
+
+                if (results.length === 0) {
+                    container.innerHTML = this.emptyState('ph-magnifying-glass', 'Sonuç Yok', 'Aradığınız kriterde ürün bulunamadı.');
+                    return;
+                }
+
+                const limit = 50;
+                const display = results.slice(0, limit);
+
+                let html = '<div class="bg-white rounded-[2rem] p-2 shadow-sm border border-slate-100 space-y-1">';
+                display.forEach(p => {
+                    html += `
+                        <div class="flex items-center p-3 rounded-2xl bg-white hover:bg-slate-50 transition-colors">
+                            <img src="${p.image}" onerror="this.src='${UI.fallbackImg}'" class="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0">
+                            <div class="ml-4 flex-1 pr-2">
+                                <span class="text-[10px] font-bold text-brand-500 uppercase">${p.category === 'Kategorisiz' ? 'Rafa Atanmamış' : p.category}</span>
+                                <h4 class="font-bold text-slate-800 text-[13px] leading-snug break-words">${p.name}</h4>
+                            </div>
+                            
+                            <div class="flex items-center space-x-1 flex-shrink-0">
+                                <button onclick="app.openBarcodeModal('${p.id}')" class="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center active:scale-90 transition-transform">
+                                    <i class="ph-bold ph-barcode text-xl"></i>
+                                </button>
+                                <button onclick="app.openShelfModal('${p.id}')" class="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center active:scale-90 transition-transform">
+                                    <i class="ph-bold ph-pencil-simple text-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+
+                if (results.length > limit) {
+                    html += `<p class="text-center text-xs font-semibold text-slate-400 mt-6 pb-6">İlk ${limit} sonuç gösteriliyor.</p>`;
+                }
+
+                container.innerHTML = html;
+            },
+
+            renderSettings() {
+                document.getElementById('stats-text').innerText = `${this.cache.products.length} Kayıtlı Ürün\n${this.cache.categories.length} Aktif Raf`;
+                document.getElementById('header-action').innerHTML = '';
+                
+                const shelvesContainer = document.getElementById('settings-shelves-list');
+                if(shelvesContainer) {
+                    shelvesContainer.innerHTML = this.cache.categories.map(cat => `
+                        <div class="flex items-center justify-between bg-brand-50 border border-brand-100 px-4 py-2.5 rounded-xl text-[13px] font-bold text-brand-700 shadow-sm">
+                            <span>${cat}</span>
+                            <button onclick="app.deleteShelfFromSettings('${cat}')" class="ml-3 text-red-400 hover:text-red-600 active:scale-90 transition-all"><i class="ph-fill ph-x-circle text-lg"></i></button>
+                        </div>
+                    `).join('');
+                }
+            },
+
+            async addShelfFromSettings() {
+                UI.vibrate(10);
+                const input = document.getElementById('settings-new-shelf');
+                const name = input.value.trim();
+                if(!name) return;
+                
+                await db.shelves.put({ name });
+                input.value = '';
+                await this.loadCache(); 
+                this.renderSettings();
+                UI.showToast("Yeni Raf eklendi!");
+            },
+
+            async deleteShelfFromSettings(name) {
+                if(confirm(`'${name}' rafını silmek istediğinize emin misiniz? (Ürünler silinmez, sadece raf kaldırılır)`)) {
+                    UI.vibrate(15);
+                    await db.shelves.delete(name);
+                    await this.loadCache();
+                    this.renderSettings();
+                    this.renderShelves();
+                    UI.showToast("Raf başarıyla silindi!");
+                }
+            },
+
+            emptyState(icon, title, desc) {
+                return `<div class="flex flex-col items-center justify-center h-72 text-center fade-in"><div class="w-24 h-24 bg-slate-200/50 rounded-full flex items-center justify-center text-slate-400 mb-4"><i class="${icon} text-5xl"></i></div><h3 class="text-xl font-extrabold text-slate-700">${title}</h3><p class="text-sm font-medium text-slate-500 mt-2 max-w-[220px]">${desc}</p></div>`;
+            },
+
+            openModal(id) {
+                const modal = document.getElementById(`modal-${id}`);
+                const backdrop = document.getElementById(`modal-${id}-backdrop`);
+                const sheet = document.getElementById(`modal-${id}-sheet`);
+                modal.classList.remove('hidden');
+                requestAnimationFrame(() => {
+                    backdrop.classList.remove('opacity-0', 'pointer-events-none');
+                    backdrop.classList.add('pointer-events-auto');
+                    sheet.classList.remove('translate-y-full');
+                });
+            },
+            
+            closeModal(id) {
+                const backdrop = document.getElementById(`modal-${id}-backdrop`);
+                const sheet = document.getElementById(`modal-${id}-sheet`);
+                backdrop.classList.add('opacity-0', 'pointer-events-none');
+                backdrop.classList.remove('pointer-events-auto');
+                sheet.classList.add('translate-y-full');
+                setTimeout(() => { document.getElementById(`modal-${id}`).classList.add('hidden'); }, 300);
+            },
+
+            openShelfModal(productId) {
+                UI.vibrate(10);
+                this.editingProductId = productId;
+                const p = this.cache.products.find(x => x.id === productId);
+                if (!p) return;
+
+                document.getElementById('modal-product-name').innerText = p.name;
+                
+                const selectElement = document.getElementById('input-shelf-name');
+                selectElement.innerHTML = `<option value="Kategorisiz">Rafa Atanmamış (Kategorisiz)</option>` + 
+                    this.cache.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+                
+                selectElement.value = p.category;
+
+                this.openModal('shelf');
+            },
+
+            async saveShelfChange() {
+                UI.vibrate(15);
+                const id = this.editingProductId;
+                if (!id) return;
+                const newCat = document.getElementById('input-shelf-name').value;
+
+                await db.products.update(id, { category: newCat });
+                if (this.cache.basket[id] !== undefined) await db.basket.update(id, { category: newCat });
+
+                const p = this.cache.products.find(x => x.id === id);
+                if (p) p.category = newCat;
+
+                await this.loadCache(); 
+
+                this.closeModal('shelf');
+                UI.showToast('Raf güncellendi!');
+                if(this.currentTab === 'catalog') this.renderCatalog();
+            },
+
+            openBarcodeModal(productId) {
+                UI.vibrate(10);
+                const p = this.cache.products.find(x => x.id === productId);
+                if (!p) return;
+
+                document.getElementById('barcode-product-name').innerText = p.name;
+                const svg = document.getElementById('barcode-svg');
+                
+                let code = p.barcode || '0000000000000';
+                this.currentBarcodeValue = code;
+                document.getElementById('barcode-number-text').innerText = code;
+                
+                try {
+                    let formatType = "CODE128";
+                    if (code.length === 13 && /^\d+$/.test(code)) formatType = "EAN13";
+                    else if (code.length === 8 && /^\d+$/.test(code)) formatType = "EAN8";
+
+                    JsBarcode(svg, code, { format: formatType, width: 2.5, height: 80, displayValue: false, background: "transparent", lineColor: "#1e293b" });
+                } catch(e) {
+                    try { JsBarcode(svg, code, { format: "CODE128", width: 2, height: 80, displayValue: false, background: "transparent", lineColor: "#1e293b" }); } 
+                    catch(err) { console.error("Barkod çizilemedi", err); }
+                }
+
+                this.openModal('barcode');
+            },
+
+            copyBarcode() {
+                navigator.clipboard.writeText(this.currentBarcodeValue).then(() => {
+                    UI.showToast("Barkod Kopyalandı!");
+                });
+            },
+
+            // --- YENİ EKLENEN OTOMATİK TAMAMLAMA (AUTOCOMPLETE) VE EKLEME MANTIĞI ---
+            openAddProductModal() {
+                UI.vibrate(10);
+                this.selectedCatalogProductId = null; // Sıfırla
+                
+                document.getElementById('add-name').value = '';
+                document.getElementById('add-barcode').value = '';
+                document.getElementById('add-image').value = '';
+                document.getElementById('add-autocomplete-results').classList.add('hidden');
+                
+                // Raf (Kategori) Select kutusunu güncel ayarlardan doldur
+                const selectElement = document.getElementById('add-category');
+                selectElement.innerHTML = `<option value="Kategorisiz">Rafa Atanmamış (Kategorisiz)</option>` + 
+                    this.cache.categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+
+                this.openModal('add');
+            },
+
+            searchCatalogForAdd(val) {
+                const container = document.getElementById('add-autocomplete-results');
+                this.selectedCatalogProductId = null; // Kullanıcı tekrar bir şey yazarsa seçimi sıfırla
+                
+                const q = val.toLocaleLowerCase('tr-TR').trim();
+                if (q.length < 2) {
+                    container.classList.add('hidden');
+                    return;
+                }
+
+                const terms = q.split(/\s+/);
+                const results = this.cache.products.filter(p => {
+                    const targetText = `${p.name} ${p.barcode || ''}`.toLocaleLowerCase('tr-TR');
+                    return terms.every(term => targetText.includes(term));
+                }).slice(0, 10); // En iyi 10 sonucu göster
+
+                if (results.length === 0) {
+                    container.classList.add('hidden');
+                    return;
+                }
+
+                container.innerHTML = results.map(p => `
+                    <div onclick="app.selectAutocompleteProduct('${p.id}')" class="flex items-center p-3 border-b border-slate-100 cursor-pointer hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                        <img src="${p.image}" onerror="this.src='${UI.fallbackImg}'" class="w-10 h-10 rounded-lg object-cover bg-slate-100 flex-shrink-0">
+                        <div class="ml-3 flex-1 overflow-hidden">
+                            <p class="text-[13px] font-bold text-slate-700 truncate">${p.name}</p>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Barkod: ${p.barcode || 'Yok'}</p>
+                        </div>
+                    </div>
+                `).join('');
+                
+                container.classList.remove('hidden');
+            },
+
+            selectAutocompleteProduct(id) {
+                UI.vibrate(10);
+                const p = this.cache.products.find(x => x.id === id);
+                if (!p) return;
+                
+                this.selectedCatalogProductId = p.id;
+                document.getElementById('add-name').value = p.name;
+                document.getElementById('add-barcode').value = p.barcode || '';
+                document.getElementById('add-image').value = p.image || '';
+                
+                // Bulunan ürünün var olan rafını seçili hale getir
+                const selectElement = document.getElementById('add-category');
+                selectElement.value = p.category;
+
+                document.getElementById('add-autocomplete-results').classList.add('hidden');
+            },
+
+            async saveNewProduct() {
+                const name = document.getElementById('add-name').value.trim();
+                const category = document.getElementById('add-category').value;
+                const barcodeInput = document.getElementById('add-barcode').value.trim();
+                const image = document.getElementById('add-image').value.trim();
+
+                if (!name) { alert("Ürün Adı zorunludur!"); return; }
+
+                const barcode = barcodeInput || Math.floor(1000000000000 + Math.random() * 9000000000000).toString();
+
+                if (this.selectedCatalogProductId) {
+                    // Kullanıcı katalogdan ürün seçti, onu güncelliyoruz (Rafa atıyoruz)
+                    const id = this.selectedCatalogProductId;
+                    await db.products.update(id, { name, category, barcode, image });
+                    
+                    const p = this.cache.products.find(x => x.id === id);
+                    if (p) {
+                        p.name = name;
+                        p.category = category;
+                        p.barcode = barcode;
+                        p.image = image;
+                    }
+                    if (this.cache.basket[id] !== undefined) {
+                        await db.basket.update(id, { category });
+                    }
+                    UI.showToast("Ürün başarıyla seçtiğiniz rafa atandı!");
+                } else {
+                    // Kullanıcı yepyeni bir ürün ismi yazdı
+                    const newProduct = {
+                        id: 'p_' + Math.random().toString(36).substr(2, 9),
+                        name, category, barcode, image
+                    };
+                    await db.products.add(newProduct);
+                    this.cache.products.push(newProduct);
+                    UI.showToast("Sıfırdan yeni ürün eklendi!");
+                }
+
+                await this.loadCache();
+                this.closeModal('add');
+                this.renderAll();
+            },
+
+            async updateNeeded(id, change) {
+                UI.vibrate(15);
+                let current = this.cache.basket[id] || 0;
+                let next = Math.max(0, current + change);
+                const p = this.cache.products.find(x => x.id === id);
+                if (!p) return;
+                if (next === 0) { delete this.cache.basket[id]; await db.basket.delete(id); } 
+                else { this.cache.basket[id] = next; await db.basket.put({ id, category: p.category, needed: next }); }
+                this.updateBadge();
+                this.renderShelves(); 
+            },
+
+            async pickItem(id) {
+                UI.vibrate(10);
+                const needed = this.cache.basket[id] || 0;
+                if (needed > 1) {
+                    this.currentPickId = id;
+                    this.currentPickMax = needed;
+                    this.currentPickVal = 1;
+                    const p = this.cache.products.find(x => x.id === id);
+                    document.getElementById('pick-qty-name').innerText = p.name;
+                    document.getElementById('pick-qty-input').innerText = this.currentPickVal;
+                    this.openModal('pick-qty');
+                    return;
+                }
+                
+                UI.vibrate([20, 30, 20]);
+                const el = document.getElementById(`basket-item-${id}`);
+                if (el) el.classList.add('pop-out');
+                delete this.cache.basket[id];
+                await db.basket.delete(id);
+                setTimeout(() => { this.updateBadge(); this.renderBasket(); }, 300);
+            },
+
+            adjustPickQty(change) {
+                UI.vibrate(10);
+                let next = this.currentPickVal + change;
+                if (next < 1) next = 1;
+                if (next > this.currentPickMax) next = this.currentPickMax;
+                this.currentPickVal = next;
+                document.getElementById('pick-qty-input').innerText = this.currentPickVal;
+            },
+
+            async confirmPickQty() {
+                UI.vibrate([20, 30, 20]);
+                const id = this.currentPickId;
+                const next = this.currentPickMax - this.currentPickVal;
+                
+                if (next <= 0) {
+                    const el = document.getElementById(`basket-item-${id}`);
+                    if (el) el.classList.add('pop-out');
+                    delete this.cache.basket[id];
+                    await db.basket.delete(id);
+                    setTimeout(() => { this.updateBadge(); this.renderBasket(); }, 300);
+                } else {
+                    this.cache.basket[id] = next;
+                    const p = this.cache.products.find(x => x.id === id);
+                    await db.basket.put({ id, category: p.category, needed: next });
+                    this.updateBadge(); this.renderBasket(); 
+                }
+                this.closeModal('pick-qty');
+            },
+
+            async pickAllQty() {
+                this.currentPickVal = this.currentPickMax;
+                await this.confirmPickQty();
+            },
+            
+            openProductDetails(id) {
+                UI.vibrate(10);
+                const p = this.cache.products.find(x => x.id === id);
+                if (!p) return;
+                
+                document.getElementById('detail-image').src = p.image || UI.fallbackImg;
+                document.getElementById('detail-name').innerText = p.name;
+                
+                let allBarcodes = [];
+                if (typeof defaultProducts !== 'undefined') {
+                    const rawProducts = defaultProducts.products || defaultProducts;
+                    const rawP = rawProducts.find(x => x.id === p.id);
+                    if (rawP && rawP.barcodes && rawP.barcodes.length > 0) {
+                        allBarcodes = rawP.barcodes.map(b => b.code || b);
+                    }
+                }
+                
+                if (allBarcodes.length === 0 && p.barcode) {
+                    allBarcodes.push(p.barcode);
+                }
+                
+                const container = document.getElementById('detail-barcodes');
+                if (allBarcodes.length === 0) {
+                    container.innerHTML = `<span class="text-sm text-brand-600 font-medium">Kayıtlı barkod yok.</span>`;
+                } else {
+                    container.innerHTML = allBarcodes.map(code => `
+                        <div class="flex items-center justify-between bg-white px-4 py-3 rounded-xl shadow-sm border border-brand-50">
+                            <span class="font-mono font-bold text-slate-700 tracking-wider text-base">${code}</span>
+                            <button onclick="navigator.clipboard.writeText('${code}'); UI.showToast('Kopyalandı!')" class="text-brand-500 active:scale-90 transition-transform p-2 bg-brand-50 rounded-lg"><i class="ph-bold ph-copy text-xl"></i></button>
+                        </div>
+                    `).join('');
+                }
+                
+                this.openModal('product-details');
+            },
+
+            async clearBasket() {
+                if(confirm('Sepeti boşaltmak istiyor musunuz?')) {
+                    UI.setLoading(true, "Temizleniyor...");
+                    await db.basket.clear();
+                    this.cache.basket = {};
+                    this.updateBadge(); this.renderBasket();
+                    UI.setLoading(false);
+                }
+            },
+
+            async importJSON(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                UI.setLoading(true, "Dosya Analiz Ediliyor...");
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        const items = data.products || data;
+                        if (!Array.isArray(items)) throw new Error("JSON formatı hatalı.");
+
+                        const cleaned = [];
+                        items.forEach(item => {
+                            const parsed = this.extractDataFromJSON(item);
+                            if(parsed) cleaned.push(parsed);
+                        });
+
+                        UI.setLoading(true, "Veritabanına Yazılıyor...");
+                        await db.products.clear(); 
+                        await db.products.bulkAdd(cleaned);
+                        await this.loadCache();
+                        
+                        UI.setLoading(false);
+                        UI.showToast(`${cleaned.length} ürün başarıyla yüklendi!`);
+                        event.target.value = '';
+                        this.switchTab('catalog'); 
+                    } catch (err) {
+                        UI.setLoading(false); alert("Hata: " + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            },
+
+            async copyDataToClipboard() {
+                try {
+                    UI.setLoading(true, "Hazırlanıyor...");
+                    const shelves = await db.shelves.toArray();
+                    const shelfNames = shelves.map(s => s.name);
+                    const allProducts = await db.products.toArray();
+                    
+                    // YALNIZCA kullanıcının kendi oluşturduğu raflarda olan ürünleri filtrele
+                    const products = allProducts.filter(p => shelfNames.includes(p.category));
+                    const basket = await db.basket.toArray();
+                    
+                    const data = JSON.stringify({ products, shelves, basket });
+                    await navigator.clipboard.writeText(data);
+                    UI.setLoading(false);
+                    UI.showToast("Listeler ve sepet kopyalandı!");
+                } catch(e) {
+                    UI.setLoading(false);
+                    alert("Kopyalama hatası: " + e.message);
+                }
+            },
+
+            async pasteDataFromClipboard() {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    if (!text) throw new Error("Panoda metin yok!");
+                    
+                    UI.setLoading(true, "Veriler Yükleniyor...");
+                    const data = JSON.parse(text);
+                    
+                    let currentShelfNames = [];
+                    if (data.shelves && Array.isArray(data.shelves)) {
+                        const currentShelves = await db.shelves.toArray();
+                        currentShelfNames = currentShelves.map(s => s.name);
+                        await db.shelves.clear();
+                        await db.shelves.bulkAdd(data.shelves);
+                    }
+                    
+                    if (data.products && Array.isArray(data.products)) {
+                        const allProducts = await db.products.toArray();
+                        const toReset = allProducts.filter(p => currentShelfNames.includes(p.category));
+                        toReset.forEach(p => { p.category = 'Kategorisiz'; p.shelfOrder = 0; });
+                        if (toReset.length > 0) await db.products.bulkPut(toReset);
+                        
+                        await db.products.bulkPut(data.products);
+                    }
+                    
+                    if (data.basket && Array.isArray(data.basket)) {
+                        await db.basket.clear();
+                        await db.basket.bulkAdd(data.basket);
+                    }
+                    
+                    await this.loadCache();
+                    UI.setLoading(false);
+                    UI.showToast("Listeler başarıyla aktarıldı!");
+                    this.renderSettings();
+                    this.switchTab('catalog');
+                } catch(e) {
+                    UI.setLoading(false);
+                    alert("Yapıştırma hatası: " + e.message);
+                }
+            },
+
+            async resetDatabase() {
+                if(confirm('TÜM ÜRÜNLER ve Raflar silinecektir. Emin misiniz?')) {
+                    UI.setLoading(true, "Sıfırlanıyor...");
+                    await db.delete(); window.location.reload(); 
+                }
+            },
+
+            setupInputs() {
+                const input = document.getElementById('input-search');
+                const btn = document.getElementById('btn-clear-search');
+                input.addEventListener('input', () => { btn.classList.toggle('hidden', input.value.length === 0); });
+            },
+            
+            handleSearch(val) { this.searchQuery = val.trim(); this.renderCatalog(); },
+            clearSearch() { this.searchQuery = ''; document.getElementById('input-search').value = ''; document.getElementById('btn-clear-search').classList.add('hidden'); if(this.currentTab === 'catalog') this.renderCatalog(); }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => { window.app.init(); });
+        
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').then(reg => {
+                    console.log('ServiceWorker kayıt başarılı:', reg.scope);
+                }).catch(err => {
+                    console.log('ServiceWorker kayıt hatası:', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>

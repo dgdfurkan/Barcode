@@ -3,6 +3,11 @@
 
     let broadcastApiAvailable = true;
 
+    /** Kanal yoklamasında tablo başına çekilecek kolonlar. */
+    const POLL_COLUMNS = {
+        users: 'id,username,premium_features,chat_messages,last_chat_update,counting_data,trial_end,is_active,is_admin',
+    };
+
     function parseFilter(filter) {
         if (!filter || typeof filter !== 'string') return null;
         const m = filter.match(/^(\w+)=eq\.(.+)$/);
@@ -68,7 +73,12 @@
             const table = handler.filter?.table;
             if (!table) return;
 
-            let query = this.client.from(table).select('*');
+            // DİKKAT: users tablosunda parola kolonlarına kimsenin SELECT
+            // yetkisi yok. PostgreSQL'de kolon bazlı yetki varken `SELECT *`
+            // tamamen reddedilir — bu yüzden users için kolonlar açıkça
+            // sayılıyor. Diğer tablolarda * sorun değil.
+            const cols = POLL_COLUMNS[table] || '*';
+            let query = this.client.from(table).select(cols);
             const parsed = parseFilter(handler.filter?.filter);
             if (parsed) {
                 query = query.eq(parsed.column, parsed.value);

@@ -726,35 +726,64 @@ app.post('/api/telegram/notify', requireUser, async (req, res) => {
     }
 });
 
-/** Admin panelinin bot ayarlarını okuması/yazması — token asla geri dönmez. */
-app.get('/api/admin/telegram', requireAdmin, async (req, res) => {
+/**
+ * Admin ayarları — admin_settings tablosu tarayıcıya TAMAMEN kapalı.
+ * Bu tablo Telegram bot token'ı, Gemini ve Cloudinary anahtarlarını tutuyor.
+ *
+ * GET  sırların DEĞERİNİ döndürmez; yalnızca "tanımlı mı" bilgisini ve
+ *      gizli olmayan alanları (chat id, cloud adı) döndürür.
+ * POST boş bırakılan sır alanlarını DEĞİŞTİRMEZ (COALESCE/NULLIF) —
+ *      böylece admin, mevcut token'ı görmeden diğer ayarları kaydedebilir.
+ */
+const SECRET_SETTING_FIELDS = ['telegram_bot_token', 'gemini_api_key', 'cloudinary_api_key'];
+const PLAIN_SETTING_FIELDS = ['telegram_chat_id', 'cloudinary_cloud_name', 'cloudinary_upload_preset'];
+
+app.get('/api/admin/settings', requireAdmin, async (req, res) => {
     try {
-        const s = await loadTelegramSettings();
-        return res.json({
-            ok: true,
-            configured: !!(s?.telegram_bot_token && s?.telegram_chat_id),
-            chatId: s?.telegram_chat_id || '',
-        });
+        const r = await pool.query('SELECT * FROM admin_settings WHERE id = $1 LIMIT 1', [ADMIN_SETTINGS_ID]);
+        const row = r.rows[0] || {};
+        const out = { ok: true, configured: {} };
+        for (const f of SECRET_SETTING_FIELDS) {
+            out.configured[f] = !!(row[f] && String(row[f]).length);
+        }
+        for (const f of PLAIN_SETTING_FIELDS) {
+            out[f] = row[f] || '';
+        }
+        return res.json(out);
     } catch (e) {
+        console.error('admin settings read error:', e);
         return res.status(500).json({ ok: false, error: 'server_error' });
     }
 });
 
-app.post('/api/admin/telegram', requireAdmin, async (req, res) => {
-    const token = String(req.body?.botToken || '').trim().slice(0, 200);
-    const chatId = String(req.body?.chatId || '').trim().slice(0, 100);
+app.post('/api/admin/settings', requireAdmin, async (req, res) => {
+    const body = req.body || {};
+    const vals = {};
+    for (const f of [...SECRET_SETTING_FIELDS, ...PLAIN_SETTING_FIELDS]) {
+        vals[f] = String(body[f] ?? '').trim().slice(0, 500);
+    }
     try {
         await pool.query(
-            `INSERT INTO admin_settings (id, telegram_bot_token, telegram_chat_id)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (id) DO UPDATE
-             SET telegram_bot_token = COALESCE(NULLIF(EXCLUDED.telegram_bot_token, ''), admin_settings.telegram_bot_token),
-                 telegram_chat_id  = COALESCE(NULLIF(EXCLUDED.telegram_chat_id, ''), admin_settings.telegram_chat_id)`,
-            [ADMIN_SETTINGS_ID, token, chatId]
+            `INSERT INTO admin_settings
+                (id, telegram_bot_token, telegram_chat_id, gemini_api_key,
+                 cloudinary_api_key, cloudinary_cloud_name, cloudinary_upload_preset)
+             VALUES ($1,$2,$3,$4,$5,$6,$7)
+             ON CONFLICT (id) DO UPDATE SET
+                telegram_bot_token       = COALESCE(NULLIF(EXCLUDED.telegram_bot_token,''),       admin_settings.telegram_bot_token),
+                gemini_api_key           = COALESCE(NULLIF(EXCLUDED.gemini_api_key,''),           admin_settings.gemini_api_key),
+                cloudinary_api_key       = COALESCE(NULLIF(EXCLUDED.cloudinary_api_key,''),       admin_settings.cloudinary_api_key),
+                telegram_chat_id         = NULLIF(EXCLUDED.telegram_chat_id,''),
+                cloudinary_cloud_name    = NULLIF(EXCLUDED.cloudinary_cloud_name,''),
+                cloudinary_upload_preset = NULLIF(EXCLUDED.cloudinary_upload_preset,'')`,
+            [
+                ADMIN_SETTINGS_ID,
+                vals.telegram_bot_token, vals.telegram_chat_id, vals.gemini_api_key,
+                vals.cloudinary_api_key, vals.cloudinary_cloud_name, vals.cloudinary_upload_preset,
+            ]
         );
         return res.json({ ok: true });
     } catch (e) {
-        console.error('admin telegram save error:', e);
+        console.error('admin settings save error:', e);
         return res.status(500).json({ ok: false, error: 'server_error' });
     }
 });

@@ -621,10 +621,17 @@ class ChatSystem {
                 ? `${baseUrl}/api/telegram/notify`
                 : legacyUrl;
 
+            // Telegram bildirimi artık kimlik doğrulaması istiyor: eskiden
+            // internetteki herkes bu uçtan bot'a mesaj gönderebiliyordu.
+            // Gönderen adı sunucuda token'dan okunur, gövdeden değil.
+            const headers = { 'Content-Type': 'application/json' };
+            const authToken = window.jetbarkodAuth?.get?.();
+            if (authToken) headers.Authorization = 'Bearer ' + authToken;
+
             const response = await fetch(endpoint, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, message }),
+                headers,
+                body: JSON.stringify({ message }),
             });
 
             if (!response.ok) {
@@ -711,95 +718,56 @@ class ChatSystem {
         }
     }
 
+    /**
+     * Misafir mesajını sunucuya gönderir.
+     *
+     * Eskiden tarayıcı doğrudan guest_chats tablosuna yazıyordu ve o tablo
+     * herkese açıktı: "Kullanıcı101, Kullanıcı102..." diye sırayla deneyen
+     * biri BAŞKALARININ destek yazışmalarını okuyabiliyordu.
+     *
+     * Artık ziyaretçi imzalı bir misafir token'ı taşır ve API yalnızca o
+     * token'ın sahibi olan konuşmaya yazar. Tablo tarayıcıya tamamen kapalı.
+     */
     async saveGuestMessageToSupabase(message) {
         try {
-            if (!window.supabase) {
+            const api = window.jetbarkodAuth;
+            const guest = window.guestUserManager;
+            if (!api || !guest?.getGuestToken) {
                 this.saveGuestMessageToLocalStorage(message);
                 return;
             }
 
-            console.log('💬 Saving guest user message to Supabase:', message);
-            
-            // Get client IP
-            const clientIP = await window.guestUserManager.getClientIP();
-            
-            // Try to get guest chat from guest_chats table
-            const { data: guestChatData, error: getError } = await window.supabase
-                .from('guest_chats')
-                .select('*')
-                .eq('username', this.currentUser)
-                .single();
-
-            let chatMessages = [];
-            
-            if (getError && getError.code === 'PGRST116') {
-                // Guest chat doesn't exist, create new one
-                const newGuestChat = {
-                    username: this.currentUser,
-                    ip_address: clientIP,
-                    chat_messages: JSON.stringify([{
-                        message: message,
-                        sender: 'user',
-                        timestamp: new Date().toISOString(),
-                        adminStatus: 'unread',
-                        userStatus: 'sent'
-                    }]),
-                    last_chat_update: new Date().toISOString(),
-                    created_at: new Date().toISOString()
-                };
-
-                const { error: insertError } = await window.supabase
-                    .from('guest_chats')
-                    .insert([newGuestChat]);
-
-                if (insertError) {
-                    console.error('❌ Error creating guest chat:', insertError);
-                    this.saveGuestMessageToLocalStorage(message);
-                    return;
-                }
-
-                chatMessages = [newGuestChat.chat_messages];
-            } else if (getError) {
-                console.error('❌ Error getting guest chat:', getError);
+            let token = guest.getGuestToken();
+            if (!token) {
+                await guest.getOrCreateGuestUser();
+                token = guest.getGuestToken();
+            }
+            if (!token) {
                 this.saveGuestMessageToLocalStorage(message);
                 return;
-            } else {
-                // Guest chat exists, update it
-                chatMessages = guestChatData.chat_messages ? JSON.parse(guestChatData.chat_messages) : [];
-                
-                chatMessages.push({
-                    message: message,
-                    sender: 'user',
-                    timestamp: new Date().toISOString(),
-                    adminStatus: 'unread',
-                    userStatus: 'sent'
-                });
-
-                const { error: updateError } = await window.supabase
-                    .from('guest_chats')
-                    .update({
-                        chat_messages: JSON.stringify(chatMessages),
-                        last_chat_update: new Date().toISOString()
-                    })
-                    .eq('username', this.currentUser);
-
-                if (updateError) {
-                    console.error('❌ Error updating guest chat:', updateError);
-                    this.saveGuestMessageToLocalStorage(message);
-                    return;
-                }
             }
 
-            console.log('✅ Guest message saved successfully');
-            this.messages = chatMessages;
-            void this._notifyTelegram(this.currentUser, message);
-            
-            // Update last seen
-            if (window.guestUserManager) {
-                await window.guestUserManager.updateGuestUserLastSeen(this.currentUser);
+            const res = await fetch(`${api.apiBase()}/api/guest/chat`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: 'Bearer ' + token,
+                },
+                body: JSON.stringify({ message }),
+            });
+
+            if (!res.ok) {
+                console.error('❌ Misafir mesajı gönderilemedi:', res.status);
+                this.saveGuestMessageToLocalStorage(message);
+                return;
             }
+
+            const data = await res.json();
+            this.messages = Array.isArray(data.messages) ? data.messages : [];
+            console.log('✅ Misafir mesajı kaydedildi');
+            // Telegram bildirimini sunucu gönderiyor — istemciden ayrıca çağrılmaz.
         } catch (error) {
-            console.error('❌ Error saving guest message:', error);
+            console.error('❌ Misafir mesajı hatası:', error);
             this.saveGuestMessageToLocalStorage(message);
         }
     }
@@ -833,17 +801,18 @@ class ChatSystem {
         try {
             console.log('💬 Loading guest chat history for:', this.currentUser);
             
-            if (window.supabase && this.currentUser) {
-                // Try to load from Supabase guest_chats table
-                const { data: guestChatData, error } = await window.supabase
-                    .from('guest_chats')
-                    .select('*')
-                    .eq('username', this.currentUser)
-                    .single();
+            const _api = window.jetbarkodAuth;
+            const _guestToken = window.guestUserManager?.getGuestToken?.();
+            if (_api && _guestToken && this.currentUser) {
+                // Misafir geçmişi API'den gelir; guest_chats tablosu tarayıcıya kapalı.
+                const _res = await fetch(`${_api.apiBase()}/api/guest/chat`, {
+                    headers: { Authorization: 'Bearer ' + _guestToken },
+                });
+                const _data = _res.ok ? await _res.json() : null;
 
-                if (!error && guestChatData && guestChatData.chat_messages) {
-                    const chatMessages = JSON.parse(guestChatData.chat_messages);
-                    console.log('✅ Loaded guest chat messages from Supabase:', chatMessages);
+                if (_data && Array.isArray(_data.messages)) {
+                    const chatMessages = _data.messages;
+                    console.log('✅ Misafir sohbet geçmişi yüklendi:', chatMessages.length, 'mesaj');
                     
                     // Clear existing messages
                     const messagesContainer = document.getElementById('chatMessages');
@@ -1525,14 +1494,25 @@ class ChatSystem {
                 
                 if (isGuest) {
                     // Guest kullanıcı için guest_chats tablosunu kontrol et
-                    const { data: guestData, error: guestError } = await window.supabase
-                        .from('guest_chats')
-                        .select('chat_messages, last_chat_update')
-                        .eq('username', this.currentUser)
-                        .maybeSingle();
-                    
-                    data = guestData;
-                    error = guestError;
+                    // Misafir yoklaması API üzerinden (guest_chats tarayıcıya kapalı)
+                    const _api = window.jetbarkodAuth;
+                    const _gt = window.guestUserManager?.getGuestToken?.();
+                    if (_api && _gt) {
+                        const _r = await fetch(`${_api.apiBase()}/api/guest/chat`, {
+                            headers: { Authorization: 'Bearer ' + _gt },
+                        });
+                        if (_r.ok) {
+                            const _d = await _r.json();
+                            data = { chat_messages: JSON.stringify(_d.messages || []), last_chat_update: _d.lastUpdate };
+                            error = null;
+                        } else {
+                            data = null;
+                            error = { code: 'GUEST_API', message: 'HTTP ' + _r.status };
+                        }
+                    } else {
+                        data = null;
+                        error = { code: 'PGRST116' };
+                    }
                 } else {
                     // Kayıtlı kullanıcı için users tablosunu kontrol et
                     const { data: userData, error: userError } = await window.supabase
@@ -1728,44 +1708,9 @@ class ChatSystem {
             
             if (isGuest) {
                 // Handle guest user
-                if (window.supabase) {
-                    const { data: guestChatData, error: guestError } = await window.supabase
-                        .from('guest_chats')
-                        .select('chat_messages')
-                        .eq('username', this.currentUser)
-                        .single();
-
-                    if (!guestError && guestChatData && guestChatData.chat_messages) {
-                        let chatMessages = JSON.parse(guestChatData.chat_messages);
-                        let hasChanges = false;
-                        
-                        // Mark all admin messages as read by user
-                        chatMessages.forEach(msg => {
-                            if (msg.sender === 'admin' && msg.userStatus !== 'read') {
-                                msg.userStatus = 'read'; // User okudu
-                                hasChanges = true;
-                            }
-                        });
-                        
-                        if (hasChanges) {
-                            // Update in Supabase
-                            await window.supabase
-                                .from('guest_chats')
-                                .update({ 
-                                    chat_messages: JSON.stringify(chatMessages),
-                                    last_chat_update: new Date().toISOString()
-                                })
-                                .eq('username', this.currentUser);
-                            
-                            console.log('✅ Admin messages marked as read by guest user');
-                            
-                            // Refresh the chat display to show green ticks
-                            setTimeout(() => {
-                                this.loadChatHistory();
-                            }, 200);
-                        }
-                    }
-                } else {
+                // Misafirde okundu bilgisi sunucuda tutuluyor; burada yalnızca
+                // yerel yedek güncelleniyor.
+                {
                     // Fallback to localStorage
                     const guestChats = JSON.parse(localStorage.getItem('guestChats') || '{}');
                     if (guestChats[this.currentUser] && guestChats[this.currentUser].chat_messages) {

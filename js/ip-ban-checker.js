@@ -27,31 +27,28 @@
                     }
                 }
 
-                // Supabase'den kontrol et
-                if (!window.supabase) {
-                    return {
-                        isBlocked: false,
-                        reason: null,
-                        cached: false
-                    };
+                // API'den kontrol et.
+                // Eskiden tarayıcı blocked_ips tablosunu doğrudan okuyordu;
+                // bu, engelli IP listesinin tamamının dışarıdan çekilebilmesi
+                // demekti. Artık sunucu yalnızca "senin IP'n engelli mi"
+                // sorusuna cevap veriyor, liste dışarı çıkmıyor.
+                const api = window.jetbarkodAuth;
+                if (!api || !api.apiBase()) {
+                    return { isBlocked: false, reason: null, cached: false };
                 }
 
-                const { data, error } = await window.supabase
-                    .from('blocked_ips')
-                    .select('ip_address')
-                    .eq('ip_address', clientIP)
-                    .limit(1);
-
-                if (error) {
-                    console.error('Error checking IP ban status:', error);
-                    return {
-                        isBlocked: false,
-                        reason: null,
-                        cached: false
-                    };
+                let isBlocked = false;
+                try {
+                    const res = await fetch(`${api.apiBase()}/api/ip/status`);
+                    if (!res.ok) {
+                        return { isBlocked: false, reason: null, cached: false };
+                    }
+                    const data = await res.json();
+                    isBlocked = !!data.blocked;
+                } catch (e) {
+                    console.warn('IP durumu sorgulanamadı:', e?.message);
+                    return { isBlocked: false, reason: null, cached: false };
                 }
-
-                const isBlocked = data && data.length > 0;
 
                 // Cache'e kaydet
                 this.banCache[clientIP] = {
@@ -255,55 +252,33 @@
                     return;
                 }
 
-                // Check if supabase is a client instance (has channel method)
-                if (typeof supabaseClient.channel !== 'function') {
-                    // If window.supabase is the createClient function, we need to create a client
-                    if (typeof supabaseClient.createClient === 'function') {
-                        return;
-                    }
-                    // If it's already a client but channel doesn't exist, wait a bit
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    supabaseClient = window.supabase;
-                    if (!supabaseClient || typeof supabaseClient.channel !== 'function') {
-                        return;
-                    }
+                // blocked_ips tablosu artık tarayıcıya kapalı; realtime aboneliği
+                // VPS modunda bu tabloyu 4 saniyede bir yokluyordu ve sürekli
+                // yetki hatası verirdi. Onun yerine sunucuya "benim IP'm
+                // engellendi mi" diye soruyoruz — engelli listesi dışarı çıkmıyor.
+                if (this._banPollTimer) {
+                    clearInterval(this._banPollTimer);
+                    this._banPollTimer = null;
                 }
 
-                // Önceki subscription'ı kapat
-                if (this.realtimeSubscription && typeof supabaseClient.removeChannel === 'function') {
-                    await supabaseClient.removeChannel(this.realtimeSubscription);
-                }
+                const api = window.jetbarkodAuth;
+                if (!api || !api.apiBase()) return;
 
-                // Yeni subscription oluştur
-                const channelName = 'ip_ban_changes_' + Date.now();
-                
-                this.realtimeSubscription = supabaseClient
-                    .channel(channelName)
-                    .on('postgres_changes', {
-                        event: '*',
-                        schema: 'public',
-                        table: 'blocked_ips'
-                    }, async (payload) => {
-                        const newData = payload.new || payload.record || {};
-                        const oldData = payload.old || {};
-                        const ip = newData.ip_address || oldData.ip_address;
-                        const eventType = payload.eventType || payload.event;
+                const poll = async () => {
+                    try {
+                        const res = await fetch(`${api.apiBase()}/api/ip/status`);
+                        if (!res.ok) return;
+                        const data = await res.json();
+                        if (data.blocked && data.ip) {
+                            this.clearCache(data.ip);
+                            await this.checkAndLogoutBannedIP(data.ip);
+                            await this.triggerBanChangeCallbacks(data.ip, true);
+                        }
+                    } catch (e) { /* ağ hatası — sessiz geç */ }
+                };
 
-                        if (eventType === 'INSERT' && ip) {
-                            this.clearCache(ip);
-                            await this.checkAndLogoutBannedIP(ip);
-                            await this.triggerBanChangeCallbacks(ip, true);
-                        } else if (eventType === 'DELETE' && ip) {
-                            this.clearCache(ip);
-                        }
-                    })
-                    .subscribe((status) => {
-                        if (status === 'CHANNEL_ERROR') {
-                            console.error('❌ Realtime subscription error for IP bans');
-                        } else if (status === 'TIMED_OUT') {
-                            console.error('⏱️ Realtime subscription timed out for IP bans');
-                        }
-                    });
+                this._banPollTimer = setInterval(poll, 60000);
+                void poll();
 
             } catch (error) {
                 console.error('Error setting up realtime subscription:', error);
@@ -312,9 +287,9 @@
 
         // Realtime subscription'ı kapat
         async cleanupRealtimeSubscription() {
-            if (this.realtimeSubscription && window.supabase) {
-                await window.supabase.removeChannel(this.realtimeSubscription);
-                this.realtimeSubscription = null;
+            if (this._banPollTimer) {
+                clearInterval(this._banPollTimer);
+                this._banPollTimer = null;
             }
         }
     }

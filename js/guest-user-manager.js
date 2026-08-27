@@ -21,94 +21,71 @@
         }
     }
 
-    // Get or create guest user for current IP (Supabase-based)
+    const GUEST_TOKEN_KEY = 'jb_guest_token';
+    const GUEST_NAME_KEY = 'jb_guest_username';
+
+    function getGuestToken() {
+        try { return localStorage.getItem(GUEST_TOKEN_KEY) || ''; } catch (e) { return ''; }
+    }
+
+    function setGuestSession(token, username) {
+        try {
+            if (token) localStorage.setItem(GUEST_TOKEN_KEY, token);
+            if (username) localStorage.setItem(GUEST_NAME_KEY, username);
+        } catch (e) { /* ignore */ }
+    }
+
+    function clearGuestSession() {
+        try {
+            localStorage.removeItem(GUEST_TOKEN_KEY);
+            localStorage.removeItem(GUEST_NAME_KEY);
+        } catch (e) { /* ignore */ }
+    }
+
+    /**
+     * Misafir kimliğini SUNUCUDAN alır.
+     *
+     * Eskiden tarayıcı guest_chats tablosunu doğrudan okuyup yazıyordu; tablo
+     * herkese açık olduğu için başkalarının destek yazışmaları okunabiliyordu.
+     * Artık sunucu, IP'ye göre kimliği belirleyip İMZALI bir misafir token'ı
+     * veriyor. Ziyaretçi yalnızca kendi konuşmasına erişebiliyor.
+     */
     async function getOrCreateGuestUser() {
-        const clientIP = await getClientIP();
-        
-        // Önce Supabase'de bu IP'ye ait guest user var mı kontrol et
-        if (window.supabase) {
-            try {
-                // IP'ye göre guest_chats tablosunda arama yap
-                const { data: existingGuestChat, error: searchError } = await window.supabase
-                    .from('guest_chats')
-                    .select('username')
-                    .eq('ip_address', clientIP)
-                    .order('last_chat_update', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
+        const api = window.jetbarkodAuth;
+        if (!api || !api.apiBase()) {
+            return await getOrCreateGuestUserLocalStorage(await getClientIP());
+        }
 
-                if (!searchError && existingGuestChat && existingGuestChat.username) {
-                    console.log('✅ Existing guest user found in Supabase for IP:', clientIP, '->', existingGuestChat.username);
-                    return existingGuestChat.username;
-                }
+        try {
+            const headers = { 'Content-Type': 'application/json' };
+            const existing = getGuestToken();
+            if (existing) headers.Authorization = 'Bearer ' + existing;
 
-                // Guest user yoksa, yeni bir tane oluştur
-                // Önce maksimum numarayı bul (performanslı yöntem)
-                const { data: allGuests, error: fetchError } = await window.supabase
-                    .from('guest_chats')
-                    .select('username')
-                    .like('username', `${GUEST_USER_PREFIX}%`);
+            const res = await fetch(`${api.apiBase()}/api/guest/session`, {
+                method: 'POST',
+                headers,
+                body: '{}',
+            });
 
-                if (fetchError) {
-                    console.error('❌ Error fetching guest users:', fetchError);
-                    // Fallback to localStorage
-                    return await getOrCreateGuestUserLocalStorage(clientIP);
-                }
-
-                // Maksimum numarayı bul
-                let maxNumber = GUEST_START_NUMBER - 1;
-                if (allGuests && allGuests.length > 0) {
-                    const numbers = allGuests
-                        .map(guest => {
-                            const match = guest.username.match(/^Kullanıcı(\d+)$/);
-                            return match ? parseInt(match[1]) : null;
-                        })
-                        .filter(num => num !== null);
-                    
-                    if (numbers.length > 0) {
-                        maxNumber = Math.max(...numbers);
-                    }
-                }
-
-                const nextNumber = maxNumber + 1;
-                const guestUsername = `${GUEST_USER_PREFIX}${nextNumber}`;
-
-                // Yeni guest_chats kaydı oluştur
-                const { data: newGuestChat, error: insertError } = await window.supabase
-                    .from('guest_chats')
-                    .insert([{
-                        username: guestUsername,
-                        ip_address: clientIP,
-                        chat_messages: '[]',
-                        last_chat_update: new Date().toISOString(),
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                    }])
-                    .select()
-                    .single();
-
-                if (insertError) {
-                    console.error('❌ Error creating guest user in Supabase:', insertError);
-                    // Fallback to localStorage
-                    return await getOrCreateGuestUserLocalStorage(clientIP);
-                }
-
-                console.log('✅ New guest user created in Supabase:', guestUsername, 'for IP:', clientIP);
-                return guestUsername;
-
-            } catch (error) {
-                console.error('❌ Exception in getOrCreateGuestUser:', error);
-                // Fallback to localStorage
-                return await getOrCreateGuestUserLocalStorage(clientIP);
+            if (!res.ok) {
+                console.warn('Misafir oturumu alınamadı, yerel yedeğe düşülüyor:', res.status);
+                return await getOrCreateGuestUserLocalStorage(await getClientIP());
             }
-        } else {
-            // Supabase yoksa localStorage'a fallback
-            console.warn('⚠️ Supabase not available, using localStorage fallback');
-            return await getOrCreateGuestUserLocalStorage(clientIP);
+
+            const data = await res.json();
+            if (data?.ok && data.username) {
+                setGuestSession(data.token, data.username);
+                console.log('✅ Misafir kimliği:', data.username, data.reused ? '(mevcut)' : '(yeni)');
+                return data.username;
+            }
+
+            return await getOrCreateGuestUserLocalStorage(await getClientIP());
+        } catch (e) {
+            console.warn('Misafir oturumu hatası:', e?.message);
+            return await getOrCreateGuestUserLocalStorage(await getClientIP());
         }
     }
 
-    // Fallback: localStorage tabanlı guest user oluşturma (eski yöntem)
     async function getOrCreateGuestUserLocalStorage(clientIP) {
         // Check if IP already has a guest user assigned
         const ipMapping = JSON.parse(localStorage.getItem(IP_USER_MAPPING_KEY) || '{}');
@@ -158,63 +135,16 @@
     }
 
     // Update guest user last seen (Supabase-based)
-    async function updateGuestUserLastSeen(username) {
-        if (window.supabase) {
-            try {
-                // Supabase'de guest_chats tablosunda updated_at otomatik güncelleniyor
-                // Ama last_chat_update'ı da güncelleyelim
-                const { error } = await window.supabase
-                    .from('guest_chats')
-                    .update({ 
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('username', username);
-
-                if (error) {
-                    console.error('❌ Error updating guest user last seen in Supabase:', error);
-                }
-            } catch (error) {
-                console.error('❌ Exception updating guest user last seen:', error);
-            }
-        }
-        
-        // Fallback to localStorage
-        const guestUsers = JSON.parse(localStorage.getItem(GUEST_STORAGE_KEY) || '{}');
-        if (guestUsers[username]) {
-            guestUsers[username].lastSeen = new Date().toISOString();
-            localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(guestUsers));
-        }
+    /** Sunucu son görülmeyi kendi güncelliyor (mesaj yazıldığında). */
+    async function updateGuestUserLastSeen() {
+        return true;
     }
 
-    // Get guest user by IP (Supabase-based)
+    /** Misafir kimliği artık sunucudan geliyor; yerelde saklanan ada bakılır. */
     async function getGuestUserByIP() {
-        const clientIP = await getClientIP();
-        
-        // Önce Supabase'de ara
-        if (window.supabase) {
-            try {
-                const { data: guestChat, error } = await window.supabase
-                    .from('guest_chats')
-                    .select('username')
-                    .eq('ip_address', clientIP)
-                    .order('last_chat_update', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-
-                if (!error && guestChat && guestChat.username) {
-                    return guestChat.username;
-                }
-            } catch (error) {
-                console.error('❌ Error getting guest user by IP from Supabase:', error);
-            }
-        }
-        
-        // Fallback to localStorage
-        const ipMapping = JSON.parse(localStorage.getItem(IP_USER_MAPPING_KEY) || '{}');
-        return ipMapping[clientIP] || null;
+        try { return localStorage.getItem(GUEST_NAME_KEY) || null; } catch (e) { return null; }
     }
 
-    // Check if user is guest
     function isGuestUser(username) {
         if (!username) return false;
         return username.startsWith(GUEST_USER_PREFIX) && /^\d+$/.test(username.replace(GUEST_USER_PREFIX, ''));
@@ -226,7 +156,9 @@
         getGuestUserByIP,
         updateGuestUserLastSeen,
         isGuestUser,
-        getClientIP
+        getClientIP,
+        getGuestToken,
+        clearGuestSession
     };
 
     console.log('✅ Guest User Manager initialized');

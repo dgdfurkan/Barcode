@@ -40,7 +40,23 @@
                 nextInit.headers ||
                     (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined)
             );
-            headers.delete('Authorization');
+
+            // Kullanıcının imzalı oturum token'ı. PostgREST bunu doğrulayıp
+            // JWT'deki role'e (web_user / web_admin) geçer; RLS politikaları da
+            // username / is_admin claim'lerini buradan okur.
+            //
+            // Token yoksa istek web_anon olarak gider ve neredeyse hiçbir
+            // tabloya erişemez — bu bilinçlidir.
+            //
+            // (Eskiden bu satır Authorization başlığını SİLİYORDU; veritabanı
+            //  kimlik doğrulamasız, herkese açıktı.)
+            const token = window.jetbarkodAuth?.get?.() || '';
+            if (token) {
+                headers.set('Authorization', 'Bearer ' + token);
+            } else {
+                headers.delete('Authorization');
+            }
+
             nextInit.headers = headers;
             return fetch(input, nextInit);
         };
