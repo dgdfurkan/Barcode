@@ -589,10 +589,59 @@ async function checkAuthAsync() {
 }
 
 // Logout function
+/**
+ * Kullanıcıya ait TÜM yerel izleri temizler.
+ *
+ * Eskiden çıkışta yalnızca userSession + authToken siliniyordu; currentUser,
+ * username, tempChatUser, sohbet geçmişi ve premium önbelleği kalıyordu.
+ * Sonuç: çıkış yapıp başka biri girse bile sohbet hâlâ önceki kullanıcının
+ * adını taşıyordu (hem hata hem gizlilik sorunu).
+ */
+function clearAllUserState() {
+    const anahtarlar = [
+        'userSession', 'authToken', 'jb_token',
+        'currentUser', 'username', 'tempChatUser', 'session',
+        'chatMessages', 'messages', 'globalMessages', 'guestChats',
+        'jb_guest_token', 'jb_guest_username',
+    ];
+    anahtarlar.forEach((k) => {
+        try { localStorage.removeItem(k); } catch (e) { /* ignore */ }
+    });
+
+    // Kullanıcı adına göre türetilen premium önbellekleri
+    try {
+        Object.keys(localStorage)
+            .filter((k) => k.startsWith('jetbarkod_premium_'))
+            .forEach((k) => localStorage.removeItem(k));
+    } catch (e) { /* ignore */ }
+
+    try {
+        sessionStorage.removeItem('jetbarkod_premium_features');
+    } catch (e) { /* ignore */ }
+
+    // Bellekteki sistemleri de sıfırla ki eski kullanıcıyla sorgu atmasınlar
+    try {
+        if (window.chatSystem) {
+            window.chatSystem.currentUser = null;
+            window.chatSystem.isGuest = false;
+            window.chatSystem.messages = [];
+        }
+        if (window.premiumFeatures) {
+            window.premiumFeatures.currentUser = null;
+            window.premiumFeatures.premiumFeatures = {};
+        }
+        if (window.userDataManager) {
+            window.userDataManager.currentUser = null;
+            window.userDataManager.userData = null;
+        }
+    } catch (e) { /* ignore */ }
+}
+
 function logout() {
     // İmzalı token'ı ilk iş olarak temizle — sonrasında hata çıksa bile
     // yetkisiz bir token ortada kalmasın.
     window.jetbarkodAuth?.clear?.();
+    clearAllUserState();
 
     // Get current session for logging
     const session = JSON.parse(localStorage.getItem('userSession') || '{}');

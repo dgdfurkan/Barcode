@@ -197,7 +197,13 @@ class ChatSystem {
         // aşağıdaki misafir akışı doğru davranış.
 
         // Öncelik 3: localStorage'dan geçici kullanıcı bilgileri
-            const storedUsername = localStorage.getItem('currentUser') || localStorage.getItem('username');
+            // Oturum YOKKEN eski kullanıcı adına güvenme: çıkış sonrası
+            // tarayıcıda kalan ad, önceki kullanıcı gibi davranmaya ve
+            // onun adına sorgu atmaya (401) yol açıyordu.
+            const oturumVar = !!window.authUtils?.checkAuth?.();
+            const storedUsername = oturumVar
+                ? (localStorage.getItem('currentUser') || localStorage.getItem('username'))
+                : null;
             const tempChatUser = localStorage.getItem('tempChatUser'); // For trial expired users
             const sessionData = JSON.parse(localStorage.getItem('session') || '{}');
             
