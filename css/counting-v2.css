@@ -410,3 +410,305 @@
         transition: none !important;
     }
 }
+
+/* ================================================================
+   v2 YERLEŞİM — yeniden düzenlenmiş kabuk
+   ================================================================ */
+
+.counting-v2 .v2-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+/* --- Özet şerit: 4 metrik tek satır --- */
+.counting-v2 .v2-summary .skeleton-content {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0 !important;
+    border: 1px solid var(--v2-line);
+    border-radius: 1rem;
+    background: #fff;
+    overflow: hidden;
+}
+
+.counting-v2 .v2-summary .stat-card {
+    border: none !important;
+    border-left: none !important;
+    border-radius: 0 !important;
+    padding: 0.7rem 0.9rem !important;
+    box-shadow: none !important;
+}
+
+.counting-v2 .v2-summary .stat-card + .stat-card {
+    border-left: 1px solid var(--v2-soft) !important;
+}
+
+.counting-v2 .v2-summary .stat-card p:last-child {
+    font-size: 1.45rem !important;
+}
+
+/* --- Eylem çubuğu --- */
+.counting-v2 .v2-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid var(--v2-line);
+    border-radius: 1rem;
+    background: #fff;
+}
+
+.counting-v2 .v2-actions__left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 15rem;
+    position: relative;
+}
+
+.counting-v2 .v2-actions__left #manualProductInputWrapper {
+    flex: 1;
+    min-width: 0;
+    margin: 0 !important;
+}
+
+.counting-v2 .v2-actions__right {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.counting-v2 .v2-actions button {
+    white-space: nowrap;
+}
+
+/* --- Ana alan --- */
+.counting-v2 .v2-body #countingTableContainer {
+    border-radius: 1rem !important;
+    border: 1px solid var(--v2-line) !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+}
+
+/* --- Üst bar: aktif tablo çipi --- */
+.counting-v2 .v2-table-chip {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    padding: 0.3rem 0.7rem;
+    margin-left: 0.5rem;
+    border: 1px solid var(--v2-line);
+    border-left: 3px solid var(--v2-accent);
+    border-radius: 0.7rem;
+    background: #fff;
+    cursor: pointer;
+    text-align: left;
+    max-width: 14rem;
+    position: relative;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.counting-v2 .v2-table-chip.is-daily { border-left-color: #7c3aed; }
+.counting-v2 .v2-table-chip:hover { background: var(--v2-track); }
+
+.counting-v2 .v2-table-chip__eyebrow {
+    font-size: 0.56rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--v2-faint);
+    line-height: 1.2;
+}
+
+.counting-v2 .v2-table-chip__name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--v2-ink);
+    line-height: 1.25;
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.counting-v2 .v2-table-chip__caret {
+    position: absolute;
+    right: 0.45rem;
+    top: 50%;
+    width: 0.8rem;
+    height: 0.8rem;
+    color: var(--v2-faint);
+    transform: translateY(-50%);
+}
+
+/* --- Token: üst bar düğmesi + popover --- */
+.counting-v2 .v2-token { position: relative; }
+
+.counting-v2 .v2-token-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--v2-line);
+    border-radius: 9999px;
+    background: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--v2-muted);
+    cursor: pointer;
+}
+
+.counting-v2 .v2-token-btn:hover { background: var(--v2-track); }
+
+.counting-v2 .v2-token-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    background: #cbd5e1;
+}
+
+.counting-v2 .v2-token-dot.is-ok { background: var(--v2-ok); }
+.counting-v2 .v2-token-dot.is-warn { background: var(--v2-warn); }
+.counting-v2 .v2-token-dot.is-bad { background: var(--v2-bad); }
+
+.counting-v2 .v2-token-pop {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.45rem);
+    z-index: 120;
+    width: min(23rem, 90vw);
+    padding: 0.75rem;
+    border: 1px solid var(--v2-line);
+    border-radius: 0.9rem;
+    background: #fff;
+    box-shadow: 0 18px 40px -20px rgb(15 23 42 / 0.3);
+}
+
+.counting-v2 .v2-token-pop__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.82rem;
+}
+
+.counting-v2 .v2-token-paste {
+    padding: 0.3rem 0.6rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: var(--v2-accent);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.counting-v2 .v2-token-paste:hover { background: #1d4ed8; }
+
+.counting-v2 .v2-token-pop #apiStatusCard {
+    background: var(--v2-track) !important;
+    border: 1px solid var(--v2-line) !important;
+    border-radius: 0.7rem !important;
+    margin: 0 !important;
+}
+
+/* --- Çekmece --- */
+.counting-v2 .v2-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 210;
+    background: rgb(15 23 42 / 0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease-out;
+}
+
+body.v2-drawer-open .v2-drawer-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.counting-v2 .v2-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 220;
+    width: min(30rem, 100vw);
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-left: 1px solid var(--v2-line);
+    box-shadow: -24px 0 48px -24px rgb(15 23 42 / 0.3);
+    transform: translate3d(100%, 0, 0);
+    transition: transform 0.28s var(--v2-ease);
+}
+
+body.v2-drawer-open .v2-drawer { transform: translate3d(0, 0, 0); }
+
+.counting-v2 .v2-drawer__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 1rem 1.1rem 0.75rem;
+    border-bottom: 1px solid var(--v2-soft);
+}
+
+.counting-v2 .v2-drawer__eyebrow {
+    margin: 0;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--v2-faint);
+}
+
+.counting-v2 .v2-drawer__title {
+    margin: 0.1rem 0 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--v2-ink);
+}
+
+.counting-v2 .v2-drawer__scope { padding: 0.75rem 1.1rem 0; }
+.counting-v2 .v2-drawer__scope .v2-scope { width: 100%; }
+.counting-v2 .v2-drawer__scope .v2-scope button { flex: 1; }
+
+.counting-v2 .v2-drawer__body {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.85rem 1.1rem 1.25rem;
+}
+
+.counting-v2 .v2-iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--v2-muted);
+    cursor: pointer;
+}
+
+.counting-v2 .v2-iconbtn:hover { background: var(--v2-soft); color: var(--v2-ink); }
+.counting-v2 .v2-iconbtn svg { width: 1.1rem; height: 1.1rem; }
+
+body.v2-drawer-open { overflow: hidden; }
+
+@media (max-width: 640px) {
+    .counting-v2 .v2-table-chip { max-width: 9rem; margin-left: 0.35rem; }
+    .counting-v2 .v2-table-chip__name { max-width: 7rem; }
+    .counting-v2 .v2-summary .skeleton-content { grid-template-columns: repeat(3, 1fr); }
+    .counting-v2 .v2-actions { padding: 0.5rem; }
+    .counting-v2 .v2-drawer { width: 100vw; }
+}
