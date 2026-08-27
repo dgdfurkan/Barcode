@@ -18,7 +18,6 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -176,33 +175,15 @@ async function isIPBlocked(clientIP) {
 // security_02 ile düşürülebilir.
 const BCRYPT_ROUNDS = 12;
 
-async function verifyAndUpgradePassword(user, plainPassword) {
-    if (user.password_hash) {
-        return bcrypt.compare(plainPassword, user.password_hash);
+async function verifyPassword(user, plainPassword) {
+    // Tüm parolalar bcrypt'e taşındı; düz metin yolu kaldırıldı ve
+    // users.password kolonu düşürüldü. Hash'i olmayan kullanıcı giriş
+    // yapamaz — admin panelinden yeni parola belirlenmesi gerekir.
+    if (!user.password_hash) {
+        console.warn(`parola hash'i yok, giris reddedildi: ${user.username}`);
+        return false;
     }
-
-    // Henüz hash'lenmemiş eski kayıt
-    if (typeof user.password === 'string' && user.password.length > 0) {
-        // Zamanlama farkını sızdırmamak için sabit süreli karşılaştırma
-        const a = Buffer.from(user.password);
-        const b = Buffer.from(plainPassword);
-        const ok = a.length === b.length && crypto.timingSafeEqual(a, b);
-        if (!ok) return false;
-
-        try {
-            const hash = await bcrypt.hash(plainPassword, BCRYPT_ROUNDS);
-            await pool.query(
-                'UPDATE users SET password_hash = $1, password = NULL, updated_at = NOW() WHERE id = $2',
-                [hash, user.id]
-            );
-            console.log(`parola bcrypt'e taşındı: ${user.username}`);
-        } catch (e) {
-            console.error('parola hash yazılamadı:', e.message);
-        }
-        return true;
-    }
-
-    return false;
+    return bcrypt.compare(plainPassword, user.password_hash);
 }
 
 // =====================================================================
@@ -316,7 +297,7 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const userResult = await pool.query(
-            `SELECT id, username, password, password_hash, company, contact_email, trial_end,
+            `SELECT id, username, password_hash, company, contact_email, trial_end,
                     is_active, is_admin, premium_features, max_ip_count, ip_tracking_enabled,
                     allowed_ips, tracked_ips
              FROM users WHERE username = $1 LIMIT 1`,
@@ -332,7 +313,7 @@ app.post('/api/auth/login', async (req, res) => {
 
         const user = userResult.rows[0];
 
-        if (!(await verifyAndUpgradePassword(user, password))) {
+        if (!(await verifyPassword(user, password))) {
             await recordFailedAttempt(clientIP);
             return res.status(401).json({ ok: false, error: 'Kullanıcı adı veya şifre hatalı!' });
         }
@@ -808,7 +789,7 @@ app.post('/api/admin/users/password', requireAdmin, async (req, res) => {
     try {
         const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
         const r = await pool.query(
-            'UPDATE users SET password_hash = $1, password = NULL, updated_at = NOW() WHERE username = $2',
+            'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE username = $2',
             [hash, username]
         );
         if (r.rowCount === 0) return res.status(404).json({ ok: false, error: 'user_not_found' });
