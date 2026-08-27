@@ -1,0 +1,200 @@
+/**
+ * Jet Barkod — açılış (boot) deneyimi
+ *
+ * Giriş yapıldıktan sonra uygulama sayfası açılırken markalı bir yükleme
+ * ekranı gösterir, ardından header elemanlarını sıralı biçimde ortaya çıkarır.
+ *
+ * TASARIM KURALI (modal animasyonlarında öğrendiğimiz ders):
+ * Dinlenme hâli DAİMA "görünür/açılmış" durumdur. Perde yalnızca
+ * .app-boot--active sınıfı VARKEN görünür; JS hiç çalışmasa bile sayfada
+ * gömülü güvenlik ağı onu kaldırır. Yani perde asla kalıcı takılamaz.
+ *
+ * PERFORMANS: yalnızca opacity ve transform animate edilir (compositor'da
+ * çalışır). Layout veya boya tetikleyen hiçbir özellik animate edilmez.
+ */
+
+.app-boot {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    background: var(--color-background, #f8fafc);
+    opacity: 1;
+    transition: opacity 420ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Perde yalnızca bu sınıf varken durur; yoksa DOM'dan da kalkar */
+.app-boot:not(.app-boot--active) {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.app-boot__inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.15rem;
+    transform: translate3d(0, 0, 0) scale(1);
+    transition: transform 420ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-boot:not(.app-boot--active) .app-boot__inner {
+    transform: translate3d(0, -6px, 0) scale(1.03);
+}
+
+/* ---------- Logo ---------- */
+
+.app-boot__mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 4.5rem;
+    height: 4.5rem;
+}
+
+.app-boot__logo {
+    width: 3.25rem;
+    height: 3.25rem;
+    object-fit: contain;
+    animation: bootBreathe 2.6s ease-in-out infinite;
+}
+
+/* Logonun arkasında yavaşça genişleyen halka */
+.app-boot__mark::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 1.5px solid var(--color-primary, #2563eb);
+    opacity: 0;
+    animation: bootPulse 2.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes bootBreathe {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.06); }
+}
+
+@keyframes bootPulse {
+    0%   { transform: scale(0.85); opacity: 0.35; }
+    70%  { transform: scale(1.25); opacity: 0; }
+    100% { transform: scale(1.25); opacity: 0; }
+}
+
+/* ---------- Metin ---------- */
+
+.app-boot__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-text-primary, #0f172a);
+}
+
+.app-boot__status {
+    margin: 0;
+    min-height: 1.1em;
+    font-size: 0.78rem;
+    color: #94a3b8;
+    transition: opacity 220ms ease-out;
+}
+
+.app-boot__status.is-swapping {
+    opacity: 0;
+}
+
+/* ---------- İlerleme çubuğu ---------- */
+
+.app-boot__track {
+    width: 11rem;
+    height: 3px;
+    border-radius: 9999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+
+.app-boot__bar {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, #3b82f6, var(--color-primary, #2563eb));
+    transform: scaleX(0);
+    transform-origin: left center;
+    /* Yumuşak, doğal ilerleme — sıçramasın */
+    transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ---------- Header koreografisi ---------- */
+/*
+ * Boot bittikten sonra header elemanları sırayla belirir.
+ * Dinlenme hâli görünür; .boot-reveal yalnızca giriş anında eklenir
+ * ve bir sonraki karede kaldırılır.
+ */
+.boot-reveal {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
+}
+
+.boot-reveal-ready {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    transition:
+        opacity 380ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Ana içerik de perdenin ardından yumuşakça gelsin */
+.boot-content-enter {
+    animation: bootContentIn 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes bootContentIn {
+    from { opacity: 0; transform: translate3d(0, 10px, 0); }
+    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* ---------- Giriş sayfasından çıkış ---------- */
+
+.page-leaving {
+    animation: pageLeave 260ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes pageLeave {
+    to { opacity: 0; transform: translate3d(0, -8px, 0); }
+}
+
+/* ---------- Mobil ---------- */
+
+@media (max-width: 640px) {
+    .app-boot__mark { width: 4rem; height: 4rem; }
+    .app-boot__logo { width: 2.9rem; height: 2.9rem; }
+    .app-boot__track { width: 9rem; }
+}
+
+/* ---------- Hareket azaltma ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+    .app-boot,
+    .app-boot__inner,
+    .app-boot__bar,
+    .boot-reveal-ready {
+        transition: none !important;
+    }
+    .app-boot__logo,
+    .app-boot__mark::after {
+        animation: none !important;
+    }
+    .boot-content-enter,
+    .page-leaving {
+        animation: none !important;
+    }
+    .boot-reveal {
+        opacity: 1;
+        transform: none;
+    }
+}

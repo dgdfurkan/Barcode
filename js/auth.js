@@ -187,11 +187,30 @@ async function loginViaVpsApi(username, password, clientIP) {
         }
     }
 
-    if (sessionData.isAdmin) {
-        window.location.replace('admin.html');
-    } else {
-        window.location.replace('pages/product_search.html');
-    }
+    // Giriş sayfasından uygulamaya yumuşak geçiş: sayfa sıçrayarak değil,
+    // kısa bir sönümlemeyle bırakılır. Hedef sayfa kendi açılış perdesini
+    // ilk karede boyadığı için araya beyaz ekran girmez.
+    const hedef = sessionData.isAdmin ? 'admin.html' : 'pages/product_search.html';
+    gecisliYonlendir(hedef);
+}
+
+/** Sayfayı kısa bir animasyonla bırakıp yönlendirir (animasyon şart değil). */
+function gecisliYonlendir(hedef) {
+    let gitti = false;
+    const git = () => {
+        if (gitti) return;
+        gitti = true;
+        window.location.replace(hedef);
+    };
+
+    try {
+        const azHareket = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+        if (azHareket) return git();
+        document.body.classList.add('page-leaving');
+    } catch (e) { /* animasyon başarısızsa sorun değil */ }
+
+    // Animasyon süresi kadar bekle; her koşulda yönlendir.
+    setTimeout(git, 240);
 }
 
 async function login(username, password) {

@@ -142,31 +142,67 @@ class PremiumFeatures {
         }
     }
 
+    /**
+     * Premium haklarını sunucudan çeker.
+     *
+     * KURAL: Hata durumunda ELDEKİ DEĞERLER KORUNUR.
+     * Eskiden her hatada premiumFeatures = {} yapılıyordu; arka planda
+     * sessizce çalışan yenileme geçici bir sebeple başarısız olunca
+     * kullanıcının tüm premium özellikleri kilitli görünüyordu.
+     * Yalnızca sunucudan BAŞARILI bir yanıt geldiğinde değer değişir.
+     *
+     * @returns {Promise<boolean>} taze veri alındı mı
+     */
     async _fetchPremiumFeaturesFromSupabase() {
         try {
             if (!window.supabase || !this.currentUser) {
-                this.premiumFeatures = {};
-                return;
+                return false;
             }
 
             const { data, error } = await window.supabase
                 .from('users')
                 .select('premium_features')
                 .eq('username', this.currentUser.username)
-                .single();
+                .maybeSingle();
 
-            if (!error && data && data.premium_features) {
-                this.premiumFeatures = data.premium_features;
-                if (this.currentUser?.username) {
-                    this._writePremiumCache(this.currentUser.username, this.premiumFeatures);
-                }
-            } else {
-                this.premiumFeatures = {};
+            if (error) {
+                console.warn('Premium hakları alınamadı, mevcut değerler korunuyor:', error.message);
+                return false;
             }
+
+            if (!data) {
+                console.warn('Kullanıcı satırı dönmedi, premium hakları korunuyor.');
+                return false;
+            }
+
+            // Boş nesne meşru bir cevap: kullanıcının hiç premium hakkı yok.
+            this.premiumFeatures = data.premium_features || {};
+            if (this.currentUser?.username) {
+                this._writePremiumCache(this.currentUser.username, this.premiumFeatures);
+            }
+            return true;
         } catch (error) {
-            console.error('Error loading premium features:', error);
-            this.premiumFeatures = {};
+            console.warn('Premium hakları alınamadı (istisna), mevcut değerler korunuyor:', error?.message);
+            return false;
         }
+    }
+
+    /**
+     * Önbelleği atlayıp sunucudan TAZE premium haklarını getirir ve bekler.
+     * Ayarlar ekranı bunu kullanır — orada bayat veri göstermek kabul edilemez.
+     */
+    async refresh() {
+        const session = window.authUtils?.checkAuth?.();
+        if (!session) return false;
+        this.currentUser = session;
+
+        if (session.isGuest && window.jetbarkodGuestAccess?.isEnabled?.()) {
+            this._applyGuestPremiumFeatures();
+            return true;
+        }
+
+        await this._waitForSupabase(8000);
+        return this._fetchPremiumFeaturesFromSupabase();
     }
 
     // Check if a specific premium feature is enabled

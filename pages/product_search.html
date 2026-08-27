@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <script src="../js/console-quiet.js?v=20260827g"></script>
+    <script src="../js/console-quiet.js?v=20260827h"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,38 +18,40 @@
     <link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
     <link rel="shortcut icon" href="../assets/logo.png?v=2">
     
-    <link rel="stylesheet" href="../css/main.css?v=20260827g" />
-    <link rel="stylesheet" href="../css/tailwind.css?v=20260827g" />
-    <link rel="stylesheet" href="../css/settings-panel.css?v=20260827g" />
+    <link rel="stylesheet" href="../css/main.css?v=20260827h" />
+    <link rel="stylesheet" href="../css/tailwind.css?v=20260827h" />
+    <link rel="stylesheet" href="../css/settings-panel.css?v=20260827h" />
+    <link rel="stylesheet" href="../css/app-boot.css?v=20260827h" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <!-- Supabase Client Library -->
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="../js/auth-token.js?v=20260827g"></script>
-    <script src="../js/supabase-config.js?v=20260827g"></script>
-    <script src="../js/vps-supabase-shim.js?v=20260827g"></script>
-    <script src="../js/supabase-bootstrap.js?v=20260827g"></script>
+    <script src="../js/auth-token.js?v=20260827h"></script>
+    <script src="../js/supabase-config.js?v=20260827h"></script>
+    <script src="../js/vps-supabase-shim.js?v=20260827h"></script>
+    <script src="../js/supabase-bootstrap.js?v=20260827h"></script>
     <!-- QR Code Library - Using QRCode.js (more reliable) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" onload="console.log('✅ QRCode.js library loaded')" onerror="console.error('❌ QRCode.js failed to load')"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="temp_products.js"></script>
-    <script src="../js/getir-cdn-paste.js?v=20260827g"></script>
-    <script src="../js/guest-access-config.js?v=20260827g"></script>
-    <script src="../js/auth.js?v=20260827g"></script>
-    <script src="../js/skeleton-ui.js?v=20260827g"></script>
-    <script src="../js/guest-access.js?v=20260827g"></script>
-    <script src="../js/image-lightbox.js?v=20260827g"></script>
-    <script src="../js/trial-notifications.js?v=20260827g"></script>
-    <script src="../js/user-manager.js?v=20260827g"></script>
-    <script src="../js/premium-features.js?v=20260827g"></script>
-    <script src="../js/notifications.js?v=20260827g"></script>
-    <script src="../js/feature-definitions.js?v=20260827g"></script>
-    <script src="../js/feature-manager.js?v=20260827g"></script>
-    <script src="../js/feature-checker.js?v=20260827g"></script>
-    <script src="../js/update-notifications.js?v=20260827g"></script>
-    <script src="../js/ip-ban-checker.js?v=20260827g"></script>
-    <script src="../js/changelog.js?v=20260827g"></script>
+    <script src="../js/getir-cdn-paste.js?v=20260827h"></script>
+    <script src="../js/guest-access-config.js?v=20260827h"></script>
+    <script src="../js/auth.js?v=20260827h"></script>
+    <script src="../js/skeleton-ui.js?v=20260827h"></script>
+    <script src="../js/app-boot.js?v=20260827h"></script>
+    <script src="../js/guest-access.js?v=20260827h"></script>
+    <script src="../js/image-lightbox.js?v=20260827h"></script>
+    <script src="../js/trial-notifications.js?v=20260827h"></script>
+    <script src="../js/user-manager.js?v=20260827h"></script>
+    <script src="../js/premium-features.js?v=20260827h"></script>
+    <script src="../js/notifications.js?v=20260827h"></script>
+    <script src="../js/feature-definitions.js?v=20260827h"></script>
+    <script src="../js/feature-manager.js?v=20260827h"></script>
+    <script src="../js/feature-checker.js?v=20260827h"></script>
+    <script src="../js/update-notifications.js?v=20260827h"></script>
+    <script src="../js/ip-ban-checker.js?v=20260827h"></script>
+    <script src="../js/changelog.js?v=20260827h"></script>
     <script>
         // ===== SCAN EFFECT VISIBILITY FUNCTION - MUST BE DEFINED BEFORE feature-manager.js LOADS =====
         // Load and update scan effect visibility (DEFINED AT TOP LEVEL SO IT'S ALWAYS AVAILABLE)
@@ -1975,9 +1977,36 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="../css/motion.css?v=20260827g" />
+    <link rel="stylesheet" href="../css/motion.css?v=20260827h" />
 </head>
 <body class="bg-background min-h-screen">
+    <!-- Açılış perdesi. İlk karede boyanır; JS hiç çalışmasa bile
+         aşağıdaki gömülü güvenlik ağı onu kaldırır. -->
+    <div id="appBoot" class="app-boot app-boot--active" role="status" aria-live="polite" aria-label="Uygulama yükleniyor">
+        <div class="app-boot__inner">
+            <span class="app-boot__mark">
+                <img src="../assets/logo.png" alt="" class="app-boot__logo" decoding="async" />
+            </span>
+            <h1 class="app-boot__title">Jet Barkod</h1>
+            <span class="app-boot__track"><span class="app-boot__bar"></span></span>
+            <p class="app-boot__status">Başlatılıyor</p>
+        </div>
+    </div>
+    <script>
+        /* GÜVENLİK AĞI — app-boot.js yüklenemese veya bir hata oluşsa bile
+           perde en fazla 9 saniye durur. Site asla beyaz ekranda kalmaz. */
+        (function () {
+            document.documentElement.classList.add('boot-locked');
+            setTimeout(function () {
+                var p = document.getElementById('appBoot');
+                if (p) {
+                    p.classList.remove('app-boot--active');
+                    setTimeout(function () { if (p.parentNode) p.parentNode.removeChild(p); }, 500);
+                }
+                document.documentElement.classList.remove('boot-locked');
+            }, 9000);
+        })();
+    </script>
     <!-- Header Section -->
     <header class="bg-surface border-b border-border shadow-sm site-header">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -2960,6 +2989,7 @@
         function markProductsHydratedForClipboard() {
             if (products.length > 0) {
                 buildCatalogSearchIndexes(products);
+                window.AppBoot?.step('catalog');
             }
             if (typeof _resolveProductsHydratedForClipboard === 'function') {
                 _resolveProductsHydratedForClipboard();
@@ -3647,6 +3677,7 @@
                 if (window.SkeletonUI) {
                     window.SkeletonUI.leave('headerPremiumNavHost');
                 }
+                window.AppBoot?.step('premium');
             }
         }
         const updateCountingPageButtonsVisibility = updatePremiumNavVisibility;
@@ -10288,7 +10319,13 @@
         }
 
         async function showSettings() {
-            if (window.premiumFeatures) window.premiumFeatures.clearCache();
+            // Toggle tercihlerinin önbelleğini düşür VE premium haklarını
+            // sunucudan taze çek. clearCache() yalnızca tercihleri temizliyor;
+            // hakları yenilemediği için ayarlar bayat veri gösterebiliyordu.
+            if (window.premiumFeatures) {
+                window.premiumFeatures.clearCache();
+                try { await window.premiumFeatures.refresh(); } catch (e) { console.warn(e); }
+            }
             if (window.userDataManager && !window.userDataManager.userData) {
                 try { await window.userDataManager.init(); } catch (e) { console.warn(e); }
             }
@@ -11118,6 +11155,7 @@
             if (window.SkeletonUI) {
                 window.SkeletonUI.enterMany(['headerUserHost', 'headerPremiumNavHost', 'trialCountdownHost']);
             }
+            window.AppBoot?.step('auth');
             
             // Prevent admin users from accessing this page
             if (session.isAdmin) {
@@ -11173,6 +11211,7 @@
             if (window.SkeletonUI) {
                 window.SkeletonUI.leave('headerUserHost');
             }
+            window.AppBoot?.step('ui');
 
             void updatePremiumNavVisibility();
             
@@ -11522,7 +11561,7 @@
     </button>
 
     <!-- Chat System Script -->
-    <script src="../js/chat.js?v=20260827g"></script>
+    <script src="../js/chat.js?v=20260827h"></script>
     
     <!-- Debug Script for Chat Button -->
     <script>
