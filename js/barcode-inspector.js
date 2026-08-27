@@ -352,25 +352,34 @@
         var k = el('article', 'bk-kart');
         sayac++;
 
-        // --- Üst: tip, değer, doğrulama ---
+        /*
+         * Üst blok iki satır: tip+doğrulama, sonra kodun kendisi.
+         * Tipin uzun açıklaması ("Perakende ürün kodu" gibi) satır yemek
+         * yerine ipucu metnine taşındı — kart zaten dar, her satır pahalı.
+         */
         var ust = el('header', 'bk-kart__ust');
-        var sol = el('div', 'bk-kart__kimlik');
 
-        var etiket = kod.tip + (kod.alan ? ' · ' + kod.alan : '');
-        sol.appendChild(el('p', 'bk-kart__tip', etiket));
-        sol.appendChild(el('p', 'bk-kart__deger', kod.deger));
-        sol.appendChild(el('p', 'bk-kart__aciklama', kod.aciklama));
-        ust.appendChild(sol);
+        var satir = el('div', 'bk-kart__satir');
+        var tip = el('span', 'bk-kart__tip', kod.tip + (kod.alan ? ' · ' + kod.alan : ''));
+        tip.title = kod.aciklama;
+        satir.appendChild(tip);
 
         if (kod.gecerli === true) {
-            ust.appendChild(el('span', 'bk-rozet bk-rozet--ok', 'Kontrol hanesi geçerli'));
+            var ok = el('span', 'bk-rozet bk-rozet--ok');
+            ok.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">' +
+                '<path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>';
+            ok.title = 'Kontrol hanesi geçerli';
+            satir.appendChild(ok);
         } else if (kod.gecerli === false) {
-            var uyari = el('span', 'bk-rozet bk-rozet--uyari');
-            uyari.textContent = 'Kontrol hanesi tutmuyor · doğrusu ' + kod.kontrolBeklenen;
-            uyari.title = 'Kod ya yanlış okundu ya da eksik yazıldı. Düzeltilmiş hâli otomatik ' +
-                'gösterilmiyor: yanlış bir barkodu doğru sanıp basmak, hiç basmamaktan kötüdür.';
-            ust.appendChild(uyari);
+            var uyari = el('span', 'bk-rozet bk-rozet--uyari', 'son hane ' + kod.kontrolBeklenen + ' olmalı');
+            uyari.title = 'Kontrol hanesi tutmuyor. Kod yanlış okunmuş ya da eksik yazılmış ' +
+                'olabilir. Düzeltilmiş hâli otomatik gösterilmiyor: yanlış bir barkodu doğru ' +
+                'sanıp basmak, hiç basmamaktan kötüdür.';
+            satir.appendChild(uyari);
         }
+
+        ust.appendChild(satir);
+        ust.appendChild(el('p', 'bk-kart__deger', kod.deger));
         k.appendChild(ust);
 
         // --- Görsel ---
@@ -409,18 +418,19 @@
         }));
 
         if (cizildi) {
-            alt.appendChild(dugme('PNG indir', IKON.indir, function () {
+            alt.appendChild(dugme('PNG', IKON.indir, function () {
                 pngIndir(svg, kod.deger);
             }));
         }
 
-        alt.appendChild(dugme(kod.qrGerekli ? 'QR gizle' : 'QR göster', IKON.qr, function (e) {
-            var s = e.currentTarget.querySelector('span');
+        var qrBtn = dugme('QR', IKON.qr, function (e) {
             var acilacak = qrKap.hidden;
             qrKap.hidden = !acilacak;
             if (acilacak && !qrKap.childElementCount) qrCiz(qrKap, kod.deger);
-            s.textContent = acilacak ? 'QR gizle' : 'QR göster';
-        }));
+            e.currentTarget.classList.toggle('bk-btn--acik', acilacak);
+        });
+        if (kod.qrGerekli) qrBtn.classList.add('bk-btn--acik');
+        alt.appendChild(qrBtn);
 
         k.appendChild(alt);
         return k;
@@ -440,13 +450,13 @@
             return 0;
         }
 
+        // Tek satır. Kartlar zaten ne olduklarını söylüyor; başlığın işi
+        // yalnızca "bunlar ürün değil, kod" demek.
         var baslik = el('div', 'bk-baslik');
         baslik.innerHTML =
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">' +
             '<path stroke-linecap="round" d="M4 6v12M7 6v12M10 6v12M14 6v12M17 6v12M20 6v12"/></svg>' +
-            '<div><p class="bk-baslik__ad">' +
-            (kodlar.length > 1 ? kodlar.length + ' kod tanındı' : 'Barkod tanındı') +
-            '</p><p class="bk-baslik__alt">Katalogda karşılığı yok — kod olarak çözümlendi.</p></div>';
+            '<span>Katalogda yok · ' + kodlar.length + ' kod çözümlendi</span>';
         kap.appendChild(baslik);
 
         var liste = el('div', 'bk-liste');

@@ -1,0 +1,11 @@
+{
+  "name": "jetbarkod",
+  "private": true,
+  "description": "Jet Barkod — statik ön yüz. Yalnızca CSS derlemesi için Node gerekir.",
+  "scripts": {
+    "css": "tailwindcss -c build/tw-app.config.js -i build/tw-input.css -o css/tw-app.css --minify && tailwindcss -c build/tw-landing.config.js -i build/tw-input.css -o css/tw-landing.css --minify && tailwindcss -c build/tw-admin.config.js -i build/tw-input.css -o css/tw-admin.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.19"
+  }
+}
