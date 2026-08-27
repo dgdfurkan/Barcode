@@ -168,3 +168,116 @@ için Aşama 4'te script adreslerine sürüm etiketi ekleyeceğiz.
       Aşama 6'dan sonra planlayacağız.
 - [ ] Telegram bot token'ı rotasyonu (`admin_settings` tablosu açıktaydı).
       BotFather → `/revoke` → yeni token → admin panelinden gir.
+
+---
+
+# Aşama 3 — API'yi güncelle
+
+> **Sıralama neden önemli?**
+> Yeni frontend, girişte sunucudan bir JWT bekliyor. API bunu vermeden
+> frontend yayına alınırsa giriş kırılır. Bu yüzden **önce API**.
+>
+> Ayrıca PostgREST, `jwt-secret` tanımlı değilken `Authorization` başlığı
+> taşıyan isteği reddeder. O yüzden PostgREST'e sırrı da bu aşamada
+> tanıtıyoruz — ama `db-anon-role` şimdilik değişmiyor, yani eski
+> tarayıcılar çalışmaya devam ediyor.
+
+## 3.1 Kodu sunucuya al
+
+**Nerede:** Terminal 1 (VPS) · `root@flowcobalt:/#`
+
+```bash
+cd /opt/jetbarkod-api && cp server.js server.js.yedek-$(date +%F) && ls
+```
+
+**Nerede:** Terminal 2 (Mac) · `furkangunduz@192 Barcode %`
+
+```bash
+cd ~/CursorProjects/Barcode && git pull && scp vps-api/server.js vps-api/package.json root@198.55.109.160:/opt/jetbarkod-api/
+```
+
+## 3.2 Sırrı üret ve .env'e yaz
+
+**Nerede:** Terminal 1 (VPS) · `root@flowcobalt:/opt/jetbarkod-api#`
+
+> Bu komut sırrı ekrana **basmaz**, doğrudan dosyaya yazar. Bana göndermene
+> gerek yok, zaten göndermemelisin.
+
+```bash
+cd /opt/jetbarkod-api
+grep -q '^JWT_SECRET=' .env || echo "JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')" >> .env
+grep -q '^ALLOWED_ORIGINS=' .env || echo "ALLOWED_ORIGINS=https://jetbarkod.com.tr,https://www.jetbarkod.com.tr" >> .env
+echo "--- .env anahtarlari (degerler gizli) ---"
+sed 's/=.*/=***/' .env
+```
+
+> **ALLOWED_ORIGINS zorunlu.** Yeni API, bu ayar boşsa tarayıcı isteklerini
+> reddediyor (eskiden boşsa herkese açıktı). Alan adın farklıysa düzelt.
+
+## 3.3 Bağımlılıkları kur ve başlat
+
+**Nerede:** Terminal 1 (VPS) · `root@flowcobalt:/opt/jetbarkod-api#`
+
+```bash
+npm install --omit=dev && systemctl restart jetbarkod-api && sleep 2 && systemctl is-active jetbarkod-api && curl -s http://127.0.0.1:3001/health
+```
+
+> `active` ve `{"ok":true,...}` görmelisin. Servis açılmıyorsa:
+> `journalctl -u jetbarkod-api -n 30 --no-pager`
+
+## 3.4 PostgREST'e aynı sırrı tanıt
+
+**Nerede:** Terminal 1 (VPS) · `root@flowcobalt:/opt/jetbarkod-api#`
+
+```bash
+cd /opt/jetbarkod-api
+cp postgrest.env postgrest.env.yedek-$(date +%F)
+SECRET=$(grep '^JWT_SECRET=' .env | cut -d= -f2-)
+grep -q '^jwt-secret' postgrest.env || echo "jwt-secret = \"$SECRET\"" >> postgrest.env
+grep -q '^jwt-aud' postgrest.env || true
+chmod 600 postgrest.env
+systemctl restart postgrest && sleep 2 && systemctl is-active postgrest
+echo "--- postgrest.env anahtarlari (degerler gizli) ---"
+sed 's/=.*/= ***/' postgrest.env
+```
+
+## 3.5 Doğrula — hem eski hem yeni yol çalışmalı
+
+**Nerede:** Terminal 1 (VPS) · `root@flowcobalt:/opt/jetbarkod-api#`
+
+```bash
+echo "1) token'siz (eski tarayicilar) - 200 BEKLENIYOR:"
+curl -s -o /dev/null -w "   HTTP %{http_code}\n" http://127.0.0.1:3002/system_features
+echo "2) gecersiz token - 401 BEKLENIYOR:"
+curl -s -o /dev/null -w "   HTTP %{http_code}\n" -H "Authorization: Bearer sahte.token.degeri" http://127.0.0.1:3002/system_features
+echo "3) API saglik:"
+curl -s http://127.0.0.1:3001/health
+```
+
+**Bana at:** 3.3, 3.4 ve 3.5 çıktılarını.
+
+Bu aşamada **site kullanıcı gözünde hiç değişmez.** Giriş yapıp gezin, her şey normal olmalı.
+
+---
+
+# Aşama 4 — Frontend (kritik aşama)
+
+Bu, kırılma olacaksa görüleceği yer. Frontend JWT göndermeye başlayınca
+kullanıcılar `web_user` rolüne düşer ve **RLS devreye girer**.
+
+Aşama 3 yeşilse haber ver; frontend'i `main`'e alma komutlarını ve
+adım adım doğrulama listesini o zaman vereceğim (tek kullanıcıyla
+önce ben test edeceğim).
+
+Geri alma: `git revert` + GitHub Pages'in yeniden yayınlaması (~1 dk).
+
+---
+
+# Aşama 5 — Anonim kapıyı kapat
+
+`postgrest.env` içinde `db-anon-role = "jetbarkod"` → `"web_anon"` ve
+`db-uri` kullanıcısı `authenticator` olur. **Açık bu anda kapanır.**
+
+# Aşama 6 — Düz metin parolaları temizle
+
+Herkes bir kez giriş yaptıktan sonra `users.password` kolonu düşürülür.
