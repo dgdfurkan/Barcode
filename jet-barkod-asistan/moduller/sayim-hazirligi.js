@@ -416,7 +416,7 @@
                     baseUrl: apiEndpoints.baseUrl,
                     stockEndpoint: apiEndpoints.stock,
                     token: apiEndpoints.token, // Bearer token olarak
-                    warehouseId: apiEndpoints.warehouseId || '5dcafe6ae2c61b1e52cf1704', // Default warehouse ID
+                    warehouseId: apiEndpoints.warehouseId || null, // Sabit depo kimliği kaldırıldı: her depoda farklı. Yakalanmadıysa boş kalır ve istek atılmaz.
                     warehouseName: apiEndpoints.warehouseName || null, // Warehouse name
                     headers: apiEndpoints.headers,
                     timestamp: Date.now(),
@@ -1314,7 +1314,7 @@
                         baseUrl: apiEndpoints.baseUrl,
                         stockEndpoint: apiEndpoints.stock,
                         token: apiEndpoints.token,
-                        warehouseId: apiEndpoints.warehouseId || '5dcafe6ae2c61b1e52cf1704', // Default warehouse ID
+                        warehouseId: apiEndpoints.warehouseId || null, // Sabit depo kimliği kaldırıldı: her depoda farklı. Yakalanmadıysa boş kalır ve istek atılmaz.
                         headers: apiEndpoints.headers,
                         timestamp: Date.now(),
                         tokenExpiry: apiEndpoints.tokenExpiry
@@ -1444,7 +1444,7 @@
                     },
                     fetchExpiryProducts: function(productIds, options = {}) {
                         const ids = Array.isArray(productIds) ? productIds.filter(Boolean) : [];
-                        const warehouseId = options.warehouseId || '5dcafe6ae2c61b1e52cf1704';
+                        const warehouseId = options.warehouseId || null; // Sabit depo kimliği kaldırıldı: her depoda farklı. Yakalanmadıysa boş kalır ve istek atılmaz.
                         const endDate = options.endDate || '2030-07-31';
                         return new Promise((resolve, reject) => {
                             if (!ids.length) {

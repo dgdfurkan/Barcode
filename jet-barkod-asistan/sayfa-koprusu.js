@@ -93,9 +93,15 @@
             var url = typeof girdi === 'string' ? girdi : (girdi && girdi.url) || '';
             sablonYakala(url, init);
             jetonYakala(url, init && init.headers);
+            // Request nesnesiyle çağrıldıysa başlıklar orada.
+            if (typeof girdi === 'object' && girdi && girdi.headers) {
+                jetonYakala(url, girdi.headers);
+            }
             hareketGovdesiYakala(url, init);
             // Yanıt olduğu gibi geri gidiyor; sayfanın akışına karışmıyoruz.
-            return asilFetch.apply(this, arguments);
+            return asilFetch.apply(this, arguments).then(function (yanit) {
+                return yanitiDuyur(url, yanit);
+            });
         };
     }
 
@@ -162,6 +168,25 @@
         if (deger === sonJeton) return;
         sonJeton = deger;
         gonder({ type: 'JB_JETON', jeton: deger });
+        // Hızlı Bul modülü bu adı bekliyor (kaynağındaki inject.js'ten).
+        gonder({ type: 'GETIR_TOKEN_CAPTURED', token: deger });
+    }
+
+    /**
+     * Getir API yanıtlarını sayfaya duyurur. Hızlı Bul sipariş kimliklerini
+     * buradan topluyor; kendi isteğini atmıyor, sayfanın zaten aldığı
+     * yanıtı okuyor. Getir tarafında ek yük yok.
+     *
+     * Yanıt klonlanıp okunuyor, aslına dokunulmuyor.
+     */
+    function yanitiDuyur(url, yanit) {
+        if (!url || url.indexOf('getirapi.com') === -1) return yanit;
+        try {
+            yanit.clone().json().then(function (veri) {
+                gonder({ type: 'GETIR_DATA_RECEIVED', payload: veri, url: url });
+            }).catch(function () { /* JSON değilse boş ver */ });
+        } catch (e) { /* sessiz */ }
+        return yanit;
     }
 
     function jetonYakala(url, basliklar) {

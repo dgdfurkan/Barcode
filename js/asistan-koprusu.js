@@ -27,12 +27,12 @@
     var ESLEME = {
         // Şemsiye hak: tek başına bütün modülleri açar.
         jetBarkodAsistan: ['topluKopyalama', 'sayimKopyalama', 'stokBarkodlari',
-                           'siparisUrunArama', 'firinPisirme', 'dusukStok',
-                           'sayimHazirligi'],
+                           'hizliBul', 'firinPisirme', 'dusukStok',
+                           'sayimHazirligi', 'rafEtiketi', 'urunCekici'],
         // Tek tek verilmiş eski haklar da kendi modülünü açmaya devam ediyor.
         bulkCopy: ['topluKopyalama', 'sayimKopyalama'],
         getirStockBarcodesExtension: ['stokBarkodlari'],
-        siparisUrunArama: ['siparisUrunArama'],
+        siparisUrunArama: ['hizliBul'],
         firinPisirme: ['firinPisirme'],
         lowStockAlert: ['dusukStok'],
         stokSenkron: ['sayimHazirligi']

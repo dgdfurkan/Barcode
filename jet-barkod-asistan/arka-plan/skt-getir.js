@@ -236,10 +236,21 @@ export async function handleFetchExpiryProducts(message, sendResponse, sender = 
   const productIds = Array.isArray(message.productIds)
     ? [...new Set(message.productIds.map(String).filter(Boolean))]
     : [];
-  const warehouseId = message.warehouseId || '5dcafe6ae2c61b1e52cf1704';
+  // Sabit depo kimliği kaldırıldı. Bilinmeyen depoya istek atmak hem yanlış
+  // veri getirir hem Getir tarafında açıklanamaz trafik olur.
+  const warehouseId = message.warehouseId || null;
   const endDate = message.endDate || '2030-07-31';
   const batchSize = Math.min(Math.max(Number(message.batchSize) || 12, 1), 30);
   const callerTabs = await resolveCallerTabs(sender);
+
+  if (!warehouseId) {
+    sendExpiryResponse(callerTabs, {
+      success: false,
+      error: 'Depo bilgisi yok. Franchise stok sayfasını bir kez aç, depo kimliği oradan yakalanıyor.',
+      byProductId: {}
+    });
+    return;
+  }
 
   if (!productIds.length) {
     sendExpiryResponse(callerTabs, { success: false, error: 'Ürün listesi boş', byProductId: {} });

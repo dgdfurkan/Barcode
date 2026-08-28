@@ -28,7 +28,6 @@
     if (!JBA) return;
 
     var HAREKET_ADRESI = 'https://franchise-api-gateway.getirapi.com/stocks/stock-movements';
-    var VARSAYILAN_DEPO = '5dcafe6ae2c61b1e52cf1704';
     var EN_FAZLA_SAYFA = 3;
     var SAYFA_ARASI_MS = 2000;
 
@@ -54,21 +53,15 @@
         }
     });
 
-    /** Sayfa hiç istek atmadıysa bugünün aralığıyla varsayılan gövde. */
-    function varsayilanGovde() {
-        try {
-            var bas = new Date();
-            bas.setHours(0, 0, 0, 0);
-            var son = new Date(bas.getTime() + 24 * 60 * 60 * 1000 - 1);
-            return JSON.stringify({
-                warehouseIds: [VARSAYILAN_DEPO],
-                startDate: bas.toISOString(),
-                endDate: son.toISOString()
-            });
-        } catch (e) {
-            return JSON.stringify({});
-        }
-    }
+    /**
+     * İstek gövdesi yalnızca sayfadan yakalanır. Eskiden gövde
+     * yakalanmamışsa koda gömülü bir depo kimliğiyle varsayılan gövde
+     * üretiliyordu; depo kimliği depodan depoya değişiyor, yani başka
+     * bir kullanıcıda yanlış depoya istek gidiyordu. Hem veri yanlış
+     * oluyordu hem Getir tarafında açıklanamayan trafik.
+     *
+     * Artık gövde yoksa istek atılmıyor, sebebi söyleniyor.
+     */
 
     // ==================================================================
     // Arka planın isteği
@@ -81,7 +74,8 @@
         var kullanilan = elleJeton || jeton;
         if (!kullanilan) return Promise.resolve({ error: 'TOKEN_NOT_CAPTURED' });
 
-        var govde = istek.bodyTemplate || sonGovde || varsayilanGovde();
+        var govde = istek.bodyTemplate || sonGovde;
+        if (!govde) return Promise.resolve({ error: 'MOVEMENTS_BODY_NOT_CAPTURED' });
         var hepsi = [];
 
         function sayfa(kayma, sayac) {

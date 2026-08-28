@@ -71,6 +71,10 @@
             if (dusukStokAktar(d)) return;
         }
 
+        if (YONETICI_ESLEME[d.type]) {
+            if (yoneticiAktar(d)) return;
+        }
+
         if (d.type.indexOf('GETIR_') === 0) {
             if (d.type === 'GETIR_EXTENSION_PONG' || d.type === 'GETIR_API_INFO_RESULT') return;
             if (sktAktar(d)) return;
@@ -225,7 +229,7 @@
             arkaPlana({
                 type: 'FETCH_EXPIRY_PRODUCTS',
                 productIds: d.productIds || [],
-                warehouseId: d.warehouseId || '5dcafe6ae2c61b1e52cf1704',
+                warehouseId: d.warehouseId,   // depo kimliği çağırandan gelir, sabit yok
                 endDate: d.endDate || '2030-07-31'
             }, function () {
                 // Asıl sonuç arka plandan WAREHOUSE_EXPIRY_RESPONSE olarak
@@ -244,6 +248,51 @@
         }
 
         return false;
+    }
+
+    // ==================================================================
+    // Yönetici paneli aktarımı: Raf Etiketi ve Ürün Çekici
+    //
+    // Eski eklentiler bu işi `https://*/*` izniyle yapıyordu, yani Chrome
+    // kurulumda "ziyaret ettiğiniz tüm sitelerdeki verileri okuyabilir"
+    // diyordu. Tek sebebi yönetici paneline eklenti kimliğini yazmaktı.
+    // Burada aktarım jetbarkod.com.tr ile sınırlı, o izne hiç gerek yok.
+    //
+    // Panelin kullandığı mesaj adları (WAREHOUSE_EXPORT_SHELF_LABELS gibi)
+    // korundu; `js/admin-product-importer.js` değişmedi. Çakışan adlar
+    // yalnızca eklentinin İÇİNDE ayrıldı.
+    // ==================================================================
+
+    var YONETICI_ESLEME = {
+        WAREHOUSE_EXPORT_SHELF_LABELS: 'JBA_RAF_ETIKET_DISAKTAR',
+        WAREHOUSE_PARSE_MANUAL_HTML: 'JBA_RAF_HTML_AYRISTIR',
+        GETIR_EXPORT_PRODUCTS: 'JBA_URUN_DISAKTAR'
+    };
+
+    // Arka plandan panele geri dönen adlar. Bunlar çakışmıyor, olduğu gibi
+    // aktarılıyor; panel zaten bunları dinliyor.
+    var YONETICI_CEVAPLARI = [
+        'WAREHOUSE_SHELF_LABEL_PROGRESS', 'WAREHOUSE_SHELF_LABEL_RESPONSE',
+        'WAREHOUSE_MANUAL_HTML_RESPONSE', 'WAREHOUSE_EXTENSION_ID_RESPONSE',
+        'GETIR_EXPORT_PRODUCTS_RESPONSE', 'GETIR_PROGRESS'
+    ];
+
+    try {
+        chrome.runtime.onMessage.addListener(function (m) {
+            if (m && typeof m.type === 'string' && YONETICI_CEVAPLARI.indexOf(m.type) > -1) {
+                gonder(m);
+            }
+        });
+    } catch (e) { /* sessiz */ }
+
+    function yoneticiAktar(d) {
+        var yeniAd = YONETICI_ESLEME[d.type];
+        if (!yeniAd) return false;
+        var istek = {};
+        for (var k in d) { if (Object.prototype.hasOwnProperty.call(d, k)) istek[k] = d[k]; }
+        istek.type = yeniAd;
+        arkaPlana(istek, function () { /* sonuç ayrı mesajla geliyor */ });
+        return true;
     }
 
     // Sayfa dinleyicisini bizden önce kurmuş olabilir de olmayabilir de.

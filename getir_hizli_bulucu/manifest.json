@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Getir Depo Hızlı Bul",
+  "version": "1.0",
+  "description": "Sipariş kartlarının içindeki ürünleri anında aramanı sağlar.",
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "style.css"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "inject.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

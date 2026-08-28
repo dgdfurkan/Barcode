@@ -104,10 +104,11 @@
             site: 'warehouse.getir.com',
             dosya: 'Jet Barkod - Asistan',
             ikon: null,
-            ozet: 'Bütün araçlar tek eklentide. Yedi modül içinde: kopyalama, sayım, arama, fırın, stok uyarısı.',
+            ozet: 'Bütün araçlar tek eklentide. Dokuz modül: kopyalama, sayım, hızlı bul, fırın, stok uyarısı ve yönetici araçları.',
             neYapar: [
-                'Beş ayrı eklenti yerine tek kurulum, tek güncelleme.',
+                'Yedi ayrı eklenti yerine tek kurulum, tek güncelleme.',
                 'Fırın Pişirme artık yer imi değil, sayfaya düğme koyuyor.',
+                'Her modül yalnız kendi sayfasında uyanıyor, başka yerde görünmüyor.',
                 'Sayfada tek düğme var; hangi modülün çalıştığını oradan görürsün.',
                 'Bir modül hata verse diğerleri çalışmaya devam eder.',
                 'Hakkın olmayan modül hiç başlamaz, kilit gerçekten işler.',

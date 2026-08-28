@@ -1099,15 +1099,16 @@
     // ==================================================================
 
     /**
-     * Fırın sayfasında mıyız. Getir yolu değiştirebildiği için hem adrese
-     * hem sayfadaki metne bakıyoruz; ikisinden biri tutarsa yeter.
+     * Yalnız pişirme tahmini listesi:
+     *   /r/<depoKimligi>/stock/stock-management/product/bakery-estimation/list
+     *
+     * Depo kimliği depodan depoya değişiyor, o yüzden desende sabit değil
+     * 24 haneli onaltılık kalıp var. Başka hiçbir sayfada düğme çıkmıyor.
      */
+    var FIRIN_YOLU = /^\/r\/[a-f0-9]{24}\/stock\/stock-management\/product\/bakery-estimation\/list\/?$/;
+
     function firinSayfasiMi() {
-        var yol = location.pathname.toLowerCase();
-        if (yol.indexOf('bake') !== -1 || yol.indexOf('firin') !== -1 ||
-            yol.indexOf('oven') !== -1) return true;
-        var g = document.body ? document.body.innerText : '';
-        return g.indexOf('Isıtma Tahmini') !== -1 || g.indexOf('Pişirme') !== -1;
+        return FIRIN_YOLU.test(location.pathname);
     }
 
     /** Düğmenin gireceği yer: sayfa başlığının yanı, yoksa araç çubuğu. */
@@ -1152,6 +1153,7 @@
         ad: 'Fırın Pişirme',
         ozet: 'Fırın sayfasına pişirme paneli düğmesi ekler. Ne kadar pişirileceğini hesaplar.',
         hostlar: ['warehouse.getir.com'],
+        yol: function (yol) { return FIRIN_YOLU.test(yol); },
 
         baslat: function (ctx) {
             stilKur();

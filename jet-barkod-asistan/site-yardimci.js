@@ -66,8 +66,33 @@
         if (e.source !== global || e.origin !== KAYNAK) return;
         if (e.data && e.data.type === 'GETIR_EXTENSION_PONG' && e.data.extensionId) {
             kimlik = e.data.extensionId;
+            kimligiDuyur();
         }
     });
+
+    /*
+     * Yönetici paneli (`js/admin-product-importer.js`) eklentiyi bu iki
+     * değişkenden tanıyor. Eski eklentiler bunları içerik betiğinden
+     * yazıyordu, yani yalıtılmış dünyada; panel hiç göremiyordu. Burada
+     * sayfanın kendi dünyasındayız, gerçekten görüyor.
+     *
+     * Eski eklenti hâlâ kuruluysa üstüne yazmıyoruz.
+     */
+    function kimligiDuyur() {
+        if (!kimlik) return;
+        if (!global.getirExtensionId) {
+            global.getirExtensionId = kimlik;
+            global.getirExtensionAvailable = true;
+        }
+        if (!global.getirWarehouseExtensionId) {
+            global.getirWarehouseExtensionId = kimlik;
+            global.getirWarehouseExtensionAvailable = true;
+        }
+        try {
+            global.dispatchEvent(new CustomEvent('getirExtensionReady', { detail: { extensionId: kimlik } }));
+            global.dispatchEvent(new CustomEvent('getirWarehouseExtensionReady', { detail: { extensionId: kimlik } }));
+        } catch (e) { /* sessiz */ }
+    }
 
     global.getirExtensionHelper = {
         get extensionId() { return kimlik; },
@@ -92,7 +117,7 @@
             return sorCevapla({
                 type: 'GETIR_FETCH_EXPIRY_REQUEST',
                 productIds: idler,
-                warehouseId: secenekler.warehouseId || '5dcafe6ae2c61b1e52cf1704',
+                warehouseId: secenekler.warehouseId,   // depo kimliği çağırandan gelir, sabit yok
                 endDate: secenekler.endDate || '2030-07-31'
             }, 'WAREHOUSE_EXPIRY_RESPONSE', 120000).then(function (y) {
                 if (y.success) return y;
