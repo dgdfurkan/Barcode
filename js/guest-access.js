@@ -55,7 +55,7 @@
 
     function getGuestPremiumFeatures() {
         const list = cfg().guestPremiumFeatures;
-        return Array.isArray(list) ? list.slice() : ['autoPaste', 'bulkCopy', 'imageSearch'];
+        return Array.isArray(list) ? list.slice() : ['autoPaste', 'bulkCopy'];
     }
 
     function injectWelcomeStyles() {

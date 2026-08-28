@@ -7,5 +7,5 @@ window.JETBARKOD_GUEST_ACCESS = {
     contactEmail: 'furkan@flowcobalt.com',
     welcomeStorageKey: 'jetbarkod_welcome_seen_v1',
     /** Misafir modunda açık premium özellikler */
-    guestPremiumFeatures: ['autoPaste', 'bulkCopy', 'imageSearch'],
+    guestPremiumFeatures: ['autoPaste', 'bulkCopy'],
 };

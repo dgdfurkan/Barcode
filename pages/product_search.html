@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <script src="../js/console-quiet.js?v=20260828g"></script>
+    <script src="../js/console-quiet.js?v=20260828h"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,39 +18,41 @@
     <link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
     <link rel="shortcut icon" href="../assets/logo.png?v=2">
     
-    <link rel="stylesheet" href="../css/main.css?v=20260828g" />
-    <link rel="stylesheet" href="../css/tailwind.css?v=20260828g" />
-    <link rel="stylesheet" href="../css/settings-panel.css?v=20260828g" />
-    <link rel="stylesheet" href="../css/barcode-inspector.css?v=20260828g" />
-    <link rel="stylesheet" href="../css/app-boot.css?v=20260828g" />
-    <link rel="stylesheet" href="../css/tw-app.css?v=20260828g" />
-    <script src="../js/vendor/JsBarcode.all.min.js?v=20260828g"></script>
-    <script src="../js/auth-token.js?v=20260828g"></script>
-    <script src="../js/db-config.js?v=20260828g"></script>
-    <script src="../js/jb-db.js?v=20260828g"></script>
+    <link rel="stylesheet" href="../css/main.css?v=20260828h" />
+    <link rel="stylesheet" href="../css/tailwind.css?v=20260828h" />
+    <link rel="stylesheet" href="../css/settings-panel.css?v=20260828h" />
+    <link rel="stylesheet" href="../css/barcode-inspector.css?v=20260828h" />
+    <link rel="stylesheet" href="../css/eklenti-rehberi.css?v=20260828h" />
+    <link rel="stylesheet" href="../css/app-boot.css?v=20260828h" />
+    <link rel="stylesheet" href="../css/tw-app.css?v=20260828h" />
+    <script src="../js/vendor/JsBarcode.all.min.js?v=20260828h"></script>
+    <script src="../js/auth-token.js?v=20260828h"></script>
+    <script src="../js/db-config.js?v=20260828h"></script>
+    <script src="../js/jb-db.js?v=20260828h"></script>
     <!-- QR Code Library - Using QRCode.js (more reliable) -->
-    <script src="../js/vendor/qrcode.min.js?v=20260828g"></script>
+    <script src="../js/vendor/qrcode.min.js?v=20260828h"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="temp_products.js"></script>
-    <script src="../js/getir-cdn-paste.js?v=20260828g"></script>
-    <script src="../js/barcode-inspector.js?v=20260828g"></script>
-    <script src="../js/guest-access-config.js?v=20260828g"></script>
-    <script src="../js/auth.js?v=20260828g"></script>
-    <script src="../js/skeleton-ui.js?v=20260828g"></script>
-    <script src="../js/app-boot.js?v=20260828g"></script>
-    <script src="../js/guest-access.js?v=20260828g"></script>
-    <script src="../js/image-lightbox.js?v=20260828g"></script>
-    <script src="../js/trial-notifications.js?v=20260828g"></script>
-    <script src="../js/user-manager.js?v=20260828g"></script>
-    <script src="../js/premium-features.js?v=20260828g"></script>
-    <script src="../js/notifications.js?v=20260828g"></script>
-    <script src="../js/feature-definitions.js?v=20260828g"></script>
-    <script src="../js/feature-manager.js?v=20260828g"></script>
-    <script src="../js/feature-checker.js?v=20260828g"></script>
-    <script src="../js/update-notifications.js?v=20260828g"></script>
-    <script src="../js/ip-ban-checker.js?v=20260828g"></script>
-    <script src="../js/changelog.js?v=20260828g"></script>
+    <script src="../js/getir-cdn-paste.js?v=20260828h"></script>
+    <script src="../js/barcode-inspector.js?v=20260828h"></script>
+    <script src="../js/eklenti-rehberi.js?v=20260828h"></script>
+    <script src="../js/guest-access-config.js?v=20260828h"></script>
+    <script src="../js/auth.js?v=20260828h"></script>
+    <script src="../js/skeleton-ui.js?v=20260828h"></script>
+    <script src="../js/app-boot.js?v=20260828h"></script>
+    <script src="../js/guest-access.js?v=20260828h"></script>
+    <script src="../js/image-lightbox.js?v=20260828h"></script>
+    <script src="../js/trial-notifications.js?v=20260828h"></script>
+    <script src="../js/user-manager.js?v=20260828h"></script>
+    <script src="../js/premium-features.js?v=20260828h"></script>
+    <script src="../js/notifications.js?v=20260828h"></script>
+    <script src="../js/feature-definitions.js?v=20260828h"></script>
+    <script src="../js/feature-manager.js?v=20260828h"></script>
+    <script src="../js/feature-checker.js?v=20260828h"></script>
+    <script src="../js/update-notifications.js?v=20260828h"></script>
+    <script src="../js/ip-ban-checker.js?v=20260828h"></script>
+    <script src="../js/changelog.js?v=20260828h"></script>
     <script>
         // ===== SCAN EFFECT VISIBILITY FUNCTION - MUST BE DEFINED BEFORE feature-manager.js LOADS =====
         // Load and update scan effect visibility (DEFINED AT TOP LEVEL SO IT'S ALWAYS AVAILABLE)
@@ -1976,7 +1978,7 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="../css/motion.css?v=20260828g" />
+    <link rel="stylesheet" href="../css/motion.css?v=20260828h" />
 </head>
 <body class="bg-background min-h-screen">
     <!-- Açılış perdesi. İlk karede boyanır; JS hiç çalışmasa bile
@@ -5879,10 +5881,10 @@
             const isImageUrl = /^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i.test(input.trim());
             if (isImageUrl) {
                 // Check both premium feature and user preference
-                const hasPremium = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                const hasPremium = typeof checkPremiumFeature === 'function' && checkPremiumFeature('bulkCopy');
                 let isEnabled = true;
                 try {
-                    isEnabled = localStorage.getItem('imageSearchEnabled') !== '0'; // Default to enabled if not set
+                    isEnabled = localStorage.getItem('bulkCopyEnabled') !== '0'; // Default to enabled if not set
                 } catch (e) {
                     isEnabled = true;
                 }
@@ -5922,13 +5924,13 @@
             }
             
             // Getir depo satırı: barkod çözümü premium'a bağlı olmamalı (görsel URL DB ile eşleşir).
-            // Diğer HTML tablolar: imageSearch premium + kullanıcı tercihi.
+            // Diğer HTML tablolar: Toplu Kopyalama hakkı + kullanıcı tercihi.
             if (hasHtmlTags) {
                 const isGetirRow = typeof isGetirStyleProductHtml === 'function' && isGetirStyleProductHtml(input);
-                const hasPremium = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                const hasPremium = typeof checkPremiumFeature === 'function' && checkPremiumFeature('bulkCopy');
                 let isEnabled = true;
                 try {
-                    isEnabled = localStorage.getItem('imageSearchEnabled') !== '0'; // Default to enabled if not set
+                    isEnabled = localStorage.getItem('bulkCopyEnabled') !== '0'; // Default to enabled if not set
                 } catch (e) {
                     isEnabled = true;
                 }
@@ -6623,15 +6625,15 @@
 
             // Check if input contains HTML tags
             const hasHtmlTags = /<[^>]+>/.test(query);
-            const hasPremiumImage = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
-            let imageSearchUserOn = true;
+            const hasPremiumImage = typeof checkPremiumFeature === 'function' && checkPremiumFeature('bulkCopy');
+            let topluKopyalamaAcik = true;
             try {
-                imageSearchUserOn = localStorage.getItem('imageSearchEnabled') !== '0';
+                topluKopyalamaAcik = localStorage.getItem('bulkCopyEnabled') !== '0';
             } catch (e) {
-                imageSearchUserOn = true;
+                topluKopyalamaAcik = true;
             }
             const isGetirHtml = typeof isGetirStyleProductHtml === 'function' && isGetirStyleProductHtml(query);
-            const shouldParseHtmlToBarcodes = hasHtmlTags && (isGetirHtml || (hasPremiumImage && imageSearchUserOn));
+            const shouldParseHtmlToBarcodes = hasHtmlTags && (isGetirHtml || (hasPremiumImage && topluKopyalamaAcik));
             
             // Getir satırı veya premium görsel arama: HTML → barkod/isim çözümü
             let parsedQuery = query;
@@ -6773,7 +6775,7 @@
                     
                     // Check if this is an image URL search (premium feature)
                     const isImageUrl = /^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i.test(searchTerm);
-                    const hasImageSearch = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                    const hasImageSearch = typeof checkPremiumFeature === 'function' && checkPremiumFeature('bulkCopy');
                     
                     // Check if term contains both product name and image URL (format: "productName|imageUrl")
                     const hasCombinedFormat = searchTerm.includes('|');
@@ -7005,7 +7007,7 @@
             // Search history removed as per requirements (will be added later if needed)
             
             if (isTableData && searchTerms.length === 1 && activeResults.length === 0 && outOfStockResults.length === 0) {
-                const hasImgFeatSingle = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                const hasImgFeatSingle = typeof checkPremiumFeature === 'function' && checkPremiumFeature('bulkCopy');
                 if (hasImgFeatSingle && productImageMap && productImageMap.size > 0) {
                     activeResults.push(buildPendingPlaceholderProduct(searchTerms[0], 0));
                 }
@@ -7097,7 +7099,7 @@
                 
                 // Optimize: Only search through products once per term
                 let foundCount = 0;
-                const hasImageSearch = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                const hasImageSearch = typeof checkPremiumFeature === 'function' && checkPremiumFeature('bulkCopy');
                 const isImageUrl = /^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg)/i.test(searchTerm);
                 const hasCombinedFormat = searchTerm.includes('|');
                 let productNamePart = '';
@@ -7388,7 +7390,7 @@
                 }
                 
                 if (isTableData && foundCount === 0) {
-                    const hasImgFeat = typeof checkPremiumFeature === 'function' && checkPremiumFeature('imageSearch');
+                    const hasImgFeat = typeof checkPremiumFeature === 'function' && checkPremiumFeature('bulkCopy');
                     if (hasImgFeat && productImageMap && productImageMap.size > 0) {
                         termResults.active.push(buildPendingPlaceholderProduct(searchTerm, termIndex));
                     }
@@ -8438,6 +8440,7 @@
         
         // Premium features configuration
         const PREMIUM_FEATURES_CONFIG = {
+            // ---- Uygulama içi özellikler ----
             'autoPaste': {
                 name: 'Otomatik Yapıştır',
                 description: 'Kopyalanan ürün adı veya barkodunu sayfaya geri döndüğünüzde anında arama kutusuna yapıştırır',
@@ -8449,18 +8452,6 @@
                 description: 'Klavye kısayolları ile hızlı erişim',
                 emoji: '⌨️',
                 storageKey: 'keyboardShortcutsEnabled'
-            },
-            'bulkCopy': {
-                name: 'Toplu Kopyalama',
-                description: 'Birden fazla barkodu tek seferde kopyala',
-                emoji: '📦',
-                storageKey: null
-            },
-            'imageSearch': {
-                name: 'Görsel Link Arama',
-                description: 'HTML tablolardan görsel linklerini çıkarıp görsel linkine göre arama yap',
-                emoji: '🖼️',
-                storageKey: 'imageSearchEnabled'
             },
             'stokSayimi': {
                 name: 'Stok Sayımı',
@@ -8486,41 +8477,52 @@
                 emoji: '📋',
                 storageKey: null
             },
+
+            /*
+             * ---- Chrome eklentileri ----
+             * Bunlar tarayıcıya kurulan ayrı yazılımlar. `eklenti` alanı
+             * `js/eklenti-rehberi.js` içindeki kayda bağlanır; tanıtım ve
+             * kurulum sihirbazı oradan gelir.
+             *
+             * "Görsel Link Arama" ayrı bir hak olarak duruyordu ama Toplu
+             * Kopyalama ile aynı işin iki yarısıydı (eklenti kopyalar,
+             * uygulama çözümler). Tek özelliğe indirildi; eski hak
+             * `premium-features.js` içindeki köprüyle geçerliliğini koruyor.
+             */
+            'bulkCopy': {
+                name: 'Toplu Kopyalama',
+                description: 'Warehouse listelerini tek tıkla kopyalar, uygulama barkod ve görselleri çözer',
+                emoji: '📦',
+                storageKey: 'bulkCopyEnabled',
+                eklenti: 'topluKopyalama'
+            },
             'getirStockBarcodesExtension': {
                 name: 'Getir Stok Barkodları',
-                description: 'Franchise stok sayfasında görsel URL’lerini satır sırasıyla kopyalamak için Chrome eklentisi (ZIP)',
+                description: 'Franchise stok sayfasındaki görsel adreslerini satır sırasıyla kopyalar',
                 emoji: '🧩',
-                storageKey: null
+                storageKey: null,
+                eklenti: 'stokBarkodlari'
             },
-            'darkMode': {
-                name: 'Karanlık Mod',
-                description: 'Göz yormayan karanlık tema',
-                emoji: '🌙',
-                storageKey: null
+            'stokSenkron': {
+                name: 'Sayım Hazırlığı',
+                description: 'Franchise stok sayfasından istediğin ürünleri toplu seçip sayım tablosuna taşır',
+                emoji: '🔄',
+                storageKey: null,
+                eklenti: 'stokSenkron'
             },
-            'offlineMode': {
-                name: 'Çevrimdışı Mod',
-                description: 'İnternet olmadan da çalışma',
-                emoji: '📡',
-                storageKey: null
+            'siparisUrunArama': {
+                name: 'Sipariş İçi Ürün Arama',
+                description: 'Aktif siparişleri tarar, aradığın ürünün hangi siparişte olduğunu renklendirerek gösterir',
+                emoji: '🔎',
+                storageKey: null,
+                eklenti: 'siparisUrunArama'
             },
-            'advancedFilters': {
-                name: 'Gelişmiş Filtreler',
-                description: 'Gelişmiş filtreleme seçenekleri',
-                emoji: '🔍',
-                storageKey: null
-            },
-            'unlimitedHistory': {
-                name: 'Sınırsız Geçmiş',
-                description: 'Sınırsız arama geçmişi',
-                emoji: '📜',
-                storageKey: null
-            },
-            'favorites': {
-                name: 'Favoriler',
-                description: 'Sık kullanılan ürünleri favorilere ekle',
-                emoji: '⭐',
-                storageKey: null
+            'firinPisirme': {
+                name: 'Fırın Pişirme',
+                description: 'Fırın sekmesindeki pişirme akışını tek ekrana toplar',
+                emoji: '🔥',
+                storageKey: null,
+                eklenti: 'firinPisirme'
             }
         };
 
@@ -8576,11 +8578,27 @@
             // Tercihler: önbellekte varsa anında, yoksa boş — ağ beklenmiyor
             let featurePreferences = window.premiumFeatures?.featurePreferencesCache || {};
 
-            // Açık özellikler üstte; kilitliler listenin sonunda toplanır
-            const featureKeys = Object.keys(PREMIUM_FEATURES_CONFIG).sort((a, b) => {
-                const aOpen = window.premiumFeatures?.checkPremiumFeature(a) ? 0 : 1;
-                const bOpen = window.premiumFeatures?.checkPremiumFeature(b) ? 0 : 1;
-                return aOpen - bOpen;
+            /*
+             * Sıra: önce uygulama içi özellikler, sonra Chrome eklentileri.
+             * Her grubun içinde açık olanlar üstte, kilitliler altta.
+             *
+             * Gruplama şart: kullanıcı "eklentiyi nereden kuracağım" diye
+             * bakınca karışık bir listede aramak zorunda kalıyordu.
+             */
+            const acikMi = (k) => (window.premiumFeatures?.checkPremiumFeature(k) ? 0 : 1);
+            const tumAnahtarlar = Object.keys(PREMIUM_FEATURES_CONFIG);
+            const gruplar = [
+                { etiket: 'Uygulama içi', anahtarlar: tumAnahtarlar.filter((k) => !PREMIUM_FEATURES_CONFIG[k].eklenti) },
+                { etiket: 'Chrome eklentileri', anahtarlar: tumAnahtarlar.filter((k) => PREMIUM_FEATURES_CONFIG[k].eklenti) },
+            ];
+            gruplar.forEach((g) => g.anahtarlar.sort((a, b) => acikMi(a) - acikMi(b)));
+
+            const featureKeys = [];
+            const grupBasliklari = {};   // ilk anahtar -> grup etiketi
+            gruplar.forEach((g) => {
+                if (!g.anahtarlar.length) return;
+                grupBasliklari[g.anahtarlar[0]] = g.etiket;
+                featureKeys.push(...g.anahtarlar);
             });
 
             for (const featureKey of featureKeys) {
@@ -8603,6 +8621,13 @@
                 }
 
                 const action = hasPremium ? PREMIUM_FEATURE_ACTIONS[featureKey] : null;
+
+                if (grupBasliklari[featureKey]) {
+                    const ayrac = document.createElement('div');
+                    ayrac.className = 'settings-feature-group';
+                    ayrac.textContent = grupBasliklari[featureKey];
+                    container.appendChild(ayrac);
+                }
 
                 const featureItem = document.createElement('div');
                 featureItem.className = 'settings-feature' + (hasPremium ? '' : ' settings-feature--locked');
@@ -8709,12 +8734,23 @@
                 return;
             }
             
-            // ImageSearch için özel içerik (bookmarklet kurulumu)
-            if (featureKey === 'imageSearch') {
-                showImageSearchModal(hasPremium);
-                return;
+            /*
+             * Chrome eklentileri: tanıtım + kurulum sihirbazı tek yerden.
+             * Beşinin de kurulumu aynı olduğu için her birine ayrı modal
+             * yazmak yerine `js/eklenti-rehberi.js` içindeki kayda
+             * bağlanıyoruz. Kilitliyse sihirbaz yerine uyarı gösterilir —
+             * ama tanıtım yine açılır, kullanıcı ne kaçırdığını görür.
+             */
+            if (config.eklenti && window.EklentiRehberi) {
+                document.getElementById('featureDetailEmoji').textContent = config.emoji;
+                document.getElementById('featureDetailName').textContent = config.name;
+                const kap = document.getElementById('featureDetailContent');
+                if (window.EklentiRehberi.ciz(kap, config.eklenti, !hasPremium)) {
+                    jbOpenModal(document.getElementById('premiumFeatureDetailModal'));
+                    return;
+                }
             }
-            
+
             // StokSayimi için özel içerik (dosya kopyalama butonları)
             if (featureKey === 'stokSayimi') {
                 showStokSayimiModal(hasPremium);
@@ -8724,11 +8760,6 @@
             // Düşük stok uyarısı için özel içerik (sayfaya git butonu)
             if (featureKey === 'lowStockAlert') {
                 showLowStockAlertModal(hasPremium);
-                return;
-            }
-            
-            if (featureKey === 'getirStockBarcodesExtension') {
-                showGetirStockBarcodesModal(hasPremium);
                 return;
             }
             
@@ -11636,7 +11667,7 @@
     </button>
 
     <!-- Chat System Script -->
-    <script src="../js/chat.js?v=20260828g"></script>
+    <script src="../js/chat.js?v=20260828h"></script>
     
     <!-- Debug Script for Chat Button -->
     <script>

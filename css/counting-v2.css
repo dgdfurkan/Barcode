@@ -191,8 +191,23 @@
 
 .counting-v2 .v2-surum svg { width: 0.85rem; height: 0.85rem; flex: none; }
 
-/* Dar ekranda yer yok — çip ve token rozeti önceliğe sahip */
+/*
+ * Dar ekranda üst barda yer yok; ama düğmeyi tamamen kaldırmak sürüm
+ * geçişini telefonda İMKÂNSIZ yapıyordu. Simgeye iniyor: yazı gidiyor,
+ * dokunma hedefi kalıyor.
+ */
 @media (max-width: 1023px) {
+    .counting-v2 .v2-surum {
+        width: 2.15rem;
+        padding: 0;
+        justify-content: center;
+        margin-left: 0.25rem;
+    }
+    .counting-v2 .v2-surum__yazi { display: none; }
+}
+
+/* Çok dar telefonda çip öncelikli — sürüm düğmesi çekmeceye devrediyor */
+@media (max-width: 380px) {
     .counting-v2 .v2-surum { display: none; }
 }
 

@@ -13,7 +13,7 @@ class PremiumFeatures {
         const cfg = window.JETBARKOD_GUEST_ACCESS || {};
         return Array.isArray(cfg.guestPremiumFeatures)
             ? cfg.guestPremiumFeatures
-            : ['autoPaste', 'bulkCopy', 'imageSearch'];
+            : ['autoPaste', 'bulkCopy'];
     }
 
     _isGuestPremiumFeature(featureName) {
@@ -206,6 +206,18 @@ class PremiumFeatures {
     }
 
     // Check if a specific premium feature is enabled
+    /**
+     * Eski anahtar → yeni anahtar.
+     *
+     * "Görsel Link Arama" ile "Toplu Kopyalama" aslında aynı işi yapıyordu
+     * (HTML tablodan görsel/barkod çıkarma) ve iki ayrı hak olarak duruyordu.
+     * Tek özelliğe indirildi. Admin'in daha önce SADECE imageSearch verdiği
+     * kullanıcılar hakkını kaybetmesin diye eski anahtar hâlâ okunuyor.
+     */
+    static get ESKI_ANAHTARLAR() {
+        return { imageSearch: 'bulkCopy' };
+    }
+
     checkPremiumFeature(featureName) {
         if (this._isGuestPremiumFeature(featureName)) {
             return true;
@@ -214,8 +226,20 @@ class PremiumFeatures {
         if (!this.premiumFeatures || typeof this.premiumFeatures !== 'object') {
             return false;
         }
-        
-        const feature = this.premiumFeatures[featureName];
+
+        let feature = this.premiumFeatures[featureName];
+
+        // Yeni anahtar verilmemişse eskisine bak
+        if (feature === undefined) {
+            const eskiler = Object.keys(PremiumFeatures.ESKI_ANAHTARLAR)
+                .filter((k) => PremiumFeatures.ESKI_ANAHTARLAR[k] === featureName);
+            for (const eski of eskiler) {
+                if (this.premiumFeatures[eski] !== undefined) {
+                    feature = this.premiumFeatures[eski];
+                    break;
+                }
+            }
+        }
         
         // Support both old format (true/false) and new format ({enabled: true, limit: 3})
         if (typeof feature === 'boolean') {

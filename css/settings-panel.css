@@ -1309,3 +1309,19 @@ body:has(.jb-modal:not(.hidden)) #openChat {
         transform: none;
     }
 }
+
+/*
+ * Özellik listesi grup başlığı.
+ * Uygulama içi özellikler ile Chrome eklentileri karışık duruyordu;
+ * kullanıcı "eklentiyi nereden kuracağım" diye bakınca aramak zorundaydı.
+ */
+.settings-feature-group {
+    padding: 0.7rem 0.15rem 0.3rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--set-faint, #94a3b8);
+}
+
+.settings-feature-group:first-child { padding-top: 0.15rem; }

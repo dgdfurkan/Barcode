@@ -3799,26 +3799,33 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
             }
         }
         
-        // Define available premium features (ORDERED - imageSearch is 4th)
+        /*
+         * Verilebilir premium haklar. Sıra kullanıcı panelindekiyle aynı:
+         * önce uygulama içi özellikler, sonra Chrome eklentileri.
+         *
+         * Kaldırılanlar (karanlık mod, çevrimdışı, gelişmiş filtreler,
+         * sınırsız geçmiş, favoriler) hiç hayata geçmemişti; listede
+         * durmaları admin'i olmayan bir şeyi açabilir sanmaya itiyordu.
+         *
+         * 'imageSearch' -> 'bulkCopy' ile birleşti. Eski hak
+         * premium-features.js'teki köprü sayesinde geçerli kalıyor,
+         * bu yüzden burada ayrı satır olarak gösterilmiyor.
+         */
         const availableFeatures = {
             'autoPaste': 'Otomatik Yapıştır',
             'keyboardShortcuts': 'Klavye Kısayolları',
-            'bulkCopy': 'Toplu Kopyalama',
-            'imageSearch': 'Görsel Link Arama',
             'stokSayimi': 'Stok Sayımı',
             'lowStockAlert': 'Düşük Stok Uyarısı',
             'urunAjandasi': 'Ürün Ajandası',
             'raftakiEksikler': 'Raftaki Eksikler',
+            'bulkCopy': 'Toplu Kopyalama (Chrome)',
             'getirStockBarcodesExtension': 'Getir Stok Barkodları (Chrome)',
-            'darkMode': 'Karanlık Mod',
-            'offlineMode': 'Çevrimdışı Mod',
-            'advancedFilters': 'Gelişmiş Filtreler',
-            'unlimitedHistory': 'Sınırsız Geçmiş',
-            'favorites': 'Favoriler'
+            'stokSenkron': 'Sayım Hazırlığı (Chrome)',
+            'siparisUrunArama': 'Sipariş İçi Ürün Arama (Chrome)',
+            'firinPisirme': 'Fırın Pişirme (Chrome)'
         };
         
-        console.log('🖼️ Loading premium features, available:', Object.keys(availableFeatures));
-        console.log('🖼️ imageSearch in list:', 'imageSearch' in availableFeatures);
+        console.log('Premium haklar yükleniyor:', Object.keys(availableFeatures));
         
         // Render premium features list
         const featuresList = document.getElementById('premiumFeaturesList');
@@ -3909,18 +3916,15 @@ AdminPanel.prototype.getFeatureDescription = function(featureKey) {
     const descriptions = {
         'autoPaste': 'Terminalden kopyalanan barkodları otomatik yapıştırır',
         'keyboardShortcuts': 'Klavye kısayolları ile hızlı erişim',
-        'bulkCopy': 'Birden fazla barkodu tek seferde kopyala',
-        'imageSearch': 'HTML tablolardan görsel linklerini çıkarıp görsel linkine göre arama yap',
+        'bulkCopy': 'Warehouse listelerini tek tıkla kopyalar, uygulama barkod ve görselleri çözer (eski Görsel Link Arama hakkı da bunu açar)',
         'stokSayimi': 'Stok sayımı sayfası ve Getir franchise stok senkronizasyonu',
         'lowStockAlert': 'Stok hareketlerine göre eşiğin altına düşen ürünlerde sesli/görsel uyarı ve liste',
         'urunAjandasi': 'Müşteri eksik bildirimlerini takip — gönderim ajandası',
         'raftakiEksikler': 'Depo raflarında eksik ürün takibi — sepet ve cihazlar arası senkron',
-        'getirStockBarcodesExtension': 'Franchise sayfasında görsel URL’lerini kopyalayan Chrome eklentisi (ZIP)',
-        'darkMode': 'Göz yormayan karanlık tema',
-        'offlineMode': 'İnternet olmadan da çalışma',
-        'advancedFilters': 'Gelişmiş filtreleme seçenekleri',
-        'unlimitedHistory': 'Sınırsız arama geçmişi',
-        'favorites': 'Sık kullanılan ürünleri favorilere ekle'
+        'getirStockBarcodesExtension': 'Franchise sayfasında görsel URL’lerini kopyalayan Chrome eklentisi',
+        'stokSenkron': 'Franchise stok sayfasından toplu ürün seçip sayım tablosuna taşıyan Chrome eklentisi',
+        'siparisUrunArama': 'Warehouse sipariş sayfasında ürün arayıp siparişleri renklendiren Chrome eklentisi',
+        'firinPisirme': 'Fırın sekmesindeki pişirme akışını tek ekrana toplayan Chrome eklentisi'
     };
     return descriptions[featureKey] || '';
 };
