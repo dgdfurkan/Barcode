@@ -25,7 +25,14 @@
      * Yeni modül eklenince tek değişecek yer burası.
      */
     var ESLEME = {
-        bulkCopy: ['topluKopyalama', 'sayimKopyalama']
+        // Şemsiye hak: tek başına bütün modülleri açar.
+        jetBarkodAsistan: ['topluKopyalama', 'sayimKopyalama', 'stokBarkodlari',
+                           'siparisUrunArama', 'firinPisirme'],
+        // Tek tek verilmiş eski haklar da kendi modülünü açmaya devam ediyor.
+        bulkCopy: ['topluKopyalama', 'sayimKopyalama'],
+        getirStockBarcodesExtension: ['stokBarkodlari'],
+        siparisUrunArama: ['siparisUrunArama'],
+        firinPisirme: ['firinPisirme']
     };
 
     var durum = { kurulu: false, surum: null, kimlik: null };
@@ -52,7 +59,8 @@
             } catch (e) { acik = false; }
             if (acik) liste = liste.concat(ESLEME[hak]);
         });
-        return liste;
+        // Aynı modül iki haktan da gelmiş olabilir.
+        return liste.filter(function (m, i) { return liste.indexOf(m) === i; });
     }
 
     function moduleriBildir() {

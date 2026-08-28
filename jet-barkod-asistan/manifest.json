@@ -1,16 +1,21 @@
 {
   "manifest_version": 3,
   "name": "Jet Barkod Asistan",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Jet Barkod araçlarının tamamı tek eklentide. Getir panellerinde kopyalama, sayım ve arama işlerini tek yerden yürütür.",
   "icons": {
-    "16": "varliklar/ikon128.png",
-    "48": "varliklar/ikon128.png",
+    "16": "varliklar/ikon16.png",
+    "32": "varliklar/ikon32.png",
+    "48": "varliklar/ikon48.png",
     "128": "varliklar/ikon128.png"
   },
-  "permissions": ["storage"],
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
     "https://warehouse.getir.com/*",
+    "https://franchise.getir.com/*",
+    "https://warehouse-panel-api-gateway.getirapi.com/*",
     "https://jetbarkod.com.tr/*",
     "https://www.jetbarkod.com.tr/*",
     "http://localhost/*",
@@ -21,12 +26,38 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://warehouse.getir.com/*"],
+      "matches": [
+        "https://warehouse.getir.com/*"
+      ],
+      "js": [
+        "sayfa-koprusu.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://warehouse.getir.com/*"
+      ],
       "js": [
         "ortak/cekirdek.js",
         "ortak/panel.js",
         "moduller/toplu-kopyalama.js",
         "moduller/sayim-kopyalama.js",
+        "moduller/siparis-arama.js",
+        "moduller/firin-pisirme.js",
+        "yukleyici.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://franchise.getir.com/*"
+      ],
+      "js": [
+        "ortak/cekirdek.js",
+        "ortak/panel.js",
+        "moduller/stok-barkodlari.js",
         "yukleyici.js"
       ],
       "run_at": "document_idle"
@@ -38,8 +69,13 @@
         "http://localhost/*",
         "http://127.0.0.1/*"
       ],
-      "js": ["site-koprusu.js"],
+      "js": [
+        "site-koprusu.js"
+      ],
       "run_at": "document_end"
     }
-  ]
+  ],
+  "action": {
+    "default_title": "Jet Barkod Asistan"
+  }
 }

@@ -3812,6 +3812,7 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
          * bu yüzden burada ayrı satır olarak gösterilmiyor.
          */
         const availableFeatures = {
+            'jetBarkodAsistan': 'Jet Barkod Asistan (Chrome, tek eklenti)',
             'autoPaste': 'Otomatik Yapıştır',
             'keyboardShortcuts': 'Klavye Kısayolları',
             'stokSayimi': 'Stok Sayımı',
@@ -3914,6 +3915,7 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
 
 AdminPanel.prototype.getFeatureDescription = function(featureKey) {
     const descriptions = {
+        'jetBarkodAsistan': 'Bütün Chrome araçlarını tek eklentide toplayan yeni sürüm. Eski eklentiler yerinde kalır; bu hak açıkken kullanıcı tek eklentiyi kurup hepsini oradan kullanabilir',
         'autoPaste': 'Terminalden kopyalanan barkodları otomatik yapıştırır',
         'keyboardShortcuts': 'Klavye kısayolları ile hızlı erişim',
         'bulkCopy': 'Warehouse listelerini tek tıkla kopyalar, uygulama barkod ve görselleri çözer (eski Görsel Link Arama hakkı da bunu açar)',

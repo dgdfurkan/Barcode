@@ -210,7 +210,30 @@
         '  background: #eff6ff; color: #1d4ed8; font-family: inherit; font-size: 11.5px;',
         '  font-weight: 600; cursor: pointer; transition: background 140ms ease; }',
         '.eylem:hover { background: #dbeafe; }',
-        '.bos { font-size: 11.5px; line-height: 1.5; color: #94a3b8; }'
+        '.bos { font-size: 11.5px; line-height: 1.5; color: #94a3b8; }',
+
+        /* Diyalog. Her modül kendi modalını yazmasın diye ortak. */
+        '.perde { position: fixed; inset: 0; display: flex; align-items: center;',
+        '  justify-content: center; padding: 16px; background: rgb(15 23 42 / 0.45);',
+        "  font-family: Inter, -apple-system, 'Segoe UI', sans-serif; }",
+        '.diyalog { width: 100%; max-width: 400px; max-height: 84vh; overflow: auto;',
+        '  padding: 18px; border-radius: 14px; background: #fff;',
+        '  box-shadow: 0 24px 60px rgb(15 23 42 / 0.32); }',
+        '.diyalog__baslik { margin: 0 0 8px; font-size: 15px; font-weight: 700; color: #0f172a; }',
+        '.diyalog__aciklama { margin: 0 0 14px; font-size: 12.5px; line-height: 1.5; color: #64748b; }',
+        '.diyalog__secim { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 10px;',
+        '  font-size: 13px; line-height: 1.4; color: #0f172a; cursor: pointer; }',
+        '.diyalog__secim input { margin-top: 2px; flex: none; }',
+        '.diyalog__metin { width: 100%; height: 190px; padding: 9px; border: 1px solid #e2e8f0;',
+        '  border-radius: 8px; font-family: ui-monospace, monospace; font-size: 11px;',
+        '  line-height: 1.5; resize: vertical; }',
+        '.diyalog__alt { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }',
+        '.diyalog__btn { padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 8px;',
+        '  background: #fff; color: #475569; font-family: inherit; font-size: 13px;',
+        '  font-weight: 600; cursor: pointer; }',
+        '.diyalog__btn:hover { background: #f1f5f9; }',
+        '.diyalog__btn--ana { border-color: #1d4ed8; background: #1d4ed8; color: #fff; }',
+        '.diyalog__btn--ana:hover { background: #1e40af; }'
     ].join('\n');
 
     // ==================================================================
@@ -245,6 +268,98 @@
         kap.innerHTML = '<div class="bildirimler"></div>';
         k.appendChild(kap);
         return kap;
+    }
+
+    // ==================================================================
+    // Diyalog
+    // ==================================================================
+
+    var acikPerde = null;
+
+    function perdeKapat() {
+        if (acikPerde) { acikPerde.remove(); acikPerde = null; }
+    }
+
+    /**
+     * Gölge DOM içinde diyalog açar. Modüller kendi modalını yazmasın:
+     * eski eklentilerde her biri sayfaya kendi kutusunu enjekte ediyordu,
+     * Ant Design modalıyla z-index yarışına giriyorlardı.
+     *
+     * Seçenek: { kimlik, etiket, varsayilan }
+     * Sonuç:   onay(secimler) çağrılır, secimler[kimlik] = true/false
+     */
+    function diyalog(a) {
+        korumali('diyalog', function () {
+            perdeKapat();
+            var k = golgeKok();
+
+            var perde = document.createElement('div');
+            perde.className = 'perde';
+
+            var kutu = document.createElement('div');
+            kutu.className = 'diyalog';
+            kutu.innerHTML =
+                '<h3 class="diyalog__baslik"></h3>' +
+                (a.aciklama ? '<p class="diyalog__aciklama"></p>' : '');
+            kutu.querySelector('.diyalog__baslik').textContent = a.baslik || '';
+            if (a.aciklama) kutu.querySelector('.diyalog__aciklama').textContent = a.aciklama;
+
+            var girdiler = {};
+            (a.secenekler || []).forEach(function (s) {
+                var etiket = document.createElement('label');
+                etiket.className = 'diyalog__secim';
+                var kutucuk = document.createElement('input');
+                kutucuk.type = 'checkbox';
+                kutucuk.checked = s.varsayilan !== false;
+                var yazi = document.createElement('span');
+                yazi.textContent = s.etiket;
+                etiket.appendChild(kutucuk);
+                etiket.appendChild(yazi);
+                kutu.appendChild(etiket);
+                girdiler[s.kimlik] = kutucuk;
+            });
+
+            var metinAlani = null;
+            if (a.metin != null) {
+                metinAlani = document.createElement('textarea');
+                metinAlani.className = 'diyalog__metin';
+                metinAlani.value = a.metin;
+                metinAlani.readOnly = true;
+                kutu.appendChild(metinAlani);
+            }
+
+            var alt = document.createElement('div');
+            alt.className = 'diyalog__alt';
+
+            if (a.onay) {
+                var iptal = document.createElement('button');
+                iptal.type = 'button';
+                iptal.className = 'diyalog__btn';
+                iptal.textContent = a.iptalEtiketi || 'İptal';
+                iptal.addEventListener('click', perdeKapat);
+                alt.appendChild(iptal);
+            }
+
+            var ana = document.createElement('button');
+            ana.type = 'button';
+            ana.className = 'diyalog__btn diyalog__btn--ana';
+            ana.textContent = a.onayEtiketi || (a.onay ? 'Tamam' : 'Kapat');
+            ana.addEventListener('click', function () {
+                var secimler = {};
+                Object.keys(girdiler).forEach(function (kk) { secimler[kk] = girdiler[kk].checked; });
+                perdeKapat();
+                if (a.onay) korumali('diyalog onayı', function () { a.onay(secimler); });
+            });
+            alt.appendChild(ana);
+
+            kutu.appendChild(alt);
+            perde.appendChild(kutu);
+            perde.addEventListener('click', function (e) { if (e.target === perde) perdeKapat(); });
+            k.appendChild(perde);
+            acikPerde = perde;
+
+            if (metinAlani) { metinAlani.focus(); metinAlani.select(); }
+        });
     }
 
     // ==================================================================
@@ -289,6 +404,8 @@
         izle: izle,
         panoyaYaz: panoyaYaz,
         bildir: bildir,
+        diyalog: diyalog,
+        perdeKapat: perdeKapat,
         korumali: korumali,
         golgeKok: golgeKok,
         arayuzKabi: arayuzKabi,
