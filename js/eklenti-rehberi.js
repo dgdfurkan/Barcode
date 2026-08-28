@@ -117,22 +117,40 @@
             'fill="#fff" stroke="#0f172a" stroke-width="1.2" stroke-linejoin="round"/></g>';
     }
 
-    /** Chrome penceresi kabuğu (sekme şeridi + adres çubuğu). */
+    /**
+     * Chrome penceresi kabuğu (sekme şeridi + adres çubuğu).
+     *
+     * Gölge bir filtre değil, altta duran ikinci bir dikdörtgen. 4. ve 5.
+     * adımda kabuk yakınlaştırılıyor; filtre olsaydı tarayıcı her karede
+     * yeniden rasterize ederdi. Böyle bedava.
+     */
     function chromeKabuk(adres) {
-        return '<rect x="8" y="10" width="304" height="160" rx="8" class="c-pencere"/>' +
+        return '<rect x="10" y="14" width="304" height="160" rx="9" class="c-golge"/>' +
+            '<rect x="8" y="10" width="304" height="160" rx="8" class="c-pencere"/>' +
             '<path d="M8 18a8 8 0 018-8h288a8 8 0 018 8v14H8z" class="c-sekmeserit"/>' +
+            '<circle cx="286" cy="17" r="1.9" class="c-nokta"/>' +
+            '<circle cx="293" cy="17" r="1.9" class="c-nokta"/>' +
+            '<circle cx="300" cy="17" r="1.9" class="c-nokta"/>' +
             '<path d="M20 32v-9a5 5 0 015-5h56a5 5 0 015 5v9z" class="c-sekme"/>' +
-            '<rect x="16" y="40" width="288" height="16" rx="8" class="c-adres"/>' +
-            (adres ? '<text x="28" y="51" class="c-yazi c-yazi--mono">' + adres + '</text>' : '') +
+            '<circle cx="31" cy="25" r="3" class="c-favikon"/>' +
+            '<rect x="39" y="22" width="36" height="5" rx="2.5" class="c-bos"/>' +
+            '<rect x="94" y="22" width="44" height="5" rx="2.5" class="c-bos-soluk"/>' +
+            '<path d="M24 44l-4 4 4 4" class="c-gezinti"/>' +
+            '<path d="M34 44l4 4-4 4" class="c-gezinti c-gezinti--soluk"/>' +
+            '<rect x="44" y="40" width="252" height="16" rx="8" class="c-adres"/>' +
+            (adres ? '<text x="54" y="51" class="c-yazi c-yazi--mono">' + adres + '</text>' : '') +
             '<path d="M8 62h304" class="c-ince"/>';
     }
 
     /** Windows Gezgini penceresi kabuğu. */
     function gezginKabuk(baslik) {
-        return '<rect x="8" y="10" width="304" height="160" rx="6" class="c-pencere"/>' +
+        return '<rect x="10" y="14" width="304" height="160" rx="7" class="c-golge"/>' +
+            '<rect x="8" y="10" width="304" height="160" rx="6" class="c-pencere"/>' +
             '<path d="M8 16a6 6 0 016-6h292a6 6 0 016 6v18H8z" class="c-baslikserit"/>' +
-            '<text x="20" y="27" class="c-yazi c-yazi--kalin">' + baslik + '</text>' +
-            '<path d="M281 22h8M293 18h8v8h-8zM272 22l-4-4m4 4l-4 4" class="c-pencere-dugme"/>' +
+            '<path d="M19 18h5.4l1.7 2.1h7.9a1.4 1.4 0 011.4 1.4v5.1a1.4 1.4 0 01-1.4 1.4H19a1.4 1.4 0 01-1.4-1.4v-7.2A1.4 1.4 0 0119 18z" class="c-klasor"/>' +
+            '<text x="42" y="27" class="c-yazi c-yazi--kalin">' + baslik + '</text>' +
+            // Küçült, büyüt, kapat. Sağdan sola gerçek sırasıyla.
+            '<path d="M277 22h8M291 18h8v8h-8zM304 19l6 6m0-6l-6 6" class="c-pencere-dugme"/>' +
             '<rect x="16" y="40" width="288" height="14" rx="3" class="c-adres"/>' +
             '<text x="26" y="50" class="c-yazi">Bu bilgisayar › İndirilenler</text>';
     }
@@ -211,8 +229,8 @@
                 kopyala: 'chrome://extensions',
                 sahne:
                     chromeKabuk('') +
-                    '<text x="28" y="51" class="c-yazi c-yazi--mono s-yazi-cikar">chrome://extensions</text>' +
-                    '<rect class="s-imlec" x="146" y="43" width="1.5" height="10"/>' +
+                    '<text x="54" y="51" class="c-yazi c-yazi--mono s-yazi-cikar">chrome://extensions</text>' +
+                    '<rect class="s-imlec" x="147" y="43" width="1.5" height="10"/>' +
                     '<rect x="16" y="76" width="288" height="86" rx="6" class="c-bos"/>' +
                     '<text x="120" y="122" class="c-yazi c-yazi--soluk">Enter</text>' +
                     fare('s-fare-adres', 160, 44),
@@ -225,7 +243,7 @@
                 sahne:
                     '<g class="s-zoom-4">' +
                     chromeKabuk('chrome://extensions') +
-                    '  <text x="20" y="80" class="c-yazi c-yazi--kalin">Eklenteler</text>' +
+                    '  <text x="20" y="80" class="c-yazi c-yazi--kalin">Eklentiler</text>' +
                     '  <text x="214" y="80" class="c-yazi">Geliştirici modu</text>' +
                     '  <g class="s-anahtar">' +
                     '    <rect x="278" y="71" width="24" height="12" rx="6" class="c-anahtar-yol"/>' +
@@ -250,9 +268,11 @@
                     '    <rect x="122" y="70" width="56" height="18" rx="9" class="c-bos"/>' +
                     '    <rect x="184" y="70" width="52" height="18" rx="9" class="c-bos"/>' +
                     '  </g>' +
-                    '  <text x="214" y="52" class="c-yazi c-yazi--soluk">Geliştirici modu</text>' +
-                    '  <rect x="278" y="43" width="24" height="12" rx="6" class="c-anahtar-acik"/>' +
-                    '  <circle cx="296" cy="49" r="4.6" class="c-anahtar-top"/>' +
+                    // Açık kalan anahtar düğmelerle aynı satırda. Adres çubuğunun
+                    // hizasındayken adresin üstüne biniyordu.
+                    '  <text x="212" y="83" class="c-yazi c-yazi--soluk">Geliştirici modu</text>' +
+                    '  <rect x="278" y="73" width="24" height="12" rx="6" class="c-anahtar-acik"/>' +
+                    '  <circle cx="296" cy="79" r="4.6" class="c-anahtar-top"/>' +
                     '  <rect x="16" y="98" width="288" height="30" rx="5" class="c-bos"/>' +
                     '  <rect x="16" y="134" width="288" height="26" rx="5" class="c-bos"/>' +
                     '</g>' +
@@ -385,7 +405,11 @@
     // ==================================================================
 
     function kacir(m) {
-        return String(m).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return String(m)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
     }
 
     /** <b> etiketine izin ver, gerisini kaçır. */
@@ -397,7 +421,29 @@
         indir: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>',
         kopya: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-2M8 5a2 2 0 002 2h4a2 2 0 002-2M8 5a2 2 0 012-2h4a2 2 0 012 2"/></svg>',
         kilit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>',
+        tik: '<svg class="er-nokta__tik" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>',
     };
+
+    /**
+     * Üstteki adım rayı: numaralı kareler, aralarında dolan çizgiler.
+     *
+     * Her kareye tıklanabilir, kullanıcı istediği adıma atlayabilir. Bu bir
+     * form değil, anlatım; ileri gitmeden önce doldurulacak bir şey yok.
+     *
+     * Numara ile tik aynı kutuda üst üste duruyor, yalnızca görünürlükleri
+     * değişiyor. Biri diğerinin yerini almadığı için ray hiçbir durumda
+     * genişlik değiştirmez.
+     */
+    function ray(adimlar) {
+        return adimlar.map(function (a, i) {
+            return (i === 0 ? '' : '<span class="er-bag"><i></i></span>') +
+                '<button type="button" class="er-nokta' + (i === 0 ? ' is-simdi' : '') + '"' +
+                ' data-git="' + i + '" title="' + kacir(a.baslik) + '"' +
+                ' aria-label="' + (i + 1) + '. adım. ' + kacir(a.baslik) + '">' +
+                '<span class="er-nokta__no">' + (i + 1) + '</span>' + IKON.tik +
+                '</button>';
+        }).join('');
+    }
 
     function ciz(kap, anahtar, kilitli) {
         var k = KAYITLAR[anahtar];
@@ -423,10 +469,14 @@
             html +=
                 '  <div class="er-sihirbaz">' +
                 '    <div class="er-ust">' +
-                '      <span class="er-sayac" id="erSayac">1 / ' + adimlar.length + '</span>' +
-                '      <div class="er-cubuk"><span class="er-cubuk__dolu" id="erCubuk"></span></div>' +
+                '      <div class="er-ust__satir">' +
+                '        <span class="er-ust__etiket">' +
+                (k.tur === 'yerImi' ? 'Yer imi kurulumu' : 'Eklenti kurulumu') + '</span>' +
+                '        <span class="er-sayac" id="erSayac">1 / ' + adimlar.length + '</span>' +
+                '      </div>' +
+                '      <div class="er-ray" id="erRay">' + ray(adimlar) + '</div>' +
                 '    </div>' +
-                '    <div class="er-adimlar" id="erAdimlar">' +
+                '    <div class="er-adimlar is-ileri" id="erAdimlar">' +
                 adimlar.map(function (a, i) {
                     var ek = '';
                     if (a.indirme) {
@@ -471,37 +521,56 @@
     }
 
     function bagla(kap, toplam) {
+        var sihirbaz = kap.querySelector('.er-sihirbaz');
+        var kutu = kap.querySelector('#erAdimlar');
         var adimlar = kap.querySelectorAll('.er-adim');
+        var noktalar = kap.querySelectorAll('.er-nokta');
+        var baglar = kap.querySelectorAll('.er-bag');
         var geri = kap.querySelector('#erGeri');
         var ileri = kap.querySelector('#erIleri');
         var sayac = kap.querySelector('#erSayac');
-        var cubuk = kap.querySelector('#erCubuk');
-        var simdi = 0;
+        var simdi = -1;
 
         function goster(yeni) {
-            if (yeni < 0 || yeni >= toplam) return;
-            simdi = yeni;
+            if (yeni < 0 || yeni >= toplam || yeni === simdi) return;
 
             /*
-             * Sınıf ANINDA ve tek seferde kuruluyor.
+             * Yön sınıfı adım açılmadan ÖNCE kutuya yazılıyor: giren adım
+             * hangi taraftan süzüleceğini böyle öğreniyor. Çıkan adım
+             * animasyon yapmaz, doğrudan display:none olur. İki adım aynı
+             * anda yer kaplamadığı için panelin boyu asla oynamaz.
              *
-             * Önce "kaldır, bir kare sonra ekle" deniyordu; iki tıklama arka
-             * arkaya gelince ikinci tıklama henüz eklenmemiş sınıfı kaldırmaya
-             * çalışıyor, sonra iki requestAnimationFrame de kendi adımına
-             * sınıfı ekliyordu. Sonuç: aynı anda iki adım açık kalıyor ve
-             * ekranda sayaçtan farklı bir adım görünüyordu.
-             *
-             * Animasyonun baştan başlaması için hileye gerek yok: adım
-             * `display: none`'dan çıkınca CSS animasyonu zaten sıfırdan başlar.
+             * Sınıflar tek seferde ve anında kuruluyor. Önce "kaldır, bir
+             * kare sonra ekle" deniyordu; iki tıklama arka arkaya gelince
+             * aynı anda iki adım açık kalıyordu.
              */
+            kutu.classList.toggle('is-geri', yeni < simdi);
+            kutu.classList.toggle('is-ileri', yeni > simdi);
+            simdi = yeni;
+
             for (var i = 0; i < adimlar.length; i++) {
                 adimlar[i].classList.toggle('is-aktif', i === simdi);
             }
+            for (var j = 0; j < noktalar.length; j++) {
+                noktalar[j].classList.toggle('is-simdi', j === simdi);
+                noktalar[j].classList.toggle('is-bitti', j < simdi);
+                noktalar[j].setAttribute('aria-current', j === simdi ? 'step' : 'false');
+            }
+            // baglar[b], b ile b+1 arasındaki çizgi. b'yi geçtiysek dolu.
+            for (var b = 0; b < baglar.length; b++) {
+                baglar[b].classList.toggle('is-dolu', b < simdi);
+            }
 
             sayac.textContent = (simdi + 1) + ' / ' + toplam;
-            cubuk.style.width = ((simdi + 1) / toplam * 100) + '%';
             geri.disabled = simdi === 0;
             ileri.textContent = simdi === toplam - 1 ? 'Bitir' : 'İleri';
+            ileri.classList.toggle('er-btn--bitir', simdi === toplam - 1);
+        }
+
+        for (var n = 0; n < noktalar.length; n++) {
+            noktalar[n].addEventListener('click', function () {
+                goster(Number(this.dataset.git));
+            });
         }
 
         geri.addEventListener('click', function () { goster(simdi - 1); });
@@ -513,6 +582,29 @@
             }
             goster(simdi + 1);
         });
+
+        /*
+         * Ok tuşlarıyla gezinme. Dinleyici belgeye bağlı ama dört kapıdan
+         * geçiyor: sihirbaz DOM'dan çıktıysa kendini siler, modal kapalıysa
+         * (offsetParent yok) hiç karışmaz, bir yazı alanındaysan tuş sana
+         * kalır, değiştirici tuş basılıysa tarayıcının kısayolu bozulmaz.
+         */
+        function tus(e) {
+            if (!document.body.contains(sihirbaz)) {
+                document.removeEventListener('keydown', tus);
+                return;
+            }
+            if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            if (!sihirbaz.offsetParent) return;
+            var h = e.target;
+            if (h && (h.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(h.tagName))) return;
+            if (e.key === 'ArrowRight') { e.preventDefault(); goster(simdi + 1); }
+            else if (e.key === 'ArrowLeft') { e.preventDefault(); goster(simdi - 1); }
+        }
+        // Panel her açılışta yeniden çiziliyor; önceki dinleyici burada gider.
+        if (global.__erTus) document.removeEventListener('keydown', global.__erTus);
+        global.__erTus = tus;
+        document.addEventListener('keydown', tus);
 
         // Kopyala düğmeleri
         kap.querySelectorAll('[data-kopya]').forEach(function (b) {
@@ -527,7 +619,7 @@
             });
         });
 
-        cubuk.style.width = (1 / toplam * 100) + '%';
+        goster(0);
     }
 
     /**
