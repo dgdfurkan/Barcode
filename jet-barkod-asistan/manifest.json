@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jet Barkod Asistan",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Jet Barkod araçlarının tamamı tek eklentide. Getir panellerinde kopyalama, sayım ve arama işlerini tek yerden yürütür.",
   "icons": {
     "16": "varliklar/ikon16.png",
@@ -63,7 +63,6 @@
       ],
       "js": [
         "ortak/cekirdek.js",
-        "ortak/panel.js",
         "moduller/toplu-kopyalama.js",
         "moduller/sayim-kopyalama.js",
         "moduller/hizli-bul.js",
@@ -79,7 +78,6 @@
       ],
       "js": [
         "ortak/cekirdek.js",
-        "ortak/panel.js",
         "moduller/stok-barkodlari.js",
         "moduller/dusuk-stok.js",
         "moduller/sayim-hazirligi.js",
@@ -102,7 +100,8 @@
     }
   ],
   "action": {
-    "default_title": "Jet Barkod Asistan"
+    "default_title": "Jet Barkod Asistan",
+    "default_popup": "arayuz/kapi.html"
   },
   "externally_connectable": {
     "matches": [

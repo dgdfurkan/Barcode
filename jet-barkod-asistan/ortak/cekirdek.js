@@ -21,8 +21,19 @@
  * taranır. Burada tek gözlemci var; değişiklikler bir çizim karesinde
  * toplanıp aboneler bir kez uyandırılıyor.
  *
+ * SAYFADA İZ BIRAKMAMA
+ * Eklenti sayfaya kendiliğinden HİÇBİR ŞEY koymuyor. Gölge kök ancak bir
+ * bildirim ya da diyalog gerçekten gerektiğinde oluşuyor, o da işi bitince
+ * boş kalıyor. Modüllerin kendi düğmeleri zaten yalnız ilgili sayfada ve
+ * ilgili tablonun içinde.
+ *
+ * Önceki sürümde sağ altta sürekli duran bir "Jet Barkod" düğmesi vardı.
+ * Her sayfada yer kaplıyor, gözü yoruyor ve eklentiyi olduğundan daha
+ * müdahaleci gösteriyordu. Kaldırıldı; durum ve eylemler artık Chrome
+ * araç çubuğundaki eklenti simgesine tıklayınca açılıyor (`arayuz/`).
+ *
  * ARAYÜZ ÇAKIŞMASI
- * Yüzen arayüzün tamamı gölge DOM içinde. Getir panelleri Ant Design
+ * Bildirim ve diyalog gölge DOM içinde. Getir panelleri Ant Design
  * kullanıyor ve sayfaya global stil enjekte etmek er geç çakışıyor.
  * Gölge kökün içindeki stil dışarı sızmaz, dışarıdaki içeri giremez.
  * ============================================================================
@@ -173,44 +184,8 @@
         '                 to { opacity: 1; transform: none; } }',
         '@keyframes cik { from { opacity: 1; } to { opacity: 0; transform: translateY(6px); } }',
         '@media (prefers-reduced-motion: reduce) {',
-        '  .bildirim, .panel, .dugme { animation: none; transition: none; } }',
+        '  .bildirim { animation: none; transition: none; } }',
 
-        /* Açma düğmesi */
-        '.dugme { display: inline-flex; align-items: center; gap: 8px; height: 38px;',
-        '  padding: 0 14px 0 11px; border: none; border-radius: 999px; cursor: pointer;',
-        '  background: #1d4ed8; color: #fff; font-size: 13px; font-weight: 600;',
-        "  font-family: inherit; box-shadow: 0 6px 20px rgb(29 78 216 / 0.35);",
-        '  transition: transform 140ms ease, background 140ms ease; }',
-        '.dugme:hover { background: #1e40af; transform: translateY(-1px); }',
-        '.dugme:active { transform: translateY(0); }',
-        '.dugme__nokta { width: 7px; height: 7px; border-radius: 50%; background: #86efac; }',
-        '.dugme__sayi { padding: 1px 6px; border-radius: 999px; background: rgb(255 255 255 / 0.2);',
-        '  font-size: 11px; font-variant-numeric: tabular-nums; }',
-
-        /* Panel */
-        '.panel { width: 288px; padding: 12px; border-radius: 14px; background: #fff;',
-        '  border: 1px solid #e2e8f0; box-shadow: 0 18px 44px rgb(15 23 42 / 0.2);',
-        '  animation: gir 180ms cubic-bezier(0.22, 1, 0.36, 1); }',
-        '.panel[hidden] { display: none; }',
-        '.panel__bas { display: flex; align-items: baseline; justify-content: space-between;',
-        '  margin-bottom: 10px; }',
-        '.panel__ad { font-size: 13px; font-weight: 700; color: #0f172a; }',
-        '.panel__yer { font-size: 10px; font-weight: 700; letter-spacing: 0.06em;',
-        '  text-transform: uppercase; color: #94a3b8; }',
-        '.modul { padding: 9px 0; border-top: 1px solid #f1f5f9; }',
-        '.modul:first-of-type { border-top: none; padding-top: 0; }',
-        '.modul__ust { display: flex; align-items: center; gap: 7px; }',
-        '.modul__nokta { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; flex: none; }',
-        '.modul__nokta.uyku { background: #cbd5e1; }',
-        '.modul__nokta.bozuk { background: #ef4444; }',
-        '.modul__ad { font-size: 12.5px; font-weight: 600; color: #0f172a; }',
-        '.modul__ozet { margin: 3px 0 0 13px; font-size: 11.5px; line-height: 1.45; color: #64748b; }',
-        '.eylemler { display: flex; flex-wrap: wrap; gap: 6px; margin: 7px 0 0 13px; }',
-        '.eylem { padding: 5px 10px; border: 1px solid #dbeafe; border-radius: 7px;',
-        '  background: #eff6ff; color: #1d4ed8; font-family: inherit; font-size: 11.5px;',
-        '  font-weight: 600; cursor: pointer; transition: background 140ms ease; }',
-        '.eylem:hover { background: #dbeafe; }',
-        '.bos { font-size: 11.5px; line-height: 1.5; color: #94a3b8; }',
 
         /* Diyalog. Her modül kendi modalını yazmasın diye ortak. */
         '.perde { position: fixed; inset: 0; display: flex; align-items: center;',

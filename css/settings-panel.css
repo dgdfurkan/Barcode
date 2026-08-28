@@ -1311,15 +1311,68 @@ body:has(.jb-modal:not(.hidden)) #openChat {
 }
 
 
-/* İkonlar emoji değil çizim; çizgi rengi arayüzden gelsin */
+/* ---------- Özellik ikonları ----------
+   İkonlar emoji değil çizim. Her özelliğin kendi renk çifti var; JS
+   kutuya --ik-a (koyu) ve --ik-b (açık) olarak yazıyor. Renk yoksa
+   arayüzün kendi mavisine düşüyor, hiçbir kart renksiz kalmıyor.
+
+   Zemin doygun değil, rengin çok soluk bir karışımı. Amaç kartları
+   birbirinden ayırmak; on iki doygun kutu yan yana gelince liste
+   okunmaz oluyor. Çizgi renkli, zemin sakin. */
+
+.settings-feature__ikon {
+    --ik-a: var(--color-primary, #2563eb);
+    --ik-b: #93c5fd;
+    position: relative;
+    border-color: color-mix(in srgb, var(--ik-a) 22%, transparent);
+    background:
+        linear-gradient(140deg,
+            color-mix(in srgb, var(--ik-b) 26%, #fff),
+            color-mix(in srgb, var(--ik-a) 11%, #fff));
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
 .settings-feature__ikon svg {
     width: 1.15rem;
     height: 1.15rem;
-    color: var(--set-muted, #64748b);
+    color: var(--ik-a);
 }
 
-.settings-feature:hover .settings-feature__ikon svg { color: var(--color-primary, #2563eb); }
-.settings-feature--locked .settings-feature__ikon svg { color: var(--set-faint, #94a3b8); }
+/* Kartın üstüne gelince ikon hafifçe kalkıyor ve rengi belirginleşiyor.
+   Yalnız transform ve gölge oynuyor; satır yüksekliği sabit kalıyor. */
+.settings-feature:hover .settings-feature__ikon {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--ik-a) 40%, transparent);
+    box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--ik-a) 45%, transparent);
+}
+
+.settings-feature:hover .settings-feature__ikon svg { color: var(--ik-a); }
+
+/* Kilitli kart zaten grayscale filtresi alıyor; rengi ayrıca söndürmeye
+   gerek yok, söndürürsek filtre üstüne filtre binip is gibi oluyor. */
+.settings-feature--locked .settings-feature__ikon svg { color: var(--ik-a); }
+
+/* color-mix desteklemeyen eski tarayıcıda kutu boş kalmasın. */
+@supports not (background: color-mix(in srgb, red 10%, white)) {
+    .settings-feature__ikon {
+        background: var(--set-track);
+        border-color: var(--set-line);
+    }
+}
 
 /* Detay penceresi başlığındaki ikon */
-.jb-modal__icon svg { width: 1.25rem; height: 1.25rem; color: var(--color-primary, #2563eb); }
+.jb-modal__icon {
+    --ik-a: var(--color-primary, #2563eb);
+    --ik-b: #93c5fd;
+    background: linear-gradient(140deg,
+        color-mix(in srgb, var(--ik-b) 30%, #fff),
+        color-mix(in srgb, var(--ik-a) 13%, #fff));
+    border: 1px solid color-mix(in srgb, var(--ik-a) 24%, transparent);
+}
+
+.jb-modal__icon svg { width: 1.25rem; height: 1.25rem; color: var(--ik-a); }
+
+@supports not (background: color-mix(in srgb, red 10%, white)) {
+    .jb-modal__icon { background: var(--set-accent-soft); border: none; }
+    .jb-modal__icon svg { color: var(--set-accent); }
+}

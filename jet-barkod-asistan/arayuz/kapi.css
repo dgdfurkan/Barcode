@@ -1,0 +1,218 @@
+/**
+ * Jet Barkod Asistan. Araç çubuğu paneli.
+ *
+ * Sayfada duran yüzen düğmenin yerini aldı. Chrome'un eklenti simgesine
+ * tıklanınca açılıyor, kapanınca hiç iz bırakmıyor.
+ *
+ * Genişlik sabit: Chrome açılır panelinde içerik genişliği değişirse panel
+ * her açılışta farklı boyda görünür. Satırlar da sabit yükseklikte; modül
+ * durumu değişince liste zıplamaz.
+ */
+
+:root {
+    --renk-zemin: #ffffff;
+    --renk-yumusak: #f8fafc;
+    --renk-cizgi: #e8edf3;
+    --renk-yazi: #0f172a;
+    --renk-soluk: #64748b;
+    --renk-cok-soluk: #94a3b8;
+    --renk-vurgu: #2563eb;
+    --renk-vurgu-koyu: #1d4ed8;
+    --renk-vurgu-soft: #eff6ff;
+    --renk-acik: #059669;
+    --renk-kapali: #cbd5e1;
+    --renk-bozuk: #dc2626;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    width: 312px;
+    margin: 0;
+    background: var(--renk-zemin);
+    color: var(--renk-yazi);
+    font-family: Inter, -apple-system, 'Segoe UI', system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+/* ---------- Başlık ---------- */
+
+.bas {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 12px 13px;
+    border-bottom: 1px solid var(--renk-cizgi);
+    background: linear-gradient(180deg, #fcfdff, var(--renk-yumusak));
+}
+
+.bas__logo {
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 8px;
+}
+
+.bas__yazi { flex: 1; min-width: 0; }
+
+.bas__ad {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.bas__yer {
+    margin: 1px 0 0;
+    font-family: ui-monospace, 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--renk-cok-soluk);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Rozet sabit genişlikte: sayı 1'den 2'ye çıkınca başlık kaymasın. */
+.rozet {
+    flex: none;
+    min-width: 46px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--renk-vurgu-soft);
+    color: var(--renk-vurgu-koyu);
+    font-size: 10.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.rozet.bos { background: #f1f5f9; color: var(--renk-cok-soluk); }
+.rozet.bozuk { background: #fef2f2; color: var(--renk-bozuk); }
+
+/* ---------- Gövde ---------- */
+
+.govde {
+    max-height: 380px;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.bos {
+    margin: 0;
+    padding: 20px 16px;
+    color: var(--renk-cok-soluk);
+    font-size: 12px;
+    line-height: 1.55;
+    text-align: center;
+}
+
+.modul {
+    padding: 10px 13px;
+    border-bottom: 1px solid #f4f7fa;
+}
+
+.modul:last-child { border-bottom: none; }
+
+.modul__ust {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Nokta üç durumda da aynı boyda: satır genişliği hiç oynamaz. */
+.nokta {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--renk-kapali);
+}
+
+.nokta.acik { background: var(--renk-acik); box-shadow: 0 0 0 3px rgb(5 150 105 / 0.13); }
+.nokta.bozuk { background: var(--renk-bozuk); box-shadow: 0 0 0 3px rgb(220 38 38 / 0.13); }
+
+.modul__ad {
+    flex: 1;
+    min-width: 0;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.modul__durum {
+    flex: none;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--renk-cok-soluk);
+}
+
+.modul__durum.acik { color: var(--renk-acik); }
+.modul__durum.bozuk { color: var(--renk-bozuk); }
+
+.modul__ozet {
+    margin: 4px 0 0 15px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--renk-soluk);
+}
+
+.eylemler {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0 0 15px;
+}
+
+.eylem {
+    padding: 5px 10px;
+    border: 1px solid #dbeafe;
+    border-radius: 7px;
+    background: var(--renk-vurgu-soft);
+    color: var(--renk-vurgu-koyu);
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 140ms ease, border-color 140ms ease;
+}
+
+.eylem:hover { background: #dbeafe; border-color: #bfdbfe; }
+.eylem:active { transform: translateY(1px); }
+.eylem:disabled { opacity: 0.5; cursor: default; transform: none; }
+.eylem:focus-visible { outline: 2px solid var(--renk-vurgu); outline-offset: 2px; }
+
+/* ---------- Alt ---------- */
+
+.alt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 13px;
+    border-top: 1px solid var(--renk-cizgi);
+    background: var(--renk-yumusak);
+}
+
+.alt__surum {
+    font-size: 10.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--renk-cok-soluk);
+}
+
+.alt__bag {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--renk-vurgu-koyu);
+    text-decoration: none;
+}
+
+.alt__bag:hover { text-decoration: underline; }
+
+@media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+}

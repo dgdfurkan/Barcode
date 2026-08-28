@@ -69,8 +69,48 @@
                     JBA.calisanlar.filter(function (c) { return c.calisiyor; }).length + ' tanesi çalışıyor.');
         }
 
-        if (JBA.panel) JBA.panel.goster();
     }
+
+    /*
+     * Araç çubuğundaki panel durumu buradan soruyor. Sayfada duran bir
+     * düğme yok; kullanıcı Chrome'daki eklenti simgesine tıklayınca
+     * bu mesaj geliyor ve o anki sekmenin durumu dönüyor.
+     */
+    function durumDinleyici(istek, gonderen, cevapla) {
+        if (!istek || typeof istek.type !== 'string') return;
+
+        if (istek.type === 'JBA_DURUM_SOR') {
+            cevapla({
+                adres: location.hostname,
+                yol: location.pathname,
+                moduller: JBA.calisanlar.map(function (c, i) {
+                    return {
+                        sira: i,
+                        kimlik: c.modul.kimlik,
+                        ad: c.modul.ad,
+                        ozet: c.modul.ozet || '',
+                        calisiyor: !!c.calisiyor,
+                        hata: c.hata ? String(c.hata.message || c.hata) : null,
+                        eylemler: (c.modul.eylemler || []).map(function (e) { return e.ad; })
+                    };
+                })
+            });
+            return true;
+        }
+
+        if (istek.type === 'JBA_EYLEM_CALISTIR') {
+            var c = JBA.calisanlar.filter(function (x) {
+                return x.modul.kimlik === istek.kimlik;
+            })[0];
+            var e = c && (c.modul.eylemler || [])[istek.eylem];
+            if (!e) { cevapla({ ok: false }); return true; }
+            JBA.korumali(c.modul.kimlik + ' eylemi', function () { e.calistir(); });
+            cevapla({ ok: true });
+            return true;
+        }
+    }
+
+    try { chrome.runtime.onMessage.addListener(durumDinleyici); } catch (e) { /* sessiz */ }
 
     function baslat() {
         acikListesi().then(calistir, function () { calistir(null); });

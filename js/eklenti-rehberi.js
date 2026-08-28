@@ -80,15 +80,16 @@
 
         siparisUrunArama: {
             tur: 'eklenti',
-            ad: 'Sipariş İçi Ürün Arama',
+            ad: 'Hızlı Bul',
             site: 'warehouse.getir.com',
             dosya: 'Jet Barkod - Sipariş İçi Ürün Arama',
             ikon: null,
-            ozet: 'Aktif siparişleri tarar, aradığın ürün hangi siparişteyse o kartı renklendirir.',
+            ozet: 'Sipariş kartlarının içindeki ürünleri anında arar. Aradığın ürün hangi siparişteyse o kart öne çıkar.',
             neYapar: [
-                'Sipariş sayfasına bir arama çubuğu ekler.',
-                'Ürünü arayınca içinde o ürün geçen siparişlerin kartları renklenir.',
-                'Hangi siparişe gideceğini listeyi tek tek açmadan görürsün.',
+                'Sipariş sayfasına arama çubuğu ekler, ürün adı ya da barkodla ararsın.',
+                'Kendi kategorilerini tanımlarsın; su, fırın, dondurma gibi. Kartlar o renge boyanır.',
+                'Bir kez okunan sipariş yerel hafızada kalır, aynı sipariş tekrar sorgulanmaz.',
+                'Yalnız sipariş listesi sayfasında çalışır, başka yerde görünmez.',
             ],
         },
 
