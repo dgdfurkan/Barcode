@@ -41,3 +41,6 @@ supabaseden_csv/
 
 # İhale monitor — bu repoya dahil edilmez
 ihale-monitor/
+# MCP anahtarları asla depoya girmez (depo herkese açık)
+.mcp.local.json
+*.apikey
