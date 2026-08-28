@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jet Barkod Asistan",
-  "version": "0.2.0",
+  "version": "0.5.0",
   "description": "Jet Barkod araçlarının tamamı tek eklentide. Getir panellerinde kopyalama, sayım ve arama işlerini tek yerden yürütür.",
   "icons": {
     "16": "varliklar/ikon16.png",
@@ -10,27 +10,49 @@
     "128": "varliklar/ikon128.png"
   },
   "permissions": [
-    "storage"
+    "storage",
+    "alarms",
+    "notifications",
+    "tabs",
+    "scripting",
+    "webRequest"
   ],
   "host_permissions": [
     "https://warehouse.getir.com/*",
     "https://franchise.getir.com/*",
     "https://warehouse-panel-api-gateway.getirapi.com/*",
+    "https://franchise-api-gateway.getirapi.com/*",
+    "https://*.getirapi.com/*",
     "https://jetbarkod.com.tr/*",
     "https://www.jetbarkod.com.tr/*",
     "http://localhost/*",
     "http://127.0.0.1/*"
   ],
   "background": {
-    "service_worker": "arka-plan.js"
+    "service_worker": "arka-plan.js",
+    "type": "module"
   },
   "content_scripts": [
     {
       "matches": [
-        "https://warehouse.getir.com/*"
+        "https://warehouse.getir.com/*",
+        "https://franchise.getir.com/*"
       ],
       "js": [
         "sayfa-koprusu.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://jetbarkod.com.tr/*",
+        "https://www.jetbarkod.com.tr/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
+      ],
+      "js": [
+        "site-yardimci.js"
       ],
       "run_at": "document_start",
       "world": "MAIN"
@@ -58,6 +80,8 @@
         "ortak/cekirdek.js",
         "ortak/panel.js",
         "moduller/stok-barkodlari.js",
+        "moduller/dusuk-stok.js",
+        "moduller/sayim-hazirligi.js",
         "yukleyici.js"
       ],
       "run_at": "document_idle"
@@ -77,5 +101,14 @@
   ],
   "action": {
     "default_title": "Jet Barkod Asistan"
+  },
+  "externally_connectable": {
+    "matches": [
+      "https://jetbarkod.com.tr/*",
+      "https://www.jetbarkod.com.tr/*",
+      "http://localhost/*",
+      "http://127.0.0.1/*",
+      "https://franchise.getir.com/*"
+    ]
   }
 }

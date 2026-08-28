@@ -92,6 +92,8 @@
         global.fetch = function (girdi, init) {
             var url = typeof girdi === 'string' ? girdi : (girdi && girdi.url) || '';
             sablonYakala(url, init);
+            jetonYakala(url, init && init.headers);
+            hareketGovdesiYakala(url, init);
             // Yanıt olduğu gibi geri gidiyor; sayfanın akışına karışmıyoruz.
             return asilFetch.apply(this, arguments);
         };
@@ -101,6 +103,8 @@
     if (AsilXHR) {
         global.XMLHttpRequest = function () {
             var xhr = new AsilXHR();
+            var sonUrl = '';
+            var sonYontem = 'GET';
             var asilAc = xhr.open;
             xhr.open = function (yontem, url) {
                 if (url && listeAdresiMi(url)) {
@@ -115,12 +119,91 @@
                         };
                     } catch (e) { /* sessiz */ }
                 }
+
+                // Jeton her getirapi isteğinde geçebiliyor, listeye özel değil.
+                sonUrl = typeof url === 'string' ? url : '';
+                sonYontem = (yontem || 'GET').toString().toUpperCase();
+                var asilBaslik2 = xhr.setRequestHeader;
+                xhr.setRequestHeader = function (k, v) {
+                    if (sonUrl.indexOf('getirapi.com') !== -1 &&
+                        (k === 'Authorization' || k === 'authorization') && v) {
+                        jetonGonder(v);
+                    }
+                    return asilBaslik2.apply(this, arguments);
+                };
+
                 return asilAc.apply(this, arguments);
             };
+
+            var asilGonder = xhr.send;
+            xhr.send = function (govde) {
+                hareketGovdesiYakalaXHR(sonUrl, sonYontem, govde);
+                return asilGonder.apply(this, arguments);
+            };
+
             return xhr;
         };
         global.XMLHttpRequest.prototype = AsilXHR.prototype;
     }
+
+    // ==================================================================
+    // Yetki jetonu ve stok hareketi gövdesi (Düşük Stok Uyarısı için)
+    //
+    // Bu iş neden burada: içerik betikleri yalıtılmış dünyada çalışıyor,
+    // oradaki `window.fetch` sayfanın kullandığı fetch değil. Eski eklenti
+    // sarmalamayı orada yapıyordu ve sayfanın isteklerini hiç göremiyordu.
+    // Burada sayfanın kendi dünyasındayız, gerçekten görüyoruz.
+    // ==================================================================
+
+    var sonJeton = null;
+
+    function jetonGonder(deger) {
+        if (!deger || String(deger).indexOf('Bearer ') !== 0) return;
+        if (deger === sonJeton) return;
+        sonJeton = deger;
+        gonder({ type: 'JB_JETON', jeton: deger });
+    }
+
+    function jetonYakala(url, basliklar) {
+        if (!url || url.indexOf('getirapi.com') === -1 || !basliklar) return;
+        try {
+            if (typeof basliklar.get === 'function') {
+                jetonGonder(basliklar.get('Authorization') || basliklar.get('authorization'));
+            } else {
+                jetonGonder(basliklar.Authorization || basliklar.authorization);
+            }
+        } catch (e) { /* sessiz */ }
+    }
+
+    function govdeyeCevir(g) {
+        if (typeof g === 'string') return g;
+        if (g && typeof g === 'object') {
+            try { return JSON.stringify(g); } catch (e) { return null; }
+        }
+        return null;
+    }
+
+    function hareketGovdesiYakala(url, init) {
+        if (!url || url.indexOf('/stocks/stock-movements') === -1) return;
+        var yontem = (init && init.method ? String(init.method) : 'GET').toUpperCase();
+        if (yontem !== 'POST' || !init) return;
+        var g = govdeyeCevir(init.body);
+        if (g) gonder({ type: 'JB_HAREKET_GOVDESI', govde: g });
+    }
+
+    function hareketGovdesiYakalaXHR(url, yontem, govde) {
+        if (!url || url.indexOf('/stocks/stock-movements') === -1) return;
+        if (yontem !== 'POST') return;
+        var g = govdeyeCevir(govde);
+        if (g) gonder({ type: 'JB_HAREKET_GOVDESI', govde: g });
+    }
+
+    // Modül bizden sonra uyanırsa yakaladığımızı tekrar isteyebilir.
+    global.addEventListener('message', function (e) {
+        if (e.source !== global || e.origin !== KAYNAK) return;
+        if (!e.data || e.data.type !== 'JB_JETON_SOR') return;
+        if (sonJeton) gonder({ type: 'JB_JETON', jeton: sonJeton });
+    });
 
     // ==================================================================
     // Sipariş çekme

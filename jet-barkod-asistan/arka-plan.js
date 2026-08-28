@@ -1,13 +1,13 @@
 /**
  * Jet Barkod Asistan. Arka plan.
  *
- * Şimdilik işi az: kurulumda varsayılanı hazırlıyor. Modül listesini
- * site köprüsü doğrudan chrome.storage'a yazıyor, yükleyici de oradan
- * okuyor; arada mesajlaşmaya gerek yok.
- *
- * Sonraki modüller (token yakalama, bildirim, alarm) buraya eklenecek.
- * O yüzden dosya boş görünse de yerinde duruyor.
+ * Modüllerin arka plan gerektiren parçaları `arka-plan/` altında ayrı
+ * dosyalarda duruyor ve buradan içeri alınıyor. Böylece bir modülün arka
+ * plan kodu diğerininkiyle karışmıyor.
  */
+import './arka-plan/dusuk-stok.js';
+import './arka-plan/sayim-hazirligi.js';
+
 chrome.runtime.onInstalled.addListener(function (ayrinti) {
     if (ayrinti.reason === 'install') {
         console.log('[Jet Barkod] Asistan kuruldu.');
