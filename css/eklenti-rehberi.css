@@ -1,13 +1,17 @@
 /**
- * Jet Barkod — eklenti tanıtımı + kurulum sihirbazı
+ * Jet Barkod. Eklenti tanıtımı ve kurulum sihirbazı.
  *
- * Kurulum masaüstünde yapılıyor; panel bilinçli olarak DAR tutuldu.
- * Ana sitenin `--color-*` değişkenlerini kullanır.
+ * Kurulum masaüstünde yapılıyor, panel bilinçli olarak dar tutuldu.
+ * Renkler ana sitenin `--color-*` değişkenlerinden gelir.
  *
- * HAREKET KURALI: yalnızca `.er-adim.is-aktif` altındaki çizimler animate
- * olur. Görünmeyen adımda animasyon tanımlı değildir — tarayıcı onlar için
- * ne kare hesaplar ne de boyar. Animate edilen tek şey `opacity` ve
- * `transform`; ikisi de compositor'da çalışır.
+ * KAYMA YOK
+ * Çizim kutusunun oranı sabit (16/9), metin alanının en az yüksekliği
+ * sabit. Adım değişince panelin boyu oynamaz. Hareketin tamamı SVG'nin
+ * kendi koordinat sisteminde; sayfa yerleşimine dokunmaz.
+ *
+ * HAREKET
+ * Yalnızca `.er-adim.is-aktif` altında tanımlı. Görünmeyen adım ne kare
+ * hesaplatır ne boya üretir. Animate edilen tek şey opacity ve transform.
  */
 
 .er {
@@ -68,10 +72,10 @@
 }
 
 .er-site span {
+    font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    font-size: 0.62rem;
     color: #94a3b8;
 }
 
@@ -80,7 +84,7 @@
     color: var(--color-text-primary, #0f172a);
 }
 
-/* ---------- Kilitli / yakında ---------- */
+/* ---------- Kilitli ---------- */
 
 .er-kilit {
     display: flex;
@@ -97,13 +101,7 @@
 
 .er-kilit svg { width: 1.1rem; height: 1.1rem; flex: none; }
 
-.er-kilit--yakinda {
-    border-color: var(--color-border, #e2e8f0);
-    background: var(--er-zemin);
-    color: var(--color-text-secondary, #475569);
-}
-
-/* ---------- Sihirbaz kabuğu ---------- */
+/* ---------- Sihirbaz ---------- */
 
 .er-sihirbaz {
     border: 1px solid var(--color-border, #e2e8f0);
@@ -116,7 +114,7 @@
     display: flex;
     align-items: center;
     gap: 0.65rem;
-    padding: 0.6rem 0.8rem;
+    padding: 0.55rem 0.8rem;
     border-bottom: 1px solid #f1f5f9;
     background: var(--er-zemin);
 }
@@ -140,76 +138,153 @@
 .er-cubuk__dolu {
     display: block;
     height: 100%;
-    width: 14%;
     border-radius: 999px;
     background: var(--er-vurgu);
     transition: width 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* ---------- Adımlar ---------- */
+/* ---------- Adım ---------- */
 
-.er-adimlar { position: relative; }
+.er-adim { display: none; padding: 0.85rem 0.9rem 0.95rem; }
 
-.er-adim { display: none; padding: 0.9rem 0.95rem 1rem; }
-.er-adim.is-aktif { display: block; animation: er-gir 260ms cubic-bezier(0.22, 1, 0.36, 1); }
+.er-adim.is-aktif {
+    display: block;
+    animation: er-gir 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
 
 @keyframes er-gir {
-    from { opacity: 0; transform: translate3d(0, 6px, 0); }
-    to   { opacity: 1; transform: translate3d(0, 0, 0); }
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 
+/* Oranı sabit kutu: adım değişince yükseklik oynamaz */
 .er-gorsel {
-    display: grid;
-    place-items: center;
-    margin-bottom: 0.75rem;
-    padding: 0.4rem;
-    border-radius: 0.7rem;
+    aspect-ratio: 320 / 180;
+    margin-bottom: 0.7rem;
+    border: 1px solid #eef2f7;
+    border-radius: 0.6rem;
     background: var(--er-zemin);
+    overflow: hidden;
 }
 
-.er-cizim { width: 100%; max-width: 20rem; height: auto; display: block; }
+.er-sahne { display: block; width: 100%; height: 100%; }
 
 .er-baslik {
-    margin: 0 0 0.3rem;
+    margin: 0 0 0.25rem;
     font-size: 0.9rem;
     font-weight: 700;
     letter-spacing: -0.01em;
     color: var(--color-text-primary, #0f172a);
 }
 
+/* Metin alanı sabit yükseklikte: iki satırlık da üç satırlık da olsa
+   panel aynı boyda kalır. */
 .er-metin {
     margin: 0;
+    min-height: 3.4rem;
     font-size: 0.8rem;
     line-height: 1.55;
     color: var(--color-text-secondary, #475569);
 }
 
 .er-metin b {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 0.76rem;
     padding: 0.05rem 0.25rem;
     border-radius: 0.25rem;
     background: var(--er-soft);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.76rem;
     color: var(--color-primary-700, #1d4ed8);
 }
 
-.er-indir {
+/* ---------- Adım eylemleri ----------
+   Alan her adımda ayrılır, boş olsa bile. Yoksa düğmesi olan adımda panel
+   uzuyor ve adım değiştirince ekran zıplıyordu. */
+
+.er-eylem-alani {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    min-height: 3.1rem;
+    margin-top: 0.35rem;
+}
+
+
+.er-eylem {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    margin-top: 0.85rem;
-    padding: 0.55rem 0.9rem;
-    border-radius: 0.6rem;
+    max-width: 100%;
+    padding: 0.5rem 0.85rem;
+    border: none;
+    border-radius: 0.55rem;
+    background: var(--er-vurgu);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 650;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 140ms;
+}
+
+.er-eylem:hover { background: var(--color-primary-700, #1d4ed8); }
+.er-eylem svg { width: 0.9rem; height: 0.9rem; flex: none; }
+.er-eylem span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.er-eylem--ikincil {
+    background: #fff;
+    border: 1px solid var(--color-border, #e2e8f0);
+    color: var(--color-text-secondary, #475569);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+.er-eylem--ikincil:hover { background: #f1f5f9; color: var(--color-text-primary, #0f172a); }
+
+/* ---------- Sürüklenecek yer imi ---------- */
+
+.er-yerimi {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 0.9rem;
+    border-radius: 0.55rem;
     background: var(--er-vurgu);
     color: #fff;
     font-size: 0.8rem;
     font-weight: 650;
     text-decoration: none;
-    transition: background 140ms;
+    cursor: grab;
+    /* Basılı tutunca yazı seçilmesin, sürükleme temiz olsun */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-user-drag: element;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.12);
 }
 
-.er-indir:hover { background: var(--color-primary-700, #1d4ed8); }
-.er-indir svg { width: 0.95rem; height: 0.95rem; }
+.er-yerimi:active { cursor: grabbing; }
+
+.er-yerimi__nokta {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: rgb(255 255 255 / 0.55);
+}
+
+.er-yerimi.is-hazir .er-yerimi__nokta { background: #86efac; }
+.er-yerimi.is-hatali { background: #dc2626; }
+
+.er-yerimi--sars { animation: er-sars 420ms ease-in-out; }
+@keyframes er-sars {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-4px); }
+    75%      { transform: translateX(4px); }
+}
+
+.er-ipucu {
+    margin: 0.3rem 0 0;
+    font-size: 0.7rem;
+    color: #94a3b8;
+}
 
 /* ---------- Alt çubuk ---------- */
 
@@ -238,112 +313,252 @@
 .er-btn:hover:not(:disabled) { background: #f1f5f9; color: var(--color-text-primary, #0f172a); }
 .er-btn:disabled { opacity: 0.4; cursor: default; }
 
-.er-btn--ana {
-    background: var(--er-vurgu);
-    border-color: var(--er-vurgu);
-    color: #fff;
-}
-
+.er-btn--ana { background: var(--er-vurgu); border-color: var(--er-vurgu); color: #fff; }
 .er-btn--ana:hover:not(:disabled) { background: var(--color-primary-700, #1d4ed8); color: #fff; }
 
 /* ==========================================================================
-   ÇİZİM DİLİ
+   SAHNE DİLİ
    ========================================================================== */
 
-.er-cizim .er-kutu { fill: #fff; stroke: var(--er-cizgi); stroke-width: 1.5; }
-.er-cizim .er-cizgi { stroke: var(--er-cizgi); stroke-width: 1.5; }
-.er-cizim .er-cizgi-ince { stroke: #e2e8f0; stroke-width: 3; stroke-linecap: round; }
-.er-cizim .er-nokta { fill: #e2e8f0; }
-.er-cizim .er-dolgu { fill: var(--er-cizgi); }
-.er-cizim .er-dolgu-soft { fill: #f1f5f9; }
-.er-cizim .er-vurgu-cizgi { stroke: var(--er-vurgu); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; fill: none; }
-.er-cizim .er-vurgu-dolgu { fill: var(--er-vurgu); }
-.er-cizim .er-vurgu-soft { fill: var(--er-soft); stroke: var(--er-vurgu); stroke-width: 1.5; }
-.er-cizim .er-tik-cizgi { stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; fill: none; }
-.er-cizim .er-anahtar-yol { fill: #e2e8f0; }
-.er-cizim .er-anahtar-top { fill: #fff; stroke: var(--er-cizgi); stroke-width: 1.5; }
+.er-sahne .c-pencere { fill: #fff; stroke: var(--er-cizgi); stroke-width: 1.2; }
+.er-sahne .c-sekmeserit { fill: #f1f5f9; }
+.er-sahne .c-baslikserit { fill: #f1f5f9; }
+.er-sahne .c-sekme { fill: #fff; }
+.er-sahne .c-adres { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1; }
+.er-sahne .c-ince { stroke: #eef2f7; stroke-width: 1; }
+.er-sahne .c-bos { fill: #f1f5f9; }
+.er-sahne .c-kart { fill: #fff; stroke: var(--er-cizgi); stroke-width: 1.2; }
+.er-sahne .c-menu { fill: #fff; stroke: var(--er-cizgi); stroke-width: 1; filter: drop-shadow(0 4px 8px rgb(15 23 42 / 0.14)); }
+.er-sahne .c-secili { fill: #dbeafe; }
+.er-sahne .c-indirme { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1; }
+.er-sahne .c-yerimi-serit { fill: #f8fafc; stroke: #eef2f7; stroke-width: 1; }
+.er-sahne .c-tus { fill: #fff; stroke: var(--er-cizgi); stroke-width: 1.2; }
+.er-sahne .c-pencere-dugme { stroke: #94a3b8; stroke-width: 1.2; fill: none; }
 
-.er-cizim .er-yazi {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 11px;
-    fill: #64748b;
+.er-sahne .c-klasor { fill: #fbbf24; }
+.er-sahne .c-zip { fill: #cbd5e1; }
+.er-sahne .c-zip-dis { fill: #94a3b8; }
+.er-sahne .c-devredisi { opacity: 0.42; }
+
+.er-sahne .c-vurgu-dolgu { fill: var(--er-vurgu); }
+.er-sahne .c-vurgu-soft { fill: var(--er-soft); stroke: var(--er-vurgu); stroke-width: 1.2; }
+.er-sahne .c-tam-dolgu { fill: #059669; }
+.er-sahne .c-tik { stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+
+.er-sahne .c-anahtar-yol { fill: #cbd5e1; }
+.er-sahne .c-anahtar-acik { fill: var(--er-vurgu); }
+.er-sahne .c-anahtar-top { fill: #fff; }
+
+.er-sahne .c-yazi { font-family: Inter, sans-serif; font-size: 8px; fill: #64748b; }
+.er-sahne .c-yazi--mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.er-sahne .c-yazi--kalin { font-weight: 700; fill: #0f172a; }
+.er-sahne .c-yazi--ters { fill: #fff; font-weight: 650; }
+.er-sahne .c-yazi--vurgu { fill: var(--color-primary-700, #1d4ed8); font-weight: 650; }
+.er-sahne .c-yazi--soluk { fill: #94a3b8; }
+.er-sahne .c-yazi--kucuk { font-size: 6.5px; }
+
+.er-sahne .er-fare { pointer-events: none; }
+
+/* ==========================================================================
+   HAREKET. Yalnızca görünen adımda.
+   Her sahne 4 saniyelik bir döngü; adımlar arasında ortak ritim.
+   ========================================================================== */
+
+.er-adim.is-aktif .s-fare-tikla { animation: f-tikla 4s ease-in-out infinite; }
+@keyframes f-tikla {
+    0%       { transform: translate(212px, 132px); }
+    22%, 30% { transform: translate(152px, 96px); }
+    26%      { transform: translate(152px, 99px); }
+    100%     { transform: translate(152px, 96px); }
+}
+.er-adim.is-aktif .s-dugme { animation: s-bas 4s ease-in-out infinite; transform-origin: 160px 99px; }
+@keyframes s-bas {
+    0%, 22%, 34%, 100% { transform: scale(1); }
+    27%                { transform: scale(0.95); }
+}
+.er-adim.is-aktif .s-indirme-cubugu { animation: s-belir 4s ease-in-out infinite; }
+@keyframes s-belir {
+    0%, 34%   { opacity: 0; transform: translateY(6px); }
+    44%, 100% { opacity: 1; transform: translateY(0); }
 }
 
-.er-cizim .er-yazi--lg { font-family: Inter, sans-serif; font-size: 14px; font-weight: 600; fill: #0f172a; }
-.er-cizim .er-yazi--ters { font-family: Inter, sans-serif; font-size: 11px; font-weight: 600; fill: #fff; }
-
-/* ---------- Hareket: YALNIZCA aktif adımda ---------- */
-
-.er-adim.is-aktif .hr-indir { animation: hr-indir 1.9s ease-in-out infinite; }
-@keyframes hr-indir {
-    0%, 100% { transform: translateY(0); opacity: 1; }
-    50%      { transform: translateY(7px); opacity: 0.65; }
+/* --- 2. adım: sağ tık, menü, klasör --- */
+.er-adim.is-aktif .s-fare-sagtik { animation: f-sagtik 5s ease-in-out infinite; }
+@keyframes f-sagtik {
+    0%       { transform: translate(210px, 130px); }
+    18%, 92% { transform: translate(110px, 70px); }
+    52%      { transform: translate(118px, 112px); }
+    68%, 92% { transform: translate(118px, 112px); }
+    100%     { transform: translate(110px, 70px); }
+}
+.er-adim.is-aktif .s-secim { animation: s-gec 5s ease-in-out infinite; }
+@keyframes s-gec { 0%, 16% { opacity: 0; } 22%, 100% { opacity: 1; } }
+.er-adim.is-aktif .s-menu { animation: s-menu-ac 5s ease-in-out infinite; transform-origin: 96px 82px; }
+@keyframes s-menu-ac {
+    0%, 22%   { opacity: 0; transform: scale(0.94); }
+    28%, 70%  { opacity: 1; transform: scale(1); }
+    76%, 100% { opacity: 0; transform: scale(1); }
+}
+.er-adim.is-aktif .s-menu-sec { animation: s-vurgula 5s ease-in-out infinite; }
+@keyframes s-vurgula { 0%, 46% { opacity: 0; } 52%, 74% { opacity: 1; } 80%, 100% { opacity: 0; } }
+.er-adim.is-aktif .s-yeni-klasor { animation: s-klasor-cik 5s ease-in-out infinite; }
+@keyframes s-klasor-cik {
+    0%, 74%   { opacity: 0; transform: translateY(-5px); }
+    82%, 100% { opacity: 1; transform: translateY(0); }
 }
 
-.er-adim.is-aktif .hr-zip { animation: hr-kay-sol 2.4s ease-in-out infinite; }
-.er-adim.is-aktif .hr-klasor { animation: hr-belir 2.4s ease-in-out infinite; }
-.er-adim.is-aktif .hr-ok { animation: hr-nabiz 2.4s ease-in-out infinite; }
-@keyframes hr-kay-sol {
-    0%, 40%, 100% { transform: translateX(0); }
-    70%           { transform: translateX(-6px); }
+/* --- 3. adım: adrese yazma --- */
+.er-adim.is-aktif .s-fare-adres { animation: f-adres 4s ease-in-out infinite; }
+@keyframes f-adres {
+    0%       { transform: translate(230px, 120px); opacity: 1; }
+    16%, 26% { transform: translate(160px, 44px); opacity: 1; }
+    40%, 100% { transform: translate(160px, 44px); opacity: 0; }
 }
-@keyframes hr-belir {
-    0%, 30%  { opacity: 0.35; transform: scale(0.97); }
-    60%, 100% { opacity: 1; transform: scale(1); }
+.er-adim.is-aktif .s-yazi-cikar {
+    animation: s-yaz 4s steps(19, end) infinite;
+    clip-path: inset(0 100% 0 0);
 }
-@keyframes hr-nabiz {
-    0%, 100% { opacity: 0.35; }
-    50%      { opacity: 1; }
+@keyframes s-yaz {
+    0%, 26%   { clip-path: inset(0 100% 0 0); }
+    62%, 100% { clip-path: inset(0 0 0 0); }
+}
+.er-adim.is-aktif .s-imlec { fill: var(--er-vurgu); animation: s-yanip 1s step-end infinite; }
+@keyframes s-yanip { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+/* --- 4. adım: yakınlaş, anahtarı aç --- */
+.er-adim.is-aktif .s-zoom-4 {
+    animation: z-anahtar 5s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    transform-origin: 285px 77px;
+}
+@keyframes z-anahtar {
+    0%, 14%   { transform: scale(1); }
+    34%, 86%  { transform: scale(1.9); }
+    100%      { transform: scale(1); }
+}
+.er-adim.is-aktif .s-fare-anahtar { animation: f-anahtar 5s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+@keyframes f-anahtar {
+    0%, 14%  { transform: translate(240px, 150px); opacity: 0; }
+    24%      { opacity: 1; }
+    40%, 86% { transform: translate(290px, 84px); opacity: 1; }
+    100%     { transform: translate(240px, 150px); opacity: 0; }
+}
+/* Anahtar topu yalnızca X ekseninde kayar, kutu yerinde durur */
+.er-adim.is-aktif .s-anahtar circle { animation: a-top 5s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+@keyframes a-top {
+    0%, 48%   { transform: translateX(0); }
+    58%, 100% { transform: translateX(12px); }
+}
+.er-adim.is-aktif .s-anahtar rect { animation: a-yol 5s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+@keyframes a-yol {
+    0%, 48%   { fill: #cbd5e1; }
+    58%, 100% { fill: var(--er-vurgu); }
 }
 
-.er-adim.is-aktif .hr-imlec { animation: hr-yanip 1.05s step-end infinite; fill: var(--er-vurgu); }
-@keyframes hr-yanip { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
-
-.er-adim.is-aktif .hr-anahtar { animation: hr-anahtar 2.6s ease-in-out infinite; }
-@keyframes hr-anahtar {
-    0%, 35%   { transform: translateX(0); }
-    55%, 100% { transform: translateX(22px); }
+/* --- 5. adım: yakınlaş, düğmeye bas --- */
+.er-adim.is-aktif .s-zoom-5 {
+    animation: z-yukle 5s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    transform-origin: 67px 79px;
 }
-.er-adim.is-aktif .hr-anahtar .er-anahtar-yol { animation: hr-anahtar-renk 2.6s ease-in-out infinite; }
-@keyframes hr-anahtar-renk {
-    0%, 35%   { fill: #e2e8f0; }
-    55%, 100% { fill: var(--er-vurgu); }
+@keyframes z-yukle {
+    0%, 16%  { transform: scale(1); }
+    36%, 88% { transform: scale(1.7); }
+    100%     { transform: scale(1); }
+}
+.er-adim.is-aktif .s-dugmeler { animation: s-belir-yumusak 5s ease-in-out infinite; }
+@keyframes s-belir-yumusak { 0%, 10% { opacity: 0; } 20%, 100% { opacity: 1; } }
+.er-adim.is-aktif .s-fare-yukle { animation: f-yukle 5s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+@keyframes f-yukle {
+    0%, 16%  { transform: translate(220px, 150px); opacity: 0; }
+    26%      { opacity: 1; }
+    46%, 88% { transform: translate(74px, 86px); opacity: 1; }
+    100%     { transform: translate(220px, 150px); opacity: 0; }
+}
+.er-adim.is-aktif .s-dalga {
+    fill: none;
+    stroke: var(--er-vurgu);
+    stroke-width: 1.5;
+    animation: s-dalga 5s ease-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+}
+@keyframes s-dalga {
+    0%, 52%  { opacity: 0; transform: scale(0.3); }
+    62%      { opacity: 0.55; }
+    82%, 100% { opacity: 0; transform: scale(1.9); }
 }
 
-.er-adim.is-aktif .hr-basma { animation: hr-bas 2.2s ease-in-out infinite; transform-origin: 120px 68px; }
-@keyframes hr-bas {
-    0%, 55%, 100% { transform: scale(1); }
-    65%           { transform: scale(0.95); }
+/* --- 6. adım: klasörü seç --- */
+.er-adim.is-aktif .s-fare-klasor { animation: f-klasor 4.5s ease-in-out infinite; }
+@keyframes f-klasor {
+    0%       { transform: translate(210px, 140px); }
+    24%, 60% { transform: translate(140px, 98px); }
+    82%, 100% { transform: translate(276px, 148px); }
 }
-.er-adim.is-aktif .hr-dalga { animation: hr-dalga 2.2s ease-out infinite; fill: none; stroke: var(--er-vurgu); stroke-width: 2; }
-@keyframes hr-dalga {
-    0%, 55%  { opacity: 0; transform: scale(0.4); }
-    70%      { opacity: 0.5; }
-    100%     { opacity: 0; transform: scale(2.1); }
+.er-adim.is-aktif .s-klasor-secim { animation: s-gec2 4.5s ease-in-out infinite; }
+@keyframes s-gec2 { 0%, 22% { opacity: 0; } 30%, 100% { opacity: 1; } }
+
+/* --- 7. adım: kart ve tik --- */
+.er-adim.is-aktif .s-kart { animation: s-belir-yumusak 3.6s ease-in-out infinite; }
+.er-adim.is-aktif .s-tik {
+    animation: s-tik 3.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+}
+@keyframes s-tik {
+    0%, 30%   { opacity: 0; transform: scale(0.2); }
+    46%, 100% { opacity: 1; transform: scale(1); }
 }
 
-.er-adim.is-aktif .hr-secim { animation: hr-belir 2.2s ease-in-out infinite; }
+/* --- Yer imi sahneleri --- */
+.er-adim.is-aktif .s-kisayol { animation: s-nabiz 2.6s ease-in-out infinite; }
+@keyframes s-nabiz { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.er-adim.is-aktif .s-yerimi-serit { animation: s-serit-ac 4s ease-in-out infinite; }
+@keyframes s-serit-ac { 0%, 30% { opacity: 0; } 44%, 100% { opacity: 1; } }
 
-.er-adim.is-aktif .hr-parca { animation: hr-belir 2.6s ease-in-out infinite; }
-.er-adim.is-aktif .hr-tik { animation: hr-tik 2.6s cubic-bezier(0.22, 1, 0.36, 1) infinite; transform-origin: 198px 76px; }
-@keyframes hr-tik {
-    0%, 35%   { transform: scale(0); opacity: 0; }
-    55%, 100% { transform: scale(1); opacity: 1; }
+.er-adim.is-aktif .s-surukle { animation: s-tasi 4.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes s-tasi {
+    0%, 14%   { transform: translate(0, 0); opacity: 1; }
+    58%       { transform: translate(-42px, -52px); opacity: 0.85; }
+    70%, 100% { transform: translate(-42px, -52px); opacity: 0; }
+}
+.er-adim.is-aktif .s-fare-surukle { animation: f-surukle 4.5s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+@keyframes f-surukle {
+    0%, 14%   { transform: translate(206px, 128px); }
+    58%, 100% { transform: translate(164px, 76px); }
+}
+.er-adim.is-aktif .s-birakma-yeri { animation: s-nabiz 4.5s ease-in-out infinite; }
+
+.er-adim.is-aktif .s-fare-sekme { animation: f-sekme 3.6s ease-in-out infinite; }
+@keyframes f-sekme {
+    0%       { transform: translate(210px, 150px); }
+    32%, 100% { transform: translate(108px, 110px); }
+}
+.er-adim.is-aktif .s-yerimi-kurulu { animation: s-belir-yumusak 3.6s ease-in-out infinite; }
+
+.er-adim.is-aktif .s-fare-yerimi { animation: f-yerimi 4s ease-in-out infinite; }
+@keyframes f-yerimi {
+    0%       { transform: translate(200px, 140px); }
+    26%, 100% { transform: translate(106px, 80px); }
+}
+.er-adim.is-aktif .s-panel { animation: s-panel-ac 4s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+@keyframes s-panel-ac {
+    0%, 38%   { opacity: 0; transform: translateY(-8px); }
+    52%, 100% { opacity: 1; transform: translateY(0); }
 }
 
 /* Hareket tercihine saygı */
 @media (prefers-reduced-motion: reduce) {
     .er-adim.is-aktif,
-    .er-adim.is-aktif [class^='hr-'],
-    .er-adim.is-aktif [class*=' hr-'],
-    .er-cubuk__dolu {
+    .er-adim.is-aktif [class^='s-'],
+    .er-adim.is-aktif [class*=' s-'],
+    .er-cubuk__dolu,
+    .er-yerimi--sars {
         animation: none !important;
         transition: none !important;
     }
 }
 
-/* Telefon: kurulum burada yapılmıyor ama panel yine de düzgün dursun */
 @media (max-width: 480px) {
-    .er-gorsel { padding: 0.25rem; }
     .er-alt .er-btn { flex: 1; }
+    .er-metin { min-height: 4.2rem; }
 }
