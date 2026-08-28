@@ -22,7 +22,7 @@
     <link rel="stylesheet" href="../css/tailwind.css?v=20260828i" />
     <link rel="stylesheet" href="../css/settings-panel.css?v=20260828i" />
     <link rel="stylesheet" href="../css/barcode-inspector.css?v=20260828i" />
-    <link rel="stylesheet" href="../css/eklenti-rehberi.css?v=20260828j" />
+    <link rel="stylesheet" href="../css/eklenti-rehberi.css?v=20260828k" />
     <link rel="stylesheet" href="../css/app-boot.css?v=20260828i" />
     <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
     <script src="../js/vendor/JsBarcode.all.min.js?v=20260828i"></script>
@@ -36,7 +36,8 @@
     <script src="temp_products.js"></script>
     <script src="../js/getir-cdn-paste.js?v=20260828i"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
-    <script src="../js/eklenti-rehberi.js?v=20260828j"></script>
+    <script src="../js/asistan-koprusu.js?v=20260828k"></script>
+    <script src="../js/eklenti-rehberi.js?v=20260828k"></script>
     <script src="../js/guest-access-config.js?v=20260828i"></script>
     <script src="../js/auth.js?v=20260828i"></script>
     <script src="../js/skeleton-ui.js?v=20260828i"></script>
@@ -8497,6 +8498,13 @@
              * uygulama çözümler). Tek özelliğe indirildi; eski hak
              * `premium-features.js` içindeki köprüyle geçerliliğini koruyor.
              */
+            'jetBarkodAsistan': {
+                name: 'Jet Barkod Asistan (yeni)',
+                description: 'Bütün araçlar tek eklentide. Eski eklentiler yerinde, bu onların yerine geçmeye aday',
+                ikon: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d="M12 3l2.1 4.5L19 9l-3.4 3.4.8 4.9L12 15l-4.4 2.3.8-4.9L5 9l4.9-1.5z"/><path d="M5 19h14"/></svg>',
+                storageKey: null,
+                eklenti: 'jetBarkodAsistan'
+            },
             'bulkCopy': {
                 name: 'Toplu Kopyalama',
                 description: 'Warehouse listelerini tek tıkla kopyalar, uygulama barkod ve görselleri çözer',

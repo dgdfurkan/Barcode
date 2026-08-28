@@ -92,6 +92,27 @@
             ],
         },
 
+        /*
+         * Tek eklenti denemesi. Eskilerin hepsi yerinde duruyor; bu onların
+         * yerine geçmeye aday, henüz değil. Aynı anda ikisi kuruluysa
+         * warehouse sayfasında iki kopyalama düğmesi çıkar, beklenen davranış.
+         */
+        jetBarkodAsistan: {
+            tur: 'eklenti',
+            asistan: true,
+            ad: 'Jet Barkod Asistan',
+            site: 'warehouse.getir.com',
+            dosya: 'Jet Barkod - Asistan',
+            ikon: null,
+            ozet: 'Bütün araçlar tek eklentide. Şu an sipariş kopyalama ve sayım listesi kopyalama modülleri içinde.',
+            neYapar: [
+                'Beş ayrı eklenti yerine tek kurulum, tek güncelleme.',
+                'Sayfada tek düğme var; hangi modülün çalıştığını oradan görürsün.',
+                'Bir modül hata verse diğerleri çalışmaya devam eder.',
+                'Hakkın olmayan modül hiç başlamaz, kilit gerçekten işler.',
+            ],
+        },
+
         firinPisirme: {
             tur: 'yerImi',
             ad: 'Fırın Pişirme',
@@ -459,6 +480,8 @@
             k.neYapar.map(function (x) { return '<li>' + kacir(x) + '</li>'; }).join('') +
             '    </ul>' +
             '    <p class="er-site"><span>Çalıştığı yer</span><b>' + kacir(k.site) + '</b></p>' +
+            (k.asistan ? '    <p class="er-durum" id="erAsistanDurum"><span class="er-durum__nokta"></span>' +
+                         '<span>Kurulu mu diye bakılıyor...</span></p>' : '') +
             '  </div>';
 
         if (kilitli) {
@@ -517,6 +540,7 @@
             bagla(kap, adimlar.length);
             if (k.tur === 'yerImi') yerIminiHazirla(kap, k);
         }
+        if (k.asistan) asistanDurumu(kap);
         return true;
     }
 
@@ -650,6 +674,30 @@
             a.classList.add('er-yerimi--sars');
             setTimeout(function () { a.classList.remove('er-yerimi--sars'); }, 500);
         });
+    }
+
+    /**
+     * Asistan kurulu mu, satırı canlı tutar. Eklenti sayfaya selam
+     * gönderince köprü haber veriyor; iki saniye ses çıkmazsa kurulu değil.
+     */
+    function asistanDurumu(kap) {
+        var satir = kap.querySelector('#erAsistanDurum');
+        if (!satir) return;
+        var yazi = satir.querySelector('span:last-child');
+
+        function yaz(d) {
+            if (!kap.contains(satir)) return;
+            satir.classList.toggle('is-kurulu', !!d.kurulu);
+            yazi.textContent = d.kurulu
+                ? 'Kurulu. Sürüm ' + (d.surum || '?')
+                : 'Henüz kurulu değil. Aşağıdaki adımları izle.';
+        }
+
+        var koprü = global.JetBarkodAsistan;
+        if (!koprü) return yaz({ kurulu: false });
+        koprü.dinle(yaz);
+        koprü.sor();
+        setTimeout(function () { if (!koprü.durum.kurulu) yaz(koprü.durum); }, 2000);
     }
 
     global.EklentiRehberi = { KAYITLAR: KAYITLAR, ciz: ciz };
