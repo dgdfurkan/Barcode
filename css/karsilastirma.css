@@ -69,27 +69,84 @@
 
 /* Yazı "Oynat", "Oynuyor" ve "Tekrar oynat" arasında geçiyor. Genişlik
    sabitlenmezse üst şerit her seferinde biraz kayıyor. */
-.krs__dugme {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 8.6rem;
-    gap: 0.4rem;
-    padding: 0.5rem 0.9rem;
-    border: 1px solid var(--krs-cizgi);
-    border-radius: 0.6rem;
-    background: #fff;
-    color: var(--krs-yazi);
-    font-family: inherit;
-    font-size: 0.82rem;
-    font-weight: 600;
+/* ---------- Oynat perdesi ----------
+   Küçük bir köşe düğmesi kimsenin gözüne çarpmıyordu. Sahnenin tam
+   ortasında, video oynatıcı gibi duran büyük bir düğme var artık.
+   Sahne görüş alanına girdiğinde halkası genişleyerek dikkat çekiyor. */
+
+.krs__alan { position: relative; }
+
+.krs__perde {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    gap: 0.9rem;
+    background: rgb(248 250 252 / 0.72);
+    -webkit-backdrop-filter: blur(2px) saturate(120%);
+    backdrop-filter: blur(2px) saturate(120%);
+    border: none;
     cursor: pointer;
-    transition: background 150ms ease, border-color 150ms ease;
+    font-family: inherit;
+    transition: opacity 260ms ease;
 }
 
-.krs__dugme:hover { background: #f1f5f9; border-color: #cbd5e1; }
-.krs__dugme:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
-.krs__dugme svg { width: 0.85rem; height: 0.85rem; }
+.krs__perde[hidden] { display: none; }
+.krs__perde.gizli { opacity: 0; pointer-events: none; }
+
+.krs__oynat {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: var(--krs-mor);
+    color: #fff;
+    box-shadow: 0 14px 34px -12px rgb(93 62 188 / 0.75);
+    transition: transform 200ms var(--krs-yumusak-gecis), background 200ms ease;
+}
+
+.krs__perde:hover .krs__oynat { transform: scale(1.06); background: #4c31a0; }
+.krs__perde:active .krs__oynat { transform: scale(0.98); }
+.krs__perde:focus-visible { outline: 3px solid var(--krs-mor); outline-offset: -4px; }
+
+.krs__oynat svg { width: 30px; height: 30px; margin-left: 4px; }
+
+/* Genişleyen halka: sahne göründüğünde çalışıyor, sonra duruyor. */
+.krs__oynat::before,
+.krs__oynat::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid var(--krs-mor);
+    opacity: 0;
+}
+
+.krs.gorunur .krs__oynat::before { animation: krs-halka 2.6s ease-out infinite; }
+.krs.gorunur .krs__oynat::after { animation: krs-halka 2.6s ease-out 1.3s infinite; }
+
+@keyframes krs-halka {
+    0%   { opacity: 0.55; transform: scale(1); }
+    70%  { opacity: 0; transform: scale(1.9); }
+    100% { opacity: 0; transform: scale(1.9); }
+}
+
+.krs__perde-yazi {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--krs-yazi);
+    text-align: center;
+}
+
+.krs__perde-alt {
+    margin-top: -0.55rem;
+    font-size: 0.76rem;
+    color: var(--krs-soluk);
+    text-align: center;
+}
 
 /* ---------- İki şerit ---------- */
 
@@ -479,6 +536,17 @@
 .krs .p-vurgu { fill: #eff6ff; stroke: #2563eb; stroke-width: 1; }
 .krs .p-yesil { fill: #059669; }
 .krs .p-kirmizi { fill: #dc2626; }
+
+/* El yazısı. Elde tutulan sayım defteri için: sistemin ürettiği yazıyla
+   karışmasın diye ayrı bir yazı tipi ve mürekkep rengi. Dış yazı tipi
+   indirilmiyor, işletim sisteminin el yazısı yüzü kullanılıyor. */
+.krs .el-yazisi {
+    font-family: 'Bradley Hand', 'Segoe Script', 'Snell Roundhand', 'Comic Sans MS', cursive;
+    fill: #1e3a8a;
+    font-weight: 600;
+}
+
+.krs .el-yazisi--kirmizi { fill: #b91c1c; }
 
 @media (prefers-reduced-motion: reduce) {
     .krs__ekran,

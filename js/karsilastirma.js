@@ -278,16 +278,24 @@
         kap.innerHTML =
             '<div class="krs__ust">' +
             '  <h3 class="krs__ad">' + kacir(tanim.baslik) + '</h3>' +
-            '  <span class="krs__bosluk"></span>' +
-            '  <button type="button" class="krs__dugme" data-rol="oynat">' +
-            '    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
-            '      <path d="M8 5v14l11-7z"/></svg>' +
-            '    <span data-rol="dugmeYazi">Oynat</span>' +
-            '  </button>' +
             '</div>' +
             '<div class="krs__alan">' +
             seritHtml(tanim.sol, false) +
             seritHtml(tanim.sag, true) +
+            /*
+             * Oynat perdesi sahnenin üstünde duruyor. Köşedeki küçük düğme
+             * gözden kaçıyordu; buradaki video oynatıcı gibi görünüyor,
+             * sahne göründüğünde halkası genişleyerek dikkat çekiyor.
+             */
+            '  <button type="button" class="krs__perde" data-rol="oynat"' +
+            ' aria-label="Karşılaştırmayı oynat">' +
+            '    <span class="krs__oynat">' +
+            '      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+            '        <path d="M8 5v14l11-7z"/></svg>' +
+            '    </span>' +
+            '    <span class="krs__perde-yazi" data-rol="dugmeYazi">Karşılaştırmayı oynat</span>' +
+            '    <span class="krs__perde-alt">İki taraf aynı anda başlar</span>' +
+            '  </button>' +
             '</div>' +
             '<div class="krs__sonuc">' +
             '  <span data-rol="sonucYazi">' + kacir(tanim.ozet || '') + '</span>' +
@@ -338,10 +346,19 @@
             if (vurguEl) vurguEl.classList.add('acik');
         }
 
+        var perde = kap.querySelector('.krs__perde');
+        var perdeAlt = kap.querySelector('.krs__perde-alt');
+
+        function perdeyiGoster(goster) {
+            perde.classList.toggle('gizli', !goster);
+        }
+
         function dur() {
             calisiyor = false;
             if (kare) { cancelAnimationFrame(kare); kare = 0; }
             dugmeYazi.textContent = 'Tekrar oynat';
+            perdeAlt.textContent = 'Baştan izlemek için dokun';
+            perdeyiGoster(true);
         }
 
         function adim() {
@@ -371,11 +388,14 @@
                 sol.sonHal();
                 sag.sonHal();
                 farkYaz();
-                dugmeYazi.textContent = 'Tekrar oynat';
+                dugmeYazi.textContent = 'Son hâli gösteriliyor';
+                perdeyiGoster(false);
                 return;
             }
 
-            dugmeYazi.textContent = 'Oynuyor';
+            perdeyiGoster(false);
+            dugmeYazi.textContent = 'Karşılaştırmayı oynat';
+            perdeAlt.textContent = 'İki taraf aynı anda başlar';
             calisiyor = true;
             // Tek damga: iki şerit de bundan hesaplanıyor.
             baslangic = performance.now();
@@ -392,12 +412,24 @@
         var gozlemci = null;
         if ('IntersectionObserver' in global) {
             gozlemci = new IntersectionObserver(function (kayitlar) {
-                if (!kayitlar[0].isIntersecting && calisiyor) {
+                // Sınıf perdedeki halka animasyonunu da tetikliyor.
+                kap.classList.toggle('gorunur', kayitlar[0].isIntersecting);
+                if (kayitlar[0].isIntersecting) return;
+
+                /*
+                 * Sahne ekrandan çıkınca perde KOŞULSUZ geri geliyor.
+                 * Önce yalnız `calisiyor` iken geri getiriliyordu; oynatma
+                 * bitmiş ama kullanıcı kaydırıp geri dönmüşse perde gizli
+                 * kalıyor ve sahne tıklanamaz görünüyordu.
+                 */
+                if (calisiyor) {
                     dur();
                     sol.sifirla();
                     sag.sifirla();
-                    dugmeYazi.textContent = 'Oynat';
                 }
+                dugmeYazi.textContent = 'Karşılaştırmayı oynat';
+                perdeAlt.textContent = 'İki taraf aynı anda başlar';
+                perdeyiGoster(true);
             }, { threshold: 0.15 });
             gozlemci.observe(kap);
         }

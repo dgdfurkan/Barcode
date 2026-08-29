@@ -71,18 +71,26 @@
                        (aranan ? 'Aranıyor…' : 'Ürün adı yazıp aratın') + '</text>';
         }
 
+        /*
+         * Elde tutulan tablo artık daktilo değil, el yazısı. Sistem
+         * yazısıyla aynı görünmesi kafa karıştırıyordu; bu satırlar
+         * gerçekte kalemle deftere yazılıyor.
+         */
         var kagit = '';
         for (var i = 0; i < kagitSatir; i++) {
             var u2 = URUNLER[i];
-            var yy = 216 + i * 13;
+            var yy = 218 + i * 14;
+            var egim = [-0.9, 0.7, -0.5, 1.1, -0.7][i % 5];
+            var fark = u2[3] - u2[4];
             kagit +=
-                '<text x="86" y="' + yy + '" class="p-yazi" style="font-size:4px">' +
-                u2[0].slice(0, 20) + '</text>' +
-                '<text x="212" y="' + yy + '" class="p-yazi" style="font-size:4.4px">' + u2[3] + '</text>' +
-                '<text x="248" y="' + yy + '" class="p-yazi" style="font-size:4.4px">' + u2[4] + '</text>' +
-                '<text x="284" y="' + yy + '" class="p-yazi" style="font-size:4.4px" fill="' +
-                (u2[3] - u2[4] < 0 ? '#dc2626' : '#64748b') + '">' +
-                (u2[3] - u2[4] > 0 ? '+' : '') + (u2[3] - u2[4]) + '</text>';
+                '<g transform="rotate(' + egim + ' 200 ' + yy + ')">' +
+                '<text x="88" y="' + yy + '" class="el-yazisi" style="font-size:6.4px">' +
+                u2[0].slice(0, 18) + '</text>' +
+                '<text x="216" y="' + yy + '" class="el-yazisi" style="font-size:7px">' + u2[3] + '</text>' +
+                '<text x="252" y="' + yy + '" class="el-yazisi" style="font-size:7px">' + u2[4] + '</text>' +
+                '<text x="288" y="' + yy + '" class="el-yazisi el-yazisi--kirmizi"' +
+                ' style="font-size:7px">' + (fark > 0 ? '+' : '') + fark + '</text>' +
+                '</g>';
         }
 
         return '<svg viewBox="0 0 400 300">' + sekmeSeridi() +
@@ -113,18 +121,24 @@
             satirlar +
 
             /* Yanda tutulan tablo */
-            '<rect x="72" y="182" width="316" height="106" rx="6" fill="#fffdf5" stroke="#fde68a"/>' +
-            '<text x="82" y="196" class="p-yazi" style="font-size:5px;font-weight:700" fill="#92400e">' +
-            'Elde tutulan sayım tablosu</text>' +
-            '<text x="86" y="208" class="p-yazi" style="font-size:4px" opacity="0.55">Ürün</text>' +
-            '<text x="212" y="208" class="p-yazi" style="font-size:4px" opacity="0.55">Depo</text>' +
-            '<text x="248" y="208" class="p-yazi" style="font-size:4px" opacity="0.55">Sistem</text>' +
-            '<text x="284" y="208" class="p-yazi" style="font-size:4px" opacity="0.55">Fark</text>' +
-            '<path d="M80 211 h300" class="p-cizgi"/>' + kagit +
+            /* Çizgili defter: masanın üstünde duran kağıt */
+            '<rect x="72" y="182" width="316" height="106" rx="4" fill="#fffdf3" stroke="#e7dcc0"/>' +
+            '<path d="M84 182 v106" stroke="#f4a8a8" stroke-width="0.9"/>' +
+            (function () {
+                var c = '';
+                for (var g = 0; g < 6; g++) {
+                    c += '<path d="M76 ' + (206 + g * 14) + ' h308" stroke="#dfe7f3"' +
+                         ' stroke-width="0.7"/>';
+                }
+                return c;
+            })() +
+            '<text x="90" y="196" class="el-yazisi" style="font-size:7px">Raf C4 sayım</text>' +
+            '<text x="216" y="196" class="el-yazisi" style="font-size:5.6px">depo</text>' +
+            '<text x="252" y="196" class="el-yazisi" style="font-size:5.6px">sistem</text>' +
+            '<text x="288" y="196" class="el-yazisi" style="font-size:5.6px">fark</text>' + kagit +
             (kagitSatir < 5
-                ? '<text x="86" y="' + (216 + kagitSatir * 13 + 4) + '" class="p-yazi"' +
-                  ' style="font-size:3.8px" opacity="0.4">kalan ' + (11 - kagitSatir) +
-                  ' kalem için aynı tur</text>'
+                ? '<text x="88" y="' + (218 + kagitSatir * 14) + '" class="el-yazisi"' +
+                  ' style="font-size:6px" opacity="0.45">…</text>'
                 : '') +
             '</svg>';
     }
@@ -237,57 +251,86 @@
             '</svg>';
     }
 
-    /** Sayım bitince: depo ve sistem yan yana, fark hesaplanmış. */
-    var EKRAN_TABLO =
+    /**
+     * Sayım bitince açılan ızgara. Bizim sayım sayfamızın kendisi:
+     * ürünler kart kart, her kartın altında depo, fark ve sistem değerleri
+     * tek şeritte. Renk anlamı: eksik kırmızı, eşit gri, fazla yeşil.
+     */
+    function izgaraKart(x, yy, u) {
+        var fark = u[3] - u[4];
+        var sinif = fark === 0 ? ['#f1f5f9', '#64748b'] :
+                    (fark < 0 ? ['#fee2e2', '#b91c1c'] : ['#dcfce7', '#15803d']);
+        return '<g>' +
+            '<rect x="' + x + '" y="' + yy + '" width="86" height="76" rx="7"' +
+            ' fill="#fff" stroke="#e8edf3"/>' +
+            '<rect x="' + (x + 1) + '" y="' + (yy + 1) + '" width="84" height="38" rx="6" fill="#fbfdff"/>' +
+            gorsel(x + 29, yy + 4, 30, u[1]) +
+            '<text x="' + (x + 6) + '" y="' + (yy + 50) + '" class="p-yazi"' +
+            ' style="font-size:4.2px;font-weight:600">' + u[0].slice(0, 20) + '</text>' +
+            '<text x="' + (x + 6) + '" y="' + (yy + 57) + '" class="p-yazi"' +
+            ' style="font-size:3.6px" opacity="0.5">' + u[2] + '</text>' +
+            /* Alt şerit: depo · fark · sistem */
+            '<rect x="' + (x + 5) + '" y="' + (yy + 60) + '" width="76" height="12" rx="3" fill="' +
+            sinif[0] + '"/>' +
+            '<text x="' + (x + 11) + '" y="' + (yy + 68.5) + '" class="p-yazi"' +
+            ' style="font-size:5.4px;font-weight:700" fill="' + sinif[1] + '">' + u[3] + '</text>' +
+            '<text x="' + (x + 36) + '" y="' + (yy + 68.5) + '" class="p-yazi"' +
+            ' style="font-size:5px;font-weight:700" fill="' + sinif[1] + '">' +
+            (fark > 0 ? '+' : '') + fark + '</text>' +
+            '<text x="' + (x + 66) + '" y="' + (yy + 68.5) + '" class="p-yazi"' +
+            ' style="font-size:5.4px;font-weight:700" fill="' + sinif[1] + '">' + u[4] + '</text>' +
+            '</g>';
+    }
+
+    var EKRAN_IZGARA =
         '<svg viewBox="0 0 400 300">' +
         '<rect x="0" y="0" width="400" height="300" fill="#f7f9fc"/>' +
         '<rect x="0" y="0" width="400" height="30" fill="#fff"/>' +
         '<path d="M0 30 h400" class="p-cizgi"/>' +
         '<rect x="14" y="8" width="14" height="14" rx="4" fill="#2563eb"/>' +
         '<text x="34" y="20" class="p-yazi p-yazi--kalin" style="font-size:6px">Jet Barkod · Sayım</text>' +
-        '<text x="300" y="20" class="p-yazi" style="font-size:4.6px" opacity="0.6">Raf C4 · 11 kalem</text>' +
+        '<rect x="300" y="8" width="34" height="14" rx="4" fill="#fff" stroke="#e8edf3"/>' +
+        '<text x="308" y="18" class="p-yazi" style="font-size:4.4px">Liste</text>' +
+        '<rect x="338" y="8" width="34" height="14" rx="4" fill="#eef4ff" stroke="#c7dbff"/>' +
+        '<text x="346" y="18" class="p-yazi" fill="#1d4ed8" style="font-size:4.4px">Izgara</text>' +
 
-        '<rect x="14" y="40" width="118" height="40" rx="7" class="p-kart"/>' +
-        '<text x="24" y="54" class="p-yazi" style="font-size:4.2px" opacity="0.6">TOPLAM SAYILAN</text>' +
-        '<text x="24" y="72" class="p-yazi" style="font-size:14px;font-weight:700">54</text>' +
-        '<rect x="140" y="40" width="118" height="40" rx="7" fill="#fef2f2" stroke="#fecaca"/>' +
-        '<text x="150" y="54" class="p-yazi" style="font-size:4.2px" fill="#b91c1c">DEPODA EKSİK</text>' +
-        '<text x="150" y="72" class="p-yazi" style="font-size:14px;font-weight:700" fill="#dc2626">8</text>' +
-        '<text x="196" y="72" class="p-yazi" style="font-size:6px;font-weight:700" fill="#dc2626">' +
-        '− ₺ 412,60</text>' +
-        '<rect x="266" y="40" width="120" height="40" rx="7" fill="#ecfdf5" stroke="#a7f3d0"/>' +
-        '<text x="276" y="54" class="p-yazi" style="font-size:4.2px" fill="#047857">TAM EŞLEŞEN</text>' +
-        '<text x="276" y="72" class="p-yazi" style="font-size:14px;font-weight:700" fill="#059669">2</text>' +
+        /* Özet kutuları */
+        '<rect x="14" y="38" width="88" height="34" rx="6" class="p-kart"/>' +
+        '<text x="22" y="50" class="p-yazi" style="font-size:3.8px" opacity="0.55">TOPLAM SAYILAN</text>' +
+        '<text x="22" y="65" class="p-yazi" style="font-size:12px;font-weight:700">54</text>' +
+        '<rect x="108" y="38" width="88" height="34" rx="6" fill="#fef2f2" stroke="#fecaca"/>' +
+        '<text x="116" y="50" class="p-yazi" style="font-size:3.8px" fill="#b91c1c">DEPODA EKSİK</text>' +
+        '<text x="116" y="65" class="p-yazi" style="font-size:12px;font-weight:700" fill="#dc2626">8</text>' +
+        '<text x="150" y="65" class="p-yazi" style="font-size:5.4px;font-weight:700" fill="#dc2626">' +
+        '− ₺412,60</text>' +
+        '<rect x="202" y="38" width="88" height="34" rx="6" fill="#f1f5f9"/>' +
+        '<text x="210" y="50" class="p-yazi" style="font-size:3.8px" opacity="0.55">TAM EŞLEŞEN</text>' +
+        '<text x="210" y="65" class="p-yazi" style="font-size:12px;font-weight:700">2</text>' +
+        '<rect x="296" y="38" width="90" height="34" rx="6" fill="#ecfdf5" stroke="#a7f3d0"/>' +
+        '<text x="304" y="50" class="p-yazi" style="font-size:3.8px" fill="#047857">SAYIM SÜRESİ</text>' +
+        '<text x="304" y="65" class="p-yazi" style="font-size:12px;font-weight:700" fill="#059669">' +
+        '3dk</text>' +
 
-        '<rect x="14" y="90" width="372" height="196" rx="7" class="p-kart"/>' +
-        '<text x="26" y="106" class="p-yazi" style="font-size:4.4px" opacity="0.55">Ürün</text>' +
-        '<text x="228" y="106" class="p-yazi" style="font-size:4.4px" opacity="0.55">Depo</text>' +
-        '<text x="272" y="106" class="p-yazi" style="font-size:4.4px" opacity="0.55">Sistem</text>' +
-        '<text x="320" y="106" class="p-yazi" style="font-size:4.4px" opacity="0.55">Fark</text>' +
-        '<path d="M22 111 h356" class="p-cizgi"/>' +
-        (function () {
-            var t = '';
-            for (var i = 0; i < URUNLER.length; i++) {
-                var u = URUNLER[i];
-                var fark = u[3] - u[4];
-                var yy = 130 + i * 30;
-                t += gorsel(26, yy - 12, 18, u[1]) +
-                     '<text x="52" y="' + yy + '" class="p-yazi" style="font-size:5px">' + u[0] + '</text>' +
-                     '<text x="52" y="' + (yy + 8) + '" class="p-yazi" style="font-size:4px"' +
-                     ' opacity="0.55">' + u[2] + '</text>' +
-                     '<text x="230" y="' + yy + '" class="p-yazi" style="font-size:6px;font-weight:700">' +
-                     u[3] + '</text>' +
-                     '<text x="276" y="' + yy + '" class="p-yazi" style="font-size:6px;font-weight:700">' +
-                     u[4] + '</text>' +
-                     '<rect x="316" y="' + (yy - 8) + '" width="30" height="12" rx="3" fill="' +
-                     (fark === 0 ? '#f1f5f9' : '#fee2e2') + '"/>' +
-                     '<text x="323" y="' + yy + '" class="p-yazi" style="font-size:5px;font-weight:700"' +
-                     ' fill="' + (fark === 0 ? '#64748b' : '#dc2626') + '">' +
-                     (fark > 0 ? '+' : '') + fark + '</text>' +
-                     '<path d="M22 ' + (yy + 15) + ' h356" class="p-cizgi"/>';
-            }
-            return t;
-        })() +
+        /* Renk anahtarı */
+        '<rect x="14" y="78" width="372" height="14" rx="4" fill="#fff" stroke="#eef2f7"/>' +
+        '<rect x="22" y="82" width="7" height="7" rx="2" fill="#fee2e2"/>' +
+        '<text x="33" y="88" class="p-yazi" style="font-size:4px" opacity="0.65">Depoda eksik</text>' +
+        '<rect x="82" y="82" width="7" height="7" rx="2" fill="#f1f5f9"/>' +
+        '<text x="93" y="88" class="p-yazi" style="font-size:4px" opacity="0.65">Eşit</text>' +
+        '<rect x="122" y="82" width="7" height="7" rx="2" fill="#dcfce7"/>' +
+        '<text x="133" y="88" class="p-yazi" style="font-size:4px" opacity="0.65">Depoda fazla</text>' +
+        '<text x="300" y="88" class="p-yazi" style="font-size:4px" opacity="0.5">' +
+        'depo · fark · sistem</text>' +
+
+        /* Izgara: kart kart ürünler */
+        izgaraKart(14, 98, URUNLER[0]) + izgaraKart(108, 98, URUNLER[1]) +
+        izgaraKart(202, 98, URUNLER[2]) + izgaraKart(296, 98, URUNLER[3]) +
+        izgaraKart(14, 182, URUNLER[4]) +
+        '<rect x="108" y="182" width="86" height="76" rx="7" fill="#fff" stroke="#e8edf3"/>' +
+        '<rect x="202" y="182" width="86" height="76" rx="7" fill="#fff" stroke="#e8edf3"/>' +
+        '<rect x="296" y="182" width="86" height="76" rx="7" fill="#fff" stroke="#e8edf3"/>' +
+        '<text x="14" y="274" class="p-yazi" style="font-size:4px" opacity="0.5">' +
+        '11 kalem · sistem stoğu otomatik alındı · fark adet ve tutar olarak hesaplandı</text>' +
         '</svg>';
 
     // ==================================================================
@@ -298,40 +341,66 @@
 
     global.JBSenaryoSayim = {
         baslik: 'Bir rafın sayımı',
-        ozet: 'On bir kalemlik bir raf sayılacak. Solda masa başında, sağda rafın önünde.',
-        vurgu: 'Solda sistem stoğu tek tek aratılıyor. Sağda sayım bitince kendiliğinden geliyor.',
+        ozet: 'On bir kalemlik bir raf. Solda elle, sağda telefonla.',
+        vurgu: 'Elle sayımda her kalem için ayrı arama. Izgarada hepsi tek ekranda.',
 
         sol: {
-            ad: 'Eski yöntem · masa başı',
+            ad: 'Elle sayım · masa başı',
             ekranlar: {
-                bos: stokEkrani('', 0, 0),
                 aranan1: stokEkrani('kuru soğan', 0, 0),
                 sonuc1: stokEkrani('kuru soğan', 1, 0),
                 yazildi1: stokEkrani('kuru soğan', 1, 1),
                 sonuc2: stokEkrani('maydanoz', 2, 1),
                 yazildi2: stokEkrani('maydanoz', 2, 2),
                 sonuc3: stokEkrani('calve barbekü', 3, 2),
-                yazildi3: stokEkrani('calve barbekü', 3, 3)
+                yazildi3: stokEkrani('calve barbekü', 3, 3),
+                sonuc4: stokEkrani('erikli su', 4, 3),
+                yazildi4: stokEkrani('erikli su', 4, 4),
+                sonuc5: stokEkrani('galeta unu', 5, 4),
+                yazildi5: stokEkrani('galeta unu', 5, 5)
             },
             adimlar: [
-                { ad: 'Stok ekranı açık, ilk ürün yazıldı', sure: 1400, ekran: 'aranan1',
+                { ad: '1. kalem aratıldı', sure: 1500, ekran: 'aranan1',
                   imlec: y(180, 98), goz: y(180, 98), tik: true },
-                { ad: 'Sistem stoğu geldi', sureAralik: [1200, 1800], ekran: 'sonuc1',
+                { ad: 'Sistem stoğu geldi', sureAralik: [1400, 2100], ekran: 'sonuc1',
                   yukleniyor: true, goz: y(240, 155) },
-                { ad: 'Değer tabloya yazıldı', sure: 1300, ekran: 'yazildi1',
-                  imlec: y(250, 216), goz: y(200, 216), tik: true },
-                { ad: 'İkinci ürün aratıldı', sure: 1400, ekran: 'sonuc2',
+                { ad: 'Deftere elle yazıldı', sure: 1600, ekran: 'yazildi1',
+                  imlec: y(250, 218), goz: y(200, 218), tik: true },
+
+                { ad: '2. kalem aratıldı', sure: 1500, ekran: 'sonuc2',
                   imlec: y(180, 98), goz: y(180, 98), tik: true },
-                { ad: 'Değer okundu ve yazıldı', sureAralik: [1400, 2000], ekran: 'yazildi2',
-                  goz: y(200, 229) },
-                { ad: 'Üçüncü ürün aratıldı', sure: 1400, ekran: 'sonuc3',
+                { ad: 'Okundu ve yazıldı', sureAralik: [1600, 2300], ekran: 'yazildi2',
+                  goz: y(200, 232) },
+
+                { ad: '3. kalem aratıldı', sure: 1500, ekran: 'sonuc3',
                   imlec: y(180, 98), goz: y(180, 98), tik: true },
-                { ad: 'Değer okundu ve yazıldı', sureAralik: [1400, 2000], ekran: 'yazildi3',
-                  goz: y(200, 242) },
-                { ad: 'Kalan sekiz kalem için aynı tur', sureAralik: [1600, 2400],
-                  ekran: 'yazildi3', goz: y(200, 262) },
-                { ad: 'Raftaki gerçek adetler ayrıca sayılacak', sure: 1500,
-                  ekran: 'yazildi3', goz: y(200, 200), imlec: null }
+                { ad: 'Okundu ve yazıldı', sureAralik: [1600, 2300], ekran: 'yazildi3',
+                  goz: y(200, 246) },
+
+                { ad: '4. kalem aratıldı', sure: 1500, ekran: 'sonuc4',
+                  imlec: y(180, 98), goz: y(180, 98), tik: true },
+                { ad: 'Okundu ve yazıldı', sureAralik: [1600, 2300], ekran: 'yazildi4',
+                  goz: y(200, 260) },
+
+                { ad: '5. kalem aratıldı', sure: 1500, ekran: 'sonuc5',
+                  imlec: y(180, 98), goz: y(180, 98), tik: true },
+                { ad: 'Okundu ve yazıldı', sureAralik: [1600, 2300], ekran: 'yazildi5',
+                  goz: y(200, 274) },
+
+                { ad: '6. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
+                  imlec: y(180, 98), goz: y(180, 98), tik: true },
+                { ad: '7. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
+                  imlec: y(250, 240), goz: y(240, 155), tik: true },
+                { ad: '8. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
+                  imlec: y(180, 98), goz: y(180, 98), tik: true },
+                { ad: '9. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
+                  imlec: y(250, 240), goz: y(240, 155), tik: true },
+                { ad: '10. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
+                  imlec: y(180, 98), goz: y(180, 98), tik: true },
+                { ad: '11. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
+                  imlec: y(250, 240), goz: y(240, 155), tik: true },
+                { ad: 'Farklar elle hesaplanacak', sure: 2400, ekran: 'yazildi5',
+                  goz: y(288, 250), imlec: null }
             ]
         },
 
@@ -340,24 +409,23 @@
             ekranlar: {
                 tara: depoEkrani(0, true),
                 bir: depoEkrani(1, true),
-                iki: depoEkrani(2, true),
                 uc: depoEkrani(3, true),
                 bes: depoEkrani(5, false),
-                tablo: EKRAN_TABLO
+                izgara: EKRAN_IZGARA
             },
             adimlar: [
-                { ad: 'Raf başında seri okuma açıldı', sure: 800, ekran: 'tara',
+                { ad: 'Raf başında seri okuma açıldı', sure: 550, ekran: 'tara',
                   goz: y(200, 158) },
-                { ad: 'İlk barkod okutuldu, ürün listeye düştü', sure: 900, ekran: 'bir',
+                { ad: 'Barkodlar peş peşe okutuldu', sure: 600, ekran: 'bir',
                   goz: y(200, 158) },
-                { ad: 'İkinci ürün', sure: 700, ekran: 'iki', goz: y(200, 158) },
-                { ad: 'Üçüncü ürün', sure: 700, ekran: 'uc', goz: y(200, 158) },
-                { ad: 'Peş peşe okundu, adetler girildi', sure: 1100, ekran: 'bes',
+                { ad: 'Ürünler listeye kendiliğinden düştü', sure: 600, ekran: 'uc',
+                  goz: y(200, 158) },
+                { ad: 'On bir kalem bitti', sure: 600, ekran: 'bes',
                   goz: y(200, 240) },
-                { ad: 'Sistem stoğu otomatik alındı', sure: 800, ekran: 'tablo',
-                  yukleniyor: true, goz: y(200, 60) },
-                { ad: 'Depo ve sistem yan yana, fark hesaplandı', sure: 1200, ekran: 'tablo',
-                  goz: y(320, 150), imlec: null }
+                { ad: 'Sistem stoğu otomatik alındı', sure: 550, ekran: 'izgara',
+                  yukleniyor: true, goz: y(200, 55) },
+                { ad: 'Izgarada hepsi: depo, fark, sistem', sure: 900, ekran: 'izgara',
+                  goz: y(200, 160), imlec: null }
             ]
         }
     };
