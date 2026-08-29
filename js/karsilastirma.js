@@ -46,8 +46,16 @@
 
     function sayiIki(n) { return (n < 10 ? '0' : '') + n; }
 
-    /** ms değerini sa:sn.ss biçiminde yazar. */
+    /**
+     * ms değerini sa:sn.ss biçiminde yazar.
+     *
+     * Negatif değer sıfıra çekiliyor. `performance.now` normalde geri
+     * gitmez ama saat ayarı, sekmenin askıya alınması ya da dışarıdan
+     * müdahale gibi durumlarda geçen süre eksiye düşebiliyor; o zaman
+     * `sayiIki` "0-8" gibi bozuk bir metin üretiyordu.
+     */
     function saatYaz(ms) {
+        if (!(ms > 0)) ms = 0;
         var toplamSaniye = Math.floor(ms / 1000);
         var dakika = Math.floor(toplamSaniye / 60);
         var saniye = toplamSaniye % 60;
@@ -284,6 +292,8 @@
             '<div class="krs__sonuc">' +
             '  <span data-rol="sonucYazi">' + kacir(tanim.ozet || '') + '</span>' +
             '  <span class="krs__bosluk"></span>' +
+            (tanim.vurgu ? '  <span class="krs__vurgu" data-rol="vurgu">' +
+                           kacir(tanim.vurgu) + '</span>' : '') +
             '  <span class="krs__fark" data-rol="fark"></span>' +
             '</div>';
 
@@ -294,6 +304,7 @@
         var dugme = kap.querySelector('[data-rol="oynat"]');
         var dugmeYazi = kap.querySelector('[data-rol="dugmeYazi"]');
         var farkEl = kap.querySelector('[data-rol="fark"]');
+        var vurguEl = kap.querySelector('[data-rol="vurgu"]');
 
         var azHareket = global.matchMedia &&
                         global.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -319,6 +330,12 @@
             farkSure.textContent = saatYaz(fark) + ' daha hızlı';
             farkKat.textContent = kat.toFixed(1).replace('.', ',') + ' kat';
             farkEl.classList.add('acik');
+            /*
+             * Bazı senaryolarda asıl kazanç süre değil. Fırında mesele
+             * hızdan çok fazla pişirmenin önlenmesi; o cümle burada
+             * görünür oluyor.
+             */
+            if (vurguEl) vurguEl.classList.add('acik');
         }
 
         function dur() {
@@ -346,6 +363,7 @@
         function oynat() {
             if (kare) { cancelAnimationFrame(kare); kare = 0; }
             farkEl.classList.remove('acik');
+            if (vurguEl) vurguEl.classList.remove('acik');
             sol.sifirla();
             sag.sifirla();
 

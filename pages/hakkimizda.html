@@ -18,7 +18,7 @@
 <meta property="og:image" content="https://jetbarkod.com.tr/assets/logo.png">
 
 <link rel="stylesheet" href="../css/hakkimizda.css?v=20260829c">
-<link rel="stylesheet" href="../css/karsilastirma.css?v=20260829c">
+<link rel="stylesheet" href="../css/karsilastirma.css?v=20260829d">
 
 <script>
 /*
@@ -670,6 +670,25 @@
             </div>
 
         </div>
+
+        <div class="gir" style="margin-top:3.4rem">
+            <h3 class="baslik" style="font-size:clamp(1.2rem,2.4vw,1.6rem)">
+                Fırın: altmış satır mı, üç karar kartı mı
+            </h3>
+            <p class="giris">
+                Pişirme Önerileri sayfası dört zaman dilimini yan yana gösteriyor ve her
+                dilimde on beş ürün var. Altmış satırın çoğunda yazan sayı bir ya da sıfır.
+                Satırda yalnız kaç adet pişirileceği yazıyor; rafta ve donukta ne kadar
+                olduğunu görmek için satırları tek tek açmak gerekiyor.
+            </p>
+            <p class="giris" style="margin-top:0.9rem">
+                Asıl kazanç burada değil. Pişirme paneli sonraki dilimleri de aynı ekranda
+                gösterdiği için, akşam talebi düşecek bir üründen sabah fazla pişirilmiyor.
+                Fazla pişen ekmek akşam çöpe gidiyor; bu, önlenebilir bir maddi kayıp.
+            </p>
+        </div>
+
+        <div id="krsFirin" class="gir"></div>
     </div>
 </section>
 
@@ -787,13 +806,17 @@
     </div>
 </footer>
 
-<script src="../js/karsilastirma.js?v=20260829b"></script>
+<script src="../js/karsilastirma.js?v=20260829d"></script>
 <script src="../js/karsilastirma-barkod.js?v=20260829c"></script>
+<script src="../js/karsilastirma-firin.js?v=20260829b"></script>
 <script src="../js/hakkimizda.js?v=20260829c"></script>
 <script>
   // Sahneler betikler yüklendikten sonra kuruluyor.
   if (window.JBKarsilastirma && window.JBSenaryoBarkod) {
       JBKarsilastirma.kur(document.getElementById('krsBarkod'), JBSenaryoBarkod);
+  }
+  if (window.JBKarsilastirma && window.JBSenaryoFirin) {
+      JBKarsilastirma.kur(document.getElementById('krsFirin'), JBSenaryoFirin);
   }
 </script>
 </body>
