@@ -18,7 +18,7 @@
 <meta property="og:image" content="https://jetbarkod.com.tr/assets/logo.png">
 
 <link rel="stylesheet" href="../css/hakkimizda.css?v=20260829c">
-<link rel="stylesheet" href="../css/karsilastirma.css?v=20260829d">
+<link rel="stylesheet" href="../css/karsilastirma.css?v=20260829e">
 
 <script>
 /*
@@ -692,6 +692,47 @@
         </div>
 
         <div id="krsFirin" class="gir"></div>
+
+        <div class="gir" style="margin-top:3.4rem">
+            <h3 class="baslik" style="font-size:clamp(1.2rem,2.4vw,1.6rem)">
+                Bankoda kalan ürün hangi siparişe ait
+            </h3>
+            <p class="giris">
+                Dolapta ya da bankoda unutulan bir ürün çıktığında, hangi siparişe ait
+                olduğunu bulmanın tek yolu siparişleri tek tek açıp içeriğini okumaktı.
+                Sekiz aktif sipariş varsa en kötü ihtimalle sekiz kez açıp kapatmak
+                gerekiyor.
+            </p>
+            <p class="giris" style="margin-top:0.9rem">
+                Hızlı Bul, ürün adını bir kez yazmanız yeterli olacak şekilde çalışıyor.
+                Eşleşen siparişler öne çıkıyor, kalanlar geri plana düşüyor. Kartlar
+                içeriğe göre renkleniyor: su mavi, fırın sarı, dondurma mor. Sipariş
+                numarasının yanında kaç parça olduğu da yazıyor.
+            </p>
+        </div>
+
+        <div id="krsHizliBul" class="gir"></div>
+
+        <div class="gir" style="margin-top:3.4rem">
+            <h3 class="baslik" style="font-size:clamp(1.2rem,2.4vw,1.6rem)">
+                Sayım: masa başında mı, rafın önünde mi
+            </h3>
+            <p class="giris">
+                Eski yöntemde sayım iki ayrı yerde yürüyordu. Raftaki gerçek adet rafın
+                önünde sayılıyor, sistem stoğu ise masaya dönüp ürün ürün aratılıyor,
+                çıkan değer elde tutulan bir tabloya yazılıyordu. On bir kalemlik bir raf
+                için on bir ayrı arama demek.
+            </p>
+            <p class="giris" style="margin-top:0.9rem">
+                Jet Barkod'da sayım rafın önünde bitiyor. Telefonun kamerasıyla barkod
+                okutuluyor, ürün listeye kendiliğinden düşüyor, seri okuma modunda
+                ürünler peş peşe ekleniyor. Sayım biter bitmez sistem stoğu otomatik
+                alınıyor; depo ile sistem yan yana duruyor ve fark adet ve tutar olarak
+                hesaplanıyor.
+            </p>
+        </div>
+
+        <div id="krsSayim" class="gir"></div>
     </div>
 </section>
 
@@ -812,6 +853,8 @@
 <script src="../js/karsilastirma.js?v=20260829d"></script>
 <script src="../js/karsilastirma-barkod.js?v=20260829d"></script>
 <script src="../js/karsilastirma-firin.js?v=20260829d"></script>
+<script src="../js/karsilastirma-hizlibul.js?v=20260829a"></script>
+<script src="../js/karsilastirma-sayim.js?v=20260829a"></script>
 <script src="../js/hakkimizda.js?v=20260829c"></script>
 <script>
   // Sahneler betikler yüklendikten sonra kuruluyor.
@@ -820,6 +863,12 @@
   }
   if (window.JBKarsilastirma && window.JBSenaryoFirin) {
       JBKarsilastirma.kur(document.getElementById('krsFirin'), JBSenaryoFirin);
+  }
+  if (window.JBKarsilastirma && window.JBSenaryoHizliBul) {
+      JBKarsilastirma.kur(document.getElementById('krsHizliBul'), JBSenaryoHizliBul);
+  }
+  if (window.JBKarsilastirma && window.JBSenaryoSayim) {
+      JBKarsilastirma.kur(document.getElementById('krsSayim'), JBSenaryoSayim);
   }
 </script>
 </body>

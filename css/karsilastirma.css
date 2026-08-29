@@ -93,13 +93,21 @@
 
 /* ---------- İki şerit ---------- */
 
+/*
+ * `minmax(0, 1fr)` şart. Düz `1fr` en az içerik genişliğinin altına
+ * inemiyor; başlıktaki etiket ve kronometre yan yana sığmayınca ız
+ * büyüyor ve şerit kabından taşıp kırpılıyordu. Dar ekranda 340 piksellik
+ * kutuya 361 piksellik şerit giriyordu.
+ */
 .krs__alan {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
 }
 
+.krs__serit { min-width: 0; }
+
 @media (min-width: 820px) {
-    .krs__alan { grid-template-columns: 1fr 1fr; }
+    .krs__alan { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .krs__serit + .krs__serit { border-left: 1px solid var(--krs-cizgi); }
 }
 
@@ -113,6 +121,7 @@
     display: flex;
     align-items: center;
     gap: 0.55rem;
+    min-width: 0;
     padding: 0.8rem 1.05rem;
     border-bottom: 1px solid var(--krs-cizgi);
 }
@@ -124,8 +133,17 @@
     text-transform: uppercase;
 }
 
+.krs__etiket { flex: none; }
 .krs__serit--eski .krs__etiket { color: var(--krs-eski); }
 .krs__serit--yeni .krs__etiket { color: var(--krs-yeni); }
+
+/* Çok dar ekranda etiket ile şerit adı yan yana sığmıyor. Etiket gidiyor;
+   hangi tarafın hangisi olduğu zaten şerit adından ve renginden belli. */
+@media (max-width: 430px) {
+    .krs__etiket { display: none; }
+    .krs__saat { min-width: 4.9rem; font-size: 0.78rem; }
+    .krs__baslik { padding-left: 0.8rem; padding-right: 0.8rem; }
+}
 
 .krs__serit-ad {
     flex: 1;
