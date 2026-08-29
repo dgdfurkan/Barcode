@@ -259,113 +259,228 @@
     /** Ürün adı seçili hâli: kopyalama anı. */
     var EKRAN_SECILI = ekranSiparisDetay(false, true);
 
-    /** Raf etiketleri sayfası: kendi başlığı, sipariş sekmeleri yok. */
-    function rafKabuk() {
+    /**
+     * Raf Etiketi sayfası. Canlı panele bakılarak çizildi: solda açılan
+     * Stok ağacı, üstte kırıntı yolu, Filtreler paneli (Depo, Ürünler,
+     * Raf, Temizle, Uygula) ve altında Barkodlar / Ürün Görseli / Ürün ID /
+     * Ürün Adı / Raf sütunlu tablo.
+     */
+    function rafKabuk(urunAlani) {
+        var yan = ['Kontrol Paneli', 'Harita', 'Stok', 'Sık Kullanılanlar', 'Favoriler'];
+        var yanYazi = '';
+        for (var i = 0; i < yan.length; i++) {
+            var aktif = yan[i] === 'Stok';
+            yanYazi += '<text x="14" y="' + (78 + i * 17) + '" class="p-yazi p-yazi--kucuk" fill="' +
+                       (aktif ? '#5d3ebc' : '#334155') + '"' + (aktif ? ' font-weight="700"' : '') +
+                       '>' + yan[i] + '</text>';
+        }
+
         return '<rect x="0" y="22" width="400" height="38" class="p-mor"/>' +
             '<text x="14" y="46" class="p-sari" style="font-size:12px;font-weight:800">getir</text>' +
-            '<text x="46" y="42" class="p-yazi--ak" style="font-size:7px;font-weight:700">Depo Paneli</text>' +
-            '<text x="148" y="48" class="p-yazi p-yazi--kucuk p-yazi--ak" opacity="0.8">Kontrol Paneli</text>' +
-            '<text x="204" y="48" class="p-sari" style="font-size:5.5px">Stok</text>' +
-            '<rect x="204" y="52" width="13" height="1.6" class="p-sari"/>' +
+            '<text x="46" y="38" class="p-yazi--ak" style="font-size:6.5px;font-weight:700">Depo Paneli</text>' +
+            '<rect x="46" y="42" width="28" height="8" rx="3" fill="#0f7b4a"/>' +
+            '<text x="50" y="48" class="p-yazi p-yazi--ak" style="font-size:4.5px">Müsait</text>' +
+            '<text x="78" y="48" class="p-yazi p-yazi--ak" style="font-size:5.5px">Göksu Park</text>' +
             '<circle cx="386" cy="41" r="7" fill="rgb(255 255 255 / 0.24)"/>' +
-            '<rect x="0" y="60" width="400" height="240" class="p-zemin"/>' +
-            '<text x="18" y="78" class="p-yazi p-yazi--kalin">Raf Etiketleri</text>';
+            '<rect x="0" y="60" width="400" height="240" fill="#fff"/>' +
+
+            /* Sol menü */
+            '<rect x="0" y="60" width="72" height="240" fill="#fff"/>' +
+            '<path d="M72 60 v240" class="p-cizgi"/>' +
+            '<rect x="8" y="66" width="56" height="10" rx="3" fill="#f1f5f9"/>' +
+            '<text x="13" y="73" class="p-yazi p-yazi--kucuk" opacity="0.45" style="font-size:5px">Arama</text>' +
+            yanYazi +
+
+            /* Kırıntı yolu */
+            '<text x="82" y="72" class="p-yazi p-yazi--kucuk" opacity="0.5">Stok / Stok Yönetimi /</text>' +
+            '<text x="152" y="72" class="p-yazi p-yazi--kucuk">Raf Etiketi</text>' +
+
+            /* Kart */
+            '<rect x="80" y="80" width="312" height="212" rx="6" class="p-kart"/>' +
+            '<text x="90" y="96" class="p-yazi p-yazi--kalin">Raf Etiketi</text>' +
+            '<rect x="336" y="87" width="46" height="13" rx="4" fill="#fff" stroke="#5d3ebc"/>' +
+            '<text x="343" y="96" class="p-yazi p-yazi--kucuk" fill="#5d3ebc" style="font-size:5px">Import CSV</text>' +
+
+            /* Filtreler */
+            '<rect x="88" y="104" width="296" height="52" rx="5" fill="#fafbfc" stroke="#eef2f7"/>' +
+            '<text x="96" y="116" class="p-yazi p-yazi--kucuk">Filtreler</text>' +
+            '<rect x="96" y="120" width="86" height="14" rx="4" fill="#f1f5f9" stroke="#e2e8f0"/>' +
+            '<text x="101" y="130" class="p-yazi p-yazi--kucuk" opacity="0.45">Göksu Park</text>' +
+            urunAlani +
+            '<rect x="282" y="120" width="94" height="14" rx="4" fill="#fff" stroke="#e2e8f0"/>' +
+            '<text x="287" y="130" class="p-yazi p-yazi--kucuk" opacity="0.45">Raf</text>' +
+            '<rect x="96" y="138" width="10" height="10" rx="3" fill="#fff" stroke="#e2e8f0"/>' +
+            '<text x="99" y="146" class="p-yazi p-yazi--kucuk">+</text>' +
+            '<rect x="110" y="138" width="72" height="11" rx="4" fill="#fff" stroke="#e2e8f0"/>' +
+            '<text x="115" y="146" class="p-yazi p-yazi--kucuk" opacity="0.45" style="font-size:5px">Kayıtlı aramalar</text>' +
+            '<rect x="298" y="137" width="34" height="13" rx="4" fill="#fff" stroke="#e2e8f0"/>' +
+            '<text x="305" y="146" class="p-yazi p-yazi--kucuk">Temizle</text>' +
+            '<rect x="338" y="137" width="38" height="13" rx="4" class="p-mor"/>' +
+            '<text x="348" y="146" class="p-yazi p-yazi--kucuk p-yazi--ak">Uygula</text>';
     }
 
-    // ==================================================================
-    // Ekranlar: eski yöntem
-    // ==================================================================
+    /** Tablo başlığı ve satırları. */
+    function rafTablo(satirlar, vurguSira) {
+        var cikti =
+            '<text x="94" y="172" class="p-yazi p-yazi--kucuk" opacity="0.6">Barkodlar</text>' +
+            '<text x="152" y="172" class="p-yazi p-yazi--kucuk" opacity="0.6">Görsel</text>' +
+            '<text x="188" y="172" class="p-yazi p-yazi--kucuk" opacity="0.6">Ürün ID</text>' +
+            '<text x="256" y="172" class="p-yazi p-yazi--kucuk" opacity="0.6">Ürün Adı</text>' +
+            '<text x="366" y="172" class="p-yazi p-yazi--kucuk" opacity="0.6">Raf</text>' +
+            '<path d="M88 176 h296" class="p-cizgi"/>';
+
+        for (var i = 0; i < satirlar.length; i++) {
+            var yy = 190 + i * 20;
+            var vurgu = i === vurguSira;
+            cikti +=
+                (vurgu ? '<rect x="88" y="' + (yy - 11) + '" width="296" height="18" fill="#ecfdf5"/>' : '') +
+                '<rect x="92" y="' + (yy - 8) + '" width="54" height="11" rx="3" fill="#f5f3ff" stroke="' +
+                (vurgu ? '#059669' : '#c4b5fd') + '"/>' +
+                '<text x="96" y="' + yy + '" class="p-yazi p-yazi--kucuk" fill="' +
+                (vurgu ? '#047857' : '#6d28d9') + '" style="font-size:5px">' + satirlar[i][0] + '</text>' +
+                '<rect x="154" y="' + (yy - 9) + '" width="12" height="12" rx="3" fill="' + satirlar[i][2] + '"/>' +
+                '<rect x="186" y="' + (yy - 8) + '" width="62" height="11" rx="3" fill="#f8fafc" stroke="#eef2f7"/>' +
+                '<text x="189" y="' + yy + '" class="p-yazi p-yazi--kucuk" opacity="0.7" style="font-size:4.5px">' +
+                satirlar[i][3] + '</text>' +
+                '<rect x="254" y="' + (yy - 8) + '" width="104" height="11" rx="3" fill="#f8fafc" stroke="#eef2f7"/>' +
+                '<text x="257" y="' + yy + '" class="p-yazi p-yazi--kucuk" style="font-size:4.5px">' +
+                satirlar[i][1] + '</text>' +
+                '<text x="368" y="' + yy + '" class="p-yazi p-yazi--kucuk" opacity="0.5">-</text>';
+        }
+        return cikti;
+    }
+
+    var RAF_VARSAYILAN = [
+        ['8696368011332', 'Activia Probiyotik Sade Yoğurt (4 x 100 g)', '#a7f3d0', '559823ceb1dc700c'],
+        ['8696368011349', 'Activia Probiyotik Çilekli Yoğurt (4 x 100 g)', '#fca5a5', '559823f7b1dc700c'],
+        ['8696368011493', 'Activia Probiyotik Ananaslı Yoğurt (4 x 100 g)', '#fde68a', '55982415b1dc700c'],
+        ['8690709040005', 'Cook Alüminyum Folyo (10 M)', '#e2e8f0', '55982541b1dc700c'],
+        ['8690637805219', 'Cook Kraft Pişirme Kağıdı (16 M)', '#d6d3d1', '5598258db1dc700c']
+    ];
+
+    var URUN_BOS =
+        '<rect x="188" y="120" width="88" height="14" rx="4" fill="#fff" stroke="#e2e8f0"/>' +
+        '<text x="193" y="130" class="p-yazi p-yazi--kucuk" opacity="0.45">Ürünler</text>';
+
+    var URUN_YAZILDI =
+        '<rect x="188" y="120" width="88" height="14" rx="4" fill="#fff" stroke="#5d3ebc"/>' +
+        '<text x="193" y="130" class="p-yazi p-yazi--kucuk">sütaş</text>' +
+        '<rect x="212" y="123" width="1.2" height="8" fill="#5d3ebc"/>';
 
     var EKRAN_RAF_BOS =
-        '<svg viewBox="0 0 400 300">' +
-        sekmeSeridi(['Depo Paneli', 'Raf Etiketleri'], 1) +
-        rafKabuk() +
-        '<rect x="18" y="88" width="230" height="20" rx="5" class="p-kart"/>' +
-        '<circle cx="32" cy="98" r="4.6" fill="none" stroke="#94a3b8" stroke-width="1.4"/>' +
-        '<path d="M35.4 101.4 L39 105" stroke="#94a3b8" stroke-width="1.4" stroke-linecap="round"/>' +
-        '<text x="43" y="101" class="p-yazi p-yazi--kucuk" opacity="0.45">Ürün adı ile ara</text>' +
-        '<rect x="256" y="88" width="52" height="20" rx="5" class="p-mor"/>' +
-        '<text x="270" y="101" class="p-yazi p-yazi--kucuk p-yazi--ak">Ara</text>' +
-        '<rect x="18" y="122" width="364" height="162" rx="7" class="p-kart"/>' +
-        '<text x="150" y="205" class="p-yazi p-yazi--kucuk" opacity="0.45">Arama yapılmadı</text>' +
-        '</svg>';
+        '<svg viewBox="0 0 400 300">' + sekmeSeridi(['Depo Paneli', 'Raf Etiketi'], 1) +
+        rafKabuk(URUN_BOS) + rafTablo(RAF_VARSAYILAN, -1) + '</svg>';
 
-    var EKRAN_RAF_YAZILDI = EKRAN_RAF_BOS
-        .replace('<text x="43" y="101" class="p-yazi p-yazi--kucuk" opacity="0.45">Ürün adı ile ara</text>',
-                 '<text x="43" y="101" class="p-yazi p-yazi--kucuk">Sütaş Yarım Yağlı Süt</text>' +
-                 '<rect x="128" y="93" width="1.2" height="10" fill="#5d3ebc"/>');
+    var EKRAN_RAF_YAZILDI =
+        '<svg viewBox="0 0 400 300">' + sekmeSeridi(['Depo Paneli', 'Raf Etiketi'], 1) +
+        rafKabuk(URUN_YAZILDI) + rafTablo(RAF_VARSAYILAN, -1) + '</svg>';
 
     /**
-     * Arama sonucu. Kampanyalı ürünler listeye karışıyor; doğru satırı
-     * ayıklamak zaman alan kısım burası.
+     * Açılan öneri listesi. Canlı panelde tam olarak böyle: kasa, paket ve
+     * kampanya üçlüsü aranan tekil ürünle karışıyor. Aranan satır listenin
+     * görünen kısmında bile olmayabiliyor.
      */
-    function rafSonucSatiri(y, ad, etiket, dogru) {
-        return '<g>' +
-            (dogru ? '<rect x="26" y="' + (y - 8) + '" width="348" height="17" rx="4" fill="#ecfdf5"/>' : '') +
-            '<text x="34" y="' + y + '" class="p-yazi p-yazi--kucuk"' +
-            (dogru ? ' font-weight="700"' : '') + '>' + ad + '</text>' +
-            (etiket
-                ? '<rect x="252" y="' + (y - 7.5) + '" width="42" height="10" rx="3" fill="#fef3c7"/>' +
-                  '<text x="256" y="' + (y - 0.5) + '" class="p-yazi p-yazi--kucuk" fill="#b45309">' +
-                  etiket + '</text>'
-                : '') +
-            '<text x="306" y="' + y + '" class="p-yazi p-yazi--kucuk" opacity="0.7">' +
-            (dogru ? '8690767670053' : '86907…') + '</text>' +
-            '</g>';
+    var ONERILER = [
+        ['Sütaş, Uno & Domates Üçlüsü', 'ÜÇLÜ', '#fca5a5'],
+        ['Sütaş Kasa', 'KASA', '#c4b5fd'],
+        ['Sütaş Yağlı Süt Paketi (4 x 1 L)', 'PAKET', '#bfdbfe'],
+        ['Sütaş Çilekli Süt (200 ml)', '', '#fbcfe8'],
+        ['Sütaş Muzlu Süt (200 ml)', '', '#fde68a'],
+        ['Sütaş Laktozsuz Süt (200 ml)', '', '#bae6fd'],
+        ['Sütaş Çikolatalı Süt (200 ml)', '', '#d6bfa8'],
+        ['Sütaş Kasa - 30012', 'KASA', '#c4b5fd']
+    ];
+
+    function oneriListesi(secili) {
+        var cikti = '<rect x="188" y="136" width="130" height="' + (ONERILER.length * 13 + 8) +
+                    '" rx="5" fill="#fff" stroke="#e2e8f0"/>';
+        for (var i = 0; i < ONERILER.length; i++) {
+            var yy = 148 + i * 13;
+            if (i === secili) {
+                cikti += '<rect x="190" y="' + (yy - 9) + '" width="126" height="12" rx="3" fill="#ecfdf5"/>';
+            }
+            cikti += '<rect x="194" y="' + (yy - 8) + '" width="8" height="8" rx="2" fill="' +
+                     ONERILER[i][2] + '"/>' +
+                     '<text x="206" y="' + yy + '" class="p-yazi p-yazi--kucuk" style="font-size:4.6px"' +
+                     (i === secili ? ' font-weight="700"' : '') + '>' + ONERILER[i][0] + '</text>' +
+                     (ONERILER[i][1]
+                        ? '<rect x="292" y="' + (yy - 7.5) + '" width="22" height="8" rx="2" fill="#fef3c7"/>' +
+                          '<text x="295" y="' + (yy - 1.5) + '" class="p-yazi" fill="#b45309"' +
+                          ' style="font-size:4px">' + ONERILER[i][1] + '</text>'
+                        : '');
+        }
+        return cikti;
     }
 
+    var EKRAN_RAF_ONERI =
+        '<svg viewBox="0 0 400 300">' + sekmeSeridi(['Depo Paneli', 'Raf Etiketi'], 1) +
+        rafKabuk(URUN_YAZILDI) + rafTablo(RAF_VARSAYILAN, -1) + oneriListesi(-1) + '</svg>';
+
+    var EKRAN_RAF_SECILDI =
+        '<svg viewBox="0 0 400 300">' + sekmeSeridi(['Depo Paneli', 'Raf Etiketi'], 1) +
+        rafKabuk(URUN_YAZILDI) + rafTablo(RAF_VARSAYILAN, -1) + oneriListesi(2) + '</svg>';
+
     var EKRAN_RAF_SONUC =
-        '<svg viewBox="0 0 400 300">' +
-        sekmeSeridi(['Depo Paneli', 'Raf Etiketleri'], 1) +
-        rafKabuk() +
-        '<rect x="18" y="88" width="230" height="20" rx="5" class="p-kart"/>' +
-        '<text x="43" y="101" class="p-yazi p-yazi--kucuk">Sütaş Yarım Yağlı Süt</text>' +
-        '<rect x="256" y="88" width="52" height="20" rx="5" class="p-mor"/>' +
-        '<text x="270" y="101" class="p-yazi p-yazi--kucuk p-yazi--ak">Ara</text>' +
-        '<rect x="18" y="122" width="364" height="162" rx="7" class="p-kart"/>' +
-        '<text x="34" y="138" class="p-yazi p-yazi--kucuk" opacity="0.6">9 sonuç</text>' +
-        rafSonucSatiri(154, 'Sütaş Yarım Yağlı Süt 1 L (2+1)', 'KAMPANYA', false) +
-        rafSonucSatiri(172, 'Sütaş Tam Yağlı Süt 1 L', '', false) +
-        rafSonucSatiri(190, 'Sütaş Yarım Yağlı Süt 500 ml', '', false) +
-        rafSonucSatiri(208, 'Sütaş Yarım Yağlı Süt (1 L)', '', true) +
-        rafSonucSatiri(226, 'Sütaş Yarım Yağlı Süt 1 L (İndirim)', 'KAMPANYA', false) +
-        rafSonucSatiri(244, 'Sütaş Laktozsuz Süt 1 L', '', false) +
-        rafSonucSatiri(262, 'Sütaş Yarım Yağlı Süt 200 ml', '', false) +
+        '<svg viewBox="0 0 400 300">' + sekmeSeridi(['Depo Paneli', 'Raf Etiketi'], 1) +
+        rafKabuk('<rect x="188" y="120" width="88" height="14" rx="4" fill="#f5f3ff" stroke="#c4b5fd"/>' +
+                 '<text x="192" y="130" class="p-yazi p-yazi--kucuk" fill="#6d28d9" style="font-size:4.6px">' +
+                 'Sütaş Yarım Yağlı Süt (1 L)</text>') +
+        rafTablo([['8690767670053', 'Sütaş Yarım Yağlı Süt (1 L)', '#bfdbfe', '5598262ab1dc700c']], 0) +
         '</svg>';
 
-    var EKRAN_BARKOD_BOS =
-        '<svg viewBox="0 0 400 300">' +
-        sekmeSeridi(['Depo Paneli', 'Raf Etiketleri', 'Barkod Üreteci'], 2) +
-        '<rect x="0" y="22" width="400" height="278" fill="#f8fafc"/>' +
-        '<rect x="0" y="22" width="400" height="30" fill="#1e293b"/>' +
-        '<text x="16" y="42" class="p-yazi p-yazi--ak" style="font-weight:700">Barkod Üreteci</text>' +
-        '<rect x="60" y="86" width="280" height="24" rx="5" class="p-kart"/>' +
-        '<text x="70" y="101" class="p-yazi p-yazi--kucuk" opacity="0.45">Barkod numarasını yapıştırın</text>' +
-        '<rect x="60" y="120" width="80" height="22" rx="5" fill="#1e293b"/>' +
-        '<text x="82" y="135" class="p-yazi p-yazi--kucuk p-yazi--ak">Oluştur</text>' +
-        '<rect x="60" y="156" width="280" height="112" rx="7" fill="#fff" stroke="#e2e8f0" stroke-dasharray="4 3"/>' +
-        '<text x="150" y="216" class="p-yazi p-yazi--kucuk" opacity="0.4">Barkod burada görünecek</text>' +
-        '</svg>';
+    // ==================================================================
+    // Barkod üreteci (barkodist.com)
+    // ==================================================================
 
-    var EKRAN_BARKOD_YAPISTIRILDI = EKRAN_BARKOD_BOS.replace(
-        '<text x="70" y="101" class="p-yazi p-yazi--kucuk" opacity="0.45">Barkod numarasını yapıştırın</text>',
-        '<text x="70" y="101" class="p-yazi p-yazi--kucuk">8690767670053</text>');
+    function barkodistKabuk(aktifTur, deger, sonucVar) {
+        var turler = ['CODE 128', 'EAN / UPC', 'CODE39', 'ITF 14', 'MSI', 'Codabar'];
+        var x = 18;
+        var turYazi = '';
+        for (var i = 0; i < turler.length; i++) {
+            var aktif = turler[i] === aktifTur;
+            var g = turler[i].length * 3.4 + 12;
+            if (aktif) turYazi += '<rect x="' + (x - 6) + '" y="84" width="' + g +
+                                  '" height="14" rx="4" fill="#0f172a"/>';
+            turYazi += '<text x="' + x + '" y="94" class="p-yazi p-yazi--kucuk" fill="' +
+                       (aktif ? '#ffffff' : '#0f172a') + '"' + (aktif ? ' font-weight="700"' : '') +
+                       '>' + turler[i] + '</text>';
+            x += g + 4;
+        }
 
-    var EKRAN_BARKOD_HAZIR =
-        '<svg viewBox="0 0 400 300">' +
-        sekmeSeridi(['Depo Paneli', 'Raf Etiketleri', 'Barkod Üreteci'], 2) +
-        '<rect x="0" y="22" width="400" height="278" fill="#f8fafc"/>' +
-        '<rect x="0" y="22" width="400" height="30" fill="#1e293b"/>' +
-        '<text x="16" y="42" class="p-yazi p-yazi--ak" style="font-weight:700">Barkod Üreteci</text>' +
-        '<rect x="60" y="86" width="280" height="24" rx="5" class="p-kart"/>' +
-        '<text x="70" y="101" class="p-yazi p-yazi--kucuk">8690767670053</text>' +
-        '<rect x="60" y="120" width="80" height="22" rx="5" fill="#1e293b"/>' +
-        '<text x="82" y="135" class="p-yazi p-yazi--kucuk p-yazi--ak">Oluştur</text>' +
-        '<rect x="60" y="156" width="280" height="112" rx="7" fill="#fff" stroke="#e2e8f0"/>' +
-        barkod(96, 176, 210, 58) +
-        '<text x="152" y="250" class="p-yazi p-yazi--kucuk">8690767670053</text>' +
-        '<text x="128" y="264" class="p-yazi p-yazi--kucuk" opacity="0.55">Tek ürün için hazır</text>' +
-        '</svg>';
+        return '<svg viewBox="0 0 400 300">' +
+            sekmeSeridi(['Depo Paneli', 'Raf Etiketi', 'Barkodist'], 2) +
+            '<rect x="0" y="22" width="400" height="278" fill="#fff"/>' +
+            '<circle cx="26" cy="40" r="9" fill="none" stroke="#0f172a" stroke-width="1.6"/>' +
+            '<path d="M22 36 v8 M26 34 v10 M30 36 v8" stroke="#0f172a" stroke-width="1.4"/>' +
+            '<text x="286" y="43" class="p-yazi p-yazi--kucuk">Anasayfa</text>' +
+            '<text x="322" y="43" class="p-yazi p-yazi--kucuk">Barkod Oluştur</text>' +
+            '<path d="M0 56 h400" class="p-cizgi"/>' +
+            '<text x="18" y="74" class="p-yazi--kalin" style="font-size:13px">Ücretsiz Barkod Oluşturucu</text>' +
+            turYazi +
+            '<rect x="12" y="104" width="42" height="10" rx="5" fill="#0f172a"/>' +
+            '<text x="17" y="112" class="p-yazi p-yazi--ak" style="font-size:4.5px">CODE 128 AUTO</text>' +
+            '<rect x="12" y="122" width="292" height="150" rx="6" class="p-kart"/>' +
+            (sonucVar
+                ? '<rect x="120" y="132" width="80" height="46" rx="2" fill="#fff" stroke="#e2e8f0"/>' +
+                  barkod(126, 136, 68, 34) +
+                  '<text x="136" y="188" class="p-yazi p-yazi--kucuk">' + deger + '</text>'
+                : '<rect x="120" y="132" width="80" height="46" rx="2" fill="#fff" stroke="#e2e8f0"/>' +
+                  barkod(126, 136, 68, 34, '#94a3b8') +
+                  '<text x="146" y="188" class="p-yazi p-yazi--kucuk" opacity="0.5">Merhaba!</text>') +
+            '<rect x="24" y="198" width="268" height="18" rx="4" fill="#fff" stroke="#e2e8f0"/>' +
+            '<text x="32" y="210" class="p-yazi p-yazi--kucuk"' + (deger ? '' : ' opacity="0.45"') + '>' +
+            (deger || 'Barkod Numarası Giriniz') + '</text>' +
+            '<rect x="24" y="224" width="128" height="18" rx="4" fill="#0f172a"/>' +
+            '<text x="72" y="236" class="p-yazi p-yazi--ak">+ Oluştur</text>' +
+            '<rect x="164" y="224" width="128" height="18" rx="4" fill="#0f172a"/>' +
+            '<text x="214" y="236" class="p-yazi p-yazi--ak">İndir</text>' +
+            '</svg>';
+    }
+
+    var EKRAN_BARKOD_BOS = barkodistKabuk('CODE 128', '', false);
+    var EKRAN_BARKOD_TUR = barkodistKabuk('EAN / UPC', '', false);
+    var EKRAN_BARKOD_YAPISTIRILDI = barkodistKabuk('EAN / UPC', '8690767670053', false);
+    var EKRAN_BARKOD_HAZIR = barkodistKabuk('EAN / UPC', '8690767670053', true);
 
     // ==================================================================
     // Ekranlar: Jet Barkod
@@ -434,8 +549,11 @@
                 secili: EKRAN_SECILI,
                 rafBos: EKRAN_RAF_BOS,
                 rafYazildi: EKRAN_RAF_YAZILDI,
+                rafOneri: EKRAN_RAF_ONERI,
+                rafSecildi: EKRAN_RAF_SECILDI,
                 rafSonuc: EKRAN_RAF_SONUC,
                 barkodBos: EKRAN_BARKOD_BOS,
+                barkodTur: EKRAN_BARKOD_TUR,
                 barkodYapistirildi: EKRAN_BARKOD_YAPISTIRILDI,
                 barkodHazir: EKRAN_BARKOD_HAZIR
             },
@@ -446,24 +564,34 @@
                   yukleniyor: true, goz: y(200, 200) },
                 { ad: 'Ürün adı seçilip kopyalandı', sure: 2200, ekran: 'secili',
                   imlec: y(278, 246), goz: y(268, 244), tik: true },
-                { ad: 'Raf etiketleri sistemine geçildi', sure: 1100, ekran: 'rafBos',
-                  imlec: y(105, 12), goz: y(105, 12), tik: true },
+                { ad: 'Raf Etiketi sayfasına geçildi', sure: 1100, ekran: 'rafBos',
+                  imlec: y(100, 12), goz: y(100, 12), tik: true },
                 { ad: 'Sayfa yükleniyor', sureAralik: [2000, 3000], ekran: 'rafBos',
-                  yukleniyor: true, goz: y(200, 150) },
-                { ad: 'Ürün adı arama kutusuna yazıldı', sure: 2600, ekran: 'rafYazildi',
-                  imlec: y(130, 98), goz: y(120, 98), tik: true },
-                { ad: 'Sonuçlar arasında doğru ürün aranıyor', sureAralik: [2600, 4200],
-                  ekran: 'rafSonuc', goz: y(150, 190), imlec: y(300, 160) },
-                { ad: 'Doğru satır bulundu, barkod kopyalandı', sure: 1400, ekran: 'rafSonuc',
-                  imlec: y(334, 208), goz: y(334, 208), tik: true },
-                { ad: 'Barkod üreteci sekmesi açıldı', sure: 1000, ekran: 'barkodBos',
+                  yukleniyor: true, goz: y(230, 200) },
+                { ad: 'Ürünler filtresine ürün adı yazıldı', sure: 2400, ekran: 'rafYazildi',
+                  imlec: y(232, 127), goz: y(232, 127), tik: true },
+                { ad: 'Açılan listede kasa ve paketler karışık', sure: 900, ekran: 'rafOneri',
+                  goz: y(250, 160), imlec: y(310, 150) },
+                { ad: 'Doğru tekil ürün aranıyor', sureAralik: [3000, 4600], ekran: 'rafOneri',
+                  goz: y(250, 215), imlec: y(310, 210) },
+                { ad: 'Ürün seçildi', sure: 900, ekran: 'rafSecildi',
+                  imlec: y(250, 174), goz: y(250, 174), tik: true },
+                { ad: 'Uygula düğmesine basıldı', sure: 800, ekran: 'rafSecildi',
+                  imlec: y(357, 144), goz: y(357, 144), tik: true },
+                { ad: 'Tablo yeniden yükleniyor', sureAralik: [1600, 2600], ekran: 'rafSonuc',
+                  yukleniyor: true, goz: y(230, 200) },
+                { ad: 'Barkod rozetine tıklanıp kopyalandı', sure: 1100, ekran: 'rafSonuc',
+                  imlec: y(120, 190), goz: y(120, 190), tik: true },
+                { ad: 'Barkod üreteci sekmesine geçildi', sure: 1000, ekran: 'barkodBos',
                   imlec: y(178, 12), goz: y(178, 12), tik: true },
+                { ad: 'EAN / UPC türü seçildi', sure: 900, ekran: 'barkodTur',
+                  imlec: y(86, 92), goz: y(86, 92), tik: true },
                 { ad: 'Numara yapıştırıldı', sure: 900, ekran: 'barkodYapistirildi',
-                  imlec: y(200, 98), goz: y(200, 98), tik: true },
+                  imlec: y(150, 208), goz: y(150, 208), tik: true },
                 { ad: 'Oluştur düğmesine basıldı', sure: 700, ekran: 'barkodYapistirildi',
-                  imlec: y(100, 131), goz: y(100, 131), tik: true },
+                  imlec: y(88, 234), goz: y(88, 234), tik: true },
                 { ad: 'Tek ürünün barkodu hazır', sure: 900, ekran: 'barkodHazir',
-                  goz: y(200, 205), imlec: null }
+                  goz: y(160, 158), imlec: null }
             ]
         },
 
