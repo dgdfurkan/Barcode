@@ -1,0 +1,491 @@
+/**
+ * Jet Barkod. Karşılaştırma senaryosu: barkoda ulaşmak.
+ * ============================================================================
+ *
+ * Başlangıç noktası iki tarafta da aynı: rafta okunmayan bir barkodla
+ * karşılaşan personel bilgisayarın başına geliyor, kontrol panelinde aktif
+ * sipariş açık. Kronometre, siparişe tıklandığı anda başlıyor.
+ *
+ * SOLDA yaşanan gerçek akış: ürün adını kopyala, raf etiketleri sistemini
+ * aç, yüklenmesini bekle, ara, kampanyalı ürünlerin arasından doğru olanı
+ * ayıkla, barkodu kopyala, yeni sekmede barkod üretecine yapıştır, oluştur.
+ *
+ * SAĞDA: tümünü kopyala, yan sekmeye geç, hepsi barkoduyla karşında.
+ *
+ * SÜRELER
+ * Sabit değil. Sayfa yüklenmesi ve arama gibi adımlar `sureAralik` ile
+ * veriliyor; her oynatmada o aralıktan rastgele seçiliyor. Gerçekte de
+ * bu adımlar her seferinde aynı sürmüyor.
+ *
+ * ÖLÇEK
+ * Bütün sahneler 400x300 birimlik alanda çiziliyor. İmleç ve göz konumları
+ * sahnenin yüzdesi olarak veriliyor, yani SVG birimini 4 ve 3'e bölerek.
+ * ============================================================================
+ */
+(function (global) {
+    'use strict';
+
+    // ==================================================================
+    // Ortak parçalar
+    // ==================================================================
+
+    /**
+     * Getir depo panelinin üst şeridi. Canlı panele bakılarak çizildi:
+     * sarı getir yazısı, Depo Paneli başlığı, yeşil "Müsait" rozeti ve
+     * depo adı solda; gezinme ortada; arama, görünüm, bildirim ve profil
+     * sağda. Altında kırıntı yolu ve alt sekmeler var.
+     */
+    function getirKabuk(altSekme) {
+        var ust = ['Kontrol Paneli', 'Harita', 'Stok', 'Sık Kullanılanlar'];
+        var x = 148;
+        var ustYazi = '';
+        for (var i = 0; i < ust.length; i++) {
+            var aktif = ust[i] === 'Kontrol Paneli';
+            ustYazi += '<text x="' + x + '" y="26" class="p-yazi p-yazi--kucuk" fill="' +
+                       (aktif ? '#ffd300' : '#ffffff') + '"' + (aktif ? '' : ' opacity="0.8"') +
+                       '>' + ust[i] + '</text>';
+            if (aktif) ustYazi += '<rect x="' + x + '" y="30" width="' + (ust[i].length * 3.2) +
+                                  '" height="1.6" class="p-sari"/>';
+            x += ust[i].length * 3.2 + 12;
+        }
+
+        var alt = ['Siparişler', 'Harita', 'Pişirme Önerileri', 'İptal Siparişler',
+                   'İade Siparişler', 'Eksik Ürünlü Siparişler'];
+        var ax = 14;
+        var altYazi = '';
+        for (var j = 0; j < alt.length; j++) {
+            var sec = alt[j] === altSekme;
+            altYazi += '<text x="' + ax + '" y="70" class="p-yazi p-yazi--kucuk" fill="' +
+                       (sec ? '#5d3ebc' : '#64748b') + '"' + (sec ? ' font-weight="700"' : '') +
+                       '>' + alt[j] + '</text>';
+            if (sec) altYazi += '<rect x="' + ax + '" y="74" width="' + (alt[j].length * 3.1) +
+                                '" height="1.6" fill="#5d3ebc"/>';
+            ax += alt[j].length * 3.1 + 12;
+        }
+
+        return '<rect x="0" y="0" width="400" height="38" class="p-mor"/>' +
+            '<text x="14" y="24" class="p-sari" style="font-size:12px;font-weight:800">getir</text>' +
+            '<text x="46" y="16" class="p-yazi--ak" style="font-size:7px;font-weight:700">Depo Paneli</text>' +
+            '<rect x="46" y="20" width="30" height="9" rx="3" fill="#0f7b4a"/>' +
+            '<text x="51" y="27" class="p-yazi p-yazi--kucuk p-yazi--ak" style="font-size:5px">Müsait</text>' +
+            '<text x="80" y="27" class="p-yazi p-yazi--kucuk p-yazi--ak" style="font-size:6px">Göksu Park</text>' +
+            ustYazi +
+            '<rect x="332" y="12" width="16" height="15" rx="5" fill="rgb(255 255 255 / 0.16)"/>' +
+            '<rect x="352" y="12" width="22" height="15" rx="4" fill="rgb(255 255 255 / 0.16)"/>' +
+            '<circle cx="386" cy="19" r="7" fill="rgb(255 255 255 / 0.24)"/>' +
+            '<text x="383.5" y="22" class="p-yazi p-yazi--ak" style="font-size:6px">F</text>' +
+            '<rect x="0" y="38" width="400" height="262" fill="#fff"/>' +
+            '<text x="14" y="50" class="p-yazi p-yazi--kucuk" opacity="0.55">Kontrol Paneli</text>' +
+            altYazi +
+            '<path d="M0 78 h400" class="p-cizgi"/>' +
+            '<rect x="0" y="78" width="400" height="222" class="p-zemin"/>';
+    }
+
+    /** Tarayıcı sekme şeridi. Hangi sekmenin önde olduğunu gösterir. */
+    function sekmeSeridi(sekmeler, aktifSira) {
+        var cikti = '<rect x="0" y="0" width="400" height="22" fill="#dfe3e8"/>';
+        var x = 6;
+        for (var i = 0; i < sekmeler.length; i++) {
+            var g = sekmeler[i].length * 3.1 + 26;
+            var onde = i === aktifSira;
+            cikti += '<path d="M' + x + ' 22 v-13 a4 4 0 0 1 4 -4 h' + (g - 8) +
+                     ' a4 4 0 0 1 4 4 v13 z" fill="' + (onde ? '#ffffff' : '#eef1f4') + '"/>' +
+                     '<circle cx="' + (x + 11) + '" cy="12.5" r="3.2" fill="' +
+                     (onde ? '#5d3ebc' : '#b9c2cc') + '"/>' +
+                     '<text x="' + (x + 18) + '" y="15" class="p-yazi p-yazi--kucuk"' +
+                     (onde ? '' : ' opacity="0.6"') + '>' + sekmeler[i] + '</text>';
+            x += g + 4;
+        }
+        return cikti;
+    }
+
+    /**
+     * Sipariş kartı. Canlı panelde üstte geçen süre ve kırmızı bir çubuk,
+     * altında sipariş kodu, müşteri, kurye ve toplayıcı satırları, sağ
+     * altta da lokasyon rozeti duruyor.
+     */
+    function siparisKart(x, y, sure, kod, musteri, toplayici, lokasyon, secili) {
+        var satir = function (sy, im, metin) {
+            return '<rect x="' + (x + 9) + '" y="' + (sy - 5) + '" width="6" height="6" rx="1.5" fill="#c7cdd6"/>' +
+                   '<text x="' + (x + 19) + '" y="' + sy + '" class="p-yazi p-yazi--kucuk">' + metin + '</text>';
+        };
+        return '<g>' +
+            '<rect x="' + x + '" y="' + y + '" width="104" height="86" rx="6" class="p-kart"' +
+            (secili ? ' stroke="#5d3ebc" stroke-width="1.6"' : '') + '/>' +
+            '<text x="' + (x + 34) + '" y="' + (y + 13) + '" class="p-yazi p-yazi--kucuk">' + sure + '</text>' +
+            '<rect x="' + (x + 8) + '" y="' + (y + 17) + '" width="88" height="1.8" rx="1" fill="#e11d48"/>' +
+            satir(y + 32, 1, kod) +
+            satir(y + 45, 2, musteri) +
+            satir(y + 58, 3, '-') +
+            satir(y + 71, 4, toplayici) +
+            '<rect x="' + (x + 60) + '" y="' + (y + 76) + '" width="38" height="9" rx="2" fill="#f1f5f9"/>' +
+            '<text x="' + (x + 64) + '" y="' + (y + 83) + '" class="p-yazi p-yazi--kucuk" style="font-size:5px">' +
+            lokasyon + '</text>' +
+            '</g>';
+    }
+
+    /** Kanban sütunu başlığı. */
+    function sutunBas(x, ad, sayi) {
+        return '<text x="' + x + '" y="94" class="p-yazi p-yazi--kucuk" opacity="0.75">' + ad + '</text>' +
+               '<rect x="' + x + '" y="100" width="16" height="12" rx="3" fill="#fff" stroke="#e2e8f0"/>' +
+               '<text x="' + (x + 6) + '" y="109" class="p-yazi p-yazi--kucuk">' + sayi + '</text>' +
+               '<path d="M' + (x + 112) + ' 88 v190" class="p-cizgi"/>';
+    }
+
+    /** Barkod çizgileri. */
+    function barkod(x, y, g, y2, renk) {
+        var cikti = '';
+        var enler = [2, 1, 2.6, 1, 1.8, 2.6, 1, 2, 1.2, 2.4, 1, 1.8, 2.6, 1, 2, 1.4, 2.2, 1, 1.6, 2.8];
+        var kx = x;
+        var i = 0;
+        while (kx < x + g - 3) {
+            cikti += '<rect x="' + kx.toFixed(1) + '" y="' + y + '" width="' + enler[i % enler.length] +
+                     '" height="' + y2 + '" fill="' + (renk || '#0f172a') + '"/>';
+            kx += enler[i % enler.length] + 1.6;
+            i++;
+        }
+        return cikti;
+    }
+
+    /** Ürün satırı (sipariş detayı tablosu). */
+    function urunSatiri(y, ad, adet, kopyalaDugmesi) {
+        return '<g>' +
+            '<text x="46" y="' + (y + 7) + '" class="p-yazi p-yazi--kucuk">' + ad + '</text>' +
+            '<text x="286" y="' + (y + 7) + '" class="p-yazi p-yazi--kucuk">' + adet + '</text>' +
+            (kopyalaDugmesi
+                ? '<rect x="306" y="' + y + '" width="34" height="10" rx="3" fill="#f1f5f9" stroke="#e2e8f0"/>' +
+                  '<text x="311" y="' + (y + 7) + '" class="p-yazi p-yazi--kucuk" opacity="0.8">kopyala</text>'
+                : '') +
+            '<path d="M40 ' + (y + 12) + ' h320" class="p-cizgi"/>' +
+            '</g>';
+    }
+
+    // ==================================================================
+    // Ekranlar: ortak
+    // ==================================================================
+
+    var EKRAN_PANEL =
+        '<svg viewBox="0 0 400 300">' +
+        sekmeSeridi(['Depo Paneli'], 0) +
+        '<g transform="translate(0,22)">' +
+        getirKabuk('Siparişler') +
+        sutunBas(14, 'Toplayıcı Bekliyor', 0) +
+        sutunBas(140, 'Hazırlandı', 4) +
+        sutunBas(266, 'Yolda / Ulaştı', 3) +
+        siparisKart(140, 120, '00:04:52', 'c7d4', 'Dlk', 'M. Hırlakoğlu', 'BNK.004', true) +
+        siparisKart(140, 214, '00:04:00', '4cdb', 'Buket', 'M. Hırlakoğlu', 'BNK.027', false) +
+        siparisKart(266, 120, '00:02:18', '82c9', 'Zeynep', 'M. Hırlakoğlu', 'BNK.007', false) +
+        '</g>' +
+        '</svg>';
+
+    /**
+     * Sipariş detayı penceresi. Canlı panelde bilgi alanı üç sütun, ürün
+     * tablosu ise İKİ sütun hâlinde yan yana; ürünlerin küçük fotoğrafı
+     * var. Buradaki kareler o fotoğrafların yerini tutuyor.
+     */
+    function ekranSiparisDetay(tumunuKopyala, seciliUrun) {
+        var urunler = [
+            ['Mini Karpuz paket', 1, '#86efac'], ['Nektarin Paket', 2, '#fdba74'],
+            ['Kuru Soğan File', 1, '#fcd34d'], ['Yerli Tohum Domates', 1, '#fca5a5'],
+            ['Mantar Paket', 1, '#d6d3d1'], ['Fanta', 2, '#fb923c'],
+            ['Maydanoz Paket', 1, '#4ade80'], ['Eker Kaymak', 1, '#e7e5e4'],
+            ['La Lorraine Simit', 3, '#d4a373'], ['Sütaş Yarım Yağlı Süt', 1, '#bfdbfe']
+        ];
+
+        var tablo = '';
+        for (var i = 0; i < urunler.length; i++) {
+            var sol = i % 2 === 0;
+            var sira = Math.floor(i / 2);
+            var x = sol ? 44 : 214;
+            var yy = 168 + sira * 20;
+            var sonUrun = i === urunler.length - 1;
+            tablo +=
+                '<rect x="' + x + '" y="' + (yy - 9) + '" width="12" height="12" rx="3" fill="' +
+                urunler[i][2] + '"/>' +
+                (sonUrun && seciliUrun
+                    ? '<rect x="' + (x + 16) + '" y="' + (yy - 8) + '" width="96" height="11" rx="2" fill="#bfdbfe"/>'
+                    : '') +
+                '<text x="' + (x + 18) + '" y="' + yy + '" class="p-yazi p-yazi--kucuk">' +
+                urunler[i][0] + '</text>' +
+                '<text x="' + (x + 130) + '" y="' + yy + '" class="p-yazi p-yazi--kucuk">' +
+                urunler[i][1] + '</text>' +
+                '<path d="M' + x + ' ' + (yy + 5) + ' h150" class="p-cizgi"/>';
+        }
+
+        return '<svg viewBox="0 0 400 300">' +
+            sekmeSeridi(['Depo Paneli'], 0) +
+            '<g transform="translate(0,22)">' + getirKabuk('Siparişler') + '</g>' +
+            '<rect x="0" y="22" width="400" height="278" fill="rgb(15 23 42 / 0.4)"/>' +
+            '<rect x="24" y="46" width="352" height="234" rx="8" fill="#fff"/>' +
+            '<text x="38" y="66" class="p-yazi p-yazi--kalin">Sipariş Detayları</text>' +
+            '<rect x="104" y="57" width="86" height="12" rx="3" fill="#f1f5f9"/>' +
+            '<text x="108" y="66" class="p-yazi p-yazi--kucuk" style="font-size:5px">6a92a7c2e61dd8460735c7d4</text>' +
+            '<path d="M358 60 l8 8 M366 60 l-8 8" stroke="#94a3b8" stroke-width="1.4" stroke-linecap="round"/>' +
+
+            '<text x="38" y="88" class="p-yazi p-yazi--kucuk" opacity="0.55">Müşteri Adı:</text>' +
+            '<text x="82" y="88" class="p-yazi p-yazi--kucuk">Dlk</text>' +
+            '<text x="38" y="102" class="p-yazi p-yazi--kucuk" opacity="0.55">Durum:</text>' +
+            '<text x="72" y="102" class="p-yazi p-yazi--kucuk">Hazırlandı</text>' +
+            '<text x="38" y="116" class="p-yazi p-yazi--kucuk" opacity="0.55">Kurye Adı:</text>' +
+            '<text x="78" y="116" class="p-yazi p-yazi--kucuk">-</text>' +
+
+            '<text x="160" y="88" class="p-yazi p-yazi--kucuk" opacity="0.55">Teslimat Adresi:</text>' +
+            '<text x="160" y="98" class="p-yazi p-yazi--kucuk" style="font-size:5px">Eryaman, Söğüt Cad. No: 16/B</text>' +
+            '<text x="160" y="116" class="p-yazi p-yazi--kucuk" opacity="0.55">Lokasyonlar:</text>' +
+            '<rect x="206" y="108" width="34" height="11" rx="3" fill="#f1f5f9"/>' +
+            '<text x="210" y="116" class="p-yazi p-yazi--kucuk" style="font-size:5px">13 BNK.004</text>' +
+
+            '<text x="266" y="88" class="p-yazi p-yazi--kucuk" opacity="0.55">Toplayıcı Adı:</text>' +
+            '<text x="266" y="98" class="p-yazi p-yazi--kucuk">M. Hırlakoğlu</text>' +
+            '<text x="266" y="116" class="p-yazi p-yazi--kucuk" opacity="0.55">Adet:</text>' +
+            '<text x="290" y="116" class="p-yazi p-yazi--kucuk">13</text>' +
+
+            (tumunuKopyala
+                ? '<rect x="252" y="126" width="72" height="15" rx="4" fill="#e8f4f8" stroke="#4a90e2"/>' +
+                  '<text x="258" y="136" class="p-yazi p-yazi--kucuk" fill="#2563eb">Tümünü Kopyala</text>'
+                : '') +
+            '<rect x="330" y="126" width="34" height="15" rx="4" class="p-mor"/>' +
+            '<text x="334" y="136" class="p-yazi p-yazi--kucuk p-yazi--ak" style="font-size:5px">Şüpheli Bildir</text>' +
+
+            '<path d="M38 150 h324" class="p-cizgi"/>' +
+            '<text x="44" y="160" class="p-yazi p-yazi--kucuk" opacity="0.55">Ürün Adı</text>' +
+            '<text x="174" y="160" class="p-yazi p-yazi--kucuk" opacity="0.55">Adet</text>' +
+            '<text x="214" y="160" class="p-yazi p-yazi--kucuk" opacity="0.55">Ürün Adı</text>' +
+            '<text x="344" y="160" class="p-yazi p-yazi--kucuk" opacity="0.55">Adet</text>' +
+            tablo +
+            '</svg>';
+    }
+
+    /** Ürün adı seçili hâli: kopyalama anı. */
+    var EKRAN_SECILI = ekranSiparisDetay(false, true);
+
+    /** Raf etiketleri sayfası: kendi başlığı, sipariş sekmeleri yok. */
+    function rafKabuk() {
+        return '<rect x="0" y="22" width="400" height="38" class="p-mor"/>' +
+            '<text x="14" y="46" class="p-sari" style="font-size:12px;font-weight:800">getir</text>' +
+            '<text x="46" y="42" class="p-yazi--ak" style="font-size:7px;font-weight:700">Depo Paneli</text>' +
+            '<text x="148" y="48" class="p-yazi p-yazi--kucuk p-yazi--ak" opacity="0.8">Kontrol Paneli</text>' +
+            '<text x="204" y="48" class="p-sari" style="font-size:5.5px">Stok</text>' +
+            '<rect x="204" y="52" width="13" height="1.6" class="p-sari"/>' +
+            '<circle cx="386" cy="41" r="7" fill="rgb(255 255 255 / 0.24)"/>' +
+            '<rect x="0" y="60" width="400" height="240" class="p-zemin"/>' +
+            '<text x="18" y="78" class="p-yazi p-yazi--kalin">Raf Etiketleri</text>';
+    }
+
+    // ==================================================================
+    // Ekranlar: eski yöntem
+    // ==================================================================
+
+    var EKRAN_RAF_BOS =
+        '<svg viewBox="0 0 400 300">' +
+        sekmeSeridi(['Depo Paneli', 'Raf Etiketleri'], 1) +
+        rafKabuk() +
+        '<rect x="18" y="88" width="230" height="20" rx="5" class="p-kart"/>' +
+        '<circle cx="32" cy="98" r="4.6" fill="none" stroke="#94a3b8" stroke-width="1.4"/>' +
+        '<path d="M35.4 101.4 L39 105" stroke="#94a3b8" stroke-width="1.4" stroke-linecap="round"/>' +
+        '<text x="43" y="101" class="p-yazi p-yazi--kucuk" opacity="0.45">Ürün adı ile ara</text>' +
+        '<rect x="256" y="88" width="52" height="20" rx="5" class="p-mor"/>' +
+        '<text x="270" y="101" class="p-yazi p-yazi--kucuk p-yazi--ak">Ara</text>' +
+        '<rect x="18" y="122" width="364" height="162" rx="7" class="p-kart"/>' +
+        '<text x="150" y="205" class="p-yazi p-yazi--kucuk" opacity="0.45">Arama yapılmadı</text>' +
+        '</svg>';
+
+    var EKRAN_RAF_YAZILDI = EKRAN_RAF_BOS
+        .replace('<text x="43" y="101" class="p-yazi p-yazi--kucuk" opacity="0.45">Ürün adı ile ara</text>',
+                 '<text x="43" y="101" class="p-yazi p-yazi--kucuk">Sütaş Yarım Yağlı Süt</text>' +
+                 '<rect x="128" y="93" width="1.2" height="10" fill="#5d3ebc"/>');
+
+    /**
+     * Arama sonucu. Kampanyalı ürünler listeye karışıyor; doğru satırı
+     * ayıklamak zaman alan kısım burası.
+     */
+    function rafSonucSatiri(y, ad, etiket, dogru) {
+        return '<g>' +
+            (dogru ? '<rect x="26" y="' + (y - 8) + '" width="348" height="17" rx="4" fill="#ecfdf5"/>' : '') +
+            '<text x="34" y="' + y + '" class="p-yazi p-yazi--kucuk"' +
+            (dogru ? ' font-weight="700"' : '') + '>' + ad + '</text>' +
+            (etiket
+                ? '<rect x="252" y="' + (y - 7.5) + '" width="42" height="10" rx="3" fill="#fef3c7"/>' +
+                  '<text x="256" y="' + (y - 0.5) + '" class="p-yazi p-yazi--kucuk" fill="#b45309">' +
+                  etiket + '</text>'
+                : '') +
+            '<text x="306" y="' + y + '" class="p-yazi p-yazi--kucuk" opacity="0.7">' +
+            (dogru ? '8690767670053' : '86907…') + '</text>' +
+            '</g>';
+    }
+
+    var EKRAN_RAF_SONUC =
+        '<svg viewBox="0 0 400 300">' +
+        sekmeSeridi(['Depo Paneli', 'Raf Etiketleri'], 1) +
+        rafKabuk() +
+        '<rect x="18" y="88" width="230" height="20" rx="5" class="p-kart"/>' +
+        '<text x="43" y="101" class="p-yazi p-yazi--kucuk">Sütaş Yarım Yağlı Süt</text>' +
+        '<rect x="256" y="88" width="52" height="20" rx="5" class="p-mor"/>' +
+        '<text x="270" y="101" class="p-yazi p-yazi--kucuk p-yazi--ak">Ara</text>' +
+        '<rect x="18" y="122" width="364" height="162" rx="7" class="p-kart"/>' +
+        '<text x="34" y="138" class="p-yazi p-yazi--kucuk" opacity="0.6">9 sonuç</text>' +
+        rafSonucSatiri(154, 'Sütaş Yarım Yağlı Süt 1 L (2+1)', 'KAMPANYA', false) +
+        rafSonucSatiri(172, 'Sütaş Tam Yağlı Süt 1 L', '', false) +
+        rafSonucSatiri(190, 'Sütaş Yarım Yağlı Süt 500 ml', '', false) +
+        rafSonucSatiri(208, 'Sütaş Yarım Yağlı Süt (1 L)', '', true) +
+        rafSonucSatiri(226, 'Sütaş Yarım Yağlı Süt 1 L (İndirim)', 'KAMPANYA', false) +
+        rafSonucSatiri(244, 'Sütaş Laktozsuz Süt 1 L', '', false) +
+        rafSonucSatiri(262, 'Sütaş Yarım Yağlı Süt 200 ml', '', false) +
+        '</svg>';
+
+    var EKRAN_BARKOD_BOS =
+        '<svg viewBox="0 0 400 300">' +
+        sekmeSeridi(['Depo Paneli', 'Raf Etiketleri', 'Barkod Üreteci'], 2) +
+        '<rect x="0" y="22" width="400" height="278" fill="#f8fafc"/>' +
+        '<rect x="0" y="22" width="400" height="30" fill="#1e293b"/>' +
+        '<text x="16" y="42" class="p-yazi p-yazi--ak" style="font-weight:700">Barkod Üreteci</text>' +
+        '<rect x="60" y="86" width="280" height="24" rx="5" class="p-kart"/>' +
+        '<text x="70" y="101" class="p-yazi p-yazi--kucuk" opacity="0.45">Barkod numarasını yapıştırın</text>' +
+        '<rect x="60" y="120" width="80" height="22" rx="5" fill="#1e293b"/>' +
+        '<text x="82" y="135" class="p-yazi p-yazi--kucuk p-yazi--ak">Oluştur</text>' +
+        '<rect x="60" y="156" width="280" height="112" rx="7" fill="#fff" stroke="#e2e8f0" stroke-dasharray="4 3"/>' +
+        '<text x="150" y="216" class="p-yazi p-yazi--kucuk" opacity="0.4">Barkod burada görünecek</text>' +
+        '</svg>';
+
+    var EKRAN_BARKOD_YAPISTIRILDI = EKRAN_BARKOD_BOS.replace(
+        '<text x="70" y="101" class="p-yazi p-yazi--kucuk" opacity="0.45">Barkod numarasını yapıştırın</text>',
+        '<text x="70" y="101" class="p-yazi p-yazi--kucuk">8690767670053</text>');
+
+    var EKRAN_BARKOD_HAZIR =
+        '<svg viewBox="0 0 400 300">' +
+        sekmeSeridi(['Depo Paneli', 'Raf Etiketleri', 'Barkod Üreteci'], 2) +
+        '<rect x="0" y="22" width="400" height="278" fill="#f8fafc"/>' +
+        '<rect x="0" y="22" width="400" height="30" fill="#1e293b"/>' +
+        '<text x="16" y="42" class="p-yazi p-yazi--ak" style="font-weight:700">Barkod Üreteci</text>' +
+        '<rect x="60" y="86" width="280" height="24" rx="5" class="p-kart"/>' +
+        '<text x="70" y="101" class="p-yazi p-yazi--kucuk">8690767670053</text>' +
+        '<rect x="60" y="120" width="80" height="22" rx="5" fill="#1e293b"/>' +
+        '<text x="82" y="135" class="p-yazi p-yazi--kucuk p-yazi--ak">Oluştur</text>' +
+        '<rect x="60" y="156" width="280" height="112" rx="7" fill="#fff" stroke="#e2e8f0"/>' +
+        barkod(96, 176, 210, 58) +
+        '<text x="152" y="250" class="p-yazi p-yazi--kucuk">8690767670053</text>' +
+        '<text x="128" y="264" class="p-yazi p-yazi--kucuk" opacity="0.55">Tek ürün için hazır</text>' +
+        '</svg>';
+
+    // ==================================================================
+    // Ekranlar: Jet Barkod
+    // ==================================================================
+
+    function jetKart(x, y, ad, alt, kod) {
+        return '<g>' +
+            '<rect x="' + x + '" y="' + y + '" width="112" height="62" rx="7" class="p-kart"/>' +
+            '<rect x="' + (x + 8) + '" y="' + (y + 8) + '" width="26" height="30" rx="4" fill="#eff6ff"/>' +
+            '<path d="M' + (x + 13) + ' ' + (y + 30) + ' h16 M' + (x + 13) + ' ' + (y + 34) +
+            ' h10" stroke="#93c5fd" stroke-width="2.4" stroke-linecap="round"/>' +
+            '<text x="' + (x + 40) + '" y="' + (y + 17) + '" class="p-yazi p-yazi--kucuk p-yazi--kalin">' +
+            ad + '</text>' +
+            '<text x="' + (x + 40) + '" y="' + (y + 27) + '" class="p-yazi p-yazi--kucuk" opacity="0.7">' +
+            alt + '</text>' +
+            barkod(x + 40, y + 32, 62, 14) +
+            '<text x="' + (x + 40) + '" y="' + (y + 55) + '" class="p-yazi p-yazi--kucuk" opacity="0.75">' +
+            kod + '</text>' +
+            '</g>';
+    }
+
+    var EKRAN_JET =
+        '<svg viewBox="0 0 400 300">' +
+        sekmeSeridi(['Depo Paneli', 'Jet Barkod'], 1) +
+        '<rect x="0" y="22" width="400" height="278" fill="#f8fafc"/>' +
+        '<rect x="0" y="22" width="400" height="30" fill="#fff"/>' +
+        '<path d="M0 52 h400" class="p-cizgi"/>' +
+        '<rect x="14" y="30" width="14" height="14" rx="4" fill="#2563eb"/>' +
+        '<text x="34" y="42" class="p-yazi p-yazi--kalin">Jet Barkod</text>' +
+        '<rect x="14" y="62" width="372" height="22" rx="6" class="p-kart"/>' +
+        '<circle cx="28" cy="73" r="4.4" fill="none" stroke="#94a3b8" stroke-width="1.4"/>' +
+        '<path d="M31.2 76.2 L35 80" stroke="#94a3b8" stroke-width="1.4" stroke-linecap="round"/>' +
+        '<text x="40" y="76" class="p-yazi p-yazi--kucuk">Sütaş Yarım Yağlı Süt, Calve Barbekü Sos, Algida…</text>' +
+        '<text x="14" y="98" class="p-yazi p-yazi--kucuk" opacity="0.65">5 ürün · hepsi barkoduyla</text>' +
+        jetKart(14, 106, 'Sütaş Süt', '1 L', '8690767670053') +
+        jetKart(144, 106, 'Calve Sos', '290 g', '8690637805219') +
+        jetKart(274, 106, 'Algida Kakao', '65 ml', '8690637846922') +
+        jetKart(14, 178, 'Erikli Su', '1,5 L', '8690793010151') +
+        jetKart(144, 178, 'Galeta Unu', '250 g', '8691530010311') +
+        '<rect x="274" y="178" width="112" height="62" rx="7" fill="#ecfdf5" stroke="#a7f3d0"/>' +
+        '<circle cx="330" cy="200" r="11" class="p-yesil"/>' +
+        '<path d="M325 200 l4 4 l7 -8" stroke="#fff" stroke-width="2.2" fill="none"' +
+        ' stroke-linecap="round" stroke-linejoin="round"/>' +
+        '<text x="296" y="224" class="p-yazi p-yazi--kucuk" fill="#047857">Hepsi ekranda</text>' +
+        '</svg>';
+
+    // ==================================================================
+    // Senaryo
+    // ==================================================================
+
+    /*
+     * İmleç ve göz konumları sahnenin yüzdesi. Sahne 400x300 birim
+     * olduğu için x/4 ve y/3 ile çevriliyor.
+     */
+    function y(x, yy) { return [x / 4, yy / 3]; }
+
+    global.JBSenaryoBarkod = {
+        baslik: 'Okunmayan bir barkodu bulmak',
+        ozet: 'İki tarafta da aynı yerden başlanıyor: kontrol panelinde açık bir sipariş.',
+
+        sol: {
+            ad: 'Eklentisiz depo',
+            ekranlar: {
+                panel: EKRAN_PANEL,
+                detay: ekranSiparisDetay(false, false),
+                secili: EKRAN_SECILI,
+                rafBos: EKRAN_RAF_BOS,
+                rafYazildi: EKRAN_RAF_YAZILDI,
+                rafSonuc: EKRAN_RAF_SONUC,
+                barkodBos: EKRAN_BARKOD_BOS,
+                barkodYapistirildi: EKRAN_BARKOD_YAPISTIRILDI,
+                barkodHazir: EKRAN_BARKOD_HAZIR
+            },
+            adimlar: [
+                { ad: 'Siparişe tıklandı', sure: 700, ekran: 'panel',
+                  imlec: y(190, 176), goz: y(190, 176), tik: true },
+                { ad: 'Sipariş detayı yükleniyor', sureAralik: [900, 1400], ekran: 'detay',
+                  yukleniyor: true, goz: y(200, 200) },
+                { ad: 'Ürün adı seçilip kopyalandı', sure: 2200, ekran: 'secili',
+                  imlec: y(278, 246), goz: y(268, 244), tik: true },
+                { ad: 'Raf etiketleri sistemine geçildi', sure: 1100, ekran: 'rafBos',
+                  imlec: y(105, 12), goz: y(105, 12), tik: true },
+                { ad: 'Sayfa yükleniyor', sureAralik: [2000, 3000], ekran: 'rafBos',
+                  yukleniyor: true, goz: y(200, 150) },
+                { ad: 'Ürün adı arama kutusuna yazıldı', sure: 2600, ekran: 'rafYazildi',
+                  imlec: y(130, 98), goz: y(120, 98), tik: true },
+                { ad: 'Sonuçlar arasında doğru ürün aranıyor', sureAralik: [2600, 4200],
+                  ekran: 'rafSonuc', goz: y(150, 190), imlec: y(300, 160) },
+                { ad: 'Doğru satır bulundu, barkod kopyalandı', sure: 1400, ekran: 'rafSonuc',
+                  imlec: y(334, 208), goz: y(334, 208), tik: true },
+                { ad: 'Barkod üreteci sekmesi açıldı', sure: 1000, ekran: 'barkodBos',
+                  imlec: y(178, 12), goz: y(178, 12), tik: true },
+                { ad: 'Numara yapıştırıldı', sure: 900, ekran: 'barkodYapistirildi',
+                  imlec: y(200, 98), goz: y(200, 98), tik: true },
+                { ad: 'Oluştur düğmesine basıldı', sure: 700, ekran: 'barkodYapistirildi',
+                  imlec: y(100, 131), goz: y(100, 131), tik: true },
+                { ad: 'Tek ürünün barkodu hazır', sure: 900, ekran: 'barkodHazir',
+                  goz: y(200, 205), imlec: null }
+            ]
+        },
+
+        sag: {
+            ad: 'Jet Barkod Asistan kurulu',
+            ekranlar: {
+                panel: EKRAN_PANEL,
+                detay: ekranSiparisDetay(true, false),
+                jet: EKRAN_JET
+            },
+            adimlar: [
+                { ad: 'Siparişe tıklandı', sure: 700, ekran: 'panel',
+                  imlec: y(190, 176), goz: y(190, 176), tik: true },
+                { ad: 'Sipariş detayı yükleniyor', sureAralik: [900, 1400], ekran: 'detay',
+                  yukleniyor: true, goz: y(200, 200) },
+                { ad: 'Tümünü Kopyala düğmesine basıldı', sure: 800, ekran: 'detay',
+                  imlec: y(288, 134), goz: y(288, 134), tik: true },
+                { ad: 'Yan sekmedeki Jet Barkod açıldı', sure: 700, ekran: 'jet',
+                  imlec: y(98, 12), goz: y(98, 12), tik: true },
+                { ad: 'Beş ürün de barkoduyla ekranda', sure: 900, ekran: 'jet',
+                  goz: y(200, 170), imlec: null }
+            ]
+        }
+    };
+})(window);

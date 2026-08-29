@@ -17,7 +17,8 @@
 <meta property="og:url" content="https://jetbarkod.com.tr/pages/hakkimizda.html">
 <meta property="og:image" content="https://jetbarkod.com.tr/assets/logo.png">
 
-<link rel="stylesheet" href="../css/hakkimizda.css?v=20260829b">
+<link rel="stylesheet" href="../css/hakkimizda.css?v=20260829c">
+<link rel="stylesheet" href="../css/karsilastirma.css?v=20260829b">
 
 <script>
 /*
@@ -460,6 +461,20 @@
                 </div>
             </div>
         </div>
+
+        <div class="gir" style="margin-top:3.4rem">
+            <h3 class="baslik" style="font-size:clamp(1.2rem,2.4vw,1.6rem)">
+                Aynı işi iki yöntemle yan yana yapalım
+            </h3>
+            <p class="giris">
+                Aşağıdaki iki şerit aynı anda başlıyor ve aynı saati paylaşıyor.
+                Başlangıç noktası ikisinde de aynı: rafta okunmayan bir barkodla
+                karşılaşan personel bilgisayarın başına geliyor ve kontrol panelindeki
+                siparişe tıklıyor. Kronometre tam o anda çalışmaya başlıyor.
+            </p>
+        </div>
+
+        <div id="krsBarkod" class="gir"></div>
     </div>
 </section>
 
@@ -764,6 +779,14 @@
     </div>
 </footer>
 
-<script src="../js/hakkimizda.js?v=20260829b"></script>
+<script src="../js/karsilastirma.js?v=20260829a"></script>
+<script src="../js/karsilastirma-barkod.js?v=20260829a"></script>
+<script src="../js/hakkimizda.js?v=20260829c"></script>
+<script>
+  // Sahneler betikler yüklendikten sonra kuruluyor.
+  if (window.JBKarsilastirma && window.JBSenaryoBarkod) {
+      JBKarsilastirma.kur(document.getElementById('krsBarkod'), JBSenaryoBarkod);
+  }
+</script>
 </body>
 </html>

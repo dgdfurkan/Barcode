@@ -1,0 +1,441 @@
+/**
+ * Jet Barkod. Karşılaştırma sahnesi.
+ * ============================================================================
+ *
+ * Solda eski yöntem, sağda Jet Barkod. İkisi aynı anda başlar, aynı saati
+ * paylaşır. Biri bitince bayrağını çeker ve kronometresi durur; diğeri
+ * saymaya devam eder. Aradaki fark rakamla ortada kalır.
+ *
+ * TEK SAAT
+ * İki kronometre ayrı sayaçlar değil. Tek bir başlangıç damgası var,
+ * her çizim karesinde ikisi de aynı damgadan hesaplanıyor. Bu yüzden
+ * "aynı anda başlama" iddiası gerçekten doğru; iki zamanlayıcı arasında
+ * kayma olmuyor.
+ *
+ * KAYMA YOK
+ * Sahne kutusunun oranı sabit. Ekranlar üst üste duruyor, biri diğerinin
+ * yerini almıyor; yalnız görünürlükleri değişiyor. İmleç, göz ve bayrak
+ * transform ile hareket ediyor. Adım listesi de baştan tam boyunda
+ * yazılıyor, satırlar sonradan eklenmiyor.
+ *
+ * HAREKET TERCİHİ
+ * `prefers-reduced-motion` açıksa canlandırma hiç oynatılmıyor; iki taraf
+ * da son hâliyle ve bitiş süreleriyle gösteriliyor. Anlatılan şey
+ * kayboluyor değil, hareketsiz duruyor.
+ * ============================================================================
+ */
+
+.krs {
+    --krs-cizgi: #e6ecf3;
+    --krs-yumusak: #f6f8fb;
+    --krs-yazi: #0f172a;
+    --krs-soluk: #51617a;
+    --krs-cok-soluk: #8496ad;
+    --krs-eski: #b45309;
+    --krs-eski-soft: #fffbeb;
+    --krs-yeni: #047857;
+    --krs-yeni-soft: #ecfdf5;
+    --krs-mor: #5d3ebc;
+    --krs-yumusak-gecis: cubic-bezier(0.22, 1, 0.36, 1);
+
+    margin-top: 2.4rem;
+    border: 1px solid var(--krs-cizgi);
+    border-radius: 1.2rem;
+    background: #fff;
+    overflow: hidden;
+}
+
+/* ---------- Üst şerit ---------- */
+
+.krs__ust {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.95rem 1.15rem;
+    border-bottom: 1px solid var(--krs-cizgi);
+    background: var(--krs-yumusak);
+}
+
+.krs__ad {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+    color: var(--krs-yazi);
+}
+
+.krs__bosluk { flex: 1; }
+
+.krs__dugme {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid var(--krs-cizgi);
+    border-radius: 0.6rem;
+    background: #fff;
+    color: var(--krs-yazi);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 150ms ease, border-color 150ms ease;
+}
+
+.krs__dugme:hover { background: #f1f5f9; border-color: #cbd5e1; }
+.krs__dugme:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.krs__dugme svg { width: 0.85rem; height: 0.85rem; }
+
+/* ---------- İki şerit ---------- */
+
+.krs__alan {
+    display: grid;
+    grid-template-columns: 1fr;
+}
+
+@media (min-width: 820px) {
+    .krs__alan { grid-template-columns: 1fr 1fr; }
+    .krs__serit + .krs__serit { border-left: 1px solid var(--krs-cizgi); }
+}
+
+.krs__serit + .krs__serit { border-top: 1px solid var(--krs-cizgi); }
+
+@media (min-width: 820px) {
+    .krs__serit + .krs__serit { border-top: none; }
+}
+
+.krs__baslik {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.8rem 1.05rem;
+    border-bottom: 1px solid var(--krs-cizgi);
+}
+
+.krs__etiket {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+.krs__serit--eski .krs__etiket { color: var(--krs-eski); }
+.krs__serit--yeni .krs__etiket { color: var(--krs-yeni); }
+
+.krs__serit-ad {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--krs-soluk);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Kronometre sabit genişlikte: rakam değişince başlık kaymaz. */
+.krs__saat {
+    flex: none;
+    min-width: 5.4rem;
+    padding: 0.24rem 0.55rem;
+    border-radius: 0.45rem;
+    background: #0f172a;
+    color: #e2e8f0;
+    font-family: ui-monospace, 'JetBrains Mono', Menlo, monospace;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    transition: background 260ms ease, color 260ms ease;
+}
+
+.krs__saat.bitti { background: var(--krs-yeni); color: #fff; }
+.krs__serit--eski .krs__saat.bitti { background: #78716c; }
+
+/* ---------- Sahne ---------- */
+
+.krs__sahne {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    background: var(--krs-yumusak);
+    overflow: hidden;
+}
+
+/* Ekranlar üst üste; biri diğerinin yerini almıyor. */
+.krs__ekran {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 240ms ease;
+    pointer-events: none;
+}
+
+.krs__ekran.acik { opacity: 1; }
+
+.krs__ekran svg { display: block; width: 100%; height: 100%; }
+
+/* ---------- Yükleniyor perdesi ---------- */
+
+.krs__yukleniyor {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    gap: 0.6rem;
+    background: rgb(248 250 252 / 0.82);
+    -webkit-backdrop-filter: blur(1.5px);
+    backdrop-filter: blur(1.5px);
+    opacity: 0;
+    transition: opacity 200ms ease;
+    pointer-events: none;
+}
+
+.krs__yukleniyor.acik { opacity: 1; }
+
+.krs__cark {
+    width: 26px;
+    height: 26px;
+    border: 3px solid #dbeafe;
+    border-top-color: var(--krs-mor);
+    border-radius: 50%;
+    animation: krs-don 900ms linear infinite;
+}
+
+@keyframes krs-don { to { transform: rotate(360deg); } }
+
+.krs__yukleniyor span {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--krs-cok-soluk);
+}
+
+/* ---------- Göz odağı ---------- */
+
+/*
+ * Personelin gözünün nereye baktığını gösterir. Karartma değil, tersi:
+ * bakılan yer olduğu gibi kalır, gerisi hafifçe soluklaşır. Sert bir
+ * spot ışığı bilgiyi okunmaz hâle getiriyordu.
+ */
+.krs__goz {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 84px;
+    height: 84px;
+    margin: -42px 0 0 -42px;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+    transition: transform 520ms var(--krs-yumusak-gecis), opacity 260ms ease;
+    background: radial-gradient(circle,
+        rgb(37 99 235 / 0.16) 0%,
+        rgb(37 99 235 / 0.09) 42%,
+        rgb(37 99 235 / 0) 68%);
+    box-shadow: inset 0 0 0 1.5px rgb(37 99 235 / 0.28);
+}
+
+.krs__goz.acik { opacity: 1; }
+
+.krs__goz::after {
+    content: '';
+    position: absolute;
+    inset: 26px;
+    border-radius: 50%;
+    border: 1.5px solid rgb(37 99 235 / 0.4);
+    animation: krs-goz 2.2s ease-in-out infinite;
+}
+
+@keyframes krs-goz {
+    0%, 100% { transform: scale(0.82); opacity: 0.85; }
+    50%      { transform: scale(1.06); opacity: 0.35; }
+}
+
+/* ---------- İmleç ---------- */
+
+.krs__imlec {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 22px;
+    height: 22px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+    transition: transform 520ms var(--krs-yumusak-gecis), opacity 200ms ease;
+    filter: drop-shadow(0 2px 3px rgb(15 23 42 / 0.32));
+    z-index: 3;
+}
+
+.krs__imlec.acik { opacity: 1; }
+
+/* Tıklama halkası: imlecin ucundan açılır. */
+.krs__tik {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 34px;
+    height: 34px;
+    margin: -17px 0 0 -17px;
+    border-radius: 50%;
+    border: 2px solid var(--krs-mor);
+    pointer-events: none;
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.2);
+    z-index: 2;
+}
+
+.krs__tik.calis { animation: krs-tik 460ms ease-out; }
+
+@keyframes krs-tik {
+    0%   { opacity: 0.9; transform: translate3d(var(--x), var(--y), 0) scale(0.2); }
+    100% { opacity: 0;   transform: translate3d(var(--x), var(--y), 0) scale(1.35); }
+}
+
+/* ---------- Bayrak ---------- */
+
+.krs__bayrak {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 62px;
+    height: 62px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.8);
+    transition: opacity 320ms ease, transform 520ms var(--krs-yumusak-gecis);
+    z-index: 4;
+}
+
+.krs__bayrak.acik { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+
+.krs__bayrak .bez {
+    transform-box: fill-box;
+    transform-origin: left center;
+    animation: krs-dalgalan 1.5s ease-in-out infinite;
+}
+
+@keyframes krs-dalgalan {
+    0%, 100% { transform: skewY(0deg) scaleX(1); }
+    30%      { transform: skewY(-4.5deg) scaleX(0.965); }
+    70%      { transform: skewY(4deg) scaleX(0.985); }
+}
+
+/* ---------- Adım listesi ---------- */
+
+.krs__adimlar {
+    margin: 0;
+    padding: 0.7rem 0.85rem 0.9rem;
+    list-style: none;
+    border-top: 1px solid var(--krs-cizgi);
+    background: #fff;
+}
+
+.krs__adim {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.2rem 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--krs-cok-soluk);
+    transition: color 220ms ease;
+}
+
+.krs__adim.gecti { color: var(--krs-soluk); }
+.krs__adim.simdi { color: var(--krs-yazi); font-weight: 600; }
+
+/* Nokta üç durumda da aynı boyda: satır genişliği hiç oynamıyor. */
+.krs__adim-nokta {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    margin-top: 0.42rem;
+    border-radius: 50%;
+    background: #e2e8f0;
+    transition: background 220ms ease, box-shadow 220ms ease;
+}
+
+.krs__adim.gecti .krs__adim-nokta { background: #cbd5e1; }
+
+.krs__serit--eski .krs__adim.simdi .krs__adim-nokta {
+    background: var(--krs-eski);
+    box-shadow: 0 0 0 3px rgb(180 83 9 / 0.15);
+}
+
+.krs__serit--yeni .krs__adim.simdi .krs__adim-nokta {
+    background: var(--krs-yeni);
+    box-shadow: 0 0 0 3px rgb(4 120 87 / 0.15);
+}
+
+/* Satır sayısı baştan belli; liste sonradan uzamıyor. */
+.krs__adim-yazi { flex: 1; min-width: 0; }
+
+/* ---------- Sonuç ---------- */
+
+.krs__sonuc {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 1.1rem;
+    padding: 0.9rem 1.15rem;
+    border-top: 1px solid var(--krs-cizgi);
+    background: var(--krs-yumusak);
+    font-size: 0.85rem;
+    color: var(--krs-soluk);
+    /* Metin sonradan dolsa da yükseklik sabit kalsın. */
+    min-height: 3.1rem;
+}
+
+.krs__fark {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    padding: 0.28rem 0.65rem;
+    border-radius: 0.5rem;
+    background: var(--krs-yeni-soft);
+    border: 1px solid #a7f3d0;
+    color: var(--krs-yeni);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    transition: opacity 320ms ease;
+}
+
+.krs__fark.acik { opacity: 1; }
+
+.krs__fark small { font-size: 0.72rem; font-weight: 600; }
+
+/* ---------- Sahne dili ---------- */
+
+.krs g, .krs rect, .krs path, .krs circle, .krs text { vector-effect: non-scaling-stroke; }
+
+.krs .p-zemin { fill: #f1f5f9; }
+.krs .p-kart { fill: #fff; stroke: #e2e8f0; stroke-width: 1; }
+.krs .p-mor { fill: #5d3ebc; }
+.krs .p-sari { fill: #ffd300; }
+.krs .p-cizgi { stroke: #e2e8f0; stroke-width: 1; fill: none; }
+.krs .p-gri { fill: #e2e8f0; }
+.krs .p-koyu { fill: #0f172a; }
+.krs .p-soluk { fill: #94a3b8; }
+.krs .p-yazi { font-family: inherit; font-size: 6.5px; fill: #475569; }
+.krs .p-yazi--kalin { font-weight: 700; fill: #0f172a; }
+.krs .p-yazi--ak { fill: #fff; }
+.krs .p-yazi--kucuk { font-size: 5.5px; }
+.krs .p-vurgu { fill: #eff6ff; stroke: #2563eb; stroke-width: 1; }
+.krs .p-yesil { fill: #059669; }
+.krs .p-kirmizi { fill: #dc2626; }
+
+@media (prefers-reduced-motion: reduce) {
+    .krs__ekran,
+    .krs__imlec,
+    .krs__goz,
+    .krs__bayrak,
+    .krs__yukleniyor { transition: none !important; }
+
+    .krs__cark,
+    .krs__goz::after,
+    .krs__bayrak .bez,
+    .krs__tik { animation: none !important; }
+}
