@@ -441,7 +441,7 @@ async function handleExportAllProducts(sendResponse) {
             sendProgressMessage('✅ Token bulundu, API\'ye bağlanılıyor...');
             
             const API_BASE_URL = 'https://franchise-api-gateway.getirapi.com';
-            const WAREHOUSE_ID = '5dcafe6ae2c61b1e52cf1704';
+            const WAREHOUSE_ID = null;
             
             sendProgressMessage('📊 Stoklar çekiliyor...');
             

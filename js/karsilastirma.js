@@ -302,11 +302,22 @@
         var baslangic = 0;
         var kare = 0;
 
+        /*
+         * Rozetin iskeleti BAŞTAN yazılıyor, yalnız rakamlar değişiyor.
+         * Önce boş bırakılıyordu; içi dolunca kutu sıfırdan büyüyor ve
+         * sonuç şeridi bir satır uzuyordu. Boş kutu yer kaplamaz, opaklık
+         * sıfır olan dolu kutu kaplar.
+         */
+        farkEl.innerHTML = '<span data-rol="farkSure">00:00.00 daha hızlı</span>' +
+                           '<small data-rol="farkKat">0,0 kat</small>';
+        var farkSure = farkEl.querySelector('[data-rol="farkSure"]');
+        var farkKat = farkEl.querySelector('[data-rol="farkKat"]');
+
         function farkYaz() {
             var fark = Math.max(0, sol.toplam - sag.toplam);
             var kat = sag.toplam > 0 ? (sol.toplam / sag.toplam) : 0;
-            farkEl.innerHTML = '<span>' + saatYaz(fark) + ' daha hızlı</span>' +
-                               '<small>' + kat.toFixed(1).replace('.', ',') + ' kat</small>';
+            farkSure.textContent = saatYaz(fark) + ' daha hızlı';
+            farkKat.textContent = kat.toFixed(1).replace('.', ',') + ' kat';
             farkEl.classList.add('acik');
         }
 

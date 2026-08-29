@@ -17,6 +17,12 @@
  * veriliyor; her oynatmada o aralıktan rastgele seçiliyor. Gerçekte de
  * bu adımlar her seferinde aynı sürmüyor.
  *
+ * VERİ TAMAMEN KURGUSAL
+ * Buradaki depo adı, müşteri, toplayıcı, kurye, sipariş kimliği, ürün
+ * kimliği ve lokasyon kodlarının hiçbiri gerçek değil. Ekranlar canlı
+ * panele BAKILARAK çizildi ama içindeki hiçbir veri oradan alınmadı.
+ * Depo herkese açık; buraya gerçek bir isim ya da kimlik yazılmaz.
+ *
  * ÖLÇEK
  * Bütün sahneler 400x300 birimlik alanda çiziliyor. İmleç ve göz konumları
  * sahnenin yüzdesi olarak veriliyor, yani SVG birimini 4 ve 3'e bölerek.
@@ -68,7 +74,7 @@
             '<text x="46" y="16" class="p-yazi--ak" style="font-size:7px;font-weight:700">Depo Paneli</text>' +
             '<rect x="46" y="20" width="30" height="9" rx="3" fill="#0f7b4a"/>' +
             '<text x="51" y="27" class="p-yazi p-yazi--kucuk p-yazi--ak" style="font-size:5px">Müsait</text>' +
-            '<text x="80" y="27" class="p-yazi p-yazi--kucuk p-yazi--ak" style="font-size:6px">Göksu Park</text>' +
+            '<text x="80" y="27" class="p-yazi p-yazi--kucuk p-yazi--ak" style="font-size:6px">Örnek Depo</text>' +
             ustYazi +
             '<rect x="332" y="12" width="16" height="15" rx="5" fill="rgb(255 255 255 / 0.16)"/>' +
             '<rect x="352" y="12" width="22" height="15" rx="4" fill="rgb(255 255 255 / 0.16)"/>' +
@@ -132,6 +138,37 @@
                '<path d="M' + (x + 112) + ' 88 v190" class="p-cizgi"/>';
     }
 
+    /**
+     * Ürün görseli. Adresler `assets/tanitim/` altında yerelde duruyor;
+     * dış bir CDN'e bağlanmıyoruz. Görseller ürün kataloğundan alınıp
+     * 140 piksele küçültüldü.
+     */
+    function gorsel(x, yy, boyut, dosya) {
+        return '<image href="../assets/tanitim/' + dosya + '" x="' + x + '" y="' + yy +
+               '" width="' + boyut + '" height="' + boyut +
+               '" preserveAspectRatio="xMidYMid slice"' +
+               ' style="clip-path: inset(0 round 2px)"/>';
+    }
+
+    /*
+     * Sahnelerde geçen ürünler. Adlar ve barkodlar gerçek ürün
+     * kataloğundan; kişi, depo ya da sipariş bilgisi DEĞİL.
+     */
+    var URUNLER = {
+        sut:      ['Sütaş Yarım Yağlı Süt (4 x 1 L)', '8690767714887', 'sut.jpg'],
+        sos:      ['Calve Barbekü Sos (290 g)', '8690637805219', 'sos.jpg'],
+        su:       ['Erikli Doğal Kaynak Suyu (500 ml)', '8690793010052', 'su.jpg'],
+        un:       ['Bağdat Galeta Unu (250 g)', '8690560011077', 'un.jpg'],
+        maydanoz: ['Maydanoz Paket (1 Adet)', '8680422241643', 'maydanoz.jpg'],
+        sogan:    ['Kuru Soğan (1 kg)', '8697458342084', 'sogan.jpg'],
+        simit:    ['La Lorraine Sokak Simiti (90 g)', '8681573033125', 'simit.jpg'],
+        dondurma: ['Algida Nogger Sandwich (145 ml)', '8690637117121', 'dondurma.jpg'],
+        kaymak:   ['Sütaş Kaymaksız Yoğurt (600 g)', '8690767671104', 'kaymak.jpg'],
+        folyo:    ['Cook Alüminyum Folyo (10 M)', '8690709040005', 'folyo.jpg'],
+        yogurt:   ['Activia Probiyotik Sade Yoğurt (4 x 100 g)', '8696368011332', 'yogurt.jpg'],
+        yogurt2:  ['Activia Probiyotik Çilekli Yoğurt (4 x 100 g)', '8696368011349', 'yogurt2.jpg']
+    };
+
     /** Barkod çizgileri. */
     function barkod(x, y, g, y2, renk) {
         var cikti = '';
@@ -172,9 +209,9 @@
         sutunBas(14, 'Toplayıcı Bekliyor', 0) +
         sutunBas(140, 'Hazırlandı', 4) +
         sutunBas(266, 'Yolda / Ulaştı', 3) +
-        siparisKart(140, 120, '00:04:52', 'c7d4', 'Dlk', 'M. Hırlakoğlu', 'BNK.004', true) +
-        siparisKart(140, 214, '00:04:00', '4cdb', 'Buket', 'M. Hırlakoğlu', 'BNK.027', false) +
-        siparisKart(266, 120, '00:02:18', '82c9', 'Zeynep', 'M. Hırlakoğlu', 'BNK.007', false) +
+        siparisKart(140, 120, '00:04:52', 'c7d4', 'S. Kaya', 'A. Demir', 'DP.101', true) +
+        siparisKart(140, 214, '00:04:00', '4cdb', 'E. Şahin', 'A. Demir', 'DP.114', false) +
+        siparisKart(266, 120, '00:02:18', '82c9', 'M. Aydın', 'A. Demir', 'DP.126', false) +
         '</g>' +
         '</svg>';
 
@@ -184,31 +221,27 @@
      * var. Buradaki kareler o fotoğrafların yerini tutuyor.
      */
     function ekranSiparisDetay(tumunuKopyala, seciliUrun) {
-        var urunler = [
-            ['Mini Karpuz paket', 1, '#86efac'], ['Nektarin Paket', 2, '#fdba74'],
-            ['Kuru Soğan File', 1, '#fcd34d'], ['Yerli Tohum Domates', 1, '#fca5a5'],
-            ['Mantar Paket', 1, '#d6d3d1'], ['Fanta', 2, '#fb923c'],
-            ['Maydanoz Paket', 1, '#4ade80'], ['Eker Kaymak', 1, '#e7e5e4'],
-            ['La Lorraine Simit', 3, '#d4a373'], ['Sütaş Yarım Yağlı Süt', 1, '#bfdbfe']
-        ];
+        var sira = ['sogan', 'maydanoz', 'su', 'sos', 'simit',
+                    'dondurma', 'kaymak', 'un', 'folyo', 'sut'];
+        var adetler = [1, 1, 2, 1, 3, 2, 1, 1, 1, 1];
 
         var tablo = '';
-        for (var i = 0; i < urunler.length; i++) {
-            var sol = i % 2 === 0;
-            var sira = Math.floor(i / 2);
-            var x = sol ? 44 : 214;
-            var yy = 168 + sira * 20;
-            var sonUrun = i === urunler.length - 1;
+        for (var i = 0; i < sira.length; i++) {
+            var u = URUNLER[sira[i]];
+            var solda = i % 2 === 0;
+            var satirNo = Math.floor(i / 2);
+            var x = solda ? 44 : 214;
+            var yy = 168 + satirNo * 20;
+            var sonUrun = i === sira.length - 1;
             tablo +=
-                '<rect x="' + x + '" y="' + (yy - 9) + '" width="12" height="12" rx="3" fill="' +
-                urunler[i][2] + '"/>' +
+                gorsel(x, yy - 9, 12, u[2]) +
                 (sonUrun && seciliUrun
-                    ? '<rect x="' + (x + 16) + '" y="' + (yy - 8) + '" width="96" height="11" rx="2" fill="#bfdbfe"/>'
+                    ? '<rect x="' + (x + 16) + '" y="' + (yy - 8) + '" width="104" height="11" rx="2" fill="#bfdbfe"/>'
                     : '') +
-                '<text x="' + (x + 18) + '" y="' + yy + '" class="p-yazi p-yazi--kucuk">' +
-                urunler[i][0] + '</text>' +
+                '<text x="' + (x + 18) + '" y="' + yy + '" class="p-yazi p-yazi--kucuk"' +
+                ' style="font-size:4.6px">' + u[0] + '</text>' +
                 '<text x="' + (x + 130) + '" y="' + yy + '" class="p-yazi p-yazi--kucuk">' +
-                urunler[i][1] + '</text>' +
+                adetler[i] + '</text>' +
                 '<path d="M' + x + ' ' + (yy + 5) + ' h150" class="p-cizgi"/>';
         }
 
@@ -219,24 +252,24 @@
             '<rect x="24" y="46" width="352" height="234" rx="8" fill="#fff"/>' +
             '<text x="38" y="66" class="p-yazi p-yazi--kalin">Sipariş Detayları</text>' +
             '<rect x="104" y="57" width="86" height="12" rx="3" fill="#f1f5f9"/>' +
-            '<text x="108" y="66" class="p-yazi p-yazi--kucuk" style="font-size:5px">6a92a7c2e61dd8460735c7d4</text>' +
+            '<text x="108" y="66" class="p-yazi p-yazi--kucuk" style="font-size:5px">0000000000000000000000aa</text>' +
             '<path d="M358 60 l8 8 M366 60 l-8 8" stroke="#94a3b8" stroke-width="1.4" stroke-linecap="round"/>' +
 
             '<text x="38" y="88" class="p-yazi p-yazi--kucuk" opacity="0.55">Müşteri Adı:</text>' +
-            '<text x="82" y="88" class="p-yazi p-yazi--kucuk">Dlk</text>' +
+            '<text x="82" y="88" class="p-yazi p-yazi--kucuk">S. Kaya</text>' +
             '<text x="38" y="102" class="p-yazi p-yazi--kucuk" opacity="0.55">Durum:</text>' +
             '<text x="72" y="102" class="p-yazi p-yazi--kucuk">Hazırlandı</text>' +
             '<text x="38" y="116" class="p-yazi p-yazi--kucuk" opacity="0.55">Kurye Adı:</text>' +
             '<text x="78" y="116" class="p-yazi p-yazi--kucuk">-</text>' +
 
             '<text x="160" y="88" class="p-yazi p-yazi--kucuk" opacity="0.55">Teslimat Adresi:</text>' +
-            '<text x="160" y="98" class="p-yazi p-yazi--kucuk" style="font-size:5px">Eryaman, Söğüt Cad. No: 16/B</text>' +
+            '<text x="160" y="98" class="p-yazi p-yazi--kucuk" style="font-size:5px">Örnek Mah. Örnek Cad. No: 1</text>' +
             '<text x="160" y="116" class="p-yazi p-yazi--kucuk" opacity="0.55">Lokasyonlar:</text>' +
             '<rect x="206" y="108" width="34" height="11" rx="3" fill="#f1f5f9"/>' +
-            '<text x="210" y="116" class="p-yazi p-yazi--kucuk" style="font-size:5px">13 BNK.004</text>' +
+            '<text x="210" y="116" class="p-yazi p-yazi--kucuk" style="font-size:5px">13 DP.101</text>' +
 
             '<text x="266" y="88" class="p-yazi p-yazi--kucuk" opacity="0.55">Toplayıcı Adı:</text>' +
-            '<text x="266" y="98" class="p-yazi p-yazi--kucuk">M. Hırlakoğlu</text>' +
+            '<text x="266" y="98" class="p-yazi p-yazi--kucuk">A. Demir</text>' +
             '<text x="266" y="116" class="p-yazi p-yazi--kucuk" opacity="0.55">Adet:</text>' +
             '<text x="290" y="116" class="p-yazi p-yazi--kucuk">13</text>' +
 
@@ -280,7 +313,7 @@
             '<text x="46" y="38" class="p-yazi--ak" style="font-size:6.5px;font-weight:700">Depo Paneli</text>' +
             '<rect x="46" y="42" width="28" height="8" rx="3" fill="#0f7b4a"/>' +
             '<text x="50" y="48" class="p-yazi p-yazi--ak" style="font-size:4.5px">Müsait</text>' +
-            '<text x="78" y="48" class="p-yazi p-yazi--ak" style="font-size:5.5px">Göksu Park</text>' +
+            '<text x="78" y="48" class="p-yazi p-yazi--ak" style="font-size:5.5px">Örnek Depo</text>' +
             '<circle cx="386" cy="41" r="7" fill="rgb(255 255 255 / 0.24)"/>' +
             '<rect x="0" y="60" width="400" height="240" fill="#fff"/>' +
 
@@ -305,7 +338,7 @@
             '<rect x="88" y="104" width="296" height="52" rx="5" fill="#fafbfc" stroke="#eef2f7"/>' +
             '<text x="96" y="116" class="p-yazi p-yazi--kucuk">Filtreler</text>' +
             '<rect x="96" y="120" width="86" height="14" rx="4" fill="#f1f5f9" stroke="#e2e8f0"/>' +
-            '<text x="101" y="130" class="p-yazi p-yazi--kucuk" opacity="0.45">Göksu Park</text>' +
+            '<text x="101" y="130" class="p-yazi p-yazi--kucuk" opacity="0.45">Örnek Depo</text>' +
             urunAlani +
             '<rect x="282" y="120" width="94" height="14" rx="4" fill="#fff" stroke="#e2e8f0"/>' +
             '<text x="287" y="130" class="p-yazi p-yazi--kucuk" opacity="0.45">Raf</text>' +
@@ -338,7 +371,7 @@
                 (vurgu ? '#059669' : '#c4b5fd') + '"/>' +
                 '<text x="96" y="' + yy + '" class="p-yazi p-yazi--kucuk" fill="' +
                 (vurgu ? '#047857' : '#6d28d9') + '" style="font-size:5px">' + satirlar[i][0] + '</text>' +
-                '<rect x="154" y="' + (yy - 9) + '" width="12" height="12" rx="3" fill="' + satirlar[i][2] + '"/>' +
+                gorsel(154, yy - 9, 12, satirlar[i][2]) +
                 '<rect x="186" y="' + (yy - 8) + '" width="62" height="11" rx="3" fill="#f8fafc" stroke="#eef2f7"/>' +
                 '<text x="189" y="' + yy + '" class="p-yazi p-yazi--kucuk" opacity="0.7" style="font-size:4.5px">' +
                 satirlar[i][3] + '</text>' +
@@ -351,11 +384,11 @@
     }
 
     var RAF_VARSAYILAN = [
-        ['8696368011332', 'Activia Probiyotik Sade Yoğurt (4 x 100 g)', '#a7f3d0', '559823ceb1dc700c'],
-        ['8696368011349', 'Activia Probiyotik Çilekli Yoğurt (4 x 100 g)', '#fca5a5', '559823f7b1dc700c'],
-        ['8696368011493', 'Activia Probiyotik Ananaslı Yoğurt (4 x 100 g)', '#fde68a', '55982415b1dc700c'],
-        ['8690709040005', 'Cook Alüminyum Folyo (10 M)', '#e2e8f0', '55982541b1dc700c'],
-        ['8690637805219', 'Cook Kraft Pişirme Kağıdı (16 M)', '#d6d3d1', '5598258db1dc700c']
+        [URUNLER.yogurt[1],   URUNLER.yogurt[0],   URUNLER.yogurt[2],   '0000aa11bb22cc33'],
+        [URUNLER.yogurt2[1],  URUNLER.yogurt2[0],  URUNLER.yogurt2[2],  '0000aa11bb22cc34'],
+        [URUNLER.folyo[1],    URUNLER.folyo[0],    URUNLER.folyo[2],    '0000aa11bb22cc35'],
+        [URUNLER.su[1],       URUNLER.su[0],       URUNLER.su[2],       '0000aa11bb22cc36'],
+        [URUNLER.sos[1],      URUNLER.sos[0],      URUNLER.sos[2],      '0000aa11bb22cc37']
     ];
 
     var URUN_BOS =
@@ -383,12 +416,12 @@
     var ONERILER = [
         ['Sütaş, Uno & Domates Üçlüsü', 'ÜÇLÜ', '#fca5a5'],
         ['Sütaş Kasa', 'KASA', '#c4b5fd'],
-        ['Sütaş Yağlı Süt Paketi (4 x 1 L)', 'PAKET', '#bfdbfe'],
         ['Sütaş Çilekli Süt (200 ml)', '', '#fbcfe8'],
         ['Sütaş Muzlu Süt (200 ml)', '', '#fde68a'],
         ['Sütaş Laktozsuz Süt (200 ml)', '', '#bae6fd'],
         ['Sütaş Çikolatalı Süt (200 ml)', '', '#d6bfa8'],
-        ['Sütaş Kasa - 30012', 'KASA', '#c4b5fd']
+        ['Sütaş Kasa - 30012', 'KASA', '#c4b5fd'],
+        ['Sütaş Yarım Yağlı Süt (4 x 1 L)', '', '#bfdbfe']
     ];
 
     function oneriListesi(secili) {
@@ -418,14 +451,14 @@
 
     var EKRAN_RAF_SECILDI =
         '<svg viewBox="0 0 400 300">' + sekmeSeridi(['Depo Paneli', 'Raf Etiketi'], 1) +
-        rafKabuk(URUN_YAZILDI) + rafTablo(RAF_VARSAYILAN, -1) + oneriListesi(2) + '</svg>';
+        rafKabuk(URUN_YAZILDI) + rafTablo(RAF_VARSAYILAN, -1) + oneriListesi(7) + '</svg>';
 
     var EKRAN_RAF_SONUC =
         '<svg viewBox="0 0 400 300">' + sekmeSeridi(['Depo Paneli', 'Raf Etiketi'], 1) +
         rafKabuk('<rect x="188" y="120" width="88" height="14" rx="4" fill="#f5f3ff" stroke="#c4b5fd"/>' +
                  '<text x="192" y="130" class="p-yazi p-yazi--kucuk" fill="#6d28d9" style="font-size:4.6px">' +
-                 'Sütaş Yarım Yağlı Süt (1 L)</text>') +
-        rafTablo([['8690767670053', 'Sütaş Yarım Yağlı Süt (1 L)', '#bfdbfe', '5598262ab1dc700c']], 0) +
+                 'Sütaş Yarım Yağlı Süt (4 x 1 L)</text>') +
+        rafTablo([[URUNLER.sut[1], URUNLER.sut[0], URUNLER.sut[2], '0000aa11bb22cc38']], 0) +
         '</svg>';
 
     // ==================================================================
@@ -486,46 +519,69 @@
     // Ekranlar: Jet Barkod
     // ==================================================================
 
-    function jetKart(x, y, ad, alt, kod) {
+    /**
+     * Jet Barkod sonuç kartı. Ürünün fotoğrafı, adı ve okutulabilir
+     * barkodu aynı kartta. Sattığımız şey burası: personel sonucu okumuyor,
+     * görüyor.
+     */
+    function jetKart(x, yy, anahtar) {
+        var u = URUNLER[anahtar];
         return '<g>' +
-            '<rect x="' + x + '" y="' + y + '" width="112" height="62" rx="7" class="p-kart"/>' +
-            '<rect x="' + (x + 8) + '" y="' + (y + 8) + '" width="26" height="30" rx="4" fill="#eff6ff"/>' +
-            '<path d="M' + (x + 13) + ' ' + (y + 30) + ' h16 M' + (x + 13) + ' ' + (y + 34) +
-            ' h10" stroke="#93c5fd" stroke-width="2.4" stroke-linecap="round"/>' +
-            '<text x="' + (x + 40) + '" y="' + (y + 17) + '" class="p-yazi p-yazi--kucuk p-yazi--kalin">' +
-            ad + '</text>' +
-            '<text x="' + (x + 40) + '" y="' + (y + 27) + '" class="p-yazi p-yazi--kucuk" opacity="0.7">' +
-            alt + '</text>' +
-            barkod(x + 40, y + 32, 62, 14) +
-            '<text x="' + (x + 40) + '" y="' + (y + 55) + '" class="p-yazi p-yazi--kucuk" opacity="0.75">' +
-            kod + '</text>' +
+            '<rect x="' + x + '" y="' + yy + '" width="121" height="74" rx="6" class="p-kart"/>' +
+            gorsel(x + 7, yy + 7, 32, u[2]) +
+            '<text x="' + (x + 45) + '" y="' + (yy + 15) + '" class="p-yazi p-yazi--kucuk"' +
+            ' style="font-size:4.4px;font-weight:700">' + u[0] + '</text>' +
+            barkod(x + 45, yy + 20, 68, 17) +
+            '<text x="' + (x + 45) + '" y="' + (yy + 44) + '" class="p-yazi p-yazi--kucuk"' +
+            ' style="font-size:4.6px">' + u[1] + '</text>' +
+            '<rect x="' + (x + 7) + '" y="' + (yy + 46) + '" width="32" height="9" rx="2" fill="#ecfdf5"/>' +
+            '<text x="' + (x + 11) + '" y="' + (yy + 52) + '" class="p-yazi" fill="#047857"' +
+            ' style="font-size:4px">GÖRSELLİ</text>' +
+            barkod(x + 45, yy + 50, 68, 17) +
+            '<text x="' + (x + 45) + '" y="' + (yy + 70) + '" class="p-yazi p-yazi--kucuk"' +
+            ' opacity="0.55" style="font-size:4px">ekrandan okutulabilir</text>' +
             '</g>';
     }
 
-    var EKRAN_JET =
-        '<svg viewBox="0 0 400 300">' +
-        sekmeSeridi(['Depo Paneli', 'Jet Barkod'], 1) +
-        '<rect x="0" y="22" width="400" height="278" fill="#f8fafc"/>' +
-        '<rect x="0" y="22" width="400" height="30" fill="#fff"/>' +
-        '<path d="M0 52 h400" class="p-cizgi"/>' +
-        '<rect x="14" y="30" width="14" height="14" rx="4" fill="#2563eb"/>' +
-        '<text x="34" y="42" class="p-yazi p-yazi--kalin">Jet Barkod</text>' +
-        '<rect x="14" y="62" width="372" height="22" rx="6" class="p-kart"/>' +
-        '<circle cx="28" cy="73" r="4.4" fill="none" stroke="#94a3b8" stroke-width="1.4"/>' +
-        '<path d="M31.2 76.2 L35 80" stroke="#94a3b8" stroke-width="1.4" stroke-linecap="round"/>' +
-        '<text x="40" y="76" class="p-yazi p-yazi--kucuk">Sütaş Yarım Yağlı Süt, Calve Barbekü Sos, Algida…</text>' +
-        '<text x="14" y="98" class="p-yazi p-yazi--kucuk" opacity="0.65">5 ürün · hepsi barkoduyla</text>' +
-        jetKart(14, 106, 'Sütaş Süt', '1 L', '8690767670053') +
-        jetKart(144, 106, 'Calve Sos', '290 g', '8690637805219') +
-        jetKart(274, 106, 'Algida Kakao', '65 ml', '8690637846922') +
-        jetKart(14, 178, 'Erikli Su', '1,5 L', '8690793010151') +
-        jetKart(144, 178, 'Galeta Unu', '250 g', '8691530010311') +
-        '<rect x="274" y="178" width="112" height="62" rx="7" fill="#ecfdf5" stroke="#a7f3d0"/>' +
-        '<circle cx="330" cy="200" r="11" class="p-yesil"/>' +
-        '<path d="M325 200 l4 4 l7 -8" stroke="#fff" stroke-width="2.2" fill="none"' +
-        ' stroke-linecap="round" stroke-linejoin="round"/>' +
-        '<text x="296" y="224" class="p-yazi p-yazi--kucuk" fill="#047857">Hepsi ekranda</text>' +
-        '</svg>';
+    /** Jet Barkod kabuğu. Sonuç alanı ayrı veriliyor. */
+    function jetKabuk(sonucAlani, aramaMetni) {
+        return '<svg viewBox="0 0 400 300">' +
+            sekmeSeridi(['Depo Paneli', 'Jet Barkod'], 1) +
+            '<rect x="0" y="22" width="400" height="278" fill="#f8fafc"/>' +
+            '<rect x="0" y="22" width="400" height="30" fill="#fff"/>' +
+            '<path d="M0 52 h400" class="p-cizgi"/>' +
+            '<rect x="14" y="30" width="14" height="14" rx="4" fill="#2563eb"/>' +
+            '<text x="34" y="42" class="p-yazi p-yazi--kalin">Jet Barkod</text>' +
+            '<text x="300" y="42" class="p-yazi p-yazi--kucuk" opacity="0.55">Ürün Barkod Arama</text>' +
+            '<rect x="14" y="60" width="372" height="20" rx="6" class="p-kart"/>' +
+            '<circle cx="27" cy="70" r="4.2" fill="none" stroke="#94a3b8" stroke-width="1.3"/>' +
+            '<path d="M30 73 L33.6 76.6" stroke="#94a3b8" stroke-width="1.3" stroke-linecap="round"/>' +
+            '<text x="38" y="73" class="p-yazi p-yazi--kucuk"' +
+            (aramaMetni ? '' : ' opacity="0.45"') + ' style="font-size:4.6px">' +
+            (aramaMetni || 'Ürün adı, barkod veya yapıştırılan tablo') + '</text>' +
+            sonucAlani +
+            '</svg>';
+    }
+
+    var JET_ARAMA = 'Kuru Soğan, Maydanoz, Erikli Su, Calve Sos, Sokak Simiti, Algida…';
+
+    /* Sekmeye yeni geçilmiş an: arama dolu, sonuç henüz gelmemiş. */
+    var EKRAN_JET_BOS = jetKabuk(
+        '<text x="14" y="94" class="p-yazi p-yazi--kucuk" opacity="0.55">Yapıştırılan liste çözülüyor…</text>' +
+        '<rect x="14" y="100" width="121" height="74" rx="6" fill="#eef2f7"/>' +
+        '<rect x="139" y="100" width="121" height="74" rx="6" fill="#eef2f7"/>' +
+        '<rect x="264" y="100" width="121" height="74" rx="6" fill="#eef2f7"/>' +
+        '<rect x="14" y="180" width="121" height="74" rx="6" fill="#eef2f7"/>' +
+        '<rect x="139" y="180" width="121" height="74" rx="6" fill="#eef2f7"/>' +
+        '<rect x="264" y="180" width="121" height="74" rx="6" fill="#eef2f7"/>',
+        JET_ARAMA);
+
+    var EKRAN_JET = jetKabuk(
+        '<text x="14" y="94" class="p-yazi p-yazi--kucuk" opacity="0.7">' +
+        '10 ürün · hepsi görseli ve barkoduyla</text>' +
+        jetKart(14, 100, 'sogan') + jetKart(139, 100, 'maydanoz') + jetKart(264, 100, 'su') +
+        jetKart(14, 180, 'sos') + jetKart(139, 180, 'simit') + jetKart(264, 180, 'dondurma'),
+        JET_ARAMA);
 
     // ==================================================================
     // Senaryo
@@ -600,6 +656,7 @@
             ekranlar: {
                 panel: EKRAN_PANEL,
                 detay: ekranSiparisDetay(true, false),
+                jetBos: EKRAN_JET_BOS,
                 jet: EKRAN_JET
             },
             adimlar: [
@@ -609,10 +666,12 @@
                   yukleniyor: true, goz: y(200, 200) },
                 { ad: 'Tümünü Kopyala düğmesine basıldı', sure: 800, ekran: 'detay',
                   imlec: y(288, 134), goz: y(288, 134), tik: true },
-                { ad: 'Yan sekmedeki Jet Barkod açıldı', sure: 700, ekran: 'jet',
+                { ad: 'Yan sekmedeki Jet Barkod açıldı', sure: 600, ekran: 'jetBos',
                   imlec: y(98, 12), goz: y(98, 12), tik: true },
-                { ad: 'Beş ürün de barkoduyla ekranda', sure: 900, ekran: 'jet',
-                  goz: y(200, 170), imlec: null }
+                { ad: 'Liste çözülüyor', sure: 500, ekran: 'jetBos',
+                  yukleniyor: true, goz: y(200, 180) },
+                { ad: 'Hepsi görseli ve barkoduyla ekranda', sure: 1000, ekran: 'jet',
+                  goz: y(200, 180), imlec: null }
             ]
         }
     };

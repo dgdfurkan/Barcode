@@ -67,9 +67,13 @@
 
 .krs__bosluk { flex: 1; }
 
+/* Yazı "Oynat", "Oynuyor" ve "Tekrar oynat" arasında geçiyor. Genişlik
+   sabitlenmezse üst şerit her seferinde biraz kayıyor. */
 .krs__dugme {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
+    min-width: 8.6rem;
     gap: 0.4rem;
     padding: 0.5rem 0.9rem;
     border: 1px solid var(--krs-cizgi);
@@ -163,11 +167,16 @@
 }
 
 /* Ekranlar üst üste; biri diğerinin yerini almıyor. */
+/*
+ * Ekranlar üst üste duruyor. Geçiş kısa: uzun tutulduğunda yeni ekranın
+ * içeriği eskisinin üstünde okunacak kadar uzun görünüyor ve "daha
+ * gelmeden geldi" hissi veriyordu.
+ */
 .krs__ekran {
     position: absolute;
     inset: 0;
     opacity: 0;
-    transition: opacity 240ms ease;
+    transition: opacity 120ms ease;
     pointer-events: none;
 }
 
@@ -344,7 +353,13 @@
 }
 
 .krs__adim.gecti { color: var(--krs-soluk); }
-.krs__adim.simdi { color: var(--krs-yazi); font-weight: 600; }
+
+/*
+ * Sıradaki adım koyulaşıyor ama KALINLAŞMIYOR. Kalın yazı daha geniş
+ * olduğu için satır bir alta sarıyor, satır yüksekliği değişiyor ve liste
+ * zıplıyordu. Vurgu rengi ve noktadaki halka yeterli.
+ */
+.krs__adim.simdi { color: var(--krs-yazi); }
 
 /* Nokta üç durumda da aynı boyda: satır genişliği hiç oynamıyor. */
 .krs__adim-nokta {
@@ -384,9 +399,12 @@
     background: var(--krs-yumusak);
     font-size: 0.85rem;
     color: var(--krs-soluk);
-    /* Metin sonradan dolsa da yükseklik sabit kalsın. */
-    min-height: 3.1rem;
+    /* Fark rozeti sonradan görünür olsa da yükseklik sabit kalsın. */
+    min-height: 3.4rem;
 }
+
+/* Rozet baştan yer kaplıyor, yalnız görünürlüğü değişiyor. */
+.krs__fark { min-width: 11.5rem; min-height: 1.75rem; justify-content: center; }
 
 .krs__fark {
     display: inline-flex;

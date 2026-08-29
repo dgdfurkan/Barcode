@@ -43,6 +43,10 @@ Token'ın çoğu araç çıktısında gidiyor, cevaplarda değil. Sıralama en p
 - API anahtarı, token, parola **hiçbir zaman** commit edilen dosyaya yazılmaz. Depo herkese açık.
 - Premium kilidi admin kontrolünde: admin açarsa kullanılır, açmazsa kilitli görünür.
 - Kullanıcıya gösterilen her metin Türkçe. Dosya ve klasör adları da Türkçe.
+- **Canlı panelden görülen hiçbir gerçek veri depoya yazılmaz.** Depo adı, müşteri,
+  toplayıcı, kurye adı, sipariş kimliği, ürün kimliği, adres, lokasyon kodu ve depo
+  kimliği dahil. Ekran çizerken canlı panele bakılır ama içine kurgusal veri yazılır.
+  Depo herkese açık; bu bir kere sızarsa git geçmişinden de temizlemek gerekir.
 - Kayma, zıplama, boyut oynaması kabul edilmez. Ölç ve kanıtla.
 - Dış CDN kullanma. Her şey yerelde: `js/vendor/`, `css/tailwind.build.css`.
 

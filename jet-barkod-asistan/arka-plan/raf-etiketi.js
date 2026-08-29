@@ -675,7 +675,7 @@ async function handleFetchExpiryProducts(message, sendResponse, sender = null) {
   const productIds = Array.isArray(message.productIds)
     ? [...new Set(message.productIds.map(String).filter(Boolean))]
     : [];
-  const warehouseId = message.warehouseId || '5dcafe6ae2c61b1e52cf1704';
+  const warehouseId = message.warehouseId || null;
   const endDate = message.endDate || '2030-07-31';
   const batchSize = Math.min(Math.max(Number(message.batchSize) || 12, 1), 30);
   const adminTabs = await resolveAdminTabs(sender);
