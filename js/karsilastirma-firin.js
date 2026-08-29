@@ -2,26 +2,22 @@
  * Jet Barkod. Karşılaştırma senaryosu: fırında ne pişecek.
  * ============================================================================
  *
- * SAYFA GERÇEKTE NASIL (canlı panelin DOM'una bakılarak düzeltildi)
+ * SAYFA GERÇEKTE NASIL (canlı panelin DOM'una bakılarak)
  * Dört zaman dilimi yan yana kart hâlinde. İçinde bulunulan dilimin kartı
- * mor başlıklı ve yanında alev simgesi var; sağ üstünde sıralama ve
- * kopyalama düğmeleri duruyor.
+ * mor başlıklı, yanında alev simgesi, sağ üstünde sıralama ve kopyalama
+ * düğmeleri var.
  *
- * Her ürün satırı BAŞTAN AÇIK geliyor. Yani "satırları tek tek açmak
- * gerekiyor" doğru değil; ilk yazımda öyle kurgulamıştım, yanlıştı.
- * Satırda ürünün küçük kare fotoğrafı, adı ve "N Pişir" rozeti var;
- * hemen altında DÖRT stok hücresi: Satılan, Rezerve, Donuk, Raf.
+ * Ürün satırları KAPALI geliyor (`aria-expanded="false"`). Satırda yalnız
+ * ürünün küçük fotoğrafı, adı ve "N Pişir" rozeti görünüyor. Satılan,
+ * Rezerve, Donuk ve Raf değerlerini görmek için satıra tıklayıp açmak
+ * gerekiyor. On beş ürün çarpı dört dilim, altmış satır.
  *
- * ASIL ZORLUK BURADA
- * Bilgi eksik değil, fazla. On beş ürün çarpı dört dilim, altmış satır ve
- * satır başına dört sayı, yani iki yüz kırk rakam. Hiçbiri "ne yapayım"
- * sorusuna cevap vermiyor. Personel Raf'a mı baksın, Donuk'a mı, Satılan
- * eğilimine mi? Sonraki dilimleri okuyup toplayan da yok. Sonuçta gözle
- * tarayıp tahmin ediyor ve fazla pişiriyor.
- *
- * SAYFA YÜKLEME ADIMI YOK
- * İlk yazımda iki şeride de "sayfa yükleniyor" koymuştum. Personel zaten
- * panelin içinde; sekmeye geçmek tam sayfa yüklemesi değil. Kaldırıldı.
+ * PİŞİRME PANELİ GERÇEKTE NASIL
+ * Başlıkta saat, stok özeti ve ayarlar düğmeleri var. Kartlar aciliyete
+ * göre sıralı geliyor: önce ACİL PİŞİR (kırmızı), sonra PİŞİRME GEREKLİ
+ * (sarı), en sonda FAZLA (yeşil). Her kartta ürünün fotoğrafı, kaç adet
+ * pişirileceği, sebebi, dört dilimin sayıları ve sağda MEVCUT ile DONUK
+ * değerleri duruyor. İçinde bulunulan dilim yeşil ve kalın.
  *
  * VERİ
  * 12:00-16:00 sütunu ve stok değerleri gerçek panelden alınan biçimde.
@@ -116,11 +112,16 @@
         return cikti;
     }
 
-    /** Tek dilim kartı. Satırların hepsi açık, tıpkı gerçeğinde olduğu gibi. */
-    function dilimKarti(x, dilimSira, adet) {
+    /**
+     * Tek dilim kartı. Satırlar varsayılan olarak KAPALI; `acikSira`
+     * verilirse o satır açılır ve altında dört stok hücresi görünür.
+     * Gerçeğinde de böyle: değerleri görmek için satıra tıklamak gerekiyor.
+     */
+    function dilimKarti(x, dilimSira, adet, acikSira) {
         var aktif = dilimSira === 1;
+        var acikVar = acikSira >= 0 && acikSira < adet;
         var cikti =
-            '<rect x="' + x + '" y="96" width="80" height="' + (28 + adet * 30) +
+            '<rect x="' + x + '" y="96" width="80" height="' + (26 + adet * 19 + (acikVar ? 16 : 0)) +
             '" rx="6" fill="#fff" stroke="' + (aktif ? '#5d3ebc' : '#e8edf3') + '"/>' +
             '<rect x="' + x + '" y="96" width="80" height="20" rx="6" fill="' +
             (aktif ? '#5d3ebc' : '#fafbfc') + '"/>' +
@@ -131,7 +132,7 @@
                 : '<circle cx="' + (x + 8) + '" cy="106" r="3.2" fill="none" stroke="#94a3b8"' +
                   ' stroke-width="0.9"/><path d="M' + (x + 8) + ' 104 v2.3 l1.6 1" stroke="#94a3b8"' +
                   ' stroke-width="0.9" fill="none" stroke-linecap="round"/>') +
-            '<text x="' + (x + 15) + '" y="' + 109 + '" class="p-yazi" style="font-size:5px" fill="' +
+            '<text x="' + (x + 15) + '" y="109" class="p-yazi" style="font-size:5px" fill="' +
             (aktif ? '#ffffff' : '#334155') + '">' + DILIMLER[dilimSira] + '</text>' +
             '<rect x="' + (x + 60) + '" y="102" width="8" height="8" rx="2" fill="' +
             (aktif ? 'rgb(255 255 255 / 0.28)' : '#eef2f7') + '"/>' +
@@ -141,21 +142,30 @@
         var yy = 122;
         for (var i = 0; i < adet; i++) {
             var u = URUNLER[i];
+            var acik = i === acikSira;
             cikti +=
                 (i ? '<path d="M' + (x + 4) + ' ' + (yy - 3) + ' h72" class="p-cizgi"/>' : '') +
                 gorsel(x + 4, yy, 9, u[1]) +
-                '<text x="' + (x + 16) + '" y="' + (yy + 4) + '" class="p-yazi"' +
-                ' style="font-size:3.4px">' + u[0].slice(0, 26) + '</text>' +
-                '<rect x="' + (x + 16) + '" y="' + (yy + 6) + '" width="24" height="7" rx="2" fill="#fef3c7"/>' +
-                '<text x="' + (x + 19) + '" y="' + (yy + 11.4) + '" class="p-yazi" fill="#92400e"' +
-                ' style="font-size:3.8px">' + u[2][dilimSira] + ' Pişir</text>' +
-                stokSatiri(x, yy + 20, u[3]);
-            yy += 30;
+                '<text x="' + (x + 15) + '" y="' + (yy + 4) + '" class="p-yazi"' +
+                ' style="font-size:3.2px">' + u[0].slice(0, 24) + '</text>' +
+                '<rect x="' + (x + 15) + '" y="' + (yy + 6) + '" width="22" height="6.5" rx="2" fill="#fef3c7"/>' +
+                '<text x="' + (x + 17.5) + '" y="' + (yy + 11) + '" class="p-yazi" fill="#92400e"' +
+                ' style="font-size:3.6px">' + u[2][dilimSira] + ' Pişir</text>' +
+                /* Kapalı satırda sağda sağa bakan ok, açık satırda aşağı bakan. */
+                '<path d="M' + (x + 72) + ' ' + (yy + 4) + ' l2.4 2.4 l-2.4 2.4"' +
+                ' stroke="#9ca3af" stroke-width="0.9" fill="none" stroke-linecap="round"' +
+                (acik ? ' transform="rotate(90 ' + (x + 73.2) + ' ' + (yy + 6.4) + ')"' : '') + '/>';
+            yy += 19;
+            if (acik) {
+                cikti += '<rect x="' + (x + 3) + '" y="' + (yy - 4) + '" width="74" height="15" rx="3"' +
+                         ' fill="#f8fafc"/>' + stokSatiri(x, yy + 2, u[3]);
+                yy += 16;
+            }
         }
         return cikti;
     }
 
-    function liste(dugme) {
+    function liste(dugme, acikSira) {
         return '<svg viewBox="0 0 400 300">' + sekmeSeridi() + kabuk() +
             '<text x="76" y="104" class="p-yazi p-yazi--kalin" style="font-size:6.5px">' +
             'Pişirme Önerileri</text>' +
@@ -168,52 +178,85 @@
                   '<text x="328" y="106" class="p-yazi" fill="#5d3ebc" style="font-size:4.4px">' +
                   'Pişirme Talimatları</text>') +
             '<g transform="translate(0,18)">' +
-            dilimKarti(70, 0, 5) + dilimKarti(154, 1, 5) +
-            dilimKarti(238, 2, 5) + dilimKarti(322, 3, 5) +
+            dilimKarti(70, 0, 8, -1) +
+            dilimKarti(154, 1, 8, acikSira === undefined ? -1 : acikSira) +
+            dilimKarti(238, 2, 8, -1) + dilimKarti(322, 3, 8, -1) +
             '</g>' +
             '<text x="70" y="296" class="p-yazi" style="font-size:3.8px" opacity="0.45">' +
-            '4 dilim · dilim başına 15 ürün · satır başına 4 sayı · toplam 240 rakam</text>' +
+            '4 dilim · dilim başına 15 ürün · stok değerleri için her satıra ayrı tıklanır</text>' +
             '</svg>';
     }
 
     // ==================================================================
-    // Jet Barkod karar kartları
+    // Pişirme paneli (gerçek eklentinin kendisi)
     // ==================================================================
 
-    function kararKart(x, yy, ad, dosya, adet, sebep, rozet, renk, zemin, raf, donuk, sonraki) {
-        var s = '';
-        for (var i = 0; i < sonraki.length; i++) {
-            s += '<text x="' + (x + 124 + i * 20) + '" y="' + (yy + 15) + '" class="p-yazi"' +
-                 ' style="font-size:3.6px" opacity="0.5">' + sonraki[i][0] + '</text>' +
-                 '<text x="' + (x + 124 + i * 20) + '" y="' + (yy + 23) + '" class="p-yazi"' +
-                 ' style="font-size:6px;font-weight:700" fill="' +
-                 (sonraki[i][1] === '0' ? '#cbd5e1' : '#0f172a') + '">' + sonraki[i][1] + '</text>';
+    /*
+     * [ad, görsel, rozet, adetYazi, sebep, mevcut, donuk, [4 dilim], durum]
+     * Değerler canlı panelin ürettiği kartlardan.
+     */
+    var KARTLAR = [
+        ['La Lorraine Peynirli Rulo Börek', 'f-peynirli.jpg', 'ACİL PİŞİR',
+         '1 Adet Pişirilecek', 'Stok sıfır! Mevcut dilim hedefi: 1', 0, 178,
+         [2, 1, 1, 0], 'acil'],
+        ['La Lorraine Vanilya Kremalı Kruvasan', 'f-vanilya.jpg', 'ACİL PİŞİR',
+         '1 Adet Pişirilecek', 'Stok sıfır! Mevcut dilim hedefi: 1', 0, 33,
+         [1, 1, 1, 0], 'acil'],
+        ['La Lorraine Sokak Simiti (90 g)', 'f-simit.jpg', 'PİŞİRME GEREKLİ',
+         '7 Adet Pişirilecek', 'Stok eksik. (8/15)', 8, 130,
+         [46, 15, 6, 4], 'gerekli'],
+        ['Ekmek (200 g)', 'f-ekmek.jpg', 'FAZLA',
+         '13 Adet Fazla', 'Hedef üzerinde fazla: mevcut 35, hedef 22.', 35, 0,
+         [35, 22, 24, 12], 'fazla']
+    ];
+
+    var DURUM = {
+        acil:    ['#ef4444', '#fef2f2', '#fee2e2', '#ef4444'],
+        gerekli: ['#f59e0b', '#fffbeb', '#fef3c7', '#f59e0b'],
+        fazla:   ['#0d9488', '#f0fdfa', '#ccfbf1', '#0d9488']
+    };
+
+    /** Tek pişirme kartı. Ölçüler gerçek karttaki oranlara göre. */
+    function pisirmeKart(x, yy, k) {
+        var d = DURUM[k[8]];
+        var dilimYazi = '';
+        for (var i = 0; i < 4; i++) {
+            var simdi = i === 1;
+            var dx = x + 46 + i * 32;
+            dilimYazi +=
+                '<text x="' + dx + '" y="' + (yy + 44) + '" class="p-yazi"' +
+                ' style="font-size:5px;font-weight:700" fill="' +
+                (simdi ? '#16a34a' : '#0f172a') + '">' + k[7][i] + '</text>' +
+                '<text x="' + (dx - 6) + '" y="' + (yy + 50) + '" class="p-yazi"' +
+                ' style="font-size:3.4px" fill="' + (simdi ? '#16a34a' : '#6b7280') + '">' +
+                DILIMLER[i].replace(/ /g, '') + '</text>';
         }
+
         return '<g>' +
-            '<rect x="' + x + '" y="' + yy + '" width="180" height="54" rx="7"' +
-            ' fill="#fff" stroke="#e8edf3"/>' +
-            gorsel(x + 8, yy + 9, 26, dosya) +
-            '<text x="' + (x + 40) + '" y="' + (yy + 16) + '" class="p-yazi"' +
-            ' style="font-size:4.8px;font-weight:700">' + ad + '</text>' +
-            '<text x="' + (x + 40) + '" y="' + (yy + 25) + '" class="p-yazi"' +
-            ' style="font-size:4.4px">' + adet + '</text>' +
-            '<text x="' + (x + 40) + '" y="' + (yy + 33) + '" class="p-yazi"' +
-            ' style="font-size:3.8px" opacity="0.6">' + sebep + '</text>' +
-            '<rect x="' + (x + 8) + '" y="' + (yy + 39) + '" width="44" height="10" rx="3" fill="' +
-            zemin + '"/>' +
-            '<text x="' + (x + 12) + '" y="' + (yy + 46) + '" class="p-yazi" fill="' + renk +
-            '" style="font-size:4.2px;font-weight:700">' + rozet + '</text>' +
-            '<text x="' + (x + 58) + '" y="' + (yy + 46) + '" class="p-yazi"' +
-            ' style="font-size:3.8px" opacity="0.5">Raf</text>' +
-            '<text x="' + (x + 71) + '" y="' + (yy + 46) + '" class="p-yazi"' +
-            ' style="font-size:5px;font-weight:700">' + raf + '</text>' +
-            '<text x="' + (x + 84) + '" y="' + (yy + 46) + '" class="p-yazi"' +
-            ' style="font-size:3.8px" opacity="0.5">Donuk</text>' +
-            '<text x="' + (x + 105) + '" y="' + (yy + 46) + '" class="p-yazi"' +
-            ' style="font-size:5px;font-weight:700">' + donuk + '</text>' +
-            '<path d="M' + (x + 118) + ' ' + (yy + 8) + ' v34" class="p-cizgi"/>' +
-            '<text x="' + (x + 124) + '" y="' + (yy + 9) + '" class="p-yazi"' +
-            ' style="font-size:3.2px" opacity="0.4">SONRAKİ DİLİMLER</text>' + s +
+            '<rect x="' + x + '" y="' + yy + '" width="330" height="56" rx="6" fill="' +
+            d[1] + '" stroke="' + d[0] + '" stroke-width="1.2"/>' +
+            gorsel(x + 6, yy + 6, 26, k[1]) +
+            '<text x="' + (x + 38) + '" y="' + (yy + 13) + '" class="p-yazi"' +
+            ' style="font-size:5.2px;font-weight:700">' + k[0] + '</text>' +
+            '<rect x="' + (x + 232) + '" y="' + (yy + 7) + '" width="' + (k[2].length * 2.9 + 8) +
+            '" height="9" rx="4.5" fill="' + d[2] + '"/>' +
+            '<text x="' + (x + 236) + '" y="' + (yy + 13.5) + '" class="p-yazi" fill="' + d[3] +
+            '" style="font-size:3.8px;font-weight:700">' + k[2] + '</text>' +
+            '<text x="' + (x + 38) + '" y="' + (yy + 25) + '" class="p-yazi"' +
+            ' style="font-size:7.5px;font-weight:700" fill="#111827">' + k[3] + '</text>' +
+            '<text x="' + (x + 38) + '" y="' + (yy + 33) + '" class="p-yazi"' +
+            ' style="font-size:3.8px" fill="#4b5563">' + k[4] + '</text>' +
+            '<path d="M' + (x + 38) + ' ' + (yy + 37) + ' h192" stroke="#e5e7eb" stroke-width="0.8"/>' +
+            dilimYazi +
+            '<path d="M' + (x + 278) + ' ' + (yy + 6) + ' v44" stroke="#e5e7eb" stroke-width="0.8"/>' +
+            '<text x="' + (x + 292) + '" y="' + (yy + 16) + '" class="p-yazi"' +
+            ' style="font-size:3.6px;font-weight:600" fill="#4b5563">MEVCUT</text>' +
+            '<text x="' + (x + 300) + '" y="' + (yy + 26) + '" class="p-yazi"' +
+            ' style="font-size:7px;font-weight:700">' + k[5] + '</text>' +
+            '<text x="' + (x + 294) + '" y="' + (yy + 37) + '" class="p-yazi"' +
+            ' style="font-size:3.6px;font-weight:600" fill="#4b5563">DONUK</text>' +
+            '<text x="' + (x + 298) + '" y="' + (yy + 47) + '" class="p-yazi"' +
+            ' style="font-size:7px;font-weight:700">' + k[6] + '</text>' +
             '</g>';
     }
 
@@ -224,66 +267,35 @@
             '<rect x="306" y="96" width="80" height="15" rx="4" fill="#1d4ed8"/>' +
             '<circle cx="314" cy="103.5" r="2.6" fill="#fbbf24"/>' +
             '<text x="320" y="106" class="p-yazi p-yazi--ak" style="font-size:5px">Pişirme Paneli</text>' +
-            '<rect x="0" y="22" width="400" height="278" fill="rgb(15 23 42 / 0.45)"/>' +
-            '<rect x="18" y="52" width="364" height="238" rx="9" fill="#f7f9fc"/>' +
-            '<path d="M18 61 a9 9 0 0 1 9 -9 h346 a9 9 0 0 1 9 9 v17 h-364 z" fill="#1d4ed8"/>' +
-            '<circle cx="34" cy="66" r="3.4" fill="#fbbf24"/>' +
-            '<text x="42" y="69" class="p-yazi p-yazi--ak" style="font-size:6.5px;font-weight:700">' +
-            'Pişirme Paneli</text>' +
-            '<text x="292" y="69" class="p-yazi p-yazi--ak" style="font-size:4.4px" opacity="0.8">' +
-            'Jet Barkod Asistan</text>' + icerik + '</svg>';
+            '<rect x="0" y="22" width="400" height="278" fill="rgb(15 23 42 / 0.5)"/>' +
+            '<rect x="20" y="44" width="360" height="248" rx="8" fill="#fff"/>' +
+            '<path d="M28 62 h344" stroke="#e5e7eb" stroke-width="0.9"/>' +
+            '<text x="28" y="58" class="p-yazi" style="font-size:6.5px;font-weight:700">' +
+            '🥐 Pişirme önerileri</text>' +
+            '<text x="286" y="58" class="p-yazi" style="font-size:6px;font-weight:700">13:33</text>' +
+            '<rect x="318" y="50" width="11" height="11" rx="3" fill="#f3f4f6"/>' +
+            '<text x="320.5" y="58" style="font-size:6px">📋</text>' +
+            '<rect x="333" y="50" width="11" height="11" rx="3" fill="#f3f4f6"/>' +
+            '<text x="335.5" y="58" style="font-size:6px">⚙️</text>' +
+            '<path d="M358 51 l8 8 M366 51 l-8 8" stroke="#9ca3af" stroke-width="1.2"' +
+            ' stroke-linecap="round"/>' + icerik + '</svg>';
     }
 
     var PANEL_BOS = panelKabuk(
-        '<rect x="28" y="88" width="180" height="54" rx="7" fill="#eaeff5"/>' +
-        '<rect x="28" y="150" width="180" height="54" rx="7" fill="#eaeff5"/>' +
-        '<rect x="28" y="212" width="180" height="54" rx="7" fill="#eaeff5"/>' +
-        '<rect x="218" y="88" width="146" height="178" rx="7" fill="#eaeff5"/>' +
-        '<text x="150" y="282" class="p-yazi" style="font-size:4.4px" opacity="0.45">' +
-        'Dört dilim ve stok değerleri okunuyor…</text>');
+        '<rect x="30" y="70" width="330" height="56" rx="6" fill="#f3f4f6"/>' +
+        '<rect x="30" y="130" width="330" height="56" rx="6" fill="#f3f4f6"/>' +
+        '<rect x="30" y="190" width="330" height="56" rx="6" fill="#f3f4f6"/>' +
+        '<text x="160" y="272" class="p-yazi" style="font-size:4.4px" opacity="0.45">' +
+        'Dört dilim ve stoklar okunuyor…</text>');
 
     var PANEL_DOLU = panelKabuk(
-        kararKart(28, 88, 'La Lorraine Çikolatalı Kruvasan', 'f-cikolata.jpg',
-                  '2 adet pişirilecek', 'Rafta 3 kaldı, donukta 56 var', 'ACİL PİŞİR',
-                  '#b91c1c', '#fee2e2', '3', '56', [['16-20', '0'], ['20-24', '0']]) +
-        kararKart(28, 150, 'La Lorraine Sokak Simiti', 'f-simit.jpg',
-                  '15 adet pişirilecek', 'Satılan 15, rafta yalnız 8 var', 'HAZIRLIK YAP',
-                  '#b45309', '#fef3c7', '8', '130', [['16-20', '6'], ['20-24', '4']]) +
-        kararKart(28, 212, 'Ekmek (200 g)', 'f-ekmek.jpg',
-                  'Pişirmeye gerek yok', 'Rafta 35 var, donukta hiç yok', 'FAZLA',
-                  '#475569', '#f1f5f9', '35', '0', [['16-20', '24'], ['20-24', '12']]) +
-
-        '<rect x="218" y="88" width="146" height="106" rx="7" fill="#ecfdf5" stroke="#a7f3d0"/>' +
-        '<text x="228" y="102" class="p-yazi" fill="#047857"' +
-        ' style="font-size:5.5px;font-weight:700">İsraf önlendi</text>' +
-        '<text x="228" y="113" class="p-yazi" style="font-size:4.2px" fill="#065f46">' +
-        'Çikolatalı kruvasan sonraki iki</text>' +
-        '<text x="228" y="121" class="p-yazi" style="font-size:4.2px" fill="#065f46">' +
-        'dilimde hiç istenmiyor.</text>' +
-        '<rect x="228" y="127" width="126" height="1" fill="#a7f3d0"/>' +
-        '<text x="228" y="142" class="p-yazi" style="font-size:4.2px" opacity="0.7">' +
-        'Tahminle pişirilirdi</text>' +
-        '<text x="330" y="144" class="p-yazi" style="font-size:9px;font-weight:700" fill="#94a3b8">6</text>' +
-        '<text x="228" y="158" class="p-yazi" style="font-size:4.2px" opacity="0.7">' +
-        'Panelin dediği</text>' +
-        '<text x="330" y="160" class="p-yazi" style="font-size:9px;font-weight:700" fill="#047857">2</text>' +
-        '<rect x="228" y="166" width="126" height="14" rx="4" fill="#047857"/>' +
-        '<text x="238" y="176" class="p-yazi p-yazi--ak" style="font-size:4.6px">' +
-        '4 kruvasan çöpe gitmedi</text>' +
-        '<text x="228" y="189" class="p-yazi" style="font-size:3.6px" opacity="0.6" fill="#065f46">' +
-        'Gece 23.00 sonrası yalnız elde stoğu olanlar listelenir.</text>' +
-
-        '<rect x="218" y="202" width="146" height="64" rx="7" fill="#fff" stroke="#e8edf3"/>' +
-        '<text x="228" y="216" class="p-yazi" style="font-size:4.6px;font-weight:700">' +
-        'Panel neyi hesaplıyor</text>' +
-        '<text x="228" y="228" class="p-yazi" style="font-size:4px" opacity="0.7">' +
-        'Satılan eğilimi, rezerve, donuktaki</text>' +
-        '<text x="228" y="236" class="p-yazi" style="font-size:4px" opacity="0.7">' +
-        'stok ve raftaki mevcut, dört dilim</text>' +
-        '<text x="228" y="244" class="p-yazi" style="font-size:4px" opacity="0.7">' +
-        'birlikte okunuyor.</text>' +
-        '<text x="228" y="258" class="p-yazi" style="font-size:4px" fill="#1d4ed8" font-weight="700">' +
-        '240 rakam yerine 3 karar.</text>');
+        pisirmeKart(30, 70, KARTLAR[0]) +
+        pisirmeKart(30, 130, KARTLAR[1]) +
+        pisirmeKart(30, 190, KARTLAR[2]) +
+        '<text x="30" y="262" class="p-yazi" style="font-size:4px" opacity="0.55">' +
+        'Kartlar aciliyete göre sıralı: acil pişecekler üstte, fazla olanlar en altta.</text>' +
+        '<text x="30" y="272" class="p-yazi" style="font-size:4px" opacity="0.55">' +
+        'Aşağıda 4 kart daha var. Gece 23.00 sonrası yalnız elde stoğu olanlar listelenir.</text>');
 
     // ==================================================================
     // Senaryo
@@ -293,39 +305,49 @@
 
     global.JBSenaryoFirin = {
         baslik: 'Fırında ne pişecek, ne kadar pişecek',
-        ozet: 'Sayfa ikisinde de açık ve satırlar zaten görünüyor. Sorun bilgiyi bulmak değil, karar vermek.',
-        vurgu: 'Asıl kazanç sürede değil: 6 yerine 2 pişiriliyor, 4 kruvasan çöpe gitmiyor.',
+        ozet: 'Sayfa ikisinde de açık. Solda stok değerleri için her satıra ayrı tıklanıyor.',
+        vurgu: '60 satırı tek tek açmak yerine, aciliyete göre sıralanmış karar kartları.',
 
         sol: {
             ad: 'Eklentisiz depo',
-            ekranlar: { liste: liste(false) },
+            ekranlar: {
+                liste: liste(false, -1),
+                acik0: liste(false, 0),
+                acik1: liste(false, 1),
+                acik2: liste(false, 2),
+                acik5: liste(false, 5)
+            },
             adimlar: [
                 { ad: 'Pişirme Önerileri sekmesine geçildi', sure: 700, ekran: 'liste',
                   imlec: y(124, 82), goz: y(124, 82), tik: true },
-                { ad: 'İçinde bulunulan dilim okunmaya başlandı', sure: 1200, ekran: 'liste',
-                  goz: y(194, 130), imlec: y(230, 130) },
-                { ad: 'İlk ürünün dört sayısı karşılaştırıldı', sureAralik: [1500, 2200],
-                  ekran: 'liste', goz: y(194, 160) },
-                { ad: 'İkinci ürün: satılan 15, rafta 8', sureAralik: [1500, 2200],
-                  ekran: 'liste', goz: y(194, 190) },
-                { ad: 'Üçüncü ve dördüncü ürün okundu', sureAralik: [1800, 2600],
-                  ekran: 'liste', goz: y(194, 240) },
-                { ad: 'Sonraki dilime bakıldı', sureAralik: [1400, 2000], ekran: 'liste',
-                  goz: y(278, 170), imlec: y(300, 170) },
-                { ad: 'İki dilim kafada karşılaştırılmaya çalışıldı', sureAralik: [1600, 2400],
-                  ekran: 'liste', goz: y(236, 200) },
-                { ad: 'Kalan on bir ürün için aşağı kaydırıldı', sure: 1500, ekran: 'liste',
-                  goz: y(194, 270), imlec: y(236, 270) },
-                { ad: 'Dördüncü dilim hiç okunmadı', sure: 1200, ekran: 'liste',
-                  goz: y(362, 170), imlec: null },
-                { ad: 'Miktar tahminle belirlendi, fazla pişirildi', sure: 1600, ekran: 'liste',
-                  goz: y(194, 150) }
+                { ad: 'İçinde bulunulan dilim tarandı', sure: 1200, ekran: 'liste',
+                  goz: y(194, 140), imlec: y(228, 140) },
+                { ad: 'İlk satır açıldı', sure: 800, ekran: 'acik0',
+                  imlec: y(228, 145), goz: y(228, 145), tik: true },
+                { ad: 'Dört stok değeri okundu', sureAralik: [1300, 1900], ekran: 'acik0',
+                  goz: y(194, 162) },
+                { ad: 'İkinci satır açıldı', sure: 800, ekran: 'acik1',
+                  imlec: y(228, 164), goz: y(228, 164), tik: true },
+                { ad: 'Değerler tekrar okundu', sureAralik: [1300, 1900], ekran: 'acik1',
+                  goz: y(194, 181) },
+                { ad: 'Üçüncü satır açıldı', sure: 800, ekran: 'acik2',
+                  imlec: y(228, 183), goz: y(228, 183), tik: true },
+                { ad: 'Değerler bir kez daha okundu', sureAralik: [1300, 1900], ekran: 'acik2',
+                  goz: y(194, 200) },
+                { ad: 'Aşağıdaki satırlara geçildi', sure: 1100, ekran: 'acik5',
+                  imlec: y(228, 240), goz: y(228, 240), tik: true },
+                { ad: 'Kalan on bir satır için aynı tur gerekiyor', sureAralik: [1500, 2200],
+                  ekran: 'acik5', goz: y(194, 258) },
+                { ad: 'Sonraki dilimler için baştan başlanacak', sure: 1300, ekran: 'liste',
+                  goz: y(278, 180), imlec: y(300, 180) },
+                { ad: 'Miktar tahminle belirlendi', sure: 1400, ekran: 'liste',
+                  goz: y(194, 150), imlec: null }
             ]
         },
 
         sag: {
             ad: 'Jet Barkod Asistan kurulu',
-            ekranlar: { liste: liste(true), panelBos: PANEL_BOS, panel: PANEL_DOLU },
+            ekranlar: { liste: liste(true, -1), panelBos: PANEL_BOS, panel: PANEL_DOLU },
             adimlar: [
                 { ad: 'Pişirme Önerileri sekmesine geçildi', sure: 700, ekran: 'liste',
                   imlec: y(124, 82), goz: y(124, 82), tik: true },
@@ -333,12 +355,12 @@
                   imlec: y(346, 104), goz: y(346, 104), tik: true },
                 { ad: 'Dört dilim ve stoklar birlikte okunuyor', sure: 700, ekran: 'panelBos',
                   yukleniyor: true, goz: y(200, 170) },
-                { ad: 'Üç karar kartı hazır', sure: 1200, ekran: 'panel',
-                  goz: y(118, 120), imlec: null },
-                { ad: 'Sonraki dilimler kartın üstünde', sure: 1100, ekran: 'panel',
-                  goz: y(154, 118) },
-                { ad: 'Fazla pişirme daha başlamadan engellendi', sure: 1300, ekran: 'panel',
-                  goz: y(291, 140) }
+                { ad: 'Karar kartları aciliyete göre sıralı geldi', sure: 1200, ekran: 'panel',
+                  goz: y(150, 96), imlec: null },
+                { ad: 'Kaç adet ve neden, kartın üstünde yazıyor', sure: 1100, ekran: 'panel',
+                  goz: y(120, 158) },
+                { ad: 'Dört dilim ve MEVCUT / DONUK aynı kartta', sure: 1300, ekran: 'panel',
+                  goz: y(300, 160) }
             ]
         }
     };
