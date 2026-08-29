@@ -194,6 +194,14 @@
     Serit.prototype.bitir = function () {
         if (this.bittiMi) return;
         this.bittiMi = true;
+
+        /*
+         * Son adımın ekranını garantiye al. `ilerle` toplam süreyi aşan
+         * karede doğrudan buraya geliyor ve ekranı ilerletmiyordu; kare
+         * atlanırsa ya da cihaz yavaşsa sahne bir önceki ekranda kalıp
+         * bitiyordu. İzleyicinin görmesi gereken kare son karedir.
+         */
+        this.adimaGec(this.tanim.adimlar.length - 1);
         this.saatEl.classList.add('bitti');
         this.saatEl.textContent = saatYaz(this.toplam);
         this.bayrak.classList.add('acik');
@@ -296,13 +304,24 @@
             '    <span class="krs__perde-yazi" data-rol="dugmeYazi">Karşılaştırmayı oynat</span>' +
             '    <span class="krs__perde-alt">İki taraf aynı anda başlar</span>' +
             '  </button>' +
-            '</div>' +
+'</div>' +
             '<div class="krs__sonuc">' +
             '  <span data-rol="sonucYazi">' + kacir(tanim.ozet || '') + '</span>' +
             '  <span class="krs__bosluk"></span>' +
             (tanim.vurgu ? '  <span class="krs__vurgu" data-rol="vurgu">' +
                            kacir(tanim.vurgu) + '</span>' : '') +
             '  <span class="krs__fark" data-rol="fark"></span>' +
+            /*
+             * Tekrar düğmesi sonuç şeridinde. Sahnenin üstünde yüzerken
+             * dar ekranda iki şerit alt alta dizildiği için çok aşağıda
+             * kalıyordu; burada her genişlikte sonucun hemen yanında.
+             */
+            '  <button type="button" class="krs__tekrar" data-rol="tekrar">' +
+            '    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"' +
+            ' stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+            '      <path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>' +
+            '    <span>Tekrar oynat</span>' +
+            '  </button>' +
             '</div>';
 
         var seritler = kap.querySelectorAll('.krs__serit');
@@ -348,17 +367,41 @@
 
         var perde = kap.querySelector('.krs__perde');
         var perdeAlt = kap.querySelector('.krs__perde-alt');
+        var tekrarDugme = kap.querySelector('[data-rol="tekrar"]');
+        var sonucSerit = kap.querySelector('.krs__sonuc');
+        var sagSerit = kap.querySelector('.krs__serit--yeni');
 
         function perdeyiGoster(goster) {
             perde.classList.toggle('gizli', !goster);
         }
 
-        function dur() {
+        /** Başlangıç hâli: büyük perde açık, sonuç izleri silinmiş. */
+        function basaAl() {
+            perdeyiGoster(true);
+            tekrarDugme.classList.remove('acik');
+            sonucSerit.classList.remove('bitti');
+            sagSerit.classList.remove('kazandi');
+            farkEl.classList.remove('acik');
+            if (vurguEl) vurguEl.classList.remove('acik');
+            dugmeYazi.textContent = 'Karşılaştırmayı oynat';
+            perdeAlt.textContent = 'İki taraf aynı anda başlar';
+        }
+
+        /**
+         * Oynatma bittiğinde BÜYÜK PERDE GERİ GELMİYOR. Geri gelseydi son
+         * kareyi, bayrakları ve süreleri örterdi; izleyici sonucu göremeden
+         * ekran kapanıyordu. Sahne açıkta kalıyor, altta küçük bir tekrar
+         * düğmesi beliriyor.
+         */
+        function dur(bittiMi) {
             calisiyor = false;
             if (kare) { cancelAnimationFrame(kare); kare = 0; }
-            dugmeYazi.textContent = 'Tekrar oynat';
-            perdeAlt.textContent = 'Baştan izlemek için dokun';
-            perdeyiGoster(true);
+            perdeyiGoster(false);
+            tekrarDugme.classList.add('acik');
+            if (bittiMi) {
+                sonucSerit.classList.add('bitti');
+                sagSerit.classList.add('kazandi');
+            }
         }
 
         function adim() {
@@ -371,7 +414,7 @@
 
             if (solBitti && sagBitti) {
                 farkYaz();
-                dur();
+                dur(true);
                 return;
             }
             kare = requestAnimationFrame(adim);
@@ -388,14 +431,17 @@
                 sol.sonHal();
                 sag.sonHal();
                 farkYaz();
-                dugmeYazi.textContent = 'Son hâli gösteriliyor';
                 perdeyiGoster(false);
+                tekrarDugme.classList.add('acik');
+                sonucSerit.classList.add('bitti');
+                sagSerit.classList.add('kazandi');
                 return;
             }
 
             perdeyiGoster(false);
-            dugmeYazi.textContent = 'Karşılaştırmayı oynat';
-            perdeAlt.textContent = 'İki taraf aynı anda başlar';
+            tekrarDugme.classList.remove('acik');
+            sonucSerit.classList.remove('bitti');
+            sagSerit.classList.remove('kazandi');
             calisiyor = true;
             // Tek damga: iki şerit de bundan hesaplanıyor.
             baslangic = performance.now();
@@ -403,6 +449,7 @@
         }
 
         dugme.addEventListener('click', oynat);
+        tekrarDugme.addEventListener('click', oynat);
 
         /*
          * Sahne ekrandan çıkınca oynatmayı durdur. Görünmeyen sahnenin
@@ -423,13 +470,12 @@
                  * kalıyor ve sahne tıklanamaz görünüyordu.
                  */
                 if (calisiyor) {
-                    dur();
-                    sol.sifirla();
-                    sag.sifirla();
+                    calisiyor = false;
+                    if (kare) { cancelAnimationFrame(kare); kare = 0; }
                 }
-                dugmeYazi.textContent = 'Karşılaştırmayı oynat';
-                perdeAlt.textContent = 'İki taraf aynı anda başlar';
-                perdeyiGoster(true);
+                sol.sifirla();
+                sag.sifirla();
+                basaAl();
             }, { threshold: 0.15 });
             gozlemci.observe(kap);
         }

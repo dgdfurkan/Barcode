@@ -53,7 +53,7 @@
             '<text x="24" y="15" class="p-yazi" style="font-size:5px">Depo Paneli</text>';
     }
 
-    function stokEkrani(aranan, sonucVar, kagitSatir) {
+    function stokEkrani(aranan, sonucVar, yaziBirimi) {
         var satirlar = '';
         if (sonucVar) {
             var u = URUNLER[sonucVar - 1];
@@ -72,25 +72,55 @@
         }
 
         /*
-         * Elde tutulan tablo artık daktilo değil, el yazısı. Sistem
-         * yazısıyla aynı görünmesi kafa karıştırıyordu; bu satırlar
-         * gerçekte kalemle deftere yazılıyor.
+         * Deftere yazma parça parça ilerliyor. `yaziBirimi` kaç parçanın
+         * yazıldığını söylüyor; her satır dört parça: ürün adı, depo
+         * adedi, sistem değeri ve fark.
+         *
+         * Önce satırın tamamı tek karede beliriyordu. Gerçekte kimse bir
+         * satırı bir anda yazmıyor: adı yazılıyor, sonra rakamlar tek tek
+         * giriliyor, fark en son hesaplanıyor. Süre farkının nereden
+         * geldiği ancak böyle anlaşılıyor.
          */
         var kagit = '';
-        for (var i = 0; i < kagitSatir; i++) {
+        var tamSatir = Math.floor(yaziBirimi / 4);
+        var yarimParca = yaziBirimi % 4;
+
+        for (var i = 0; i <= tamSatir && i < URUNLER.length; i++) {
+            var parca = i < tamSatir ? 4 : yarimParca;
+            if (!parca) break;
+
             var u2 = URUNLER[i];
             var yy = 218 + i * 14;
             var egim = [-0.9, 0.7, -0.5, 1.1, -0.7][i % 5];
             var fark = u2[3] - u2[4];
-            kagit +=
-                '<g transform="rotate(' + egim + ' 200 ' + yy + ')">' +
-                '<text x="88" y="' + yy + '" class="el-yazisi" style="font-size:6.4px">' +
-                u2[0].slice(0, 18) + '</text>' +
-                '<text x="216" y="' + yy + '" class="el-yazisi" style="font-size:7px">' + u2[3] + '</text>' +
-                '<text x="252" y="' + yy + '" class="el-yazisi" style="font-size:7px">' + u2[4] + '</text>' +
-                '<text x="288" y="' + yy + '" class="el-yazisi el-yazisi--kirmizi"' +
-                ' style="font-size:7px">' + (fark > 0 ? '+' : '') + fark + '</text>' +
-                '</g>';
+            var g = '<g transform="rotate(' + egim + ' 200 ' + yy + ')">';
+
+            if (parca >= 1) {
+                g += '<text x="88" y="' + yy + '" class="el-yazisi" style="font-size:6.4px">' +
+                     u2[0].slice(0, 18) + '</text>';
+            }
+            if (parca >= 2) {
+                g += '<text x="216" y="' + yy + '" class="el-yazisi" style="font-size:7px">' +
+                     u2[3] + '</text>';
+            }
+            if (parca >= 3) {
+                g += '<text x="252" y="' + yy + '" class="el-yazisi" style="font-size:7px">' +
+                     u2[4] + '</text>';
+            }
+            if (parca >= 4) {
+                g += '<text x="288" y="' + yy + '" class="el-yazisi el-yazisi--kirmizi"' +
+                     ' style="font-size:7px">' + (fark > 0 ? '+' : '') + fark + '</text>';
+            }
+
+            /* Yazılan satırın ucunda kalem izi: sıra burada. */
+            if (i === tamSatir && parca < 4) {
+                var kalemX = [88, 216, 252, 288][parca];
+                if (parca >= 1) kalemX = [88, 216, 252, 288][parca];
+                g += '<rect x="' + kalemX + '" y="' + (yy - 5) + '" width="7" height="1.2"' +
+                     ' fill="#1e3a8a" opacity="0.55"/>';
+            }
+            g += '</g>';
+            kagit += g;
         }
 
         return '<svg viewBox="0 0 400 300">' + sekmeSeridi() +
@@ -136,10 +166,7 @@
             '<text x="216" y="196" class="el-yazisi" style="font-size:5.6px">depo</text>' +
             '<text x="252" y="196" class="el-yazisi" style="font-size:5.6px">sistem</text>' +
             '<text x="288" y="196" class="el-yazisi" style="font-size:5.6px">fark</text>' + kagit +
-            (kagitSatir < 5
-                ? '<text x="88" y="' + (218 + kagitSatir * 14) + '" class="el-yazisi"' +
-                  ' style="font-size:6px" opacity="0.45">…</text>'
-                : '') +
+
             '</svg>';
     }
 
@@ -346,61 +373,74 @@
 
         sol: {
             ad: 'Elle sayım · masa başı',
-            ekranlar: {
-                aranan1: stokEkrani('kuru soğan', 0, 0),
-                sonuc1: stokEkrani('kuru soğan', 1, 0),
-                yazildi1: stokEkrani('kuru soğan', 1, 1),
-                sonuc2: stokEkrani('maydanoz', 2, 1),
-                yazildi2: stokEkrani('maydanoz', 2, 2),
-                sonuc3: stokEkrani('calve barbekü', 3, 2),
-                yazildi3: stokEkrani('calve barbekü', 3, 3),
-                sonuc4: stokEkrani('erikli su', 4, 3),
-                yazildi4: stokEkrani('erikli su', 4, 4),
-                sonuc5: stokEkrani('galeta unu', 5, 4),
-                yazildi5: stokEkrani('galeta unu', 5, 5)
-            },
+            /*
+             * Ekran adları: a<arama sırası>_<yazılan parça sayısı>.
+             * Parça sayısı deftere kaç alanın girildiğini söylüyor;
+             * her satır dört alan.
+             */
+            ekranlar: (function () {
+                var e = {};
+                var aramalar = ['kuru soğan', 'maydanoz', 'calve barbekü', 'erikli su', 'galeta unu'];
+                /* İlk üç kalem alan alan yazılıyor. */
+                for (var i = 0; i < 3; i++) {
+                    var taban = i * 4;
+                    e['ara' + i] = stokEkrani(aramalar[i], 0, taban);
+                    e['bul' + i] = stokEkrani(aramalar[i], i + 1, taban);
+                    for (var k = 1; k <= 4; k++) {
+                        e['y' + i + '_' + k] = stokEkrani(aramalar[i], i + 1, taban + k);
+                    }
+                }
+                /* Kalan kalemler satır satır. */
+                e.dort = stokEkrani(aramalar[3], 4, 16);
+                e.bes = stokEkrani(aramalar[4], 5, 20);
+                return e;
+            })(),
             adimlar: [
-                { ad: '1. kalem aratıldı', sure: 1500, ekran: 'aranan1',
+                { ad: '1. kalem aratıldı', sure: 1300, ekran: 'ara0',
                   imlec: y(180, 98), goz: y(180, 98), tik: true },
-                { ad: 'Sistem stoğu geldi', sureAralik: [1400, 2100], ekran: 'sonuc1',
+                { ad: 'Sistem stoğu geldi', sureAralik: [1300, 1900], ekran: 'bul0',
                   yukleniyor: true, goz: y(240, 155) },
-                { ad: 'Deftere elle yazıldı', sure: 1600, ekran: 'yazildi1',
-                  imlec: y(250, 218), goz: y(200, 218), tik: true },
+                { ad: 'Ürün adı deftere yazılıyor', sure: 2100, ekran: 'y0_1',
+                  imlec: y(120, 218), goz: y(120, 218) },
+                { ad: 'Depodaki adet giriliyor', sure: 1000, ekran: 'y0_2',
+                  imlec: y(219, 218), goz: y(219, 218) },
+                { ad: 'Sistem değeri giriliyor', sure: 1000, ekran: 'y0_3',
+                  imlec: y(255, 218), goz: y(255, 218) },
+                { ad: 'Fark elde hesaplanıp yazılıyor', sure: 1400, ekran: 'y0_4',
+                  imlec: y(291, 218), goz: y(291, 218) },
 
-                { ad: '2. kalem aratıldı', sure: 1500, ekran: 'sonuc2',
+                { ad: '2. kalem aratıldı', sure: 1300, ekran: 'ara1',
                   imlec: y(180, 98), goz: y(180, 98), tik: true },
-                { ad: 'Okundu ve yazıldı', sureAralik: [1600, 2300], ekran: 'yazildi2',
-                  goz: y(200, 232) },
+                { ad: 'Sistem stoğu geldi', sureAralik: [1300, 1900], ekran: 'bul1',
+                  yukleniyor: true, goz: y(240, 155) },
+                { ad: 'Ürün adı yazılıyor', sure: 2000, ekran: 'y1_1',
+                  imlec: y(120, 232), goz: y(120, 232) },
+                { ad: 'Depo adedi', sure: 950, ekran: 'y1_2',
+                  imlec: y(219, 232), goz: y(219, 232) },
+                { ad: 'Sistem değeri', sure: 950, ekran: 'y1_3',
+                  imlec: y(255, 232), goz: y(255, 232) },
+                { ad: 'Fark', sure: 1300, ekran: 'y1_4',
+                  imlec: y(291, 232), goz: y(291, 232) },
 
-                { ad: '3. kalem aratıldı', sure: 1500, ekran: 'sonuc3',
+                { ad: '3. kalem aratıldı', sure: 1300, ekran: 'ara2',
                   imlec: y(180, 98), goz: y(180, 98), tik: true },
-                { ad: 'Okundu ve yazıldı', sureAralik: [1600, 2300], ekran: 'yazildi3',
-                  goz: y(200, 246) },
+                { ad: 'Sistem stoğu geldi', sureAralik: [1300, 1900], ekran: 'bul2',
+                  yukleniyor: true, goz: y(240, 155) },
+                { ad: 'Ürün adı yazılıyor', sure: 2000, ekran: 'y2_1',
+                  imlec: y(120, 246), goz: y(120, 246) },
+                { ad: 'Depo adedi', sure: 950, ekran: 'y2_2',
+                  imlec: y(219, 246), goz: y(219, 246) },
+                { ad: 'Sistem değeri', sure: 950, ekran: 'y2_3',
+                  imlec: y(255, 246), goz: y(255, 246) },
+                { ad: 'Fark', sure: 1300, ekran: 'y2_4',
+                  imlec: y(291, 246), goz: y(291, 246) },
 
-                { ad: '4. kalem aratıldı', sure: 1500, ekran: 'sonuc4',
-                  imlec: y(180, 98), goz: y(180, 98), tik: true },
-                { ad: 'Okundu ve yazıldı', sureAralik: [1600, 2300], ekran: 'yazildi4',
-                  goz: y(200, 260) },
-
-                { ad: '5. kalem aratıldı', sure: 1500, ekran: 'sonuc5',
-                  imlec: y(180, 98), goz: y(180, 98), tik: true },
-                { ad: 'Okundu ve yazıldı', sureAralik: [1600, 2300], ekran: 'yazildi5',
-                  goz: y(200, 274) },
-
-                { ad: '6. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
-                  imlec: y(180, 98), goz: y(180, 98), tik: true },
-                { ad: '7. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
-                  imlec: y(250, 240), goz: y(240, 155), tik: true },
-                { ad: '8. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
-                  imlec: y(180, 98), goz: y(180, 98), tik: true },
-                { ad: '9. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
-                  imlec: y(250, 240), goz: y(240, 155), tik: true },
-                { ad: '10. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
-                  imlec: y(180, 98), goz: y(180, 98), tik: true },
-                { ad: '11. kalem', sureAralik: [2600, 3400], ekran: 'yazildi5',
-                  imlec: y(250, 240), goz: y(240, 155), tik: true },
-                { ad: 'Farklar elle hesaplanacak', sure: 2400, ekran: 'yazildi5',
-                  goz: y(288, 250), imlec: null }
+                { ad: '4. kalem: ara, oku, yaz', sureAralik: [4200, 5200], ekran: 'dort',
+                  imlec: y(180, 98), goz: y(200, 260), tik: true },
+                { ad: '5. kalem: ara, oku, yaz', sureAralik: [4200, 5200], ekran: 'bes',
+                  imlec: y(180, 98), goz: y(200, 274), tik: true },
+                { ad: 'Kalan altı kalem için aynı tur', sureAralik: [5000, 6500],
+                  ekran: 'bes', goz: y(200, 240), imlec: null }
             ]
         },
 

@@ -148,6 +148,80 @@
     text-align: center;
 }
 
+/* ---------- Bitiş hâli ----------
+   Oynatma bitince büyük perde GERİ GELMİYOR. Geri gelseydi son kareyi,
+   bayrakları ve süreleri örterdi; izleyici sonucu göremeden ekran
+   kapanıyordu. Onun yerine köşede küçük bir tekrar düğmesi beliriyor,
+   sahne olduğu gibi açıkta kalıyor. */
+
+/* Sonuç şeridinde duruyor: her genişlikte sonucun hemen yanında,
+   sahnenin hiçbir yerini örtmüyor. Yer baştan ayrılmış, görünürlük
+   değişince şerit uzayıp kısalmıyor. */
+.krs__tekrar {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: #0f172a;
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    visibility: hidden;
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+    transition: opacity 260ms ease, transform 320ms var(--krs-yumusak-gecis),
+                background 160ms ease;
+}
+
+.krs__tekrar.acik {
+    visibility: visible;
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+}
+
+.krs__tekrar:hover { background: #1e293b; }
+.krs__tekrar:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.krs__tekrar svg { width: 0.85rem; height: 0.85rem; }
+
+/* Kazanan şerit: sonucu tek bakışta okutan yumuşak bir çerçeve. */
+.krs__serit { position: relative; }
+
+.krs__serit::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border: 2px solid transparent;
+    transition: border-color 420ms ease, box-shadow 420ms ease;
+}
+
+.krs__serit--yeni.kazandi::after {
+    border-color: rgb(4 120 87 / 0.55);
+    box-shadow: inset 0 0 34px -12px rgb(4 120 87 / 0.55);
+}
+
+/* Sonuç şeridi bitince öne çıkıyor. */
+.krs__sonuc {
+    transition: background 420ms ease, border-color 420ms ease;
+}
+
+.krs__sonuc.bitti {
+    background: linear-gradient(180deg, #f6fdfa, #ecfdf5);
+    border-top-color: #a7f3d0;
+}
+
+.krs__fark {
+    transform: scale(0.94);
+    transition: opacity 320ms ease, transform 420ms var(--krs-yumusak-gecis);
+}
+
+.krs__fark.acik { transform: scale(1); }
+
 /* ---------- İki şerit ---------- */
 
 /*
