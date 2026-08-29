@@ -520,67 +520,161 @@
     // ==================================================================
 
     /**
-     * Jet Barkod sonuç kartı. Ürünün fotoğrafı, adı ve okutulabilir
-     * barkodu aynı kartta. Sattığımız şey burası: personel sonucu okumuyor,
-     * görüyor.
+     * EAN-13 basamak dizilimi. Gerçek sayfada olduğu gibi: ilk hane
+     * barkodun solunda ayrı duruyor, kalan on iki hane altta iki gruba
+     * bölünüyor.
      */
-    function jetKart(x, yy, anahtar) {
+    function eanYazi(x, yy, kod) {
+        var ilk = kod.slice(0, 1);
+        var sol = kod.slice(1, 7);
+        var sag = kod.slice(7);
+        return '<text x="' + x + '" y="' + yy + '" class="p-yazi" style="font-size:4.4px">' +
+               ilk + '</text>' +
+               '<text x="' + (x + 14) + '" y="' + yy + '" class="p-yazi"' +
+               ' style="font-size:4.4px;letter-spacing:0.5px">' + sol + '</text>' +
+               '<text x="' + (x + 48) + '" y="' + yy + '" class="p-yazi"' +
+               ' style="font-size:4.4px;letter-spacing:0.5px">' + sag + '</text>';
+    }
+
+    /**
+     * Jet Barkod sonuç kartı. Canlı sayfaya bakılarak çizildi: üstte
+     * ürünün büyük fotoğrafı, altında adı, ince ayraç, sağda çoklu barkod
+     * sayfalaması ve en altta okutulabilir EAN-13 barkod.
+     *
+     * Sattığımız şey burası. Önceki çizimde kart küçük ve cılızdı,
+     * ürünü hak ettiğinden zayıf gösteriyordu.
+     */
+    function jetKart(x, yy, anahtar, barkodSayisi) {
         var u = URUNLER[anahtar];
+        var ad = u[0];
+        // Uzun adlar iki satıra iniyor, tıpkı gerçek kartta olduğu gibi.
+        var satir1 = ad, satir2 = '';
+        if (ad.length > 24) {
+            var kes = ad.lastIndexOf(' ', 24);
+            if (kes > 10) { satir1 = ad.slice(0, kes); satir2 = ad.slice(kes + 1); }
+        }
+
         return '<g>' +
-            '<rect x="' + x + '" y="' + yy + '" width="121" height="74" rx="6" class="p-kart"/>' +
-            gorsel(x + 7, yy + 7, 32, u[2]) +
-            '<text x="' + (x + 45) + '" y="' + (yy + 15) + '" class="p-yazi p-yazi--kucuk"' +
-            ' style="font-size:4.4px;font-weight:700">' + u[0] + '</text>' +
-            barkod(x + 45, yy + 20, 68, 17) +
-            '<text x="' + (x + 45) + '" y="' + (yy + 44) + '" class="p-yazi p-yazi--kucuk"' +
-            ' style="font-size:4.6px">' + u[1] + '</text>' +
-            '<rect x="' + (x + 7) + '" y="' + (yy + 46) + '" width="32" height="9" rx="2" fill="#ecfdf5"/>' +
-            '<text x="' + (x + 11) + '" y="' + (yy + 52) + '" class="p-yazi" fill="#047857"' +
-            ' style="font-size:4px">GÖRSELLİ</text>' +
-            barkod(x + 45, yy + 50, 68, 17) +
-            '<text x="' + (x + 45) + '" y="' + (yy + 70) + '" class="p-yazi p-yazi--kucuk"' +
-            ' opacity="0.55" style="font-size:4px">ekrandan okutulabilir</text>' +
+            '<rect x="' + x + '" y="' + yy + '" width="88" height="118" rx="7"' +
+            ' fill="#fff" stroke="#eef2f7"/>' +
+            '<rect x="' + (x + 1) + '" y="' + (yy + 1) + '" width="86" height="52" rx="6" fill="#fbfdff"/>' +
+            gorsel(x + 27, yy + 5, 34, u[2]) +
+            '<text x="' + (x + 8) + '" y="' + (yy + 66) + '" class="p-yazi"' +
+            ' style="font-size:5px;font-weight:700">' + satir1 + '</text>' +
+            (satir2
+                ? '<text x="' + (x + 8) + '" y="' + (yy + 73) + '" class="p-yazi"' +
+                  ' style="font-size:5px;font-weight:700">' + satir2 + '</text>'
+                : '') +
+            '<path d="M' + (x + 8) + ' ' + (yy + 80) + ' h72" class="p-cizgi"/>' +
+            '<text x="' + (x + 54) + '" y="' + (yy + 89) + '" class="p-yazi"' +
+            ' style="font-size:4px" opacity="0.55">1 / ' + barkodSayisi + '</text>' +
+            '<path d="M' + (x + 68) + ' ' + (yy + 86) + ' l-2 2 l2 2" stroke="#cbd5e1"' +
+            ' stroke-width="0.9" fill="none" stroke-linecap="round"/>' +
+            '<path d="M' + (x + 75) + ' ' + (yy + 86) + ' l2 2 l-2 2" stroke="#94a3b8"' +
+            ' stroke-width="0.9" fill="none" stroke-linecap="round"/>' +
+            barkod(x + 10, yy + 93, 68, 16) +
+            eanYazi(x + 10, yy + 114, u[1]) +
             '</g>';
     }
 
-    /** Jet Barkod kabuğu. Sonuç alanı ayrı veriliyor. */
+    /** Jet Barkod üst şeridi. Gerçek sayfadaki düğmeler ve deneme rozeti. */
+    function jetUst() {
+        return '<rect x="0" y="22" width="400" height="34" fill="#fff"/>' +
+            '<path d="M0 56 h400" class="p-cizgi"/>' +
+            '<rect x="12" y="30" width="17" height="17" rx="5" fill="#eef4ff" stroke="#dbe6ff"/>' +
+            '<circle cx="20.5" cy="38.5" r="4.4" fill="none" stroke="#2563eb" stroke-width="1.4"/>' +
+            '<path d="M23.6 41.6 L26 44" stroke="#2563eb" stroke-width="1.4" stroke-linecap="round"/>' +
+            '<text x="34" y="38" class="p-yazi" style="font-size:7px;font-weight:800">Jet Barkod</text>' +
+            '<text x="34" y="46" class="p-yazi" style="font-size:4.2px" opacity="0.6">' +
+            'Ürün Barkod Arama Sistemi</text>' +
+            '<rect x="132" y="31" width="34" height="14" rx="5" fill="#fff" stroke="#e8edf3"/>' +
+            '<text x="139" y="40" class="p-yazi" style="font-size:4.4px">Sayım</text>' +
+            '<rect x="170" y="31" width="34" height="14" rx="5" fill="#fff" stroke="#e8edf3"/>' +
+            '<text x="177" y="40" class="p-yazi" style="font-size:4.4px">Ajanda</text>' +
+            '<rect x="208" y="31" width="52" height="14" rx="5" fill="#fff" stroke="#e8edf3"/>' +
+            '<text x="214" y="40" class="p-yazi" style="font-size:4.4px">Raftaki Eksikler</text>' +
+            '<rect x="266" y="31" width="46" height="14" rx="5" fill="#fff" stroke="#e8edf3"/>' +
+            '<text x="272" y="40" class="p-yazi" style="font-size:4.4px" font-weight="700">14</text>' +
+            '<text x="279" y="40" class="p-yazi" style="font-size:4.2px" opacity="0.6">gün</text>' +
+            '<text x="292" y="40" class="p-yazi" style="font-size:4.4px" font-weight="700">18</text>' +
+            '<text x="299" y="40" class="p-yazi" style="font-size:4.2px" opacity="0.6">saat</text>' +
+            '<rect x="316" y="29" width="46" height="18" rx="7" fill="#fff" stroke="#e8edf3"/>' +
+            '<circle cx="325" cy="38" r="5.5" fill="#eef4ff"/>' +
+            '<text x="334" y="37" class="p-yazi" style="font-size:4.6px;font-weight:700">deneme</text>' +
+            '<text x="334" y="43" class="p-yazi" style="font-size:3.6px" opacity="0.6">Örnek Depo</text>' +
+            '<rect x="366" y="31" width="26" height="14" rx="5" fill="#fff" stroke="#e8edf3"/>' +
+            '<text x="371" y="40" class="p-yazi" style="font-size:4.2px">Ayarlar</text>';
+    }
+
+    /** Arama kartı: başlık, ipucu rozetleri, Liste/Grid geçişi. */
+    function jetArama(metin) {
+        return '<rect x="10" y="62" width="380" height="52" rx="8" class="p-kart"/>' +
+            '<rect x="18" y="68" width="14" height="14" rx="5" fill="#eef4ff"/>' +
+            '<circle cx="25" cy="74.5" r="3.6" fill="none" stroke="#2563eb" stroke-width="1.2"/>' +
+            '<path d="M27.6 77.1 L29.6 79.1" stroke="#2563eb" stroke-width="1.2" stroke-linecap="round"/>' +
+            '<text x="38" y="74" class="p-yazi" style="font-size:5.5px;font-weight:700">Ürün Arama</text>' +
+            '<text x="38" y="81" class="p-yazi" style="font-size:4px" opacity="0.6">' +
+            'Ürün adını yazarak barkod bilgilerine ulaşın</text>' +
+            '<rect x="326" y="66" width="28" height="13" rx="4" fill="#fff" stroke="#e8edf3"/>' +
+            '<text x="333" y="75" class="p-yazi" style="font-size:4.2px">Liste</text>' +
+            '<rect x="356" y="66" width="26" height="13" rx="4" fill="#eef4ff" stroke="#c7dbff"/>' +
+            '<text x="362" y="75" class="p-yazi" style="font-size:4.2px" fill="#1d4ed8">Grid</text>' +
+            '<rect x="18" y="86" width="364" height="14" rx="5" fill="#fff" stroke="' +
+            (metin ? '#93c5fd' : '#e8edf3') + '"/>' +
+            '<circle cx="27" cy="93" r="3.4" fill="none" stroke="#94a3b8" stroke-width="1.1"/>' +
+            '<path d="M29.4 95.4 L31.4 97.4" stroke="#94a3b8" stroke-width="1.1" stroke-linecap="round"/>' +
+            '<text x="37" y="95" class="p-yazi" style="font-size:4.4px"' +
+            (metin ? '' : ' opacity="0.42"') + '>' +
+            (metin || 'Ürün adını yazın veya tablo verisi yapıştırın… (örn: Nesfit, Coca Cola)') + '</text>' +
+            '<text x="18" y="109" class="p-yazi" style="font-size:3.8px" opacity="0.5">İpucu:</text>' +
+            '<rect x="36" y="103" width="86" height="9" rx="3" fill="#eff6ff"/>' +
+            '<text x="40" y="109.5" class="p-yazi" fill="#1d4ed8" style="font-size:3.6px">' +
+            'Virgülle birden fazla terim</text>' +
+            '<rect x="126" y="103" width="72" height="9" rx="3" fill="#ecfdf5"/>' +
+            '<text x="130" y="109.5" class="p-yazi" fill="#047857" style="font-size:3.6px">' +
+            'Türkçe karakter desteği</text>' +
+            '<rect x="202" y="103" width="76" height="9" rx="3" fill="#ecfdf5"/>' +
+            '<text x="206" y="109.5" class="p-yazi" fill="#047857" style="font-size:3.6px">' +
+            'Tablo verisi yapıştırma</text>';
+    }
+
     function jetKabuk(sonucAlani, aramaMetni) {
         return '<svg viewBox="0 0 400 300">' +
             sekmeSeridi(['Depo Paneli', 'Jet Barkod'], 1) +
-            '<rect x="0" y="22" width="400" height="278" fill="#f8fafc"/>' +
-            '<rect x="0" y="22" width="400" height="30" fill="#fff"/>' +
-            '<path d="M0 52 h400" class="p-cizgi"/>' +
-            '<rect x="14" y="30" width="14" height="14" rx="4" fill="#2563eb"/>' +
-            '<text x="34" y="42" class="p-yazi p-yazi--kalin">Jet Barkod</text>' +
-            '<text x="300" y="42" class="p-yazi p-yazi--kucuk" opacity="0.55">Ürün Barkod Arama</text>' +
-            '<rect x="14" y="60" width="372" height="20" rx="6" class="p-kart"/>' +
-            '<circle cx="27" cy="70" r="4.2" fill="none" stroke="#94a3b8" stroke-width="1.3"/>' +
-            '<path d="M30 73 L33.6 76.6" stroke="#94a3b8" stroke-width="1.3" stroke-linecap="round"/>' +
-            '<text x="38" y="73" class="p-yazi p-yazi--kucuk"' +
-            (aramaMetni ? '' : ' opacity="0.45"') + ' style="font-size:4.6px">' +
-            (aramaMetni || 'Ürün adı, barkod veya yapıştırılan tablo') + '</text>' +
-            sonucAlani +
+            '<rect x="0" y="22" width="400" height="278" fill="#f7f9fc"/>' +
+            jetUst() + jetArama(aramaMetni) + sonucAlani +
             '</svg>';
     }
 
-    var JET_ARAMA = 'Kuru Soğan, Maydanoz, Erikli Su, Calve Sos, Sokak Simiti, Algida…';
+    var JET_ARAMA = 'kuru soğan, maydanoz, erikli, calve barbekü, sokak simiti, algida';
 
-    /* Sekmeye yeni geçilmiş an: arama dolu, sonuç henüz gelmemiş. */
+    /* Sekmeye yeni geçilmiş an: arama dolu, sonuçlar henüz gelmemiş. */
     var EKRAN_JET_BOS = jetKabuk(
-        '<text x="14" y="94" class="p-yazi p-yazi--kucuk" opacity="0.55">Yapıştırılan liste çözülüyor…</text>' +
-        '<rect x="14" y="100" width="121" height="74" rx="6" fill="#eef2f7"/>' +
-        '<rect x="139" y="100" width="121" height="74" rx="6" fill="#eef2f7"/>' +
-        '<rect x="264" y="100" width="121" height="74" rx="6" fill="#eef2f7"/>' +
-        '<rect x="14" y="180" width="121" height="74" rx="6" fill="#eef2f7"/>' +
-        '<rect x="139" y="180" width="121" height="74" rx="6" fill="#eef2f7"/>' +
-        '<rect x="264" y="180" width="121" height="74" rx="6" fill="#eef2f7"/>',
+        '<rect x="10" y="122" width="380" height="24" rx="7" class="p-kart"/>' +
+        '<rect x="18" y="128" width="12" height="12" rx="4" fill="#ecfdf5"/>' +
+        '<text x="36" y="134" class="p-yazi" style="font-size:5px;font-weight:700">Arama Sonuçları</text>' +
+        '<text x="36" y="141" class="p-yazi" style="font-size:4px" opacity="0.6">' +
+        'çözülüyor…</text>' +
+        '<rect x="10" y="152" width="88" height="118" rx="7" fill="#eef2f7"/>' +
+        '<rect x="108" y="152" width="88" height="118" rx="7" fill="#eef2f7"/>' +
+        '<rect x="206" y="152" width="88" height="118" rx="7" fill="#eef2f7"/>' +
+        '<rect x="304" y="152" width="88" height="118" rx="7" fill="#eef2f7"/>',
         JET_ARAMA);
 
     var EKRAN_JET = jetKabuk(
-        '<text x="14" y="94" class="p-yazi p-yazi--kucuk" opacity="0.7">' +
-        '10 ürün · hepsi görseli ve barkoduyla</text>' +
-        jetKart(14, 100, 'sogan') + jetKart(139, 100, 'maydanoz') + jetKart(264, 100, 'su') +
-        jetKart(14, 180, 'sos') + jetKart(139, 180, 'simit') + jetKart(264, 180, 'dondurma'),
+        '<rect x="10" y="122" width="380" height="24" rx="7" class="p-kart"/>' +
+        '<rect x="18" y="128" width="12" height="12" rx="4" fill="#ecfdf5"/>' +
+        '<path d="M21 134 l2 2 l4 -4" stroke="#047857" stroke-width="1.2" fill="none"' +
+        ' stroke-linecap="round" stroke-linejoin="round"/>' +
+        '<text x="36" y="134" class="p-yazi" style="font-size:5px;font-weight:700">Arama Sonuçları</text>' +
+        '<text x="36" y="141" class="p-yazi" style="font-size:4px" opacity="0.65">' +
+        '35 ürün bulundu (6 arama terimi) · hepsi görseli ve barkoduyla</text>' +
+        jetKart(10, 152, 'sogan', 2) +
+        jetKart(108, 152, 'maydanoz', 6) +
+        jetKart(206, 152, 'su', 4) +
+        jetKart(304, 152, 'sos', 2) +
+        '<text x="10" y="284" class="p-yazi" style="font-size:4px" opacity="0.5">' +
+        'Barkodu olmayan ürün yok. Çoklu barkodlu ürünlerde oklarla diğer kodlara geçilir.</text>',
         JET_ARAMA);
 
     // ==================================================================
@@ -596,6 +690,7 @@
     global.JBSenaryoBarkod = {
         baslik: 'Okunmayan bir barkodu bulmak',
         ozet: 'İki tarafta da aynı yerden başlanıyor: kontrol panelinde açık bir sipariş.',
+        vurgu: 'Solda tek ürünün barkodu çıktı. Sağda siparişin tamamı, görseliyle birlikte.',
 
         sol: {
             ad: 'Eklentisiz depo',
@@ -668,10 +763,12 @@
                   imlec: y(288, 134), goz: y(288, 134), tik: true },
                 { ad: 'Yan sekmedeki Jet Barkod açıldı', sure: 600, ekran: 'jetBos',
                   imlec: y(98, 12), goz: y(98, 12), tik: true },
-                { ad: 'Liste çözülüyor', sure: 500, ekran: 'jetBos',
-                  yukleniyor: true, goz: y(200, 180) },
-                { ad: 'Hepsi görseli ve barkoduyla ekranda', sure: 1000, ekran: 'jet',
-                  goz: y(200, 180), imlec: null }
+                { ad: 'Liste çözülüyor', sure: 550, ekran: 'jetBos',
+                  yukleniyor: true, goz: y(200, 200) },
+                { ad: '35 ürün görseli ve barkoduyla ekranda', sure: 1100, ekran: 'jet',
+                  goz: y(150, 210), imlec: null },
+                { ad: 'Aranan ürün ilk bakışta görülüyor', sure: 900, ekran: 'jet',
+                  goz: y(54, 200) }
             ]
         }
     };
