@@ -169,14 +169,25 @@
     }
 
     /*
-     * Toplu sonuç gelince banko açılıyor.
+     * Banko YALNIZCA toplu kopyalamada açılıyor.
      *
-     * Tek ürün aranınca açılmıyor: depocu barkod bakıyordur, banko
-     * hazırlamıyordur. Birden fazla ürün geldiyse toplu kopyalama yapılmış
-     * demektir ve sıradaki iş sepeti bir bankoya koymak.
+     * ÖNCEKİ ÖLÇÜT YANLIŞTI
+     * "Birden fazla sonuç geldiyse toplu kopyalamadır" diye bakıyordum.
+     * Oysa tek kelime yazınca da yüz sonuç geliyor: "süt" yazan depocunun
+     * karşısına banko karekodu çıkıyordu. Sonuç sayısı sorgunun ne olduğunu
+     * söylemiyor.
      *
-     * Aynı sonuç kümesi için ikinci kez açılmıyor; kullanıcı kapattıysa
-     * kapalı kalıyor.
+     * DOĞRU ÖLÇÜT: SORGUNUN KENDİSİ
+     * Toplu kopyalama arama kutusuna virgülle ayrılmış bir liste bırakıyor
+     * (eklentinin "Tümünü Kopyala" düğmesi de, tablo yapıştırması da).
+     * Elle tek ürün arayan virgül yazmıyor. O yüzden ölçüt virgülle ayrılmış
+     * en az iki terim.
+     *
+     * Sonuç sayısına yine bakılıyor ama yalnızca "hiç sonuç yoksa açma"
+     * için; tetikleyen şey sorgunun biçimi.
+     *
+     * Aynı sorgu için ikinci kez açılmıyor: kullanıcı kapattıysa kapalı
+     * kalıyor, her yeniden çizimde önüne fırlamıyor.
      */
     var sonAcilisImzasi = null;
 
@@ -187,12 +198,26 @@
         return Math.max(t, g, m);
     }
 
+    /** Virgülle ayrılmış, boş olmayan terim sayısı. */
+    function terimSayisi() {
+        var ham = (aramaKutusu && aramaKutusu.value) || '';
+        if (!ham) return 0;
+        var parcalar = ham.split(',');
+        var adet = 0;
+        for (var i = 0; i < parcalar.length; i++) {
+            if (parcalar[i].replace(/\s+/g, '')) adet++;
+        }
+        return adet;
+    }
+
     function topluSonucGeldi() {
         if (!bankoArayuz || typeof bankoArayuz.otomatikAc !== 'function') return;
-        var adet = sonucSayisi();
-        if (adet < 2) return;
 
-        var imza = adet + '|' + ((aramaKutusu && aramaKutusu.value) || '');
+        // Tek terimli arama toplu kopyalama değildir.
+        if (terimSayisi() < 2) return;
+        if (!sonucSayisi()) return;
+
+        var imza = (aramaKutusu && aramaKutusu.value) || '';
         if (imza === sonAcilisImzasi) return;
         sonAcilisImzasi = imza;
 
