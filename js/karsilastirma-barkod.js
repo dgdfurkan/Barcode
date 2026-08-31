@@ -225,9 +225,11 @@
      * var. Buradaki kareler o fotoğrafların yerini tutuyor.
      */
     function ekranSiparisDetay(tumunuKopyala, seciliUrun) {
-        var sira = ['sogan', 'maydanoz', 'su', 'sos', 'simit',
-                    'dondurma', 'kaymak', 'un', 'folyo', 'sut'];
-        var adetler = [1, 1, 2, 1, 3, 2, 1, 1, 1, 1];
+        /* Sipariştekiler ve Jet Barkod'da çıkanlar aynı on iki ürün.
+           Sağ şeritteki ızgara (JET_SIRALAR) bu listeyle birebir aynı. */
+        var sira = ['sogan', 'maydanoz', 'su', 'sos', 'simit', 'dondurma',
+                    'kaymak', 'un', 'folyo', 'sut', 'peynir', 'ayran'];
+        var adetler = [1, 1, 2, 1, 3, 2, 1, 1, 1, 1, 1, 1];
 
         var tablo = '';
         for (var i = 0; i < sira.length; i++) {
@@ -270,12 +272,12 @@
             '<text x="160" y="98" class="p-yazi p-yazi--kucuk" style="font-size:5px">Örnek Mah. Örnek Cad. No: 1</text>' +
             '<text x="160" y="116" class="p-yazi p-yazi--kucuk" opacity="0.55">Lokasyonlar:</text>' +
             '<rect x="206" y="108" width="34" height="11" rx="3" fill="#f1f5f9"/>' +
-            '<text x="210" y="116" class="p-yazi p-yazi--kucuk" style="font-size:5px">13 DP.101</text>' +
+            '<text x="210" y="116" class="p-yazi p-yazi--kucuk" style="font-size:5px">16 DP.101</text>' +
 
             '<text x="266" y="88" class="p-yazi p-yazi--kucuk" opacity="0.55">Toplayıcı Adı:</text>' +
             '<text x="266" y="98" class="p-yazi p-yazi--kucuk">A. Demir</text>' +
             '<text x="266" y="116" class="p-yazi p-yazi--kucuk" opacity="0.55">Adet:</text>' +
-            '<text x="290" y="116" class="p-yazi p-yazi--kucuk">13</text>' +
+            '<text x="290" y="116" class="p-yazi p-yazi--kucuk">16</text>' +
 
             (tumunuKopyala
                 ? '<rect x="252" y="126" width="72" height="15" rx="4" fill="#e8f4f8" stroke="#4a90e2"/>' +
@@ -711,7 +713,11 @@
             '</svg>';
     }
 
-    var JET_ARAMA = 'kuru soğan, maydanoz, erikli, calve barbekü, sokak simiti, algida';
+    /* Tümünü Kopyala siparişin on iki kalemini birden yapıştırıyor.
+       Sipariş tablosundaki sırayla, aynı ürünler. */
+    var JET_ARAMA = 'kuru soğan, maydanoz, erikli, calve, sokak simiti, algida, ' +
+                    'sütaş kaymaksız, galeta unu, cook folyo, sütaş süt, ' +
+                    'pınar peynir, sütaş ayran';
 
     /* Sekmeye yeni geçilmiş an: arama dolu, sonuçlar henüz gelmemiş. */
     var EKRAN_JET_BOS = jetKabuk(
@@ -733,7 +739,7 @@
         ' stroke-linecap="round" stroke-linejoin="round"/>' +
         '<text x="36" y="134" class="p-yazi" style="font-size:5px;font-weight:700">Arama Sonuçları</text>' +
         '<text x="36" y="141" class="p-yazi" style="font-size:4px" opacity="0.65">' +
-        '35 ürün bulundu (6 arama terimi) · hepsi görseli ve barkoduyla</text>' +
+        '35 ürün bulundu (12 arama terimi) · hepsi görseli ve barkoduyla</text>' +
         jetKart(10, 152, 'sogan', 2) +
         jetKart(108, 152, 'maydanoz', 6) +
         jetKart(206, 152, 'su', 4) +
@@ -780,7 +786,7 @@
     }
 
     var EKRAN_JET_KAYDIR = jetKabuk(
-        jetBaslik('35 ürün bulundu (6 arama terimi) · liste baştan sona geçiyor') +
+        jetBaslik('35 ürün bulundu (12 arama terimi) · liste baştan sona geçiyor') +
         '<clipPath id="jbKirp"><rect x="6" y="150" width="388" height="132" rx="7"/></clipPath>' +
         '<g clip-path="url(#jbKirp)"><g class="jb-kaydir">' + jetIzgara() + '</g></g>' +
         /* Kaydırma çubuğu */
