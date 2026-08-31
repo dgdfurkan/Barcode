@@ -72,7 +72,7 @@
         ['6f15', 'A. Tunç',   'Kurye 2', 8,  false, 'firin']
     ];
 
-    var KATEGORI = { su: '#3b82f6', firin: '#eab308', dondurma: '#a855f7', '': null };
+    var KATEGORI = { su: '#135bec', firin: '#c08a2a', dondurma: '#0d6b8a', '': null };
 
     /**
      * Sipariş kartı. `vurgu` verildiğinde kart öne çıkıyor, `sonuk`

@@ -532,6 +532,9 @@ img { max-width: 100%; display: block; }
     font-size: 0.74rem;
     font-weight: 620;
     font-variant-numeric: tabular-nums;
+    /* Sonuç sayısı bir haneden iki haneye çıkınca rozet genişlemesin. */
+    min-width: 4.6rem;
+    text-align: center;
 }
 
 /* Liste yüksekliği sabit: sonuç geldikçe sayfa oynamıyor. */
