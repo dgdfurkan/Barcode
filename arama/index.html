@@ -5769,6 +5769,28 @@
             return getirRow || getirImg || fullTableMarkers;
         }
 
+        /*
+         * Panodaki metin doğrudan arama kutusuna yazılsın mı?
+         *
+         * BURADA BİR HATA VARDI
+         * Eskiden yalnızca karakter sınıfına bakılıyordu: harf, rakam ve
+         * tire içeren her kelime "barkod ya da stok kodu" sayılıyordu.
+         * Panoda "Furkan" yazarken siteye gelince o da yapıştırılıyor ve
+         * "0 sonuç" ekranı açılıyordu. Oysa katalogda öyle bir şey
+         * olmadığı baştan biliniyor.
+         *
+         * Barkodun içinde her zaman rakam vardır. Rakamsız bir kelime
+         * kısa yoldan geçemiyor; katalog kontrolüne düşüyor ve orada
+         * karşılığı yoksa hiç yapıştırılmıyor.
+         *
+         * Katalogda rakamsız iç kodlar da var (dorleo, kucukposet gibi,
+         * yetmiş tane). Onlar engellenmiyor: kısa yoldan geçemeseler de
+         * katalog kontrolü barkod eşleşmesini buluyor ve yapıştırma
+         * gerçekleşiyor. Tek fark bir arama turu daha dönmesi.
+         *
+         * Toplu kopyalama HTML'i ve ürün görseli adresi bu fonksiyona hiç
+         * uğramıyor; onların kendi kapıları var.
+         */
         function isPlainBarcodeOrSkuList(s) {
             if (!s || typeof s !== 'string' || isLikelyEmail(s)) return false;
             const t = s.trim();
@@ -5780,6 +5802,7 @@
                 if (p.length < 2 || p.length > 40) return false;
                 if (/^https?:\/\//i.test(p)) return false;
                 if (/[\s@]/.test(p)) return false;
+                if (!/\d/.test(p)) return false;   // Rakamsızsa kod değil, kelimedir
                 return /^[A-Za-z0-9\-]+$/.test(p);
             };
             return parts.every(tokenOk);
