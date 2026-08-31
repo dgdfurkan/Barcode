@@ -1,0 +1,590 @@
+/**
+ * Jet Barkod. Giriş sayfası.
+ * ============================================================================
+ *
+ * Bu sayfa çoğu ziyaretçinin gördüğü ilk ekran. İki işi var: giriş yaptırmak
+ * ve hesabı olmayanı bize yazmaya götürmek. O yüzden sol tarafta form değil,
+ * ne yaptığımızın kısa ve somut anlatımı duruyor.
+ *
+ * RENK
+ * Zemin derin mürekkep, tek vurgu logodaki mavi (#135bec). Arkadaki canlı
+ * gradyan da yalnızca mavinin tonlarında geziniyor. Kart beyaz ve keskin:
+ * koyu zeminin üstünde gözün gideceği tek yer orası.
+ *
+ * KAYMA YOK
+ * Giriş animasyonları yalnızca opacity ve transform. Arka plan tuvali akış
+ * dışında (`position: fixed`), yeniden boyutlanırken sayfayı itmiyor.
+ *
+ * WEBGL YOKSA
+ * Tuvalin arkasında CSS ile çizilmiş sabit bir zemin var. Tuval kurulamazsa
+ * ya da bağlam kaybolursa sayfa boş kalmıyor, sadece durgun görünüyor.
+ * ============================================================================
+ */
+
+:root {
+    --g-murekkep: #050810;
+    --g-mavi: #135bec;
+    --g-mavi-ac: #6ea3ff;
+    --g-ak: #eef2f8;
+    --g-ak-soluk: rgb(238 242 248 / 0.62);
+    --g-cizgi: rgb(255 255 255 / 0.10);
+    --g-cizgi-guclu: rgb(255 255 255 / 0.18);
+    --g-yay: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ==========================================================================
+   Zemin
+   ========================================================================== */
+
+body.giris {
+    min-height: 100svh;
+    margin: 0;
+    background: var(--g-murekkep);
+    color: var(--g-ak);
+    overflow-x: hidden;
+}
+
+/* Tuval kurulamazsa görünen sabit zemin. Tek renk ailesi, bant yok. */
+.giris-zemin {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(70% 55% at 22% 18%, rgb(19 91 236 / 0.30), transparent 62%),
+        radial-gradient(60% 50% at 82% 78%, rgb(14 42 99 / 0.42), transparent 66%),
+        var(--g-murekkep);
+}
+
+#girisTuval {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 900ms ease-out;
+}
+
+#girisTuval.hazir { opacity: 1; }
+
+/* Okunurluk perdesi: yazı gradyanın parlak yerine denk gelse de okunuyor */
+.giris-perde {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgb(5 8 16 / 0.55) 0%, rgb(5 8 16 / 0.20) 38%, rgb(5 8 16 / 0.72) 100%);
+}
+
+/* ==========================================================================
+   Yerleşim
+   ========================================================================== */
+
+.giris-kabuk {
+    position: relative;
+    z-index: 3;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+}
+
+.giris-ust {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.15rem clamp(1rem, 4vw, 2.5rem);
+}
+
+.giris-marka {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 680;
+    letter-spacing: -0.025em;
+    font-size: 1.02rem;
+}
+
+.giris-marka img {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    object-fit: contain;
+    background: rgb(255 255 255 / 0.07);
+    padding: 2px;
+}
+
+.giris-ust__bosluk { flex: 1; }
+
+.giris-ustbag {
+    padding: 0.42rem 0.85rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--g-ak-soluk);
+    font: inherit;
+    font-size: 0.87rem;
+    font-weight: 550;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+
+.giris-ustbag:hover {
+    color: #fff;
+    background: rgb(255 255 255 / 0.08);
+    border-color: var(--g-cizgi);
+}
+
+.giris-orta {
+    flex: 1;
+    display: grid;
+    align-items: center;
+    gap: clamp(2rem, 5vw, 4.5rem);
+    width: 100%;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(1rem, 3vw, 2rem) clamp(1rem, 4vw, 2.5rem) clamp(2.5rem, 5vw, 3.5rem);
+    grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 1024px) {
+    .giris-orta {
+        grid-template-columns: minmax(0, 1.05fr) minmax(0, 420px);
+        align-items: center;
+    }
+}
+
+/* ==========================================================================
+   Anlatım
+   ========================================================================== */
+
+.giris-anlatim { min-width: 0; }
+
+.giris-rozet {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.32rem 0.8rem 0.32rem 0.55rem;
+    border: 1px solid var(--g-cizgi-guclu);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.06);
+    color: var(--g-ak);
+    font-size: 0.78rem;
+    font-weight: 570;
+    letter-spacing: 0.01em;
+}
+
+.giris-rozet__nokta {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #34d399;
+    box-shadow: 0 0 0 3px rgb(52 211 153 / 0.20);
+    animation: g-nabiz 2.6s ease-in-out infinite;
+}
+
+@keyframes g-nabiz {
+    0%, 100% { box-shadow: 0 0 0 3px rgb(52 211 153 / 0.20); }
+    50% { box-shadow: 0 0 0 6px rgb(52 211 153 / 0.06); }
+}
+
+.giris-baslik {
+    margin: 1.15rem 0 0.9rem;
+    max-width: 17ch;
+    font-size: clamp(2.05rem, 5.2vw, 3.4rem);
+    font-weight: 680;
+    line-height: 1.06;
+    letter-spacing: -0.042em;
+    color: #fff;
+}
+
+.giris-baslik em {
+    display: block;
+    font-style: italic;
+    font-family: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+    font-weight: 400;
+    letter-spacing: -0.018em;
+    color: var(--g-mavi-ac);
+}
+
+.giris-ozet {
+    margin: 0 0 1.7rem;
+    max-width: 46ch;
+    color: var(--g-ak-soluk);
+    font-size: 1.02rem;
+    line-height: 1.62;
+}
+
+/* --- Rakamlar --- */
+
+.giris-rakamlar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 clamp(1.4rem, 4vw, 2.6rem);
+    margin: 0 0 1.8rem;
+    padding: 1rem 0 0;
+    border-top: 1px solid var(--g-cizgi);
+}
+
+.giris-rakam { min-width: 0; }
+
+.giris-rakam__sayi {
+    display: block;
+    font-size: clamp(1.35rem, 3vw, 1.75rem);
+    font-weight: 660;
+    letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
+    color: #fff;
+    line-height: 1.15;
+}
+
+.giris-rakam__not {
+    display: block;
+    margin-top: 0.15rem;
+    color: rgb(238 242 248 / 0.5);
+    font-size: 0.79rem;
+    line-height: 1.4;
+}
+
+/* --- Özellik satırları --- */
+
+.giris-ozellikler {
+    display: grid;
+    gap: 0.55rem;
+    margin: 0 0 1.9rem;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+@media (min-width: 560px) {
+    .giris-ozellikler { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.giris-ozellik {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.68rem 0.85rem;
+    border: 1px solid var(--g-cizgi);
+    border-radius: 12px;
+    background: rgb(255 255 255 / 0.045);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    transition: border-color 220ms ease, background 220ms ease, transform 260ms var(--g-yay);
+}
+
+.giris-ozellik:hover {
+    border-color: var(--g-cizgi-guclu);
+    background: rgb(255 255 255 / 0.08);
+    transform: translateY(-2px);
+}
+
+.giris-ozellik__im {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 9px;
+    background: rgb(19 91 236 / 0.22);
+    color: var(--g-mavi-ac);
+}
+
+.giris-ozellik__im svg { width: 1rem; height: 1rem; }
+
+.giris-ozellik__ad {
+    margin: 0;
+    color: #fff;
+    font-size: 0.88rem;
+    font-weight: 590;
+    letter-spacing: -0.012em;
+}
+
+.giris-ozellik__not {
+    margin: 0.08rem 0 0;
+    color: rgb(238 242 248 / 0.48);
+    font-size: 0.76rem;
+}
+
+/* --- Bize yazın --- */
+
+.giris-cagri {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 0.95rem 1.1rem;
+    border: 1px solid rgb(19 91 236 / 0.42);
+    border-radius: 14px;
+    background: rgb(19 91 236 / 0.12);
+}
+
+.giris-cagri__yazi { min-width: 0; flex: 1; }
+
+.giris-cagri__ad {
+    margin: 0;
+    color: #fff;
+    font-size: 0.93rem;
+    font-weight: 600;
+}
+
+.giris-cagri__not {
+    margin: 0.12rem 0 0;
+    color: rgb(238 242 248 / 0.6);
+    font-size: 0.8rem;
+    line-height: 1.45;
+}
+
+.giris-cagri__dugme {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.6rem 1.05rem;
+    border: 0;
+    border-radius: 10px;
+    background: var(--g-mavi);
+    color: #fff;
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 620;
+    cursor: pointer;
+    transition: background 180ms ease, transform 240ms var(--g-yay), box-shadow 240ms var(--g-yay);
+}
+
+.giris-cagri__dugme svg { width: 1rem; height: 1rem; }
+
+.giris-cagri__dugme:hover {
+    background: #0f4fd4;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 26px -10px rgb(19 91 236 / 0.75);
+}
+
+.giris-cagri__dugme:active { transform: translateY(0) scale(0.98); }
+
+/* ==========================================================================
+   Giriş kartı
+   ========================================================================== */
+
+.giris-kart {
+    width: 100%;
+    max-width: 420px;
+    margin: 0 auto;
+    border-radius: 18px;
+    background: #fff;
+    border: 1px solid rgb(255 255 255 / 0.6);
+    box-shadow:
+        0 30px 70px -30px rgb(0 0 0 / 0.75),
+        0 2px 8px -3px rgb(0 0 0 / 0.3);
+    overflow: hidden;
+    color: #0f172a;
+}
+
+.giris-kart__bas {
+    padding: 1.8rem 1.75rem 1.15rem;
+    text-align: center;
+    border-bottom: 1px solid #eef1f5;
+}
+
+.giris-kart__logo {
+    width: 46px;
+    height: 46px;
+    margin: 0 auto 0.75rem;
+    object-fit: contain;
+}
+
+.giris-kart__ad {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 680;
+    letter-spacing: -0.028em;
+    color: #0f172a;
+}
+
+.giris-kart__alt {
+    margin: 0.2rem 0 0;
+    color: #64748b;
+    font-size: 0.83rem;
+}
+
+.giris-kart__govde { padding: 1.5rem 1.75rem 1.75rem; }
+
+.giris-alan { margin-bottom: 1rem; }
+
+.giris-alan__etiket {
+    display: block;
+    margin-bottom: 0.4rem;
+    color: #334155;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.giris-alan__kutu { position: relative; }
+
+.giris-alan__im {
+    position: absolute;
+    top: 50%;
+    left: 0.85rem;
+    transform: translateY(-50%);
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.giris-alan__im svg { width: 1.05rem; height: 1.05rem; display: block; }
+
+.giris-kart input[type='text'],
+.giris-kart input[type='password'] {
+    width: 100%;
+    padding: 0.78rem 0.9rem 0.78rem 2.6rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 11px;
+    background: #f8fafc;
+    color: #0f172a;
+    font: inherit;
+    font-size: 0.95rem;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 220ms var(--g-yay);
+}
+
+.giris-kart input::placeholder { color: #94a3b8; }
+
+.giris-kart input[type='text']:focus,
+.giris-kart input[type='password']:focus {
+    outline: none;
+    background: #fff;
+    border-color: var(--g-mavi);
+    box-shadow: 0 0 0 3px rgb(19 91 236 / 0.15);
+}
+
+.giris-gonder {
+    width: 100%;
+    margin-top: 0.35rem;
+    padding: 0.85rem 1rem;
+    border: 0;
+    border-radius: 11px;
+    background: #0f172a;
+    color: #fff;
+    font: inherit;
+    font-size: 0.97rem;
+    font-weight: 620;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: background 180ms ease, transform 240ms var(--g-yay), box-shadow 240ms var(--g-yay);
+}
+
+.giris-gonder:hover {
+    background: var(--g-mavi);
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px -12px rgb(19 91 236 / 0.8);
+}
+
+.giris-gonder:active { transform: translateY(0) scale(0.99); }
+
+.giris-kart__dip {
+    margin: 1.1rem 0 0;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.83rem;
+}
+
+.giris-kart__dip button {
+    border: 0;
+    background: transparent;
+    color: var(--g-mavi);
+    font: inherit;
+    font-weight: 640;
+    cursor: pointer;
+    padding: 0;
+}
+
+.giris-kart__dip button:hover { text-decoration: underline; }
+
+/* ==========================================================================
+   Dip
+   ========================================================================== */
+
+.giris-dip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem 1.4rem;
+    padding: 0 clamp(1rem, 4vw, 2.5rem) 1.4rem;
+    color: rgb(238 242 248 / 0.42);
+    font-size: 0.79rem;
+}
+
+.giris-dip a { color: rgb(238 242 248 / 0.62); text-decoration: none; }
+.giris-dip a:hover { color: #fff; }
+
+/* ==========================================================================
+   Sohbet düğmesine dikkat çekme
+   ==========================================================================
+   Hesabı olmayan ziyaretçinin gideceği yer burası. Halka bir kez değil,
+   uzun aralıklarla atıyor: göz ucuyla fark ediliyor ama rahatsız etmiyor. */
+
+body.giris #openChat { position: relative; }
+
+body.giris #openChat::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 999px;
+    border: 2px solid rgb(19 91 236 / 0.55);
+    opacity: 0;
+    pointer-events: none;
+    animation: g-halka 4.5s var(--g-yay) infinite;
+}
+
+@keyframes g-halka {
+    0%, 62% { transform: scale(0.86); opacity: 0; }
+    72% { opacity: 0.85; }
+    100% { transform: scale(1.25); opacity: 0; }
+}
+
+/* ==========================================================================
+   Giriş animasyonu
+   ========================================================================== */
+
+.g-gir {
+    animation: g-gir 700ms var(--g-yay) both;
+    animation-delay: calc(var(--s, 0) * 80ms);
+}
+
+@keyframes g-gir {
+    from { opacity: 0; transform: translate3d(0, 16px, 0); }
+    to { opacity: 1; transform: none; }
+}
+
+/* ==========================================================================
+   Küçük ekran
+   ========================================================================== */
+
+@media (max-width: 1023px) {
+    /* Telefonda önce kart: gelen kişi çoğunlukla giriş yapmaya geliyor.
+       Anlatım altında, isteyen aşağı iniyor. */
+    .giris-orta { grid-template-columns: minmax(0, 1fr); }
+    .giris-kart { order: -1; }
+    .giris-baslik { max-width: 20ch; }
+}
+
+@media (max-width: 560px) {
+    .giris-ust { padding: 0.9rem 1rem; }
+    .giris-rakamlar { gap: 0 1.2rem; }
+    .giris-cagri { flex-direction: column; align-items: stretch; text-align: center; }
+    .giris-cagri__dugme { justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .g-gir, .giris-rozet__nokta, body.giris #openChat::after { animation: none !important; }
+    .g-gir { opacity: 1; transform: none; }
+    .giris-ozellik, .giris-gonder, .giris-cagri__dugme { transition: none; }
+    #girisTuval { transition: none; }
+}
