@@ -1,0 +1,67 @@
+/**
+ * "Şunu mu demek istediniz?" şeridi.
+ * ============================================================================
+ * Kendi renklerini taşıyor; hangi sürümde olursa olsun aynı görünüyor.
+ * Boş sonuç ekranının üstünde beliriyor, yer kaplamıyor.
+ * ============================================================================
+ */
+
+.jb-oneri {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-bottom: 1rem;
+    padding: 0.9rem 1.1rem;
+    border: 1px solid #cfe0fb;
+    border-radius: 14px;
+    background: #edf3fe;
+    color: #10141b;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    animation: jb-oneri-gir 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes jb-oneri-gir {
+    from { opacity: 0; transform: translate3d(0, 10px, 0); }
+    to { opacity: 1; transform: none; }
+}
+
+.jb-oneri__im {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 9px;
+    background: #135bec;
+    color: #fff;
+}
+
+.jb-oneri__im svg { width: 1rem; height: 1rem; }
+
+.jb-oneri__dugme {
+    padding: 0 0.1rem 0.08rem;
+    border: 0;
+    border-bottom: 2px solid #135bec;
+    background: transparent;
+    color: #0e46b8;
+    font: inherit;
+    font-weight: 670;
+    cursor: pointer;
+    transition: color 160ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.jb-oneri__dugme:hover { color: #0b0e14; transform: translateY(-1px); }
+.jb-oneri__dugme:active { transform: translateY(0); }
+
+.jb-oneri__dugme:focus-visible {
+    outline: 2px solid #135bec;
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .jb-oneri { animation: none; }
+    .jb-oneri__dugme { transition: none; }
+}

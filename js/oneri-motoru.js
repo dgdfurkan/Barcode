@@ -76,6 +76,26 @@
             .replace(/(.)\1+/g, '$1');
     }
 
+    /*
+     * İki kelimenin harf KÜMESİ ne kadar farklı? Sıra hiç bakılmıyor.
+     *
+     * "sütşia" ile "sütaş" arasında sıradan yazım uzaklığı üç: iki harf
+     * yer değiştirmiş, bir de fazladan harf var. Sınırın dışında kalıyor
+     * ve öneri üretilemiyordu. Oysa harflere bakınca fark tek bir "i".
+     * Bu ölçü, karışık yazılmış kelimeyi yakalamak için.
+     */
+    function harfFarki(a, b) {
+        var sa = a.split('').sort();
+        var sb = b.split('').sort();
+        var i = 0, j = 0, fark = 0;
+        while (i < sa.length && j < sb.length) {
+            if (sa[i] === sb[j]) { i++; j++; }
+            else if (sa[i] < sb[j]) { fark++; i++; }
+            else { fark++; j++; }
+        }
+        return fark + (sa.length - i) + (sb.length - j);
+    }
+
     function trigramlar(kelime) {
         var k = '  ' + kelime + ' ';
         var liste = [];
@@ -122,7 +142,8 @@
     // İndeks
     // ==================================================================
 
-    var dagarcik = null;        // kelime -> kaç üründe geçtiği
+    var dagarcik = null;        // sade kelime -> kaç üründe geçtiği
+    var orijinal = null;        // sade kelime -> katalogdaki Türkçe yazımı
     var kelimeler = null;       // dizi
     var trigramIndeks = null;   // trigram -> kelime indeksleri
     var karisikIndeks = null;   // sıralı harf anahtarı -> kelime indeksleri
@@ -152,6 +173,7 @@
         kuruluyor = true;
 
         dagarcik = new Map();
+        orijinal = new Map();
         var i = 0;
         var DILIM = hemen ? urunler.length : 700;
 
@@ -160,16 +182,27 @@
             for (; i < son; i++) {
                 var u = urunler[i];
                 if (!u) continue;
-                var metin = sadelestir(
-                    (u.name || '') + ' ' + (u.brand || '') + ' ' + (u.category || '')
-                );
-                if (!metin) continue;
-                var parcalar = metin.split(' ');
-                for (var j = 0; j < parcalar.length; j++) {
-                    var p = parcalar[j];
+                var ham = (u.name || '') + ' ' + (u.brand || '') + ' ' + (u.category || '');
+                /*
+                 * Öneri kullanıcıya KATALOGDAKİ yazımıyla gösteriliyor.
+                 * Eşleştirme sadeleştirilmiş metin üzerinden yapılıyor
+                 * ("sütaş" -> "sutas") ama ekranda "Sütaş" yazmalı. Önceden
+                 * sadeleştirilmiş hâli gösteriliyordu; kullanıcı "sutas
+                 * yarim yagli" görüyor ve haklı olarak yadırgıyordu.
+                 */
+                var hamParcalar = ham.replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(/\s+/);
+                for (var j = 0; j < hamParcalar.length; j++) {
+                    var hamKelime = hamParcalar[j];
+                    if (!hamKelime) continue;
+                    var p = sadelestir(hamKelime);
                     // Tek harfler ve saf sayılar dağarcığa girmiyor
-                    if (p.length < 3 || /^\d+$/.test(p)) continue;
+                    if (!p || p.length < 3 || /^\d+$/.test(p)) continue;
                     dagarcik.set(p, (dagarcik.get(p) || 0) + 1);
+                    /* Aynı kelimenin katalogda birden çok yazımı olabiliyor
+                       ("Su", "su", "SU"). En sık geçeni gösteriliyor. */
+                    var sayimlar = orijinal.get(p);
+                    if (!sayimlar) { sayimlar = new Map(); orijinal.set(p, sayimlar); }
+                    sayimlar.set(hamKelime, (sayimlar.get(hamKelime) || 0) + 1);
                 }
             }
             if (i < urunler.length) {
@@ -222,10 +255,19 @@
         return i;
     }
 
-    /** Tek bir kelime için en iyi adayı döndürür, yoksa null. */
-    function kelimeDuzelt(kelime) {
-        if (!hazirMi || !kelime || kelime.length < 3) return null;
-        if (dagarcik.has(kelime)) return null;          // Zaten doğru
+    /**
+     * Tek bir kelime için sıralı aday listesi döndürür.
+     *
+     * NEDEN TEK ADAY YETMİYOR
+     * "sütşia" için harflere bakıldığında iki aday var: "ustası" (harfleri
+     * birebir aynı) ve "sütaş" (bir harf fazla). Tek aday döndürülünce
+     * "ustası" seçiliyor, "sütşia yarım yağlı" sorgusu çözülemiyordu.
+     * Birden fazla aday dönünce üst kat bileşimleri deneyip gerçekten sonuç
+     * getireni seçiyor: "sütaş yarım yağlı".
+     */
+    function kelimeAdaylari(kelime, kacTane) {
+        if (!hazirMi || !kelime || kelime.length < 3) return [];
+        if (dagarcik.has(kelime)) return [];            // Zaten doğru
 
         /* Sınır kelime boyuna göre. Sekiz harften uzun kelimelerde de iki
            ile yetiniliyor; üçe çıkarıldığında alakasız kelimeler öneri
@@ -263,9 +305,9 @@
             for (var v = 0; v < sesAdaylar.length; v++) adaylar.push(sesAdaylar[v]);
         }
 
-        if (!adaylar.length) return null;
+        if (!adaylar.length) return [];
 
-        var enIyi = null, enIyiPuan = Infinity;
+        var siralama = [];
         var gorulen = new Set();
 
         for (var a = 0; a < adaylar.length; a++) {
@@ -285,7 +327,19 @@
                 d = 1;
             } else {
                 d = uzaklik(kelime, aday, sinir);
-                if (d > sinir) continue;
+                if (d > sinir) {
+                    /* Sıradan uzaklık tutmadı. Harfler neredeyse aynı mı?
+                       "sütşia" -> "sütaş" burada yakalanıyor. Boy farkı bir
+                       harfi geçmemeli, yoksa alakasız kelimeler girer. */
+                    if (kelime.length >= 4 &&
+                        Math.abs(aday.length - kelime.length) <= 1 &&
+                        harfFarki(kelime, aday) <= 1) {
+                        d = 2;
+                        karisik = true;
+                    } else {
+                        continue;
+                    }
+                }
             }
 
             var onEk = ortakOnEk(kelime, aday);
@@ -299,7 +353,7 @@
              * kelimedir. Bu kural olmadan panoda duran "Furkan" için
              * "Fersan" öneriliyordu.
              */
-            if (!karisik && d >= 2 && onEk < 2) continue;
+            if (d >= 2 && onEk < 2) continue;
 
             var siklik = dagarcik.get(aday) || 1;
             var boyFarki = Math.abs(aday.length - kelime.length);
@@ -308,15 +362,49 @@
                      - Math.min(Math.log10(siklik), 3) * 0.08
                      + boyFarki * 0.15;   // Aynı boydaki aday tercih edilir
 
-            if (puan < enIyiPuan) { enIyiPuan = puan; enIyi = aday; }
+            siralama.push({ kelime: aday, puan: puan });
         }
 
-        return enIyi;
+        siralama.sort(function (x, y) { return x.puan - y.puan; });
+        var cikti = [];
+        for (var z = 0; z < siralama.length && cikti.length < (kacTane || 1); z++) {
+            cikti.push(siralama[z].kelime);
+        }
+        return cikti;
+    }
+
+    /** Geriye dönük uyum: tek aday isteyenler için. */
+    function kelimeDuzelt(kelime) {
+        var liste = kelimeAdaylari(kelime, 1);
+        return liste.length ? liste[0] : null;
     }
 
     // ==================================================================
     // Sorgu önerisi
     // ==================================================================
+
+    /**
+     * Sade kelimeleri katalogdaki Türkçe yazımına çevirir.
+     * "sutas yarim yagli" -> "Sütaş Yarım Yağlı"
+     */
+    function turkceYaz(sadeKelimeler) {
+        var cikti = [];
+        for (var i = 0; i < sadeKelimeler.length; i++) {
+            var k = sadeKelimeler[i];
+            var sayimlar = orijinal && orijinal.get(k);
+            if (!sayimlar) { cikti.push(k); continue; }
+            var enIyi = k, enCok = -1;
+            sayimlar.forEach(function (adet, yazim) {
+                /* Eşitlikte baş harfi büyük olan kazanıyor: "Su", "su"
+                   arasında kalındığında ürün adı gibi duran seçiliyor. */
+                var buyukBasli = yazim[0] !== yazim[0].toLocaleLowerCase('tr');
+                var puan = adet * 2 + (buyukBasli ? 1 : 0);
+                if (puan > enCok) { enCok = puan; enIyi = yazim; }
+            });
+            cikti.push(enIyi);
+        }
+        return cikti.join(' ');
+    }
 
     /** Bir kelime için sıralı seçenek listesi: en olası önce. */
     function kelimeSecenekleri(kelime) {
@@ -324,14 +412,15 @@
         var varMi = dagarcik.has(kelime);
         if (varMi) secenekler.push(kelime);
 
-        var duzeltme = kelimeDuzelt(kelime);
-        if (duzeltme && secenekler.indexOf(duzeltme) === -1) secenekler.push(duzeltme);
-
         /*
          * Kelime katalogda GEÇSE BİLE ses karşılığı aranıyor. "kola" gerçek
-         * bir kelime, katalogda var; ama "coka kola" yazan kişi Coca-Cola
-         * arıyor ve doğru karşılık "cola". Yalnızca hatalı kelimeler
-         * düzeltilseydi bu sorgu çözülemezdi.
+         * bir kelime, katalogda var; ama "koka kola" yazan kişi Coca-Cola
+         * arıyor ve doğru karşılık "cola".
+         *
+         * Ses karşılığı listenin BAŞINA konuyor. Türkçe yazan biri markayı
+         * kulağıyla yazıyor; harf harf yakın bir kelimeden ("koka" -> "kola")
+         * daha güçlü bir işaret bu. Sona konduğunda "koka kola" için
+         * "kola cola" gibi saçma bir öneri çıkıyordu.
          */
         var ses = sesAnahtar(kelime);
         var sesKova = sesIndeks.get(ses);
@@ -346,8 +435,13 @@
             if (enIyiSes && secenekler.indexOf(enIyiSes) === -1) secenekler.push(enIyiSes);
         }
 
+        var duzeltmeler = kelimeAdaylari(kelime, 3);
+        for (var d = 0; d < duzeltmeler.length; d++) {
+            if (secenekler.indexOf(duzeltmeler[d]) === -1) secenekler.push(duzeltmeler[d]);
+        }
+
         if (!secenekler.length) secenekler.push(kelime);
-        return secenekler.slice(0, 3);
+        return secenekler.slice(0, 4);
     }
 
     /**
@@ -377,7 +471,7 @@
         // Bileşimleri maliyete göre sırala: 0 = ilk seçenek, büyüdükçe uzaklaşır
         var bilesimler = [];
         function uret(sira, secim, maliyet) {
-            if (bilesimler.length > 24) return;
+            if (bilesimler.length > 48) return;
             if (sira === secenekListesi.length) {
                 bilesimler.push({ secim: secim.slice(), maliyet: maliyet });
                 return;
@@ -392,7 +486,7 @@
         uret(0, [], 0);
         bilesimler.sort(function (a, b) { return a.maliyet - b.maliyet; });
 
-        var DENEME_SINIRI = 10;
+        var DENEME_SINIRI = 14;
         var denenen = 0;
 
         for (var b = 0; b < bilesimler.length && denenen < DENEME_SINIRI; b++) {
@@ -408,7 +502,38 @@
                 }
             }
             if (!degisen.length) continue;
-            return { metin: metin, degisen: degisen };
+
+            /* "koka kola" için "kola kola" öneriliyordu: aynı kelime iki
+               kez. Kullanıcı iki farklı kelime yazdıysa öneri de iki farklı
+               kelime olmalı. Bu eleme sayesinde döngü devam ediyor ve
+               "coca cola" bulunuyor. */
+            var tekrarVar = false;
+            for (var t2 = 1; t2 < bilesimler[b].secim.length; t2++) {
+                if (bilesimler[b].secim[t2] === bilesimler[b].secim[t2 - 1] &&
+                    parcalar[t2] !== parcalar[t2 - 1]) { tekrarVar = true; break; }
+            }
+            if (tekrarVar) continue;
+
+            /*
+             * Üç harflik bir kelime düzeltiliyorsa karşılığın katalogda
+             * gerçekten yaygın olması şart. "mehmet ali" için "Mehmet Âlâ"
+             * öneriliyordu: "âlâ" katalogda birkaç kez geçen tuhaf bir
+             * kelime. "pinar syt" -> "Pınar Süt" ise geçerli, çünkü "süt"
+             * yüzlerce üründe var. Uzunluk değil yaygınlık ölçüt.
+             */
+            var kisaTahmin = false;
+            for (var t3 = 0; t3 < degisen.length; t3++) {
+                if (degisen[t3][0].length <= 3 && (dagarcik.get(degisen[t3][1]) || 0) < 5) {
+                    kisaTahmin = true; break;
+                }
+            }
+            if (kisaTahmin) continue;
+
+            return {
+                metin: metin,                       // aramaya gidecek sade hâli
+                gosterim: turkceYaz(bilesimler[b].secim),  // ekranda görünecek hâli
+                degisen: degisen
+            };
         }
 
         return null;
@@ -418,7 +543,9 @@
         hazirla: hazirla,
         oner: oner,
         kelimeDuzelt: kelimeDuzelt,
+        kelimeAdaylari: kelimeAdaylari,
         sadelestir: sadelestir,
+        turkceYaz: turkceYaz,
         hazirMi: function () { return hazirMi; },
         dagarcikBoyu: function () { return dagarcik ? dagarcik.size : 0; }
     };
