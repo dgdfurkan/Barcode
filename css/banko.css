@@ -109,26 +109,22 @@
 .bnk__alan::placeholder { color: var(--bnk-cizgi-koyu); font-weight: 500; }
 
 /* Son kullanılanlar: tek dokunuşla tekrar */
-.bnk__son {
+/* Rastgele öneriler: satırda tek dokunuşluk kısayollar */
+.bnk__oneri {
     display: flex;
     align-items: center;
-    gap: 0.3rem;
+    gap: 0.28rem;
     min-width: 0;
     overflow: hidden;
+    flex-wrap: nowrap;
 }
 
-.bnk__sonEtiket {
-    color: var(--bnk-cok-soluk);
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-right: 0.1rem;
-}
-
-.bnk__sonOge {
-    padding: 0.2rem 0.5rem;
+.bnk__oneriOge {
+    flex: none;
+    min-width: 2rem;
+    padding: 0.22rem 0.45rem;
     border: 1px solid var(--bnk-cizgi);
-    border-radius: 999px;
+    border-radius: 0.5rem;
     background: var(--bnk-yuzey);
     color: var(--bnk-soluk);
     font: inherit;
@@ -137,16 +133,43 @@
     cursor: pointer;
     transition: border-color 160ms ease, background 160ms ease,
                 color 160ms ease, transform 180ms var(--bnk-yay);
+    animation: bnk-oneri 300ms var(--bnk-yay) both;
 }
 
-.bnk__sonOge:hover {
+@keyframes bnk-oneri {
+    from { opacity: 0; transform: translate3d(0, 4px, 0); }
+    to { opacity: 1; transform: none; }
+}
+
+.bnk__oneriOge:hover {
     border-color: var(--bnk-mavi);
     background: var(--bnk-mavi-soft);
     color: var(--bnk-mavi);
     transform: translateY(-1px);
 }
 
-.bnk__sonOge:active { transform: translateY(0) scale(0.94); }
+.bnk__oneriOge:active { transform: translateY(0) scale(0.93); }
+
+.bnk__yenile {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid var(--bnk-cizgi);
+    border-radius: 0.5rem;
+    background: var(--bnk-yuzey);
+    color: var(--bnk-soluk);
+    cursor: pointer;
+    transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.bnk__yenile svg { width: 0.95rem; height: 0.95rem; }
+.bnk__yenile:hover { border-color: var(--bnk-mavi); background: var(--bnk-mavi-soft); color: var(--bnk-mavi); }
+.bnk__yenile.donuyor svg { animation: bnk-don 480ms var(--bnk-yay); }
+
+@keyframes bnk-don { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 
 .bnk__bosluk { flex: 1; }
 
@@ -167,8 +190,13 @@
 .bnk__tumu:hover { border-color: var(--bnk-cizgi-koyu); background: var(--bnk-zemin); transform: translateY(-1px); }
 .bnk__tumu:active { transform: translateY(0) scale(0.97); }
 
+@media (max-width: 860px) {
+    /* Dar ekranda öneriler satırı taşırıyordu; ilk üçü kalıyor. */
+    .bnk__oneriOge:nth-child(n + 4) { display: none; }
+}
+
 @media (max-width: 640px) {
-    .bnk__son { display: none; }
+    .bnk__oneri { display: none; }
     .bnk__satir { gap: 0.5rem; }
 }
 
@@ -367,4 +395,89 @@ body.bnk-acik { overflow: hidden; }
         animation-duration: 0.001ms !important;
         transition-duration: 0.001ms !important;
     }
+}
+
+/* ---------- Karekod düğmesi, sayaç ---------- */
+
+/* Karekodun kendisi düğme: dokunmak "başkasını ver" demek. */
+.bnk__qrDugme {
+    padding: 0;
+    border: 1px solid var(--bnk-cizgi);
+    border-radius: 0.7rem;
+    background: #fff;
+    cursor: pointer;
+    line-height: 0;
+    transition: border-color 180ms ease, transform 220ms var(--bnk-yay);
+}
+
+.bnk__qrDugme:hover { border-color: var(--bnk-mavi); }
+.bnk__qrDugme:active { transform: scale(0.985); }
+
+.bnk__qrDugme:focus-visible { outline: 2px solid var(--bnk-mavi); outline-offset: 3px; }
+
+.bnk__qr img { animation: bnk-qr 260ms var(--bnk-yay); }
+
+@keyframes bnk-qr {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Kendiliğinden kapanma sayacı: süre görünür, ekran habersiz kapanmaz */
+.bnk__sayac {
+    width: 100%;
+    height: 3px;
+    margin-top: 0.15rem;
+    border-radius: 2px;
+    background: var(--bnk-zemin);
+    overflow: hidden;
+}
+
+.bnk__sayacCubuk {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 2px;
+    background: var(--bnk-mavi);
+    transform-origin: 0 50%;
+}
+
+/* Ayarlanan aralığın dışındaki bankolar ızgarada soluk */
+.bnk__hucre.disarida { opacity: 0.38; }
+
+/* ---------- Ayar denetimleri ---------- */
+
+.bnk-ayar { display: contents; }
+
+.bnk-ayar__aralik {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.bnk-ayar__ayrac { color: var(--bnk-cok-soluk); }
+
+.bnk-ayar__sayi {
+    width: 4.2rem;
+    padding: 0.42rem 0.5rem;
+    border: 1px solid var(--bnk-cizgi);
+    border-radius: 0.5rem;
+    background: var(--bnk-yuzey);
+    color: var(--bnk-yazi);
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.bnk-ayar__sayi:focus {
+    outline: none;
+    border-color: var(--bnk-mavi);
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15);
+}
+
+.bnk-ayar__kaydir {
+    width: 11rem;
+    max-width: 46vw;
+    accent-color: var(--bnk-mavi);
 }

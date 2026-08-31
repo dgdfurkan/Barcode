@@ -169,40 +169,71 @@
     }
 
     /*
-     * Toplu kopyalama sonrası sonuçlar ekrana gelince banko alanına odak
-     * veriliyor. Depocu hiçbir yere dokunmadan numarayı yazmaya başlıyor;
-     * geriye tek hareket kalıyor.
+     * Toplu sonuç gelince banko açılıyor.
      *
-     * Yalnızca kullanıcı o an arama kutusuna yazmıyorsa odak alınıyor.
-     * Aksi hâlde yazdığı harfler banko alanına düşerdi.
+     * Tek ürün aranınca açılmıyor: depocu barkod bakıyordur, banko
+     * hazırlamıyordur. Birden fazla ürün geldiyse toplu kopyalama yapılmış
+     * demektir ve sıradaki iş sepeti bir bankoya koymak.
+     *
+     * Aynı sonuç kümesi için ikinci kez açılmıyor; kullanıcı kapattıysa
+     * kapalı kalıyor.
      */
-    function bankoyaOdakla() {
-        if (!bankoArayuz || typeof bankoArayuz.odakla !== 'function') return;
-        var etkin = document.activeElement;
-        if (etkin && (etkin.tagName === 'INPUT' || etkin.tagName === 'TEXTAREA')) return;
-        bankoArayuz.odakla();
+    var sonAcilisImzasi = null;
+
+    function sonucSayisi() {
+        var t = document.querySelectorAll('#resultsTableBody tr').length;
+        var g = document.querySelectorAll('#gridResults > *').length;
+        var m = document.querySelectorAll('#mobileResults > *').length;
+        return Math.max(t, g, m);
+    }
+
+    function topluSonucGeldi() {
+        if (!bankoArayuz || typeof bankoArayuz.otomatikAc !== 'function') return;
+        var adet = sonucSayisi();
+        if (adet < 2) return;
+
+        var imza = adet + '|' + ((aramaKutusu && aramaKutusu.value) || '');
+        if (imza === sonAcilisImzasi) return;
+        sonAcilisImzasi = imza;
+
+        bankoArayuz.otomatikAc();
     }
 
     var sonucBolumu = document.getElementById('resultsSection');
     if (sonucBolumu && typeof MutationObserver !== 'undefined') {
         new MutationObserver(function () {
-            if (!sonucBolumu.classList.contains('hidden')) setTimeout(bankoyaOdakla, 260);
+            if (!sonucBolumu.classList.contains('hidden')) setTimeout(topluSonucGeldi, 320);
         }).observe(sonucBolumu, { attributes: true, attributeFilter: ['class'] });
+
+        ['resultsTableBody', 'gridResults', 'mobileResults'].forEach(function (kimlik) {
+            var el = document.getElementById(kimlik);
+            if (el) new MutationObserver(function () {
+                if (!sonucBolumu.classList.contains('hidden')) setTimeout(topluSonucGeldi, 320);
+            }).observe(el, { childList: true });
+        });
     }
 
+    // ==================================================================
+    // Ayarlar
+    // ==================================================================
+
     /**
-     * Ayar anahtarı "Görünüm" sekmesine ekleniyor. Sayfanın kendi ayar
-     * yapısı kullanılıyor, yeni bir görsel dil getirilmiyor.
+     * Banko ayarları "Görünüm" sekmesine ekleniyor. Sayfanın kendi ayar
+     * yapısı (settings-row / settings-switch) kullanılıyor; yeni bir görsel
+     * dil getirilmiyor.
      *
-     * Sekme sayfa açılırken gizli olabiliyor; ayarlar penceresi ilk kez
-     * açıldığında da denenmesi için düğmeye dinleyici bağlanıyor.
+     * Anahtar kapalıyken alt ayarlar gizleniyor: kapalı bir özelliğin
+     * ayarları ekranda durup kafa karıştırmasın.
      */
     function ayarEkle() {
         var pano = document.getElementById('settingsPaneTercihler');
         if (!pano || document.getElementById('bankoToggle') || !window.JBBanko) return;
 
+        var s = window.JBBanko.secenekler();
+
         var grup = document.createElement('div');
         grup.className = 'settings-group';
+        grup.id = 'bankoAyarGrubu';
         grup.innerHTML =
             '<span class="settings-group__label">Depo</span>' +
             '<div class="settings-card">' +
@@ -218,8 +249,7 @@
                     '<div class="settings-row__body">' +
                         '<p class="settings-row__title">Banko Karekodları</p>' +
                         '<p class="settings-row__desc">Sipariş sonuçlarının üstünde banko ' +
-                        'paneli açılır. Önünde durduğun bankonun numarasını yaz, karekod ' +
-                        'okutulacak boyda ekrana gelsin. Kapalıyken sayfa şu anki gibi kalır.</p>' +
+                        'paneli açılır. Kapalıyken sayfa şu anki gibi kalır.</p>' +
                     '</div>' +
                     '<div class="settings-row__actions">' +
                         '<label class="settings-switch">' +
@@ -228,40 +258,148 @@
                         '</label>' +
                     '</div>' +
                 '</div>' +
+
+                '<div id="bankoAltAyar" class="bnk-ayar" hidden>' +
+                    '<div class="settings-row settings-row--stack">' +
+                        '<div class="settings-row__body">' +
+                            '<p class="settings-row__title">Banko aralığı</p>' +
+                            '<p class="settings-row__desc">Öneriler yalnızca bu aralıktan ' +
+                            'gelir. Deponda kullanılmayan numaralar hiç çıkmaz.</p>' +
+                        '</div>' +
+                        '<div class="settings-row__actions bnk-ayar__aralik">' +
+                            '<input type="number" id="bankoAlt" class="bnk-ayar__sayi" min="1"' +
+                            ' max="120" aria-label="En küçük banko numarası">' +
+                            '<span class="bnk-ayar__ayrac">–</span>' +
+                            '<input type="number" id="bankoUst" class="bnk-ayar__sayi" min="1"' +
+                            ' max="120" aria-label="En büyük banko numarası">' +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="settings-row settings-row--stack">' +
+                        '<div class="settings-row__body">' +
+                            '<p class="settings-row__title">Satırdaki öneri sayısı</p>' +
+                            '<p class="settings-row__desc">Panelde kaç rastgele banko ' +
+                            'görünsün. <b data-rol="oneriDeger"></b> tane.</p>' +
+                        '</div>' +
+                        '<div class="settings-row__actions">' +
+                            '<input type="range" id="bankoOneriAdedi" class="bnk-ayar__kaydir"' +
+                            ' min="0" max="20" step="1" aria-label="Öneri sayısı">' +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="settings-row">' +
+                        '<div class="settings-row__body">' +
+                            '<p class="settings-row__title">Toplu kopyalamada kendiliğinden aç</p>' +
+                            '<p class="settings-row__desc">Birden fazla ürün geldiğinde ' +
+                            'rastgele bir banko karekodu ekrana gelir.</p>' +
+                        '</div>' +
+                        '<div class="settings-row__actions">' +
+                            '<label class="settings-switch">' +
+                                '<input type="checkbox" id="bankoOtoAc" aria-label="Kendiliğinden aç">' +
+                                '<span class="settings-switch__track"></span>' +
+                            '</label>' +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="settings-row settings-row--stack">' +
+                        '<div class="settings-row__body">' +
+                            '<p class="settings-row__title">Kendiliğinden kapanma</p>' +
+                            '<p class="settings-row__desc">Karekod <b data-rol="sureDeger"></b> ' +
+                            'sonra kapanır; okuttuktan sonra elini sürmene gerek kalmaz. ' +
+                            'Sıfır yapılırsa kapanmaz.</p>' +
+                        '</div>' +
+                        '<div class="settings-row__actions">' +
+                            '<input type="range" id="bankoSure" class="bnk-ayar__kaydir"' +
+                            ' min="0" max="15" step="1" aria-label="Kapanma süresi">' +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="settings-row">' +
+                        '<div class="settings-row__body">' +
+                            '<p class="settings-row__title">Verilmiş bankoları unut</p>' +
+                            '<p class="settings-row__desc">Son verilen bankolar bir süre ' +
+                            'tekrar önerilmez. Bu listeyi sıfırlar.</p>' +
+                        '</div>' +
+                        '<div class="settings-row__actions">' +
+                            '<button id="bankoSifirla" class="settings-btn" type="button">Sıfırla</button>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
             '</div>';
 
         pano.insertBefore(grup, pano.firstChild);
 
-        var kutucuk = grup.querySelector('#bankoToggle');
-        kutucuk.checked = window.JBBanko.acikMi();
-        kutucuk.addEventListener('change', function () {
-            window.JBBanko.ayarla(kutucuk.checked);
+        var anahtar = grup.querySelector('#bankoToggle');
+        var altAyar = grup.querySelector('#bankoAltAyar');
+        var alt = grup.querySelector('#bankoAlt');
+        var ust = grup.querySelector('#bankoUst');
+        var adet = grup.querySelector('#bankoOneriAdedi');
+        var otoAc = grup.querySelector('#bankoOtoAc');
+        var sure = grup.querySelector('#bankoSure');
+        var sifirla = grup.querySelector('#bankoSifirla');
+        var adetYazi = grup.querySelector('[data-rol="oneriDeger"]');
+        var sureYazi = grup.querySelector('[data-rol="sureDeger"]');
+
+        function yaz() {
+            var g = window.JBBanko.secenekler();
+            alt.value = g.altSinir;
+            ust.value = g.ustSinir;
+            adet.value = g.oneriAdedi;
+            otoAc.checked = g.otoAc;
+            sure.value = g.otoKapatSn;
+            adetYazi.textContent = g.oneriAdedi;
+            sureYazi.textContent = g.otoKapatSn ? g.otoKapatSn + ' saniye' : 'kendiliğinden değil';
+            anahtar.checked = window.JBBanko.acikMi();
+            altAyar.hidden = !anahtar.checked;
+        }
+
+        function kaydet(yeni) {
+            window.JBBanko.secenekYaz(yeni);
+            yaz();
+            if (bankoArayuz && typeof bankoArayuz.tazele === 'function') bankoArayuz.tazele();
+        }
+
+        anahtar.addEventListener('change', function () {
+            window.JBBanko.ayarla(anahtar.checked);
             bankoYerlestir();
+            yaz();
         });
+
+        alt.addEventListener('change', function () { kaydet({ altSinir: parseInt(alt.value, 10) }); });
+        ust.addEventListener('change', function () { kaydet({ ustSinir: parseInt(ust.value, 10) }); });
+        otoAc.addEventListener('change', function () { kaydet({ otoAc: otoAc.checked }); });
+
+        /* Kaydırırken sayı anında güncelleniyor, bırakınca kaydediliyor:
+           her piksel için yerel depolamaya yazılmıyor. */
+        adet.addEventListener('input', function () { adetYazi.textContent = adet.value; });
+        adet.addEventListener('change', function () { kaydet({ oneriAdedi: parseInt(adet.value, 10) }); });
+        sure.addEventListener('input', function () {
+            sureYazi.textContent = +sure.value ? sure.value + ' saniye' : 'kendiliğinden değil';
+        });
+        sure.addEventListener('change', function () { kaydet({ otoKapatSn: parseInt(sure.value, 10) }); });
+
+        sifirla.addEventListener('click', function () {
+            window.JBBanko.gecmisSifirla();
+            if (bankoArayuz && typeof bankoArayuz.tazele === 'function') bankoArayuz.tazele();
+            sifirla.textContent = 'Sıfırlandı';
+            setTimeout(function () { sifirla.textContent = 'Sıfırla'; }, 1400);
+        });
+
+        yaz();
     }
 
     ayarEkle();
     bankoYerlestir();
 
-    /* "Görünüm" sekmesi yalnızca parlama önleme açıkken görünüyor. Ayar
-       satırımız o sekmede duruyor; sekme gizliyse kullanıcı bulamaz. Ayarlar
-       her açıldığında satırın yerinde olduğu doğrulanıyor ve sekme gerekiyorsa
-       görünür kılınıyor. */
+    /* "Görünüm" sekmesi parlama önleme kapalıyken gizleniyor. Banko ayarları
+       orada olduğu için sekme her hâlükârda açık kalmalı. */
     var ayarDugmesi = document.getElementById('settingsBtn');
     if (ayarDugmesi) {
         ayarDugmesi.addEventListener('click', function () {
             setTimeout(function () {
                 ayarEkle();
-                var bolum = document.getElementById('antiGlareSettingsSection');
                 var sekme = document.getElementById('settingsTabTercihler');
-                /* Parlama önleme kapalıysa bölüm gizleniyor ve sekme de
-                   onunla birlikte kayboluyordu. Banko satırı orada olduğu
-                   için sekme her hâlükârda açık kalmalı. */
                 if (sekme) sekme.classList.remove('settings-tab--display-only');
-                if (bolum && bolum.classList.contains('hidden')) {
-                    var pano = document.getElementById('settingsPaneTercihler');
-                    if (pano) pano.hidden = pano.hidden;   // yerleşimi bozma
-                }
             }, 120);
         });
     }
