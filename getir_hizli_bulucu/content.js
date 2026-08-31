@@ -513,7 +513,7 @@ if (window.location.href.includes('/dashboard/orders')) {
                 document.getElementById('cat-color').value = cat.color;
                 editingCategoryIndex = idx;
                 document.getElementById('add-category-btn').innerText = 'Güncelle';
-                document.querySelector('.settings-body').scrollTop = 0;
+                document.getElementById('getir-settings-view').scrollTop = 0;
             };
         });
     };

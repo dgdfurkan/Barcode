@@ -43,7 +43,7 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-#getir-fab {
+#getir-fab-container #getir-fab {
     width: 56px;
     height: 56px;
     background: #5d3ebc;
@@ -57,9 +57,9 @@
     font-size: 22px;
     transition: transform 0.15s ease;
 }
-#getir-fab:hover { transform: scale(1.08); }
+#getir-fab-container #getir-fab:hover { transform: scale(1.08); }
 
-#getir-panel {
+#getir-fab-container #getir-panel {
     width: 360px;
     background: #fff;
     border: 1.5px solid #5d3ebc;
@@ -71,7 +71,7 @@
     overflow: hidden;
 }
 
-.panel-header {
+#getir-fab-container .panel-header {
     background: linear-gradient(135deg, #5d3ebc, #7b5ce6);
     padding: 11px 14px;
     display: flex;
@@ -82,18 +82,18 @@
     font-size: 14px;
     flex-shrink: 0;
 }
-.header-buttons { display: flex; gap: 8px; }
-.icon-btn { background: transparent; border: none; color: white; cursor: pointer; font-size: 17px; opacity: 0.9; }
-.icon-btn:hover { opacity: 1; }
+#getir-fab-container .header-buttons { display: flex; gap: 8px; }
+#getir-fab-container .icon-btn { background: transparent; border: none; color: white; cursor: pointer; font-size: 17px; opacity: 0.9; }
+#getir-fab-container .icon-btn:hover { opacity: 1; }
 
-.panel-body {
+#getir-fab-container .panel-body {
     padding: 14px;
     display: flex;
     flex-direction: column;
     gap: 9px;
 }
 
-.token-expiry-badge {
+#getir-fab-container .token-expiry-badge {
     font-size: 12px;
     text-align: center;
     font-weight: 700;
@@ -103,43 +103,43 @@
     padding: 5px 8px;
 }
 
-.auto-token-note {
+#getir-fab-container .auto-token-note {
     font-size: 10px;
     text-align: center;
     color: #28a745;
     margin-top: -4px;
 }
 
-.search-input {
+#getir-fab-container .search-input {
     border: 2px solid #5d3ebc !important;
     font-size: 14px !important;
     padding: 9px 10px !important;
 }
 
-.search-results {
+#getir-fab-container .search-results {
     background: #f7f5ff;
     border: 1px solid #d8d0f5;
     border-radius: 8px;
     overflow: hidden;
     font-size: 12px;
 }
-.sr-header {
+#getir-fab-container .sr-header {
     background: #5d3ebc;
     color: white;
     padding: 5px 10px;
     font-weight: 600;
     font-size: 11px;
 }
-.sr-row {
+#getir-fab-container .sr-row {
     display: flex;
     flex-direction: column;
     padding: 7px 10px;
     border-bottom: 1px solid #ede9ff;
     transition: filter 0.15s ease;
 }
-.sr-row:hover { filter: brightness(0.95); }
-.sr-row:last-child { border-bottom: none; }
-.sr-bnk {
+#getir-fab-container .sr-row:hover { filter: brightness(0.95); }
+#getir-fab-container .sr-row:last-child { border-bottom: none; }
+#getir-fab-container .sr-bnk {
     font-weight: 700;
     color: #5d3ebc;
     background: #ede9ff;
@@ -147,22 +147,22 @@
     border-radius: 6px;
     font-size: 11px;
 }
-.sr-count { color: #555; font-size: 11px; }
-.sr-empty { padding: 8px 10px; color: #999; text-align: center; font-size: 11px; }
+#getir-fab-container .sr-count { color: #555; font-size: 11px; }
+#getir-fab-container .sr-empty { padding: 8px 10px; color: #999; text-align: center; font-size: 11px; }
 
-.queue-status-text {
+#getir-fab-container .queue-status-text {
     font-size: 11px;
     color: #888;
     text-align: center;
 }
 
 /* AYARLAR */
-.settings-body {
+#getir-fab-container .settings-body {
     display: none;
     flex-direction: column;
     max-height: 580px;
 }
-.settings-form {
+#getir-fab-container .settings-form {
     padding: 14px;
     background: #fafafa;
     border-bottom: 1px solid #eee;
@@ -171,7 +171,7 @@
     gap: 8px;
     flex-shrink: 0;
 }
-#category-list {
+#getir-fab-container #category-list {
     padding: 10px 12px;
     overflow-y: auto;
     flex-grow: 1;
@@ -182,13 +182,13 @@
 }
 
 /* GELİŞMİŞ AYARLAR */
-.advanced-section {
+#getir-fab-container .advanced-section {
     padding: 10px 12px;
     background: #fafafa;
     border-top: 1px solid #eee;
     flex-shrink: 0;
 }
-.btn-secondary-sm {
+#getir-fab-container .btn-secondary-sm {
     width: 100%;
     background: transparent;
     border: 1px solid #ccc;
@@ -199,8 +199,8 @@
     color: #666;
     text-align: left;
 }
-.btn-secondary-sm:hover { background: #f0ecff; border-color: #5d3ebc; color: #5d3ebc; }
-.advanced-note {
+#getir-fab-container .btn-secondary-sm:hover { background: #f0ecff; border-color: #5d3ebc; color: #5d3ebc; }
+#getir-fab-container .advanced-note {
     font-size: 11px;
     color: #f57c00;
     margin: 0 0 8px 0;
@@ -209,7 +209,7 @@
     border-radius: 6px;
 }
 
-.custom-input {
+#getir-fab-container .custom-input {
     width: 100%;
     padding: 8px;
     border: 1px solid #ccc;
@@ -219,11 +219,11 @@
     font-family: inherit;
 }
 
-.btn-primary { background: #ffd300; color: #5d3ebc; border: none; padding: 9px; font-weight: 700; border-radius: 6px; cursor: pointer; width: 100%; }
-.btn-primary:hover { background: #f5c800; }
-.btn-danger { background: #dc3545; color: white; border: none; padding: 6px; font-weight: 700; border-radius: 6px; cursor: pointer; }
+#getir-fab-container .btn-primary { background: #ffd300; color: #5d3ebc; border: none; padding: 9px; font-weight: 700; border-radius: 6px; cursor: pointer; width: 100%; }
+#getir-fab-container .btn-primary:hover { background: #f5c800; }
+#getir-fab-container .btn-danger { background: #dc3545; color: white; border: none; padding: 6px; font-weight: 700; border-radius: 6px; cursor: pointer; }
 
-.category-card {
+#getir-fab-container .category-card {
     background: #fff;
     border: 1px solid #ddd;
     border-left: 5px solid;
@@ -231,7 +231,7 @@
     border-radius: 8px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-.action-btn {
+#getir-fab-container .action-btn {
     background: transparent;
     border: none;
     cursor: pointer;
@@ -239,9 +239,9 @@
     padding: 2px 5px;
     border-radius: 4px;
 }
-.action-btn:hover { background: #f0f0f0; }
+#getir-fab-container .action-btn:hover { background: #f0f0f0; }
 
-.badge {
+#getir-fab-container .badge {
     padding: 2px 7px;
     border-radius: 10px;
     font-size: 10px;
@@ -250,11 +250,11 @@
     display: inline-block;
     margin-top: 3px;
 }
-.badge.inc { background: #28a745; }
-.badge.exc { background: #dc3545; }
+#getir-fab-container .badge.inc { background: #28a745; }
+#getir-fab-container .badge.exc { background: #dc3545; }
 
 /* Parça sayısı badge — BNK etiketinin soluna */
-.g-count-badge {
+#getir-fab-container .g-count-badge {
     display: inline-flex;
     align-items: center;
     background: #5d3ebc;
@@ -797,7 +797,7 @@
                     document.getElementById('cat-color').value = cat.color;
                     editingCategoryIndex = idx;
                     document.getElementById('add-category-btn').innerText = 'Güncelle';
-                    document.querySelector('.settings-body').scrollTop = 0;
+                    document.getElementById('getir-settings-view').scrollTop = 0;
                 };
             });
         };

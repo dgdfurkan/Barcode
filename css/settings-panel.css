@@ -309,16 +309,21 @@ body:has(.jb-modal:not(.hidden)) #openChat {
 
 /* ---------- Gövde ---------- */
 
-.settings-body,
-.jb-modal__body {
-    flex: 1;
+/* Kimlik seçiciyle yazıldı: bazı Chrome eklentileri her siteye
+   `.settings-body { display:none }` gibi çıplak sınıf kuralı enjekte ediyor.
+   Sadece sınıfla yazılan kural onlara yeniliyordu; panel gövdesi boş kalıyordu. */
+#settingsModal .settings-body,
+.jb-modal .jb-modal__body {
+    display: block;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     padding: 1.1rem 1.35rem 1.35rem;
 }
 
-.jb-modal__body {
+.jb-modal .jb-modal__body {
     display: flex;
     flex-direction: column;
     gap: 1.1rem;
@@ -798,8 +803,8 @@ body:has(.jb-modal:not(.hidden)) #openChat {
         display: none;
     }
 
-    .settings-body,
-    .jb-modal__body {
+    #settingsModal .settings-body,
+    .jb-modal .jb-modal__body {
         padding: 1rem 1rem 1.25rem;
     }
 
