@@ -26,16 +26,18 @@
  */
 
 .krs {
-    --krs-cizgi: #e6ecf3;
-    --krs-yumusak: #f6f8fb;
-    --krs-yazi: #0f172a;
-    --krs-soluk: #51617a;
-    --krs-cok-soluk: #8496ad;
-    --krs-eski: #b45309;
-    --krs-eski-soft: #fffbeb;
-    --krs-yeni: #047857;
-    --krs-yeni-soft: #ecfdf5;
-    --krs-mor: #5d3ebc;
+    /* Renkler hakkımızda sayfasıyla aynı: kırık beyaz kağıt, mürekkep
+       siyahı, markanın mavisi. İki renk arası degrade yok. */
+    --krs-cizgi: #e4e1d8;
+    --krs-yumusak: #f7f6f2;
+    --krs-yazi: #131720;
+    --krs-soluk: #5b6472;
+    --krs-cok-soluk: #8b909a;
+    --krs-eski: #8a6420;
+    --krs-eski-soft: #faf6ec;
+    --krs-yeni: #0e7c58;
+    --krs-yeni-soft: #eef7f2;
+    --krs-mor: #135bec;
     --krs-yumusak-gecis: cubic-bezier(0.22, 1, 0.36, 1);
 
     margin-top: 2.4rem;
@@ -211,8 +213,8 @@
 }
 
 .krs__sonuc.bitti {
-    background: linear-gradient(180deg, #f6fdfa, #ecfdf5);
-    border-top-color: #a7f3d0;
+    background: var(--krs-yeni-soft);
+    border-top-color: #b9ddcc;
 }
 
 .krs__fark {
@@ -388,10 +390,10 @@
     transform: translate3d(0, 0, 0);
     transition: transform 520ms var(--krs-yumusak-gecis), opacity 260ms ease;
     background: radial-gradient(circle,
-        rgb(37 99 235 / 0.16) 0%,
-        rgb(37 99 235 / 0.09) 42%,
-        rgb(37 99 235 / 0) 68%);
-    box-shadow: inset 0 0 0 1.5px rgb(37 99 235 / 0.28);
+        rgb(19 91 236 / 0.15) 0%,
+        rgb(19 91 236 / 0.08) 42%,
+        rgb(19 91 236 / 0) 68%);
+    box-shadow: inset 0 0 0 1.5px rgb(19 91 236 / 0.26);
 }
 
 .krs__goz.acik { opacity: 1; }
@@ -633,4 +635,47 @@
     .krs__goz::after,
     .krs__bayrak .bez,
     .krs__tik { animation: none !important; }
+
+    .krs__ekran.acik .jb-kaydir,
+    .krs__ekran.acik .jb-kaydir-cubuk { animation: none !important; }
+}
+
+
+/* 380px altında fark rozeti şeridi 360 piksele zorluyordu; sayfa yatay
+   kayıyordu. Rozet burada daralıyor, yükseklik aynı kalıyor. */
+@media (max-width: 380px) {
+    .krs__fark { min-width: 8.6rem; }
+    .krs__saat { min-width: 4.4rem; }
+}
+
+/* ==========================================================================
+   Sonuç ızgarasının kaydırılması (barkod sahnesi, sağ şerit)
+   ==========================================================================
+   "35 ürün geldi" yazmak yetmiyordu; ziyaretçi ilk dört kartı görüp
+   gerisini hayal ediyordu. Kartlar kırpma alanının içinde yukarı kayıyor,
+   bütün liste gözünün önünden geçiyor.
+
+   Kayma yalnızca ekran açıkken oynuyor. Kapalı ekranlarda animasyon hiç
+   başlamıyor, arka planda kare harcanmıyor. `forwards` sayesinde adım
+   bitince liste sonda kalıyor, başa zıplamıyor. */
+
+.krs__ekran .jb-kaydir,
+.krs__ekran .jb-kaydir-cubuk { transform: translateY(0); }
+
+.krs__ekran.acik .jb-kaydir {
+    animation: krs-urun-kaydir 2400ms cubic-bezier(0.33, 0, 0.2, 1) forwards;
+}
+
+.krs__ekran.acik .jb-kaydir-cubuk {
+    animation: krs-urun-cubuk 2400ms cubic-bezier(0.33, 0, 0.2, 1) forwards;
+}
+
+@keyframes krs-urun-kaydir {
+    0%, 10% { transform: translateY(0); }
+    100% { transform: translateY(-260px); }
+}
+
+@keyframes krs-urun-cubuk {
+    0%, 10% { transform: translateY(0); }
+    100% { transform: translateY(84px); }
 }

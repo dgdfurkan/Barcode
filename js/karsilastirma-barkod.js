@@ -155,7 +155,7 @@
      * kataloğundan; kişi, depo ya da sipariş bilgisi DEĞİL.
      */
     var URUNLER = {
-        sut:      ['Sütaş Yarım Yağlı Süt (4 x 1 L)', '8690767714887', 'sut.jpg'],
+        sut:      ['Sütaş %2,5 Yağlı UHT Süt (1 L)', '8690767716034', 'urunler/sutas-sut.jpg'],
         sos:      ['Calve Barbekü Sos (290 g)', '8690637805219', 'sos.jpg'],
         su:       ['Erikli Doğal Kaynak Suyu (500 ml)', '8690793010052', 'su.jpg'],
         un:       ['Bağdat Galeta Unu (250 g)', '8690560011077', 'un.jpg'],
@@ -165,8 +165,12 @@
         dondurma: ['Algida Nogger Sandwich (145 ml)', '8690637117121', 'dondurma.jpg'],
         kaymak:   ['Sütaş Kaymaksız Yoğurt (600 g)', '8690767671104', 'kaymak.jpg'],
         folyo:    ['Cook Alüminyum Folyo (10 M)', '8690709040005', 'folyo.jpg'],
-        yogurt:   ['Activia Probiyotik Sade Yoğurt (4 x 100 g)', '8696368011332', 'yogurt.jpg'],
-        yogurt2:  ['Activia Probiyotik Çilekli Yoğurt (4 x 100 g)', '8696368011349', 'yogurt2.jpg']
+        peynir:   ['Pınar Beyaz Taze Peynir (350 g)', '8690565022733', 'urunler/pinar-peynir.jpg'],
+        ayran:    ['Sütaş Ayran (1 L)', '8690767160189', 'urunler/sutas-ayran.jpg'],
+        kola:     ['Coca-Cola (250 ml)', '5000112664867', 'urunler/kola.jpg'],
+        cips:     ["Lay's Klasik Patates Cipsi (107 g)", '8690624100983', 'urunler/lays.jpg'],
+        gofret:   ['Ülker Çikolatalı Gofret (36 g)', '8690504020509', 'urunler/ulker-gofret.jpg'],
+        pogaca:   ['Uno Kaşar Peynirli Poğaça (75 g)', '8680959080333', 'urunler/uno-pogaca.jpg']
     };
 
     /** Barkod çizgileri. */
@@ -384,8 +388,8 @@
     }
 
     var RAF_VARSAYILAN = [
-        [URUNLER.yogurt[1],   URUNLER.yogurt[0],   URUNLER.yogurt[2],   '0000aa11bb22cc33'],
-        [URUNLER.yogurt2[1],  URUNLER.yogurt2[0],  URUNLER.yogurt2[2],  '0000aa11bb22cc34'],
+        [URUNLER.peynir[1],   URUNLER.peynir[0],   URUNLER.peynir[2],   '0000aa11bb22cc33'],
+        [URUNLER.ayran[1],    URUNLER.ayran[0],    URUNLER.ayran[2],    '0000aa11bb22cc34'],
         [URUNLER.folyo[1],    URUNLER.folyo[0],    URUNLER.folyo[2],    '0000aa11bb22cc35'],
         [URUNLER.su[1],       URUNLER.su[0],       URUNLER.su[2],       '0000aa11bb22cc36'],
         [URUNLER.sos[1],      URUNLER.sos[0],      URUNLER.sos[2],      '0000aa11bb22cc37']
@@ -409,55 +413,116 @@
         rafKabuk(URUN_YAZILDI) + rafTablo(RAF_VARSAYILAN, -1) + '</svg>';
 
     /**
-     * Açılan öneri listesi. Canlı panelde tam olarak böyle: kasa, paket ve
-     * kampanya üçlüsü aranan tekil ürünle karışıyor. Aranan satır listenin
-     * görünen kısmında bile olmayabiliyor.
+     * Açılan öneri listesi.
+     *
+     * Gerçekte olan şu: "sütaş" yazınca kasa, kampanya ve tekil ürünler aynı
+     * listede karışıyor. Aranan tekil ürün listenin görünen kısmında bile
+     * olmuyor, aşağı kaydırmak gerekiyor. Sattığımız zaman farkının yarısı
+     * burada kaybediliyor.
+     *
+     * Liste on dört satır, kutuda sekiz satır görünüyor. `kaydir` verilince
+     * alt yarısı gösteriliyor; iki ekran arka arkaya oynatılınca personelin
+     * listeyi aşağı çekişi görülüyor.
      */
     var ONERILER = [
-        ['Sütaş, Uno & Domates Üçlüsü', 'ÜÇLÜ', '#fca5a5'],
-        ['Sütaş Kasa', 'KASA', '#c4b5fd'],
-        ['Sütaş Çilekli Süt (200 ml)', '', '#fbcfe8'],
-        ['Sütaş Muzlu Süt (200 ml)', '', '#fde68a'],
-        ['Sütaş Laktozsuz Süt (200 ml)', '', '#bae6fd'],
-        ['Sütaş Çikolatalı Süt (200 ml)', '', '#d6bfa8'],
-        ['Sütaş Kasa - 30012', 'KASA', '#c4b5fd'],
-        ['Sütaş Yarım Yağlı Süt (4 x 1 L)', '', '#bfdbfe']
+        ['Sütaş & Uno Kahvaltılık', 'KAMPANYA'],
+        ['Sütaş Kasa - 30012', 'KASA'],
+        ['Sütaş Çilekli Süt (200 ml)', ''],
+        ['Sütaş Muzlu Süt (200 ml)', ''],
+        ['Sütaş Kakaolu Süt (200 ml)', ''],
+        ['Sütaş Laktozsuz Süt (1 L)', ''],
+        ['Sütaş Kasa - 30018', 'KASA'],
+        ['Sütaş Labne (180 g)', ''],
+        ['Sütaş Süzme Peynir (500 g)', ''],
+        ['Sütaş Kaymaksız Yoğurt (600 g)', ''],
+        ['Sütaş Ayran (1 L)', ''],
+        ['Sütaş Kasa - 30021', 'KASA'],
+        ['Sütaş Tereyağı (250 g)', ''],
+        ['Sütaş %2,5 Yağlı UHT Süt (1 L)', '']
     ];
 
-    function oneriListesi(secili) {
-        var cikti = '<rect x="188" y="136" width="130" height="' + (ONERILER.length * 13 + 8) +
-                    '" rx="5" fill="#fff" stroke="#e2e8f0"/>';
-        for (var i = 0; i < ONERILER.length; i++) {
-            var yy = 148 + i * 13;
-            if (i === secili) {
-                cikti += '<rect x="190" y="' + (yy - 9) + '" width="126" height="12" rx="3" fill="#ecfdf5"/>';
+    var ONERI_PENCERE = 8;
+
+    /**
+     * @param secili  Vurgulanacak satırın listedeki gerçek sırası, yoksa -1.
+     * @param kaydir  0 ise başı, 1 ise sonu gösteriliyor.
+     */
+    function oneriListesi(secili, kaydir) {
+        var bas = kaydir ? ONERILER.length - ONERI_PENCERE : 0;
+        var x = 186, g = 136, satirY = 15;
+        var yuk = ONERI_PENCERE * satirY + 12;
+
+        /* Aşağıya düşen gölge: liste tablonun üstünde duran bir katman. */
+        var cikti =
+            '<rect x="' + (x + 1) + '" y="' + (g + 3) + '" width="' + g + '" height="' + yuk +
+            '" rx="6" fill="#0f172a" opacity="0.07"/>' +
+            '<rect x="' + x + '" y="' + g + '" width="' + g + '" height="' + yuk +
+            '" rx="6" fill="#fff" stroke="#dfe4ec"/>';
+
+        /* Kaydırma çubuğu: iki ekranda farklı yerde, hareket görünüyor. */
+        var yol = yuk - 14;
+        var basparmak = yol * (ONERI_PENCERE / ONERILER.length);
+        cikti +=
+            '<rect x="' + (x + g - 6) + '" y="' + (g + 7) + '" width="2.4" height="' + yol +
+            '" rx="1.2" fill="#eef1f5"/>' +
+            '<rect x="' + (x + g - 6) + '" y="' + (g + 7 + (kaydir ? yol - basparmak : 0)) +
+            '" width="2.4" height="' + basparmak + '" rx="1.2" fill="#c3cad6"/>';
+
+        for (var i = 0; i < ONERI_PENCERE; i++) {
+            var sira = bas + i;
+            var oge = ONERILER[sira];
+            if (!oge) continue;
+            var yy = g + 8 + i * satirY;
+            var bu = sira === secili;
+
+            if (bu) {
+                cikti += '<rect x="' + (x + 3) + '" y="' + yy + '" width="' + (g - 12) +
+                         '" height="' + (satirY - 1) + '" rx="3" fill="#f2f8f5"/>';
             }
-            cikti += '<rect x="194" y="' + (yy - 8) + '" width="8" height="8" rx="2" fill="' +
-                     ONERILER[i][2] + '"/>' +
-                     '<text x="206" y="' + yy + '" class="p-yazi p-yazi--kucuk" style="font-size:4.6px"' +
-                     (i === secili ? ' font-weight="700"' : '') + '>' + ONERILER[i][0] + '</text>' +
-                     (ONERILER[i][1]
-                        ? '<rect x="292" y="' + (yy - 7.5) + '" width="22" height="8" rx="2" fill="#fef3c7"/>' +
-                          '<text x="295" y="' + (yy - 1.5) + '" class="p-yazi" fill="#b45309"' +
-                          ' style="font-size:4px">' + ONERILER[i][1] + '</text>'
-                        : '');
+
+            /* Ant Design çoklu seçim kutucuğu */
+            cikti +=
+                '<rect x="' + (x + 8) + '" y="' + (yy + 4) + '" width="6.5" height="6.5" rx="1.6"' +
+                ' fill="' + (bu ? '#0e7c58' : '#fff') + '" stroke="' + (bu ? '#0e7c58' : '#cbd2dc') +
+                '" stroke-width="0.8"/>' +
+                (bu ? '<path d="M' + (x + 9.6) + ' ' + (yy + 7.3) + ' l1.4 1.4 l2.5 -2.6"' +
+                      ' stroke="#fff" stroke-width="1" fill="none" stroke-linecap="round"' +
+                      ' stroke-linejoin="round"/>' : '') +
+                '<text x="' + (x + 20) + '" y="' + (yy + 9.6) + '" class="p-yazi"' +
+                ' style="font-size:4.6px"' + (bu ? ' font-weight="700"' : '') + '>' +
+                oge[0] + '</text>' +
+                (oge[1]
+                    ? '<rect x="' + (x + g - 40) + '" y="' + (yy + 2.6) + '" width="30" height="8"' +
+                      ' rx="2" fill="#fdf3e2"/>' +
+                      '<text x="' + (x + g - 37) + '" y="' + (yy + 8.6) + '" class="p-yazi"' +
+                      ' fill="#8a6420" style="font-size:3.6px">' + oge[1] + '</text>'
+                    : '');
         }
+
+        cikti += '<text x="' + (x + 8) + '" y="' + (g + yuk - 3) + '" class="p-yazi"' +
+                 ' style="font-size:3.6px" opacity="0.5">' + ONERILER.length + ' kayıt</text>';
         return cikti;
     }
 
     var EKRAN_RAF_ONERI =
         '<svg viewBox="0 0 400 300">' + sekmeSeridi(['Depo Paneli', 'Raf Etiketi'], 1) +
-        rafKabuk(URUN_YAZILDI) + rafTablo(RAF_VARSAYILAN, -1) + oneriListesi(-1) + '</svg>';
+        rafKabuk(URUN_YAZILDI) + rafTablo(RAF_VARSAYILAN, -1) + oneriListesi(-1, 0) + '</svg>';
+
+    var EKRAN_RAF_KAYDIRILDI =
+        '<svg viewBox="0 0 400 300">' + sekmeSeridi(['Depo Paneli', 'Raf Etiketi'], 1) +
+        rafKabuk(URUN_YAZILDI) + rafTablo(RAF_VARSAYILAN, -1) + oneriListesi(-1, 1) + '</svg>';
 
     var EKRAN_RAF_SECILDI =
         '<svg viewBox="0 0 400 300">' + sekmeSeridi(['Depo Paneli', 'Raf Etiketi'], 1) +
-        rafKabuk(URUN_YAZILDI) + rafTablo(RAF_VARSAYILAN, -1) + oneriListesi(7) + '</svg>';
+        rafKabuk(URUN_YAZILDI) + rafTablo(RAF_VARSAYILAN, -1) +
+        oneriListesi(ONERILER.length - 1, 1) + '</svg>';
 
     var EKRAN_RAF_SONUC =
         '<svg viewBox="0 0 400 300">' + sekmeSeridi(['Depo Paneli', 'Raf Etiketi'], 1) +
         rafKabuk('<rect x="188" y="120" width="88" height="14" rx="4" fill="#f5f3ff" stroke="#c4b5fd"/>' +
-                 '<text x="192" y="130" class="p-yazi p-yazi--kucuk" fill="#6d28d9" style="font-size:4.6px">' +
-                 'Sütaş Yarım Yağlı Süt (4 x 1 L)</text>') +
+                 '<rect x="192" y="123.5" width="76" height="7" rx="2" fill="#ede9fe"/>' +
+                 '<text x="195" y="129.5" class="p-yazi" fill="#5b21b6" style="font-size:4.2px">' +
+                 'Sütaş %2,5 Yağlı UHT S…</text>') +
         rafTablo([[URUNLER.sut[1], URUNLER.sut[0], URUNLER.sut[2], '0000aa11bb22cc38']], 0) +
         '</svg>';
 
@@ -677,6 +742,52 @@
         'Barkodu olmayan ürün yok. Çoklu barkodlu ürünlerde oklarla diğer kodlara geçilir.</text>',
         JET_ARAMA);
 
+    /**
+     * Bütün sonuçların kaydırılarak geçtiği ekran.
+     *
+     * Üç sıra, on iki kart. Kartlar bir kırpma alanının içinde duruyor ve
+     * CSS ile yukarı kayıyor. Kayma yalnızca ekran açıkken oynuyor
+     * (`.krs__ekran.acik`), arka planda kare harcanmıyor.
+     *
+     * NEDEN VAR
+     * Sağ şeritte "35 ürün geldi" yazmak yetmiyordu; ziyaretçi ilk dört
+     * kartı görüp geri kalanını hayal ediyordu. Liste gözünün önünde
+     * geçince gerçekten hepsinin geldiği anlaşılıyor.
+     */
+    var JET_SIRALAR = [
+        ['sogan', 'maydanoz', 'su', 'sos'],
+        ['simit', 'dondurma', 'kaymak', 'un'],
+        ['folyo', 'sut', 'peynir', 'ayran']
+    ];
+
+    function jetIzgara() {
+        var cikti = '';
+        for (var r = 0; r < JET_SIRALAR.length; r++) {
+            for (var k = 0; k < JET_SIRALAR[r].length; k++) {
+                cikti += jetKart(10 + k * 98, 152 + r * 130, JET_SIRALAR[r][k], 2 + ((r + k) % 5));
+            }
+        }
+        return cikti;
+    }
+
+    function jetBaslik(altYazi) {
+        return '<rect x="10" y="122" width="380" height="24" rx="7" class="p-kart"/>' +
+            '<rect x="18" y="128" width="12" height="12" rx="4" fill="#ecfdf5"/>' +
+            '<path d="M21 134 l2 2 l4 -4" stroke="#047857" stroke-width="1.2" fill="none"' +
+            ' stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<text x="36" y="134" class="p-yazi" style="font-size:5px;font-weight:700">Arama Sonuçları</text>' +
+            '<text x="36" y="141" class="p-yazi" style="font-size:4px" opacity="0.65">' + altYazi + '</text>';
+    }
+
+    var EKRAN_JET_KAYDIR = jetKabuk(
+        jetBaslik('35 ürün bulundu (6 arama terimi) · liste baştan sona geçiyor') +
+        '<clipPath id="jbKirp"><rect x="6" y="150" width="388" height="132" rx="7"/></clipPath>' +
+        '<g clip-path="url(#jbKirp)"><g class="jb-kaydir">' + jetIzgara() + '</g></g>' +
+        /* Kaydırma çubuğu */
+        '<rect x="394" y="152" width="2.4" height="128" rx="1.2" fill="#e8edf3"/>' +
+        '<rect x="394" y="152" width="2.4" height="44" rx="1.2" fill="#b9c3d1" class="jb-kaydir-cubuk"/>',
+        JET_ARAMA);
+
     // ==================================================================
     // Senaryo
     // ==================================================================
@@ -701,6 +812,7 @@
                 rafBos: EKRAN_RAF_BOS,
                 rafYazildi: EKRAN_RAF_YAZILDI,
                 rafOneri: EKRAN_RAF_ONERI,
+                rafKaydirildi: EKRAN_RAF_KAYDIRILDI,
                 rafSecildi: EKRAN_RAF_SECILDI,
                 rafSonuc: EKRAN_RAF_SONUC,
                 barkodBos: EKRAN_BARKOD_BOS,
@@ -715,21 +827,19 @@
                   yukleniyor: true, goz: y(200, 200) },
                 { ad: 'Ürün adı seçilip kopyalandı', sure: 2200, ekran: 'secili',
                   imlec: y(278, 246), goz: y(268, 244), tik: true },
-                { ad: 'Raf Etiketi sayfasına geçildi', sure: 1100, ekran: 'rafBos',
+                { ad: 'Raf Etiketi sayfasına geçildi', sureAralik: [1300, 1900], ekran: 'rafBos',
                   imlec: y(100, 12), goz: y(100, 12), tik: true },
-                { ad: 'Sayfa yükleniyor', sureAralik: [2000, 3000], ekran: 'rafBos',
-                  yukleniyor: true, goz: y(230, 200) },
                 { ad: 'Ürünler filtresine ürün adı yazıldı', sure: 2400, ekran: 'rafYazildi',
                   imlec: y(232, 127), goz: y(232, 127), tik: true },
-                { ad: 'Açılan listede kasa ve paketler karışık', sure: 900, ekran: 'rafOneri',
-                  goz: y(250, 160), imlec: y(310, 150) },
-                { ad: 'Doğru tekil ürün aranıyor', sureAralik: [3000, 4600], ekran: 'rafOneri',
-                  goz: y(250, 215), imlec: y(310, 210) },
+                { ad: 'Listede kasa ve kampanyalar karışık geliyor', sure: 1500, ekran: 'rafOneri',
+                  goz: y(250, 165), imlec: y(300, 158) },
+                { ad: 'Doğru tekil ürün için liste aşağı çekiliyor', sureAralik: [2600, 3800],
+                  ekran: 'rafKaydirildi', goz: y(250, 220), imlec: y(300, 215) },
                 { ad: 'Ürün seçildi', sure: 900, ekran: 'rafSecildi',
-                  imlec: y(250, 174), goz: y(250, 174), tik: true },
+                  imlec: y(240, 254), goz: y(240, 254), tik: true },
                 { ad: 'Uygula düğmesine basıldı', sure: 800, ekran: 'rafSecildi',
                   imlec: y(357, 144), goz: y(357, 144), tik: true },
-                { ad: 'Tablo yeniden yükleniyor', sureAralik: [1600, 2600], ekran: 'rafSonuc',
+                { ad: 'Tablo yeniden yükleniyor', sureAralik: [1300, 1900], ekran: 'rafSonuc',
                   yukleniyor: true, goz: y(230, 200) },
                 { ad: 'Barkod rozetine tıklanıp kopyalandı', sure: 1100, ekran: 'rafSonuc',
                   imlec: y(120, 190), goz: y(120, 190), tik: true },
@@ -752,6 +862,7 @@
                 panel: EKRAN_PANEL,
                 detay: ekranSiparisDetay(true, false),
                 jetBos: EKRAN_JET_BOS,
+                jetKaydir: EKRAN_JET_KAYDIR,
                 jet: EKRAN_JET
             },
             adimlar: [
@@ -765,8 +876,8 @@
                   imlec: y(98, 12), goz: y(98, 12), tik: true },
                 { ad: 'Liste çözülüyor', sure: 550, ekran: 'jetBos',
                   yukleniyor: true, goz: y(200, 200) },
-                { ad: '35 ürün görseli ve barkoduyla ekranda', sure: 1100, ekran: 'jet',
-                  goz: y(150, 210), imlec: null },
+                { ad: '35 ürünün tamamı görseli ve barkoduyla geldi', sure: 2400,
+                  ekran: 'jetKaydir', goz: y(200, 210), imlec: null },
                 { ad: 'Aranan ürün ilk bakışta görülüyor', sure: 900, ekran: 'jet',
                   goz: y(54, 200) }
             ]
