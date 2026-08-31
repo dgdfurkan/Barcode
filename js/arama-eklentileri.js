@@ -144,6 +144,7 @@
     // ==================================================================
 
     var bankoKap = null;
+    var bankoArayuz = null;
 
     function bankoYerlestir() {
         if (!window.JBBanko) return;
@@ -164,7 +165,29 @@
         if (sonuc) ana.insertBefore(bankoKap, sonuc);
         else ana.appendChild(bankoKap);
 
-        window.JBBanko.kur(bankoKap);
+        bankoArayuz = window.JBBanko.kur(bankoKap);
+    }
+
+    /*
+     * Toplu kopyalama sonrası sonuçlar ekrana gelince banko alanına odak
+     * veriliyor. Depocu hiçbir yere dokunmadan numarayı yazmaya başlıyor;
+     * geriye tek hareket kalıyor.
+     *
+     * Yalnızca kullanıcı o an arama kutusuna yazmıyorsa odak alınıyor.
+     * Aksi hâlde yazdığı harfler banko alanına düşerdi.
+     */
+    function bankoyaOdakla() {
+        if (!bankoArayuz || typeof bankoArayuz.odakla !== 'function') return;
+        var etkin = document.activeElement;
+        if (etkin && (etkin.tagName === 'INPUT' || etkin.tagName === 'TEXTAREA')) return;
+        bankoArayuz.odakla();
+    }
+
+    var sonucBolumu = document.getElementById('resultsSection');
+    if (sonucBolumu && typeof MutationObserver !== 'undefined') {
+        new MutationObserver(function () {
+            if (!sonucBolumu.classList.contains('hidden')) setTimeout(bankoyaOdakla, 260);
+        }).observe(sonucBolumu, { attributes: true, attributeFilter: ['class'] });
     }
 
     /**
