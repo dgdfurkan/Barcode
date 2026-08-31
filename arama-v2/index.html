@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-title" content="Jet Barkod">
     <meta name="theme-color" content="#1e293b">
     <link rel="manifest" href="../manifest.json">
-    <title>Ürün Barkod Arama - Jet Barkod</title>
+    <title>Ürün Arama (v2) - Jet Barkod</title>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="../assets/logo.png?v=2">
@@ -25,14 +25,17 @@
     <link rel="stylesheet" href="../css/eklenti-rehberi.css?v=20260829a" />
     <link rel="stylesheet" href="../css/app-boot.css?v=20260828i" />
     <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
+    <link rel="stylesheet" href="../css/arama-v2.css?v=20260831a" />
+    <meta name="robots" content="noindex, nofollow" />
     <script src="../js/vendor/JsBarcode.all.min.js?v=20260828i"></script>
     <script src="../js/auth-token.js?v=20260828i"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20260828i"></script>
     <!-- QR Code Library - Using QRCode.js (more reliable) -->
     <script src="../js/vendor/qrcode.min.js?v=20260828i"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Google Fonts bağlantısı kaldırıldı: sayfa aslında oradan bir şey
+         indirmiyordu, yalnızca boşuna el sıkışma yapıyordu. Yazı tipi
+         sistemden geliyor. -->
     <script src="../veri/temp_products.js"></script>
     <script src="../js/getir-cdn-paste.js?v=20260831a"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
@@ -1981,7 +1984,7 @@
     </style>
     <link rel="stylesheet" href="../css/motion.css?v=20260828i" />
 </head>
-<body class="bg-background min-h-screen">
+<body class="bg-background min-h-screen v2">
     <!-- Açılış perdesi. İlk karede boyanır; JS hiç çalışmasa bile
          aşağıdaki gömülü güvenlik ağı onu kaldırır. -->
     <div id="appBoot" class="app-boot app-boot--active" role="status" aria-live="polite" aria-label="Uygulama yükleniyor">
@@ -4779,7 +4782,7 @@
                             <img src="${product.image || ''}" 
                                  alt="${product.name}" 
                                  class="w-auto h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-300"
-                                 onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                                 onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                         </div>
                         <div class="px-5 pt-5 pb-3 flex-1 flex flex-col">
                             <h3 class="font-semibold text-slate-800 leading-snug break-words w-full mb-2" data-product-search-title>${product.name}</h3>
@@ -4794,7 +4797,7 @@
                 const barcodeSize = currentBarcode ? currentBarcode.size : '';
                 const barcodeVariant = currentBarcode ? currentBarcode.variant : '';
                 const productName = String(product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const productImage = product.image || 'https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D';
+                const productImage = product.image || '../assets/urun-gorseli-yok.svg';
                 const isOutOfStock = outOfStockProductIds.has(product.id);
                 const hasMultipleBarcodes = barcodes.length > 1;
                 
@@ -4837,7 +4840,7 @@
                             <img src="${productImage}" 
                                  alt="${product.name}" 
                                  class="w-auto h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-300"
-                                 onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                                 onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                         </div>
                         
                         <!-- Content Area -->
@@ -4960,7 +4963,7 @@
                     name: "Nesfit Karışık Meyveli",
                     category: "Tahıl Ürünleri",
                     brand: "Nestlé",
-                    image: "https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=400&auto=format&fit=crop",
+                    image: "../assets/urun-gorseli-yok.svg",
                     barcodes: [
                         { code: "8690504123456", type: "EAN-13", size: "500g", variant: "Normal" },
                         { code: "8690504123463", type: "EAN-13", size: "750g", variant: "Büyük Boy" }
@@ -4972,7 +4975,7 @@
                     name: "Coca Cola 330ml",
                     category: "İçecekler",
                     brand: "Coca-Cola",
-                    image: "https://images.pexels.com/photos/50593/coca-cola-cold-drink-soft-drink-coke-50593.jpeg?auto=compress&cs=tinysrgb&w=400",
+                    image: "../assets/urun-gorseli-yok.svg",
                     barcodes: [
                         { code: "5449000000996", type: "EAN-13", size: "330ml", variant: "Teneke Kutu" }
                     ],
@@ -4983,7 +4986,7 @@
                     name: "Türk Kahvesi Kurukahveci",
                     category: "Kahve",
                     brand: "Kurukahveci Mehmet Efendi",
-                    image: "https://images.pexels.com/photos/324028/pexels-photo-324028.jpeg?auto=compress&cs=tinysrgb&w=400",
+                    image: "../assets/urun-gorseli-yok.svg",
                     barcodes: [
                         { code: "8690504333444", type: "EAN-13", size: "100g", variant: "Klasik" },
                         { code: "8690504333451", type: "EAN-13", size: "250g", variant: "Büyük Paket" },
@@ -5032,7 +5035,7 @@
                 <img src="${randomProduct.image}" 
                      alt="${randomProduct.name}" 
                      class="ticker-img"
-                     onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                     onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                 <div class="ticker-name">${randomProduct.name}</div>
                 <div class="ticker-barcode">
                     ${generateBarcodeSVG(barcode, 200, 50)}
@@ -5869,7 +5872,7 @@
         function buildPendingPlaceholderProduct(searchTerm, termIndex) {
             const img = lookupImageUrlForTableTerm(searchTerm);
             const id = `__pending__${termIndex}_${simpleHashForPendingId(searchTerm)}`;
-            const fallbackImg = 'https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D';
+            const fallbackImg = '../assets/urun-gorseli-yok.svg';
             return {
                 id,
                 name: searchTerm.trim(),
@@ -7602,7 +7605,7 @@
                                  alt="${product.name}" 
                                  class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200"
                                  onclick="showImageModal('${product.image}', '${product.name}')"
-                                 onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                                 onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                             <div>
                                 <h4 class="font-medium text-text-primary cursor-pointer hover:text-blue-600 transition-colors flex items-start gap-1" onclick="copyProductText('${String(product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '')}')" title="Ürün adını kopyalamak için tıklayın">
                                     <span class="flex-1 min-w-0 break-words" data-product-search-title>${product.name}</span>
@@ -7653,7 +7656,7 @@
                                      alt="${product.name}" 
                                      class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200 opacity-60"
                                      onclick="showImageModal('${product.image}', '${product.name}')"
-                                     onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                                     onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                                 <div class="min-w-0">
                                     <h4 class="font-medium text-gray-600"><span class="break-words" data-product-search-title>${product.name}</span></h4>
                                     <p class="text-sm text-gray-500">${product.brand || 'Marka Belirtilmemiş'} • ${product.category || 'Kategori Yok'}</p>
@@ -7689,7 +7692,7 @@
                              alt="${product.name}" 
                              class="w-16 h-16 rounded-lg object-cover flex-shrink-0 product-image cursor-pointer hover:scale-105 transition-transform duration-200"
                              onclick="showImageModal('${product.image}', '${product.name}')"
-                             onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                             onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                         <div class="flex-1 min-w-0">
                             <h4 class="font-medium text-text-primary mb-1 cursor-pointer hover:text-blue-600 transition-colors flex items-start gap-1" onclick="copyProductText('${String(product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '')}')" title="Ürün adını kopyalamak için tıklayın">
                                 <span class="flex-1 min-w-0 break-words" data-product-search-title>${product.name}</span>
@@ -7731,7 +7734,7 @@
                                  alt="${product.name}" 
                                  class="w-16 h-16 rounded-lg object-cover flex-shrink-0 product-image cursor-pointer hover:scale-105 transition-transform duration-200 opacity-60"
                                  onclick="showImageModal('${product.image}', '${product.name}')"
-                                 onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                                 onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                             <div class="flex-1 min-w-0">
                                 <h4 class="font-medium text-gray-600 mb-1"><span class="break-words" data-product-search-title>${product.name}</span></h4>
                                 <p class="text-sm text-gray-500 mb-2">${product.brand || 'Marka Belirtilmemiş'} • Raf: ${product.shelf}</p>
@@ -7865,7 +7868,7 @@
                                      alt="${product.name}" 
                                      class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200"
                                      onclick="showImageModal('${product.image}', '${product.name}')"
-                                     onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                                     onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                                 <div class="min-w-0">
                                     <h4 class="font-medium text-text-primary cursor-pointer hover:text-blue-600 transition-colors flex items-start gap-1" onclick="copyProductText('${String(product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '')}')" title="Ürün adını kopyalamak için tıklayın">
                                         <span class="flex-1 min-w-0 break-words" data-product-search-title>${product.name}</span>
@@ -7910,7 +7913,7 @@
                                      alt="${product.name}" 
                                      class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200"
                                      onclick="showImageModal('${product.image}', '${product.name}')"
-                                     onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                                     onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                                 <div class="min-w-0">
                                     <h4 class="font-medium text-text-primary cursor-pointer hover:text-blue-600 transition-colors flex items-start gap-1" onclick="copyProductText('${String(product.name || '').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ').replace(/\r/g, '')}')" title="Ürün adını kopyalamak için tıklayın">
                                         <span class="flex-1 min-w-0 break-words" data-product-search-title>${product.name}</span>
@@ -8069,7 +8072,7 @@
                     <img src="${imageUrl}" 
                          alt="${productName}" 
                          class="max-w-full max-h-full object-contain rounded-lg"
-                         onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
+                         onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                     <div class="text-center mt-4">
                         <h3 class="text-white text-lg font-medium">${productName}</h3>
                     </div>
@@ -9644,7 +9647,7 @@
             
             resultsContainer.innerHTML = matchingProducts.map(product => {
                 const productName = product.name || '';
-                const productImage = product.image || 'https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D';
+                const productImage = product.image || '../assets/urun-gorseli-yok.svg';
                 const productBrand = product.brand || '';
                 const productCategory = product.category || '';
                 const productBarcode = product.barcodes && product.barcodes.length > 0 ? product.barcodes[0].code : '';
@@ -10703,7 +10706,7 @@
                     productDiv.className = 'flex items-center justify-between p-1 bg-white rounded border text-xs';
                     productDiv.innerHTML = `
                         <div class="flex items-center space-x-2">
-                            <img src="${product.image}" alt="${product.name}" class="w-4 h-4 rounded object-cover" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=400&auto=format&fit=crop';">
+                            <img src="${product.image}" alt="${product.name}" class="w-4 h-4 rounded object-cover" onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                             <div class="truncate">
                                 <div class="font-medium truncate">${product.name}</div>
                                 <div class="text-gray-500 truncate">${product.barcodes.map(b => b.code).join(', ')}</div>
@@ -10801,7 +10804,7 @@
                     productDiv.innerHTML = `
                         <div class="flex items-center space-x-3 flex-1 min-w-0">
                             <input type="checkbox" class="product-checkbox w-4 h-4 text-green-600" data-index="${index}" checked>
-                            <img src="${product.image}" alt="${product.name}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=400&auto=format&fit=crop';">
+                            <img src="${product.image}" alt="${product.name}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0" onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                             <div class="flex-1 min-w-0">
                                 <div class="font-medium text-sm text-gray-900 truncate">${product.name}</div>
                                 <div class="text-xs text-gray-500 truncate">${product.barcodes.map(b => b.code).join(', ')}</div>
@@ -10819,7 +10822,7 @@
                     productDiv.innerHTML = `
                         <div class="flex items-center space-x-3 flex-1 min-w-0">
                             <input type="checkbox" class="product-checkbox w-4 h-4 text-yellow-600" data-index="${newProductsToAdd.length + index}" disabled>
-                            <img src="${product.image}" alt="${product.name}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0 opacity-60" onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=400&auto=format&fit=crop';">
+                            <img src="${product.image}" alt="${product.name}" class="w-10 h-10 rounded-lg object-cover flex-shrink-0 opacity-60" onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
                             <div class="flex-1 min-w-0">
                                 <div class="font-medium text-sm text-gray-600 truncate">${product.name}</div>
                                 <div class="text-xs text-gray-400 truncate">${product.barcodes.map(b => b.code).join(', ')}</div>
@@ -11731,5 +11734,6 @@
             }
         });
     </script>
+<script src="../js/arama-v2.js?v=20260831f"></script>
 </body>
 </html>

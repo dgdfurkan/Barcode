@@ -708,7 +708,7 @@ function logout() {
     /* Sayfalar artık /arama/, /sayim/ gibi kendi klasörlerinde. Nerede
        olursak olalım kökten yazılan adres doğru yere gider; eskiden
        dizin derinliğine göre dallanmak gerekiyordu. */
-    window.location.replace('/index.html');
+    window.location.replace('/');
 }
 
 // Show user info on index page

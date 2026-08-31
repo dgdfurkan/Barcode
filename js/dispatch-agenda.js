@@ -330,7 +330,7 @@ class DispatchAgendaApp {
 
         document.getElementById('headerLogoutBtn')?.addEventListener('click', () => {
             window.authUtils?.logout?.();
-            window.location.href = '../index.html';
+            window.location.href = '/';
         });
 
         document.querySelectorAll('#addReasonPills .agenda-reason-pill').forEach((pill) => {

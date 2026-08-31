@@ -163,7 +163,7 @@
                     localStorage.removeItem('authToken');
                     /* Sayfalar kendi klasörlerinde (/arama/, /sayim/ ...);
                        dizin derinliğine bakmak yerine kökten yazılıyor. */
-                    window.location.replace('/index.html');
+                    window.location.replace('/');
                 }
 
             } catch (error) {

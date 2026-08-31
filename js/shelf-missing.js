@@ -1783,7 +1783,7 @@ class ShelfMissingApp {
 
         document.getElementById('headerLogoutBtn')?.addEventListener('click', () => {
             window.authUtils?.logout?.();
-            window.location.href = '../index.html';
+            window.location.href = '/';
         });
 
         document.querySelectorAll('.sm-modal-backdrop').forEach((backdrop) => {

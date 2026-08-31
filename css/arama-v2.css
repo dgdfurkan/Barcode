@@ -1,0 +1,596 @@
+/**
+ * Jet Barkod. Ürün arama, ikinci sürüm görünümü.
+ * ============================================================================
+ *
+ * Bu dosya `arama-v2/index.html` üzerine biniyor. Sayfanın kendi kodu, kimlikleri
+ * ve olay dinleyicileri değişmedi; değişen yalnızca görünüş ve hareket. Böylece
+ * her düğme birinci sürümdeki gibi çalışmaya devam ediyor.
+ *
+ * RENK
+ * Hakkımızda sayfasıyla aynı aile: mürekkep siyahı, kırık beyaz kağıt ve
+ * logodaki mavi. Zemin gri değil kırık beyaz; gri, mavinin yanında soğuk
+ * duruyor. İki renk arasında geçen degrade yok.
+ *
+ * KAYMA YOK
+ * Hiçbir animasyon yükseklik, genişlik, kenar boşluğu ya da yazı boyutu
+ * oynatmıyor. Yalnızca `opacity` ve `transform` var; tarayıcı yeniden
+ * yerleşim hesaplamıyor. Üst şerit bile küçülürken yüksekliğini değil
+ * içindekilerin ölçeğini değiştiriyor.
+ *
+ * SIRALI GİRİŞ SINIRI
+ * Sonuçlar sırayla beliriyor ama gecikme ilk on iki satırda duruyor. Yüz
+ * sonuçta hepsine gecikme verilseydi son satır üç saniye sonra gelirdi;
+ * animasyon süs olmaktan çıkıp engel olurdu.
+ *
+ * HAREKET TERCİHİ
+ * `prefers-reduced-motion` açıksa bütün geçişler kapanıyor, her şey son
+ * hâliyle duruyor.
+ * ============================================================================
+ */
+
+body.v2 {
+    /* Kağıt ve mürekkep */
+    --v2-kagit: #ffffff;
+    --v2-zemin: #f8f7f4;
+    --v2-zemin-2: #f2f0ea;
+    --v2-cizgi: #e6e3dc;
+    --v2-cizgi-koyu: #d5d1c6;
+    --v2-murekkep: #12161d;
+    --v2-soluk: #5d6673;
+    --v2-cok-soluk: #8d939c;
+
+    /* Vurgu */
+    --v2-mavi: #135bec;
+    --v2-mavi-koyu: #0f47b8;
+    --v2-mavi-soft: #edf3fe;
+    --v2-yesil: #0e7c58;
+    --v2-yesil-soft: #eaf5f0;
+    --v2-altin: #8a6420;
+    --v2-altin-soft: #faf5e9;
+    --v2-kirmizi: #b3231f;
+    --v2-kirmizi-soft: #fbeeed;
+
+    /* Gölge: tek renk, yayvan, çok soluk */
+    --v2-golge-1: 0 1px 2px rgb(18 22 29 / 0.05);
+    --v2-golge-2: 0 2px 6px -2px rgb(18 22 29 / 0.08), 0 8px 24px -12px rgb(18 22 29 / 0.14);
+    --v2-golge-3: 0 4px 12px -4px rgb(18 22 29 / 0.10), 0 24px 48px -24px rgb(18 22 29 / 0.24);
+
+    --v2-yay: cubic-bezier(0.22, 1, 0.36, 1);
+    --v2-hizli: cubic-bezier(0.4, 0, 0.2, 1);
+
+    background: var(--v2-zemin);
+    color: var(--v2-murekkep);
+    /* Dışarıdan yazı tipi indirilmiyor; her işletim sisteminin kendi
+       arayüz yazı tipi kullanılıyor. En hızlısı ve en tanıdığı bu. */
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
+                 Inter, Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-feature-settings: 'kern' 1, 'liga' 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Sayfanın kendi jeton dosyası bazı yerlerde değişken kullanıyor; onları da çevir */
+body.v2 {
+    --color-background: #f8f7f4;
+    --color-surface: #ffffff;
+    --color-border: #e6e3dc;
+    --color-text-primary: #12161d;
+    --color-text-secondary: #5d6673;
+    --color-primary: #135bec;
+    --color-border-focus: #135bec;
+    --shadow-sm: 0 1px 2px rgb(18 22 29 / 0.05);
+    --shadow-focus: 0 0 0 3px rgb(19 91 236 / 0.16);
+}
+
+/* ==========================================================================
+   Tailwind sınıflarının üzerine yazan eşlemeler
+   ==========================================================================
+   Derlenmiş Tailwind bazı rengi doğrudan rgb() olarak gömmüş, değişkenden
+   okumuyor. O yüzden kullanılan sınıflar tek tek çevriliyor. */
+
+body.v2 .bg-secondary-50 { background-color: var(--v2-zemin); }
+body.v2 .bg-secondary-100 { background-color: var(--v2-zemin-2); }
+body.v2 .bg-gray-50 { background-color: var(--v2-zemin); }
+body.v2 .bg-gray-100 { background-color: var(--v2-zemin-2); }
+body.v2 .text-text-primary { color: var(--v2-murekkep); }
+body.v2 .text-text-secondary { color: var(--v2-soluk); }
+body.v2 .text-secondary-400 { color: var(--v2-cok-soluk); }
+body.v2 .text-gray-400 { color: var(--v2-cok-soluk); }
+body.v2 .text-gray-600 { color: var(--v2-soluk); }
+body.v2 .text-gray-700 { color: var(--v2-murekkep); }
+body.v2 .bg-primary-50 { background-color: var(--v2-mavi-soft); }
+body.v2 .bg-primary-100 { background-color: #dfe9fd; }
+body.v2 .text-primary { color: var(--v2-mavi); }
+body.v2 .bg-accent-50 { background-color: var(--v2-yesil-soft); }
+body.v2 .bg-accent-100 { background-color: #dcefe6; }
+body.v2 .text-accent { color: var(--v2-yesil); }
+body.v2 .bg-green-50 { background-color: var(--v2-yesil-soft); }
+body.v2 .text-green-700 { color: var(--v2-yesil); }
+body.v2 .bg-blue-50 { background-color: var(--v2-mavi-soft); }
+body.v2 .border-blue-200 { border-color: #c5d9fb; }
+body.v2 .hover\:text-blue-600:hover { color: var(--v2-mavi-koyu); }
+
+/* Deneme şeridindeki mavi-mor degrade: markanın rengi tek renk oldu */
+body.v2 #trialBanner {
+    background: var(--v2-murekkep) !important;
+    border: 1px solid #232a36;
+    box-shadow: var(--v2-golge-2);
+}
+
+/* ==========================================================================
+   Tipografi
+   ========================================================================== */
+
+body.v2 h1, body.v2 h2, body.v2 h3, body.v2 h4 {
+    letter-spacing: -0.022em;
+}
+
+body.v2 .text-2xl { font-size: 1.4rem; font-weight: 660; letter-spacing: -0.03em; }
+body.v2 .text-xl { font-size: 1.2rem; font-weight: 640; letter-spacing: -0.026em; }
+body.v2 .text-lg { font-size: 1.04rem; font-weight: 620; }
+
+/* Sayılar hep aynı genişlikte: sayaç değişince satır oynamıyor */
+body.v2 #resultCount,
+body.v2 .barkod-kod,
+body.v2 [data-barcode-code],
+body.v2 .font-mono {
+    font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   Üst şerit
+   ==========================================================================
+   Sayfa kaydırılınca yükseklik DEĞİŞMİYOR; içerideki marka bloğu hafifçe
+   küçülüyor ve alt çizgi beliriyor. Yükseklik oynasaydı altındaki her şey
+   kayardı. */
+
+body.v2 .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: rgb(255 255 255 / 0.82);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    border-bottom: 1px solid transparent;
+    box-shadow: none;
+    transition: border-color 260ms var(--v2-hizli), background 260ms var(--v2-hizli);
+}
+
+body.v2.kaydi .site-header {
+    border-bottom-color: var(--v2-cizgi);
+    background: rgb(255 255 255 / 0.94);
+}
+
+body.v2 .site-header h1 {
+    font-size: 1.32rem;
+    font-weight: 680;
+    letter-spacing: -0.032em;
+    transform-origin: left center;
+    transition: transform 320ms var(--v2-yay);
+}
+
+body.v2 .site-header h1 + p {
+    font-size: 0.78rem;
+    color: var(--v2-cok-soluk);
+    transform-origin: left center;
+    transition: opacity 240ms var(--v2-hizli), transform 320ms var(--v2-yay);
+}
+
+body.v2.kaydi .site-header h1 { transform: scale(0.94); }
+body.v2.kaydi .site-header h1 + p { opacity: 0; transform: scale(0.9); }
+
+body.v2 .site-header img { border-radius: 8px; }
+
+/* Premium sayfa düğmeleri */
+body.v2 .premium-nav-chip {
+    border: 1px solid var(--v2-cizgi);
+    background: var(--v2-kagit);
+    color: var(--v2-soluk);
+    border-radius: 9px;
+    font-weight: 560;
+    transition: border-color 180ms var(--v2-hizli),
+                color 180ms var(--v2-hizli),
+                transform 220ms var(--v2-yay),
+                background 180ms var(--v2-hizli);
+}
+
+body.v2 .premium-nav-chip:hover {
+    border-color: var(--v2-cizgi-koyu);
+    color: var(--v2-murekkep);
+    background: var(--v2-zemin);
+    transform: translateY(-1px);
+}
+
+body.v2 .premium-nav-chip:active { transform: translateY(0) scale(0.98); }
+
+/* ==========================================================================
+   Arama kartı
+   ==========================================================================
+   Sayfanın kahramanı burası. Odaklanınca kart yükseliyor ve kenarı maviye
+   dönüyor; ölçek değil gölge ve kenar değiştiği için altındaki hiçbir şey
+   kımıldamıyor. */
+
+body.v2 main > section:first-of-type > .bg-surface,
+body.v2 main > section.mb-8 > .bg-surface {
+    position: relative;
+    border-radius: 18px;
+    border: 1px solid var(--v2-cizgi);
+    box-shadow: var(--v2-golge-1);
+    transition: box-shadow 320ms var(--v2-yay), border-color 260ms var(--v2-hizli);
+}
+
+body.v2.arama-odakta main > section.mb-8 > .bg-surface {
+    border-color: #bcd2fb;
+    box-shadow: var(--v2-golge-3), 0 0 0 4px rgb(19 91 236 / 0.07);
+}
+
+body.v2 .input-field {
+    border: 1px solid var(--v2-cizgi);
+    border-radius: 12px;
+    background: var(--v2-zemin);
+    color: var(--v2-murekkep);
+    font-size: 1.02rem;
+    letter-spacing: -0.01em;
+    box-shadow: none;
+    transition: background 220ms var(--v2-hizli),
+                border-color 220ms var(--v2-hizli),
+                box-shadow 260ms var(--v2-yay);
+}
+
+body.v2 .input-field::placeholder { color: var(--v2-cok-soluk); }
+
+body.v2 .input-field:focus {
+    outline: none;
+    background: var(--v2-kagit);
+    border-color: var(--v2-mavi);
+    box-shadow: 0 0 0 3px rgb(19 91 236 / 0.14);
+}
+
+/* Arama kutusunun içindeki düğmeler */
+body.v2 #pasteFromClipboard,
+body.v2 #clearSearch {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    color: var(--v2-cok-soluk);
+    transition: background 160ms var(--v2-hizli),
+                color 160ms var(--v2-hizli),
+                transform 220ms var(--v2-yay);
+}
+
+body.v2 #pasteFromClipboard:hover,
+body.v2 #clearSearch:hover {
+    background: var(--v2-zemin-2);
+    color: var(--v2-murekkep);
+}
+
+body.v2 #pasteFromClipboard:active,
+body.v2 #clearSearch:active { transform: scale(0.9); }
+
+/* İpucu rozetleri */
+body.v2 .search-tips span[class*="rounded-md"] {
+    border-radius: 999px;
+    padding: 0.22rem 0.7rem;
+    font-size: 0.74rem;
+    font-weight: 520;
+    letter-spacing: 0.002em;
+}
+
+/* Liste / Grid geçişi: hap kaydırılıyor, yeniden yerleşim yok */
+body.v2 .view-toggle-container {
+    position: relative;
+    background: var(--v2-zemin-2);
+    border-radius: 11px;
+    padding: 3px;
+    isolation: isolate;
+}
+
+body.v2 .view-toggle-container::before {
+    content: '';
+    position: absolute;
+    z-index: 0;
+    top: 3px;
+    left: 3px;
+    height: calc(100% - 6px);
+    width: var(--hap-en, 0px);
+    border-radius: 8px;
+    background: var(--v2-kagit);
+    box-shadow: var(--v2-golge-1);
+    transform: translate3d(var(--hap-x, 0px), 0, 0);
+    transition: transform 380ms var(--v2-yay), width 380ms var(--v2-yay);
+    opacity: 0;
+}
+
+body.v2 .view-toggle-container.hap-hazir::before { opacity: 1; }
+
+body.v2 .view-toggle-btn {
+    position: relative;
+    z-index: 1;
+    background: transparent !important;
+    border-color: transparent !important;
+    color: var(--v2-soluk) !important;
+    border-radius: 8px;
+    font-weight: 560;
+    transition: color 200ms var(--v2-hizli);
+}
+
+body.v2 .view-toggle-btn.active { color: var(--v2-murekkep) !important; }
+
+/* ==========================================================================
+   Sonuçlar
+   ========================================================================== */
+
+body.v2 #resultsSection > .bg-surface,
+body.v2 #noResultsState > .bg-surface,
+body.v2 #initialState > .bg-surface,
+body.v2 #loadingState > .bg-surface {
+    border-radius: 18px;
+    border: 1px solid var(--v2-cizgi);
+    box-shadow: var(--v2-golge-1);
+}
+
+body.v2 #resultsSection thead th {
+    background: var(--v2-zemin);
+    color: var(--v2-soluk);
+    font-size: 0.72rem;
+    font-weight: 640;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding-top: 0.85rem;
+    padding-bottom: 0.85rem;
+}
+
+body.v2 #resultsTableBody tr {
+    transition: background 180ms var(--v2-hizli);
+}
+
+body.v2 #resultsTableBody tr:hover { background: var(--v2-zemin); }
+
+body.v2 #resultsTableBody td { padding-top: 0.9rem; padding-bottom: 0.9rem; }
+
+body.v2 .product-image {
+    border-radius: 10px;
+    border: 1px solid var(--v2-cizgi);
+    background: var(--v2-zemin);
+    object-fit: contain;
+    padding: 2px;
+    transition: transform 300ms var(--v2-yay), border-color 200ms var(--v2-hizli);
+}
+
+body.v2 .product-image:hover {
+    transform: scale(1.06);
+    border-color: var(--v2-cizgi-koyu);
+}
+
+/* Raf rozeti */
+body.v2 #resultsTableBody .bg-accent-50 {
+    border-radius: 999px;
+    padding: 0.2rem 0.65rem;
+    font-weight: 580;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Ürün adı: kopyalanabilir olduğu ikonun belirmesiyle anlaşılıyor */
+body.v2 #resultsTableBody h4 svg,
+body.v2 #mobileResults h4 svg {
+    opacity: 0;
+    transform: translateX(-3px);
+    transition: opacity 200ms var(--v2-hizli), transform 260ms var(--v2-yay);
+}
+
+body.v2 #resultsTableBody tr:hover h4 svg,
+body.v2 #mobileResults > *:hover h4 svg { opacity: 1; transform: none; }
+
+/* ==========================================================================
+   Düğmeler
+   ========================================================================== */
+
+body.v2 .btn-primary,
+body.v2 .btn-secondary {
+    border-radius: 10px;
+    font-weight: 560;
+    letter-spacing: -0.008em;
+    transition: background 180ms var(--v2-hizli),
+                border-color 180ms var(--v2-hizli),
+                color 180ms var(--v2-hizli),
+                transform 220ms var(--v2-yay),
+                box-shadow 220ms var(--v2-yay);
+}
+
+body.v2 .btn-primary {
+    background: var(--v2-murekkep);
+    color: #fff;
+    border: 1px solid var(--v2-murekkep);
+}
+
+body.v2 .btn-primary:hover {
+    background: var(--v2-mavi);
+    border-color: var(--v2-mavi);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px -6px rgb(19 91 236 / 0.5);
+}
+
+body.v2 .btn-secondary {
+    background: var(--v2-kagit);
+    border: 1px solid var(--v2-cizgi);
+    color: var(--v2-murekkep);
+}
+
+body.v2 .btn-secondary:hover {
+    border-color: var(--v2-cizgi-koyu);
+    background: var(--v2-zemin);
+    transform: translateY(-1px);
+}
+
+body.v2 .btn-primary:active,
+body.v2 .btn-secondary:active { transform: translateY(0) scale(0.985); }
+
+body.v2 button:focus-visible,
+body.v2 a:focus-visible,
+body.v2 input:focus-visible {
+    outline: 2px solid var(--v2-mavi);
+    outline-offset: 2px;
+    border-radius: 8px;
+}
+
+/* ==========================================================================
+   Boş ve başlangıç durumları
+   ========================================================================== */
+
+body.v2 #initialState .rounded-full,
+body.v2 #noResultsState .rounded-full {
+    background: var(--v2-mavi-soft);
+    border: 1px solid #d9e6fd;
+}
+
+body.v2 #noResultsState .rounded-full {
+    background: var(--v2-zemin);
+    border-color: var(--v2-cizgi);
+}
+
+/* ==========================================================================
+   Dip
+   ========================================================================== */
+
+body.v2 footer {
+    background: var(--v2-kagit);
+    border-top: 1px solid var(--v2-cizgi);
+}
+
+/* ==========================================================================
+   Hareket katmanı
+   ==========================================================================
+   Buradaki her kural yalnızca opacity ve transform oynatıyor. */
+
+/* --- Sayfa girişi --- */
+body.v2 main > section,
+body.v2 main > div {
+    animation: v2-belir 620ms var(--v2-yay) both;
+}
+
+body.v2 main > *:nth-child(1) { animation-delay: 0ms; }
+body.v2 main > *:nth-child(2) { animation-delay: 60ms; }
+body.v2 main > *:nth-child(3) { animation-delay: 110ms; }
+body.v2 main > *:nth-child(4) { animation-delay: 150ms; }
+
+@keyframes v2-belir {
+    from { opacity: 0; transform: translate3d(0, 14px, 0); }
+    to { opacity: 1; transform: none; }
+}
+
+/* --- Sonuç satırlarının sırayla gelişi ---
+   Gecikme yalnızca ilk on iki satırda. Sonrakiler beklemeden geliyor,
+   yoksa yüz sonuçlu bir aramada son satır saniyeler sonra belirirdi. */
+body.v2 #resultsTableBody tr,
+body.v2 #mobileResults > *,
+body.v2 #gridResults > * {
+    animation: v2-satir 460ms var(--v2-yay) both;
+}
+
+body.v2 #resultsTableBody tr:nth-child(1),
+body.v2 #mobileResults > *:nth-child(1),
+body.v2 #gridResults > *:nth-child(1) { animation-delay: 0ms; }
+body.v2 #resultsTableBody tr:nth-child(2),
+body.v2 #mobileResults > *:nth-child(2),
+body.v2 #gridResults > *:nth-child(2) { animation-delay: 26ms; }
+body.v2 #resultsTableBody tr:nth-child(3),
+body.v2 #mobileResults > *:nth-child(3),
+body.v2 #gridResults > *:nth-child(3) { animation-delay: 52ms; }
+body.v2 #resultsTableBody tr:nth-child(4),
+body.v2 #mobileResults > *:nth-child(4),
+body.v2 #gridResults > *:nth-child(4) { animation-delay: 78ms; }
+body.v2 #resultsTableBody tr:nth-child(5),
+body.v2 #mobileResults > *:nth-child(5),
+body.v2 #gridResults > *:nth-child(5) { animation-delay: 104ms; }
+body.v2 #resultsTableBody tr:nth-child(6),
+body.v2 #mobileResults > *:nth-child(6),
+body.v2 #gridResults > *:nth-child(6) { animation-delay: 128ms; }
+body.v2 #resultsTableBody tr:nth-child(7),
+body.v2 #mobileResults > *:nth-child(7),
+body.v2 #gridResults > *:nth-child(7) { animation-delay: 150ms; }
+body.v2 #resultsTableBody tr:nth-child(8),
+body.v2 #mobileResults > *:nth-child(8),
+body.v2 #gridResults > *:nth-child(8) { animation-delay: 170ms; }
+body.v2 #resultsTableBody tr:nth-child(9),
+body.v2 #mobileResults > *:nth-child(9),
+body.v2 #gridResults > *:nth-child(9) { animation-delay: 188ms; }
+body.v2 #resultsTableBody tr:nth-child(10),
+body.v2 #mobileResults > *:nth-child(10),
+body.v2 #gridResults > *:nth-child(10) { animation-delay: 204ms; }
+body.v2 #resultsTableBody tr:nth-child(11),
+body.v2 #mobileResults > *:nth-child(11),
+body.v2 #gridResults > *:nth-child(11) { animation-delay: 218ms; }
+body.v2 #resultsTableBody tr:nth-child(n + 12),
+body.v2 #mobileResults > *:nth-child(n + 12),
+body.v2 #gridResults > *:nth-child(n + 12) { animation-delay: 230ms; }
+
+@keyframes v2-satir {
+    from { opacity: 0; transform: translate3d(0, 9px, 0); }
+    to { opacity: 1; transform: none; }
+}
+
+/* --- Durum geçişi: yükleniyor ile sonuç arasında yanıp sönme olmasın --- */
+body.v2 #loadingState:not(.hidden) { animation: v2-belir 300ms var(--v2-hizli) both; }
+
+/* --- Kopyalandı geri bildirimi ---
+   Metin yerine ikon değişiyor; genişlik sabit kaldığı için satır oynamıyor. */
+body.v2 .v2-kopyalandi {
+    position: relative;
+    animation: v2-onay 520ms var(--v2-yay);
+}
+
+@keyframes v2-onay {
+    0% { transform: none; }
+    28% { transform: scale(1.06); }
+    100% { transform: none; }
+}
+
+/* --- Arama sırasında üstte ince ilerleme çizgisi --- */
+body.v2 .v2-serit {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 60;
+    height: 2px;
+    width: 100%;
+    background: var(--v2-mavi);
+    transform: scaleX(0);
+    transform-origin: 0 50%;
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 260ms var(--v2-hizli), opacity 200ms var(--v2-hizli);
+}
+
+body.v2 .v2-serit.calisiyor { opacity: 1; transform: scaleX(0.7); }
+body.v2 .v2-serit.bitti { opacity: 0; transform: scaleX(1); }
+
+/* --- Odak ışığı: arama kutusu odaklanınca sayfanın üstü hafifçe aydınlanıyor --- */
+body.v2 .v2-isik {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(46% 34% at 50% 24%,
+                rgb(19 91 236 / 0.05), rgb(19 91 236 / 0) 70%);
+    transition: opacity 420ms var(--v2-hizli);
+}
+
+body.v2.arama-odakta .v2-isik { opacity: 1; }
+
+/* ==========================================================================
+   Hareket tercihi
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    body.v2 *,
+    body.v2 *::before,
+    body.v2 *::after {
+        animation-duration: 0.001ms !important;
+        animation-delay: 0ms !important;
+        transition-duration: 0.001ms !important;
+    }
+}
