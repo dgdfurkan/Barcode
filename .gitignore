@@ -44,3 +44,7 @@ ihale-monitor/
 # MCP anahtarları asla depoya girmez (depo herkese açık)
 .mcp.local.json
 *.apikey
+
+# Getir'in iç dokümanları. Depo herkese açık; bunlar asla commit edilmez.
+DEPO QR KODLARI*.pdf
+*.pdf
