@@ -594,3 +594,219 @@ body.v2.arama-odakta .v2-isik { opacity: 1; }
         transition-duration: 0.001ms !important;
     }
 }
+
+/* ==========================================================================
+   Kayan ürün şeridi
+   ==========================================================================
+   Birinci sürümde kart 120 piksel boyundaydı ama içine 80 piksel görsel,
+   iki satır ad ve 50 piksel barkod konuyordu; barkod kartın altından
+   taşıyordu. Yerleşim yatay oldu: solda görsel, sağda ad ve barkod. Ölçüler
+   içeriğe göre değil sabit; şerit kayarken hiçbir kart boyut değiştirmiyor.
+
+   Kenarlardaki yumuşama `mask-image` ile. Kartlar ekranın kenarında
+   kesilmiyor, siliniyor. */
+
+body.v2 .ticker-viewport {
+    height: 132px;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg,
+        transparent 0, #000 76px, #000 calc(100% - 76px), transparent 100%);
+    mask-image: linear-gradient(90deg,
+        transparent 0, #000 76px, #000 calc(100% - 76px), transparent 100%);
+}
+
+body.v2 .ticker-card {
+    display: grid;
+    grid-template-columns: 62px minmax(0, 1fr);
+    align-items: center;
+    gap: 0.85rem;
+    width: 316px;
+    height: 104px;
+    padding: 0.85rem 0.95rem;
+    margin-right: 14px;
+    text-align: left;
+    overflow: hidden;
+    background: var(--v2-kagit);
+    border: 1px solid var(--v2-cizgi);
+    border-radius: 14px;
+    box-shadow: var(--v2-golge-1);
+}
+
+body.v2 .ticker-img {
+    width: 62px;
+    height: 62px;
+    margin: 0;
+    padding: 3px;
+    object-fit: contain;
+    border-radius: 10px;
+    border: 1px solid var(--v2-cizgi);
+    background: var(--v2-zemin);
+}
+
+body.v2 .ticker-name {
+    display: block;
+    max-width: none;
+    min-height: 0;
+    margin: 0 0 0.3rem;
+    color: var(--v2-murekkep);
+    font-size: 0.82rem;
+    font-weight: 570;
+    letter-spacing: -0.012em;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+body.v2 .ticker-barcode {
+    justify-content: flex-start;
+    height: 34px;
+    overflow: hidden;
+}
+
+body.v2 .ticker-barcode svg {
+    width: auto;
+    height: 34px;
+    max-width: 100%;
+}
+
+/* ==========================================================================
+   Başlangıç ekranı
+   ==========================================================================
+   Boş ekran, ürünün ilk izlenimi. Genel bir daire ve üç satır yazı yerine
+   ölçülü bir düzen: küçük bir üst etiket, kısa bir başlık, tek cümle ve
+   altında katalogun kendisi kayıyor. */
+
+body.v2 #initialState > .bg-surface {
+    padding: clamp(2.6rem, 5vw, 3.6rem) clamp(1.2rem, 4vw, 2.4rem) clamp(1.6rem, 3vw, 2rem);
+}
+
+body.v2 #initialState .rounded-full.w-20 {
+    width: 3.4rem;
+    height: 3.4rem;
+    margin-bottom: 1.4rem;
+    border-radius: 14px;
+    background: var(--v2-murekkep);
+    border: 0;
+}
+
+body.v2 #initialState .rounded-full.w-20 svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    color: #fff;
+}
+
+body.v2 #initialState h3 {
+    font-size: clamp(1.35rem, 2.6vw, 1.85rem);
+    font-weight: 660;
+    letter-spacing: -0.032em;
+    margin-bottom: 0.7rem;
+}
+
+body.v2 #initialState > .bg-surface > p {
+    max-width: 44ch;
+    color: var(--v2-soluk);
+    font-size: 0.98rem;
+    line-height: 1.6;
+    margin-bottom: 2.2rem;
+}
+
+/* ==========================================================================
+   Arama kartı: biraz daha nefes
+   ========================================================================== */
+
+body.v2 main > section.mb-8 > .bg-surface {
+    padding: 1.5rem 1.6rem 1.4rem;
+}
+
+body.v2 .input-field.h-14 {
+    height: 3.5rem;
+    padding-left: 3rem;
+}
+
+body.v2 .search-section-header h2 {
+    font-size: 1.06rem;
+    font-weight: 640;
+    letter-spacing: -0.024em;
+}
+
+body.v2 .search-section-header p {
+    font-size: 0.84rem;
+    color: var(--v2-cok-soluk);
+}
+
+/* Arama başlığındaki ikon kutusu */
+body.v2 .search-section-header .bg-primary-50 {
+    background: var(--v2-murekkep);
+    border-radius: 10px;
+}
+
+body.v2 .search-section-header .bg-primary-50 svg { color: #fff; }
+
+/* ==========================================================================
+   Sonuç ızgarası kartları
+   ========================================================================== */
+
+body.v2 #gridResults > * {
+    border-radius: 14px;
+    border: 1px solid var(--v2-cizgi);
+    background: var(--v2-kagit);
+    box-shadow: none;
+    transition: border-color 200ms var(--v2-hizli),
+                transform 260ms var(--v2-yay),
+                box-shadow 260ms var(--v2-yay);
+}
+
+body.v2 #gridResults > *:hover {
+    border-color: var(--v2-cizgi-koyu);
+    transform: translateY(-2px);
+    box-shadow: var(--v2-golge-2);
+}
+
+/* ==========================================================================
+   Sonuç başlığı
+   ========================================================================== */
+
+body.v2 #resultsSection .bg-secondary-50 {
+    background: var(--v2-kagit);
+    border-bottom: 1px solid var(--v2-cizgi);
+}
+
+body.v2 #resultsSection .bg-accent-100 {
+    background: var(--v2-murekkep);
+    border-radius: 10px;
+}
+
+body.v2 #resultsSection .bg-accent-100 svg { color: #fff; }
+
+body.v2 #resultCount {
+    color: var(--v2-cok-soluk);
+    font-size: 0.84rem;
+}
+
+/* Şerit kartının sağ sütunu: iki sabit satır. Barkod SVG'sinin kendi
+   yükseklik özniteliği (50px) sütunu şişirip kartın altından taşırıyordu;
+   satır yüksekliği burada sabitlendi. */
+body.v2 .ticker-card > *:last-child {
+    display: grid;
+    grid-template-rows: 1.05rem 32px;
+    align-content: center;
+    gap: 0.35rem;
+    min-width: 0;
+    height: 100%;
+}
+
+body.v2 .ticker-card .ticker-name { margin: 0; align-self: center; }
+
+body.v2 .ticker-barcode {
+    height: 32px;
+    align-items: center;
+    overflow: hidden;
+}
+
+body.v2 .ticker-barcode svg {
+    display: block;
+    height: 32px;
+    width: auto;
+    max-width: 100%;
+}
