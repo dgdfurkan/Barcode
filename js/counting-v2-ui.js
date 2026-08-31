@@ -424,7 +424,7 @@
     function surumAnahtariKur() {
         var a = el('countingVersionSwitch');
         if (!a) return;
-        a.setAttribute('href', 'counting.html');
+        a.setAttribute('href', '../sayim/');
         a.setAttribute('title', 'Sayım sayfasının eski tasarımına dön');
         a.className = 'v2-surum';
         var yazi = a.lastChild;

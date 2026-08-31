@@ -187,7 +187,7 @@ async function testCountingDataDb() {
 }
 
 // Otomatik çalıştır (eğer counting.html sayfasındaysak)
-if (window.location.pathname.includes('counting.html')) {
+if (window.location.pathname.includes('/sayim')) {
     console.log('🔍 Counting sayfası tespit edildi, test otomatik çalıştırılıyor...');
     testCountingDataDb().then(results => {
         window.testCountingResults = results;

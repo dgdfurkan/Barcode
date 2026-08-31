@@ -161,12 +161,9 @@
                     // Fallback logout
                     localStorage.removeItem('userSession');
                     localStorage.removeItem('authToken');
-                    // Use replace() to prevent Safari UI from showing during navigation in standalone mode
-                    if (window.location.pathname.includes('/pages/')) {
-                        window.location.replace('../index.html');
-                    } else {
-                        window.location.replace('index.html');
-                    }
+                    /* Sayfalar kendi klasörlerinde (/arama/, /sayim/ ...);
+                       dizin derinliğine bakmak yerine kökten yazılıyor. */
+                    window.location.replace('/index.html');
                 }
 
             } catch (error) {

@@ -190,7 +190,7 @@ async function loginViaVpsApi(username, password, clientIP) {
     // Giriş sayfasından uygulamaya yumuşak geçiş: sayfa sıçrayarak değil,
     // kısa bir sönümlemeyle bırakılır. Hedef sayfa kendi açılış perdesini
     // ilk karede boyadığı için araya beyaz ekran girmez.
-    const hedef = sessionData.isAdmin ? 'admin.html' : 'pages/product_search.html';
+    const hedef = sessionData.isAdmin ? '/admin.html' : '/arama/';
     gecisliYonlendir(hedef);
 }
 
@@ -449,9 +449,9 @@ async function login(username, password) {
         // Use replace() to prevent Safari UI from showing during navigation in standalone mode
         const isAdmin = user.isAdmin || user.is_admin || false;
         if (isAdmin) {
-            window.location.replace('admin.html');
+            window.location.replace('/admin.html');
         } else {
-            window.location.replace('pages/product_search.html');
+            window.location.replace('/arama/');
         }
         
     } catch (error) {
@@ -705,15 +705,10 @@ function logout() {
     localStorage.removeItem('userSession');
     localStorage.removeItem('authToken');
     
-    // Determine correct path based on current location
-    // Use replace() to prevent Safari UI from showing during navigation in standalone mode
-    if (window.location.pathname.includes('/pages/')) {
-        window.location.replace('../index.html');
-    } else if (window.location.pathname.includes('/admin')) {
-        window.location.replace('index.html');
-    } else {
-        window.location.replace('index.html');
-    }
+    /* Sayfalar artık /arama/, /sayim/ gibi kendi klasörlerinde. Nerede
+       olursak olalım kökten yazılan adres doğru yere gider; eskiden
+       dizin derinliğine göre dallanmak gerekiyordu. */
+    window.location.replace('/index.html');
 }
 
 // Show user info on index page
@@ -737,9 +732,9 @@ function showUserInfo(session) {
                 const currentSession = checkAuth();
                 if (currentSession) {
                     if (currentSession.isAdmin) {
-                        window.location.replace('admin.html');
+                        window.location.replace('/admin.html');
                     } else {
-                        window.location.replace('pages/product_search.html');
+                        window.location.replace('/arama/');
                     }
                 }
             };
@@ -768,7 +763,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initDb();
     
     // Check if already logged in (only on index.html)
-    if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/') {
+    /* Yalnızca giriş sayfasında çalışsın. Uygulama sayfalarının adresi de
+       artık / ile bittiği için (ör. /arama/) sona bakmak yetmiyor. */
+    const _yol = window.location.pathname;
+    if (_yol === '/' || _yol === '' || /(^|\/)index\.html$/i.test(_yol)) {
         const session = checkAuth();
         if (session && !session.isGuest) {
             // Yerelde oturum görünüyor — ama GERÇEKTEN geçerli mi?
@@ -817,9 +815,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             if (session.isAdmin) {
-                window.location.replace('admin.html');
+                window.location.replace('/admin.html');
             } else {
-                window.location.replace('pages/product_search.html');
+                window.location.replace('/arama/');
             }
         });
     }

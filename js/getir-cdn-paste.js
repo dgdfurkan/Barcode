@@ -1,6 +1,6 @@
 /**
  * Getir market ürün görsel CDN adreslerini metinden çıkarır ve katalogda ürün eşlemesi yapar.
- * pages/product_search.html ve js/counting.js tarafından paylaşılır.
+ * arama/index.html ve js/counting.js tarafından paylaşılır.
  */
 (function (global) {
     'use strict';

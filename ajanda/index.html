@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <script src="../js/console-quiet.js?v=20260828i"></script>
+    <script src="../js/app-boot.js?v=20260828i"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Jet Barkod">
+    <meta name="theme-color" content="#1e293b">
+    <link rel="manifest" href="../manifest.json">
+    <title>Ürün Ajandası - Jet Barkod</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/logo.png?v=2">
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
+    <link rel="stylesheet" href="../css/main.css?v=20260828i" />
+    <link rel="stylesheet" href="../css/app-boot.css?v=20260828i" />
+    <link rel="stylesheet" href="../css/tailwind.css?v=20260828i" />
+    <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
+    <script src="../js/auth-token.js?v=20260828i"></script>
+    <script src="../js/db-config.js?v=20260828i"></script>
+    <script src="../js/jb-db.js?v=20260828i"></script>
+    <script src="../veri/temp_products.js"></script>
+    <script src="../js/auth.js?v=20260831a"></script>
+    <script src="../js/user-manager.js?v=20260828i"></script>
+    <script src="../js/premium-features.js?v=20260828i"></script>
+    <script src="../js/notifications.js?v=20260828i"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: var(--color-background); }
+
+        .agenda-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(9.75rem, 1fr));
+            gap: 0.875rem;
+            padding: 0.25rem 0.25rem 0;
+            align-items: start;
+        }
+
+        .agenda-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1.35rem;
+            padding-bottom: 0.75rem;
+        }
+
+        .agenda-date-section {
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+        }
+
+        .agenda-date-head {
+            margin: 0;
+            padding: 0 0.25rem;
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: rgb(51 65 85);
+            letter-spacing: -0.01em;
+        }
+
+        .agenda-date-head::after {
+            content: '';
+            display: block;
+            height: 1px;
+            margin-top: 0.4rem;
+            background: rgb(226 232 240);
+        }
+
+        .agenda-card {
+            width: 100%;
+            min-width: 0;
+            text-align: left;
+            border-radius: 1rem;
+            border: 1px solid rgb(226 232 240);
+            background: white;
+            padding: 0.625rem;
+            box-shadow: 0 1px 3px rgb(15 23 42 / 0.06), 0 4px 14px rgb(15 23 42 / 0.04);
+            transition: box-shadow 0.2s ease, transform 0.15s ease, border-color 0.2s ease;
+        }
+        .agenda-card:hover {
+            border-color: rgb(191 219 254);
+            box-shadow: 0 8px 24px rgb(37 99 235 / 0.12);
+        }
+        .agenda-card:active { transform: scale(0.98); }
+
+        .agenda-card-img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            border-radius: 0.75rem;
+            border: 1px solid rgb(241 245 249);
+            background: linear-gradient(135deg, rgb(248 250 252), rgb(241 245 249));
+        }
+
+        .agenda-qty-badge {
+            position: absolute;
+            top: 0.4rem;
+            right: 0.4rem;
+            min-width: 1.75rem;
+            padding: 0.15rem 0.45rem;
+            border-radius: 9999px;
+            background: linear-gradient(135deg, rgb(244 63 94), rgb(225 29 72));
+            color: white;
+            font-size: 0.68rem;
+            font-weight: 800;
+            text-align: center;
+            box-shadow: 0 2px 8px rgb(225 29 72 / 0.35);
+        }
+
+        .agenda-card-title {
+            margin-top: 0.55rem;
+            font-size: 0.74rem;
+            font-weight: 600;
+            line-height: 1.3;
+            color: rgb(15 23 42);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            overflow-wrap: anywhere;
+        }
+
+        /* Modal */
+        .agenda-modal-backdrop {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.22s ease, visibility 0.22s ease;
+            backdrop-filter: blur(4px);
+        }
+        .agenda-modal-backdrop.agenda-modal-open {
+            opacity: 1;
+            visibility: visible;
+        }
+        .agenda-modal-panel {
+            transform: translateY(1.25rem) scale(0.98);
+            opacity: 0;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
+        }
+        .agenda-modal-backdrop.agenda-modal-open .agenda-modal-panel {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+
+        .agenda-search-results {
+            max-height: 16rem;
+            overflow-y: auto;
+            border-radius: 0.75rem;
+            border: 1px solid rgb(226 232 240);
+            background: white;
+            box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.04);
+        }
+        .agenda-search-results:empty { display: none; }
+
+        .agenda-search-hit {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.65rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid rgb(241 245 249);
+            transition: background 0.15s ease;
+        }
+        .agenda-search-hit:last-child { border-bottom: none; }
+        .agenda-search-hit:hover,
+        .agenda-search-hit:focus {
+            background: linear-gradient(to right, rgb(239 246 255), rgb(248 250 252));
+            outline: none;
+        }
+        .agenda-search-hit[aria-selected="true"] {
+            background: rgb(219 234 254);
+            box-shadow: inset 3px 0 0 rgb(37 99 235);
+        }
+
+        .agenda-selected-chip {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border-radius: 0.875rem;
+            border: 1px solid rgb(191 219 254);
+            background: linear-gradient(135deg, rgb(239 246 255 / 0.9), rgb(238 242 255 / 0.6));
+        }
+
+        .agenda-form-section {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.25s ease;
+            margin-top: 0;
+        }
+        .agenda-form-section.is-visible {
+            max-height: 32rem;
+            opacity: 1;
+            margin-top: 1rem;
+        }
+
+        .agenda-reason-pill {
+            padding: 0.45rem 0.75rem;
+            border-radius: 9999px;
+            border: 1px solid rgb(226 232 240);
+            background: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: rgb(71 85 105);
+            transition: all 0.15s ease;
+        }
+        .agenda-reason-pill:hover {
+            border-color: rgb(191 219 254);
+            color: rgb(29 78 216);
+        }
+        .agenda-reason-pill.is-active {
+            border-color: rgb(37 99 235);
+            background: rgb(37 99 235);
+            color: white;
+            box-shadow: 0 2px 8px rgb(37 99 235 / 0.3);
+        }
+
+        .agenda-field-label {
+            display: block;
+            margin-bottom: 0.35rem;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: rgb(100 116 139);
+        }
+
+        .agenda-field-input {
+            width: 100%;
+            border-radius: 0.625rem;
+            border: 1px solid rgb(226 232 240);
+            background: white;
+            padding: 0.55rem 0.75rem;
+            font-size: 0.875rem;
+            color: rgb(15 23 42);
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .agenda-field-input:focus {
+            outline: none;
+            border-color: rgb(37 99 235);
+            box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15);
+        }
+
+        .agenda-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.75rem 0.875rem;
+            border-radius: 0.75rem;
+            border: 1px solid rgb(226 232 240);
+            background: rgb(248 250 252);
+        }
+
+        /* Butonlar — btn-primary main.css'te yok, @apply tarayıcıda çalışmaz */
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+            border: none;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background: linear-gradient(180deg, rgb(37 99 235) 0%, rgb(29 78 216) 100%);
+            border-radius: 0.625rem;
+            padding: 0.5625rem 1.125rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            line-height: 1.25;
+            color: #fff;
+            text-decoration: none;
+            white-space: nowrap;
+            box-shadow: 0 1px 2px rgb(29 78 216 / 0.25), 0 4px 14px rgb(37 99 235 / 0.35);
+            transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(180deg, rgb(29 78 216) 0%, rgb(30 64 175) 100%);
+            box-shadow: 0 4px 18px rgb(37 99 235 / 0.45);
+        }
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+        .btn-primary:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgb(37 99 235 / 0.35), 0 4px 14px rgb(37 99 235 / 0.35);
+        }
+        .btn-primary:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        #agendaAddBtn,
+        #agendaEmptyAddBtn {
+            padding: 0.625rem 1.25rem;
+            font-weight: 700;
+            border-radius: 0.75rem;
+        }
+        #detailDeleteBtn {
+            display: flex;
+            width: 100%;
+            padding: 0.8125rem 1rem;
+            font-size: 0.9375rem;
+            font-weight: 700;
+            border-radius: 0.75rem;
+        }
+        #addModalSave {
+            display: flex;
+            flex: 1;
+            min-height: 2.75rem;
+            font-weight: 700;
+        }
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.375rem;
+            border: 1px solid rgb(226 232 240);
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background: rgb(248 250 252);
+            border-radius: 0.625rem;
+            padding: 0.5625rem 1.125rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: rgb(51 65 85);
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .btn-secondary:hover {
+            background: rgb(241 245 249);
+            border-color: rgb(203 213 225);
+        }
+        #addModalCancel {
+            display: flex;
+            flex: 1;
+            min-height: 2.75rem;
+        }
+        .btn-danger {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background: linear-gradient(180deg, rgb(239 68 68) 0%, rgb(220 38 38) 100%);
+            border-radius: 0.625rem;
+            padding: 0.5625rem 1.125rem;
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: #fff;
+            box-shadow: 0 1px 2px rgb(220 38 38 / 0.25), 0 4px 14px rgb(239 68 68 / 0.35);
+            transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+        }
+        .btn-danger:hover {
+            background: linear-gradient(180deg, rgb(220 38 38) 0%, rgb(185 28 28) 100%);
+            box-shadow: 0 4px 18px rgb(239 68 68 / 0.45);
+        }
+        .btn-danger:active { transform: scale(0.98); }
+        .btn-danger:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        #agendaDeleteConfirmConfirm { min-width: 6.5rem; }
+
+        /* Detail sheet */
+        #detailSheet { transition: opacity 0.22s ease; }
+        #detailSheet:not(.agenda-sheet-open) .agenda-sheet-panel { transform: translateY(100%); }
+        #detailSheet.agenda-sheet-open .agenda-sheet-panel { transform: translateY(0); }
+        .agenda-sheet-panel { transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
+
+        @media (min-width: 640px) {
+            .agenda-strip {
+                grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+                gap: 1rem;
+            }
+            #detailSheet .agenda-sheet-panel {
+                max-width: 28rem;
+                margin-left: auto;
+                margin-right: auto;
+                border-radius: 1.25rem 1.25rem 0 0;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-background">
+    <div id="appBoot" class="app-boot app-boot--active" data-boot-steps="auth,data,ui" role="status" aria-live="polite" aria-label="Sayfa yükleniyor">
+        <div class="app-boot__inner">
+            <span class="app-boot__mark">
+                <img src="../assets/logo.png" alt="" class="app-boot__logo" decoding="async" />
+            </span>
+            <h1 class="app-boot__title">Jet Barkod</h1>
+            <span class="app-boot__track"><span class="app-boot__bar"></span></span>
+            <p class="app-boot__status">Başlatılıyor</p>
+        </div>
+    </div>
+    <script>
+        /* GÜVENLİK AĞI — app-boot.js yüklenemese bile perde en fazla 9sn durur. */
+        (function () {
+            document.documentElement.classList.add('boot-locked');
+            setTimeout(function () {
+                var p = document.getElementById('appBoot');
+                if (p) {
+                    p.classList.remove('app-boot--active');
+                    setTimeout(function () { if (p.parentNode) p.parentNode.removeChild(p); }, 500);
+                }
+                document.documentElement.classList.remove('boot-locked');
+            }, 9000);
+        })();
+    </script>
+    <header class="bg-surface border-b border-border shadow-sm sticky top-0 z-40">
+        <div class="w-full mx-auto px-2 sm:px-4 lg:px-8">
+            <div class="flex items-center justify-between h-14 sm:h-16 gap-2 sm:gap-4">
+                <div class="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 min-w-0">
+                    <a href="../arama/" id="backToSearchBtn" class="flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors text-xs sm:text-sm font-medium flex-shrink-0" title="Ürün Arama Sayfasına Dön">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                        </svg>
+                        <span class="hidden sm:inline">Ürün Aramaya Dön</span>
+                        <span class="sm:hidden">Arama</span>
+                    </a>
+                    <div class="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
+                        <img src="../assets/logo.png" alt="Jet Barkod" class="w-full h-full object-contain">
+                    </div>
+                    <div class="flex flex-col min-w-0">
+                        <h1 class="text-lg sm:text-xl font-bold text-text-primary leading-tight truncate">Jet Barkod</h1>
+                        <p class="text-xs sm:text-sm text-text-secondary leading-tight truncate">Ürün Ajandası</p>
+                    </div>
+                </div>
+                <div class="flex-1"></div>
+                <div class="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+                    <div class="text-right hidden sm:block flex-shrink-0 max-w-[10rem] lg:max-w-[12rem]">
+                        <p class="text-sm font-semibold text-text-primary truncate" id="headerUserName">Yükleniyor…</p>
+                        <p class="text-xs text-text-secondary truncate" id="headerUserCompany">—</p>
+                    </div>
+                    <button type="button" id="headerLogoutBtn" class="btn-secondary text-xs sm:text-sm p-1.5 sm:p-2 flex-shrink-0" title="Çıkış">
+                        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                        <span class="hidden sm:inline ml-1 sm:ml-2">Çıkış</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
+        <div id="noAuth" class="hidden">
+            <div class="bg-surface rounded-xl border border-border shadow-sm p-12 text-center">
+                <p class="text-text-secondary mb-4">Bu sayfayı kullanmak için giriş yapın.</p>
+                <a href="../index.html" class="btn-primary inline-flex">Giriş Yap</a>
+            </div>
+        </div>
+        <div id="noPremium" class="hidden">
+            <div class="bg-surface rounded-xl border border-border shadow-sm p-12 text-center">
+                <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-2xl">📒</div>
+                <h2 class="text-xl font-semibold text-text-primary mb-2">Ürün Ajandası Premium Özellik</h2>
+                <p class="text-text-secondary mb-6">Müşteri eksik bildirimlerini takip etmek için yöneticinizden «Ürün Ajandası» özelliğini açmasını isteyin.</p>
+                <a href="../arama/" class="btn-secondary inline-flex">Ürün Aramaya Dön</a>
+            </div>
+        </div>
+
+        <div id="mainContent" class="hidden space-y-5">
+            <section class="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+                <div class="bg-secondary-50 px-4 sm:px-6 py-4 border-b border-border flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center space-x-3 min-w-0">
+                        <div class="bg-accent-100 rounded-lg p-2 shrink-0">
+                            <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                            </svg>
+                        </div>
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-semibold text-text-primary">Ürün Gönderimi</h2>
+                            <p class="text-sm text-text-secondary">Eksik bildirimler · karta dokunun · detay ve silme</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span id="agendaCountBadge" class="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800 tabular-nums">0</span>
+                        <button type="button" id="agendaAddBtn" class="btn-primary">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Ürün Ekle
+                        </button>
+                    </div>
+                </div>
+                <div class="p-3 sm:p-4">
+                    <div id="agendaHost" class="skeleton-host" aria-busy="false">
+                        <div class="skeleton-placeholder skeleton-agenda-list" aria-hidden="true">
+                            <div class="skeleton-agenda-date-section">
+                                <div class="skeleton-agenda-date-head">
+                                    <div class="skeleton skeleton-agenda-date-head__label"></div>
+                                    <div class="skeleton-agenda-date-head__line"></div>
+                                </div>
+                                <div class="skeleton-agenda-strip">
+                                    <div class="skeleton-agenda-card"><div class="skeleton-agenda-card__img-wrap"><div class="skeleton skeleton-agenda-card__img"></div><div class="skeleton skeleton-agenda-card__badge"></div></div><div class="skeleton skeleton-agenda-card__title"></div><div class="skeleton skeleton-agenda-card__title skeleton-agenda-card__title--short"></div></div>
+                                    <div class="skeleton-agenda-card"><div class="skeleton-agenda-card__img-wrap"><div class="skeleton skeleton-agenda-card__img"></div><div class="skeleton skeleton-agenda-card__badge"></div></div><div class="skeleton skeleton-agenda-card__title"></div><div class="skeleton skeleton-agenda-card__title skeleton-agenda-card__title--short"></div></div>
+                                    <div class="skeleton-agenda-card"><div class="skeleton-agenda-card__img-wrap"><div class="skeleton skeleton-agenda-card__img"></div><div class="skeleton skeleton-agenda-card__badge"></div></div><div class="skeleton skeleton-agenda-card__title"></div></div>
+                                    <div class="skeleton-agenda-card"><div class="skeleton-agenda-card__img-wrap"><div class="skeleton skeleton-agenda-card__img"></div><div class="skeleton skeleton-agenda-card__badge"></div></div><div class="skeleton skeleton-agenda-card__title"></div><div class="skeleton skeleton-agenda-card__title skeleton-agenda-card__title--short"></div></div>
+                                </div>
+                            </div>
+                            <div class="skeleton-agenda-date-section">
+                                <div class="skeleton-agenda-date-head">
+                                    <div class="skeleton skeleton-agenda-date-head__label"></div>
+                                    <div class="skeleton-agenda-date-head__line"></div>
+                                </div>
+                                <div class="skeleton-agenda-strip">
+                                    <div class="skeleton-agenda-card"><div class="skeleton-agenda-card__img-wrap"><div class="skeleton skeleton-agenda-card__img"></div><div class="skeleton skeleton-agenda-card__badge"></div></div><div class="skeleton skeleton-agenda-card__title"></div></div>
+                                    <div class="skeleton-agenda-card"><div class="skeleton-agenda-card__img-wrap"><div class="skeleton skeleton-agenda-card__img"></div><div class="skeleton skeleton-agenda-card__badge"></div></div><div class="skeleton skeleton-agenda-card__title"></div><div class="skeleton skeleton-agenda-card__title skeleton-agenda-card__title--short"></div></div>
+                                    <div class="skeleton-agenda-card"><div class="skeleton-agenda-card__img-wrap"><div class="skeleton skeleton-agenda-card__img"></div><div class="skeleton skeleton-agenda-card__badge"></div></div><div class="skeleton skeleton-agenda-card__title"></div></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="skeleton-content">
+                    <div id="agendaEmpty" class="hidden py-14 text-center">
+                        <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100">
+                            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                            </svg>
+                        </div>
+                        <p class="text-sm font-medium text-text-primary mb-1">Henüz kayıt yok</p>
+                        <p class="text-xs text-text-secondary mb-5">Müşteri eksik bildirimlerini buradan takip edin</p>
+                        <button type="button" id="agendaEmptyAddBtn" class="btn-primary">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            İlk Kaydı Ekle
+                        </button>
+                    </div>
+                    <div id="agendaCardStrip" class="agenda-list" role="list"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Ürün Ekle Modal -->
+    <div id="addAgendaModal" class="agenda-modal-backdrop fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-slate-900/55 p-0 sm:p-4" aria-hidden="true">
+        <div class="agenda-modal-panel w-full max-w-xl rounded-t-2xl sm:rounded-2xl bg-white border border-slate-200/80 shadow-2xl max-h-[94vh] flex flex-col overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="addModalTitle">
+            <div class="flex items-start justify-between gap-3 border-b border-blue-100/90 bg-gradient-to-r from-blue-50 via-indigo-50/80 to-violet-50/60 px-4 py-3.5 sm:px-5 sm:py-4 shrink-0">
+                <div class="min-w-0">
+                    <h3 id="addModalTitle" class="text-base sm:text-lg font-bold text-slate-900">Ürün Ekle</h3>
+                    <p class="mt-0.5 text-xs text-slate-600">Ürün ara, eksik bilgilerini doldur, kaydet</p>
+                </div>
+                <button type="button" id="addModalClose" class="shrink-0 rounded-xl p-2 text-slate-500 hover:bg-white/80 hover:text-slate-900 transition-colors" aria-label="Kapat">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-5 sm:py-5 space-y-4">
+                <!-- Arama — product_search stili -->
+                <div>
+                    <label class="agenda-field-label" for="addProductSearch">Ürün Ara</label>
+                    <div class="relative">
+                        <input
+                            type="search"
+                            id="addProductSearch"
+                            autocomplete="off"
+                            placeholder="Ürün adı veya barkod yazın…"
+                            class="input-field pl-11 pr-10 h-12 text-base"
+                        />
+                        <div class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2">
+                            <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </div>
+                        <button type="button" id="addSearchClearBtn" class="absolute right-3 top-1/2 -translate-y-1/2 hidden rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors" aria-label="Temizle">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+                    <p id="addSearchHint" class="mt-2 text-xs text-slate-500">En az 2 karakter — tıpkı barkod araması gibi isim veya barkod ile arayın</p>
+                    <div id="addProductResults" class="agenda-search-results mt-3 hidden"></div>
+                </div>
+
+                <!-- Seçili ürün -->
+                <div id="addSelectedProduct" class="hidden agenda-selected-chip">
+                    <img id="addSelectedImg" src="../assets/logo.png" alt="" class="h-14 w-14 rounded-xl border-2 border-white object-cover shadow-sm shrink-0" />
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-blue-700">Seçilen Ürün</p>
+                        <p id="addSelectedName" class="text-sm font-semibold text-slate-900 [overflow-wrap:anywhere] leading-snug"></p>
+                        <p id="addSelectedBarcode" class="mt-0.5 text-xs text-slate-500 truncate"></p>
+                    </div>
+                    <button type="button" id="addClearProductBtn" class="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors">Değiştir</button>
+                </div>
+
+                <!-- Form — ürün seçilince açılır -->
+                <div id="addFormSection" class="agenda-form-section space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="agenda-field-label" for="addQuantity">Eksik Adet</label>
+                            <input type="number" id="addQuantity" min="1" value="1" class="agenda-field-input" />
+                        </div>
+                        <div>
+                            <label class="agenda-field-label" for="addEventDate">Tarih</label>
+                            <input type="date" id="addEventDate" class="agenda-field-input" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <span class="agenda-field-label">Sebep</span>
+                        <div id="addReasonPills" class="flex flex-wrap gap-2 mt-1">
+                            <button type="button" class="agenda-reason-pill is-active" data-reason="Eksik Ürün">Eksik Ürün</button>
+                            <button type="button" class="agenda-reason-pill" data-reason="Yanlış Adet">Yanlış Adet</button>
+                            <button type="button" class="agenda-reason-pill" data-reason="Hasarlı">Hasarlı</button>
+                            <button type="button" class="agenda-reason-pill" data-reason="Diğer">Diğer</button>
+                        </div>
+                        <select id="addReasonPreset" class="sr-only" aria-hidden="true" tabindex="-1">
+                            <option>Eksik Ürün</option>
+                            <option>Yanlış Adet</option>
+                            <option>Hasarlı</option>
+                            <option>Diğer</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="agenda-field-label" for="addReasonNote">Ek Not <span class="font-normal normal-case tracking-normal text-slate-400">(isteğe bağlı)</span></label>
+                        <textarea id="addReasonNote" rows="2" placeholder="Müşteri notu, sipariş no…" class="agenda-field-input resize-none"></textarea>
+                    </div>
+
+                    <div class="agenda-toggle-row">
+                        <div>
+                            <p class="text-sm font-semibold text-slate-800">Müşteriden Alınacak</p>
+                            <p class="text-xs text-slate-500 mt-0.5">Ürün müşteriden geri alınacaksa işaretleyin</p>
+                        </div>
+                        <label class="relative inline-flex cursor-pointer items-center shrink-0">
+                            <input type="checkbox" id="addPickupRequired" class="peer sr-only" />
+                            <span class="h-6 w-11 rounded-full bg-slate-200 transition peer-checked:bg-blue-600 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5"></span>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label class="agenda-field-label" for="addAddress">Adres <span class="font-normal normal-case tracking-normal text-slate-400">(isteğe bağlı)</span></label>
+                        <input type="text" id="addAddress" placeholder="Teslimat / müşteri adresi" class="agenda-field-input" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="shrink-0 flex gap-2 border-t border-slate-100 bg-slate-50/90 px-4 py-3.5 sm:px-5">
+                <button type="button" id="addModalCancel" class="btn-secondary flex-1 justify-center">İptal</button>
+                <button type="button" id="addModalSave" class="btn-primary" disabled>Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detay sheet -->
+    <div id="detailSheet" class="fixed inset-0 z-[85] hidden" aria-hidden="true">
+        <div id="detailSheetBackdrop" class="absolute inset-0 bg-slate-900/50 backdrop-blur-[2px]"></div>
+        <div class="absolute inset-x-0 bottom-0 agenda-sheet-panel bg-white border-t border-slate-200 shadow-2xl">
+            <div class="mx-auto w-full max-w-lg">
+                <div class="flex justify-center py-2.5"><span class="h-1 w-12 rounded-full bg-slate-200"></span></div>
+                <div class="flex items-center justify-between px-4 pb-2">
+                    <h3 class="text-base font-bold text-slate-900">Kayıt Detayı</h3>
+                    <button type="button" id="detailCloseBtn" class="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors" aria-label="Kapat">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div id="detailSheetBody" class="px-4 pb-4 max-h-[55vh] overflow-y-auto"></div>
+                <div class="border-t border-slate-100 bg-slate-50/80 p-4">
+                    <button type="button" id="detailDeleteBtn" class="btn-primary">Tamamlandı · Sil</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
+    <!-- Silme onayı — tarayıcı confirm değil -->
+    <div id="agendaDeleteConfirmModal" class="agenda-modal-backdrop fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/60 p-4" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="agendaDeleteConfirmTitle">
+        <div class="agenda-modal-panel w-full max-w-md overflow-hidden rounded-2xl bg-white border border-slate-200/80 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-rose-50 to-orange-50/60 px-4 py-3.5 sm:px-5">
+                <h3 id="agendaDeleteConfirmTitle" class="text-base font-bold text-slate-900">Kaydı Sil</h3>
+                <button type="button" id="agendaDeleteConfirmClose" class="rounded-xl p-2 text-slate-500 hover:bg-white/80 hover:text-slate-900 transition-colors" aria-label="Kapat">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="px-4 py-5 sm:px-5">
+                <div class="mb-4 flex justify-center">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-full bg-rose-100">
+                        <svg class="h-6 w-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-center text-sm text-slate-700 leading-relaxed">
+                    <span class="font-bold text-slate-900" id="agendaDeleteConfirmProduct"></span>
+                    kaydını tamamlandı olarak silmek istiyor musunuz?
+                </p>
+                <p class="mt-2 text-center text-xs text-slate-500">Bu işlem geri alınamaz.</p>
+                <div class="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+                    <button type="button" id="agendaDeleteConfirmCancel" class="btn-secondary">İptal</button>
+                    <button type="button" id="agendaDeleteConfirmConfirm" class="btn-danger">Evet, Sil</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="agendaToast" class="fixed bottom-6 left-1/2 z-[100] hidden -translate-x-1/2 max-w-[90vw] rounded-xl px-4 py-2.5 text-sm font-medium text-white shadow-xl" role="status"></div>
+
+    <script src="../js/skeleton-ui.js?v=20260828i"></script>
+    <script src="../js/dispatch-agenda.js?v=20260828i"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            void window.dispatchAgendaApp?.init();
+        });
+    </script>
+</body>
+</html>

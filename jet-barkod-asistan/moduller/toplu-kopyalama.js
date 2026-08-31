@@ -25,7 +25,7 @@
     var JBA = global.JBA;
     if (!JBA) return;
 
-    var SITE = 'https://jetbarkod.com.tr/pages/product_search.html';
+    var SITE = 'https://jetbarkod.com.tr/arama/';
     var YONLENDIR_ANAHTARI = 'getirAutoRedirect';
 
     var STIL = [

@@ -105,7 +105,7 @@
     // Düşük Stok Uyarısı aktarımı
     //
     // Mesaj adları eski eklentiden birebir korundu. Site tarafında
-    // `pages/low_stock_products.html` bu adları dinliyor; değiştirseydik
+    // `dusuk-stok/index.html` bu adları dinliyor; değiştirseydik
     // onu da elden geçirmek gerekirdi.
     // ==================================================================
 

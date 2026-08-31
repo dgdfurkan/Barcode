@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Hakkımızda | Jet Barkod</title>
+<meta name="description" content="Jet Barkod, depoda barkoda ulaşmayı saniyelere indiren, stok sayımını dijitalleştiren ve ekiplerin iş yükünü azaltan operasyon yazılımıdır. Eylül 2025'ten bu yana sahada.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://jetbarkod.com.tr/hakkinda/">
+<link rel="icon" href="../assets/logo.png?v=2">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="tr_TR">
+<meta property="og:site_name" content="Jet Barkod">
+<meta property="og:title" content="Hakkımızda | Jet Barkod">
+<meta property="og:description" content="Depoda barkoda ulaşmayı saniyelere indiren, stok sayımını dijitalleştiren operasyon yazılımı.">
+<meta property="og:url" content="https://jetbarkod.com.tr/hakkinda/">
+<meta property="og:image" content="https://jetbarkod.com.tr/assets/logo.png">
+
+<link rel="stylesheet" href="../css/hakkimizda.css?v=20260831c">
+<link rel="stylesheet" href="../css/karsilastirma.css?v=20260831b">
+
+<script>
+/*
+ * Bu betik stil dosyasından ÖNCE değil, gövde çizilmeden çalışır. Amacı
+ * tek: animasyon gerçekten yapılacaksa öğeleri gizlemek.
+ *
+ * Varsayılan hâl görünür. `js-hazir` sınıfı eklenmezse sayfa animasyonsuz
+ * ama eksiksiz okunur. Ana betik üç saniyede çalışmazsa (dosya
+ * yüklenemedi, ağ koptu, tarayıcı engelledi) gizleme geri alınır.
+ * Tanıtım sayfasının içeriği hiçbir koşulda görünmez kalmamalı.
+ */
+(function (d) {
+    var azHareket = window.matchMedia &&
+                    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!('IntersectionObserver' in window) || azHareket) return;
+
+    d.documentElement.className += ' js-hazir';
+    setTimeout(function () {
+        if (!window.__hkHazir) {
+            d.documentElement.className =
+                d.documentElement.className.replace(/\bjs-hazir\b/, '');
+        }
+    }, 3000);
+})(document);
+</script>
+</head>
+<body>
+
+<div class="ilerleme" aria-hidden="true"></div>
+
+<header class="ust">
+    <a class="ust__marka" href="../index.html">
+        <img class="ust__logo" src="../assets/logo.png" alt="" width="26" height="26">
+        Jet Barkod
+    </a>
+    <span class="ust__bosluk"></span>
+    <a class="ust__bag" href="#sorun">Neyi çözüyoruz</a>
+    <a class="ust__bag" href="#moduller">Modüller</a>
+    <a class="ust__bag" href="#eklentiler">Eklentiler</a>
+    <a class="ust__bag" href="#kazanc">Kazanç</a>
+    <a class="ust__giris" href="../index.html">Giriş yap</a>
+</header>
+
+<!-- ==================================================================
+     Kahraman
+     ================================================================== -->
+<section class="kahraman">
+    <div class="kahraman__ic">
+        <div class="gir">
+            <span class="etiket">Hakkımızda</span>
+            <h1 class="kahraman__ad">Okunmayan bir barkod<em>işi durdurmasın</em></h1>
+            <p class="kahraman__ozet">
+                Jet Barkod, depoda barkoda ulaşma süresini saniyelere indirir.
+                Sayım rafın önünde biter, eksik ürün müşteri bildirmeden görünür.
+            </p>
+
+            <dl class="kunye">
+                <div>
+                    <dt>Yapımcı</dt>
+                    <dd><a href="https://flowcobalt.com" target="_blank" rel="noopener">flowcobalt.com</a></dd>
+                </div>
+                <div>
+                    <dt>Adres</dt>
+                    <dd><a href="https://jetbarkod.com.tr">jetbarkod.com.tr</a></dd>
+                </div>
+                <div>
+                    <dt>Sahada</dt>
+                    <dd>Eylül 2025'ten bu yana</dd>
+                </div>
+            </dl>
+
+            <div class="dugmeler">
+                <a class="dugme dugme--ana" href="../index.html">Hemen deneyin</a>
+                <a class="dugme dugme--sade" href="#sorun">Neyi çözdüğümüzü görün</a>
+            </div>
+        </div>
+
+        <!-- Gerçek ürün arama. Adlar, barkodlar ve fotoğraflar katalogdan
+             geliyor; barkodlar ekranda EAN-13 olarak çizdiriliyor. -->
+        <div class="arama gir gir--olcek" aria-hidden="true">
+            <div class="arama__tepe">
+                <span class="arama__nokta"></span>
+                <span class="arama__nokta"></span>
+                <span class="arama__nokta"></span>
+                <span class="arama__yol">jetbarkod.com.tr / ürün arama</span>
+            </div>
+
+            <div class="arama__kutu">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round">
+                    <circle cx="11" cy="11" r="7"/><path d="M20 20l-4.3-4.3"/>
+                </svg>
+                <span class="arama__yazi"><span id="aramaYazi"></span><span class="arama__imlec"></span></span>
+                <span class="arama__sayac" id="aramaSayac">16 sonuç</span>
+            </div>
+
+            <div class="arama__liste">
+                <div class="arama__kaydir" id="aramaListe"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Rakamlar
+     ================================================================== -->
+<div class="seritkap">
+    <div class="serit gir">
+        <div class="serit__kutu">
+            <span class="serit__sayi">9.383</span>
+            <span class="serit__not">Katalogdaki ürün. Adı, barkodu ve fotoğrafı hazır.</span>
+        </div>
+        <div class="serit__kutu">
+            <span class="serit__sayi">9</span>
+            <span class="serit__not">Asistan modülü. Tek eklenti, tek güncelleme.</span>
+        </div>
+        <div class="serit__kutu">
+            <span class="serit__sayi">10 kat</span>
+            <span class="serit__not">Elle sayım ile Jet Barkod sayımı arasındaki süre farkı.</span>
+        </div>
+        <div class="serit__kutu">
+            <span class="serit__sayi">2025</span>
+            <span class="serit__not">Eylül ayında ilk depoda açıldı. O günden beri bayi talebiyle büyüyor.</span>
+        </div>
+    </div>
+</div>
+
+<!-- ==================================================================
+     Ne yapıyoruz
+     ================================================================== -->
+<section class="kesit kesit--yumusak">
+    <div class="ic">
+        <div class="gir">
+            <span class="etiket">Operasyon</span>
+            <h2 class="baslik">Depoda bir sipariş dakikalar içinde hazırlanır</h2>
+            <p class="giris">
+                Sipariş ekrana düştüğü an sayaç başlar. Kuryeye teslim edilene kadar
+                geçen süre, deponun ay sonundaki notunu belirler.
+            </p>
+        </div>
+
+        <div class="akis">
+            <article class="akis__adim gir" style="--sira:0">
+                <span class="akis__no">01</span>
+                <h3 class="akis__ad">Sipariş düşer</h3>
+                <p class="akis__not">Sipariş depo ekranına gelir.</p>
+            </article>
+            <article class="akis__adim gir" style="--sira:1">
+                <span class="akis__no">02</span>
+                <h3 class="akis__ad">Terminale iner</h3>
+                <p class="akis__not">Ürünler el terminalinde listelenir.</p>
+            </article>
+            <article class="akis__adim gir" style="--sira:2">
+                <span class="akis__no">03</span>
+                <h3 class="akis__ad">Toplama</h3>
+                <p class="akis__not">Ürünler raflardan toplanır.</p>
+            </article>
+            <article class="akis__adim gir" style="--sira:3">
+                <span class="akis__no">04</span>
+                <h3 class="akis__ad">Doğrulama</h3>
+                <p class="akis__not">Barkod okutulur, ürün sepete girer.</p>
+            </article>
+            <article class="akis__adim gir" style="--sira:4">
+                <span class="akis__no">05</span>
+                <h3 class="akis__ad">Teslim</h3>
+                <p class="akis__not">Sipariş kuryeye verilir.</p>
+            </article>
+        </div>
+
+        <p class="akis__sonuc gir">
+            <span aria-hidden="true">⏱</span>
+            <span>
+                Dördüncü adımda takılan bir ürün, arkadaki bütün siparişleri bekletir.
+                <strong>Ay sonu notu işte bu birikimden çıkar.</strong>
+            </span>
+        </p>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Sorun
+     ================================================================== -->
+<section class="kesit kesit--koyu" id="sorun">
+    <div class="ic">
+        <div class="gir">
+            <span class="etiket">Eski yöntem</span>
+            <h2 class="baslik">Sorun listede değil, <em>rafın önünde</em></h2>
+            <p class="giris">
+                Personeli yavaşlatan liste okumak değil. Rafta çıkan altı ayrı sorun var
+                ve her biri tek bir ürün yüzünden siparişin tamamını bekletiyor.
+            </p>
+        </div>
+
+        <div class="izgara izgara--3">
+
+            <article class="kart gir oynat" style="--sira:0">
+                <div class="kart__cizim">
+                    <svg viewBox="0 0 200 120" role="img" aria-hidden="true">
+                        <rect x="18" y="24" width="164" height="72" rx="6" fill="#0f1a2c" stroke="#1e293b"/>
+                        <path d="M18 60h164" stroke="#1e293b" stroke-width="1.5"/>
+                        <rect x="30" y="32" width="24" height="22" rx="3" fill="#334155"/>
+                        <rect x="60" y="32" width="24" height="22" rx="3" fill="#334155"/>
+                        <rect class="c-kaybolan" x="90" y="32" width="24" height="22" rx="3" fill="#3b82f6"/>
+                        <rect class="c-bosluk" x="90" y="32" width="24" height="22" rx="3"
+                              fill="none" stroke="#ef4444" stroke-width="1.6" stroke-dasharray="4 3"/>
+                        <rect x="120" y="32" width="24" height="22" rx="3" fill="#334155"/>
+                        <rect x="30" y="66" width="24" height="22" rx="3" fill="#334155"/>
+                        <rect x="60" y="66" width="24" height="22" rx="3" fill="#334155"/>
+                        <rect x="90" y="66" width="24" height="22" rx="3" fill="#334155"/>
+                        <rect x="120" y="66" width="24" height="22" rx="3" fill="#334155"/>
+                    </svg>
+                </div>
+                <h3 class="kart__ad">Ürün depoda yok</h3>
+                <p class="kart__not">Sistemde görünen ürün rafta yok. Olmayan bir ürün aranıyor.</p>
+            </article>
+
+            <article class="kart gir oynat" style="--sira:1">
+                <div class="kart__cizim">
+                    <svg viewBox="0 0 200 120" role="img" aria-hidden="true">
+                        <rect x="20" y="30" width="66" height="58" rx="6" fill="#0f1a2c" stroke="#1e293b"/>
+                        <g fill="#64748b">
+                            <rect x="30" y="44" width="2" height="24"/><rect x="35" y="44" width="1.2" height="24"/>
+                            <rect x="39" y="44" width="2.6" height="24"/><rect x="45" y="44" width="1" height="24"/>
+                            <rect x="49" y="44" width="1.8" height="24"/><rect x="54" y="44" width="2.6" height="24"/>
+                            <rect x="60" y="44" width="1" height="24"/><rect x="64" y="44" width="2" height="24"/>
+                            <rect x="69" y="44" width="1.4" height="24"/><rect x="73" y="44" width="2.2" height="24"/>
+                        </g>
+                        <text x="30" y="80" class="s-yazi" fill="#475569">8690…104</text>
+
+                        <rect x="114" y="30" width="66" height="58" rx="6" fill="#0f1a2c" stroke="#1e293b"/>
+                        <rect x="124" y="42" width="46" height="30" rx="4" fill="#1e293b"/>
+                        <text x="124" y="80" class="s-yazi" fill="#475569">8690…771</text>
+
+                        <g class="c-uyusmaz" style="transform-box:fill-box;transform-origin:center">
+                            <circle cx="100" cy="59" r="13" fill="#7f1d1d"/>
+                            <path d="M94 53l12 12M106 53l-12 12" stroke="#fecaca" stroke-width="2.4" stroke-linecap="round"/>
+                        </g>
+                    </svg>
+                </div>
+                <h3 class="kart__ad">Hatalı basılmış barkod</h3>
+                <p class="kart__not">Etiketteki kod ürünle uyuşmuyor. Doğru kodu bulmak ayrı bir arama.</p>
+            </article>
+
+            <article class="kart gir oynat" style="--sira:2">
+                <div class="kart__cizim">
+                    <svg viewBox="0 0 200 120" role="img" aria-hidden="true">
+                        <rect x="26" y="26" width="148" height="68" rx="8" fill="#0f1a2c" stroke="#1e293b"/>
+                        <rect x="38" y="38" width="80" height="8" rx="4" fill="#1e293b"/>
+                        <g class="c-donen" style="transform-origin:100px 68px">
+                            <circle cx="100" cy="68" r="12" fill="none" stroke="#1e293b" stroke-width="3"/>
+                            <path d="M100 56a12 12 0 0 1 12 12" fill="none" stroke="#3b82f6"
+                                  stroke-width="3" stroke-linecap="round"/>
+                        </g>
+                        <g class="c-bosSonuc">
+                            <rect x="52" y="60" width="96" height="18" rx="5" fill="#1a1206" stroke="#78350f"/>
+                            <text x="62" y="72" class="s-yazi" fill="#fbbf24">Kayıt bulunamadı</text>
+                        </g>
+                    </svg>
+                </div>
+                <h3 class="kart__ad">Sisteme işlenmemiş barkod</h3>
+                <p class="kart__not">Yeni gelen ürün henüz tanımlı değil. Sorgu boş dönüyor.</p>
+            </article>
+
+            <article class="kart gir oynat" style="--sira:3">
+                <div class="kart__cizim">
+                    <svg viewBox="0 0 200 120" role="img" aria-hidden="true">
+                        <rect x="34" y="24" width="60" height="72" rx="6" fill="#111f38" stroke="#1e293b"/>
+                        <text x="44" y="42" class="s-yazi" fill="#64748b">eski</text>
+                        <g fill="#475569">
+                            <rect x="44" y="50" width="2" height="20"/><rect x="49" y="50" width="1.2" height="20"/>
+                            <rect x="53" y="50" width="2.4" height="20"/><rect x="59" y="50" width="1" height="20"/>
+                            <rect x="63" y="50" width="1.8" height="20"/><rect x="68" y="50" width="2.4" height="20"/>
+                            <rect x="74" y="50" width="1" height="20"/><rect x="78" y="50" width="2" height="20"/>
+                        </g>
+                        <path class="c-uyusmaz" d="M40 84l50-34" stroke="#ef4444" stroke-width="2.6"
+                              stroke-linecap="round" style="transform-box:fill-box;transform-origin:center"/>
+
+                        <rect x="106" y="24" width="60" height="72" rx="6" fill="#111f38" stroke="#1e293b"/>
+                        <text x="116" y="42" class="s-yazi" fill="#93c5fd">yeni</text>
+                        <g fill="#3b82f6">
+                            <rect x="116" y="50" width="2" height="20"/><rect x="121" y="50" width="1.2" height="20"/>
+                            <rect x="125" y="50" width="2.4" height="20"/><rect x="131" y="50" width="1" height="20"/>
+                            <rect x="135" y="50" width="1.8" height="20"/><rect x="140" y="50" width="2.4" height="20"/>
+                            <rect x="146" y="50" width="1" height="20"/><rect x="150" y="50" width="2" height="20"/>
+                        </g>
+                    </svg>
+                </div>
+                <h3 class="kart__ad">Eski barkodlu ürün</h3>
+                <p class="kart__not">Ambalaj değişmiş, eski kod geçmiyor. Aynı ürün, eşleşmeyen kayıt.</p>
+            </article>
+
+            <article class="kart gir oynat" style="--sira:4">
+                <div class="kart__cizim">
+                    <svg viewBox="0 0 200 120" role="img" aria-hidden="true">
+                        <g class="c-yirtik-sol" style="transform-box:fill-box;transform-origin:right center">
+                            <rect x="34" y="32" width="52" height="56" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+                            <g class="c-silinen" fill="#0f172a">
+                                <rect x="42" y="46" width="2" height="28"/><rect x="47" y="46" width="1.2" height="28"/>
+                                <rect x="51" y="46" width="2.6" height="28"/><rect x="57" y="46" width="1" height="28"/>
+                                <rect x="61" y="46" width="1.8" height="28"/><rect x="66" y="46" width="2.6" height="28"/>
+                                <rect x="72" y="46" width="1" height="28"/><rect x="76" y="46" width="2" height="28"/>
+                            </g>
+                        </g>
+                        <g class="c-yirtik-sag" style="transform-box:fill-box;transform-origin:left center">
+                            <rect x="88" y="32" width="52" height="56" rx="5" fill="#f8fafc" stroke="#cbd5e1"/>
+                            <g class="c-silinen" fill="#0f172a">
+                                <rect x="96" y="46" width="2" height="28"/><rect x="101" y="46" width="1.2" height="28"/>
+                                <rect x="105" y="46" width="2.6" height="28"/><rect x="111" y="46" width="1" height="28"/>
+                                <rect x="115" y="46" width="1.8" height="28"/><rect x="120" y="46" width="2.6" height="28"/>
+                                <rect x="126" y="46" width="1" height="28"/><rect x="130" y="46" width="2" height="28"/>
+                            </g>
+                        </g>
+                        <ellipse class="c-leke" cx="100" cy="62" rx="34" ry="26" fill="#38bdf8" opacity="0.32"/>
+                    </svg>
+                </div>
+                <h3 class="kart__ad">Islanmış veya yırtılmış etiket</h3>
+                <p class="kart__not">Bozulan barkod okunmuyor. Kodu başka yerden bulmak gerekiyor.</p>
+            </article>
+
+            <article class="kart gir oynat" style="--sira:5">
+                <div class="kart__cizim">
+                    <svg viewBox="0 0 200 120" role="img" aria-hidden="true">
+                        <path d="M14 96h172" stroke="#1e293b" stroke-width="2"/>
+                        <rect x="20" y="34" width="18" height="54" rx="3" fill="#1e293b"/>
+                        <rect x="52" y="34" width="18" height="54" rx="3" fill="#1e293b"/>
+                        <rect x="84" y="34" width="18" height="54" rx="3" fill="#1e293b"/>
+                        <rect x="116" y="34" width="18" height="54" rx="3" fill="#1e293b"/>
+                        <rect x="148" y="34" width="18" height="54" rx="3" fill="#334155"/>
+                        <rect x="152" y="44" width="10" height="10" rx="2" fill="#3b82f6"/>
+                        <g class="c-yuruyen">
+                            <circle cx="30" cy="86" r="5.5" fill="#93c5fd"/>
+                            <path d="M30 91v7M26 100l4-3 4 3" stroke="#93c5fd" stroke-width="1.8"
+                                  stroke-linecap="round" fill="none"/>
+                        </g>
+                        <text x="140" y="26" class="s-yazi" fill="#64748b">en arka raf</text>
+                    </svg>
+                </div>
+                <h3 class="kart__ad">Deponun en arkası</h3>
+                <p class="kart__not">Tek ürün için uzun yürüyüş. Aynı tur gün içinde defalarca.</p>
+            </article>
+
+        </div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Karşılaştırma
+     ================================================================== -->
+<section class="kesit">
+    <div class="ic">
+        <div class="gir">
+            <span class="etiket">Jet Barkod ile</span>
+            <h2 class="baslik">Barkoda ulaşmak artık saniyeler sürüyor</h2>
+            <p class="giris">
+                Sorunlu barkodlar tek bir katalogda toplanıyor. Personel aradığı kodu
+                ürünün fotoğrafıyla birlikte görüyor, doğru ürüne baktığından emin oluyor.
+            </p>
+        </div>
+
+        <div class="karsi gir">
+            <div class="karsi__bas">
+                <div class="karsi__basyazi">Eski yöntem</div>
+                <div class="karsi__basyazi">Jet Barkod ile</div>
+            </div>
+
+            <div class="karsi__satir">
+                <div class="karsi__hucre">
+                    <span class="karsi__im karsi__im--eski" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+                    </span>
+                    Barkod, manuel raf etiketi sisteminden aranırdı. Listeye kampanyalı ürünler
+                    de karıştığı için aranan ürün çoğu zaman tam olarak bulunamazdı.
+                </div>
+                <div class="karsi__hucre karsi__hucre--yeni">
+                    <span class="karsi__im karsi__im--yeni" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                    Ürün adı, barkod ya da yapıştırılan tablo verisiyle tek alandan aranır.
+                    Eklenti sayesinde siparişteki bütün ürünler tek seferde de getirilebilir.
+                </div>
+            </div>
+
+            <div class="karsi__satir">
+                <div class="karsi__hucre">
+                    <span class="karsi__im karsi__im--eski" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+                    </span>
+                    Bulunan barkodun ayrıca başka bir sisteme aktarılması gerekirdi. Bu akış
+                    tek ürün için yaklaşık on beş saniye sürerdi.
+                </div>
+                <div class="karsi__hucre karsi__hucre--yeni">
+                    <span class="karsi__im karsi__im--yeni" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                    Barkod, arandığı ekranda görünür. Aktarma adımı tamamen ortadan kalkar.
+                </div>
+            </div>
+
+            <div class="karsi__satir">
+                <div class="karsi__hucre">
+                    <span class="karsi__im karsi__im--eski" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <path d="M6 6l12 12M18 6L6 18" stroke-linecap="round"/></svg>
+                    </span>
+                    Okunmayan barkod işlemi tamamen durdururdu. Süre uzar, ay sonu puanı düşerdi.
+                </div>
+                <div class="karsi__hucre karsi__hucre--yeni">
+                    <span class="karsi__im karsi__im--yeni" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </span>
+                    Ekranda taranabilir barkod üretilir, ürün anında okutulur.
+                </div>
+            </div>
+        </div>
+
+        <div class="gir" style="margin-top:3.4rem">
+            <h3 class="baslik baslik--kucuk">Aynı iş, iki yöntem, tek kronometre</h3>
+            <p class="giris">
+                İki şerit aynı anda başlıyor ve aynı saati paylaşıyor. Başlangıç ikisinde
+                de aynı: personel paneldeki siparişe tıklıyor.
+            </p>
+        </div>
+
+        <div id="krsBarkod" class="gir"></div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Modüller
+     ================================================================== -->
+<section class="kesit kesit--yumusak" id="moduller">
+    <div class="ic">
+        <div class="gir">
+            <span class="etiket">Sistem</span>
+            <h2 class="baslik">Panelde çalışan altı ekran</h2>
+            <p class="giris">
+                Hepsi aynı katalogdan besleniyor. Bir ekranda düzelttiğiniz barkod
+                diğerlerinde de düzelmiş oluyor. Telefonda, tablette ve bilgisayarda
+                aynı şekilde çalışır.
+            </p>
+        </div>
+
+        <div class="izgara izgara--3">
+
+            <article class="kart gir" style="--sira:0">
+                <h3 class="kart__ad">Ürün Arama</h3>
+                <p class="kart__not">
+                    Ürün adı, barkod veya yapıştırılan tablo verisiyle arayın. Sonucu fotoğraftan doğrulayın, gerekirse barkodu ekrandan okutun.
+                </p>
+            </article>
+
+            <article class="kart gir" style="--sira:1">
+                <h3 class="kart__ad">Stok Sayımı</h3>
+                <p class="kart__not">
+                    Raf başında telefonla, masada bilgisayarla sayın. Depo ve sistem yan yana durur, fark anında hesaplanır.
+                </p>
+            </article>
+
+            <article class="kart gir" style="--sira:2">
+                <h3 class="kart__ad">Raftaki Eksikler</h3>
+                <p class="kart__not">
+                    Kendi raf düzeninizi kurarsınız. Eksik ürünün fotoğrafına dokunmanız yeterli, sepette raf raf birikir.
+                </p>
+            </article>
+
+            <article class="kart gir" style="--sira:3">
+                <h3 class="kart__ad">Ürün Ajandası</h3>
+                <p class="kart__not">
+                    Eksik bildirimlerini güne göre kaydedin. Hangi gün ne bildirildiği görseliyle saklanır.
+                </p>
+            </article>
+
+            <article class="kart gir" style="--sira:4">
+                <h3 class="kart__ad">Kısayollar</h3>
+                <p class="kart__not">
+                    Sık aranan ürünleri bir tuşa bağlarsınız. Tuşa basınca hepsi barkoduyla ekrana gelir.
+                </p>
+            </article>
+
+            <article class="kart gir" style="--sira:5">
+                <h3 class="kart__ad">Kâr ve zarar tablosu</h3>
+                <p class="kart__not">
+                    Sayım biter bitmez sistem stokları alınır. Eksik ve fazla, adet ve tutar olarak raporlanır.
+                </p>
+            </article>
+
+        </div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Eklentiler
+     ================================================================== -->
+<section class="kesit" id="eklentiler">
+    <div class="ic">
+        <div class="gir">
+            <span class="etiket">Tarayıcı eklentisi</span>
+            <h2 class="baslik">Kontrol panelinin üzerine yerleşen araçlar</h2>
+            <p class="giris">
+                Eklenti Getir panelinin üzerinde çalışıyor, sizi başka bir sekmeye
+                göndermiyor. Önceden her araç ayrı kuruluyordu. Dokuzu birden
+                <strong>Jet Barkod Asistan</strong> içinde toplandı: tek kurulum,
+                tek güncelleme.
+            </p>
+        </div>
+
+        <div class="izgara izgara--3" style="margin-top:2.2rem">
+
+            <div class="modul gir" style="--sira:0; --ik:#135bec">
+                <span class="modul__ikon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="8" y="8" width="12" height="12" rx="2"/>
+                        <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>
+                    </svg>
+                </span>
+                <div>
+                    <h3 class="modul__ad">Sipariş aktarımı</h3>
+                    <p class="modul__not">Sipariş detayındaki her ürüne kopyalama düğmesi,
+                    en üste de tümünü kopyala düğmesi ekler. Sipariş tek tıkla Jet Barkod'a taşınır.</p>
+                </div>
+            </div>
+
+            <div class="modul gir" style="--sira:1; --ik:#0d6b8a">
+                <span class="modul__ikon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="7"/><path d="M20 20l-4.3-4.3"/>
+                    </svg>
+                </span>
+                <div>
+                    <h3 class="modul__ad">Hızlı Bul</h3>
+                    <p class="modul__not">Bankoda ya da dolapta unutulan ürünün adını yazın;
+                    hangi siparişte olduğu anında görünür. Eşleşen kartlar öne çıkar,
+                    içeriğe göre renklenir.</p>
+                </div>
+            </div>
+
+            <div class="modul gir" style="--sira:2; --ik:#b4531c">
+                <span class="modul__ikon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 20h14M6 20v-6a6 6 0 0 1 12 0v6"/><path d="M12 4v3"/>
+                    </svg>
+                </span>
+                <div>
+                    <h3 class="modul__ad">Pişirme asistanı</h3>
+                    <p class="modul__not">Pişirme önerileri sayfası kırk bir satır gösterir ve
+                    çoğu boştur. Asistan bunu karar kartlarına indirir: ne kadar pişeceği ve
+                    sebebi kartın üzerinde yazar.</p>
+                </div>
+            </div>
+
+            <div class="modul gir" style="--sira:3; --ik:#3f4a5c">
+                <span class="modul__ikon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2.5" y="5" width="19" height="14" rx="2"/>
+                        <path d="M6 8.5v7M8.8 8.5v7M11.6 8.5v7M15 8.5v7M17.8 8.5v7"/>
+                    </svg>
+                </span>
+                <div>
+                    <h3 class="modul__ad">Stok barkodları</h3>
+                    <p class="modul__not">Stok tablosundaki ürün görsellerini satır sırasını
+                    bozmadan kopyalar. Yapıştırdığınızda hepsi barkoduyla listelenir.</p>
+                </div>
+            </div>
+
+            <div class="modul gir" style="--sira:4; --ik:#0e7c58">
+                <span class="modul__ikon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 12a8 8 0 0 1 13.7-5.6L20 8"/><path d="M20 4v4h-4"/>
+                        <path d="M20 12a8 8 0 0 1-13.7 5.6L4 16"/><path d="M4 20v-4h4"/>
+                    </svg>
+                </span>
+                <div>
+                    <h3 class="modul__ad">Sayım hazırlığı</h3>
+                    <p class="modul__not">Sayım sayfasının canlı stok ve son kullanma tarihi
+                    verisine ulaşmasını sağlar. Sayım tablosu güncel veriyle dolar.</p>
+                </div>
+            </div>
+
+            <div class="modul gir" style="--sira:5; --ik:#9a7434">
+                <span class="modul__ikon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7z"/>
+                        <path d="M10.3 20a2 2 0 0 0 3.4 0"/>
+                    </svg>
+                </span>
+                <div>
+                    <h3 class="modul__ad">Düşük stok uyarısı</h3>
+                    <p class="modul__not">Stok hareketlerini izler, eşiğin altına düşen ürünleri
+                    uyarıyla bildirir. Eksik büyümeden fark edilir.</p>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="gir" style="margin-top:3.4rem">
+            <h3 class="baslik baslik--kucuk">Fırın: altmış satır mı, üç karar kartı mı</h3>
+            <p class="giris">
+                Dört zaman dilimi, dilim başına on beş ürün. Stoğu görmek için her satırı
+                ayrı ayrı açmak gerekiyor. Pişirme paneli aynı veriyi aciliyetine göre
+                sıralanmış kartlara indiriyor.
+            </p>
+        </div>
+
+        <div id="krsFirin" class="gir"></div>
+
+        <div class="gir" style="margin-top:3.4rem">
+            <h3 class="baslik baslik--kucuk">Bankoda kalan ürün hangi siparişin</h3>
+            <p class="giris">
+                Eskiden tek yol siparişleri tek tek açmaktı. Hızlı Bul'da ürünün adını
+                bir kez yazıyorsunuz, eşleşen sipariş kartı öne çıkıyor.
+            </p>
+        </div>
+
+        <div id="krsHizliBul" class="gir"></div>
+
+        <div class="gir" style="margin-top:3.4rem">
+            <h3 class="baslik baslik--kucuk">Sayım: masa başında mı, rafın önünde mi</h3>
+            <p class="giris">
+                Elle sayımda her kalem tek tek aratılır, çıkan değer deftere yazılır.
+                On bir kalem, on bir arama. Jet Barkod'da barkod okutulur, sistem stoğu
+                kendiliğinden gelir, fark aynı satırda hesaplanır.
+            </p>
+        </div>
+
+        <div id="krsSayim" class="gir"></div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Kazanç
+     ================================================================== -->
+<section class="kesit kesit--koyu" id="kazanc">
+    <div class="ic">
+        <div class="gir">
+            <span class="etiket">Kazanç</span>
+            <h2 class="baslik">Kazanılan süre <em>doğrudan paraya dönüyor</em></h2>
+            <p class="giris">
+                Üç cephede kazandırıyor ve üçü birbirini besliyor. Her deponun hacmi
+                farklı olduğu için geri dönüş süresi de farklı çıkıyor.
+            </p>
+        </div>
+
+        <div class="sayilar">
+            <article class="sayi gir" style="--sira:0">
+                <p class="sayi__ust">Cephe 01</p>
+                <h3 class="sayi__ad">Zaman</h3>
+                <p class="sayi__not">Okunmayan barkodlar anında çözülür. Toplama kısalır, kuyruk birikmez.</p>
+            </article>
+            <article class="sayi gir" style="--sira:1">
+                <p class="sayi__ust">Cephe 02</p>
+                <h3 class="sayi__ad">İş yükü</h3>
+                <p class="sayi__not">Pişirme asistanı ve raf kontrolüyle iş akışı rahat yönetilir.</p>
+            </article>
+            <article class="sayi gir" style="--sira:2">
+                <p class="sayi__ust">Cephe 03</p>
+                <h3 class="sayi__ad">Sayım</h3>
+                <p class="sayi__not">Açıklar büyümeden görünür. Eksik bildirimi gelmeden müdahale edilir.</p>
+            </article>
+        </div>
+
+        <div class="gir" style="margin-top:3.2rem">
+            <h3 class="baslik baslik--kucuk">Harf notu yükseldikçe bayi geliri artar</h3>
+            <p class="giris">
+                E notundan C notuna çıkan bir depo sabit giderinin yarısını karşılıyor.
+                C'nin üstündeki her kademe bayi gelir bonusu demek. Jet Barkod'un bedeli
+                tek bir kademe atlamayla geri dönüyor.
+            </p>
+        </div>
+
+        <div class="merdiven">
+            <div class="basamak">
+                <div class="basamak__sutun basamak__sutun--dusuk" style="--oran:0.24; --sira:0"></div>
+                <p class="basamak__harf">E</p>
+                <p class="basamak__not">Başlangıç noktası</p>
+            </div>
+            <div class="basamak">
+                <div class="basamak__sutun basamak__sutun--orta" style="--oran:0.46; --sira:1"></div>
+                <p class="basamak__harf">C</p>
+                <p class="basamak__not">Sabit giderler karşılanır</p>
+            </div>
+            <div class="basamak">
+                <div class="basamak__sutun" style="--oran:0.66; --sira:2"></div>
+                <p class="basamak__harf">A</p>
+                <p class="basamak__not">Bayi gelir bonusu</p>
+            </div>
+            <div class="basamak">
+                <div class="basamak__sutun" style="--oran:0.84; --sira:3"></div>
+                <p class="basamak__harf">A+</p>
+                <p class="basamak__not">Bonus artar</p>
+            </div>
+            <div class="basamak">
+                <div class="basamak__sutun basamak__sutun--yuksek" style="--oran:1; --sira:4"></div>
+                <p class="basamak__harf">A++</p>
+                <p class="basamak__not">Kazanç kalıcı hale gelir</p>
+            </div>
+        </div>
+
+        <p class="giris gir" style="margin-top:1.8rem">
+            Eksik ürünü müşteri bildirmeden fark etmek, cezayı da puan düşüşünü de
+            baştan engelliyor. Ay sonunda karşılığı doğrudan kazanç oluyor.
+        </p>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Kapanış
+     ================================================================== -->
+<section class="kesit">
+    <div class="ic">
+        <div class="kapanis gir gir--olcek">
+            <h2 class="kapanis__ad">Depoda çalışan bir <em>ekip arkadaşı</em></h2>
+            <p class="kapanis__not">
+                flowcobalt.com geliştiriyor, yön veren bayilerden gelen talepler oluyor.
+                Deneme süresi, panel içi destek ve güvenli oturum standart.
+            </p>
+            <div class="dugmeler" style="justify-content:center">
+                <a class="dugme dugme--ana" href="../index.html">Denemeye başlayın</a>
+                <a class="dugme dugme--sade" href="../index.html">Panele giriş yapın</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="dip">
+    <div class="dip__ic">
+        <span>&copy; <span id="yil">2026</span> Jet Barkod</span>
+        <span class="dip__bosluk"></span>
+        <a href="https://jetbarkod.com.tr">jetbarkod.com.tr</a>
+        <a href="https://flowcobalt.com" target="_blank" rel="noopener">flowcobalt.com</a>
+        <span>Eylül 2025'ten bu yana</span>
+    </div>
+</footer>
+
+<script src="../js/vendor/JsBarcode.all.min.js"></script>
+<script src="../js/hakkimizda-urunler.js?v=20260831a"></script>
+<script src="../js/hakkimizda-arama.js?v=20260831a"></script>
+<script src="../js/karsilastirma.js?v=20260831a"></script>
+<script src="../js/karsilastirma-barkod.js?v=20260831d"></script>
+<script src="../js/karsilastirma-firin.js?v=20260831a"></script>
+<script src="../js/karsilastirma-hizlibul.js?v=20260831b"></script>
+<script src="../js/karsilastirma-sayim.js?v=20260831a"></script>
+<script src="../js/hakkimizda.js?v=20260831a"></script>
+<script>
+  // Sahneler betikler yüklendikten sonra kuruluyor.
+  if (window.JBKarsilastirma && window.JBSenaryoBarkod) {
+      JBKarsilastirma.kur(document.getElementById('krsBarkod'), JBSenaryoBarkod);
+  }
+  if (window.JBKarsilastirma && window.JBSenaryoFirin) {
+      JBKarsilastirma.kur(document.getElementById('krsFirin'), JBSenaryoFirin);
+  }
+  if (window.JBKarsilastirma && window.JBSenaryoHizliBul) {
+      JBKarsilastirma.kur(document.getElementById('krsHizliBul'), JBSenaryoHizliBul);
+  }
+  if (window.JBKarsilastirma && window.JBSenaryoSayim) {
+      JBKarsilastirma.kur(document.getElementById('krsSayim'), JBSenaryoSayim);
+  }
+</script>
+</body>
+</html>

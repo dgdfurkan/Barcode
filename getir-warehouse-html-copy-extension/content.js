@@ -6,7 +6,7 @@
     'use strict';
     if (!window.location.pathname.includes('/dashboard/orders')) return;
 
-    const BARCODE_SITE_URL = 'https://jetbarkod.com.tr/pages/product_search.html';
+    const BARCODE_SITE_URL = 'https://jetbarkod.com.tr/arama/';
     const STORAGE_KEY = 'getirAutoRedirect';
     const ORDER_HTML_KEY = 'getirOrderHtml';
 

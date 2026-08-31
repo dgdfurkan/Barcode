@@ -44,7 +44,7 @@
     }
 
     function goToProductSearch() {
-        window.location.replace('pages/product_search.html');
+        window.location.replace('/arama/');
     }
 
     function enterGuestApp() {
@@ -226,7 +226,15 @@
 
     function isIndexPage() {
         const path = window.location.pathname || '';
-        return /index\.html$/i.test(path) || path.endsWith('/') || path === '';
+        /*
+         * Sayfalar temiz adreslere taşınınca "sonu / ile bitiyorsa giriş
+         * sayfasıdır" varsayımı çöktü: /arama/ da / ile bitiyor. O yüzden
+         * misafir akışı ürün arama sayfasında da tetikleniyor, sayfa
+         * kendini sonsuz döngüyle yeniden yüklüyordu.
+         *
+         * Giriş sayfası yalnızca kök adres ya da index.html.
+         */
+        return path === '/' || path === '' || /(^|\/)index\.html$/i.test(path);
     }
 
     function initIndexGuestFlow() {

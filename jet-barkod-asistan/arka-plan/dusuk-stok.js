@@ -12,7 +12,7 @@
  * yapısına bağladık; çekirdek mantık olduğu gibi duruyor.
  *
  * Mesaj adları da korundu (LOW_STOCK_INIT, MARK_DONE, ...). Site tarafında
- * `pages/low_stock_products.html` bu adları dinliyor; değiştirseydik onu da
+ * `dusuk-stok/index.html` bu adları dinliyor; değiştirseydik onu da
  * elden geçirmek gerekirdi.
  * ============================================================================
  */
