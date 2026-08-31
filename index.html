@@ -53,7 +53,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/app-boot.css?v=20260828i" />
-    <link rel="stylesheet" href="css/giris.css?v=20260901a" />
+    <link rel="stylesheet" href="css/giris.css?v=20260901b" />
     <style>
         * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
         /* Ana sayfa arka plan — Synapse tarzı ambient orb (marka mavisi) */
@@ -626,28 +626,27 @@
                 </span>
 
                 <h1 class="giris-baslik g-gir" style="--s:2">
-                    Barkodu bulmak on beş saniye sürüyordu.
-                    <em>Artık sürmüyor.</em>
+                    Barkod, sayım ve raf işleri
+                    <em>tek ekranda.</em>
                 </h1>
 
                 <p class="giris-ozet g-gir" style="--s:3">
-                    Jet Barkod, Getir depolarında çalışan bir operasyon aracı. Okunmayan
-                    barkod, sisteme işlenmemiş ürün, yırtılmış etiket; hepsi tek ekranda
-                    çözülüyor. Sayım da masa başında değil, rafın önünde bitiyor.
+                    Getir depoları için yapıldı. Okunmayan barkodu saniyesinde bulur,
+                    sayımı rafın önünde bitirir, eksikleri müşteri fark etmeden gösterir.
                 </p>
 
                 <div class="giris-rakamlar g-gir" style="--s:4">
                     <div class="giris-rakam">
                         <span class="giris-rakam__sayi">9.383</span>
-                        <span class="giris-rakam__not">Katalogdaki ürün,<br>barkodu ve fotoğrafıyla</span>
+                        <span class="giris-rakam__not">ürün, barkodu ve fotoğrafıyla</span>
                     </div>
                     <div class="giris-rakam">
                         <span class="giris-rakam__sayi">9</span>
-                        <span class="giris-rakam__not">Tek eklentide toplanan<br>asistan modülü</span>
+                        <span class="giris-rakam__not">modül, tek eklentide</span>
                     </div>
                     <div class="giris-rakam">
                         <span class="giris-rakam__sayi">10 kat</span>
-                        <span class="giris-rakam__not">Elle sayımla<br>aradaki süre farkı</span>
+                        <span class="giris-rakam__not">daha hızlı sayım</span>
                     </div>
                 </div>
 
@@ -660,7 +659,7 @@
                         </span>
                         <div>
                             <p class="giris-ozellik__ad">Ürün Arama</p>
-                            <p class="giris-ozellik__not">Ad, barkod ya da yapıştırılan tablo</p>
+                            <p class="giris-ozellik__not">Ad, barkod ya da tablo yapıştır</p>
                         </div>
                     </article>
 
@@ -673,7 +672,7 @@
                         </span>
                         <div>
                             <p class="giris-ozellik__ad">Stok Sayımı</p>
-                            <p class="giris-ozellik__not">Depo ve sistem yan yana, fark anında</p>
+                            <p class="giris-ozellik__not">Fark anında hesaplanır</p>
                         </div>
                     </article>
 
@@ -685,7 +684,7 @@
                         </span>
                         <div>
                             <p class="giris-ozellik__ad">Raftaki Eksikler</p>
-                            <p class="giris-ozellik__not">Fotoğrafa dokun, sepette biriksin</p>
+                            <p class="giris-ozellik__not">Fotoğrafa dokun, sepete düşsün</p>
                         </div>
                     </article>
 
@@ -697,7 +696,7 @@
                         </span>
                         <div>
                             <p class="giris-ozellik__ad">Fırın Planı</p>
-                            <p class="giris-ozellik__not">Altmış satır yerine üç karar kartı</p>
+                            <p class="giris-ozellik__not">Altmış satır, üç karar kartı</p>
                         </div>
                     </article>
                 </div>
@@ -705,8 +704,7 @@
                 <div class="giris-cagri g-gir" style="--s:6">
                     <div class="giris-cagri__yazi">
                         <p class="giris-cagri__ad">Hesabın yok mu?</p>
-                        <p class="giris-cagri__not">Deponu yaz, aynı gün dönelim. Kurulum
-                        on dakika, deneme süresi var.</p>
+                        <p class="giris-cagri__not">Deponun adını yaz, aynı gün dönelim.</p>
                     </div>
                     <button type="button" class="giris-cagri__dugme" id="openSupportChat">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -763,22 +761,22 @@
                         </button>
                     </form>
 
-                    <div id="errorMessage" class="hidden" style="margin-top:1rem;padding:.8rem .9rem;border-radius:11px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:.86rem">
+                    <div id="errorMessage" class="giris-kutu--hata hidden">
                         <span id="errorText"></span>
                     </div>
 
-                    <div id="ipBanMessage" class="hidden" style="margin-top:1rem;padding:.8rem .9rem;border-radius:11px;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;font-size:.86rem">
+                    <div id="ipBanMessage" class="giris-kutu--hata hidden">
                         <span></span>
                     </div>
 
-                    <div id="userInfo" class="hidden" style="margin-top:1.2rem;padding:1.1rem;border-radius:14px;background:#f8fafc;border:1px solid #e2e8f0;text-align:center">
-                        <p style="margin:0 0 .2rem;font-size:1rem;font-weight:650;color:#0f172a">Hoş geldin</p>
-                        <p style="margin:0 0 1rem;font-size:.85rem;color:#64748b">
+                    <div id="userInfo" class="giris-kutu--oturum hidden">
+                        <p class="oturum-ad">Hoş geldin</p>
+                        <p class="oturum-alt">
                             <span id="loggedInUser">Kullanıcı</span> · <span id="loggedInCompany">Şirket</span>
                         </p>
-                        <div style="display:flex;gap:.6rem">
+                        <div style="display:flex;gap:.55rem">
                             <button id="goToApp" class="giris-gonder" style="margin:0">Panele git</button>
-                            <button id="logoutFromIndex" style="flex:none;padding:.85rem 1rem;border:1px solid #e2e8f0;border-radius:11px;background:#fff;color:#475569;font:inherit;font-weight:600;cursor:pointer">Çıkış</button>
+                            <button id="logoutFromIndex" class="giris-cikis">Çıkış</button>
                         </div>
                     </div>
 
