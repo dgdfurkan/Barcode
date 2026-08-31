@@ -1,0 +1,359 @@
+/**
+ * Banko paneli.
+ * ============================================================================
+ *
+ * Kapalıyken tek satır (48 piksel). Depocunun ekranında yer kaplamıyor, göz
+ * yormuyor; sadece hangi bankonun seçili olduğunu söylüyor. Dokununca
+ * karekod okutulabilir boyda açılıyor.
+ *
+ * KAYMA YOK
+ * Açılıp kapanma yükseklik animasyonu değil. Gövde `hidden` ile geliyor,
+ * içindekiler `opacity` ve `transform` ile beliriyor. Karekod alanı sabit
+ * ölçüde; numara değişince kutu büyüyüp küçülmüyor.
+ * ============================================================================
+ */
+
+.bnk {
+    --bnk-kagit: #ffffff;
+    --bnk-zemin: #f7f6f2;
+    --bnk-zemin-2: #efedE6;
+    --bnk-cizgi: #e4e1d8;
+    --bnk-cizgi-koyu: #d3cfc3;
+    --bnk-murekkep: #12161d;
+    --bnk-soluk: #5d6673;
+    --bnk-cok-soluk: #8d939c;
+    --bnk-mavi: #135bec;
+    --bnk-mavi-soft: #edf3fe;
+    --bnk-yay: cubic-bezier(0.22, 1, 0.36, 1);
+
+    border: 1px solid var(--bnk-cizgi);
+    border-radius: 14px;
+    background: var(--bnk-kagit);
+    overflow: hidden;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Kapalı çubuk ---------- */
+
+.bnk__cubuk {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    width: 100%;
+    padding: 0.72rem 0.95rem;
+    border: 0;
+    background: transparent;
+    color: var(--bnk-murekkep);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 160ms ease;
+}
+
+.bnk__cubuk:hover { background: var(--bnk-zemin); }
+
+.bnk__im {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    flex: none;
+    border-radius: 8px;
+    background: var(--bnk-murekkep);
+    color: #fff;
+}
+
+.bnk__im svg { width: 1.05rem; height: 1.05rem; }
+
+.bnk__baslik {
+    font-size: 0.9rem;
+    font-weight: 620;
+    letter-spacing: -0.015em;
+}
+
+.bnk__secili {
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: var(--bnk-mavi-soft);
+    color: var(--bnk-mavi);
+    font-size: 0.8rem;
+    font-weight: 640;
+    letter-spacing: 0.01em;
+    /* Kod hep aynı uzunlukta (BNK.047); yine de sabitleniyor */
+    min-width: 4.9rem;
+    text-align: center;
+}
+
+.bnk__bosluk { flex: 1; }
+
+.bnk__ipucu {
+    color: var(--bnk-cok-soluk);
+    font-size: 0.78rem;
+}
+
+.bnk__ok {
+    width: 1.05rem;
+    height: 1.05rem;
+    flex: none;
+    color: var(--bnk-cok-soluk);
+    transition: transform 300ms var(--bnk-yay);
+}
+
+.bnk[data-durum='acik'] .bnk__ok { transform: rotate(180deg); }
+
+@media (max-width: 560px) {
+    .bnk__ipucu { display: none; }
+}
+
+/* ---------- Gövde ---------- */
+
+.bnk__govde {
+    border-top: 1px solid var(--bnk-cizgi);
+    padding: 1rem 0.95rem 0.95rem;
+    animation: bnk-gir 360ms var(--bnk-yay) both;
+}
+
+@keyframes bnk-gir {
+    from { opacity: 0; transform: translate3d(0, -6px, 0); }
+    to { opacity: 1; transform: none; }
+}
+
+.bnk__ust {
+    display: grid;
+    gap: 1.1rem;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+}
+
+@media (min-width: 720px) {
+    .bnk__ust { grid-template-columns: minmax(0, 1fr) 200px; }
+}
+
+.bnk__etiket {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: var(--bnk-cok-soluk);
+    font-size: 0.7rem;
+    font-weight: 640;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.bnk__kutu {
+    display: flex;
+    align-items: center;
+    max-width: 15rem;
+    border: 1px solid var(--bnk-cizgi);
+    border-radius: 11px;
+    background: var(--bnk-zemin);
+    overflow: hidden;
+    transition: border-color 200ms ease, background 200ms ease, box-shadow 240ms var(--bnk-yay);
+}
+
+.bnk__kutu:focus-within {
+    border-color: var(--bnk-mavi);
+    background: var(--bnk-kagit);
+    box-shadow: 0 0 0 3px rgb(19 91 236 / 0.14);
+}
+
+.bnk__onek {
+    padding: 0 0.2rem 0 0.85rem;
+    color: var(--bnk-cok-soluk);
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.bnk__alan {
+    flex: 1;
+    min-width: 0;
+    padding: 0.7rem 0.85rem 0.7rem 0;
+    border: 0;
+    background: transparent;
+    color: var(--bnk-murekkep);
+    font: inherit;
+    font-size: 1.35rem;
+    font-weight: 660;
+    letter-spacing: 0.04em;
+}
+
+.bnk__alan:focus { outline: none; }
+.bnk__alan::placeholder { color: var(--bnk-cizgi-koyu); font-weight: 500; }
+
+.bnk__not {
+    margin: 0.55rem 0 0;
+    max-width: 34ch;
+    color: var(--bnk-soluk);
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+/* ---------- Son kullanılanlar ---------- */
+
+.bnk__son { margin-top: 0.9rem; }
+
+.bnk__sonBaslik,
+.bnk__sonBos {
+    display: block;
+    margin-bottom: 0.45rem;
+    color: var(--bnk-cok-soluk);
+    font-size: 0.7rem;
+    font-weight: 640;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.bnk__sonBos { text-transform: none; letter-spacing: 0; font-weight: 500; }
+
+.bnk__sonSira { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.bnk__sonOge {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    padding: 0.32rem 0.6rem;
+    border: 1px solid var(--bnk-cizgi);
+    border-radius: 999px;
+    background: var(--bnk-kagit);
+    color: var(--bnk-soluk);
+    font: inherit;
+    font-size: 0.76rem;
+    cursor: pointer;
+    transition: border-color 160ms ease, transform 200ms var(--bnk-yay), background 160ms ease;
+}
+
+.bnk__sonOge b { color: var(--bnk-murekkep); font-weight: 660; font-size: 0.86rem; }
+.bnk__sonOge:hover { border-color: var(--bnk-cizgi-koyu); background: var(--bnk-zemin); transform: translateY(-1px); }
+.bnk__sonOge:active { transform: translateY(0) scale(0.97); }
+
+/* ---------- Karekod kartı ---------- */
+
+.bnk__kart {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.85rem;
+    border: 1px solid var(--bnk-cizgi);
+    border-radius: 14px;
+    background: var(--bnk-zemin);
+}
+
+/* Ölçü sabit: numara değişince kutu oynamıyor. */
+.bnk__qr {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    max-width: 176px;
+    border-radius: 10px;
+    background: #fff;
+    border: 1px solid var(--bnk-cizgi);
+    overflow: hidden;
+}
+
+.bnk__qr img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;   /* Karekod bulanıklaşmasın, okunurluk düşer */
+    animation: bnk-qr 300ms var(--bnk-yay);
+}
+
+@keyframes bnk-qr {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: none; }
+}
+
+.bnk__bekle {
+    color: var(--bnk-cok-soluk);
+    font-size: 0.8rem;
+}
+
+.bnk__kod {
+    margin: 0;
+    color: var(--bnk-murekkep);
+    font-size: 0.98rem;
+    font-weight: 680;
+    letter-spacing: 0.03em;
+}
+
+/* ---------- Izgara ---------- */
+
+.bnk__izgaraKap {
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--bnk-cizgi);
+    max-height: 196px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.bnk__izgara {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
+    gap: 5px;
+}
+
+.bnk__hucre {
+    padding: 0.42rem 0;
+    border: 1px solid var(--bnk-cizgi);
+    border-radius: 8px;
+    background: var(--bnk-kagit);
+    color: var(--bnk-soluk);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 580;
+    cursor: pointer;
+    transition: border-color 140ms ease, background 140ms ease,
+                color 140ms ease, transform 180ms var(--bnk-yay);
+}
+
+.bnk__hucre:hover {
+    border-color: var(--bnk-cizgi-koyu);
+    background: var(--bnk-zemin);
+    color: var(--bnk-murekkep);
+    transform: translateY(-1px);
+}
+
+.bnk__hucre:active { transform: translateY(0) scale(0.94); }
+
+/* Bu cihazda yakın zamanda kullanılanlar: köşede küçük bir nokta */
+.bnk__hucre.kullanildi {
+    position: relative;
+    border-color: var(--bnk-cizgi-koyu);
+    background: var(--bnk-zemin-2);
+}
+
+.bnk__hucre.kullanildi::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--bnk-cok-soluk);
+}
+
+.bnk__hucre.secili {
+    border-color: var(--bnk-murekkep);
+    background: var(--bnk-murekkep);
+    color: #fff;
+}
+
+.bnk__hucre.secili::after { background: rgb(255 255 255 / 0.6); }
+
+.bnk__hucre:focus-visible {
+    outline: 2px solid var(--bnk-mavi);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bnk *, .bnk *::before, .bnk *::after {
+        animation-duration: 0.001ms !important;
+        transition-duration: 0.001ms !important;
+    }
+}
