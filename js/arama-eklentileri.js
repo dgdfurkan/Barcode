@@ -198,6 +198,46 @@
         return Math.max(t, g, m);
     }
 
+    /*
+     * SORGU YAZILDI MI, YAPIŞTIRILDI MI?
+     *
+     * Virgül tek başına yetmiyor. Tek ürünlük bir sipariş kopyalandığında
+     * listede virgül olmuyor ama o da bir sepet; bankoya konması gerekiyor.
+     * Öte yandan elle "süt" yazan kişiye banko açılmamalı.
+     *
+     * Ayrım şu: toplu kopyalama arama kutusunu KENDİSİ dolduruyor. Ya
+     * eklenti sayfaya dönünce otomatik yapıştırıyor, ya kullanıcı yapıştır
+     * düğmesine basıyor, ya da Ctrl+V yapıyor. Üçünde de metin bir anda
+     * beliriyor, harf harf yazılmıyor.
+     *
+     * Son tuş vuruşunun üstünden ne kadar geçtiğine bakılıyor. Ctrl+V'de
+     * tuş vuruşu da olduğu için `paste` olayı ayrıca dinleniyor ve o bir
+     * sonraki değişiklikte sözü kesiyor.
+     */
+    var sonTusAn = 0;
+    var yapistirmaBayragi = false;
+    var sonSorguYapistirma = false;
+
+    if (aramaKutusu) {
+        aramaKutusu.addEventListener('keydown', function (e) {
+            // Ctrl+V / Cmd+V tuş sayılmıyor; onu `paste` olayı üstleniyor
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) return;
+            sonTusAn = Date.now();
+        });
+
+        aramaKutusu.addEventListener('paste', function () { yapistirmaBayragi = true; });
+
+        aramaKutusu.addEventListener('input', function () {
+            if (yapistirmaBayragi) {
+                sonSorguYapistirma = true;
+                yapistirmaBayragi = false;
+                return;
+            }
+            // 400 ms: en yavaş yazan bile iki tuş arasında bu kadar beklemez
+            sonSorguYapistirma = (Date.now() - sonTusAn) > 400;
+        });
+    }
+
     /** Virgülle ayrılmış, boş olmayan terim sayısı. */
     function terimSayisi() {
         var ham = (aramaKutusu && aramaKutusu.value) || '';
@@ -213,8 +253,11 @@
     function topluSonucGeldi() {
         if (!bankoArayuz || typeof bankoArayuz.otomatikAc !== 'function') return;
 
-        // Tek terimli arama toplu kopyalama değildir.
-        if (terimSayisi() < 2) return;
+        /* Toplu kopyalamanın iki işareti var, biri yetiyor:
+           virgüllü liste (barkod listesi, ürün adı listesi, görsel
+           bağlantılı liste) ya da kutunun elle yazılmadan dolması
+           (tek ürünlük sipariş kopyalaması). */
+        if (terimSayisi() < 2 && !sonSorguYapistirma) return;
         if (!sonucSayisi()) return;
 
         var imza = (aramaKutusu && aramaKutusu.value) || '';
