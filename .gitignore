@@ -48,3 +48,10 @@ ihale-monitor/
 # Getir'in iç dokümanları. Depo herkese açık; bunlar asla commit edilmez.
 DEPO QR KODLARI*.pdf
 *.pdf
+
+# Katalogun tek kopyası depoda: kök products.json ve veri/temp_products.js.
+# pages/ altındaki kopyaları hiçbir sayfa okumuyor; her güncellemede 5,7 MB
+# daha eklememek için takip edilmiyor.
+/temp_products.js
+pages/temp_products.js
+pages/products.json

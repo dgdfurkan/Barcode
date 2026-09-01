@@ -32,7 +32,7 @@
     <script src="../js/jb-db.js?v=20260828i"></script>
     <!-- QR Code Library - Using QRCode.js (more reliable) -->
     <script src="../js/vendor/qrcode.min.js?v=20260828i"></script>
-    <script src="../veri/temp_products.js"></script>
+    <script src="../veri/temp_products.js?v=20260901a"></script>
     <script src="../js/getir-cdn-paste.js?v=20260831a"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
     <script src="../js/asistan-koprusu.js?v=20260829a"></script>
@@ -8555,7 +8555,7 @@
             const jsContent = `const PRODUCTS_DATA = ${JSON.stringify(cleanData, null, 2)};`;
             
             // Update the script tag content
-            const scriptTag = document.querySelector('script[src="../veri/temp_products.js"]');
+            const scriptTag = document.querySelector('script[src*="temp_products.js"]');
             if (scriptTag) {
                 scriptTag.textContent = jsContent;
             }
@@ -10610,7 +10610,7 @@
                 
                 // Update temp_products.js
                 const jsContent = `const PRODUCTS_DATA = ${JSON.stringify(data)};`;
-                await fetch('../veri/temp_products.js', {
+                await fetch('../veri/temp_products.js?v=20260901a', {
                     method: 'PUT',
                     body: jsContent,
                     headers: { 'Content-Type': 'application/javascript' }
@@ -10654,7 +10654,7 @@
                 const jsContent = `const PRODUCTS_DATA = ${JSON.stringify(cleanData, null, 2)};`;
                 
                 // Update the script tag content
-                const scriptTag = document.querySelector('script[src="../veri/temp_products.js"]');
+                const scriptTag = document.querySelector('script[src*="temp_products.js"]');
                 if (scriptTag) {
                     scriptTag.textContent = jsContent;
                 }

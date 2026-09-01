@@ -1242,12 +1242,37 @@
       "stock": null
     },
     {
+      "id": "559fbae8f462100c004615fe",
+      "name": "Nivea Men Fresh Active Deodorant Sprey (150 ml)",
+      "category": "Genel",
+      "brand": "Nivea",
+      "description": "Nivea Men Fresh Active Deodorant Sprey (150 ml)",
+      "image": "https://cdn-image.getir.com/market/product/887d4d7c-52ef-41bf-88c1-0f7892004b3c.jpg",
+      "barcodes": [
+        {
+          "code": "4005900155962",
+          "size": "150 ml",
+          "type": "CUSTOM",
+          "variant": "Sprey"
+        },
+        {
+          "code": "4006000217253",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "559fe8d9f462100c00461cfa",
       "name": "Cornetto Disc Vanilya Karamel (130 ml)",
       "category": "Genel",
       "brand": "Cornetto",
       "description": "Cornetto Disc Vanilya Karamel (130 ml)",
-      "image": "https://cdn-image.getir.com/market/product/c9c39a6a-2cc4-40b8-977a-abccb5556dbf.jpg",
+      "image": "https://cdn-image.getir.com/market/product/4f397104-c15c-4925-8952-bb8801874a32.jpg",
       "barcodes": [
         {
           "code": "8683130038185",
@@ -3040,10 +3065,10 @@
     },
     {
       "id": "565c2826762af60c00796b91",
-      "name": "Lipton Bardak Yeşil Çay (20'li)",
+      "name": "Lipton Sade Yeşil Çay (20'li)",
       "category": "İçecek",
       "brand": "Lipton",
-      "description": "Lipton Bardak Yeşil Çay (20'li)",
+      "description": "Lipton Sade Yeşil Çay (20'li)",
       "image": "https://cdn-image.getir.com/market/product/c932e856-df6d-47e4-b387-f0717fb162b4.jpg",
       "barcodes": [
         {
@@ -4260,10 +4285,10 @@
     },
     {
       "id": "570757d0cde6070300eb4fa2",
-      "name": "Algida Maraş Usulü Dondurma Külah (115 ml)",
+      "name": "Algida Maraş Usulü Sade Külah (115 ml)",
       "category": "İçecek",
       "brand": "Algida",
-      "description": "Algida Maraş Usulü Dondurma Külah (115 ml)",
+      "description": "Algida Maraş Usulü Sade Külah (115 ml)",
       "image": "https://cdn-image.getir.com/market/product/5b4f8c63-e1ff-464f-b701-89435c90847c.jpg",
       "barcodes": [
         {
@@ -4686,15 +4711,15 @@
     },
     {
       "id": "5734910b5c03af030056e572",
-      "name": "Vogue (Temmuz)",
+      "name": "Vogue (Ağustos)",
       "category": "Genel",
       "brand": "Vogue",
-      "description": "Vogue (Temmuz)",
+      "description": "Vogue (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/e7dcadd0-138b-43fd-8b10-7adbbdf6b9ab.jpg",
       "barcodes": [
         {
           "code": "9771309538204",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": ""
         }
@@ -4997,15 +5022,15 @@
     },
     {
       "id": "573708d67975b30300794198",
-      "name": "Capital (Temmuz)",
+      "name": "Capital (Ağustos)",
       "category": "Genel",
       "brand": "Capital",
-      "description": "Capital (Temmuz)",
+      "description": "Capital (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/bbab62bc-99ce-4990-b82a-beba225ed356.jpeg",
       "barcodes": [
         {
           "code": "9771300596005",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": ""
         }
@@ -5016,15 +5041,15 @@
     },
     {
       "id": "573709e07975b3030079420c",
-      "name": "Elle (Temmuz)",
+      "name": "Elle (Ağustos)",
       "category": "Genel",
       "brand": "Elle",
-      "description": "Elle (Temmuz)",
+      "description": "Elle (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/0816960a-4066-49a4-bc14-52b0a345a1bf.png",
       "barcodes": [
         {
           "code": "9771302198009",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": ""
         },
@@ -5041,15 +5066,15 @@
     },
     {
       "id": "57370b2fd3a34d0300d6869b",
-      "name": "Evim (Temmuz)",
+      "name": "Evim (Ağustos)",
       "category": "Genel",
       "brand": "Evim",
-      "description": "Evim (Temmuz)",
+      "description": "Evim (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/36cfc284-0768-4356-a4b2-7e0c45edd4b1.jpeg",
       "barcodes": [
         {
           "code": "9771305309006",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": ""
         }
@@ -5060,15 +5085,15 @@
     },
     {
       "id": "57370bb6922c9603005f62bb",
-      "name": "Maison Française (Temmuz)",
+      "name": "Maison Française (Ağustos)",
       "category": "Genel",
       "brand": "Maison",
-      "description": "Maison Française (Temmuz)",
+      "description": "Maison Française (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/34bba7a2-4152-4c6b-9e8f-ca4fd2fb213d.jpeg",
       "barcodes": [
         {
           "code": "9771300552001",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Française"
         }
@@ -5079,15 +5104,15 @@
     },
     {
       "id": "57370ea8d3a34d0300d687ca",
-      "name": "Ekonomist (Temmuz)",
+      "name": "Ekonomist (Ağustos)",
       "category": "Genel",
       "brand": "Ekonomist",
-      "description": "Ekonomist (Temmuz)",
+      "description": "Ekonomist (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/927f9b4e-5be1-4638-9a23-7e4d6f4aebed.jpeg",
       "barcodes": [
         {
           "code": "9771300584002",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": ""
         }
@@ -5734,17 +5759,17 @@
     },
     {
       "id": "5755322df43fe40300152b00",
-      "name": "Lipton Dökme Çay Yellow Label (500 g)",
+      "name": "Lipton Yellow Label Dökme Çay (500 g)",
       "category": "İçecek",
       "brand": "Lipton",
-      "description": "Lipton Dökme Çay Yellow Label (500 g)",
-      "image": "https://cdn-image.getir.com/market/product/99b18714-2f87-4097-8cd3-5d91c7f08934.jpg",
+      "description": "Lipton Yellow Label Dökme Çay (500 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260813111126685_8720608617623-01.jpg",
       "barcodes": [
         {
           "code": "8690639000292",
           "size": "500 g",
           "type": "CUSTOM",
-          "variant": "Label"
+          "variant": "Dökme"
         },
         {
           "code": "8720608617623",
@@ -9035,17 +9060,17 @@
     },
     {
       "id": "58a471d0e4b11b0004c5e568",
-      "name": "Lipton Dökme Çay Yellow Label (1 kg)",
+      "name": "Lipton Yellow Label Dökme Çay (1 kg)",
       "category": "İçecek",
       "brand": "Lipton",
-      "description": "Lipton Dökme Çay Yellow Label (1 kg)",
+      "description": "Lipton Yellow Label Dökme Çay (1 kg)",
       "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260602095915061_lipton-yellow-label-1000g-on.jpg",
       "barcodes": [
         {
           "code": "8690639000315",
           "size": "1 kg",
           "type": "CUSTOM",
-          "variant": "Label"
+          "variant": "Dökme"
         },
         {
           "code": "8720608617630",
@@ -9281,10 +9306,10 @@
     },
     {
       "id": "58c02788adec2b000462917c",
-      "name": "Altınkılıç İzmir Tulum Peynir (250 g)",
+      "name": "Altınkılıç Tulum Peyniri (250 g)",
       "category": "Süt Ürünleri",
       "brand": "Altınkılıç",
-      "description": "Altınkılıç İzmir Tulum Peynir (250 g)",
+      "description": "Altınkılıç Tulum Peyniri (250 g)",
       "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260709074938876_36f30bb7-a8df-4fa4-a4e8-713d09b8626b.jpeg",
       "barcodes": [
         {
@@ -9449,7 +9474,7 @@
       "category": "Meyve & Sebze",
       "brand": "Carte",
       "description": "Carte d'Or Selection Meyve Şöleni (800 ml)",
-      "image": "https://cdn-image.getir.com/market/product/0689ec15-5081-4b4e-86e7-f1145b5c5ed2.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260817140342493_01afae55-1297-4db5-b48b-73c2896869d4.jpg",
       "barcodes": [
         {
           "code": "8683130084830",
@@ -9513,6 +9538,25 @@
           "size": "550 g",
           "type": "CUSTOM",
           "variant": "Garnitür"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "58d3ba1ca56b8e00048304d8",
+      "name": "Tamek Bezelye Konservesi (670 g)",
+      "category": "Genel",
+      "brand": "Tamek",
+      "description": "Tamek Bezelye Konservesi (670 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260709090853856_Bezelye-670.jpg",
+      "barcodes": [
+        {
+          "code": "8690575061913",
+          "size": "670 g",
+          "type": "CUSTOM",
+          "variant": "Konservesi"
         }
       ],
       "shelf": "-",
@@ -10734,7 +10778,7 @@
       "category": "Genel",
       "brand": "Carte",
       "description": "Carte d'Or Selection Çikolata Karnavalı (800 ml)",
-      "image": "https://cdn-image.getir.com/market/product/4daba2fd-0b30-4ce3-a227-30eb3c5492ee.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260817140036674_7c653a3a-3ff7-45a4-84ef-6918e1a45819.jpg",
       "barcodes": [
         {
           "code": "8683130006788",
@@ -11773,7 +11817,7 @@
       "category": "Süt Ürünleri",
       "brand": "Sek",
       "description": "Sek Labne Peynir (180 g)",
-      "image": "https://cdn-image.getir.com/market/product/c105e115-68a7-4ff9-bc5a-2cb958a5f5f3.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260730112409980_sek-labne-01.jpg",
       "barcodes": [
         {
           "code": "8692095344835",
@@ -14000,15 +14044,15 @@
     },
     {
       "id": "5a702ee062d03700044667ba",
-      "name": "Home Art (Temmuz)",
+      "name": "Home Art (Ağustos)",
       "category": "Genel",
       "brand": "Home",
-      "description": "Home Art (Temmuz)",
+      "description": "Home Art (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/588c71d1-4bec-4e92-b3eb-60a46ed358da.jpg",
       "barcodes": [
         {
           "code": "9771304565007",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Art"
         }
@@ -14019,15 +14063,15 @@
     },
     {
       "id": "5a702f2862d03700044667cf",
-      "name": "Sofra (Temmuz)",
+      "name": "Sofra (Ağustos)",
       "category": "Genel",
       "brand": "Sofra",
-      "description": "Sofra (Temmuz)",
+      "description": "Sofra (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/c3bfd797-ea71-4325-a6d2-41ee35c3328b.jpg",
       "barcodes": [
         {
           "code": "9771304554001",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": ""
         }
@@ -14607,13 +14651,19 @@
       "category": "Genel",
       "brand": "Humm",
       "description": "Humm Organik Tarçınlı & Zencefilli Kurabiye (55 g)",
-      "image": "https://cdn-image.getir.com/market/product/667e4af5-40d0-4217-a2e0-8cffd1e48830.jpg",
+      "image": "https://cdn-image.getir.com/market/product/1630ba7c-35a1-48b4-b479-1247c49baa90.jpg",
       "barcodes": [
         {
           "code": "8680050304925",
           "size": "55 g",
           "type": "CUSTOM",
           "variant": "Kurabiye"
+        },
+        {
+          "code": "8685111480068",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -14729,10 +14779,10 @@
     },
     {
       "id": "5a9e72f1a5b0700004c821e5",
-      "name": "Algida Usta Usulü Çifte Dövülmüş Sade Dondurma  (500 ml)",
+      "name": "Algida Usta Usulü Çifte Dövülmüş Sade Dondurma (500 ml)",
       "category": "İçecek",
       "brand": "Algida",
-      "description": "Algida Usta Usulü Çifte Dövülmüş Sade Dondurma  (500 ml)",
+      "description": "Algida Usta Usulü Çifte Dövülmüş Sade Dondurma (500 ml)",
       "image": "https://cdn-image.getir.com/market/product/ae4b209f-7997-4101-8978-ec27a89c93ca.jpg",
       "barcodes": [
         {
@@ -15011,7 +15061,7 @@
       "category": "Genel",
       "brand": "Uno",
       "description": "Uno Fırından Tam Buğday Ekmeği (450 g)",
-      "image": "https://cdn-image.getir.com/market/product/d55343d3-891a-4e99-a161-5544e0ba0965.jpeg",
+      "image": "https://cdn.getir.com/product/5ab2bbd5115f700004662372_tr_1582528207959.jpeg",
       "barcodes": [
         {
           "code": "8690698509149",
@@ -15709,7 +15759,7 @@
       "category": "Süt Ürünleri",
       "brand": "SEK",
       "description": "SEK Protein Kakaolu Laktozsuz Süt (330 ml)",
-      "image": "https://cdn-image.getir.com/market/product/c107a697-2275-4c46-9d4f-a73a288bff67.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260730111812495_sek-protein-sut-kakaolu-01.jpg",
       "barcodes": [
         {
           "code": "8692095344569",
@@ -16259,15 +16309,15 @@
     },
     {
       "id": "5ae3564c3307340004d0963d",
-      "name": "Harper's Bazaar (Temmuz)",
+      "name": "Harper's Bazaar (Ağustos)",
       "category": "Genel",
       "brand": "Harper's",
-      "description": "Harper's Bazaar (Temmuz)",
+      "description": "Harper's Bazaar (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/04eef9fa-2ecb-4697-9fb8-0d1b7356420c.jpg",
       "barcodes": [
         {
           "code": "9771304574009",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Bazaar"
         }
@@ -19574,6 +19624,12 @@
           "variant": ""
         },
         {
+          "code": "8685157511061",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8697785102580",
           "size": "",
           "type": "CUSTOM",
@@ -20136,6 +20192,12 @@
           "variant": ""
         },
         {
+          "code": "8683079714126",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8683454680244",
           "size": "",
           "type": "CUSTOM",
@@ -20167,6 +20229,12 @@
         },
         {
           "code": "8684998374309",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685119240008",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -20225,7 +20293,7 @@
       "category": "Genel",
       "brand": "Koska",
       "description": "Koska Sade Helva (200 g)",
-      "image": "https://cdn-image.getir.com/market/product/2d7c2c34-c98a-4139-afd1-9b7675991954.jpg",
+      "image": "https://cdn-image.getir.com/market/product/a2537627-8984-4c34-a087-7c6318b061e9.jpg",
       "barcodes": [
         {
           "code": "8690710009428",
@@ -20263,7 +20331,7 @@
       "category": "Genel",
       "brand": "Koska",
       "description": "Koska Fıstıklı Helva (200 g)",
-      "image": "https://cdn-image.getir.com/market/product/bebbbb46-8b0e-4ebb-a2ec-c8cb43968136.jpg",
+      "image": "https://cdn-image.getir.com/market/product/d79c62b8-58b2-4cf1-a750-40bfc9586f76.jpg",
       "barcodes": [
         {
           "code": "8690710009442",
@@ -20967,6 +21035,12 @@
           "variant": ""
         },
         {
+          "code": "8690574120130",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8690574842063",
           "size": "",
           "type": "CUSTOM",
@@ -21012,6 +21086,12 @@
         },
         {
           "code": "8690574118953",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8690574120123",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -24547,13 +24627,19 @@
       "category": "Genel",
       "brand": "Pril",
       "description": "Pril Power Sıvı Bulaşık Deterjanı Limon (1306 ml)",
-      "image": "https://cdn-image.getir.com/market/product/abd6ea7f-7bc7-4d70-9f69-91c576514371.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260828080210058_PRILL-ULTRA-GUC-1306ML-01.jpg",
       "barcodes": [
         {
           "code": "8690572409251",
           "size": "1306 ml",
           "type": "CUSTOM",
           "variant": "Limon"
+        },
+        {
+          "code": "9000101867282",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -25803,7 +25889,7 @@
       "category": "Genel",
       "brand": "Nestle",
       "description": "Nestle 1927 %82 Bitter Çikolata (60 g)",
-      "image": "https://cdn-image.getir.com/market/product/5c40cb09-2803-41dc-bfb6-d83f8b58e8c7.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260814095709939_nestle-1927.jpg",
       "barcodes": [
         {
           "code": "8690632243078",
@@ -26419,7 +26505,7 @@
       "category": "Genel",
       "brand": "Yayla",
       "description": "Yayla Meksika Soslu Pilaki (400 g)",
-      "image": "https://cdn-image.getir.com/market/product/b1266a19-b336-4ede-a812-4866aa727455.jpg",
+      "image": "https://cdn-image.getir.com/market/product/81cfa352-154a-4698-94d2-74e51dc50c2c.jpg",
       "barcodes": [
         {
           "code": "8693374255491",
@@ -27164,7 +27250,7 @@
       "category": "Fırın",
       "brand": "Uno",
       "description": "Uno Premium Çavdarlı ve Karabuğdaylı Ekmek (400 g)",
-      "image": "https://cdn.getir.com/product/5c879a671f5acb000125e774_tr_1649144837124.jpeg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260817082325874_uno.jpg",
       "barcodes": [
         {
           "code": "8690698511685",
@@ -29365,6 +29451,12 @@
           "variant": ""
         },
         {
+          "code": "8683079714133",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8683454680251",
           "size": "",
           "type": "CUSTOM",
@@ -29396,6 +29488,12 @@
         },
         {
           "code": "8684998374316",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685119240015",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -29595,6 +29693,12 @@
           "variant": ""
         },
         {
+          "code": "8683079714157",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8683454680237",
           "size": "",
           "type": "CUSTOM",
@@ -29632,6 +29736,12 @@
         },
         {
           "code": "8684998374323",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685119240039",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -29873,6 +29983,12 @@
           "variant": ""
         },
         {
+          "code": "8685309270068",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8697785100487",
           "size": "",
           "type": "CUSTOM",
@@ -29958,6 +30074,12 @@
           "variant": ""
         },
         {
+          "code": "8683079714218",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8683489606097",
           "size": "",
           "type": "CUSTOM",
@@ -29989,6 +30111,12 @@
         },
         {
           "code": "8684952842097",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685119240091",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -31443,6 +31571,12 @@
           "variant": ""
         },
         {
+          "code": "8684952008202",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8697417464116",
           "size": "",
           "type": "CUSTOM",
@@ -31553,6 +31687,12 @@
           "variant": ""
         },
         {
+          "code": "8684779942192",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8697412601516",
           "size": "",
           "type": "CUSTOM",
@@ -31640,15 +31780,15 @@
     },
     {
       "id": "5cddc6333cc2730001bb8ac9",
-      "name": "Minika Çocuk (Temmuz)",
+      "name": "Minika Çocuk (Ağustos)",
       "category": "Genel",
       "brand": "Minika",
-      "description": "Minika Çocuk (Temmuz)",
+      "description": "Minika Çocuk (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/8bbcd8fd-23bd-460c-8492-9df068d38fa8.webp",
       "barcodes": [
         {
           "code": "9772548041005",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Çocuk"
         }
@@ -31659,15 +31799,15 @@
     },
     {
       "id": "5cddc6f36d8d3f0001a2f834",
-      "name": "Minika GO (Temmuz)",
+      "name": "Minika GO (Ağustos)",
       "category": "Genel",
       "brand": "Minika",
-      "description": "Minika GO (Temmuz)",
+      "description": "Minika GO (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/a98f081e-16f2-4cf8-b8c9-13882ff90a03.jpg",
       "barcodes": [
         {
           "code": "9772548026002",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "GO"
         }
@@ -35230,6 +35370,31 @@
           "size": "50 ml",
           "type": "CUSTOM",
           "variant": "On"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "5ce6581dfd9b330001c4a8a7",
+      "name": "Kühne Paprikano Sos (350 g)",
+      "category": "Genel",
+      "brand": "Kühne",
+      "description": "Kühne Paprikano Sos (350 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260727104211110_kuhne-paprikano-01.jpg",
+      "barcodes": [
+        {
+          "code": "8696027011970",
+          "size": "350 g",
+          "type": "CUSTOM",
+          "variant": "Paprikano"
+        },
+        {
+          "code": "8696027018795",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -42945,7 +43110,7 @@
       "category": "Genel",
       "brand": "OFF!",
       "description": "OFF! Losyon 6 Saate Kadar Etkili Sivrisineklere Karşı (100 ml)",
-      "image": "https://cdn.getir.com/product/5ceae0359d3ea8000196e0f9_3e1c1222-5193-4c33-8a26-7714fdf55fa0.jpeg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260819084739198_off-losyon-01.jpg",
       "barcodes": [
         {
           "code": "8690784124515",
@@ -43925,7 +44090,7 @@
       "category": "Genel",
       "brand": "Dr.",
       "description": "Dr. Oetker Süsleme Glazürü (4 x 19 g)",
-      "image": "https://cdn-image.getir.com/market/product/e3dcc079-94c4-4ba8-b2b5-ee7965bb4f03.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260819132950193_dr-oetker.jpg",
       "barcodes": [
         {
           "code": "8690629434823",
@@ -44311,7 +44476,7 @@
       "category": "Genel",
       "brand": "Ülker",
       "description": "Ülker Bebe Bisküvisi (400 g)",
-      "image": "https://cdn-image.getir.com/market/product/1e7a2d5e-02e6-469a-ab70-28da6ea5553e.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260827091401103_ulker-cici-bebe-400gr-01.jpg",
       "barcodes": [
         {
           "code": "8690504014508",
@@ -45221,7 +45386,7 @@
       "category": "Genel",
       "brand": "Koska",
       "description": "Koska Sade Helva (500 g)",
-      "image": "https://cdn-image.getir.com/market/product/d2919926-6c73-479f-8ef6-087d41651ea2.jpg",
+      "image": "https://cdn-image.getir.com/market/product/8f35c3cb-729f-42d3-ae0a-b2f0600f2586.jpg",
       "barcodes": [
         {
           "code": "8690710001323",
@@ -47561,6 +47726,12 @@
           "variant": ""
         },
         {
+          "code": "8683079714201",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8683454680275",
           "size": "",
           "type": "CUSTOM",
@@ -47592,6 +47763,12 @@
         },
         {
           "code": "8684998374347",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685119240084",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -47769,6 +47946,12 @@
           "variant": ""
         },
         {
+          "code": "8683079714188",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8683454680282",
           "size": "",
           "type": "CUSTOM",
@@ -47800,6 +47983,12 @@
         },
         {
           "code": "8684998374392",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685119240060",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -48937,7 +49126,7 @@
       "category": "Süt Ürünleri",
       "brand": "İçim",
       "description": "İçim Kaymaksız Yoğurt (500 g)",
-      "image": "https://cdn.getir.com/product/5ced482e4a8a2a000137da76_tr_1652192589133.jpeg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260827073552815_sek_o%CC%88n.png",
       "barcodes": [
         {
           "code": "8692971421155",
@@ -49661,6 +49850,12 @@
           "variant": ""
         },
         {
+          "code": "8683079714140",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8683454680077",
           "size": "",
           "type": "CUSTOM",
@@ -49692,6 +49887,12 @@
         },
         {
           "code": "8684998374330",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685119240022",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -49834,6 +50035,12 @@
         },
         {
           "code": "8684779940570",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685309270037",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -50708,6 +50915,12 @@
           "variant": ""
         },
         {
+          "code": "8683079714195",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8683454680299",
           "size": "",
           "type": "CUSTOM",
@@ -50739,6 +50952,12 @@
         },
         {
           "code": "8684998374354",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685119240077",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -52548,17 +52767,17 @@
     },
     {
       "id": "5cf00cd3cc444f0001d34b95",
-      "name": "Lipton Extra Dem Demlik Çay  (48'li)",
+      "name": "Lipton Extra Dem Demlik Poşet Çay (48'li)",
       "category": "İçecek",
       "brand": "Lipton",
-      "description": "Lipton Extra Dem Demlik Çay  (48'li)",
-      "image": "https://cdn-image.getir.com/market/product/9c5032e6-d26c-4132-9cc9-ed88011d6c37.jpg",
+      "description": "Lipton Extra Dem Demlik Poşet Çay (48'li)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260813115340606_8720608631346-01.jpg",
       "barcodes": [
         {
           "code": "8720608631346",
           "size": "48'li",
           "type": "CUSTOM",
-          "variant": "Demlik"
+          "variant": "Poşet"
         }
       ],
       "shelf": "-",
@@ -58042,7 +58261,7 @@
       "category": "Süt Ürünleri",
       "brand": "SEK",
       "description": "SEK Kakaolu Süt (180 ml)",
-      "image": "https://cdn-image.getir.com/market/product/78ff2808-3b21-4963-aac4-18f5fa60af47.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260730112139909_sek-kakaolu-sut-01.jpg",
       "barcodes": [
         {
           "code": "8692095343869",
@@ -61632,7 +61851,7 @@
       "category": "Süt Ürünleri",
       "brand": "La",
       "description": "La Vache Qui Rit Krem Peynir (270 g)",
-      "image": "https://cdn.getir.com/product/5d66630ce9f977000106ddb1_tr_1567435984787.jpeg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260811085942887_la-vache-qui-rit-eritme-peynir-01.jpg",
       "barcodes": [
         {
           "code": "3073781122596",
@@ -65563,6 +65782,12 @@
           "size": "",
           "type": "CUSTOM",
           "variant": ""
+        },
+        {
+          "code": "8684990863740",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -65603,6 +65828,12 @@
         },
         {
           "code": "8680853031622",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8684990863733",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -65743,6 +65974,12 @@
           "variant": ""
         },
         {
+          "code": "8685309270013",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8690422242656",
           "size": "",
           "type": "CUSTOM",
@@ -65829,6 +66066,12 @@
         },
         {
           "code": "8683941466047",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685309270020",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -71414,7 +71657,7 @@
       "category": "Fırın",
       "brand": "UNO",
       "description": "UNO Fırından Tam Çavdarlı Ekmek (450 g)",
-      "image": "https://cdn-image.getir.com/market/product/1cc209e4-ee62-4dd6-bb71-4d3c02070895.jpeg",
+      "image": "https://cdn.getir.com/product/5e317b266774b0af1b579cc7_tr_1580382843565.jpeg",
       "barcodes": [
         {
           "code": "8690698510404",
@@ -71433,7 +71676,7 @@
       "category": "Genel",
       "brand": "Uno",
       "description": "Uno Sandviç Ekmeği (5 adet)",
-      "image": "https://cdn-image.getir.com/market/product/a550f787-f199-46dc-a5f9-2b6972db188f.jpeg",
+      "image": "https://cdn.getir.com/product/5e3180c9ebb3a7e97fae5d99_tr_1580382191977.jpeg",
       "barcodes": [
         {
           "code": "8690698511616",
@@ -75088,15 +75331,15 @@
     },
     {
       "id": "5e5927d91c573b68c7b34df7",
-      "name": "Formsanté (Eylül)",
+      "name": "Formsanté (Ağustos)",
       "category": "Genel",
       "brand": "Formsanté",
-      "description": "Formsanté (Eylül)",
+      "description": "Formsanté (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/496927dc-68ba-4169-8d4c-19395d8f43f2.jpeg",
       "barcodes": [
         {
           "code": "9771300561003",
-          "size": "Eylül",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": ""
         }
@@ -75107,15 +75350,15 @@
     },
     {
       "id": "5e592b9b5a374f1505027741",
-      "name": "Popular Science (Temmuz)",
+      "name": "Popular Science (Ağustos)",
       "category": "Genel",
       "brand": "Popular",
-      "description": "Popular Science (Temmuz)",
+      "description": "Popular Science (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/921a73d3-f152-4efa-a8b1-6db1a0e2e79c.jpeg",
       "barcodes": [
         {
           "code": "9772147096000",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Science"
         },
@@ -75340,6 +75583,12 @@
         },
         {
           "code": "8682655004507",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8682655004842",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -76795,6 +77044,12 @@
           "variant": ""
         },
         {
+          "code": "8684952008219",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "869908924027",
           "size": "",
           "type": "CUSTOM",
@@ -77097,15 +77352,15 @@
     },
     {
       "id": "5e8597c3e4faef3bb9633469",
-      "name": "KAFA (Temmuz)",
+      "name": "KAFA (Ağustos)",
       "category": "Genel",
       "brand": "KAFA",
-      "description": "KAFA (Temmuz)",
+      "description": "KAFA (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/3f61efa9-920e-49c9-bbba-63089fee29c8.jpg",
       "barcodes": [
         {
           "code": "9772148782803",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": ""
         }
@@ -77141,15 +77396,15 @@
     },
     {
       "id": "5e872925713d4ea18344a52a",
-      "name": "All About Space (Temmuz)",
+      "name": "All About Space (Ağustos)",
       "category": "Genel",
       "brand": "All",
-      "description": "All About Space (Temmuz)",
+      "description": "All About Space (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/c12e9e5b-5552-40f6-8be8-da79a11ebdef.jpeg",
       "barcodes": [
         {
           "code": "9771303401009",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Space"
         },
@@ -77511,15 +77766,15 @@
     },
     {
       "id": "5e942232253c03656dd189f2",
-      "name": "How It Works (Temmuz)",
+      "name": "How It Works (Ağustos)",
       "category": "Genel",
       "brand": "How",
-      "description": "How It Works (Temmuz)",
+      "description": "How It Works (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/dcbca27d-a9c1-4ab4-887f-c76183ccc07f.jpg",
       "barcodes": [
         {
           "code": "9772651399000",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Works"
         },
@@ -77743,10 +77998,10 @@
     },
     {
       "id": "5e96b9f7a8b11453a17fa3e8",
-      "name": "Lipton Slim Plus Kiraz Saplı Bitki Çayı (20'li)",
+      "name": "Lipton Slim Plus Kiraz Saplı Bitki Meyve Çayı (20'li)",
       "category": "İçecek",
       "brand": "Lipton",
-      "description": "Lipton Slim Plus Kiraz Saplı Bitki Çayı (20'li)",
+      "description": "Lipton Slim Plus Kiraz Saplı Bitki Meyve Çayı (20'li)",
       "image": "https://cdn-image.getir.com/market/product/e19a8772-19a8-4bc6-bba3-e0f0d5f27e0d.jpg",
       "barcodes": [
         {
@@ -78569,15 +78824,15 @@
     },
     {
       "id": "5ea2cb9c8631f8ff16478232",
-      "name": "Maxi Çengel Bulmaca (Temmuz)",
+      "name": "Maxi Çengel Bulmaca (Ağustos)",
       "category": "Genel",
       "brand": "Maxi",
-      "description": "Maxi Çengel Bulmaca (Temmuz)",
+      "description": "Maxi Çengel Bulmaca (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/a79229c4-d0f0-4894-9b19-f8bcdce5d0bf.jpg",
       "barcodes": [
         {
           "code": "9772636877004",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Bulmaca"
         }
@@ -78588,15 +78843,15 @@
     },
     {
       "id": "5ea2de72c984e46fb6e08f7e",
-      "name": "Maxi Bulmaca Sudoku (Temmuz)",
+      "name": "Maxi Bulmaca Sudoku (Ağustos)",
       "category": "İçecek",
       "brand": "Maxi",
-      "description": "Maxi Bulmaca Sudoku (Temmuz)",
+      "description": "Maxi Bulmaca Sudoku (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/17470cb1-2281-448a-9d18-e01170d56b4d.jpg",
       "barcodes": [
         {
           "code": "9772667788003",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Sudoku"
         }
@@ -78771,15 +79026,15 @@
     },
     {
       "id": "5ea813d3c9436374efd5b0b8",
-      "name": "Uykusuz (Temmuz)",
+      "name": "Uykusuz (Ağustos)",
       "category": "İçecek",
       "brand": "Uykusuz",
-      "description": "Uykusuz (Temmuz)",
+      "description": "Uykusuz (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/64a60377-2329-4d4a-bff0-8005ec8c579f.jpg",
       "barcodes": [
         {
           "code": "9771307761000",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": ""
         }
@@ -79284,10 +79539,16 @@
       "image": "https://cdn-image.getir.com/market/product/31f5a80c-984e-4b73-b07e-446128addf78.jpg",
       "barcodes": [
         {
-          "code": "8690570552874",
+          "code": "8682539006764",
           "size": "22'li",
           "type": "CUSTOM",
           "variant": "Tableti"
+        },
+        {
+          "code": "8690570552874",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -80296,15 +80557,15 @@
     },
     {
       "id": "5ec8dd0b683dfa412df61aad",
-      "name": "OT Dergi (Temmuz)",
+      "name": "OT Dergi (Ağustos)",
       "category": "Genel",
       "brand": "OT",
-      "description": "OT Dergi (Temmuz)",
+      "description": "OT Dergi (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/64e2ba48-dfa9-4027-9628-68a2d7c827a7.jpeg",
       "barcodes": [
         {
           "code": "9771308450002",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Dergi"
         }
@@ -81568,6 +81829,12 @@
           "variant": "Paket"
         },
         {
+          "code": "8684990863764",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8697785101101",
           "size": "",
           "type": "CUSTOM",
@@ -81591,6 +81858,12 @@
           "size": "50 g",
           "type": "CUSTOM",
           "variant": "Paket"
+        },
+        {
+          "code": "8684990863757",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         },
         {
           "code": "8697785101071",
@@ -81619,6 +81892,12 @@
         },
         {
           "code": "8680422241568",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8684990863771",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -82377,7 +82656,7 @@
       "category": "Genel",
       "brand": "Mars",
       "description": "Mars Snickers (53 ml)",
-      "image": "https://cdn.getir.com/product/5ef32dc727eb237f0886d971_tr_1654691766224.jpeg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260811124424433_5ef32dc727eb237f0886d971_tr_1654691766224.jpeg",
       "barcodes": [
         {
           "code": "5000159343961",
@@ -83574,7 +83853,7 @@
       "category": "Genel",
       "brand": "Komili",
       "description": "Komili Doğal Siyah Sele Zeytin (170 g)",
-      "image": "https://cdn-image.getir.com/market/product/fef087dd-b523-4460-ab08-480d7a2d804b.jpg",
+      "image": "https://cdn-image.getir.com/market/product/5d17a27e-b6b7-44b1-9778-99ff576414b3.jpg",
       "barcodes": [
         {
           "code": "8681917320096",
@@ -83593,7 +83872,7 @@
       "category": "Genel",
       "brand": "Komili",
       "description": "Komili Çekirdeksiz Izgara Yeşil Zeytin (170 g)",
-      "image": "https://cdn-image.getir.com/market/product/812c29c9-6c94-44d8-aa02-444eb5a551b6.jpg",
+      "image": "https://cdn-image.getir.com/market/product/3ddd1b42-17be-4ae5-aa4c-a68965e6bb9c.jpg",
       "barcodes": [
         {
           "code": "8681917320102",
@@ -83612,7 +83891,7 @@
       "category": "Genel",
       "brand": "Komili",
       "description": "Komili Çekirdeksiz Zeytinyağlı ve Kekikli Yeşil Zeytin (170 g)",
-      "image": "https://cdn-image.getir.com/market/product/08255b0d-018a-4ba9-9f8b-55745aafbb97.jpg",
+      "image": "https://cdn-image.getir.com/market/product/6afa4b2a-9974-40a0-bf70-9b893c07064c.jpg",
       "barcodes": [
         {
           "code": "8681917320119",
@@ -87543,23 +87822,17 @@
     },
     {
       "id": "5f3e2907632361b36024285c",
-      "name": "Faber Castell Sulu Boya Büyük Boy (12 Renk)",
-      "category": "İçecek",
-      "brand": "Faber",
-      "description": "Faber Castell Sulu Boya Büyük Boy (12 Renk)",
-      "image": "https://cdn.getir.com/product/5f3e2907632361b36024285c_tr_1598620818099.jpeg",
+      "name": "Faber-Castell Pastel Boya (12'li)",
+      "category": "Genel",
+      "brand": "Faber-Castell",
+      "description": "Faber-Castell Pastel Boya (12'li)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260817111706386_fb-9.jpg",
       "barcodes": [
         {
           "code": "8690826012510",
-          "size": "12 Renk",
+          "size": "12'li",
           "type": "CUSTOM",
-          "variant": "Boy"
-        },
-        {
-          "code": "8690826125463",
-          "size": "",
-          "type": "CUSTOM",
-          "variant": ""
+          "variant": "Boya"
         }
       ],
       "shelf": "-",
@@ -88725,6 +88998,12 @@
           "variant": ""
         },
         {
+          "code": "8682655004859",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8683454680480",
           "size": "",
           "type": "CUSTOM",
@@ -89539,7 +89818,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Browni Intense Mini Çikolatalı Kek (160 g)",
-      "image": "https://cdn-image.getir.com/market/product/5dc730e5-1537-4fd0-b6f0-081e611507a6.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260819102846290_eti-browni-intense-01.jpg",
       "barcodes": [
         {
           "code": "8690526076522",
@@ -92899,6 +93178,18 @@
           "variant": ""
         },
         {
+          "code": "8685119240107",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685309270044",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8690422242649",
           "size": "",
           "type": "CUSTOM",
@@ -95987,7 +96278,7 @@
       "category": "Genel",
       "brand": "Vegeat's",
       "description": "Vegeat's Fırınlanmış Barbekü Aromalı Nohut Cipsi (50 g)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260602090817087__-Vegeat's-Firinlanmis%CC%A7-Barbeku%CC%88lu%CC%88-Cips-50g-.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260826112512170_barbekuon.jpeg",
       "barcodes": [
         {
           "code": "8681982003115",
@@ -96559,15 +96850,15 @@
     },
     {
       "id": "5fd10d865606116dd3465984",
-      "name": "All About History (Temmuz)",
+      "name": "All About History (Ağustos)",
       "category": "Genel",
       "brand": "All",
-      "description": "All About History (Temmuz)",
+      "description": "All About History (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/725273d3-4176-4343-a3fd-9b145c784cff.jpg",
       "barcodes": [
         {
           "code": "9772717853002",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "History"
         }
@@ -96749,15 +97040,15 @@
     },
     {
       "id": "5fd735b885af197b8e7c4085",
-      "name": "Fast Company (Temmuz)",
+      "name": "Fast Company (Ağustos)",
       "category": "Genel",
       "brand": "Fast",
-      "description": "Fast Company (Temmuz)",
+      "description": "Fast Company (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/a74b8f89-69a2-478a-9e7f-752799e7f792.png",
       "barcodes": [
         {
           "code": "9772687620000",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Company"
         }
@@ -98364,15 +98655,15 @@
     },
     {
       "id": "60083d478c493168fb6ddeb1",
-      "name": "Muhit Dergi (Temmuz)",
+      "name": "Muhit Dergi (Ağustos)",
       "category": "Genel",
       "brand": "Muhit",
-      "description": "Muhit Dergi (Temmuz)",
+      "description": "Muhit Dergi (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/1ba8e510-5a54-4e46-a6f4-f99084378c8b.jpg",
       "barcodes": [
         {
           "code": "9772687545006",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Dergi"
         }
@@ -100719,6 +101010,12 @@
           "variant": "Pet"
         },
         {
+          "code": "8690574120147",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8690574843862",
           "size": "",
           "type": "CUSTOM",
@@ -100794,10 +101091,10 @@
     },
     {
       "id": "603e266ed60f7fbf004162a4",
-      "name": "Lipton Ice Tea Şeftali Aromalı Soğuk Çay Pet  (4 x 1 L)",
+      "name": "Lipton Ice Tea Şeftali Aromalı Soğuk Çay Pet (4 x 1 L)",
       "category": "İçecek",
       "brand": "Lipton",
-      "description": "Lipton Ice Tea Şeftali Aromalı Soğuk Çay Pet  (4 x 1 L)",
+      "description": "Lipton Ice Tea Şeftali Aromalı Soğuk Çay Pet (4 x 1 L)",
       "image": "https://cdn-image.getir.com/market/product/94047415-f994-47df-a3e1-f4b89e6118f0.webp",
       "barcodes": [
         {
@@ -101575,6 +101872,12 @@
           "size": "",
           "type": "CUSTOM",
           "variant": ""
+        },
+        {
+          "code": "8690574120048",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -101597,6 +101900,12 @@
         },
         {
           "code": "8690574114863",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8690574120017",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -101855,17 +102164,17 @@
     },
     {
       "id": "604f7817eb7c861c1500e9ff",
-      "name": "Lipton Mango & Ananaslı Yeşil Çay (20'li)",
+      "name": "Lipton Mango & Ananaslı (Tropikal) Yeşil Çay (20'li)",
       "category": "İçecek",
       "brand": "Lipton",
-      "description": "Lipton Mango & Ananaslı Yeşil Çay (20'li)",
+      "description": "Lipton Mango & Ananaslı (Tropikal) Yeşil Çay (20'li)",
       "image": "https://cdn-image.getir.com/market/product/2ed324c8-5287-4355-8e76-a902d28ed5ed.jpg",
       "barcodes": [
         {
           "code": "8690637992032",
           "size": "20'li",
           "type": "CUSTOM",
-          "variant": "Yeşil"
+          "variant": "Ananaslı"
         },
         {
           "code": "8720608631377",
@@ -103899,17 +104208,17 @@
     },
     {
       "id": "607ea22e328a65270601e87c",
-      "name": "Skittles Sours Ekşi Meyve Aromalı Draje Şekerleme (38 g)",
+      "name": "Skittles Sours Ekşi Meyve Aromalı Draje (38 g)",
       "category": "Meyve & Sebze",
       "brand": "Skittles",
-      "description": "Skittles Sours Ekşi Meyve Aromalı Draje Şekerleme (38 g)",
-      "image": "https://cdn-image.getir.com/market/product/3721fa98-5d02-4fae-a78c-bcf39dbcd153.jpeg",
+      "description": "Skittles Sours Ekşi Meyve Aromalı Draje (38 g)",
+      "image": "https://cdn.getir.com/product/607ea22e328a65270601e87c_tr_1619368934074.jpeg",
       "barcodes": [
         {
           "code": "5000159376792",
           "size": "38 g",
           "type": "CUSTOM",
-          "variant": "Şekerleme"
+          "variant": "Draje"
         }
       ],
       "shelf": "-",
@@ -105070,7 +105379,7 @@
       "category": "Genel",
       "brand": "Komili",
       "description": "Komili Kırmızı Biber Dolgulu Yeşil Zeytin (170 g)",
-      "image": "https://cdn-image.getir.com/market/product/770faa09-6cfb-4602-8640-bb86aabec30c.jpg",
+      "image": "https://cdn-image.getir.com/market/product/02daf9a7-1594-43e0-b6cc-d43ee6ec988a.jpg",
       "barcodes": [
         {
           "code": "8680610700037",
@@ -105136,6 +105445,12 @@
         },
         {
           "code": "8683161159033",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8683941466245",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -106058,17 +106373,17 @@
     },
     {
       "id": "60ab8e864002d3603fd1c049",
-      "name": "Cerroni Rendelenmiş İtalyan Makarna Peyniri (80 g)",
+      "name": "Cerroni Toz Peynir (80 g)",
       "category": "Süt Ürünleri",
       "brand": "Cerroni",
-      "description": "Cerroni Rendelenmiş İtalyan Makarna Peyniri (80 g)",
+      "description": "Cerroni Toz Peynir (80 g)",
       "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260522072140186_cerroni.jpg",
       "barcodes": [
         {
           "code": "8680335512304",
           "size": "80 g",
           "type": "CUSTOM",
-          "variant": "İtalyan"
+          "variant": "Toz"
         }
       ],
       "shelf": "-",
@@ -106164,12 +106479,6 @@
           "size": "150 g",
           "type": "CUSTOM",
           "variant": "Cheddar"
-        },
-        {
-          "code": "8696236905381",
-          "size": "",
-          "type": "CUSTOM",
-          "variant": ""
         }
       ],
       "shelf": "-",
@@ -106774,7 +107083,7 @@
       "category": "Genel",
       "brand": "İçim",
       "description": "İçim %35 Yağlı Krema (200 ml)",
-      "image": "https://cdn.getir.com/product/60b6141f190bcee128ac87d6_tr_1651837891615.jpeg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260827073301737_kremao%CC%88n.png",
       "barcodes": [
         {
           "code": "8690504441502",
@@ -107690,7 +107999,7 @@
       "category": "Genel",
       "brand": "Eti",
       "description": "Eti Canga Gold (45 g)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260724112953712_eti-canga-yer-fistikli-01.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260814095326730_eti-5.jpg",
       "barcodes": [
         {
           "code": "8690526012704",
@@ -108846,7 +109155,7 @@
       "category": "Genel",
       "brand": "Ülker",
       "description": "Ülker Hanımeller Mahlepli Tuzlu Kurabiye (81 g)",
-      "image": "https://cdn-image.getir.com/market/product/0fcaad0c-4694-4c2a-86ef-0036fecf2a44.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260803063141315_hanimeller-tuzlu-kurabiye-01.jpg",
       "barcodes": [
         {
           "code": "8690504119050",
@@ -109807,7 +110116,7 @@
       "category": "Genel",
       "brand": "Oba",
       "description": "Oba Mac & Cheese (206 g)",
-      "image": "https://cdn.getir.com/product/612e2703a1be47192e3d7d0e_tr_1630651173235.jpeg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260810102141306_m&c.jpg",
       "barcodes": [
         {
           "code": "8690828648427",
@@ -109978,7 +110287,7 @@
       "category": "Genel",
       "brand": "Bebeto",
       "description": "Bebeto Pick & Mix Parti (650 g)",
-      "image": "https://cdn.getir.com/product/6138a94adb3ef92f12b91360_tr_1631116746962.jpeg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260814104308920_bebeto-pick&mix-01.jpg",
       "barcodes": [
         {
           "code": "8690146158493",
@@ -110086,6 +110395,12 @@
           "size": "270 g",
           "type": "CUSTOM",
           "variant": "Meyveler"
+        },
+        {
+          "code": "8684207695843",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -110440,13 +110755,19 @@
       "category": "Genel",
       "brand": "Humm",
       "description": "Humm Organic Tahinli ve Pekmezli Vegan Kurabiye (55 g)",
-      "image": "https://cdn-image.getir.com/market/product/4149acc3-8372-4973-b38e-1cd7aaefede1.jpg",
+      "image": "https://cdn-image.getir.com/market/product/7148d338-67c3-44cd-9a4c-a2347759383a.jpg",
       "barcodes": [
         {
           "code": "8680050314016",
           "size": "55 g",
           "type": "CUSTOM",
           "variant": "Kurabiye"
+        },
+        {
+          "code": "8685111480075",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -111340,6 +111661,12 @@
         },
         {
           "code": "8684278082238",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8684917691142",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -116375,15 +116702,15 @@
     },
     {
       "id": "61c4309beb72431560afb759",
-      "name": "Burda Dergi (Temmuz)",
+      "name": "Burda Dergi (Ağustos)",
       "category": "Genel",
       "brand": "Burda",
-      "description": "Burda Dergi (Temmuz)",
+      "description": "Burda Dergi (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/3745d475-e865-4268-8927-6183f6d779b7.jpg",
       "barcodes": [
         {
           "code": "9771301973003",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Dergi"
         }
@@ -117389,6 +117716,12 @@
           "variant": ""
         },
         {
+          "code": "8683079714171",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8683454680190",
           "size": "",
           "type": "CUSTOM",
@@ -117426,6 +117759,12 @@
         },
         {
           "code": "8684998374378",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685119240053",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -117607,6 +117946,12 @@
           "variant": ""
         },
         {
+          "code": "8683079714164",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8683454680329",
           "size": "",
           "type": "CUSTOM",
@@ -117638,6 +117983,12 @@
         },
         {
           "code": "8684998374361",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8685119240046",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -118966,7 +119317,7 @@
       "category": "Süt Ürünleri",
       "brand": "Eti",
       "description": "Eti Alaska Frigo Sütlü Çikolata Bar (60 g)",
-      "image": "https://cdn-image.getir.com/market/product/76867350-1eab-42c5-926b-6d085ce1b634.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260811125230971_76867350-1eab-42c5-926b-6d085ce1b634_copy.png",
       "barcodes": [
         {
           "code": "8690526099606",
@@ -119396,7 +119747,7 @@
       "category": "Genel",
       "brand": "Uno",
       "description": "Uno Tam Cookie Frambuaz & Elma & Fındık (50 g)",
-      "image": "https://cdn-image.getir.com/market/product/f23f41d6-02a8-4232-8ebd-90a4ee0f5e4c.jpeg",
+      "image": "https://cdn.getir.com/product/6202364aafb64f060130b79f_tr_1646026977141.jpeg",
       "barcodes": [
         {
           "code": "8690698513955",
@@ -120208,15 +120559,15 @@
     },
     {
       "id": "621648a392d978ddea04f7ee",
-      "name": "Milliyet Sanat (Kasım)",
+      "name": "Milliyet Sanat (Ağustos)",
       "category": "Genel",
       "brand": "Milliyet",
-      "description": "Milliyet Sanat (Kasım)",
+      "description": "Milliyet Sanat (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/530a55b5-9103-403a-a594-19f03fc1da8f.png",
       "barcodes": [
         {
           "code": "9771300442005",
-          "size": "Kasım",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Sanat"
         }
@@ -125685,11 +126036,11 @@
     },
     {
       "id": "6287516533da62038ce53218",
-      "name": "Sek Laktozsuz Kahve Kreması  (15 ml x 10)",
+      "name": "Sek Laktozsuz Kahve Kreması (15 ml x 10)",
       "category": "İçecek",
       "brand": "Sek",
-      "description": "Sek Laktozsuz Kahve Kreması  (15 ml x 10)",
-      "image": "https://cdn-image.getir.com/market/product/8ac16f47-7bba-4ccd-9af7-c00859de0539.jpg",
+      "description": "Sek Laktozsuz Kahve Kreması (15 ml x 10)",
+      "image": "https://cdn-image.getir.com/market/product/4965ff83-9ac7-40f8-b010-8ef3fe306739.jpg",
       "barcodes": [
         {
           "code": "8692095345412",
@@ -125715,6 +126066,43 @@
           "size": "650 ml",
           "type": "CUSTOM",
           "variant": "Nektarin"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "628b75e08225ed5be68e6c4d",
+      "name": "Kırkağaç Kavun (2,5 - 3 kg)",
+      "category": "Genel",
+      "brand": "Kırkağaç",
+      "description": "Kırkağaç Kavun (2,5 - 3 kg)",
+      "image": "https://cdn-image.getir.com/market/product/2919af86-c03f-41da-a7ec-a38dc30e797b.jpeg",
+      "barcodes": [
+        {
+          "code": "8681511365141",
+          "size": "2,5 - 3 kg",
+          "type": "CUSTOM",
+          "variant": "Kavun"
+        },
+        {
+          "code": "8682655002275",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8682655003401",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8682655004835",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -125791,6 +126179,31 @@
           "size": "125 g",
           "type": "CUSTOM",
           "variant": "Sütlaç"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "628cc37a8509f74fd525ac5e",
+      "name": "Hipp Organik Ahududulu Elmalı Muzlu Meyve Barı (23 g)",
+      "category": "Meyve & Sebze",
+      "brand": "Hipp",
+      "description": "Hipp Organik Ahududulu Elmalı Muzlu Meyve Barı (23 g)",
+      "image": "https://cdn.getir.com/product/628cc37a8509f74fd525ac5e_tr_1659095579825.jpeg",
+      "barcodes": [
+        {
+          "code": "4062300362208",
+          "size": "23 g",
+          "type": "CUSTOM",
+          "variant": "Barı"
+        },
+        {
+          "code": "4062300446069",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -126030,7 +126443,7 @@
       "category": "Genel",
       "brand": "Uno",
       "description": "Uno Çikolata Kremalı Kruvasan (8'li)",
-      "image": "https://cdn-image.getir.com/market/product/7e87b2e4-14d3-4c04-b619-9471641d23d2.webp",
+      "image": "https://cdn-image.getir.com/market/product/f742aede-84f6-4064-b6db-edbf8316e16f.jpg",
       "barcodes": [
         {
           "code": "8690698514754",
@@ -126946,17 +127359,17 @@
     },
     {
       "id": "62b40b5bd91196db2d383801",
-      "name": "Algida Keyif Kornet (110 ml)",
+      "name": "Algida Keyif Kornet Kakao Vanilya (110 ml)",
       "category": "Genel",
       "brand": "Algida",
-      "description": "Algida Keyif Kornet (110 ml)",
+      "description": "Algida Keyif Kornet Kakao Vanilya (110 ml)",
       "image": "https://cdn-image.getir.com/market/product/00090a3d-fa43-4136-810c-078cf5df3cf9.jpg",
       "barcodes": [
         {
           "code": "8690637892660",
           "size": "110 ml",
           "type": "CUSTOM",
-          "variant": "Kornet"
+          "variant": "Vanilya"
         }
       ],
       "shelf": "-",
@@ -128077,7 +128490,7 @@
       "category": "Süt Ürünleri",
       "brand": "İçim",
       "description": "İçim Kaşar Peyniri (400 g)",
-      "image": "https://cdn.getir.com/product/62bc26ca23f4e037fc62067d_tr_1656619925043.jpeg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260730104734486_icim-taze-kasar-400gr-01.jpg",
       "barcodes": [
         {
           "code": "8690504432227",
@@ -132327,7 +132740,7 @@
       "category": "İçecek",
       "brand": "Uno",
       "description": "Uno Premium Susamlı Büyük Hamburger Ekmeği (4 adet)",
-      "image": "https://cdn-image.getir.com/market/product/7157169d-0ea7-411c-a8f4-4052f4ed2db9.jpeg",
+      "image": "https://cdn.getir.com/product/633ae2570cf4cad2bde58c00_tr_1664971155099.jpeg",
       "barcodes": [
         {
           "code": "8690698515157",
@@ -132365,7 +132778,7 @@
       "category": "Genel",
       "brand": "Uno",
       "description": "Uno Tam Buğdaylı Sandviç Ekmeği (4 adet)",
-      "image": "https://cdn-image.getir.com/market/product/a5a01d87-1b91-4f59-b6b3-20f91e281aaf.jpeg",
+      "image": "https://cdn.getir.com/product/633b25e4520620ec31d061f6_tr_1664885673949.jpeg",
       "barcodes": [
         {
           "code": "8690698515133",
@@ -132542,7 +132955,7 @@
       "category": "Genel",
       "brand": "Uno",
       "description": "Uno Tam Buğdaylı Kavılcalı Tava Ekmeği (450 g)",
-      "image": "https://cdn-image.getir.com/market/product/ffb299e4-7330-434a-827f-f97b02b58133.webp",
+      "image": "https://cdn-image.getir.com/market/product/63f084b5-d42d-4ff5-acb3-b28dfd473d90.jpg",
       "barcodes": [
         {
           "code": "8690698515201",
@@ -132561,7 +132974,7 @@
       "category": "Genel",
       "brand": "Uno",
       "description": "Uno Otantik Tava Ekmeği (470 g)",
-      "image": "https://cdn-image.getir.com/market/product/668231e1-6f69-4cb6-a99e-22bd4fc56397.webp",
+      "image": "https://cdn-image.getir.com/market/product/81849b9e-3f7b-4d6e-810a-c04deb3e74cb.jpg",
       "barcodes": [
         {
           "code": "8690698514976",
@@ -133779,7 +134192,7 @@
       "category": "Genel",
       "brand": "Vegeat's",
       "description": "Vegeat's Fırınlanmış Deniz Tuzlu Nohut Cipsi (50 g)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260602080434329__-Vegeat's-Deniz-Tuzlu-Nohut-Cipsi-50g-.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260826112149623_deniztuzlu.jpg",
       "barcodes": [
         {
           "code": "8681982003344",
@@ -135205,11 +135618,11 @@
     },
     {
       "id": "639b1789d915cf4dae81aed7",
-      "name": "President Rende Mozzarella Peyniri (200 g)",
-      "category": "Süt Ürünleri",
+      "name": "President Rende Mozzarella (200 g)",
+      "category": "Genel",
       "brand": "President",
-      "description": "President Rende Mozzarella Peyniri (200 g)",
-      "image": "https://cdn-image.getir.com/market/product/7d4c1c0d-3d0e-46d4-881e-dc7579e81d81.jpg",
+      "description": "President Rende Mozzarella (200 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260805134141336_president-rende-mozarella-peyniri-01.jpg",
       "barcodes": [
         {
           "code": "8692971434056",
@@ -135563,7 +135976,7 @@
       "category": "Meyve & Sebze",
       "brand": "Yayla",
       "description": "Yayla Sebzeli Tavuk Sote (200 g)",
-      "image": "https://cdn-image.getir.com/market/product/a3a41638-fa4f-47e9-be0e-00cee3b3e159.jpg",
+      "image": "https://cdn-image.getir.com/market/product/47819f70-0e87-48d2-80ce-34b106ceb62d.jpg",
       "barcodes": [
         {
           "code": "8693374268514",
@@ -135601,7 +136014,7 @@
       "category": "Genel",
       "brand": "Persil",
       "description": "Persil Power Jel Sıvı Çamaşır Deterjanı Canlı Renkler (1690 ml)",
-      "image": "https://cdn-image.getir.com/market/product/650d0468-2447-42d4-8ee8-e6500ad2bc5d.jpg",
+      "image": "https://cdn-image.getir.com/market/product/725b9803-d7cc-4ba7-b8a1-d72536556f65.jpg",
       "barcodes": [
         {
           "code": "9000101538311",
@@ -135611,6 +136024,12 @@
         },
         {
           "code": "9000101597578",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "9000101864274",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -136552,15 +136971,15 @@
     },
     {
       "id": "63d144937fa42e1f68f62529",
-      "name": "Milliyet Otorama Dergi (Temmuz)",
+      "name": "Milliyet Otorama Dergi (Ağustos)",
       "category": "Genel",
       "brand": "Milliyet",
-      "description": "Milliyet Otorama Dergi (Temmuz)",
+      "description": "Milliyet Otorama Dergi (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/dadc6b7b-55d6-4b90-b100-93b6eb68d76b.jpg",
       "barcodes": [
         {
           "code": "9772980038007",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Dergi"
         }
@@ -137213,7 +137632,7 @@
       "category": "Genel",
       "brand": "Elidor",
       "description": "Elidor Saç Kremi Anında Onarıcı (350 ml)",
-      "image": "https://cdn-image.getir.com/market/product/11b450e7-1967-4d90-bc47-650977b29116.jpg",
+      "image": "https://cdn-image.getir.com/market/product/e07db984-37f2-4ee6-b4c1-8162f69ba4b3.png",
       "barcodes": [
         {
           "code": "8683130045961",
@@ -139315,7 +139734,7 @@
       "category": "Genel",
       "brand": "Elidor",
       "description": "Elidor Şampuan Güçlü ve Parlak (400 ml)",
-      "image": "https://cdn-image.getir.com/market/product/c74faca4-d620-49db-b8c7-cf630fc40b4f.jpg",
+      "image": "https://cdn-image.getir.com/market/product/fa7579cf-a39b-44b0-9da5-e0c2edb435fb.png",
       "barcodes": [
         {
           "code": "8683130049433",
@@ -139340,7 +139759,7 @@
       "category": "Genel",
       "brand": "Elidor",
       "description": "Elidor Şampuan Anında Onarıcı (400 ml)",
-      "image": "https://cdn-image.getir.com/market/product/fd953834-f139-416b-b2cf-b65d09573052.jpg",
+      "image": "https://cdn-image.getir.com/market/product/251ae9f7-59c0-4ba8-aaba-dc93ec904164.png",
       "barcodes": [
         {
           "code": "8683130049365",
@@ -141864,11 +142283,11 @@
     },
     {
       "id": "645274e3fe9481f5d149e74e",
-      "name": "Sek Laktozsuz Yoğurt  (750 g)",
+      "name": "Sek Laktozsuz Yoğurt (750 g)",
       "category": "Süt Ürünleri",
       "brand": "Sek",
-      "description": "Sek Laktozsuz Yoğurt  (750 g)",
-      "image": "https://cdn-image.getir.com/market/product/7919a2b6-6061-42b0-add0-c3b7145afbc6.jpg",
+      "description": "Sek Laktozsuz Yoğurt (750 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260730111922464_sek-laktozsuz-yogurt-01.jpg",
       "barcodes": [
         {
           "code": "8692095345801",
@@ -145825,15 +146244,15 @@
     },
     {
       "id": "64c7a447112f220c76e03125",
-      "name": "Kukuli Çocuk Hobi Dergisi (Temmuz)",
+      "name": "Kukuli Çocuk Hobi Dergisi (Ağustos)",
       "category": "Genel",
       "brand": "Kukuli",
-      "description": "Kukuli Çocuk Hobi Dergisi (Temmuz)",
+      "description": "Kukuli Çocuk Hobi Dergisi (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/cce1c80b-3ed3-4594-b863-a26c56bbef30.jpeg",
       "barcodes": [
         {
           "code": "9772757509006",
-          "size": "Temmuz",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Dergisi"
         }
@@ -146299,11 +146718,11 @@
     },
     {
       "id": "64de2f34da9ecd8c783912d2",
-      "name": "Yayla Kremalı Mantar Soslu Makarna  (250 g)",
+      "name": "Yayla Kremalı Mantar Soslu Makarna (250 g)",
       "category": "Genel",
       "brand": "Yayla",
-      "description": "Yayla Kremalı Mantar Soslu Makarna  (250 g)",
-      "image": "https://cdn-image.getir.com/market/product/444d81f4-680f-4320-b860-eeb8b6163c1f.jpg",
+      "description": "Yayla Kremalı Mantar Soslu Makarna (250 g)",
+      "image": "https://cdn-image.getir.com/market/product/0a14834a-76cc-472a-8791-56bbcb6733a1.jpg",
       "barcodes": [
         {
           "code": "8693374270777",
@@ -147990,7 +148409,7 @@
       "category": "Genel",
       "brand": "Hipp",
       "description": "Hipp Organik Çilekli Muzlu Elma Püresi (100 g)",
-      "image": "https://cdn-image.getir.com/market/product/903ece33-7cc7-484a-a12a-6c283c5f0eca.jpg",
+      "image": "https://cdn-image.getir.com/market/product/17bbee9a-1454-473e-964a-c8ddc7f5f676.jpg",
       "barcodes": [
         {
           "code": "4062300278547",
@@ -151693,6 +152112,25 @@
       "stock": null
     },
     {
+      "id": "6570682ea28386466f7cc012",
+      "name": "Hipp Organik Elma ve Muz Püresi (190 g)",
+      "category": "Genel",
+      "brand": "Hipp",
+      "description": "Hipp Organik Elma ve Muz Püresi (190 g)",
+      "image": "https://cdn-image.getir.com/market/product/64578808-e94e-4c9f-9b48-86eaac3d828f.jpg",
+      "barcodes": [
+        {
+          "code": "9062300117001",
+          "size": "190 g",
+          "type": "CUSTOM",
+          "variant": "Püresi"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "6570777e367f8cbc5b641f7b",
       "name": "Polonez Dana Karabiberli Füme Et (90 g)",
       "category": "Genel",
@@ -153273,6 +153711,25 @@
       "stock": null
     },
     {
+      "id": "65780d37c91b6953a028cbfe",
+      "name": "Dr.Oetker Çubuk Pasta Süsü (10 g)",
+      "category": "Genel",
+      "brand": "Dr.Oetker",
+      "description": "Dr.Oetker Çubuk Pasta Süsü (10 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260819132816590_dr-oetker-4.jpg",
+      "barcodes": [
+        {
+          "code": "8690629442408",
+          "size": "10 g",
+          "type": "CUSTOM",
+          "variant": "Süsü"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "657817c48fb7301d544db64c",
       "name": "Pınar Tost Peyniri (400 g)",
       "category": "Süt Ürünleri",
@@ -153591,6 +154048,12 @@
           "variant": "Pet"
         },
         {
+          "code": "8690574120154",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
           "code": "8690574843961",
           "size": "",
           "type": "CUSTOM",
@@ -153617,6 +154080,12 @@
         },
         {
           "code": "8690574114900",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8690574120093",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -154275,7 +154744,7 @@
       "category": "Genel",
       "brand": "Cornetto",
       "description": "Cornetto Classico Çilek (120 ml)",
-      "image": "https://cdn-image.getir.com/market/product/87a0b92d-a576-4bc9-a966-c7063cb55f3c.jpg",
+      "image": "https://cdn-image.getir.com/market/product/b67c8cb0-e3f2-4a5b-8c52-976a79551346.jpg",
       "barcodes": [
         {
           "code": "8683130067994",
@@ -154353,10 +154822,10 @@
     },
     {
       "id": "658a85fbbab09fe594162c04",
-      "name": "Algida Maraş Usulü Tel Kadayıf Dondurma  (500 ml)",
+      "name": "Algida Maraş Usulü Tel Kadayıf Dondurma (500 ml)",
       "category": "İçecek",
       "brand": "Algida",
-      "description": "Algida Maraş Usulü Tel Kadayıf Dondurma  (500 ml)",
+      "description": "Algida Maraş Usulü Tel Kadayıf Dondurma (500 ml)",
       "image": "https://cdn-image.getir.com/market/product/ce3d1949-a2dd-4687-aa13-3c97ec5304ce.jpg",
       "barcodes": [
         {
@@ -154397,10 +154866,10 @@
     },
     {
       "id": "658a86140b2ae7f13652c99a",
-      "name": "Carte d'Or Selection Patisserie  (800 ml)",
+      "name": "Carte d'Or Selection Patisserie (800 ml)",
       "category": "Genel",
       "brand": "Carte",
-      "description": "Carte d'Or Selection Patisserie  (800 ml)",
+      "description": "Carte d'Or Selection Patisserie (800 ml)",
       "image": "https://cdn-image.getir.com/market/product/fead1044-3899-44b8-82c8-0dc13454ed68.jpg",
       "barcodes": [
         {
@@ -154511,10 +154980,10 @@
     },
     {
       "id": "658a8dff8dafb14c69b55e63",
-      "name": "Carte d'Or Selection Aşkın Büyüsü  (800 ml)",
+      "name": "Carte d'Or Selection Aşkın Büyüsü (800 ml)",
       "category": "Genel",
       "brand": "Carte",
-      "description": "Carte d'Or Selection Aşkın Büyüsü  (800 ml)",
+      "description": "Carte d'Or Selection Aşkın Büyüsü (800 ml)",
       "image": "https://cdn-image.getir.com/market/product/ba91ed66-43af-4900-9d37-87b2f2fc29f2.jpg",
       "barcodes": [
         {
@@ -154863,7 +155332,7 @@
       "category": "Genel",
       "brand": "Milka",
       "description": "Milka Sürülebilir Çikolata (350 g)",
-      "image": "https://cdn-image.getir.com/market/product/761b94c8-1430-47e1-9475-e1e0150f3e70.jpg",
+      "image": "https://cdn-image.getir.com/market/product/d4e24833-c97e-42bc-a65d-00eace4bb68b.jpg",
       "barcodes": [
         {
           "code": "7622201459826",
@@ -154897,10 +155366,10 @@
     },
     {
       "id": "659bae102263a29cebd6d8b8",
-      "name": "Erşan Dana Sucuk  (90 g)",
+      "name": "Erşan Dana Sucuk (90 g)",
       "category": "İçecek",
       "brand": "Erşan",
-      "description": "Erşan Dana Sucuk  (90 g)",
+      "description": "Erşan Dana Sucuk (90 g)",
       "image": "https://cdn-image.getir.com/market/product/50a3c2a5-d250-4955-90a7-e8ccf50afd7e.jpg",
       "barcodes": [
         {
@@ -157381,6 +157850,25 @@
       "stock": null
     },
     {
+      "id": "65e0523ab04729032300aebb",
+      "name": "Axe Erkek Deodorant Blue Lavender (150 ml)",
+      "category": "Genel",
+      "brand": "Axe",
+      "description": "Axe Erkek Deodorant Blue Lavender (150 ml)",
+      "image": "https://cdn-image.getir.com/market/product/8c587220-4be3-4e79-97c1-05a40053814a.jpg",
+      "barcodes": [
+        {
+          "code": "8683130066492",
+          "size": "150 ml",
+          "type": "CUSTOM",
+          "variant": "Lavender"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "65e5681b3a7fd5a04da35203",
       "name": "Domestos Çamaşır Suyu Beyaz Sabun Ferahlığı (750 ml)",
       "category": "İçecek",
@@ -159054,6 +159542,25 @@
       "stock": null
     },
     {
+      "id": "6605738a2550443dee08f701",
+      "name": "HiPP Organik Bebek Bisküvisi (180 g)",
+      "category": "Genel",
+      "brand": "HiPP",
+      "description": "HiPP Organik Bebek Bisküvisi (180 g)",
+      "image": "https://cdn-image.getir.com/market/product/36e50b08-7a78-44c1-8156-f51d26fc51ee.jpg",
+      "barcodes": [
+        {
+          "code": "4062300431928",
+          "size": "180 g",
+          "type": "CUSTOM",
+          "variant": "Bisküvisi"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "660680f0518a2eba154ad6de",
       "name": "Superfresh Pizza Tost (2 x100 g)",
       "category": "İçecek",
@@ -160639,7 +161146,7 @@
       "category": "Genel",
       "brand": "Lay's",
       "description": "Lay's Tuz ve Sirke Aromalı Patates Cipsi (92 g)",
-      "image": "https://cdn-image.getir.com/market/product/b5ec82b0-57d6-457f-8097-0e2e92ee02de.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260819113157394_lays-5.jpg",
       "barcodes": [
         {
           "code": "8690624103298",
@@ -162109,15 +162616,15 @@
     },
     {
       "id": "667bfcf37e068e90e7216c0c",
-      "name": "Patrones Dikiş Dergi (Ocak)",
+      "name": "Patrones Dikiş Dergi (Ağustos)",
       "category": "Genel",
       "brand": "Patrones",
-      "description": "Patrones Dikiş Dergi (Ocak)",
+      "description": "Patrones Dikiş Dergi (Ağustos)",
       "image": "https://cdn-image.getir.com/market/product/31e0c267-10e9-4c9b-808c-a6168cb5c22a.png",
       "barcodes": [
         {
           "code": "9773023579006",
-          "size": "Ocak",
+          "size": "Ağustos",
           "type": "CUSTOM",
           "variant": "Dergi"
         }
@@ -162758,6 +163265,12 @@
           "size": "1 L",
           "type": "CUSTOM",
           "variant": "Pet"
+        },
+        {
+          "code": "8690574120031",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -162789,7 +163302,7 @@
       "category": "Genel",
       "brand": "Elidor",
       "description": "Elidor Saç Kremi Belirgin Bukleler (240 ml)",
-      "image": "https://cdn-image.getir.com/market/product/e8eabbc6-d3a1-43cf-86c8-04640207d8f9.jpg",
+      "image": "https://cdn-image.getir.com/market/product/2ff41b03-9858-42bf-bb20-b1afada4346b.jpg",
       "barcodes": [
         {
           "code": "8683130078280",
@@ -163813,7 +164326,7 @@
       "category": "Genel",
       "brand": "Duru",
       "description": "Duru Body Scrub Duş Jeli Gold (450 ml)",
-      "image": "https://cdn-image.getir.com/market/product/82e7f2eb-1309-46e1-81fd-f187e5902b7d.jpg",
+      "image": "https://cdn-image.getir.com/market/product/f5cbe497-3fb3-425c-9c7b-4c2f0d8a0233.jpg",
       "barcodes": [
         {
           "code": "8690506548247",
@@ -168547,10 +169060,10 @@
     },
     {
       "id": "673339ed0c2d8084bc443566",
-      "name": "Master Pops Biftek Çeşnili Mısır Çerezi (90 g)",
+      "name": "Master Puff Biftek Çeşnili Mısır Çerezi (90 g)",
       "category": "Genel",
       "brand": "Master",
-      "description": "Master Pops Biftek Çeşnili Mısır Çerezi (90 g)",
+      "description": "Master Puff Biftek Çeşnili Mısır Çerezi (90 g)",
       "image": "https://cdn-image.getir.com/market/product/6d9cdd49-2c78-4ec3-9d2e-22117f902020.jpg",
       "barcodes": [
         {
@@ -168651,7 +169164,7 @@
       "category": "İçecek",
       "brand": "Yayla",
       "description": "Yayla Tereyağlı Kuru Fasulye (250 g)",
-      "image": "https://cdn-image.getir.com/market/product/5f043930-625f-455a-afb7-0e8e9907422d.jpg",
+      "image": "https://cdn-image.getir.com/market/product/08cadbdb-b7a9-4e38-858d-f45aec5758df.jpg",
       "barcodes": [
         {
           "code": "8693374276458",
@@ -170605,16 +171118,10 @@
       "image": "https://cdn-image.getir.com/market/product/c29b039f-f417-4c2f-a9b1-39cb30304a5a.jpg",
       "barcodes": [
         {
-          "code": "8684207695843",
+          "code": "1234567892345",
           "size": "270 g",
           "type": "CUSTOM",
           "variant": "Meyveler"
-        },
-        {
-          "code": "8684207695850",
-          "size": "",
-          "type": "CUSTOM",
-          "variant": ""
         }
       ],
       "shelf": "-",
@@ -170794,10 +171301,10 @@
     },
     {
       "id": "677bc520d4c6c90c0044ee45",
-      "name": "Carte d'Or Selection Belçika Rüyası  (800 ml)",
+      "name": "Carte d'Or Selection Belçika Rüyası (800 ml)",
       "category": "Genel",
       "brand": "Carte",
-      "description": "Carte d'Or Selection Belçika Rüyası  (800 ml)",
+      "description": "Carte d'Or Selection Belçika Rüyası (800 ml)",
       "image": "https://cdn-image.getir.com/market/product/6c3302d0-482c-40ca-80b4-39521c5887f0.jpg",
       "barcodes": [
         {
@@ -170832,15 +171339,15 @@
     },
     {
       "id": "677bc53a41751c3845f3021f",
-      "name": "Carte d'Or Classic İsviçre Çikolatası  (1105 ml)",
+      "name": "Carte d'Or Classic İsviçre Çikolatası (1100 ml)",
       "category": "Genel",
       "brand": "Carte",
-      "description": "Carte d'Or Classic İsviçre Çikolatası  (1105 ml)",
-      "image": "https://cdn-image.getir.com/market/product/cb970fef-2676-4c9e-ac3f-9841356685c8.jpg",
+      "description": "Carte d'Or Classic İsviçre Çikolatası (1100 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260817135640458_b07f77eb-dc63-467f-9365-b5d542a989ef.jpg",
       "barcodes": [
         {
           "code": "8683130102411",
-          "size": "1105 ml",
+          "size": "1100 ml",
           "type": "CUSTOM",
           "variant": "Çikolatası"
         }
@@ -172153,7 +172660,7 @@
       "category": "Süt Ürünleri",
       "brand": "Lay’s",
       "description": "Lay’s Fırından Yoğurt Mevsim Yeşillikli Patates Çerezi Süper Boy (110 g)",
-      "image": "https://cdn-image.getir.com/market/product/98fae95e-6b39-49e7-9ff4-baf245bf91bf.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260819112606939_lays-7.jpg",
       "barcodes": [
         {
           "code": "8690624105773",
@@ -172172,7 +172679,7 @@
       "category": "Genel",
       "brand": "Lay's",
       "description": "Lay's Klasik Patates Cipsi Süper Boy (125 g)",
-      "image": "https://cdn-image.getir.com/market/product/3dbeae2f-a06c-49c1-a857-c64a56ea2045.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260819112535587_lays.jpg",
       "barcodes": [
         {
           "code": "8690624105704",
@@ -172210,7 +172717,7 @@
       "category": "Genel",
       "brand": "Lay's",
       "description": "Lay's Baharatlı Patates Cipsi Parti Boy (160 g)",
-      "image": "https://cdn-image.getir.com/market/product/ab094067-2a2f-4769-98d6-d24365069f3f.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260819112446546_lays-3.jpg",
       "barcodes": [
         {
           "code": "8690624106022",
@@ -172225,11 +172732,11 @@
     },
     {
       "id": "67a9d9f576adcff61d1d45b3",
-      "name": "Lay’s Yoğurt & Mevsim Yeşillikli Patates Cipsi  (160 g)",
+      "name": "Lay’s Yoğurt & Mevsim Yeşillikli Patates Cipsi (160 g)",
       "category": "Süt Ürünleri",
       "brand": "Lay’s",
-      "description": "Lay’s Yoğurt & Mevsim Yeşillikli Patates Cipsi  (160 g)",
-      "image": "https://cdn-image.getir.com/market/product/3158cde7-2141-4973-a828-8d46f82164b9.jpg",
+      "description": "Lay’s Yoğurt & Mevsim Yeşillikli Patates Cipsi (160 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260819112130288_lays_1.jpg",
       "barcodes": [
         {
           "code": "8690624106039",
@@ -172419,7 +172926,7 @@
       "category": "Süt Ürünleri",
       "brand": "Lay’s",
       "description": "Lay’s Yoğurt ve Mevsim Yeşillikli Patates Cipsi Süper Boy (125 g)",
-      "image": "https://cdn-image.getir.com/market/product/49036826-efeb-487d-b0ad-eb3148ac5da4.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260819112229594_lays-3.jpg",
       "barcodes": [
         {
           "code": "8690624105711",
@@ -172844,6 +173351,25 @@
           "size": "55 ml",
           "type": "CUSTOM",
           "variant": "Elma-Çilek-Limon"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "67ac9a52c0b0169a48f1bc85",
+      "name": "Golf Ice Jelly Funny  (47 ml)",
+      "category": "Genel",
+      "brand": "Golf",
+      "description": "Golf Ice Jelly Funny  (47 ml)",
+      "image": "https://cdn-image.getir.com/market/product/83c2ec2b-ba07-4174-ba5f-adb5137df83f.jpg",
+      "barcodes": [
+        {
+          "code": "8698313521170",
+          "size": "47 ml",
+          "type": "CUSTOM",
+          "variant": "Funny"
         }
       ],
       "shelf": "-",
@@ -173413,7 +173939,7 @@
       "category": "Genel",
       "brand": "Uno",
       "description": "Uno Kıtıruno Denge Tam Buğdaylı Çiya Tohumlu (50 g)",
-      "image": "https://cdn-image.getir.com/market/product/a6476f1c-7361-46ef-a10d-6dbc8da8013e.webp",
+      "image": "https://cdn-image.getir.com/market/product/5a1458a1-4fa2-4725-bbd1-3f20d1b5155b.jpg",
       "barcodes": [
         {
           "code": "8690698513627",
@@ -173770,16 +174296,10 @@
       "image": "https://cdn-image.getir.com/market/product/710e92e0-abbd-4a7d-905a-2d771b44d3fd.jpg",
       "barcodes": [
         {
-          "code": "86815060021342",
+          "code": "8681506020802",
           "size": "160 g",
           "type": "CUSTOM",
           "variant": "Boy"
-        },
-        {
-          "code": "8681506020802",
-          "size": "",
-          "type": "CUSTOM",
-          "variant": ""
         },
         {
           "code": "8681506021229",
@@ -174083,7 +174603,7 @@
       "category": "Genel",
       "brand": "Untad",
       "description": "Untad Premium Büyük Tost Ekmeği (670 g)",
-      "image": "https://cdn-image.getir.com/market/product/0e5013e8-8026-402a-8da6-ac0df5f0f1eb.webp",
+      "image": "https://cdn-image.getir.com/market/product/e4835948-339d-4dfc-bf9a-f12714dfbaf2.jpg",
       "barcodes": [
         {
           "code": "8696292000372",
@@ -174098,11 +174618,11 @@
     },
     {
       "id": "67d006335879ddf5d75cb179",
-      "name": "Untad Lavaş Sade (25 cm) (8'li)",
+      "name": "Untad Lavaş Sade (8'li)",
       "category": "Genel",
       "brand": "Untad",
-      "description": "Untad Lavaş Sade (25 cm) (8'li)",
-      "image": "https://cdn-image.getir.com/market/product/8471dccc-02e7-4010-b5c0-4f9d76eb7182.webp",
+      "description": "Untad Lavaş Sade (8'li)",
+      "image": "https://cdn-image.getir.com/market/product/39b36888-f0ef-442f-9881-a87a9f6e7987.jpg",
       "barcodes": [
         {
           "code": "8696292000433",
@@ -174121,7 +174641,7 @@
       "category": "Fırın",
       "brand": "Untad",
       "description": "Untad Premium 12 Tahıllı Ekmek (480 g)",
-      "image": "https://cdn-image.getir.com/market/product/6b7912bf-be78-42df-a4bd-66425fa118c6.webp",
+      "image": "https://cdn-image.getir.com/market/product/e84e3744-0511-45dd-900e-a45fd3971bfc.jpg",
       "barcodes": [
         {
           "code": "8696292000174",
@@ -174178,7 +174698,7 @@
       "category": "Genel",
       "brand": "Untad",
       "description": "Untad Premium Kepek Ekmeği (500 g)",
-      "image": "https://cdn-image.getir.com/market/product/815153b1-6fdd-4ccf-9e3f-32f2509dc658.webp",
+      "image": "https://cdn-image.getir.com/market/product/84b6b192-cf12-49f4-b77c-297812683842.jpg",
       "barcodes": [
         {
           "code": "8696292000013",
@@ -174212,11 +174732,11 @@
     },
     {
       "id": "67d0130eb6cc47e5a3390e38",
-      "name": "Untad Lavaş Tam Buğdaylı (25 cm) (8'li)",
+      "name": "Untad Lavaş Tam Buğdaylı (8'li)",
       "category": "Genel",
       "brand": "Untad",
-      "description": "Untad Lavaş Tam Buğdaylı (25 cm) (8'li)",
-      "image": "https://cdn-image.getir.com/market/product/1e0868b9-c173-48ce-9a93-5395ffe5609f.webp",
+      "description": "Untad Lavaş Tam Buğdaylı (8'li)",
+      "image": "https://cdn-image.getir.com/market/product/26ffab9c-1dac-4f83-b8bd-6f23e56a99f1.jpg",
       "barcodes": [
         {
           "code": "8696292000877",
@@ -174242,6 +174762,12 @@
           "size": "280 ml",
           "type": "CUSTOM",
           "variant": "Dinner"
+        },
+        {
+          "code": "8721274648065",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -174288,10 +174814,10 @@
     },
     {
       "id": "67d27ef9fcdbed0fc520b30d",
-      "name": "Lipton Ice Tea Ahududu Aromalı Soğuk Çay Pet  (1L)",
+      "name": "Lipton Ice Tea Ahududu Aromalı Soğuk Çay Pet (1L)",
       "category": "İçecek",
       "brand": "Lipton",
-      "description": "Lipton Ice Tea Ahududu Aromalı Soğuk Çay Pet  (1L)",
+      "description": "Lipton Ice Tea Ahududu Aromalı Soğuk Çay Pet (1L)",
       "image": "https://cdn-image.getir.com/market/product/7683ef88-98c7-401e-aee4-101b212db8a5.jpg",
       "barcodes": [
         {
@@ -174302,6 +174828,12 @@
         },
         {
           "code": "8690574116850",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "8690574120055",
           "size": "",
           "type": "CUSTOM",
           "variant": ""
@@ -174370,10 +174902,10 @@
     },
     {
       "id": "67d28160079704c04d2ec3fc",
-      "name": "Lipton Ice Tea Mango Aromalı Soğuk Çay Pet  (1 L)",
+      "name": "Lipton Ice Tea Mango Aromalı Soğuk Çay Pet (1 L)",
       "category": "İçecek",
       "brand": "Lipton",
-      "description": "Lipton Ice Tea Mango Aromalı Soğuk Çay Pet  (1 L)",
+      "description": "Lipton Ice Tea Mango Aromalı Soğuk Çay Pet (1 L)",
       "image": "https://cdn-image.getir.com/market/product/4bb7648a-3fe0-403f-a0ae-cd3da6ebce90.jpg",
       "barcodes": [
         {
@@ -174381,6 +174913,12 @@
           "size": "1 L",
           "type": "CUSTOM",
           "variant": "Pet"
+        },
+        {
+          "code": "8690574120024",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -174437,7 +174975,7 @@
       "category": "İçecek",
       "brand": "Kızılay",
       "description": "Kızılay Şalgam Suyu Acısız (1 L)",
-      "image": "https://cdn-image.getir.com/market/product/a0b8eaa8-9c96-45c4-a97b-baf8fb845bf9.jpg",
+      "image": "https://cdn-image.getir.com/market/product/e352e50f-4419-4d5a-8652-97f16554d6c6.jpg",
       "barcodes": [
         {
           "code": "8684698000058",
@@ -174456,7 +174994,7 @@
       "category": "Genel",
       "brand": "Kızılay",
       "description": "Kızılay Limonata Şekersiz (1 L)",
-      "image": "https://cdn-image.getir.com/market/product/067983e4-8ba9-4cc3-bbf1-9895c14629e1.jpg",
+      "image": "https://cdn-image.getir.com/market/product/9389ddbe-5b43-4e3b-91ef-23a07d03ba7a.jpg",
       "barcodes": [
         {
           "code": "8684698000119",
@@ -174475,7 +175013,7 @@
       "category": "Genel",
       "brand": "Kızılay",
       "description": "Kızılay Limonata Şekerli (1 L)",
-      "image": "https://cdn-image.getir.com/market/product/56ef4a16-99ee-4f0d-a588-a565757b9ae7.jpg",
+      "image": "https://cdn-image.getir.com/market/product/8ade4c63-22aa-41ae-bff2-d09aefca7b6b.jpg",
       "barcodes": [
         {
           "code": "8684698000096",
@@ -174513,7 +175051,7 @@
       "category": "İçecek",
       "brand": "Kızılay",
       "description": "Kızılay Soğuk Çay Şeftali (1 L)",
-      "image": "https://cdn-image.getir.com/market/product/025e395b-24e0-4d7f-98a7-d996bc5b42ba.jpg",
+      "image": "https://cdn-image.getir.com/market/product/1d575b78-b161-430a-a95f-14672030ed1f.jpg",
       "barcodes": [
         {
           "code": "8684698000218",
@@ -174835,13 +175373,19 @@
       "category": "Genel",
       "brand": "Colgate",
       "description": "Colgate Total Gelişmiş Nane Temizliği Diş Macunu (75 ml)",
-      "image": "https://cdn-image.getir.com/market/product/3f490975-3cf4-4676-ba6e-7f3e778ba6e3.jpg",
+      "image": "https://cdn-image.getir.com/market/product/9b249270-c2a1-4dd4-bacb-30d54aa72c0a.jpg",
       "barcodes": [
         {
           "code": "6920354839573",
           "size": "75 ml",
           "type": "CUSTOM",
           "variant": "Temizliği"
+        },
+        {
+          "code": "8718951744776",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -175464,17 +176008,23 @@
     },
     {
       "id": "680b91f46a332998b22ec1af",
-      "name": "Kellogg's  Şeker İlavesiz Kakao ve Bademli Granola (250 g)",
+      "name": "Kellogg's Kakao ve Bademli Granola (250 g)",
       "category": "Genel",
       "brand": "Kellogg's",
-      "description": "Kellogg's  Şeker İlavesiz Kakao ve Bademli Granola (250 g)",
-      "image": "https://cdn-image.getir.com/market/product/48f0aff5-fa62-4d93-abe3-aef8f5d9f9e0.jpeg",
+      "description": "Kellogg's Kakao ve Bademli Granola (250 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260824071129467_KELLOGGS-GRANOLA-KAKAO-BADEM-01.jpg",
       "barcodes": [
         {
           "code": "8682530222460",
           "size": "250 g",
           "type": "CUSTOM",
           "variant": "Granola"
+        },
+        {
+          "code": "8682530222958",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -175620,7 +176170,7 @@
       "category": "Genel",
       "brand": "Doğanay",
       "description": "Doğanay Pancar Kvass Cam Şişe (750 ml)",
-      "image": "https://cdn-image.getir.com/market/product/58bb06a7-9d5e-41d1-a85e-8bf87d38d654.jpg",
+      "image": "https://cdn-image.getir.com/market/product/7e3ba4b1-2527-4df2-a21c-3f9457f010cb.jpg",
       "barcodes": [
         {
           "code": "8693354001827",
@@ -176115,10 +176665,10 @@
     },
     {
       "id": "6825f493818c4f848f70c1ba",
-      "name": "Magnum Crack Beyaz Çikolata ve Cookie (440 ml)",
+      "name": "Magnum Crack Beyaz Çikolata & Cookie (440 ml)",
       "category": "Genel",
       "brand": "Magnum",
-      "description": "Magnum Crack Beyaz Çikolata ve Cookie (440 ml)",
+      "description": "Magnum Crack Beyaz Çikolata & Cookie (440 ml)",
       "image": "https://cdn-image.getir.com/market/product/1250d386-e3bc-4279-a1ed-d996afbc5aa6.jpg",
       "barcodes": [
         {
@@ -176315,7 +176865,7 @@
       "category": "İçecek",
       "brand": "Uno",
       "description": "Uno Super Tost Ekmeği (470 g)",
-      "image": "https://cdn-image.getir.com/market/product/be5d5a0a-862f-461d-bcee-957c9ca05b41.webp",
+      "image": "https://cdn-image.getir.com/market/product/807e49b7-a7a1-4886-8a2b-540a037624db.jpeg",
       "barcodes": [
         {
           "code": "8690698515652",
@@ -176999,7 +177549,7 @@
       "category": "Genel",
       "brand": "Dimes",
       "description": "Dimes Cool Lime Mix (1 L)",
-      "image": "https://cdn-image.getir.com/market/product/eb28ad33-de6b-424e-8f85-209ac4d32515.jpg",
+      "image": "https://cdn-image.getir.com/market/product/01c408bb-a370-4600-8063-a9915ec7cd27.jpg",
       "barcodes": [
         {
           "code": "8690558039335",
@@ -177306,7 +177856,7 @@
       "image": "https://cdn-image.getir.com/market/product/7147d558-d70a-474a-adf7-15e607cb3a8e.jpg",
       "barcodes": [
         {
-          "code": "8690632767444",
+          "code": "08690632767444",
           "size": "1 L",
           "type": "CUSTOM",
           "variant": "Original"
@@ -177322,13 +177872,19 @@
       "category": "Genel",
       "brand": "Persil",
       "description": "Persil Okyanus Ferahlığı Jel (26 Yıkama)",
-      "image": "https://cdn-image.getir.com/market/product/dabbc39c-604f-4284-82b0-65dee00f8bc1.jpg",
+      "image": "https://cdn-image.getir.com/market/product/caeb7736-77f1-4ec6-b139-cf6a05128738.jpg",
       "barcodes": [
         {
           "code": "9000101837308",
           "size": "26 Yıkama",
           "type": "CUSTOM",
           "variant": "Ferahlığı"
+        },
+        {
+          "code": "9000101864366",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -177512,7 +178068,7 @@
       "category": "Genel",
       "brand": "Duru",
       "description": "Duru Duş Jeli Lux Perfumes Lotus Çiçeği (450 ml)",
-      "image": "https://cdn-image.getir.com/market/product/e093f436-21b9-4dc9-98f7-fabee7e801eb.jpg",
+      "image": "https://cdn-image.getir.com/market/product/98d17007-47da-4357-8d39-4f064375ebb5.jpg",
       "barcodes": [
         {
           "code": "8690506523619",
@@ -177531,7 +178087,7 @@
       "category": "Genel",
       "brand": "Duru",
       "description": "Duru Duş Jeli Lux Perfumes Jasmin & Amber (450 ml)",
-      "image": "https://cdn-image.getir.com/market/product/c8b24f59-1802-41e9-9481-c359bd5e22d3.jpg",
+      "image": "https://cdn-image.getir.com/market/product/96d04d30-7427-4e0b-b453-d1d494792a2a.jpg",
       "barcodes": [
         {
           "code": "8690506524630",
@@ -177569,7 +178125,7 @@
       "category": "Genel",
       "brand": "Duru",
       "description": "Duru Fresh Sensations Enerji Bombası (450 ml)",
-      "image": "https://cdn-image.getir.com/market/product/6ebc6451-6406-4122-b092-69598cc1b881.jpg",
+      "image": "https://cdn-image.getir.com/market/product/23961a06-de3f-482f-a4cc-ce7a1383501a.png",
       "barcodes": [
         {
           "code": "8690506556853",
@@ -178078,15 +178634,15 @@
     },
     {
       "id": "689b1da9106e55a1341c4bc5",
-      "name": "Siyah İncir Paket (160 g)",
+      "name": "Siyah İncir Paket (200 g)",
       "category": "Genel",
       "brand": "Siyah",
-      "description": "Siyah İncir Paket (160 g)",
+      "description": "Siyah İncir Paket (200 g)",
       "image": "https://cdn-image.getir.com/market/product/5876d9e3-6215-4bfd-a707-95cde96d04df.jpg",
       "barcodes": [
         {
           "code": "8684278082276",
-          "size": "160 g",
+          "size": "200 g",
           "type": "CUSTOM",
           "variant": "Paket"
         }
@@ -178474,6 +179030,25 @@
           "size": "150 g",
           "type": "CUSTOM",
           "variant": "Cevizi"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "68a585489d86aa2eb7c5f374",
+      "name": "Rotring Visuclick 0,7 Uçlu Kalem + Jel Okul Seti Mavi (0.7 mm)",
+      "category": "İçecek",
+      "brand": "Rotring",
+      "description": "Rotring Visuclick 0,7 Uçlu Kalem + Jel Okul Seti Mavi (0.7 mm)",
+      "image": "https://cdn-image.getir.com/market/product/299f6e1d-dd7c-496e-b473-8612e749d00c.png",
+      "barcodes": [
+        {
+          "code": "8699290045666",
+          "size": "0.7 mm",
+          "type": "CUSTOM",
+          "variant": "Mavi"
         }
       ],
       "shelf": "-",
@@ -178942,7 +179517,7 @@
       "category": "Genel",
       "brand": "Fuse",
       "description": "Fuse Tea Mango & Ananas (1,5 L)",
-      "image": "https://cdn-image.getir.com/market/product/fcf987f4-2b22-400b-bff6-fdfe8f213a3c.jpg",
+      "image": "https://cdn-image.getir.com/market/product/1e1dcd2b-e8f8-44ea-a934-a5a8529b7cc0.jpg",
       "barcodes": [
         {
           "code": "5000112666182",
@@ -179663,7 +180238,7 @@
       "category": "Genel",
       "brand": "Uno",
       "description": "Uno Gurme Ekşi Mayalı Sandviç Ekmeği (4 Adet)",
-      "image": "https://cdn-image.getir.com/market/product/47e78117-8884-45d8-ab57-4d6830d884e5.webp",
+      "image": "https://cdn-image.getir.com/market/product/548f49db-3005-4b12-ac84-ba163cb491f7.jpg",
       "barcodes": [
         {
           "code": "8690698516000",
@@ -181083,6 +181658,25 @@
       "stock": null
     },
     {
+      "id": "68eebd9808e18cf30034cf0d",
+      "name": "Pınar Aç Bitir Hindi Salam (75 g)",
+      "category": "Genel",
+      "brand": "Pınar",
+      "description": "Pınar Aç Bitir Hindi Salam (75 g)",
+      "image": "https://cdn-image.getir.com/market/product/dbf9f06d-e4f9-42f0-b1d6-b0e8c702a013.jpg",
+      "barcodes": [
+        {
+          "code": "8690527010839",
+          "size": "75 g",
+          "type": "CUSTOM",
+          "variant": "Salam"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "68ef76989226861e6cd2eb31",
       "name": "Sleepy Yüzey Temizleme Havlusu Okyanus Ferahlığı (100'lü)",
       "category": "İçecek",
@@ -181247,6 +181841,25 @@
           "size": "35 g",
           "type": "CUSTOM",
           "variant": "Bootles"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "68f8dd8c9b02785153aa124e",
+      "name": "Axe Premium Collection Erkek Stick Deodorant Cherry Spritz (50 ml)",
+      "category": "Genel",
+      "brand": "Axe",
+      "description": "Axe Premium Collection Erkek Stick Deodorant Cherry Spritz (50 ml)",
+      "image": "https://cdn-image.getir.com/market/product/49a13351-d52b-4d48-8ca7-67cf8f7f3ed9.jpg",
+      "barcodes": [
+        {
+          "code": "8683130122549",
+          "size": "50 ml",
+          "type": "CUSTOM",
+          "variant": "Spritz"
         }
       ],
       "shelf": "-",
@@ -182722,7 +183335,7 @@
       "category": "Genel",
       "brand": "Algida",
       "description": "Algida Choconetto (430 ml)",
-      "image": "https://cdn-image.getir.com/market/product/715b3817-1951-472d-ace3-cacb74ea8504.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260730105323946_8721274616675_1.jpg",
       "barcodes": [
         {
           "code": "8721274616675",
@@ -182817,7 +183430,7 @@
       "category": "Fırın",
       "brand": "La",
       "description": "La Lorraine Ekşi Mayalı Kare Rustik Ekmek (385 g)",
-      "image": "https://cdn-image.getir.com/market/product/367b32d2-29f6-4ba9-9f29-b214e9f56099.jpeg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260814104456954_La-Lorraine-Eksi-Mayali-Rustik-Ekmek-.jpg",
       "barcodes": [
         {
           "code": "8681573033927",
@@ -183787,6 +184400,25 @@
       "stock": null
     },
     {
+      "id": "692b1fbc9fa1748296c901e9",
+      "name": "Dardanel Zeytinyağlı Çanakkale Sardalya (125g)",
+      "category": "Genel",
+      "brand": "Dardanel",
+      "description": "Dardanel Zeytinyağlı Çanakkale Sardalya (125g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260622130310817_sardalya.jpg",
+      "barcodes": [
+        {
+          "code": "8690559023364",
+          "size": "125g",
+          "type": "CUSTOM",
+          "variant": "Sardalya"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "692d86d11089c62630dcfd5f",
       "name": "Aroy D Tatlı Biber Sosu (350 g)",
       "category": "İçecek",
@@ -184077,7 +184709,7 @@
       "category": "Genel",
       "brand": "Ülker",
       "description": "Ülker Pötibör Çokokrem Sandviç (229 g)",
-      "image": "https://cdn-image.getir.com/market/product/4a325068-9e62-466d-aec6-bc74871e8962.jpeg",
+      "image": "https://cdn-image.getir.com/market/product/7378aed9-40e8-4630-ad3f-f474e3a63703.jpg",
       "barcodes": [
         {
           "code": "8690504013402",
@@ -184122,6 +184754,12 @@
           "size": "1 L",
           "type": "CUSTOM",
           "variant": "Ahududu"
+        },
+        {
+          "code": "8690574120062",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -184134,13 +184772,19 @@
       "category": "Meyve & Sebze",
       "brand": "Lipton",
       "description": "Lipton Ice Tea Orman Meyveli (1 L)",
-      "image": "https://cdn-image.getir.com/market/product/5e46bbc0-170b-4637-88d5-733bebca70ba.jpg",
+      "image": "https://cdn-image.getir.com/market/product/d52c62f3-76e0-4502-b590-fffe8a812a99.jpg",
       "barcodes": [
         {
           "code": "8690574118304",
           "size": "1 L",
           "type": "CUSTOM",
           "variant": "Meyveli"
+        },
+        {
+          "code": "8690574120079",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -184149,10 +184793,10 @@
     },
     {
       "id": "6936e36027468b20991c78d2",
-      "name": "Lipton Ice Tea Ahududu  (1.5 L)",
+      "name": "Lipton Ice Tea Ahududu (1.5 L)",
       "category": "Genel",
       "brand": "Lipton",
-      "description": "Lipton Ice Tea Ahududu  (1.5 L)",
+      "description": "Lipton Ice Tea Ahududu (1.5 L)",
       "image": "https://cdn-image.getir.com/market/product/4d11084c-32e6-45b4-acfa-1cb607551a80.jpg",
       "barcodes": [
         {
@@ -184160,6 +184804,12 @@
           "size": "1.5 L",
           "type": "CUSTOM",
           "variant": "Ahududu"
+        },
+        {
+          "code": "8690574120109",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -184786,7 +185436,7 @@
       "category": "Genel",
       "brand": "UNO",
       "description": "UNO Süper Tost Çavdarlı (500 g)",
-      "image": "https://cdn-image.getir.com/market/product/dbe696bd-ca06-4894-87b8-72945d56ab25.webp",
+      "image": "https://cdn-image.getir.com/market/product/264abb2b-ec6f-48f1-a4d5-8ca9d53727c8.jpeg",
       "barcodes": [
         {
           "code": "8690698516321",
@@ -185295,10 +185945,10 @@
     },
     {
       "id": "69528f4db6ced58164a52ab7",
-      "name": "Algida Maraş Usulü Sade (650 ml)",
+      "name": "Algida Maraş Usulü Sade Dondurma (650 ml)",
       "category": "İçecek",
       "brand": "Algida",
-      "description": "Algida Maraş Usulü Sade (650 ml)",
+      "description": "Algida Maraş Usulü Sade Dondurma (650 ml)",
       "image": "https://cdn-image.getir.com/market/product/2d79bb38-78af-4a59-8e69-d148fff5d2d3.jpg",
       "barcodes": [
         {
@@ -185432,7 +186082,7 @@
       "category": "Süt Ürünleri",
       "brand": "Nestle",
       "description": "Nestle Artizan İşi Sütlü Fındıklı&Fıstıklı Çikolata (60g)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260723132342840_nestle-artizan-01.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260814104001792_nestle-artizan-01.jpg",
       "barcodes": [
         {
           "code": "8690632767130",
@@ -185451,7 +186101,7 @@
       "category": "Genel",
       "brand": "Nestle",
       "description": "Nestle Artizan Işi Fındıklı & Fındık Ezmeli Beyaz Çikolata (60g)",
-      "image": "https://cdn-image.getir.com/market/product/7e9f6ad9-813a-47c7-8e13-f5fa439a73e5.webp",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260814103909633_nestle-artizan-findik-ezmeli-01.jpg",
       "barcodes": [
         {
           "code": "8690632769059",
@@ -187180,6 +187830,37 @@
           "size": "300 g",
           "type": "CUSTOM",
           "variant": "İkramlık"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6981fe3d3bfa5269464190da",
+      "name": "Playmobil Süpriz Paket Erkek (1 Adet)",
+      "category": "Genel",
+      "brand": "Playmobil",
+      "description": "Playmobil Süpriz Paket Erkek (1 Adet)",
+      "image": "https://cdn-image.getir.com/market/product/9d16cce8-345c-4e89-be9b-4abe689233d1.jpg",
+      "barcodes": [
+        {
+          "code": "4008789091468",
+          "size": "1 Adet",
+          "type": "CUSTOM",
+          "variant": "Erkek"
+        },
+        {
+          "code": "4008789707321",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        },
+        {
+          "code": "4008789716057",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -188959,6 +189640,25 @@
       "stock": null
     },
     {
+      "id": "69aed1547247e4da7be43586",
+      "name": "Zafer Denizli Gazozu (6 x 200 ml)",
+      "category": "Genel",
+      "brand": "Zafer",
+      "description": "Zafer Denizli Gazozu (6 x 200 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260309135533699_1.jpg",
+      "barcodes": [
+        {
+          "code": "8695970000017",
+          "size": "6 x 200 ml",
+          "type": "CUSTOM",
+          "variant": "Gazozu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "69aff9c30859df6e201a39fd",
       "name": "Magnum Signature Antep Fıstığı (90 ml)",
       "category": "Genel",
@@ -189006,6 +189706,25 @@
       "barcodes": [
         {
           "code": "8684531264319",
+          "size": "280 g",
+          "type": "CUSTOM",
+          "variant": "Granola"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "69b1317a2cf4f803941a48b7",
+      "name": "Mom's Yaban Mersini Granola (280 g)",
+      "category": "Genel",
+      "brand": "Mom's",
+      "description": "Mom's Yaban Mersini Granola (280 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260311091019828_4__6_.jpg",
+      "barcodes": [
+        {
+          "code": "8684531264296",
           "size": "280 g",
           "type": "CUSTOM",
           "variant": "Granola"
@@ -189078,7 +189797,7 @@
       "category": "İçecek",
       "brand": "Algida",
       "description": "Algida Maraş Usulü Kesme (650 ml)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260402092427296_860637910685_1.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260818085410649_ALGIDA-MARAS-SADE-DONDURMA-KESME-01.jpg",
       "barcodes": [
         {
           "code": "8690637910685",
@@ -190002,6 +190721,25 @@
           "size": "200 g",
           "type": "CUSTOM",
           "variant": "Dili"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "69d5188946bb2849887c98f0",
+      "name": "Çerezos Ultra Dev Acı Biber (150 g)",
+      "category": "Genel",
+      "brand": "Çerezos",
+      "description": "Çerezos Ultra Dev Acı Biber (150 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260407144530502_getImage-_4_.jpg",
+      "barcodes": [
+        {
+          "code": "8681506023513",
+          "size": "150 g",
+          "type": "CUSTOM",
+          "variant": "Biber"
         }
       ],
       "shelf": "-",
@@ -192811,6 +193549,44 @@
       "stock": null
     },
     {
+      "id": "6a104a0d31c820ee37571406",
+      "name": "Dr. Oetker Guseppe Mini Karışık AirFryer Pizza (172 g)",
+      "category": "Genel",
+      "brand": "Dr.",
+      "description": "Dr. Oetker Guseppe Mini Karışık AirFryer Pizza (172 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260522122031791_guseppe-mini-karisik-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690629451424",
+          "size": "172 g",
+          "type": "CUSTOM",
+          "variant": "Pizza"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a104a20a368e3ad7d5fb648",
+      "name": "Dr. Oetker Guseppe Mini Margarita AirFryer Pizza (156 g)",
+      "category": "Genel",
+      "brand": "Dr.",
+      "description": "Dr. Oetker Guseppe Mini Margarita AirFryer Pizza (156 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260522122050514_guseppe-mini-margarita-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690629451448",
+          "size": "156 g",
+          "type": "CUSTOM",
+          "variant": "Pizza"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "6a1064ffe69e86029f5c1b38",
       "name": "Monster Aussie Lemonade (500 ml)",
       "category": "Genel",
@@ -193096,6 +193872,63 @@
       "stock": null
     },
     {
+      "id": "6a201d40101f28e8354e231b",
+      "name": "Nilky Probiyo Yaban Mersini Keten Tohumu (140 g)",
+      "category": "Genel",
+      "brand": "Nilky",
+      "description": "Nilky Probiyo Yaban Mersini Keten Tohumu (140 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260603122539104_Nilky-Yabanmersini-ve-Keten-Tohumlu-Probiyo-140-GR.jpg",
+      "barcodes": [
+        {
+          "code": "8682983760748",
+          "size": "140 g",
+          "type": "CUSTOM",
+          "variant": "Tohumu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a201f8e33b26752bbcb6918",
+      "name": "Nilky Probiyo Yulaf ve İncirli (140 g)",
+      "category": "Genel",
+      "brand": "Nilky",
+      "description": "Nilky Probiyo Yulaf ve İncirli (140 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260603123528868_nilky-yulaf-incir.jpg",
+      "barcodes": [
+        {
+          "code": "8682983760762",
+          "size": "140 g",
+          "type": "CUSTOM",
+          "variant": "İncirli"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a2020ba0eee30b34279bc03",
+      "name": "Nilky Probiyo Sade (140 g)",
+      "category": "Genel",
+      "brand": "Nilky",
+      "description": "Nilky Probiyo Sade (140 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260603124028769_nilky-probiyo-sade.jpg",
+      "barcodes": [
+        {
+          "code": "8682983760816",
+          "size": "140 g",
+          "type": "CUSTOM",
+          "variant": "Probiyo"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "6a206f3ecddd2d2428ddf56b",
       "name": "Yayla Gönen Baldo Pirinç (1 kg)",
       "category": "Genel",
@@ -193129,10 +193962,16 @@
       "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260603183518628_OSMANCIK-YERLI-PIRINC_1KG_DIK_ON_50-_1_.jpg",
       "barcodes": [
         {
-          "code": "8693374287973",
+          "code": "8693374264547",
           "size": "1 kg",
           "type": "CUSTOM",
           "variant": "Vitaminli"
+        },
+        {
+          "code": "8693374287973",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -193335,7 +194174,7 @@
       "category": "Süt Ürünleri",
       "brand": "Sütiş",
       "description": "Sütiş Çiftliği Tahinli Dondurma (100 g)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260608174518160_Tahinli-On-2160x2160.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260803062239832_sutas-ciftligi-tahinli-dondurma-01.jpg",
       "barcodes": [
         {
           "code": "8684553907652",
@@ -193551,6 +194390,25 @@
           "size": "63 g",
           "type": "CUSTOM",
           "variant": "Vanilyalı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a2abf7c30d6a7fc0208edeb",
+      "name": "Tat Zeytinyağlı Ton Balığı (2 x 140 g)",
+      "category": "Genel",
+      "brand": "Tat",
+      "description": "Tat Zeytinyağlı Ton Balığı (2 x 140 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260619074204437_ZeytinyagliTonBaligiKartonet140x2-_1_.jpg",
+      "barcodes": [
+        {
+          "code": "8690635210411",
+          "size": "2 x 140 g",
+          "type": "CUSTOM",
+          "variant": "Balığı"
         }
       ],
       "shelf": "-",
@@ -193958,10 +194816,10 @@
     },
     {
       "id": "6a2c0d77eccbaff7fb1950e8",
-      "name": "Oando Vanilyalı Plombır Dondurma (120 ml)",
+      "name": "Oando Sade Plombır Dondurma (120 ml)",
       "category": "Genel",
       "brand": "Oando",
-      "description": "Oando Vanilyalı Plombır Dondurma (120 ml)",
+      "description": "Oando Sade Plombır Dondurma (120 ml)",
       "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260612134529000_8721274820362_1.png",
       "barcodes": [
         {
@@ -194211,17 +195069,17 @@
     },
     {
       "id": "6a32b1e024d92e61b625d9d6",
-      "name": "Ice Break Kahveli Kakaolu Laktozsuz Süt Bazlı İçecek (375 ml)",
-      "category": "Süt Ürünleri",
+      "name": "Ice Break Mocha (375 ml)",
+      "category": "Genel",
       "brand": "Ice",
-      "description": "Ice Break Kahveli Kakaolu Laktozsuz Süt Bazlı İçecek (375 ml)",
+      "description": "Ice Break Mocha (375 ml)",
       "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260617144035546_ice-break-mocha-01.jpg",
       "barcodes": [
         {
           "code": "8692971434308",
           "size": "375 ml",
           "type": "CUSTOM",
-          "variant": "İçecek"
+          "variant": "Mocha"
         }
       ],
       "shelf": "-",
@@ -194279,6 +195137,12 @@
           "size": "1 L",
           "type": "CUSTOM",
           "variant": "Tea"
+        },
+        {
+          "code": "8690574120086",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -194317,6 +195181,25 @@
           "size": "200 g",
           "type": "CUSTOM",
           "variant": "Kedidili"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a3546c77d11498f92ffbda1",
+      "name": "Kahve Dünyası Selection Kapsül Kahve (10'lu)",
+      "category": "İçecek",
+      "brand": "Kahve",
+      "description": "Kahve Dünyası Selection Kapsül Kahve (10'lu)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260727065317745_kapsul_kahve_e_ticaret_selection_01-_1_.jpg",
+      "barcodes": [
+        {
+          "code": "8683302501172",
+          "size": "10'lu",
+          "type": "CUSTOM",
+          "variant": "Kapsül"
         }
       ],
       "shelf": "-",
@@ -194450,6 +195333,63 @@
           "size": "125 g",
           "type": "CUSTOM",
           "variant": "Fıstığı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a39110a8393c828a742d3bb",
+      "name": "Tadelle Küp Gofret Kakao Kremalı (200 g)",
+      "category": "Genel",
+      "brand": "Tadelle",
+      "description": "Tadelle Küp Gofret Kakao Kremalı (200 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260622104012787_Tadelle-Kup-Kakao-Kremali-_1_.jpg",
+      "barcodes": [
+        {
+          "code": "8683417001512",
+          "size": "200 g",
+          "type": "CUSTOM",
+          "variant": "Kremalı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a3913645bcfdaea6185bf34",
+      "name": "Tadelle Küp Gofret Fındık Kremalı (200 g)",
+      "category": "Genel",
+      "brand": "Tadelle",
+      "description": "Tadelle Küp Gofret Fındık Kremalı (200 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260622105014789_Tadelle-Kup-Findik-Kremali.jpg",
+      "barcodes": [
+        {
+          "code": "8683417001543",
+          "size": "200 g",
+          "type": "CUSTOM",
+          "variant": "Kremalı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a3914a0169bfde55cfc697a",
+      "name": "Tadelle Küp Gofret Bitter Kremalı (200 g)",
+      "category": "Genel",
+      "brand": "Tadelle",
+      "description": "Tadelle Küp Gofret Bitter Kremalı (200 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260622105530797_Tadelle-Kup-Bitter.jpg",
+      "barcodes": [
+        {
+          "code": "8683417001574",
+          "size": "200 g",
+          "type": "CUSTOM",
+          "variant": "Kremalı"
         }
       ],
       "shelf": "-",
@@ -194829,7 +195769,7 @@
       "category": "Genel",
       "brand": "Uni",
       "description": "Uni Baby Newborn & Premature Islak Mendil (3 x 40'lı)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260624105014559_unibaby-newborn&premature-01.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260728140648596_uni-baby-2.jpg",
       "barcodes": [
         {
           "code": "8690530069008",
@@ -194848,7 +195788,7 @@
       "category": "Genel",
       "brand": "Uni",
       "description": "Uni Baby Soft Care Hindistan Cevizli Şampuan (700 ml)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260624105533697_uni-baby-soft-care-sampuan-01.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260728140609285_uni-baby-3.jpg",
       "barcodes": [
         {
           "code": "8690530079618",
@@ -194867,7 +195807,7 @@
       "category": "Genel",
       "brand": "Uni",
       "description": "Uni Baby Sensitive Şampuan (900 ml)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260624115014314_uni-baby-sensitive-sampuan-01.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260728140528534_uni-baby-5.jpg",
       "barcodes": [
         {
           "code": "8690530077669",
@@ -194981,7 +195921,7 @@
       "category": "Genel",
       "brand": "Heinz",
       "description": "Heinz Sosluk Set (4'lü)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260709145254226_heinz-rev.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260728104517244_heinz-sosluk-on-01.jpg",
       "barcodes": [
         {
           "code": "8685191800206",
@@ -195158,7 +196098,7 @@
       "category": "Genel",
       "brand": "Yayla",
       "description": "Yayla Fresh Herbs Pirinç Patlağı (80 g)",
-      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260709105117210_yayla-1.jpg",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260819103012224_yayla.jpg",
       "barcodes": [
         {
           "code": "8693374284330",
@@ -195210,6 +196150,50 @@
       "stock": null
     },
     {
+      "id": "6a3e8a9c2f4f84fcb656f630",
+      "name": "Magnum Sandwich Mini Karamel & Badem (400 ml)",
+      "category": "Genel",
+      "brand": "Magnum",
+      "description": "Magnum Sandwich Mini Karamel & Badem (400 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260626142015141_8721274648201_2.jpg",
+      "barcodes": [
+        {
+          "code": "8721274648201",
+          "size": "400 ml",
+          "type": "CUSTOM",
+          "variant": "Badem"
+        },
+        {
+          "code": "8721274648423",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a3e8e312f4f84fcb656fc11",
+      "name": "Magnum Crackables Pistachio (440 ml)",
+      "category": "Genel",
+      "brand": "Magnum",
+      "description": "Magnum Crackables Pistachio (440 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260626143531146_8721274647464_1.jpg",
+      "barcodes": [
+        {
+          "code": "8721274647464",
+          "size": "440 ml",
+          "type": "CUSTOM",
+          "variant": "Pistachio"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "6a42286a24e4d0aeb2870095",
       "name": "Pampers Aqua Soft Touch Bebek Islak Havlu (60 Yaprak)",
       "category": "Genel",
@@ -195220,6 +196204,25 @@
         {
           "code": "8006530140171",
           "size": "60 Yaprak",
+          "type": "CUSTOM",
+          "variant": "Islak"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a422d106ea6b2f20d06950c",
+      "name": "Pampers Aqua Soft Touch Bebek Islak Havlu (3 x 60 Yaprak)",
+      "category": "Genel",
+      "brand": "Pampers",
+      "description": "Pampers Aqua Soft Touch Bebek Islak Havlu (3 x 60 Yaprak)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260710111841911_8006530139953-01.jpg",
+      "barcodes": [
+        {
+          "code": "8006530139953",
+          "size": "3 x 60 Yaprak",
           "type": "CUSTOM",
           "variant": "Islak"
         }
@@ -195324,6 +196327,25 @@
       "stock": null
     },
     {
+      "id": "6a450165bbaa916d5809777d",
+      "name": "Alkan Soyulmuş Enginar Kavanozu (530 g)",
+      "category": "Genel",
+      "brand": "Alkan",
+      "description": "Alkan Soyulmuş Enginar Kavanozu (530 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260701115655408_enginar.jpg",
+      "barcodes": [
+        {
+          "code": "8682101007014",
+          "size": "530 g",
+          "type": "CUSTOM",
+          "variant": "Kavanozu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
       "id": "6a467018b3f74659e3e9dac1",
       "name": "Pakmaya Orman Meyveli Sos (300 g)",
       "category": "Meyve & Sebze",
@@ -195355,6 +196377,202 @@
           "size": "300 g",
           "type": "CUSTOM",
           "variant": "Karamelli"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a4672705d1df03245356647",
+      "name": "Pakmaya Çikolatalı Sos (300 g)",
+      "category": "Genel",
+      "brand": "Pakmaya",
+      "description": "Pakmaya Çikolatalı Sos (300 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260703061932874_pakmaya-5.jpg",
+      "barcodes": [
+        {
+          "code": "8690770335758",
+          "size": "300 g",
+          "type": "CUSTOM",
+          "variant": "Çikolatalı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a47a6bfb8c9b91d42ea92cb",
+      "name": "Bahs. Chickos Cheddar Aromalı Nohut Cipsi (50 g)",
+      "category": "Genel",
+      "brand": "Bahs.",
+      "description": "Bahs. Chickos Cheddar Aromalı Nohut Cipsi (50 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260703121041982_cheddar-aromali-_1_.jpg",
+      "barcodes": [
+        {
+          "code": "8684834428395",
+          "size": "50 g",
+          "type": "CUSTOM",
+          "variant": "Cipsi"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a47a6d1f14a386e237d33ba",
+      "name": "Bahs. Chickos Ketçap Aromalı Nohut Cipsi (50 g)",
+      "category": "Genel",
+      "brand": "Bahs.",
+      "description": "Bahs. Chickos Ketçap Aromalı Nohut Cipsi (50 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260703121100303_ketcap-aromali-_1_.jpg",
+      "barcodes": [
+        {
+          "code": "8684834428401",
+          "size": "50 g",
+          "type": "CUSTOM",
+          "variant": "Cipsi"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a47a7f4f367d4efb557e2c0",
+      "name": "Bahs. Chickos Ranch Aromalı Nohut Cipsi (50 g)",
+      "category": "Genel",
+      "brand": "Bahs.",
+      "description": "Bahs. Chickos Ranch Aromalı Nohut Cipsi (50 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260703121550544_ranch-aromali-_1_.jpg",
+      "barcodes": [
+        {
+          "code": "8684834428418",
+          "size": "50 g",
+          "type": "CUSTOM",
+          "variant": "Cipsi"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a47ada8b8c9b91d42eaa081",
+      "name": "Bahs. Chocolate Brownie Whey Protein Tozu (406 g)",
+      "category": "İçecek",
+      "brand": "Bahs.",
+      "description": "Bahs. Chocolate Brownie Whey Protein Tozu (406 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260703124011188_bahs-7.jpg",
+      "barcodes": [
+        {
+          "code": "8684834428098",
+          "size": "406 g",
+          "type": "CUSTOM",
+          "variant": "Tozu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a47b7137a418b7b29493d00",
+      "name": "Ülker Sürmix Peynirli Ballı Sürme (180 g)",
+      "category": "Süt Ürünleri",
+      "brand": "Ülker",
+      "description": "Ülker Sürmix Peynirli Ballı Sürme (180 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260703132020593_ulker-peynirli-balli.jpg",
+      "barcodes": [
+        {
+          "code": "8691375603402",
+          "size": "180 g",
+          "type": "CUSTOM",
+          "variant": "Sürme"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a47b84d013e8aefcec2c853",
+      "name": "Ülker Sürmix Peynirli Zeytin Ezmeli Sürme (180 g)",
+      "category": "Süt Ürünleri",
+      "brand": "Ülker",
+      "description": "Ülker Sürmix Peynirli Zeytin Ezmeli Sürme (180 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260703132535655_Ulker-Surmix-Zeytinli-Govde-_1_.jpg",
+      "barcodes": [
+        {
+          "code": "8691375603518",
+          "size": "180 g",
+          "type": "CUSTOM",
+          "variant": "Sürme"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a4b956c016b8ad95bf7ba3e",
+      "name": "Sancak İzmir Tulum Peyniri (250 g)",
+      "category": "Süt Ürünleri",
+      "brand": "Sancak",
+      "description": "Sancak İzmir Tulum Peyniri (250 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260706114551578__Dekupeli--Sancak-Izmir-Tulum-Peyniri.jpg",
+      "barcodes": [
+        {
+          "code": "8684232447134",
+          "size": "250 g",
+          "type": "CUSTOM",
+          "variant": "Tulum"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a4b97bd3d8d79a26599c788",
+      "name": "Sancak Bergama Tulum Peyniri (300 g)",
+      "category": "Süt Ürünleri",
+      "brand": "Sancak",
+      "description": "Sancak Bergama Tulum Peyniri (300 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260706115544392_sancak-bergama-tulum-peyniri-01.jpg",
+      "barcodes": [
+        {
+          "code": "8684232447233",
+          "size": "300 g",
+          "type": "CUSTOM",
+          "variant": "Tulum"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a4b9a083d67dc092783a0a9",
+      "name": "Sancak Ricotta Peyniri (200 g)",
+      "category": "Süt Ürünleri",
+      "brand": "Sancak",
+      "description": "Sancak Ricotta Peyniri (200 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260706120531054_sancak-ricotto-01.jpg",
+      "barcodes": [
+        {
+          "code": "8684232447899",
+          "size": "200 g",
+          "type": "CUSTOM",
+          "variant": "Ricotta"
+        },
+        {
+          "code": "8684232447905",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
         }
       ],
       "shelf": "-",
@@ -195431,6 +196649,1171 @@
           "size": "27 g",
           "type": "CUSTOM",
           "variant": "Bar"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a4e291d68839ea7835b28e4",
+      "name": "bahs. Domatesli ve Fesleğenli Noodle (90 g)",
+      "category": "Genel",
+      "brand": "",
+      "description": "bahs. Domatesli ve Fesleğenli Noodle (90 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260708104035097_bahs-1.jpg",
+      "barcodes": [
+        {
+          "code": "8684834428234",
+          "size": "90 g",
+          "type": "CUSTOM",
+          "variant": "Noodle"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a4e2a3fcad5191906969060",
+      "name": "bahs. Kremalı ve Körili Noodle (90 g)",
+      "category": "Genel",
+      "brand": "",
+      "description": "bahs. Kremalı ve Körili Noodle (90 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260708104521259_bahs-3.jpg",
+      "barcodes": [
+        {
+          "code": "8684834428241",
+          "size": "90 g",
+          "type": "CUSTOM",
+          "variant": "Noodle"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a4e2b7c2d89b820086510ec",
+      "name": "bahs. Kremalı ve Tavuk Aromalı Noodle (90 g)",
+      "category": "Genel",
+      "brand": "",
+      "description": "bahs. Kremalı ve Tavuk Aromalı Noodle (90 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260708105039203_bahs-5.jpg",
+      "barcodes": [
+        {
+          "code": "8684834428265",
+          "size": "90 g",
+          "type": "CUSTOM",
+          "variant": "Noodle"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a4f6a25c238b4bd66ea71b7",
+      "name": "Bahs. Cookies Choco Whey Protein Tozu (406 g)",
+      "category": "Genel",
+      "brand": "Bahs.",
+      "description": "Bahs. Cookies Choco Whey Protein Tozu (406 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260709093016088_bahs-1.jpg",
+      "barcodes": [
+        {
+          "code": "8684834428128",
+          "size": "406 g",
+          "type": "CUSTOM",
+          "variant": "Tozu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a4f7831ab1c04300ce54292",
+      "name": "Vaseline Baby Nemlendirici Jel (100 ml)",
+      "category": "Genel",
+      "brand": "Vaseline",
+      "description": "Vaseline Baby Nemlendirici Jel (100 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260709102744761_6281006612129-01.jpg",
+      "barcodes": [
+        {
+          "code": "6281006612129",
+          "size": "100 ml",
+          "type": "CUSTOM",
+          "variant": "Nemlendirici"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a50ecdaf4121eae34ef33c9",
+      "name": "Tat Ballı Kornişon Turşu (350 g)",
+      "category": "Genel",
+      "brand": "Tat",
+      "description": "Tat Ballı Kornişon Turşu (350 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260710130012570_tat-atistir-balli-hardalli-kornison-tursu-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690635190751",
+          "size": "350 g",
+          "type": "CUSTOM",
+          "variant": "Turşu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a50ef37c8633cd324f8a0f2",
+      "name": "Tat Acı & Tatlı Kornişon Turşu (350 g)",
+      "category": "Genel",
+      "brand": "Tat",
+      "description": "Tat Acı & Tatlı Kornişon Turşu (350 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260710131018124_tat-atistir-aci-tatli-kornison-tursu-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690635190768",
+          "size": "350 g",
+          "type": "CUSTOM",
+          "variant": "Turşu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a5dcc2ce7c5a3777098a460",
+      "name": "Domestos Dual Action Kireç Karşıtı Çamaşır Suyu (750 ml)",
+      "category": "İçecek",
+      "brand": "Domestos",
+      "description": "Domestos Dual Action Kireç Karşıtı Çamaşır Suyu (750 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260720072015181_domestos-4.jpg",
+      "barcodes": [
+        {
+          "code": "8683130143186",
+          "size": "750 ml",
+          "type": "CUSTOM",
+          "variant": "Çamaşır"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a5dcd563b1d8f034f2dbfa8",
+      "name": "Bref Self Active Duo Çamaşır Suyu (2 x 50 g)",
+      "category": "İçecek",
+      "brand": "Bref",
+      "description": "Bref Self Active Duo Çamaşır Suyu (2 x 50 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260720072513108_bref-3.jpg",
+      "barcodes": [
+        {
+          "code": "9000101854664",
+          "size": "2 x 50 g",
+          "type": "CUSTOM",
+          "variant": "Çamaşır"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a5ddc940159f3bfa5f7b694",
+      "name": "Dalin Peri Masalı Kolonya (150 ml)",
+      "category": "Genel",
+      "brand": "Dalin",
+      "description": "Dalin Peri Masalı Kolonya (150 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260720083014889_dalin-peri-masali-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690605088705",
+          "size": "150 ml",
+          "type": "CUSTOM",
+          "variant": "Kolonya"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a5df6592e2424338f8e013a",
+      "name": "Eti Süt Burger Sütlü Kakaolu Kek (35 g)",
+      "category": "Süt Ürünleri",
+      "brand": "Eti",
+      "description": "Eti Süt Burger Sütlü Kakaolu Kek (35 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260720102011396_sut-burger-kakaolu-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690526220659",
+          "size": "35 g",
+          "type": "CUSTOM",
+          "variant": "Kakaolu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a5df9dfe50517d5390dfb7b",
+      "name": "Eti Canga Antep Fıstıklı (40 g)",
+      "category": "Genel",
+      "brand": "Eti",
+      "description": "Eti Canga Antep Fıstıklı (40 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260720103513381_eti-canga-antep-fistikli-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690526420905",
+          "size": "40 g",
+          "type": "CUSTOM",
+          "variant": "Fıstıklı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a5dfb0a1c48584db4693fe6",
+      "name": "Eti Canga Gold Yer Fıstıklı Karamelli Nuga Bar (40 g)",
+      "category": "Genel",
+      "brand": "Eti",
+      "description": "Eti Canga Gold Yer Fıstıklı Karamelli Nuga Bar (40 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260720104013315_eti-canga-gold-yer-fistikli-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690526837437",
+          "size": "40 g",
+          "type": "CUSTOM",
+          "variant": "Bar"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a5dfc3729284ae92465e910",
+      "name": "Eti Canga Bitter (40 g)",
+      "category": "Genel",
+      "brand": "Eti",
+      "description": "Eti Canga Bitter (40 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260720104514385_eti-canga-bitter-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690526732503",
+          "size": "40 g",
+          "type": "CUSTOM",
+          "variant": "Bitter"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6740184860a9b55fd50a09",
+      "name": "Termal Piknik Çantası 35x20x20 cm (1 Adet)",
+      "category": "Genel",
+      "brand": "Termal",
+      "description": "Termal Piknik Çantası 35x20x20 cm (1 Adet)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260727112515875_piknik-cantasi-01.jpg",
+      "barcodes": [
+        {
+          "code": "8682995269260",
+          "size": "1 Adet",
+          "type": "CUSTOM",
+          "variant": "Çantası"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a67439c3f8e2eaafbec639d",
+      "name": "Herby 7 Gün Kiraz Saplı Fit Çay (14'lü)",
+      "category": "İçecek",
+      "brand": "Herby",
+      "description": "Herby 7 Gün Kiraz Saplı Fit Çay (14'lü)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260727114015114_herby-kiraz-sapli-fit-cay-01.jpg",
+      "barcodes": [
+        {
+          "code": "8682450833272",
+          "size": "14'lü",
+          "type": "CUSTOM",
+          "variant": "Fit"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a67484d3f8e2eaafbec6a8a",
+      "name": "Bizim Bitkisel Yağlı Kremsos %20 Yağlı (200 ml)",
+      "category": "Genel",
+      "brand": "Bizim",
+      "description": "Bizim Bitkisel Yağlı Kremsos %20 Yağlı (200 ml)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260727120015885_bizim-bitkisel-yagli-krema-sos-01.jpg",
+      "barcodes": [
+        {
+          "code": "8691375608742",
+          "size": "200 ml",
+          "type": "CUSTOM",
+          "variant": "Kremsos"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6766cc406dc6f84cf8f3ab",
+      "name": "Asperox Retro Arap Sabunu & Sirke (1 L)",
+      "category": "Genel",
+      "brand": "Asperox",
+      "description": "Asperox Retro Arap Sabunu & Sirke (1 L)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260727141022642_asperox-retro-8697713823662-01.jpg",
+      "barcodes": [
+        {
+          "code": "8697713823662",
+          "size": "1 L",
+          "type": "CUSTOM",
+          "variant": "Sabunu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6767f2e532701a0681c2d4",
+      "name": "Asperox Retro Limon Tuzu & Sirke (1 L)",
+      "category": "Genel",
+      "brand": "Asperox",
+      "description": "Asperox Retro Limon Tuzu & Sirke (1 L)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260731143846431_asperox.jpg",
+      "barcodes": [
+        {
+          "code": "8697713823709",
+          "size": "1 L",
+          "type": "CUSTOM",
+          "variant": "Tuzu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a676de76ec8cfc7d0f828f2",
+      "name": "Tchibo Exclusive Filtre Kahve (250 g)",
+      "category": "İçecek",
+      "brand": "Tchibo",
+      "description": "Tchibo Exclusive Filtre Kahve (250 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260727144042352_tchibo.jpg",
+      "barcodes": [
+        {
+          "code": "4006067888250",
+          "size": "250 g",
+          "type": "CUSTOM",
+          "variant": "Filtre"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a69dae3bc9c6e3c23989719",
+      "name": "Felix Doubly Delicious Çifte Lezzet Kuru Kedi Maması Sığır Etli (400 g)",
+      "category": "Genel",
+      "brand": "Felix",
+      "description": "Felix Doubly Delicious Çifte Lezzet Kuru Kedi Maması Sığır Etli (400 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260729105015110_Sigir-Etli_400g_8445291675605-20260710-062343.jpg",
+      "barcodes": [
+        {
+          "code": "8445291675605",
+          "size": "400 g",
+          "type": "CUSTOM",
+          "variant": "Etli"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a69dc12a4e14f592cceebd5",
+      "name": "Felix Doubly Delicious Çifte Lezzet Kuru Kedi Maması Balıklı (400 g)",
+      "category": "Genel",
+      "brand": "Felix",
+      "description": "Felix Doubly Delicious Çifte Lezzet Kuru Kedi Maması Balıklı (400 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260729105517866_Balikli_400g_8445291675810-20260710-062345.jpg",
+      "barcodes": [
+        {
+          "code": "8445291675810",
+          "size": "400 g",
+          "type": "CUSTOM",
+          "variant": "Balıklı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6a0c19c9e157a74a318fe5",
+      "name": "Perwoll Yumuşatıcı Çiçek Ferahlığı (1,2 L)",
+      "category": "Genel",
+      "brand": "Perwoll",
+      "description": "Perwoll Yumuşatıcı Çiçek Ferahlığı (1,2 L)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260729142011949_perwoll-5.jpg",
+      "barcodes": [
+        {
+          "code": "9000101866650",
+          "size": "1,2 L",
+          "type": "CUSTOM",
+          "variant": "Ferahlığı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6a0c2ae532701a06845483",
+      "name": "Perwoll Yumuşatıcı Derin Ferahlık (1,2 L)",
+      "category": "Genel",
+      "brand": "Perwoll",
+      "description": "Perwoll Yumuşatıcı Derin Ferahlık (1,2 L)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260729142028688_perwoll-3.jpg",
+      "barcodes": [
+        {
+          "code": "9000101866599",
+          "size": "1,2 L",
+          "type": "CUSTOM",
+          "variant": "Ferahlık"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6b2b3536b3cd02c4e1628b",
+      "name": "KitKat F1 Araba Icon Pouch Paket (6 x 11 g)",
+      "category": "Genel",
+      "brand": "KitKat",
+      "description": "KitKat F1 Araba Icon Pouch Paket (6 x 11 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260730104511441_kitkat-f1-01.jpg",
+      "barcodes": [
+        {
+          "code": "8000300440607",
+          "size": "6 x 11 g",
+          "type": "CUSTOM",
+          "variant": "Paket"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6b2c6b36b3cd02c4e16364",
+      "name": "KitKat F1 Chunky Caramel (40 g)",
+      "category": "Genel",
+      "brand": "KitKat",
+      "description": "KitKat F1 Chunky Caramel (40 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260730105021518_kitkat-f1-chunky-01.jpg",
+      "barcodes": [
+        {
+          "code": "3800020403037",
+          "size": "40 g",
+          "type": "CUSTOM",
+          "variant": "Caramel"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6b417aa682763b4d064a9f",
+      "name": "Calve Acılı Mayonez Orta Acı (380 g)",
+      "category": "Genel",
+      "brand": "Calve",
+      "description": "Calve Acılı Mayonez Orta Acı (380 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260730122012575_calve-acili-mayonez-8683130233948-01.jpg",
+      "barcodes": [
+        {
+          "code": "8683130233948",
+          "size": "380 g",
+          "type": "CUSTOM",
+          "variant": "Acı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6c91cf97dc9c851caab004",
+      "name": "Cheetos Değiş Tokuş Taco Baharatlı (100 g)",
+      "category": "Genel",
+      "brand": "Cheetos",
+      "description": "Cheetos Değiş Tokuş Taco Baharatlı (100 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260731121512773_cheetos.jpg",
+      "barcodes": [
+        {
+          "code": "8690624305524",
+          "size": "100 g",
+          "type": "CUSTOM",
+          "variant": "Baharatlı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6c91df416e575b2361583b",
+      "name": "Doritos Değiş Tokuş Biftek ve Soğan Aromalı (115 g)",
+      "category": "Genel",
+      "brand": "Doritos",
+      "description": "Doritos Değiş Tokuş Biftek ve Soğan Aromalı (115 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260731121528880_doritos.jpg",
+      "barcodes": [
+        {
+          "code": "8690624204445",
+          "size": "115 g",
+          "type": "CUSTOM",
+          "variant": "Aromalı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6c9d86dd5acc8eeafa1492",
+      "name": "Lipton English Breakfast Tea Bardak Poşet Çay (25'li)",
+      "category": "İçecek",
+      "brand": "Lipton",
+      "description": "Lipton English Breakfast Tea Bardak Poşet Çay (25'li)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260731130513105_lipton-english-breakfast-01.jpg",
+      "barcodes": [
+        {
+          "code": "5063305010322",
+          "size": "25'li",
+          "type": "CUSTOM",
+          "variant": "Poşet"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6ca10ac87145ecc52147cb",
+      "name": "Lipton Golden Ceylon Tea Bardak Poşet Çay (25'li)",
+      "category": "İçecek",
+      "brand": "Lipton",
+      "description": "Lipton Golden Ceylon Tea Bardak Poşet Çay (25'li)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260731132012637_lipton-golden-ceylon-01.jpg",
+      "barcodes": [
+        {
+          "code": "5063305011510",
+          "size": "25'li",
+          "type": "CUSTOM",
+          "variant": "Poşet"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6ca23b0d2ad4aa36fecf43",
+      "name": "Lipton Orman Meyveli Bardak Poşet Çay 15'li (22.5 g)",
+      "category": "İçecek",
+      "brand": "Lipton",
+      "description": "Lipton Orman Meyveli Bardak Poşet Çay 15'li (22.5 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260731132518082_lipton-kirmizi-meyve-ruyasi-01.jpg",
+      "barcodes": [
+        {
+          "code": "5063305009814",
+          "size": "22.5 g",
+          "type": "CUSTOM",
+          "variant": "Poşet"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6ca371a68a4370428a7f55",
+      "name": "Lipton Vanilya Karamelli Bardak Poşet Çay 15'li (22.5 g)",
+      "category": "İçecek",
+      "brand": "Lipton",
+      "description": "Lipton Vanilya Karamelli Bardak Poşet Çay 15'li (22.5 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260731133027329_lipton-vanilya-karamel-tutkusu-01.jpg",
+      "barcodes": [
+        {
+          "code": "5063305009838",
+          "size": "22.5 g",
+          "type": "CUSTOM",
+          "variant": "Poşet"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a6caf200b8c1bc91532bb97",
+      "name": "Su Organik Yumurta M Boy (10'lu)",
+      "category": "İçecek",
+      "brand": "Su",
+      "description": "Su Organik Yumurta M Boy (10'lu)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260731142018928_yumurta-10.jpg",
+      "barcodes": [
+        {
+          "code": "8681105064290",
+          "size": "10'lu",
+          "type": "CUSTOM",
+          "variant": "Boy"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a743f0acd40c775e0085f93",
+      "name": "Teksüt 3 Dilim Olgunlaştırılmış Tam Yağlı Beyaz Peynir (450 g)",
+      "category": "Süt Ürünleri",
+      "brand": "Teksüt",
+      "description": "Teksüt 3 Dilim Olgunlaştırılmış Tam Yağlı Beyaz Peynir (450 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260806075657154_TEKSUT-OLGUNLASTIRILMIS-TAM-YAGLI-BEYAZ-PEYNIR-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690158125933",
+          "size": "450 g",
+          "type": "CUSTOM",
+          "variant": "Beyaz"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a743f18efa6ee73df1710a2",
+      "name": "Teksüt Olgunlaştırılmış Tam Yağlı Beyaz Peynir (350 g)",
+      "category": "Süt Ürünleri",
+      "brand": "Teksüt",
+      "description": "Teksüt Olgunlaştırılmış Tam Yağlı Beyaz Peynir (350 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260806075729169_TEKSUT-BEYAZ-PEYNIR-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690158120440",
+          "size": "350 g",
+          "type": "CUSTOM",
+          "variant": "Beyaz"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a747d2846517839aa1e22c3",
+      "name": "Sofia 3 Katlı Tuvalet Kağıdı (16'lı)",
+      "category": "Genel",
+      "brand": "Sofia",
+      "description": "Sofia 3 Katlı Tuvalet Kağıdı (16'lı)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260806122514530_sofia.jpg",
+      "barcodes": [
+        {
+          "code": "8698996009590",
+          "size": "16'lı",
+          "type": "CUSTOM",
+          "variant": "Kağıdı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a748a09728c651e52d8a50a",
+      "name": "Knorr Çabuk Makarna Mac & Cheese Acı Chili Heat (212 g)",
+      "category": "Genel",
+      "brand": "Knorr",
+      "description": "Knorr Çabuk Makarna Mac & Cheese Acı Chili Heat (212 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260806132011002_knorr-mac-and-cheesee-chili-heat-8683130233412-01.jpg",
+      "barcodes": [
+        {
+          "code": "8683130233412",
+          "size": "212 g",
+          "type": "CUSTOM",
+          "variant": "Heat"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a75953977697b690a6ba6bc",
+      "name": "rOtring Visuclick 0,7 Uçlu Kalem + Jel Okul Seti 0.7 mm Pembe (1 Adet)",
+      "category": "İçecek",
+      "brand": "",
+      "description": "rOtring Visuclick 0,7 Uçlu Kalem + Jel Okul Seti 0.7 mm Pembe (1 Adet)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260807082012530_rotring-2.jpg",
+      "barcodes": [
+        {
+          "code": "8699290045727",
+          "size": "1 Adet",
+          "type": "CUSTOM",
+          "variant": "Pembe"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a75cb26d5f66da2065791cf",
+      "name": "Knorr Çabuk Bardak Makarna Napoletana Fusilli (65 g)",
+      "category": "Genel",
+      "brand": "Knorr",
+      "description": "Knorr Çabuk Bardak Makarna Napoletana Fusilli (65 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260807121017073_knorr.jpg",
+      "barcodes": [
+        {
+          "code": "8683130133934",
+          "size": "65 g",
+          "type": "CUSTOM",
+          "variant": "Fusilli"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a75eac523f5d084aa86c67b",
+      "name": "Fellas Kakaolu Fındık Kreması (300 g)",
+      "category": "Genel",
+      "brand": "Fellas",
+      "description": "Fellas Kakaolu Fındık Kreması (300 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260807142511549_fellas.jpg",
+      "barcodes": [
+        {
+          "code": "8684802317744",
+          "size": "300 g",
+          "type": "CUSTOM",
+          "variant": "Kreması"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a75ebf0a484428f06e84f4e",
+      "name": "Fellas Glutensiz Yulaf Ezmesi (300 g)",
+      "category": "Genel",
+      "brand": "Fellas",
+      "description": "Fellas Glutensiz Yulaf Ezmesi (300 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260807143010893_FELLAS-GLUTENSIZ-YULAF-EZMESI-01.jpg",
+      "barcodes": [
+        {
+          "code": "8683200063031",
+          "size": "300 g",
+          "type": "CUSTOM",
+          "variant": "Ezmesi"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a79711c52265aed6fe9ee6b",
+      "name": "Prima Aktif Bebek Süper Paket 3 Beden (58'li)",
+      "category": "Genel",
+      "brand": "Prima",
+      "description": "Prima Aktif Bebek Süper Paket 3 Beden (58'li)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260810063510818_prima-1.jpg",
+      "barcodes": [
+        {
+          "code": "8006530331029",
+          "size": "58'li",
+          "type": "CUSTOM",
+          "variant": "Beden"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a797375c14ec79c15f48328",
+      "name": "Prima Aktif Bebek Süper Paket 4 Beden 52'li (1 Adet)",
+      "category": "Genel",
+      "brand": "Prima",
+      "description": "Prima Aktif Bebek Süper Paket 4 Beden 52'li (1 Adet)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260810064055127_prima-2.jpg",
+      "barcodes": [
+        {
+          "code": "8006530330992",
+          "size": "1 Adet",
+          "type": "CUSTOM",
+          "variant": "Beden"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a7b2ae99fa47a1460ac59dd",
+      "name": "ChildGen 4'lü Doğal Oyun Hamuru Set Dinozor (4 x 125 g)",
+      "category": "Genel",
+      "brand": "ChildGen",
+      "description": "ChildGen 4'lü Doğal Oyun Hamuru Set Dinozor (4 x 125 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260811140013312_NATURAL-PLAY-DOUGHT-CHILDGEN-OYUN-HAMURU-01.jpg",
+      "barcodes": [
+        {
+          "code": "0744504668853",
+          "size": "4 x 125 g",
+          "type": "CUSTOM",
+          "variant": "Dinozor"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a7b2d4416ae6ffe424be659",
+      "name": "ChildGen 4'lü Doğal Oyun Hamuru Set Unicorn (4 x 125 g)",
+      "category": "Genel",
+      "brand": "ChildGen",
+      "description": "ChildGen 4'lü Doğal Oyun Hamuru Set Unicorn (4 x 125 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260811141015447_NATURAL-PLAY-DOUGHT-CHILDGEN-OYUN-HAMURU-01.jpg",
+      "barcodes": [
+        {
+          "code": "0744504668785",
+          "size": "4 x 125 g",
+          "type": "CUSTOM",
+          "variant": "Unicorn"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a7c5a6e1b2f1f274f1601b8",
+      "name": "Nestlé Çilek Aromalı Tam Tahıllı Bar (23.5 g)",
+      "category": "Genel",
+      "brand": "Nestlé",
+      "description": "Nestlé Çilek Aromalı Tam Tahıllı Bar (23.5 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260812113513758_NESTLE-NESQUIK-CILEKTOP-01.jpg",
+      "barcodes": [
+        {
+          "code": "5900020049810",
+          "size": "23.5 g",
+          "type": "CUSTOM",
+          "variant": "Bar"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a7dc6ed9fa47a1460aef0f7",
+      "name": "Sushida Karidesli Onigiri (125 g)",
+      "category": "İçecek",
+      "brand": "Sushida",
+      "description": "Sushida Karidesli Onigiri (125 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260813133023558_onigiri_karides_on_0126-_1_.jpg",
+      "barcodes": [
+        {
+          "code": "8690559028284",
+          "size": "125 g",
+          "type": "CUSTOM",
+          "variant": "Onigiri"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a7dc814231762ddf76891bc",
+      "name": "Sushida Onigiri California (125 g)",
+      "category": "İçecek",
+      "brand": "Sushida",
+      "description": "Sushida Onigiri California (125 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260813133519157_onigiri_california_on_0126-_1_.jpg",
+      "barcodes": [
+        {
+          "code": "8690559023500",
+          "size": "125 g",
+          "type": "CUSTOM",
+          "variant": "California"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a7dc943259931366e763f71",
+      "name": "Sushida Onigiri Somon Teriyaki (125 g)",
+      "category": "İçecek",
+      "brand": "Sushida",
+      "description": "Sushida Onigiri Somon Teriyaki (125 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260813133824072_onigiri_somon_on_0126.jpg",
+      "barcodes": [
+        {
+          "code": "8690559023494",
+          "size": "125 g",
+          "type": "CUSTOM",
+          "variant": "Teriyaki"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a7dca6abdf2305f2fa7854b",
+      "name": "Sushida Onigiri Ton Balıklı (125 g)",
+      "category": "İçecek",
+      "brand": "Sushida",
+      "description": "Sushida Onigiri Ton Balıklı (125 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260813134517407_onigiri_ton_on_0126.jpg",
+      "barcodes": [
+        {
+          "code": "8690559023487",
+          "size": "125 g",
+          "type": "CUSTOM",
+          "variant": "Balıklı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a7dcb9dd7bcd478ef9ffba3",
+      "name": "Sushida Teriyaki Tavuklu Onigiri (125 g)",
+      "category": "İçecek",
+      "brand": "Sushida",
+      "description": "Sushida Teriyaki Tavuklu Onigiri (125 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260813134754588_onigiri_tavuklu.jpg",
+      "barcodes": [
+        {
+          "code": "8690559030812",
+          "size": "125 g",
+          "type": "CUSTOM",
+          "variant": "Onigiri"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a7ef8beadd605eeaf62fd8e",
+      "name": "Eti Cin Lokmalık Karadutlu Limonlu Bisküvi (114 g)",
+      "category": "Genel",
+      "brand": "Eti",
+      "description": "Eti Cin Lokmalık Karadutlu Limonlu Bisküvi (114 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260814111513095_ETI-CIN-LIMON-BOGURTLEN-8690526989730-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690526989730",
+          "size": "114 g",
+          "type": "CUSTOM",
+          "variant": "Limonlu"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a82d5cc07d2327348a3859c",
+      "name": "Eti Hoşbeş Kavun Aromalı Kremalı Gofret (142 g)",
+      "category": "Genel",
+      "brand": "Eti",
+      "description": "Eti Hoşbeş Kavun Aromalı Kremalı Gofret (142 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260817093511159_ETI-HOSBES-KAVUN-01.jpg",
+      "barcodes": [
+        {
+          "code": "8690526599021",
+          "size": "142 g",
+          "type": "CUSTOM",
+          "variant": "Kremalı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a830f5dee9b5593bcf1ce66",
+      "name": "Greta Meyveli Kraker Kuru Üzümlü (150 g)",
+      "category": "Meyve & Sebze",
+      "brand": "Greta",
+      "description": "Greta Meyveli Kraker Kuru Üzümlü (150 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260817134048062_GRETA-MEYVELI-KRAKER-8691707088679-01.jpg",
+      "barcodes": [
+        {
+          "code": "8691707088600",
+          "size": "150 g",
+          "type": "CUSTOM",
+          "variant": "Üzümlü"
+        },
+        {
+          "code": "8691707088679",
+          "size": "",
+          "type": "CUSTOM",
+          "variant": ""
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a83106b52db304d5985f162",
+      "name": "Luppo Double Marshmallow (28,7 g)",
+      "category": "Genel",
+      "brand": "Luppo",
+      "description": "Luppo Double Marshmallow (28,7 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260817134518335_LUPPO-DOUBLE-MARSHMALLOW-8699141058852-01.jpg",
+      "barcodes": [
+        {
+          "code": "8699141058852",
+          "size": "28,7 g",
+          "type": "CUSTOM",
+          "variant": "Marshmallow"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a846a18b379accfac6f71a6",
+      "name": "Dr. Oetker Dekor Pasta Süsü Renkli Harfler (20 g)",
+      "category": "Genel",
+      "brand": "Dr.",
+      "description": "Dr. Oetker Dekor Pasta Süsü Renkli Harfler (20 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260818142011431_dr-oetker-11.jpg",
+      "barcodes": [
+        {
+          "code": "8690629450908",
+          "size": "20 g",
+          "type": "CUSTOM",
+          "variant": "Harfler"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a846b4762ff207d73dcbe0d",
+      "name": "Dr. Oetker Panko (200 g)",
+      "category": "Genel",
+      "brand": "Dr.",
+      "description": "Dr. Oetker Panko (200 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260818142513744_dr-oetker-14.jpg",
+      "barcodes": [
+        {
+          "code": "8690629451523",
+          "size": "200 g",
+          "type": "CUSTOM",
+          "variant": "Panko"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a846b5a07d2327348a55883",
+      "name": "Dr. Oetker Puding Karamel Parçalı (94 g)",
+      "category": "Genel",
+      "brand": "Dr.",
+      "description": "Dr. Oetker Puding Karamel Parçalı (94 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260818142533026_dr-oetker-8.jpg",
+      "barcodes": [
+        {
+          "code": "8690629451950",
+          "size": "94 g",
+          "type": "CUSTOM",
+          "variant": "Parçalı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a882787ee9b5593bcf73a9a",
+      "name": "Untad Italian Piadina Usulü Çok Tahıllı Mayalı (375 g)",
+      "category": "İçecek",
+      "brand": "Untad",
+      "description": "Untad Italian Piadina Usulü Çok Tahıllı Mayalı (375 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260821102512824_untad-1.jpg",
+      "barcodes": [
+        {
+          "code": "8696292002963",
+          "size": "375 g",
+          "type": "CUSTOM",
+          "variant": "Mayalı"
+        }
+      ],
+      "shelf": "-",
+      "price": null,
+      "stock": null
+    },
+    {
+      "id": "6a8828c6ecd1ceeec4ea9f81",
+      "name": "Untad İtalyan Piadina Tam Buğdaylı ve Mayalı (375 g)",
+      "category": "Genel",
+      "brand": "Untad",
+      "description": "Untad İtalyan Piadina Tam Buğdaylı ve Mayalı (375 g)",
+      "image": "https://vsrm-cdn.erp.getirapi.com/docs/20260821103031818_untad-1.jpg",
+      "barcodes": [
+        {
+          "code": "8696292002956",
+          "size": "375 g",
+          "type": "CUSTOM",
+          "variant": "Mayalı"
         }
       ],
       "shelf": "-",
