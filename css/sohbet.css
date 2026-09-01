@@ -68,7 +68,18 @@
 
 #chatInterface {
     width: min(92vw, 23rem) !important;
-    max-height: min(80vh, 34rem) !important;
+    /*
+     * BOY SABİT.
+     *
+     * Önce yalnızca üst sınır vardı ve panel içeriğe göre büyüyordu: mesaj
+     * yokken avuç içi kadar, ilk mesaj gelince bir anda uzuyordu. Konuşma
+     * boyunca kutunun boyu oynayınca göz her seferinde yeniden yer arıyor.
+     *
+     * Artık boy baştan belli; içerik azken de çokken de aynı. Mesaj alanı
+     * boşluğu dolduruyor, taşınca kendi içinde kayıyor.
+     */
+    height: min(78vh, 33rem) !important;
+    max-height: min(78vh, 33rem) !important;
     border: 1px solid var(--sh-cizgi) !important;
     border-radius: 1.1rem !important;
     box-shadow: 0 28px 64px -24px rgb(15 23 42 / 0.55) !important;
@@ -137,6 +148,9 @@
 
 #chatMessages {
     background: var(--sh-zemin) !important;
+    /* Panelin boyu sabit; artan yeri bu alan dolduruyor. `min-height: 0`
+       olmadan esnek çocuk kendi içeriğinden küçülemiyor ve yazma alanını
+       aşağı itiyor. */
     flex: 1 1 auto;
     height: auto !important;
     min-height: 0 !important;
@@ -144,6 +158,9 @@
     padding: 0.9rem !important;
     scrollbar-width: thin;
 }
+
+/* Boş sohbet ekranı ortada dursun: alan artık her zaman geniş */
+#chatEmptyState { height: 100%; }
 
 /* Başlık, hazır sorular ve yazma alanı esnemiyor */
 #chatInterface > div:first-child,

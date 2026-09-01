@@ -113,9 +113,11 @@
             dugme.addEventListener('click', function () {
                 /* Kutuya Türkçe yazımı giriyor. Arama zaten sadeleştirerek
                    çalıştığı için sonuç aynı; kullanıcı "sutas yarim yagli"
-                   gibi bir metin görmüyor. */
-                aramaKutusu.value = dugme.dataset.ara;
-                aramaKutusu.dispatchEvent(new Event('input', { bubbles: true }));
+                   gibi bir metin görmüyor.
+
+                   `kutuyuDoldur` üzerinden gidiyor: yoksa bu doldurma
+                   yapıştırma sanılıp banko açılıyordu. */
+                kutuyuDoldur(dugme.dataset.ara);
                 aramaKutusu.focus();
             });
         }
@@ -216,7 +218,26 @@
      */
     var tusaBasildi = false;
     var yapistirmaBayragi = false;
+    var kendiYazdik = false;
     var sonSorguYapistirma = false;
+
+    /*
+     * Arama kutusunu KENDİMİZ doldurduğumuzda çağrılıyor.
+     *
+     * Yapıştırma tespiti "tuş vuruşu var mı" diye bakıyor. Öneri şeridine
+     * tıklayınca kutuyu kod dolduruyor ve tuş vuruşu olmuyor; bu da
+     * yapıştırma sayılıp banko açılıyordu. Kullanıcı sadece "pepsi mi demek
+     * istediniz" önerisine dokunmuştu.
+     *
+     * Bu işaret, bir sonraki değişimin ne yazma ne yapıştırma olduğunu
+     * söylüyor: bizim kendi doldurmamız.
+     */
+    function kutuyuDoldur(metin) {
+        if (!aramaKutusu) return;
+        kendiYazdik = true;
+        aramaKutusu.value = metin;
+        aramaKutusu.dispatchEvent(new Event('input', { bubbles: true }));
+    }
 
     if (aramaKutusu) {
         /*
@@ -239,6 +260,12 @@
         aramaKutusu.addEventListener('paste', function () { yapistirmaBayragi = true; });
 
         aramaKutusu.addEventListener('input', function () {
+            if (kendiYazdik) {
+                sonSorguYapistirma = false;
+                kendiYazdik = false;
+                tusaBasildi = false;
+                return;
+            }
             if (yapistirmaBayragi) {
                 sonSorguYapistirma = true;
                 yapistirmaBayragi = false;
