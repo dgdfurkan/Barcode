@@ -216,65 +216,15 @@
      * tuş vuruşu da olduğu için `paste` olayı ayrıca dinleniyor ve o bir
      * sonraki değişiklikte sözü kesiyor.
      */
-    var tusaBasildi = false;
-    var yapistirmaBayragi = false;
-    var kendiYazdik = false;
-    var sonSorguYapistirma = false;
-
     /*
-     * Arama kutusunu KENDİMİZ doldurduğumuzda çağrılıyor.
-     *
-     * Yapıştırma tespiti "tuş vuruşu var mı" diye bakıyor. Öneri şeridine
-     * tıklayınca kutuyu kod dolduruyor ve tuş vuruşu olmuyor; bu da
-     * yapıştırma sayılıp banko açılıyordu. Kullanıcı sadece "pepsi mi demek
-     * istediniz" önerisine dokunmuştu.
-     *
-     * Bu işaret, bir sonraki değişimin ne yazma ne yapıştırma olduğunu
-     * söylüyor: bizim kendi doldurmamız.
+     * Arama kutusunu kendimiz doldururken kullanılıyor (öneri şeridi gibi).
+     * Sayfanın kendi arama akışı `input` olayını dinlediği için olay elle
+     * tetikleniyor.
      */
     function kutuyuDoldur(metin) {
         if (!aramaKutusu) return;
-        kendiYazdik = true;
         aramaKutusu.value = metin;
         aramaKutusu.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-
-    if (aramaKutusu) {
-        /*
-         * SÜREYE BAKMAK YANLIŞTI
-         * Önce "son tuştan 400 ms geçtiyse yazma değildir" deniyordu. Uzun
-         * bir ürün adını duraklaya duraklaya yazan biri bu sınırı aşıyor ve
-         * yazdığı şey yapıştırma sanılıyordu; "Ülker Çubuk Kraker (" yazınca
-         * banko açılıyordu.
-         *
-         * Süre değil, tuşun kendisi ölçüt. Harf harf yazarken her değişimin
-         * hemen öncesinde bir tuş vuruşu vardır. Eklenti kutuyu kendisi
-         * doldurduğunda hiç tuş vuruşu olmaz. Ctrl+V'de tuş da olur, o yüzden
-         * `paste` olayı ayrıca dinleniyor ve sözü kesiyor.
-         */
-        aramaKutusu.addEventListener('keydown', function (e) {
-            if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) return;
-            tusaBasildi = true;
-        });
-
-        aramaKutusu.addEventListener('paste', function () { yapistirmaBayragi = true; });
-
-        aramaKutusu.addEventListener('input', function () {
-            if (kendiYazdik) {
-                sonSorguYapistirma = false;
-                kendiYazdik = false;
-                tusaBasildi = false;
-                return;
-            }
-            if (yapistirmaBayragi) {
-                sonSorguYapistirma = true;
-                yapistirmaBayragi = false;
-                tusaBasildi = false;
-                return;
-            }
-            sonSorguYapistirma = !tusaBasildi;
-            tusaBasildi = false;
-        });
     }
 
     /** Virgülle ayrılmış, boş olmayan terim sayısı. */
@@ -292,11 +242,19 @@
     function topluSonucGeldi() {
         if (!bankoArayuz || typeof bankoArayuz.otomatikAc !== 'function') return;
 
-        /* Toplu kopyalamanın iki işareti var, biri yetiyor:
-           virgüllü liste (barkod listesi, ürün adı listesi, görsel
-           bağlantılı liste) ya da kutunun elle yazılmadan dolması
-           (tek ürünlük sipariş kopyalaması). */
-        if (terimSayisi() < 2 && !sonSorguYapistirma) return;
+        /*
+         * TEK ÖLÇÜT: VİRGÜLLÜ LİSTE
+         *
+         * Bir ara "yapıştırma da toplu kopyalama sayılsın" denmişti; tek
+         * ürünlük siparişler de bankoya konuyor diye. Ama tek bir ürün adı
+         * kopyalayıp siteye gelen herkese banko açılıyor, bu da rahatsız
+         * ediyor. Kural sadeleşti: banko yalnızca virgülle ayrılmış en az
+         * iki terim varsa açılıyor.
+         *
+         * Yapıştırma tespiti kaldırılmadı; başka bir işe yarıyor mu diye
+         * değil, tek sorumluluğu buydu ve artık kullanılmıyor.
+         */
+        if (terimSayisi() < 2) return;
         if (!sonucSayisi()) return;
 
         var imza = (aramaKutusu && aramaKutusu.value) || '';

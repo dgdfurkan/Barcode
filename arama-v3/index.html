@@ -5644,11 +5644,33 @@
         const normalizeOnbellek = new Map();
         const NORMALIZE_ONBELLEK_SINIRI = 60000;
 
+        /*
+         * TÜRKÇE BÜYÜK İ SORUNU
+         *
+         * Burada `toLowerCase()` kullanılıyordu ve Türkçe bilmiyor:
+         * "İ" harfini tek bir "i"ye değil, "i" + birleşen nokta (U+0307)
+         * ikilisine çeviriyor. Nokta harf sayılmadığı için bir sonraki
+         * adımda boşluğa dönüşüyor ve kelime ortadan ikiye bölünüyordu:
+         *
+         *     "Tibers İtalyan ..." -> "tibers i talyan ..."
+         *     "italya"             -> "italya"        (eşleşmiyor)
+         *     "İtalya"             -> "i talya"       (tesadüfen eşleşiyor)
+         *
+         * Yani doğru yazan bulamıyor, yanlış yazan buluyordu.
+         *
+         * Çözüm iki adımda: önce Türkçe kurallarıyla küçük harfe indiriliyor
+         * (`toLocaleLowerCase('tr')`), sonra kalan bütün birleşen işaretler
+         * ayrıştırılıp atılıyor. Böylece "İ" tek bir "i" oluyor, "ü" de "u".
+         * Geriye kalan "ı" harfinin birleşen işareti yok, tablodan çevriliyor.
+         */
         function normalizeTextHam(text) {
-            return text.toLowerCase()
-                .replace(/[ığüşöç]/g, (match) => HARF_ESLEME[match])
-                .replace(/[^a-z0-9ğüşıöç ]/gi, ' ') // Remove punctuation
-                .replace(/\s+/g, ' ') // Normalize whitespace
+            return String(text)
+                .toLocaleLowerCase('tr')
+                .normalize('NFD')                    // birleşen işaretleri ayır
+                .replace(/[\u0300-\u036f]/g, '')     // ve at
+                .replace(/[ığüşöçâîû]/g, (match) => HARF_ESLEME[match] || match)
+                .replace(/[^a-z0-9]+/g, ' ')         // noktalama boşluğa
+                .replace(/\s+/g, ' ')
                 .trim();
         }
 
@@ -11763,6 +11785,6 @@
 <script src="../js/oneri-motoru.js?v=20260831a"></script>
 <script src="../js/banko.js?v=20260831a"></script>
 <script src="../js/arama-v3.js?v=20260831a"></script>
-<script src="../js/arama-eklentileri.js?v=20260901h"></script>
+<script src="../js/arama-eklentileri.js?v=20260901i"></script>
 </body>
 </html>
