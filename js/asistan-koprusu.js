@@ -28,8 +28,7 @@
         // Şemsiye hak: tek başına bütün modülleri açar.
         jetBarkodAsistan: ['topluKopyalama', 'sayimKopyalama', 'stokBarkodlari',
                            'hizliBul', 'firinPisirme', 'dusukStok',
-                           'sayimHazirligi', 'rafEtiketi', 'urunCekici',
-                           'fiyatListesi'],
+                           'sayimHazirligi', 'rafEtiketi', 'urunCekici'],
         // Tek tek verilmiş eski haklar da kendi modülünü açmaya devam ediyor.
         bulkCopy: ['topluKopyalama', 'sayimKopyalama'],
         getirStockBarcodesExtension: ['stokBarkodlari'],
