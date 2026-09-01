@@ -7,9 +7,12 @@
  * NASIL KULLANILIR
  *   1. https://franchise.getir.com/stock/current sayfasını aç.
  *   2. F12 → Console. Bu dosyanın tamamını yapıştır, Enter.
- *   3. Şunu çalıştır:
- *        JBFiyat.basla(`Cheetos Shots ... (25 g), Erikli Doğal Kaynak Suyu (6 x 1 L), ...`)
- *      Adları virgülle ya da alt alta verebilirsin.
+ *   3. Ürün adlarını KOPYALA (virgülle ya da alt alta), sonra konsola yaz:
+ *        JBFiyat.basla()
+ *      Listeyi koda yazmana gerek yok, olmamalı da: ürün adlarında kesme
+ *      işareti geçiyor ("Nuh'un", "Lay's", "(15'li)") ve tırnaklı diziyi
+ *      ortadan kapatıyor. Araç listeyi panodan alır, pano okunamazsa
+ *      yapıştırman için bir kutu açar.
  *   4. Araç sana panelin kendi arama kutusuna yazman için bir barkod söyleyecek.
  *      O aramayı bir kez yap. Gerisini araç kendisi yürütür.
  *   5. Bitince JSON hem konsola yazılır hem panoya kopyalanır.
@@ -48,7 +51,7 @@
         return String(metin == null ? '' : metin)
             .toLocaleLowerCase('tr')
             .normalize('NFD')
-            .replace(/[̀-ͯ]/g, '')
+            .replace(/[\u0300-\u036f]/g, '')   // birleşen işaretler (kaçış dizisiyle: konsola yapıştırınca bozulmasın)
             .replace(/[ığüşöçâîû]/g, function (m) { return HARF[m] || m; })
             .replace(/(\d)[.,](\d)/g, '$1$2')
             .replace(/[^a-z0-9]+/g, ' ')
@@ -74,6 +77,32 @@
 
     function bekle(ms) {
         return new Promise(function (c) { setTimeout(c, ms); });
+    }
+
+    /**
+     * Listeyi nereden alacağını çözer.
+     *
+     * Ürün adlarında kesme işareti var: "Sade Gurme Gezen Yumurta (15'li)",
+     * "Carte d'Or", "Nuh'un", "Lay's". Bunlar tek tırnaklı bir JS dizesini
+     * ortadan kapatıyor ve konsol sözdizimi hatası veriyordu. Bu yüzden liste
+     * artık koda yazılmıyor: önce panoya, o olmazsa prompt kutusuna bakılıyor.
+     * İkisinde de tırnak diye bir dert yok.
+     */
+    function metniAl(verilen) {
+        if (verilen && String(verilen).trim()) return Promise.resolve(String(verilen));
+
+        var panodan = (global.navigator && navigator.clipboard && navigator.clipboard.readText)
+            ? navigator.clipboard.readText().catch(function () { return ''; })
+            : Promise.resolve('');
+
+        return panodan.then(function (pano) {
+            if (pano && pano.trim()) {
+                console.log('%c› Liste panodan alındı.', 'color:#8ab4ff');
+                return pano;
+            }
+            console.log('%c› Pano okunamadı, kutu açılıyor. Listeyi oraya yapıştır.', 'color:#ffb454');
+            return global.prompt('Ürün adlarını yapıştır (virgülle ya da alt alta):', '') || '';
+        });
     }
 
     // ==================================================================
@@ -190,6 +219,9 @@
         if (asilFetch) return;
         asilFetch = global.fetch;
         global.fetch = function (girdi, ayar) {
+            /* Referansı önce al. sablonuKaydet sarmayı geri alıp asilFetch'i
+               boşaltıyor; aşağıda ona dokunursak SENİN aramanı patlatırız. */
+            var asil = asilFetch;
             try {
                 var url = (typeof girdi === 'string') ? girdi : (girdi && girdi.url);
                 var govde = ayar && typeof ayar.body === 'string' ? ayar.body : null;
@@ -198,7 +230,7 @@
                     sablonuKaydet((ayar && ayar.method) || 'GET', url, bas, govde);
                 }
             } catch (e) { /* sessiz */ }
-            return asilFetch.apply(this, arguments);
+            return asil.apply(this, arguments);
         };
 
         asilAc = XMLHttpRequest.prototype.open;
@@ -215,13 +247,14 @@
             return asilAc.apply(this, arguments);
         };
         XMLHttpRequest.prototype.send = function (govde) {
+            var asil = asilYolla;   // yukarıdaki gerekçe
             try {
                 var g = typeof govde === 'string' ? govde : null;
                 if (ilgiliMi(this.__jbUrl) && izVarMi(this.__jbUrl, g)) {
                     sablonuKaydet(this.__jbYontem, this.__jbUrl, this.__jbBas, g);
                 }
             } catch (e) { /* sessiz */ }
-            return asilYolla.apply(this, arguments);
+            return asil.apply(this, arguments);
         };
     }
 
@@ -337,7 +370,14 @@
         var u = secili.product && typeof secili.product === 'object' ? secili.product : secili;
         var torba = {};
         fiyatlariTopla(u, '', torba, sayac, 0);
-        fiyatlariTopla(secili, 'stok', torba, sayac, 0);
+        /* Satırın kendisinde de fiyat olabiliyor. `product` atlanıyor, o
+           nesne yukarıda zaten tarandı; yoksa her alan listede iki kez
+           görünüyor ve hangisinin ne olduğu karışıyor. */
+        var satirKopya = {};
+        Object.keys(secili).forEach(function (k) {
+            if (k !== 'product') satirKopya[k] = secili[k];
+        });
+        fiyatlariTopla(satirKopya, 'satir', torba, sayac, 0);
 
         return {
             panelAdi: coklu(u.fullName) || coklu(u.shortName) || coklu(u.name) || '',
@@ -357,11 +397,17 @@
         sonuc: null,
 
         basla: function (adMetni) {
-            if (!adMetni || !String(adMetni).trim()) {
-                console.log('%cÜrün adı vermedin. Örnek:', 'color:#ffb454');
-                console.log("JBFiyat.basla('Magnum Badem (100 ml), Kiraz Paket (500 g)')");
-                return;
-            }
+            return metniAl(adMetni).then(function (metin) {
+                if (!metin || !metin.trim()) {
+                    console.log('%cListe boş geldi. Ürün adlarını kopyalayıp ' +
+                                'JBFiyat.basla() yaz.', 'color:#ffb454');
+                    return;
+                }
+                return API._listeyleBasla(metin);
+            });
+        },
+
+        _listeyleBasla: function (adMetni) {
             sablon = null;
             beklenenIz = null;
 
@@ -386,7 +432,8 @@
                 console.log('%c\n  ŞİMDİ SEN YAP  ', 'background:#135bec;color:#fff;font-weight:bold');
                 console.log('%cPanelin kendi arama kutusuna şunu yaz ve arat:', 'color:#f2f4f8');
                 console.log('%c    ' + beklenenIz, 'font-size:16px;font-weight:bold;color:#7ddc9a');
-                console.log('Aramayı yapınca kalan ' + (c.cozulen.length - 1) + ' ürünü kendim çekeceğim.\n');
+                console.log('Aramayı yapınca ' + c.cozulen.length +
+                            ' ürünün hepsini sırayla kendim çekeceğim.\n');
 
                 return new Promise(function (coz) { sablonuCozen = coz; }).then(API._yurut);
             });
@@ -475,6 +522,7 @@
     global.JBFiyat = API;
 
     console.log('%cJBFiyat hazır.', 'color:#7ddc9a;font-weight:bold');
-    console.log("Kullanım:  JBFiyat.basla('ürün adı, ürün adı, …')");
+    console.log('Kullanım: ürün adlarını KOPYALA, sonra şunu yaz:  JBFiyat.basla()');
+    console.log('Pano okunamazsa yapıştırman için bir kutu açılır.');
     console.log('İstekler arası bekleme: JBFiyat.ARA_MS = ' + API.ARA_MS + ' ms');
 })(window);
