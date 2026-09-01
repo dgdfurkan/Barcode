@@ -121,7 +121,19 @@
  * kayıyordu. Artık yalnızca mesaj alanı esniyor; yazma alanı her zaman
  * görünür kalıyor.
  */
-#chatInterface { display: flex !important; flex-direction: column; }
+/*
+ * `hidden` HER ZAMAN kazanmalı.
+ *
+ * Aşağıdaki `display: flex !important` Tailwind'in `.hidden { display:none }`
+ * kuralını eziyordu: panel sayfa açılır açılmaz görünüyor ve çarpıya
+ * basınca `hidden` yeniden verilse de kapanmıyordu. Banko perdesinde de
+ * aynı hata olmuştu; ikisi de aynı sebepten.
+ *
+ * Gizleme kuralı önce ve daha yüksek öncelikle yazılıyor.
+ */
+#chatInterface.hidden { display: none !important; }
+
+#chatInterface:not(.hidden) { display: flex !important; flex-direction: column; }
 
 #chatMessages {
     background: var(--sh-zemin) !important;
