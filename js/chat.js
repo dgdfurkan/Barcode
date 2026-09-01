@@ -282,7 +282,7 @@ class ChatSystem {
                         </div>
                         <div>
                             <h3 class="font-semibold">Destek Sohbeti</h3>
-                            <p class="text-xs opacity-90">Merhaba ${this.currentUser}! 👋</p>
+                            <p class="text-xs opacity-90">${this.currentUser}</p>
                         </div>
                     </div>
                     <button id="closeChat" class="text-white hover:text-gray-200 transition-colors">
@@ -435,9 +435,9 @@ class ChatSystem {
                     </svg>
                 </div>
             </div>
-            <h3 class="text-gray-700 text-lg font-bold mb-2">Merhaba! 👋</h3>
-            <p class="text-gray-600 text-sm mb-1 font-medium">Sohbet başlatmak için ilk mesajınızı yazın</p>
-            <p class="text-gray-500 text-xs">Destek ekibimiz size yardımcı olmak için burada</p>
+            <h3 class="text-gray-700 text-lg font-bold mb-2">Buradayız</h3>
+            <p class="text-gray-600 text-sm mb-1 font-medium">İlk mesajını yaz, aynı gün dönelim</p>
+            <p class="text-gray-500 text-xs">Deponu ve sorunu yazman yeterli</p>
         `;
         messagesContainer.appendChild(emptyState);
     }

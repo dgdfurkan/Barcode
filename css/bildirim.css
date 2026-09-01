@@ -1,0 +1,247 @@
+/**
+ * Bildirimler: süre uyarısı, güncelleme, açılan özellik.
+ * ============================================================================
+ *
+ * Bunlar yönetim panelinden gönderilip kullanıcıda görünen kutular. Üçü de
+ * ayrı zamanlarda yazılmış: biri mordan mora, biri turuncudan kırmızıya
+ * geçen degrade kullanıyordu, emoji vardı, köşe yarıçapları tutmuyordu.
+ * Aynı sayfada üçü birden çıkınca üç ayrı üründen parça toplanmış gibi
+ * duruyordu.
+ *
+ * Bu dosya üçünü tek dile getiriyor. Mantığa dokunulmuyor; yalnızca görünüş
+ * eziliyor, çünkü üç dosya toplam dört bin satır ve hepsini yeniden yazmak
+ * gereksiz risk.
+ *
+ * RENK
+ * Degradeler gitti. Beyaz yüzey, ince slate kenarlık, durumu tek renkli bir
+ * şerit ve ikon söylüyor: mavi bilgi, kehribar uyarı, kırmızı kritik,
+ * yeşil iyi haber.
+ *
+ * HAREKET
+ * Sağdan süzülerek geliyor, `transform` ve `opacity` ile. Yerleşim hesabı
+ * yok. Hareket azaltma açıksa hepsi olduğu yerde beliriyor.
+ * ============================================================================
+ */
+
+:root {
+    --bld-yuzey: #ffffff;
+    --bld-cizgi: #e2e8f0;
+    --bld-yazi: #0f172a;
+    --bld-soluk: #475569;
+    --bld-cok-soluk: #94a3b8;
+    --bld-mavi: #2563eb;
+    --bld-amber: #b45309;
+    --bld-kirmizi: #b91c1c;
+    --bld-yesil: #0d7a56;
+    --bld-yay: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ==========================================================================
+   Ortak kart
+   ========================================================================== */
+
+#premium-features-notification,
+#premium-features-disabled-notification,
+.trial-notification-card {
+    /* Tailwind'in degrade sınıfları satır içi geldiği için ezilmesi gerekiyor */
+    background: var(--bld-yuzey) !important;
+    background-image: none !important;
+    color: var(--bld-yazi) !important;
+    border: 1px solid var(--bld-cizgi) !important;
+    border-radius: 0.9rem !important;
+    box-shadow: 0 16px 40px -18px rgb(15 23 42 / 0.45) !important;
+    padding: 0 !important;
+    max-width: 22rem !important;
+    overflow: hidden;
+    animation: bld-gir 420ms var(--bld-yay) both;
+}
+
+#premium-features-notification:hover,
+#premium-features-disabled-notification:hover {
+    transform: none !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: 0 20px 48px -18px rgb(15 23 42 / 0.5) !important;
+}
+
+@keyframes bld-gir {
+    from { opacity: 0; transform: translate3d(18px, 0, 0); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Sol kenardaki durum şeridi: rengi tek bakışta söylüyor */
+#premium-features-notification { box-shadow: inset 4px 0 0 var(--bld-mavi), 0 16px 40px -18px rgb(15 23 42 / 0.45) !important; }
+#premium-features-disabled-notification { box-shadow: inset 4px 0 0 var(--bld-amber), 0 16px 40px -18px rgb(15 23 42 / 0.45) !important; }
+
+/* İç yerleşim: eski işaretleme padding'i dıştan alıyordu, içeri taşındı */
+#premium-features-notification > div,
+#premium-features-disabled-notification > div {
+    padding: 0.95rem 1.05rem;
+    gap: 0.75rem;
+}
+
+#premium-features-notification p,
+#premium-features-disabled-notification p { color: var(--bld-yazi); }
+
+#premium-features-notification p.text-sm,
+#premium-features-notification p.text-xs,
+#premium-features-disabled-notification p.text-sm,
+#premium-features-disabled-notification p.text-xs { color: var(--bld-soluk) !important; opacity: 1 !important; }
+
+#premium-features-notification p.font-semibold,
+#premium-features-disabled-notification p.font-semibold {
+    font-size: 0.95rem !important;
+    font-weight: 640;
+    letter-spacing: -0.02em;
+}
+
+/* Emoji yerine ikon kutusu */
+#premium-features-notification .text-2xl,
+#premium-features-disabled-notification .text-2xl {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    flex: none;
+    border-radius: 0.6rem;
+    background: #eff6ff;
+    font-size: 1rem !important;
+    line-height: 1;
+}
+
+#premium-features-disabled-notification .text-2xl { background: #fffbeb; }
+
+#premium-features-notification svg,
+#premium-features-disabled-notification svg { color: var(--bld-cok-soluk); opacity: 1 !important; }
+
+#premium-features-notification button,
+#premium-features-disabled-notification button {
+    color: var(--bld-cok-soluk) !important;
+    opacity: 1 !important;
+    width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 0.4rem;
+    line-height: 1;
+    transition: background 160ms ease, color 160ms ease;
+}
+
+#premium-features-notification button:hover,
+#premium-features-disabled-notification button:hover {
+    background: #f1f5f9;
+    color: var(--bld-yazi) !important;
+}
+
+/* ==========================================================================
+   Süre uyarısı
+   ========================================================================== */
+
+.trial-notification-card > div:first-child {
+    background: var(--bld-yuzey) !important;
+    background-image: none !important;
+    color: var(--bld-yazi) !important;
+    padding: 1rem 1.1rem !important;
+    border-bottom: 1px solid var(--bld-cizgi);
+}
+
+.trial-notification-card h3 {
+    color: var(--bld-yazi) !important;
+    font-size: 1rem !important;
+    font-weight: 660;
+    letter-spacing: -0.022em;
+}
+
+.trial-notification-card p { color: var(--bld-soluk) !important; opacity: 1 !important; }
+
+.trial-notification-card .bg-white\/20 {
+    background: #fffbeb !important;
+    color: var(--bld-amber);
+    border-radius: 0.6rem;
+    padding: 0.5rem !important;
+}
+
+.trial-notification-card .bg-white\/20 svg { color: var(--bld-amber); }
+
+.trial-notification-card #closeTrialNotification {
+    color: var(--bld-cok-soluk) !important;
+    border-radius: 0.4rem;
+}
+
+.trial-notification-card #closeTrialNotification:hover {
+    background: #f1f5f9 !important;
+    color: var(--bld-yazi) !important;
+}
+
+/* Süre azaldıkça kenar şeridi kızarıyor: renk bilgiyi taşıyor */
+.trial-notification-card { box-shadow: inset 4px 0 0 var(--bld-amber), 0 16px 40px -18px rgb(15 23 42 / 0.45) !important; }
+
+/* ==========================================================================
+   Güncelleme penceresi
+   ========================================================================== */
+
+#updateModalOverlay {
+    background: rgb(15 23 42 / 0.55) !important;
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    animation: bld-perde 200ms ease-out;
+}
+
+@keyframes bld-perde { from { opacity: 0; } to { opacity: 1; } }
+
+#updateModalOverlay > div {
+    border-radius: 1rem !important;
+    border: 1px solid var(--bld-cizgi);
+    box-shadow: 0 30px 70px -26px rgb(15 23 42 / 0.6) !important;
+    animation: bld-kart 320ms var(--bld-yay);
+}
+
+@keyframes bld-kart {
+    from { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+
+/* Pencere içindeki degradeli başlıklar ve düğmeler */
+#updateModalOverlay [class*='bg-gradient-to'] {
+    background-image: none !important;
+    background-color: var(--bld-yazi) !important;
+}
+
+#updateNotificationBadge {
+    animation: bld-gir 420ms var(--bld-yay) both;
+}
+
+#updateNotificationBadge [class*='bg-gradient-to'] {
+    background-image: none !important;
+    background-color: var(--bld-mavi) !important;
+}
+
+/* ==========================================================================
+   Yığılma
+   ==========================================================================
+   Üç bildirim aynı anda gelebiliyor ve hepsi sağ üste yapışıyordu; üst üste
+   binip birbirini gizliyorlardı. Kapsayıcı sütun oluyor. */
+
+#trialNotificationContainer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    max-width: 22rem;
+}
+
+@media (max-width: 520px) {
+    #premium-features-notification,
+    #premium-features-disabled-notification,
+    #trialNotificationContainer {
+        left: 0.75rem !important;
+        right: 0.75rem !important;
+        max-width: none !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #premium-features-notification,
+    #premium-features-disabled-notification,
+    .trial-notification-card,
+    #updateModalOverlay,
+    #updateModalOverlay > div,
+    #updateNotificationBadge { animation: none !important; }
+}

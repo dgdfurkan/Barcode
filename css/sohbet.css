@@ -1,0 +1,289 @@
+/**
+ * Destek sohbeti.
+ * ============================================================================
+ *
+ * Bu düğme ve panel, hesabı olmayan ziyaretçinin bize ulaşacağı tek yol. Satış
+ * buradan geçiyor; o yüzden ekranın en özenli parçası olmalı.
+ *
+ * ÖNCESİ
+ * Başlık mavi-mor degradeydi, balonlar da öyle. İki renk arasında geçen
+ * degrade sayfanın hiçbir yerinde yok; burada olması paneli siteye yabancı
+ * bırakıyordu. Yazı tipi de gövdeden geliyordu, ciddiyeti yoktu.
+ *
+ * SONRASI
+ * Tek renk mürekkep başlık, beyaz gövde, mavi kullanıcı balonu, açık gri
+ * karşı taraf balonu. Kenar yarıçapları balonun kime ait olduğunu söylüyor:
+ * kendi mesajının sağ alt köşesi kırık, karşınınki sol alt köşesi.
+ *
+ * MANTIĞA DOKUNULMADI
+ * `js/chat.js` iki bine yakın satır. Yalnızca görünüş eziliyor; gönderme,
+ * senkron ve okundu bilgisi aynen çalışıyor.
+ * ============================================================================
+ */
+
+:root {
+    --sh-murekkep: #0f172a;
+    --sh-yuzey: #ffffff;
+    --sh-zemin: #f8fafc;
+    --sh-cizgi: #e2e8f0;
+    --sh-yazi: #0f172a;
+    --sh-soluk: #475569;
+    --sh-cok-soluk: #94a3b8;
+    --sh-mavi: #2563eb;
+    --sh-yay: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ==========================================================================
+   Açma düğmesi
+   ========================================================================== */
+
+#openChat {
+    background: var(--sh-murekkep) !important;
+    background-image: none !important;
+    border: 0;
+    box-shadow: 0 12px 30px -12px rgb(15 23 42 / 0.7) !important;
+    transition: background 200ms ease, transform 280ms var(--sh-yay),
+                box-shadow 280ms var(--sh-yay);
+}
+
+#openChat:hover {
+    background: var(--sh-mavi) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 18px 40px -14px rgb(37 99 235 / 0.7) !important;
+}
+
+#openChat:active { transform: translateY(0) scale(0.95); }
+
+/* Okunmamış mesaj sayısı, düğmenin üstünde küçük bir madalyon */
+#openChat .chat-badge,
+#openChat [id*='unread'] {
+    background: #dc2626 !important;
+    border: 2px solid #fff;
+    font-weight: 700;
+}
+
+/* ==========================================================================
+   Panel
+   ========================================================================== */
+
+#chatInterface {
+    width: min(92vw, 23rem) !important;
+    max-height: min(80vh, 34rem) !important;
+    border: 1px solid var(--sh-cizgi) !important;
+    border-radius: 1.1rem !important;
+    box-shadow: 0 28px 64px -24px rgb(15 23 42 / 0.55) !important;
+    overflow: hidden;
+    /* Sayfanın gövde yazı tipinden bağımsız, daha ciddi bir yığın */
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI',
+                 Inter, Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+#chatInterface:not(.hidden) { animation: sh-gir 320ms var(--sh-yay); }
+
+@keyframes sh-gir {
+    from { opacity: 0; transform: translate3d(0, 16px, 0) scale(0.98); }
+    to { opacity: 1; transform: none; }
+}
+
+/* --- Başlık: degrade gitti --- */
+#chatInterface > div:first-child {
+    background: var(--sh-murekkep) !important;
+    background-image: none !important;
+    border-radius: 0 !important;
+    padding: 0.9rem 1rem !important;
+}
+
+#chatInterface > div:first-child h3 {
+    font-size: 0.95rem;
+    font-weight: 640;
+    letter-spacing: -0.02em;
+}
+
+#chatInterface > div:first-child p {
+    font-size: 0.74rem;
+    opacity: 0.6 !important;
+}
+
+#chatInterface > div:first-child .bg-white\/20 {
+    background: rgb(255 255 255 / 0.10) !important;
+    border-radius: 0.55rem;
+}
+
+#closeChat { border-radius: 0.4rem; transition: background 160ms ease; }
+#closeChat:hover { background: rgb(255 255 255 / 0.12); }
+
+/* --- Mesaj alanı --- */
+#chatMessages {
+    background: var(--sh-zemin) !important;
+    height: auto !important;
+    min-height: 15rem;
+    max-height: 21rem;
+    padding: 0.9rem !important;
+    scrollbar-width: thin;
+}
+
+#chatMessages::-webkit-scrollbar { width: 6px; }
+#chatMessages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+/* Kullanıcı balonu: mavi, sağ alt köşesi kırık */
+#chatMessages .bg-gradient-to-r {
+    background-image: none !important;
+    background-color: var(--sh-mavi) !important;
+    border-radius: 0.85rem 0.85rem 0.25rem 0.85rem !important;
+    padding: 0.5rem 0.75rem !important;
+    line-height: 1.45;
+}
+
+/* Karşı taraf balonu: açık, sol alt köşesi kırık */
+#chatMessages .bg-white,
+#chatMessages .bg-gray-200 {
+    border: 1px solid var(--sh-cizgi);
+    border-radius: 0.85rem 0.85rem 0.85rem 0.25rem !important;
+    padding: 0.5rem 0.75rem !important;
+    line-height: 1.45;
+}
+
+/* Sistem notu: balon değil, ince bir ayraç */
+#chatMessages .bg-blue-100 {
+    background: transparent !important;
+    color: var(--sh-cok-soluk) !important;
+    border: 1px dashed var(--sh-cizgi);
+    border-radius: 999px !important;
+    font-size: 0.75rem !important;
+    padding: 0.28rem 0.75rem !important;
+}
+
+#chatMessages > div { animation: sh-balon 300ms var(--sh-yay) both; }
+
+@keyframes sh-balon {
+    from { opacity: 0; transform: translate3d(0, 6px, 0); }
+    to { opacity: 1; transform: none; }
+}
+
+#chatDateHeader > div > div {
+    background: var(--sh-yuzey) !important;
+    border: 1px solid var(--sh-cizgi);
+    color: var(--sh-soluk) !important;
+    font-size: 0.7rem !important;
+    box-shadow: none !important;
+}
+
+/* --- Yazma alanı --- */
+#chatInterface > div:last-child {
+    padding: 0.75rem !important;
+    border-top: 1px solid var(--sh-cizgi) !important;
+    background: var(--sh-yuzey);
+}
+
+#messageInput {
+    border: 1px solid var(--sh-cizgi) !important;
+    border-radius: 0.65rem !important;
+    background: var(--sh-zemin);
+    padding: 0.6rem 0.8rem !important;
+    font-size: 0.88rem !important;
+    transition: border-color 180ms ease, background 180ms ease, box-shadow 220ms var(--sh-yay);
+}
+
+#messageInput:focus {
+    background: var(--sh-yuzey);
+    border-color: var(--sh-mavi) !important;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15) !important;
+}
+
+#sendMessage {
+    background: var(--sh-murekkep) !important;
+    background-image: none !important;
+    border-radius: 0.65rem !important;
+    width: 2.4rem;
+    padding: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 180ms ease, transform 220ms var(--sh-yay);
+}
+
+#sendMessage:hover { background: var(--sh-mavi) !important; transform: translateY(-1px); }
+#sendMessage:active { transform: translateY(0) scale(0.95); }
+
+/* ==========================================================================
+   Boş sohbet ekranı
+   ==========================================================================
+   Maviden mora oradan pembeye giden, nabız gibi atan bir daire ve iki emoji
+   vardı. Karşılama balonu zaten geldiği için bu ekran gereksiz kalabalık;
+   daire sakinleşiyor, emoji kalkıyor, yazı küçülüyor. */
+
+#chatEmptyState { padding: 1.5rem 1rem !important; }
+
+#chatEmptyState .bg-gradient-to-br {
+    background-image: none !important;
+    background-color: #eff6ff !important;
+    width: 3.2rem !important;
+    height: 3.2rem !important;
+    border-radius: 0.9rem !important;
+    box-shadow: none !important;
+    animation: none !important;
+}
+
+#chatEmptyState .bg-gradient-to-br svg {
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    color: var(--sh-mavi) !important;
+    stroke-width: 2 !important;
+}
+
+/* Sarı çan madalyonu: dikkat çekmiyor, sadece gürültü yapıyordu */
+#chatEmptyState .bg-yellow-400 { display: none !important; }
+
+#chatEmptyState .relative { margin-bottom: 0.9rem !important; }
+
+#chatEmptyState h3 {
+    font-size: 0.95rem !important;
+    font-weight: 640 !important;
+    color: var(--sh-yazi) !important;
+    margin-bottom: 0.3rem !important;
+}
+
+#chatEmptyState p {
+    font-size: 0.8rem !important;
+    color: var(--sh-soluk) !important;
+    font-weight: 400 !important;
+}
+
+#chatEmptyState p + p { color: var(--sh-cok-soluk) !important; font-size: 0.75rem !important; }
+
+/* ==========================================================================
+   Hazır sorular
+   ==========================================================================
+   Yazmaya üşenen ziyaretçi için. Dokununca metin kutuya yazılıyor, gönderme
+   kararı yine kullanıcıda kalıyor: adına mesaj gönderilmiyor. */
+
+.sh-hazir {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0 0.9rem 0.75rem;
+    background: var(--sh-zemin);
+}
+
+.sh-hazir__oge {
+    padding: 0.32rem 0.7rem;
+    border: 1px solid #cfe0fb;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 570;
+    cursor: pointer;
+    transition: background 160ms ease, transform 200ms var(--sh-yay), border-color 160ms ease;
+    animation: sh-balon 320ms var(--sh-yay) both;
+    animation-delay: calc(var(--s, 0) * 60ms);
+}
+
+.sh-hazir__oge:hover { background: #dbeafe; border-color: #93c5fd; transform: translateY(-1px); }
+.sh-hazir__oge:active { transform: translateY(0) scale(0.96); }
+
+@media (prefers-reduced-motion: reduce) {
+    #chatInterface, #chatMessages > div, .sh-hazir__oge { animation: none !important; }
+    #openChat, #sendMessage, #messageInput { transition: none !important; }
+}
