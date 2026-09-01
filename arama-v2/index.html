@@ -40,7 +40,7 @@
     <script src="../veri/temp_products.js?v=20260901a"></script>
     <script src="../js/getir-cdn-paste.js?v=20260831a"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
-    <script src="../js/asistan-koprusu.js?v=20260829a"></script>
+    <script src="../js/asistan-koprusu.js?v=20260901d"></script>
     <script src="../js/eklenti-rehberi.js?v=20260829a"></script>
     <script src="../js/guest-access-config.js?v=20260828i"></script>
     <script src="../js/auth.js?v=20260831a"></script>
@@ -5672,6 +5672,10 @@
                 .normalize('NFD')                    // birleşen işaretleri ayır
                 .replace(/[\u0300-\u036f]/g, '')     // ve at
                 .replace(/[ığüşöçâîû]/g, (match) => HARF_ESLEME[match] || match)
+                /* Ondalık ayraç rakamları birbirine bağlıyor. Aksi halde
+                   "1,5 L" iki ayrı sayıya bölünüyor ve "6 x 1 L" araması
+                   "6 x 1,5 L" şişesini de yakalıyordu. */
+                .replace(/(\d)[.,](\d)/g, '$1$2')
                 .replace(/[^a-z0-9]+/g, ' ')         // noktalama boşluğa
                 .replace(/\s+/g, ' ')
                 .trim();
@@ -5710,10 +5714,53 @@
             if (hazir !== undefined) return hazir;
             const normalized = normalizeText(anahtar);
             const tokens = normalized.split(' ')
-                .filter(token => token.length >= 2) // Minimum 2 characters
-                .filter(token => !DURAK_KELIMELER.includes(token)); // Remove stop words
+                .filter(token => token.length >= 1)
+                .filter(token => !DURAK_KELIMELER.includes(token));
+            /* Boyut bilgisi eskiden burada çöpe gidiyordu. "Erikli Doğal Kaynak
+               Suyu (6 x 1 L)" aramasından geriye yalnız "erikli dogal kaynak
+               suyu" kalıyordu; 500 ml'lik şişe de bu dört kelimeyi taşıdığı
+               için sonuçlara giriyordu. Artık "6", "x", "1", "l" de duruyor.
+
+               Ama kısa parça düz alt dizge olarak aranırsa yeni bir yanlış
+               doğar: "1" değeri "1250 g" içinde de bulunur. Bu yüzden her
+               parçaya nasıl aranacağı yazılıyor ve dizinin yanında taşınıyor.
+                 0 = alt dizge (eski davranış, harfli kelimeler)
+                 1 = kelime başında, devamında rakam yok (rakam içerenler)
+                 2 = tam kelime (tek harfler) */
+            tokens.modlar = tokens.map(tokenModu);
             if (tokenOnbellek.size < 5000) tokenOnbellek.set(anahtar, tokens);
             return tokens;
+        }
+
+        function tokenModu(token) {
+            if (/[0-9]/.test(token)) return 1;
+            if (token.length === 1) return 2;
+            return 0;
+        }
+
+        /* normalizeText çıktısı yalnız [a-z0-9] ve tek boşluk içerir; sınır
+           denetimi bu yüzden boşluk koduna (32) bakmakla yetiniyor. Düzenli
+           ifade kurmak dokuz bin ürünün her biri için yeniden derleme
+           demekti, indexOf döngüsü onda biri kadar sürüyor. */
+        function tokenMetindeVar(metin, token, mod) {
+            if (mod === 0) return metin.indexOf(token) !== -1;
+            const boy = token.length;
+            let nereden = 0;
+            for (;;) {
+                const yer = metin.indexOf(token, nereden);
+                if (yer === -1) return false;
+                if (yer === 0 || metin.charCodeAt(yer - 1) === 32) {
+                    const son = yer + boy;
+                    if (son === metin.length) return true;
+                    const kod = metin.charCodeAt(son);
+                    if (mod === 2) {
+                        if (kod === 32) return true;
+                    } else if (kod < 48 || kod > 57) {
+                        return true;
+                    }
+                }
+                nereden = yer + 1;
+            }
         }
 
         // Check if all tokens are found in text (order independent) - UNIVERSAL MATCHING
@@ -5724,8 +5771,10 @@
 
             /* `every` her ürün için bir kapanış üretiyordu; düz döngü
                dokuz binden fazla gereksiz nesne oluşmasını engelliyor. */
+            const modlar = tokens.modlar;
             for (let i = 0; i < tokens.length; i++) {
-                if (normalizedText.indexOf(tokens[i]) === -1) return false;
+                const mod = modlar ? modlar[i] : tokenModu(tokens[i]);
+                if (!tokenMetindeVar(normalizedText, tokens[i], mod)) return false;
             }
             return true;
         }
