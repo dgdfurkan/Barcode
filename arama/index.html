@@ -2942,6 +2942,14 @@
             barcodeToProduct: new Map(),
             dedupedProducts: [],
             productsRef: null,
+            /* Ürün adı, marka ve kategori metinlerinin normalleştirilmiş hâli.
+               dedupedProducts ile aynı sırada. Altmış altı terimlik yapıştırmada
+               normalizeText önbelleğine 626 bin kez gidiliyordu; anahtar uzun bir
+               dize olduğu için her gidiş dizeyi yeniden özetliyordu. */
+            sadeAdlar: [],
+            sadeMarkalar: [],
+            sadeKategoriler: [],
+            sadeHazir: false,
         };
 
         function buildCatalogSearchIndexes(catalog) {
@@ -2951,6 +2959,10 @@
                     barcodeToProduct: new Map(),
                     dedupedProducts: [],
                     productsRef: list || null,
+                    sadeAdlar: [],
+                    sadeMarkalar: [],
+                    sadeKategoriler: [],
+                    sadeHazir: false,
                 };
                 return catalogSearchIndexes;
             }
@@ -2983,8 +2995,12 @@
                 barcodeToProduct,
                 dedupedProducts,
                 productsRef: list,
+                sadeAdlar: new Array(dedupedProducts.length),
+                sadeMarkalar: new Array(dedupedProducts.length),
+                sadeKategoriler: new Array(dedupedProducts.length),
+                sadeHazir: false,
             };
-            katalogMetinleriIsit(dedupedProducts);
+            katalogMetinleriIsit(dedupedProducts, catalogSearchIndexes);
             return catalogSearchIndexes;
         }
 
@@ -3000,11 +3016,16 @@
          * Isıtma yarım kalırsa bir şey bozulmaz: arama yine çalışır, sadece
          * o ürünler ilk aramada normalleştirilir.
          */
-        let katalogIsitmaAcik = false;
+        /* Hangi indeks nesnesi için ısıtma yürüyor. Eskiden düz bir "açık mı"
+           bayrağıydı; katalog yeniden kurulunca ikinci ısıtma bayrak yüzünden
+           hiç başlamıyor, yeni nesnenin dizileri boş kalıyordu. */
+        let isinanHedef = null;
 
-        function katalogMetinleriIsit(liste) {
-            if (!liste || !liste.length || katalogIsitmaAcik) return;
-            katalogIsitmaAcik = true;
+        function katalogMetinleriIsit(liste, hedef) {
+            if (!liste || !liste.length) return;
+            const benim = hedef || liste;
+            if (isinanHedef === benim) return;
+            isinanHedef = benim;
 
             const DILIM = 600;
             let i = 0;
@@ -3013,16 +3034,29 @@
                 : (fn) => setTimeout(fn, 16);
 
             function dilim() {
+                // Bu arada yeni katalog geldiyse eski ısıtmayı sürdürmenin anlamı yok.
+                if (isinanHedef !== benim) return;
                 const son = Math.min(i + DILIM, liste.length);
                 for (; i < son; i++) {
                     const p = liste[i];
                     if (!p) continue;
-                    if (p.name) normalizeText(p.name);
-                    if (p.brand) normalizeText(p.brand);
-                    if (p.category) normalizeText(p.category);
+                    const ad = p.name ? normalizeText(p.name) : '';
+                    const marka = p.brand ? normalizeText(p.brand) : '';
+                    const kategori = p.category ? normalizeText(p.category) : '';
+                    if (hedef) {
+                        hedef.sadeAdlar[i] = ad;
+                        hedef.sadeMarkalar[i] = marka;
+                        hedef.sadeKategoriler[i] = kategori;
+                    }
                 }
-                if (i < liste.length) bosta(dilim);
-                else katalogIsitmaAcik = false;
+                if (i < liste.length) {
+                    bosta(dilim);
+                } else {
+                    /* Bayrak dizilerin tamamı dolduktan sonra kalkıyor. Yarım
+                       dolu diziyle arama yapılırsa eksik sonuç döner. Bu arada
+                       gelen arama eski yoldan, normalizeText ile çalışır. */
+                    if (hedef) hedef.sadeHazir = true;
+                }
             }
 
             bosta(dilim);
@@ -3809,10 +3843,8 @@
             try {
                 const text = await getClipboardRawForProductImport();
                 if (!text) return;
-                if (!(await shouldAllowClipboardIntoSearch(text))) {
-                    showClipboardImportRejectedNotification();
-                    return;
-                }
+                /* Düğmeye kullanıcı bastı; süzgeç yok. Süzgeç otomatik
+                   yapıştırma içindi, bilerek yapılan işi engellemesi yanlıştı. */
                 await waitForProductCatalogIfNeededForParse(text);
                 // Varsa tablo verisini isimlere indirgeme
                 const parsed = typeof parseTableData === 'function' ? parseTableData(text) : text;
@@ -5734,6 +5766,12 @@
                  0 = alt dizge (eski davranış, harfli kelimeler)
                  1 = kelime başında, devamında rakam yok (rakam içerenler)
                  2 = tam kelime (tek harfler) */
+            /* Sıra önemli. containsAllTokens ilk tutmayan parçada duruyor, o
+               yüzden en ayırt edici parça başa alınıyor. Uzun kelime nadir,
+               "1" ya da "l" gibi tek karakter neredeyse her üründe var.
+               Sıralamadan önce altmış altı terimlik yapıştırmada eleme çok geç
+               oluyordu ve arama iki katından fazla sürüyordu. */
+            tokens.sort(function (a, b) { return b.length - a.length; });
             tokens.modlar = tokens.map(tokenModu);
             if (tokenOnbellek.size < 5000) tokenOnbellek.set(anahtar, tokens);
             return tokens;
@@ -5774,14 +5812,16 @@
         function containsAllTokens(text, tokens) {
             if (!text || !tokens || tokens.length === 0) return false;
 
-            const normalizedText = normalizeText(text);
+            return tokenlarVarMi(normalizeText(text), tokens);
+        }
 
-            /* `every` her ürün için bir kapanış üretiyordu; düz döngü
-               dokuz binden fazla gereksiz nesne oluşmasını engelliyor. */
+        /** Zaten normalleştirilmiş metin için. Önbelleğe hiç uğramaz. */
+        function tokenlarVarMi(sadeMetin, tokens) {
+            if (!sadeMetin) return false;
             const modlar = tokens.modlar;
             for (let i = 0; i < tokens.length; i++) {
                 const mod = modlar ? modlar[i] : tokenModu(tokens[i]);
-                if (!tokenMetindeVar(normalizedText, tokens[i], mod)) return false;
+                if (!tokenMetindeVar(sadeMetin, tokens[i], mod)) return false;
             }
             return true;
         }
@@ -5909,19 +5949,49 @@
             return false;
         }
 
-        /** Katalog eşlemesi için: tek satır, makul uzunlukta ürün adı / arama metni. */
+        /**
+         * Panodan gelen düz metni terimlere böler. Ayırıcı hem virgül hem satır
+         * sonu; kullanıcı listeyi iki biçimde de kopyalayabiliyor.
+         */
+        function panoTerimleri(s) {
+            const parcalar = [];
+            String(s == null ? '' : s).split(/[\r\n]+/).forEach(function (satir) {
+                virgulleBol(satir).forEach(function (p) { parcalar.push(p); });
+            });
+            return parcalar
+                .map((p) => cleanUiNoiseFromProductName(p.trim()))
+                .filter((p) => p.length >= 3);
+        }
+
+        /**
+         * Katalog eşlemesi için: pano metni ürün adı listesine benziyor mu?
+         *
+         * Eskiden metnin YALNIZ ilk satırına bakılıyor ve tamamına 200 karakter
+         * sınırı konuyordu. Altı ürünlük virgüllü liste 220 karakter ettiği için
+         * eleniyordu; beş ürün geçiyor, altıncı ürün yapıştırmayı tümden
+         * öldürüyordu. Sınır artık listenin tamamına değil, tek terime konuyor.
+         */
         function isPlausiblePlainProductNamePaste(s) {
             if (!s || typeof s !== 'string') return false;
             if (isLikelyEmail(s)) return false;
-            const firstLine = String(s).split(/\r?\n/)[0].trim();
-            const t = cleanUiNoiseFromProductName(firstLine);
-            if (!t || t.length < 3 || t.length > 200) return false;
-            if (/<[^>]+>/.test(t)) return false;
-            if (/^https?:\/\//i.test(t)) return false;
-            const compact = t.replace(/\s/g, '');
-            if (/^\d{8,}$/.test(compact)) return false;
-            if (!/\p{L}/u.test(t)) return false;
-            return true;
+            if (/<[^>]+>/.test(s)) return false;
+            if (s.length > 8000) return false;
+
+            const terimler = panoTerimleri(s);
+            if (!terimler.length || terimler.length > 500) return false;
+
+            for (let i = 0; i < terimler.length; i++) {
+                const t = terimler[i];
+                // Tek bir ürün adı 200 karakteri geçmez; geçiyorsa bu düz yazıdır.
+                if (t.length > 200) return false;
+                if (/^https?:\/\//i.test(t)) return false;
+            }
+
+            /* Harfsiz metin ürün adı değil. Saf uzun rakam dizisi de buraya
+               düşmemeli, onun yolu isPlainBarcodeOrSkuList. */
+            return terimler.some(function (t) {
+                return /\p{L}/u.test(t) && !/^\d{8,}$/.test(t.replace(/\s/g, ''));
+            });
         }
 
         /**
@@ -6041,6 +6111,24 @@
         }
 
         /** Virgülle birleştirmeden önce boş / sadece emoji kalan parçaları atar. */
+        /**
+         * Virgülle böler ama ondalık virgülü ayırıcı saymaz.
+         *
+         * "Kuzeyden Doğal Mineralli Su (1,5 L)" düz `split(',')` ile ikiye
+         * bölünüyordu: "Kuzeyden Doğal Mineralli Su (1" ve "5 L)". Birincisi
+         * yanlış ürünü (1 L) buluyor, ikincisi un ve deterjan getiriyordu.
+         * Altmış altı ürünlük listede iki ürün böyle bozuluyordu.
+         *
+         * Ondalık virgül geçici bir imle korunuyor. Lookbehind kullanmadım,
+         * eski Safari'lerde desteklenmiyor.
+         */
+        function virgulleBol(metin) {
+            return String(metin == null ? '' : metin)
+                .replace(/(\d),(\d)/g, '$1\u0001$2')
+                .split(',')
+                .map(function (p) { return p.replace(/\u0001/g, ','); });
+        }
+
         function joinCleanCommaTerms(parts) {
             if (!parts || !parts.length) return [];
             return parts
@@ -6521,7 +6609,7 @@
                     
                     // Try to convert product names to barcodes using both name and image URL
                     if (productNamesResult && productNamesResult !== textContent) {
-                        const productNames = joinCleanCommaTerms(productNamesResult.split(','));
+                        const productNames = joinCleanCommaTerms(virgulleBol(productNamesResult));
                         const foundBarcodesFromNames = new Set();
                         
                         // Create a map of product names to their image URLs from HTML
@@ -6679,7 +6767,7 @@
                 
                 // Try to convert product names to barcodes using both name and image URL
                 if (productNamesResult && productNamesResult !== textContent) {
-                    const productNames = joinCleanCommaTerms(productNamesResult.split(','));
+                    const productNames = joinCleanCommaTerms(virgulleBol(productNamesResult));
                     const foundBarcodesFromNames = new Set();
                     
                     // Create a map of product names to their image URLs from HTML
@@ -6880,11 +6968,11 @@
             let isTableData = false;
             if (parsedQuery !== query) {
                 // Table data was parsed, split by comma to get individual product names or barcodes
-                searchTerms = joinCleanCommaTerms(parsedQuery.split(','));
+                searchTerms = joinCleanCommaTerms(virgulleBol(parsedQuery));
                 isTableData = true;
             } else {
                 // Normal comma-separated search
-                searchTerms = joinCleanCommaTerms(parsedQuery.split(','));
+                searchTerms = joinCleanCommaTerms(virgulleBol(parsedQuery));
             }
             
             // Store image URLs for premium search (if available)
@@ -7256,23 +7344,45 @@
             return { active: activeResults, outOfStock: outOfStockResults };
         }
 
-        /** Panodan düz metin: arama algoritması en az bir sonuç döndürüyorsa yapıştırmaya izin ver. */
+        /**
+         * Panodan düz metin: katalog bu metni tanıyor mu?
+         *
+         * Eskiden çok terimli listede `every` kullanılıyordu, yani listedeki
+         * BÜTÜN ürünler katalogda olmak zorundaydı. Altmış ürünlük listede
+         * katalogda olmayan tek ürün bütün yapıştırmayı çöpe atıyordu.
+         * Kullanıcının şikâyeti buydu: ürün tek başına aranınca buluyor, aynı
+         * ürün virgüllü listeye girince liste hiç yapışmıyor.
+         *
+         * Artık bir tanesinin tutması yetiyor. Amaç listenin kusursuz olması
+         * değil, panodaki metnin ürün listesi mi yoksa alakasız bir yazı mı
+         * olduğunu anlamak. Tarama ilk 25 terimle sınırlı; eşleşme bulunamayan
+         * uzun metinde katalogu beş yüz kez taramanın anlamı yok.
+         */
         function catalogYieldsSearchResultsForPlainLine(queryLine) {
             if (!queryLine || typeof queryLine !== 'string') return false;
             if (!Array.isArray(products) || products.length === 0) return false;
-            const terms = joinCleanCommaTerms(queryLine.split(','));
+            const terms = panoTerimleri(queryLine);
             if (terms.length === 0) return false;
             const hasHits = (res) => {
                 const a = (res && res.active) ? res.active.length : 0;
                 const o = (res && res.outOfStock) ? res.outOfStock.length : 0;
                 return a + o > 0;
             };
-            if (terms.length === 1) {
-                return hasHits(performOptimizedSearch(products, terms, false));
+            const bakilacak = Math.min(terms.length, 25);
+            for (let i = 0; i < bakilacak; i++) {
+                if (hasHits(performOptimizedSearch(products, [terms[i]], false))) return true;
             }
-            return terms.every((t) => hasHits(performOptimizedSearch(products, [t], false)));
+            return false;
         }
 
+        /**
+         * Yalnız OTOMATİK yapıştırma yolunda çağrılır. Kullanıcı Ctrl+V'ye ya da
+         * Yapıştır düğmesine bastıysa istediği bellidir, önüne çıkılmaz; süzgeç
+         * sayfaya girer girmez panonun kendiliğinden boşaltılmasına karşı.
+         *
+         * Metnin tamamı veriliyor. Eskiden yalnız ilk satır bakılıyordu, alt alta
+         * kopyalanmış liste ikinci satırdan sonrasını kaybediyordu.
+         */
         async function shouldAllowClipboardIntoSearch(raw) {
             if (shouldImportClipboardToSearch(raw)) return true;
             if (!isPlausiblePlainProductNamePaste(raw)) return false;
@@ -7280,8 +7390,7 @@
                 whenProductsHydratedForClipboard,
                 new Promise((r) => setTimeout(r, 25000))
             ]);
-            const line = cleanUiNoiseFromProductName(String(raw).split(/\r?\n/)[0].trim());
-            return catalogYieldsSearchResultsForPlainLine(line);
+            return catalogYieldsSearchResultsForPlainLine(raw);
         }
 
         // O(1) barkod lookup — çoklu yapıştırma (20+ barkod) için
@@ -7311,6 +7420,13 @@
         function performGroupedSearch(products, searchTerms, isTableData = false) {
             const groupedResults = [];
             const maxResultsPerGroup = 30; // Reduced limit for better performance
+
+            /* Önden normalleştirilmiş metinler yalnız listenin kendisi
+               indeksteki liste olduğunda kullanılabilir; sıralar örtüşmeli. */
+            const sade = (catalogSearchIndexes.sadeHazir &&
+                          products === catalogSearchIndexes.dedupedProducts)
+                ? catalogSearchIndexes
+                : null;
             
             for (let termIndex = 0; termIndex < searchTerms.length; termIndex++) {
                 const searchTerm = searchTerms[termIndex];
@@ -7351,11 +7467,14 @@
                     imageUrlPart = parts[1]?.trim() || '';
                 }
                 
+                /* Bu ikisi yalnız terime bağlı. Döngünün içindeyken altmış altı
+                   ürünlük yapıştırmada 626 bin kez yeniden hesaplanıyorlardı. */
+                const trimmedSearchTerm = searchTerm.replace(/\s+/g, '');
+                const isBarcodeSearchTerim = /^\d{8,}$/.test(trimmedSearchTerm);
+
                 for (let i = 0; i < products.length && foundCount < maxResultsPerGroup; i++) {
                     const product = products[i];
                     let found = false;
-                    
-                    const trimmedSearchTerm = searchTerm.replace(/\s+/g, '');
                     
                     // First check: Always check barcodes first with exact match (for any alphanumeric code)
                     // This handles both numeric barcodes (8696368011332) and alphanumeric codes (F001250)
@@ -7379,8 +7498,7 @@
                         continue;
                     }
                     
-                    // Check if searchTerm is a numeric barcode (all digits, typically 8+ digits)
-                    const isBarcodeSearch = /^\d{8,}$/.test(trimmedSearchTerm);
+                    const isBarcodeSearch = isBarcodeSearchTerim;
                     
                     if (isTableData || hasCombinedFormat) {
                         // For table data, check both product name and image URL
@@ -7557,19 +7675,14 @@
                         let categoryMatch = false;
                         let imageMatch = false;
                         
-                        // Check product name
-                        if (product.name) {
-                            nameMatch = containsAllTokens(product.name, termTokens);
-                        }
-                        
-                        // Check brand
-                        if (product.brand) {
-                            brandMatch = containsAllTokens(product.brand, termTokens);
-                        }
-                        
-                        // Check category
-                        if (product.category) {
-                            categoryMatch = containsAllTokens(product.category, termTokens);
+                        if (sade) {
+                            nameMatch = tokenlarVarMi(sade.sadeAdlar[i], termTokens);
+                            if (!nameMatch) brandMatch = tokenlarVarMi(sade.sadeMarkalar[i], termTokens);
+                            if (!nameMatch && !brandMatch) categoryMatch = tokenlarVarMi(sade.sadeKategoriler[i], termTokens);
+                        } else {
+                            if (product.name) nameMatch = containsAllTokens(product.name, termTokens);
+                            if (!nameMatch && product.brand) brandMatch = containsAllTokens(product.brand, termTokens);
+                            if (!nameMatch && !brandMatch && product.category) categoryMatch = containsAllTokens(product.category, termTokens);
                         }
                         
                         // Check image URL (premium feature) - using normalized matching
@@ -8295,11 +8408,9 @@
                     pastedText = html;
                 }
                 
-                if (!(await shouldAllowClipboardIntoSearch(pastedText))) {
-                    showClipboardImportRejectedNotification();
-                    return;
-                }
-                
+                /* Ctrl+V kullanıcının kendi hareketi; ne yapıştırdığını biliyor.
+                   Süzgeç burada da duruyordu ve altı ürünlük listeyi kutuya hiç
+                   sokmuyordu. Kaldırıldı. */
                 await waitForProductCatalogIfNeededForParse(pastedText);
                 const parsedQuery = parseTableData(pastedText);
                 

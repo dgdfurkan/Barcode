@@ -10280,6 +10280,39 @@ class CountingSystem {
             }
         }
 
+        /*
+         * Düz metin çoklu liste. Buraya kadar yalnız Getir HTML'i ve CDN görsel
+         * bağlantıları toplu işleniyordu; virgülle ayrılmış ürün adları tek bir
+         * ad sanılıp aranıyor ve hiçbiri eklenemiyordu.
+         */
+        const adlar = this.adListesiniAyikla(value);
+        if (adlar.length > 1) {
+            const cozulen = [];
+            const bulunamayan = [];
+            for (let i = 0; i < adlar.length; i++) {
+                const bulunan = this.findProduct(adlar[i]);
+                if (bulunan) cozulen.push(bulunan);
+                else bulunamayan.push(adlar[i]);
+            }
+            if (cozulen.length > 0) {
+                await this.bulkAddResolvedProductsFromGetirPaste(cozulen, 'Ad listesi');
+                if (bulunamayan.length > 0) {
+                    this.showToast(
+                        `${bulunamayan.length} ürün katalogda bulunamadı: ${bulunamayan.slice(0, 3).join(', ')}${
+                            bulunamayan.length > 3 ? '…' : ''
+                        }`,
+                        'info',
+                        6000
+                    );
+                }
+                if (clearInput) {
+                    const input = document.getElementById('manualProductInput');
+                    if (input) input.value = '';
+                }
+                return;
+            }
+        }
+
         let product = this.findProduct(value);
         if (
             !product &&
@@ -10362,7 +10395,7 @@ class CountingSystem {
      * Getir HTML parse sonucu ürün listesini tabloya ekler (satır sırası korunur).
      * @param {object[]} resolvedProducts
      */
-    async bulkAddResolvedProductsFromGetirPaste(resolvedProducts) {
+    async bulkAddResolvedProductsFromGetirPaste(resolvedProducts, kaynakEtiketi = 'Getir HTML') {
         this._beginBulkImportLock();
         try {
             const ready = await this._ensureAddTargetTableReady();
@@ -10413,7 +10446,7 @@ class CountingSystem {
 
             const tn = this.currentTableName || '';
             this.pushAuditEntry(
-                `Getir HTML · ${addedCount} yeni${
+                `${kaynakEtiketi} · ${addedCount} yeni${
                     skippedInTable ? ` · ${skippedInTable} zaten vardı` : ''
                 }`,
                 { cat: 'import', tbl: tn }
@@ -10584,7 +10617,21 @@ class CountingSystem {
 
     findProduct(searchTerm) {
         const term = searchTerm.toLowerCase().trim();
-        
+
+        /*
+         * Önce tam ad. advancedProductSearch puanlama yapmıyor, katalogdaki
+         * ilk eşleşmeyi döndürüyor; "Coca-Cola (250 ml)" için on üç eşleşmenin
+         * ilki "Coca-Cola Zero Sugar Cam Şişe (6 x 250 ml)" olabiliyordu.
+         * Toplu ekleme adla çalıştığı için yanlış ürün tabloya giriyordu.
+         */
+        const tamAd = this.normalizeSearchText(searchTerm);
+        if (tamAd) {
+            const birebir = this.allProducts.find(
+                (p) => p.name && this.normalizeSearchText(p.name) === tamAd
+            );
+            if (birebir) return birebir;
+        }
+
         // Use advanced search for better results
         const results = this.advancedProductSearch(searchTerm, 1);
         if (results.length > 0) {
@@ -14218,22 +14265,72 @@ class CountingSystem {
     
     // Tokenize query (split into words)
     tokenizeQuery(query) {
-        /* Sorgu da ürün adıyla aynı sadeleştirmeden geçiyor. Tek harflik
-           parçalar atılıyor: "45 g" yazınca "g" neredeyse her adda geçtiği
-           için hiçbir şey elemiyor, yalnızca yanlış eşleşme üretiyordu. */
-        return this.normalizeSearchText(query)
+        /* Boyut bilgisi eskiden çöpe gidiyordu: tek harflik parçalar atılınca
+           "Erikli Doğal Kaynak Suyu (6 x 1 L)" sorgusundan geriye yalnız dört
+           kelime kalıyor, 500 ml'lik şişe de eşleşiyordu. Artık kısa parçalar
+           duruyor, ama her birine nasıl aranacağı yazılıyor:
+             0 = alt dizge (harfli kelimeler, eski davranış)
+             1 = kelime başında, devamında rakam yok (rakam içerenler)
+             2 = tam kelime (tek harfler)
+           Sıra uzundan kısaya; eleme ilk parçada bitsin diye. */
+        const tokens = this.normalizeSearchText(query)
             .split(' ')
-            .filter((token) => token.length >= 2 || /^\d$/.test(token));
+            .filter((token) => token.length >= 1);
+        tokens.sort((a, b) => b.length - a.length);
+        tokens.modlar = tokens.map((t) => (/[0-9]/.test(t) ? 1 : (t.length === 1 ? 2 : 0)));
+        return tokens;
     }
-    
+
+    /* normalizeSearchText çıktısı yalnız [a-z0-9] ve tek boşluk içerdiği için
+       sınır denetimi boşluk koduna (32) bakmakla yetiniyor. */
+    tokenMetindeVar(metin, token, mod) {
+        if (mod === 0) return metin.indexOf(token) !== -1;
+        const boy = token.length;
+        let nereden = 0;
+        for (;;) {
+            const yer = metin.indexOf(token, nereden);
+            if (yer === -1) return false;
+            if (yer === 0 || metin.charCodeAt(yer - 1) === 32) {
+                const son = yer + boy;
+                if (son === metin.length) return true;
+                const kod = metin.charCodeAt(son);
+                if (mod === 2) {
+                    if (kod === 32) return true;
+                } else if (kod < 48 || kod > 57) {
+                    return true;
+                }
+            }
+            nereden = yer + 1;
+        }
+    }
+
     // Check if text contains all tokens
     containsAllTokens(text, tokens) {
         if (!text || !tokens || tokens.length === 0) return false;
         const normalized = this.normalizeSearchText(text);
+        const modlar = tokens.modlar;
         for (let i = 0; i < tokens.length; i++) {
-            if (normalized.indexOf(tokens[i]) === -1) return false;
+            const mod = modlar
+                ? modlar[i]
+                : (/[0-9]/.test(tokens[i]) ? 1 : (tokens[i].length === 1 ? 2 : 0));
+            if (!this.tokenMetindeVar(normalized, tokens[i], mod)) return false;
         }
         return true;
+    }
+
+    /**
+     * Yapıştırılan düz metni ürün adlarına böler. Ayırıcı virgül ve satır
+     * sonu; ondalık virgül ("1,5 L") ayırıcı sayılmaz.
+     */
+    adListesiniAyikla(metin) {
+        const parcalar = [];
+        String(metin == null ? '' : metin).split(/[\r\n]+/).forEach((satir) => {
+            satir
+                .replace(/(\d),(\d)/g, '$1\u0001$2')
+                .split(',')
+                .forEach((p) => parcalar.push(p.replace(/\u0001/g, ',')));
+        });
+        return parcalar.map((p) => p.trim()).filter((p) => p.length >= 3);
     }
 
     /*
@@ -14261,7 +14358,12 @@ class CountingSystem {
 
         const sonuc = String(text)
             .toLocaleLowerCase('tr')
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
             .replace(/[ığüşöçâîû]/g, (h) => COUNTING_HARF_ESLEME[h] || h)
+            /* Ondalık ayraç rakamları bağlı tutuyor. Yoksa "1,5 L" iki sayıya
+               bölünüyor ve "1 L" araması 1,5 litreliği de yakalıyor. */
+            .replace(/(\d)[.,](\d)/g, '$1$2')
             .replace(/[^a-z0-9]+/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
