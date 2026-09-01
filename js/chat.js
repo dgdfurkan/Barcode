@@ -346,6 +346,15 @@ class ChatSystem {
         // Mark messages as read
         this.hasUnreadMessages = false;
         this.stopChatButtonAnimation();
+
+        /* Panel açıldı: ekrandaki her mesaj görülmüş sayılıyor ve bu bilgi
+           yerelde kalıyor. Sayfa yenilenince aynı mesaj için tekrar
+           bildirim çıkmıyor. */
+        (this.messages || []).forEach((msg) => {
+            this.lastKnownMessageIds.add(msg.timestamp + msg.sender + msg.message);
+        });
+        this._gorulenleriKaydet();
+        document.querySelectorAll('.chat-notification').forEach((n) => n.remove());
         
         // KULLANICI CHAT'İ AÇTIĞINDA TÜM ESKİ MESAJLARI YÜKLE!
         console.log('💬 Chat açıldı - tüm eski mesajları yükleniyor...');
@@ -1067,13 +1076,53 @@ class ChatSystem {
         }
     }
 
+    /*
+     * GÖRÜLEN MESAJLARIN HAFIZASI
+     *
+     * `lastKnownMessageIds` yalnızca bellekteydi. Sayfa yenilenince set
+     * boşalıyor, daha önce okunmuş her admin mesajı yeniden "yeni" sayılıyor
+     * ve "Yeni Mesaj!" bildirimi tekrar tekrar çıkıyordu. Kullanıcı mesajı
+     * okumuş olsa bile her açılışta aynı uyarıyı görüyordu.
+     *
+     * Artık yerelde, kullanıcı bazında saklanıyor. Farklı hesap açan başka
+     * birinin geçmişini devralmasın diye anahtarda kullanıcı adı var.
+     *
+     * Liste son üç yüz kimlikle sınırlı: sohbet uzadıkça yerel depolama
+     * şişmesin. Eski kimliklerin düşmesi zararsız, o mesajlar zaten
+     * konuşmanın çok gerisinde kalıyor.
+     */
+    _gorulenAnahtar() {
+        return 'jb_sohbet_gorulen_' + (this.currentUser || 'misafir');
+    }
+
+    _gorulenleriYukle() {
+        try {
+            const ham = JSON.parse(localStorage.getItem(this._gorulenAnahtar()) || '[]');
+            if (Array.isArray(ham)) ham.forEach((id) => this.lastKnownMessageIds.add(id));
+        } catch (e) {
+            /* bozuksa boş başla */
+        }
+    }
+
+    _gorulenleriKaydet() {
+        try {
+            const hepsi = Array.from(this.lastKnownMessageIds);
+            const son = hepsi.slice(-300);
+            localStorage.setItem(this._gorulenAnahtar(), JSON.stringify(son));
+        } catch (e) {
+            /* gizli sekmede yazılamaz, sorun değil */
+        }
+    }
+
     recordExistingMessages(chatMessages) {
-        // Mevcut tüm mesajları kaydet - bu mesajlar için BİLDİRİM YOK
+        // Mevcut tüm mesajlar görülmüş sayılıyor: bunlar için BİLDİRİM YOK
         this.lastKnownMessageIds.clear();
+        this._gorulenleriYukle();
         chatMessages.forEach(msg => {
             const msgId = msg.timestamp + msg.sender + msg.message;
             this.lastKnownMessageIds.add(msgId);
         });
+        this._gorulenleriKaydet();
         console.log('📝 Recorded', this.lastKnownMessageIds.size, 'existing messages');
     }
 
@@ -1092,6 +1141,7 @@ class ChatSystem {
                 const msgId = msg.timestamp + msg.sender + msg.message;
                 this.lastKnownMessageIds.add(msgId);
             });
+            this._gorulenleriKaydet();
             
             // Bildirim göster (sadece chat kapalıysa)
             if (!this.isOpen) {
@@ -1391,8 +1441,8 @@ class ChatSystem {
                     </svg>
                 </div>
                 <div>
-                    <h4 class="font-semibold text-sm">Yeni Mesaj!</h4>
-                    <p class="text-xs opacity-90">Destek ekibinden mesajınız var</p>
+                    <h4 class="font-semibold text-sm">Yeni mesaj</h4>
+                    <p class="text-xs opacity-90">Destek ekibi yazdı. Okumak için dokun.</p>
                 </div>
                 <button onclick="event.stopPropagation(); this.parentElement.parentElement.remove();" class="ml-2 text-white hover:text-gray-200 transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1552,6 +1602,7 @@ class ChatSystem {
                                 const msgId = msg.timestamp + msg.sender + msg.message;
                                 this.lastKnownMessageIds.add(msgId);
                             });
+                            this._gorulenleriKaydet();
                             
                             // Show notification if chat is closed
                             if (!this.isOpen) {
