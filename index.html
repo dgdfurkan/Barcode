@@ -53,7 +53,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/app-boot.css?v=20260828i" />
-    <link rel="stylesheet" href="css/giris.css?v=20260901b" />
+    <link rel="stylesheet" href="css/giris.css?v=20260901c" />
     <style>
         * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
         /* Ana sayfa arka plan — Synapse tarzı ambient orb (marka mavisi) */
@@ -754,8 +754,8 @@
 
                         <button type="submit" class="giris-gonder">
                             <span id="loginText">Giriş yap</span>
-                            <span id="loginSpinner" class="hidden" style="display:none;align-items:center;gap:.5rem">
-                                <span class="spinner" style="width:1.05rem;height:1.05rem"></span>
+                            <span id="loginSpinner" class="giris-yukleniyor hidden">
+                                <span class="giris-donen" aria-hidden="true"></span>
                                 <span>Giriş yapılıyor…</span>
                             </span>
                         </button>

@@ -505,6 +505,38 @@ body.giris {
 
 .giris-gonder:active { transform: translateY(0) scale(0.99); }
 
+/*
+ * Giriş sırasındaki durum.
+ *
+ * `auth.js` yazı ile döneni `hidden` sınıfını alıp vererek değiştiriyor.
+ * Önceki işaretlemede dönenin üstünde satır içi `display:none` vardı;
+ * satır içi stil sınıfı yendiği için `hidden` kalksa da dönen görünmüyordu.
+ * Yazı gizleniyor, dönen gelmiyor, düğme boşalıyordu. Görünürlük artık
+ * yalnızca sınıfla belirleniyor.
+ */
+.giris-gonder .hidden { display: none !important; }
+
+.giris-yukleniyor {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.giris-donen {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    border: 2px solid rgb(255 255 255 / 0.35);
+    border-top-color: #fff;
+    animation: g-donen 700ms linear infinite;
+}
+
+@keyframes g-donen { to { transform: rotate(360deg); } }
+
+/* Giriş sürerken tekrar basılmasın: iki istek gitmesin */
+.giris-gonder:disabled,
+.giris-gonder[aria-busy='true'] { opacity: 0.85; cursor: progress; }
+
 .giris-kart__dip {
     margin: 0.95rem 0 0;
     text-align: center;

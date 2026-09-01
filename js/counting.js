@@ -1,3 +1,10 @@
+/* Türkçe harflerin arama karşılıkları. Kullanıcı "sutas" yazsa da
+   "Sütaş" bulunsun diye hem sorgu hem ürün adı bu tablodan geçiyor. */
+const COUNTING_HARF_ESLEME = {
+    'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c',
+    'â': 'a', 'î': 'i', 'û': 'u'
+};
+
 /** Ürün detay — API alan etiketleri */
 const COUNTING_PRODUCT_DETAIL_API_FIELD_LABELS = {
     remainingShelfLife: 'Kalan raf ömrü',
@@ -10582,10 +10589,12 @@ class CountingSystem {
             return results[0];
         }
         
-        // Fallback: simple search by name
-        let product = this.allProducts.find(p => 
-            p.name && p.name.toLowerCase().includes(term)
-        );
+        // Fallback: simple search by name (aynı sadeleştirmeyle)
+        const sadeTerim = this.normalizeSearchText(searchTerm);
+        let product = sadeTerim
+            ? this.allProducts.find((p) =>
+                  p.name && this.normalizeSearchText(p.name).includes(sadeTerim))
+            : null;
         
         if (product) return product;
         
@@ -14207,17 +14216,57 @@ class CountingSystem {
     
     // Tokenize query (split into words)
     tokenizeQuery(query) {
-        return query.toLowerCase()
-            .replace(/[^\w\sğüşıöçĞÜŞİÖÇ]/g, ' ')
-            .split(/\s+/)
-            .filter(token => token.length > 0);
+        /* Sorgu da ürün adıyla aynı sadeleştirmeden geçiyor. Tek harflik
+           parçalar atılıyor: "45 g" yazınca "g" neredeyse her adda geçtiği
+           için hiçbir şey elemiyor, yalnızca yanlış eşleşme üretiyordu. */
+        return this.normalizeSearchText(query)
+            .split(' ')
+            .filter((token) => token.length >= 2 || /^\d$/.test(token));
     }
     
     // Check if text contains all tokens
     containsAllTokens(text, tokens) {
         if (!text || !tokens || tokens.length === 0) return false;
-        const textLower = text.toLowerCase();
-        return tokens.every(token => textLower.includes(token));
+        const normalized = this.normalizeSearchText(text);
+        for (let i = 0; i < tokens.length; i++) {
+            if (normalized.indexOf(tokens[i]) === -1) return false;
+        }
+        return true;
+    }
+
+    /*
+     * Arama metnini sadeleştirir.
+     *
+     * SORUN
+     * Eski hâlinde sorgu ile ürün adı FARKLI işlemlerden geçiyordu. Sorgudan
+     * noktalama silinip boşluğa çevriliyor, ürün adına ise yalnızca
+     * `toLowerCase()` uygulanıyordu. İki taraf aynı biçime gelmediği için
+     * "Ülker Çubuk Kraker (45 g)" gibi adlarda parantez açılır açılmaz
+     * eşleşme bozuluyordu.
+     *
+     * Ayrıca `toLowerCase()` Türkçeyi bilmiyor: "İ" harfi iki kod noktalı
+     * bir diziye ("i" + birleşen nokta) dönüşüyor ve hiçbir şeye eşleşmiyor.
+     * Bu yüzden `toLocaleLowerCase('tr')` kullanılıyor ve Türkçe harfler
+     * karşılıklarına indiriliyor; kullanıcı "sutas" yazsa da "Sütaş" bulunuyor.
+     *
+     * İki taraf da buradan geçtiği için artık aynı dili konuşuyorlar.
+     */
+    normalizeSearchText(text) {
+        if (!text) return '';
+        if (!this._aramaOnbellek) this._aramaOnbellek = new Map();
+        const hazir = this._aramaOnbellek.get(text);
+        if (hazir !== undefined) return hazir;
+
+        const sonuc = String(text)
+            .toLocaleLowerCase('tr')
+            .replace(/[ığüşöçâîû]/g, (h) => COUNTING_HARF_ESLEME[h] || h)
+            .replace(/[^a-z0-9]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        // Katalog on binlerce satır olabiliyor; sınırsız büyümesin
+        if (this._aramaOnbellek.size < 60000) this._aramaOnbellek.set(text, sonuc);
+        return sonuc;
     }
     
     // Show create table modal
