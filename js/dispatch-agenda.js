@@ -165,27 +165,156 @@ class DispatchAgendaApp {
         }
     }
 
-    _searchProducts(query, limit = 30) {
-        const q = (query || '').trim().toLocaleLowerCase('tr');
-        if (q.length < 2) return [];
-        const tokens = q.split(/\s+/).filter(Boolean);
-        const results = [];
+    /*
+     * Arama metnini sadeleştirir.
+     *
+     * Önceki hâlinde yalnızca küçük harfe çevriliyordu. Türkçe harfler
+     * olduğu gibi kaldığı için "sutas" yazan "Sütaş"ı bulamıyordu; depoda
+     * çalışan biri Türkçe klavye kullanmak zorunda kalıyordu. Noktalama da
+     * duruyordu: "kraker (45" yazınca parantez bir kelime sayılıyordu.
+     *
+     * Arama sayfası ve sayım sayfasıyla aynı kural: Türkçe harfler
+     * karşılıklarına iniyor, noktalama boşluğa dönüyor. Sonuç önbellekte.
+     */
+    _sadelestir(metin) {
+        if (!metin) return '';
+        if (!this._sadeOnbellek) this._sadeOnbellek = new Map();
+        const hazir = this._sadeOnbellek.get(metin);
+        if (hazir !== undefined) return hazir;
+        const HARF = { 'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c',
+                       'â': 'a', 'î': 'i', 'û': 'u' };
+        const sonuc = String(metin)
+            .toLocaleLowerCase('tr')
+            .replace(/[ığüşöçâîû]/g, (h) => HARF[h] || h)
+            .replace(/[^a-z0-9]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+        if (this._sadeOnbellek.size < 40000) this._sadeOnbellek.set(metin, sonuc);
+        return sonuc;
+    }
 
+    /** Ürünün aranabilir metni. Ürün başına bir kez hesaplanıyor. */
+    _urunMetni(p) {
+        if (!this._urunMetinleri) this._urunMetinleri = new WeakMap();
+        const hazir = this._urunMetinleri.get(p);
+        if (hazir !== undefined) return hazir;
+        const barkodlar = (Array.isArray(p.barcodes) ? p.barcodes : [])
+            .map((b) => (typeof b === 'object' ? b.code : b))
+            .filter(Boolean)
+            .join(' ');
+        const metin = this._sadelestir(
+            `${this._productName(p)} ${p.brand || ''} ${barkodlar} ${this._productId(p)}`
+        );
+        this._urunMetinleri.set(p, metin);
+        return metin;
+    }
+
+    _searchProducts(query, limit = 30) {
+        const sade = this._sadelestir(query);
+        // Rakamla aranıyorsa tek karakter bile anlamlı: barkodun ilk hanesi
+        const enAz = /^\d/.test(sade) ? 1 : 2;
+        if (sade.length < enAz) return [];
+
+        const tokens = sade.split(' ').filter(Boolean);
+        if (!tokens.length) return [];
+
+        const results = [];
         for (const p of this.allProducts || []) {
             const id = this._productId(p);
             if (!id) continue;
-            const name = this._productName(p).toLocaleLowerCase('tr');
-            const barcodeStr = (Array.isArray(p.barcodes) ? p.barcodes : [])
-                .map((b) => (typeof b === 'object' ? b.code : b))
-                .filter(Boolean)
-                .join(' ')
-                .toLocaleLowerCase('tr');
-            const haystack = `${name} ${barcodeStr} ${String(id).toLocaleLowerCase('tr')}`;
-            const hit = tokens.every((t) => haystack.includes(t));
+            const metin = this._urunMetni(p);
+            let hit = true;
+            for (let i = 0; i < tokens.length; i++) {
+                if (metin.indexOf(tokens[i]) === -1) { hit = false; break; }
+            }
             if (hit) results.push(p);
             if (results.length >= limit) break;
         }
         return results;
+    }
+
+    // ==================================================================
+    // Son eklenenler
+    // ==================================================================
+    //
+    // Aynı ürünler tekrar tekrar giriliyor. Arama kutusu boşken son
+    // eklenenler listeleniyor; kullanıcı çoğu zaman hiç yazmadan tek
+    // dokunuşla seçiyor.
+
+    _sonEklenenler(adet = 6) {
+        const gorulen = new Set();
+        const cikti = [];
+        for (const item of this.items || []) {
+            const pid = String(item.product_id || item.productId || '');
+            if (!pid || gorulen.has(pid)) continue;
+            const p = this.productIndex.get(pid);
+            if (!p) continue;
+            gorulen.add(pid);
+            cikti.push(p);
+            if (cikti.length >= adet) break;
+        }
+        return cikti;
+    }
+
+    /**
+     * Eşleşen parçayı kalınlaştırır: göz satırı taramadan buluyor.
+     *
+     * Sadeleştirme sırasında konum haritası da tutuluyor. İlk sürümde
+     * "sadeleştirilen metnin uzunluğu aynı kalır" varsayılmıştı; oysa
+     * noktalama tek boşluğa iniyor ve uzunluk değişiyor. "cubuk 45" için
+     * "45" yerine "(4" işaretleniyordu. Harita bu kaymayı kapatıyor.
+     */
+    _sadeHarita(metin) {
+        const HARF = { 'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c',
+                       'â': 'a', 'î': 'i', 'û': 'u' };
+        let sade = '';
+        const konum = [];
+        let bosluktaydi = true;
+
+        for (let i = 0; i < metin.length; i++) {
+            let ch = metin[i].toLocaleLowerCase('tr');
+            ch = HARF[ch] || ch;
+            if (/[a-z0-9]/.test(ch)) {
+                sade += ch;
+                konum.push(i);
+                bosluktaydi = false;
+            } else if (!bosluktaydi) {
+                sade += ' ';
+                konum.push(i);
+                bosluktaydi = true;
+            }
+        }
+        // Sondaki boşluğu at
+        while (sade.endsWith(' ')) { sade = sade.slice(0, -1); konum.pop(); }
+        return { sade: sade, konum: konum };
+    }
+
+    _vurgula(ad, sorgu) {
+        const tokens = this._sadelestir(sorgu).split(' ').filter(Boolean);
+        if (!tokens.length) return this._esc(ad);
+
+        const { sade, konum } = this._sadeHarita(ad);
+        const isaret = new Array(ad.length).fill(false);
+
+        for (const t of tokens) {
+            let bas = sade.indexOf(t);
+            while (bas !== -1) {
+                for (let i = bas; i < bas + t.length && i < konum.length; i++) {
+                    isaret[konum[i]] = true;
+                }
+                bas = sade.indexOf(t, bas + t.length);
+            }
+        }
+
+        let cikti = '';
+        let acik = false;
+        for (let i = 0; i < ad.length; i++) {
+            if (isaret[i] && !acik) { cikti += '<mark>'; acik = true; }
+            else if (!isaret[i] && acik) { cikti += '</mark>'; acik = false; }
+            cikti += this._esc(ad[i]);
+        }
+        if (acik) cikti += '</mark>';
+        return cikti;
     }
 
     async loadItems(retry = 0) {
@@ -475,6 +604,7 @@ class DispatchAgendaApp {
         this._showFormSection(false);
         document.getElementById('addSearchHint')?.classList.remove('hidden');
         document.getElementById('addProductSearch')?.focus();
+        this._renderProductSearchResults('');
     }
 
     _selectProduct(product) {
@@ -540,7 +670,23 @@ class DispatchAgendaApp {
         this._searchHighlight = -1;
         const q = (query || '').trim();
 
-        if (q.length < 2) {
+        /* Kutu boşken son eklenen ürünler duruyor. Aynı ürünler tekrar
+           tekrar giriliyor; kullanıcı çoğu zaman hiç yazmadan seçiyor. */
+        if (!q) {
+            const son = this._sonEklenenler(6);
+            if (!son.length) {
+                container.innerHTML = '';
+                container.classList.add('hidden');
+                return;
+            }
+            container.innerHTML =
+                '<p class="agenda-search-basluk">Son eklediklerin</p>' +
+                son.map((p) => this._sonucSatiri(p, '')).join('');
+            container.classList.remove('hidden');
+            return;
+        }
+
+        if (q.length < 2 && !/^\d/.test(q)) {
             container.innerHTML = '';
             container.classList.add('hidden');
             return;
@@ -561,27 +707,35 @@ class DispatchAgendaApp {
             return;
         }
 
-        container.innerHTML = matches
-            .map((p) => {
-                const id = this._esc(this._productId(p));
-                const name = this._esc(this._productName(p));
-                const img = this._esc(this._productImage(p));
-                const barcode = this._esc(this._productBarcode(p));
-                const brand = this._esc(p.brand || '');
-                const meta = [brand, barcode ? `Barkod: ${barcode}` : ''].filter(Boolean).join(' · ');
-                return `
-            <button type="button" class="agenda-search-hit" data-pick-id="${id}" aria-selected="false">
-                <img src="${img}" alt="" class="h-12 w-12 shrink-0 rounded-xl border border-slate-100 object-cover bg-slate-50" loading="lazy" />
-                <div class="min-w-0 flex-1">
-                    <p class="text-sm font-semibold text-slate-900 [overflow-wrap:anywhere] leading-snug">${name}</p>
-                    ${meta ? `<p class="mt-0.5 text-xs text-slate-500 truncate">${meta}</p>` : ''}
-                </div>
-                <span class="shrink-0 rounded-lg bg-blue-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">Seç</span>
-            </button>`;
-            })
-            .join('');
+        container.innerHTML =
+            `<p class="agenda-search-basluk">${matches.length} sonuç` +
+            (matches.length >= 30 ? ' (ilk 30)' : '') +
+            ' <span>↑↓ gez · Enter seç</span></p>' +
+            matches.map((p) => this._sonucSatiri(p, q)).join('');
 
         container.classList.remove('hidden');
+    }
+
+    /** Sonuç satırı. Hem arama hem "son eklediklerin" için tek biçim. */
+    _sonucSatiri(p, sorgu) {
+        const id = this._esc(this._productId(p));
+        const ad = this._productName(p);
+        const img = this._esc(this._productImage(p));
+        const barcode = this._esc(this._productBarcode(p));
+        const brand = this._esc(p.brand || '');
+        const meta = [brand, barcode ? `Barkod: ${barcode}` : ''].filter(Boolean).join(' · ');
+        return `
+            <button type="button" class="agenda-search-hit" data-pick-id="${id}" aria-selected="false">
+                <img src="${img}" alt="" class="agenda-search-hit__img" loading="lazy" />
+                <span class="agenda-search-hit__yazi">
+                    <span class="agenda-search-hit__ad">${this._vurgula(ad, sorgu)}</span>
+                    ${meta ? `<span class="agenda-search-hit__meta">${meta}</span>` : ''}
+                </span>
+                <span class="agenda-search-hit__sec" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                         stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                </span>
+            </button>`;
     }
 
     async saveNewItem() {
