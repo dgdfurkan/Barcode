@@ -214,15 +214,26 @@
      * tuş vuruşu da olduğu için `paste` olayı ayrıca dinleniyor ve o bir
      * sonraki değişiklikte sözü kesiyor.
      */
-    var sonTusAn = 0;
+    var tusaBasildi = false;
     var yapistirmaBayragi = false;
     var sonSorguYapistirma = false;
 
     if (aramaKutusu) {
+        /*
+         * SÜREYE BAKMAK YANLIŞTI
+         * Önce "son tuştan 400 ms geçtiyse yazma değildir" deniyordu. Uzun
+         * bir ürün adını duraklaya duraklaya yazan biri bu sınırı aşıyor ve
+         * yazdığı şey yapıştırma sanılıyordu; "Ülker Çubuk Kraker (" yazınca
+         * banko açılıyordu.
+         *
+         * Süre değil, tuşun kendisi ölçüt. Harf harf yazarken her değişimin
+         * hemen öncesinde bir tuş vuruşu vardır. Eklenti kutuyu kendisi
+         * doldurduğunda hiç tuş vuruşu olmaz. Ctrl+V'de tuş da olur, o yüzden
+         * `paste` olayı ayrıca dinleniyor ve sözü kesiyor.
+         */
         aramaKutusu.addEventListener('keydown', function (e) {
-            // Ctrl+V / Cmd+V tuş sayılmıyor; onu `paste` olayı üstleniyor
             if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V')) return;
-            sonTusAn = Date.now();
+            tusaBasildi = true;
         });
 
         aramaKutusu.addEventListener('paste', function () { yapistirmaBayragi = true; });
@@ -231,10 +242,11 @@
             if (yapistirmaBayragi) {
                 sonSorguYapistirma = true;
                 yapistirmaBayragi = false;
+                tusaBasildi = false;
                 return;
             }
-            // 400 ms: en yavaş yazan bile iki tuş arasında bu kadar beklemez
-            sonSorguYapistirma = (Date.now() - sonTusAn) > 400;
+            sonSorguYapistirma = !tusaBasildi;
+            tusaBasildi = false;
         });
     }
 

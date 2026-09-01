@@ -96,10 +96,27 @@
         serit.addEventListener('click', function (e) {
             var d = e.target.closest('.sh-hazir__oge');
             if (!d) return;
+
+            /*
+             * Dokunulan soru DOĞRUDAN gönderiliyor.
+             *
+             * Önce yalnızca kutuya yazılıyordu; kullanıcı hazır soruya
+             * dokunduktan sonra bir de gönder düğmesini bulmak zorunda
+             * kalıyordu. Hazır sorunun bütün amacı bu iki adımı bire
+             * indirmek.
+             *
+             * Sayfanın kendi gönderme yolu kullanılıyor: kutuya yazıp
+             * gönder düğmesine basıyoruz. Böylece doğrulama, kayıt ve
+             * senkron aynen çalışıyor, ayrı bir gönderme yolu açılmıyor.
+             */
             giris.value = d.textContent;
-            giris.focus();
-            /* Gönderme düğmesi kullanıcıda: metni hazırlıyoruz, kararı değil. */
             giris.dispatchEvent(new Event('input', { bubbles: true }));
+
+            var gonder = document.getElementById('sendMessage');
+            if (gonder) gonder.click();
+            else giris.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', bubbles: true }));
+
+            hazirlariKaldir();
         });
     }
 

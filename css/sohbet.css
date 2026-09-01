@@ -113,14 +113,30 @@
 #closeChat:hover { background: rgb(255 255 255 / 0.12); }
 
 /* --- Mesaj alanı --- */
+/*
+ * Panel dikey bir yığın: başlık ve yazma alanı sabit, mesaj alanı esner.
+ *
+ * Mesaj alanının sabit yüksekliği vardı. Karşılama balonu ve hazır sorular
+ * eklenince toplam boy panelin sınırını aşıyor, yazma alanı ekranın altına
+ * kayıyordu. Artık yalnızca mesaj alanı esniyor; yazma alanı her zaman
+ * görünür kalıyor.
+ */
+#chatInterface { display: flex !important; flex-direction: column; }
+
 #chatMessages {
     background: var(--sh-zemin) !important;
+    flex: 1 1 auto;
     height: auto !important;
-    min-height: 15rem;
-    max-height: 21rem;
+    min-height: 0 !important;
+    max-height: none !important;
     padding: 0.9rem !important;
     scrollbar-width: thin;
 }
+
+/* Başlık, hazır sorular ve yazma alanı esnemiyor */
+#chatInterface > div:first-child,
+#chatInterface > div:last-child,
+.sh-hazir { flex: none; }
 
 #chatMessages::-webkit-scrollbar { width: 6px; }
 #chatMessages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
@@ -179,10 +195,21 @@
     border: 1px solid var(--sh-cizgi) !important;
     border-radius: 0.65rem !important;
     background: var(--sh-zemin);
+    /* Yazılan metin koyu. Kutu gövdeden gri rengi miras alıyordu ve
+       kullanıcı ne yazdığını göremiyordu. */
+    color: var(--sh-yazi) !important;
+    -webkit-text-fill-color: var(--sh-yazi);
     padding: 0.6rem 0.8rem !important;
     font-size: 0.88rem !important;
     transition: border-color 180ms ease, background 180ms ease, box-shadow 220ms var(--sh-yay);
 }
+
+#messageInput::placeholder { color: var(--sh-cok-soluk) !important; }
+
+/* Mesaj balonlarındaki yazı da koyu kalsın */
+#chatMessages .bg-white,
+#chatMessages .bg-gray-200 { color: var(--sh-yazi) !important; }
+#chatMessages .bg-gradient-to-r { color: #fff !important; }
 
 #messageInput:focus {
     background: var(--sh-yuzey);
@@ -257,13 +284,27 @@
    Yazmaya üşenen ziyaretçi için. Dokununca metin kutuya yazılıyor, gönderme
    kararı yine kullanıcıda kalıyor: adına mesaj gönderilmiyor. */
 
+/*
+ * Sorular alt alta sarıyordu: dar panelde her biri tam satır kaplıyor,
+ * şerit 130 pikseli buluyor ve yazma alanını aşağı itiyordu. Tek satırda
+ * duruyor, taşan kısım yana kaydırılıyor. Yüksekliği artık sabit.
+ */
 .sh-hazir {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.35rem;
-    padding: 0 0.9rem 0.75rem;
+    padding: 0.5rem 0.9rem;
     background: var(--sh-zemin);
+    border-top: 1px solid var(--sh-cizgi);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
 }
+
+.sh-hazir::-webkit-scrollbar { display: none; }
+
+.sh-hazir__oge { flex: none; white-space: nowrap; }
 
 .sh-hazir__oge {
     padding: 0.32rem 0.7rem;

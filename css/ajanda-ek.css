@@ -181,3 +181,123 @@
         animation: none !important;
     }
 }
+
+/* ==========================================================================
+   Sayfa görünümü
+   ==========================================================================
+   Sayfa arama sayfasından kopyalanmış ama sonradan kendi başına kalmış:
+   köşe yarıçapları, gölgeler ve başlık ölçüleri tutmuyordu; premium kutusunda
+   emoji vardı. Buradaki kurallar sayfayı diğerleriyle aynı dile getiriyor.
+   Mantığa dokunulmuyor. */
+
+body .agenda-sayfa,
+#mainContent > section,
+#noAuth > div,
+#noPremium > div {
+    border-radius: 1rem !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 3px rgb(15 23 42 / 0.06) !important;
+}
+
+/* Bölüm başlığı: gri bant yerine ince ayraç */
+#mainContent > section > div:first-child {
+    background: #fff !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding: 0.9rem 1.1rem !important;
+}
+
+#mainContent .bg-accent-100 {
+    background: #0f172a !important;
+    border-radius: 0.6rem;
+}
+
+#mainContent .bg-accent-100 svg { color: #fff !important; }
+
+#mainContent h2,
+#mainContent h3 {
+    font-size: 1rem !important;
+    font-weight: 640;
+    letter-spacing: -0.022em;
+    color: #0f172a;
+}
+
+/* Premium kutusundaki emoji yerine ikon kutusu */
+#noPremium .bg-blue-100 {
+    background: #0f172a !important;
+    color: transparent !important;
+    font-size: 0 !important;
+    border-radius: 0.8rem;
+    position: relative;
+}
+
+#noPremium .bg-blue-100::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: currentColor;
+    -webkit-mask: no-repeat center / 1.4rem url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z'/%3E%3Cpath d='M8 7h7M8 11h7'/%3E%3C/svg%3E");
+    mask: no-repeat center / 1.4rem url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 5.5A2.5 2.5 0 0 1 6.5 3H19v16H6.5A2.5 2.5 0 0 0 4 21.5z'/%3E%3Cpath d='M8 7h7M8 11h7'/%3E%3C/svg%3E");
+    background: #fff;
+}
+
+/* ---------- Ekleme penceresi ---------- */
+
+.agenda-modal-backdrop {
+    background: rgb(15 23 42 / 0.55) !important;
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+}
+
+#addAgendaModal > div,
+#agendaDeleteConfirmModal > div {
+    border-radius: 1.1rem !important;
+    box-shadow: 0 28px 64px -24px rgb(15 23 42 / 0.55) !important;
+}
+
+#addModalTitle { letter-spacing: -0.024em; }
+
+/* Arama kutusu: sayfanın diğer kutularıyla aynı ölçü ve odak halkası */
+#addProductSearch {
+    border-radius: 0.7rem !important;
+    font-size: 0.92rem !important;
+    transition: border-color 180ms ease, box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#addProductSearch:focus {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15) !important;
+}
+
+#addSearchHint { color: #94a3b8 !important; font-size: 0.74rem !important; }
+
+/* Adet ve sebep alanları */
+#addQuantity {
+    border-radius: 0.7rem !important;
+    font-variant-numeric: tabular-nums;
+}
+
+.agenda-reason-pill {
+    border-radius: 999px !important;
+    transition: background 160ms ease, border-color 160ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.agenda-reason-pill:hover { transform: translateY(-1px); }
+.agenda-reason-pill:active { transform: translateY(0) scale(0.97); }
+
+/* ---------- Kart şeridi ---------- */
+
+#agendaCardStrip > * {
+    border-radius: 0.85rem !important;
+    transition: border-color 180ms ease, transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#agendaCardStrip > *:hover {
+    border-color: #cbd5e1 !important;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px -12px rgb(15 23 42 / 0.35) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #agendaCardStrip > *, .agenda-reason-pill, #addProductSearch { transition: none !important; }
+}
