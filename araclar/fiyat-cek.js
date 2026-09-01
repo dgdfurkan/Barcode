@@ -1,69 +1,40 @@
 /**
- * Fiyat Çek — konsol aracı
+ * Fiyat Çek — konsol aracı (Jet Barkod sayım sayfası)
  * ============================================================================
  *
- * Verdiğin ürün adları için franchise panelinden SATIŞ ve TOPTAN fiyatı
- * toplar, JSON verir.
+ * Verdiğin ürün adlarının satış ve TOPTAN fiyatını toplar, tablo + JSON verir.
  *
  * NASIL KULLANILIR
- *   1. https://franchise.getir.com/stock/movements  (Stok > Stok Hareketleri)
- *      sayfasını aç.
+ *   1. https://jetbarkod.com.tr/sayim/ sayfasını aç (giriş yapmış ol).
+ *      Franchise sekmesi de açık olsun; jeton oradan geliyor.
  *   2. F12 -> Console. "allow pasting" yaz, sonra bu dosyanın tamamını
- *      yapıştır, Enter. Alt satırda `JBFiyat hazır.` görmelisin.
+ *      yapıştır, Enter. `JBFiyat hazır.` görmelisin.
  *   3. Ürün adlarını KOPYALA (virgülle ya da alt alta), sonra yaz:
  *        JBFiyat.basla()
+ *
  *      Listeyi tırnak içinde koda yazma; ürün adlarında kesme işareti var
  *      ("Nuh'un", "Lay's", "(15'li)") ve tırnağı ortadan kapatıyor. Araç
  *      listeyi panodan alır, pano okunamazsa yapıştırman için kutu açar.
- *   4. Araç senden tablonun altındaki sayfa okuna BİR KEZ basmanı ister.
- *      Bastıktan sonra gerisini kendisi yürütür.
- *   5. Bitince JSON hem konsola yazılır hem panoya kopyalanır.
+ *   4. Sonuç konsola tablo olarak basılır, JSON panoya kopyalanır.
  *
- * NEDEN STOK HAREKETLERİ SAYFASI
- * Mevcut Stok sayfasında fiyat sütunu yok; oradaki ürün araması da ağa hiç
- * çıkmıyor, listeyi tarayıcıda süzüyor. Fiyat "Stok Hareketleri" sayfasında:
- * tablodaki "Birim Fiyat" sütunu orada. Sayfanın çektiği kayıtta ürün nesnesi
- * şu alanları taşıyor: `price` (satış), `wholesalePrice` (toptan), `vat`,
- * `wholesaleVat`, `priceText`, `wholesalePriceText`, `currency`, `unitPrice`.
+ * NE YAPIYOR
+ * Sayım sayfasının zaten kullandığı yolu kullanıyor, yeni bir şey icat
+ * etmiyor: adı katalogdan ürün kimliğine çeviriyor, sonra her ürün için
+ * `countingSystem._fetchApiProductRowByProductId` ile TEK istek atıyor.
+ * O istek `POST /stocks` gövdesine yalnız o ürünün kimliğini koyuyor.
+ * İstekler sırayla ve aralıklı gidiyor, varsayılan 1,5 saniye.
  *
- * NEDEN SENDEN BİR TIK İSTİYOR
- * İsteği biz uydurmuyoruz. Sen sayfayı değiştirince sayfanın kendi isteği
- * gidiyor; biz onun adresini ve başlıklarını yakalayıp yalnızca `offset`
- * değerini artırarak aynı isteği tekrarlıyoruz. Böylece Getir'e sayfanın
- * zaten attığı istekten başka bir şey gitmiyor, oturum anahtarını biz
- * aramıyoruz, depo kimliği koda yazılmıyor.
- *
- * HIZ
- * Sayfalar arası 2 saniye. Düşük Stok modülünde kullanılan aralıkla aynı.
- * `JBFiyat.ARA_MS` ile değiştirebilirsin ama aşağı çekme.
- *
- * KAPSAM
- * Stok hareketleri bir kayıt defteri; yalnız hareket görmüş ürünler geçiyor.
- * Uzun süredir hareket görmemiş ürün taramada çıkmayabilir. Araç
- * bulamadıklarını sonunda ayrıca listeler, sessizce yutmaz.
+ * Jeton ve depo kimliği `_resolveApiInfoForDebug` üzerinden geliyor; ikisi de
+ * koda yazılmıyor. Depo kimliği bulunamazsa araç istek atmadan duruyor,
+ * çünkü o değer depodan depoya değişiyor ve yanlışı başkasının deposuna
+ * istek atmak demek.
  * ============================================================================
  */
 (function (global) {
     'use strict';
 
-    var KATALOG = 'https://jetbarkod.com.tr/products.json';
-    var HAREKET_IZI = '/stocks/stock-movements';
-
-    /* Alan adları uydurma değil, gerçek yanıttan okundu. */
-    var FIYAT_ALANLARI = {
-        price: 'satisFiyati',
-        priceText: 'satisFiyatiYazi',
-        wholesalePrice: 'toptanFiyat',
-        wholesalePriceText: 'toptanFiyatYazi',
-        vat: 'kdv',
-        wholesaleVat: 'toptanKdv',
-        unitPrice: 'birimFiyat',
-        priceTypeText: 'fiyatTuru',
-        currency: 'paraBirimi'
-    };
-
     // ==================================================================
-    // Türkçe metin sadeleştirme (sitedeki arama ile aynı kural)
+    // Metin işleri
     // ==================================================================
 
     var HARF = { 'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c' };
@@ -123,31 +94,32 @@
     }
 
     // ==================================================================
-    // Katalogdan barkod çözümü
+    // Katalogdan ürün çözümü
     // ==================================================================
 
-    var katalog = null;
+    function sistem() {
+        return global.countingSystem || null;
+    }
 
-    function katalogYukle() {
-        if (katalog) return Promise.resolve(katalog);
-        console.log('%c› Katalog indiriliyor…', 'color:#8ab4ff');
-        return fetch(KATALOG, { cache: 'force-cache' })
-            .then(function (y) {
-                if (!y.ok) throw new Error('Katalog indirilemedi (' + y.status + ')');
-                return y.json();
-            })
-            .then(function (veri) {
-                var liste = (veri && veri.products) || [];
-                var dizin = new Map();
-                liste.forEach(function (p) {
-                    if (!p || !p.name) return;
-                    var a = sade(p.name);
-                    if (!dizin.has(a)) dizin.set(a, p);
-                });
-                katalog = { liste: liste, dizin: dizin };
-                console.log('%c› ' + liste.length + ' ürünlük katalog hazır.', 'color:#7ddc9a');
-                return katalog;
-            });
+    function urunleri() {
+        var s = sistem();
+        return (s && Array.isArray(s.allProducts)) ? s.allProducts : [];
+    }
+
+    function adiCoz(ad, liste) {
+        var a = sade(ad);
+        if (!a) return null;
+
+        // Önce birebir tam ad.
+        for (var i = 0; i < liste.length; i++) {
+            if (liste[i].name && sade(liste[i].name) === a) return liste[i];
+        }
+        // Sonra adı içeren TEK kayıt.
+        var adaylar = liste.filter(function (p) {
+            return p.name && sade(p.name).indexOf(a) !== -1;
+        });
+        if (adaylar.length === 1) return adaylar[0];
+        return null;
     }
 
     function barkodBul(urun) {
@@ -159,201 +131,34 @@
         return '';
     }
 
-    function adlariCoz(adlar) {
-        var cozulen = [];
-        var eksik = [];
-        adlar.forEach(function (ad) {
-            var urun = katalog.dizin.get(sade(ad));
-            if (!urun) {
-                // Tam ad tutmadıysa adı içeren TEK bir kayıt varsa onu al.
-                var a = sade(ad);
-                var adaylar = katalog.liste.filter(function (p) {
-                    return p.name && sade(p.name).indexOf(a) !== -1;
-                });
-                if (adaylar.length === 1) urun = adaylar[0];
-            }
-            var kod = barkodBul(urun);
-            if (urun && kod) cozulen.push({ istenen: ad, ad: urun.name, barkod: kod });
-            else eksik.push(ad);
-        });
-        return { cozulen: cozulen, eksik: eksik };
-    }
-
     // ==================================================================
-    // Sayfanın kendi isteğini yakalama
+    // Yanıttan fiyat
     // ==================================================================
 
-    var sablon = null;
-    var sablonuCozen = null;
-    var asilFetch = null;
-    var asilAc = null;
-    var asilYolla = null;
-
-    function hareketIstegiMi(url) {
-        return typeof url === 'string' && url.indexOf(HAREKET_IZI) !== -1;
-    }
-
-    function basliklariDuzle(h) {
-        var o = {};
-        if (!h) return o;
+    function paraYaz(sayi) {
+        if (typeof sayi !== 'number' || !isFinite(sayi)) return null;
         try {
-            if (typeof Headers !== 'undefined' && h instanceof Headers) {
-                h.forEach(function (v, k) { o[k] = v; });
-                return o;
-            }
-        } catch (e) { /* sessiz */ }
-        if (Array.isArray(h)) {
-            h.forEach(function (c) { o[c[0]] = c[1]; });
-            return o;
+            return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(sayi);
+        } catch (e) {
+            return String(sayi);
         }
-        Object.keys(h).forEach(function (k) { o[k] = h[k]; });
-        return o;
     }
 
-    function sablonuKaydet(yontem, url, basliklar, govde) {
-        if (sablon) return;
-        sablon = {
-            yontem: yontem || 'GET',
-            url: String(url),
-            basliklar: basliklar || {},
-            govde: typeof govde === 'string' ? govde : null
+    /* Alan adları uydurma değil; sayım sayfasının okuduğu alanların aynısı
+       (js/counting.js, _summarizeApiProductRow). */
+    function fiyatCikar(satir) {
+        if (!satir || typeof satir !== 'object') return null;
+        var toptan = (typeof satir.wholesalePrice === 'number') ? satir.wholesalePrice : null;
+        var satis = (typeof satir.price === 'number') ? satir.price : null;
+        return {
+            toptanFiyat: toptan,
+            toptanFiyatYazi: satir.wholesalePriceText || paraYaz(toptan),
+            satisFiyati: satis,
+            satisFiyatiYazi: satir.priceText || paraYaz(satis),
+            kdv: (satir.vat != null ? satir.vat : null),
+            toptanKdv: (satir.wholesaleVat != null ? satir.wholesaleVat : null),
+            stok: (typeof satir.available === 'number' ? satir.available : null)
         };
-        console.log('%c✓ İstek şekli öğrenildi.', 'color:#7ddc9a;font-weight:bold');
-        dinlemeyiBirak();
-        if (sablonuCozen) sablonuCozen();
-    }
-
-    function dinlemeyeBasla() {
-        if (asilFetch) return;
-        asilFetch = global.fetch;
-        global.fetch = function (girdi, ayar) {
-            /* Referansı önce al. sablonuKaydet sarmayı geri alıp asilFetch'i
-               boşaltıyor; aşağıda ona dokunursak SENİN isteğini patlatırız. */
-            var asil = asilFetch;
-            try {
-                var url = (typeof girdi === 'string') ? girdi : (girdi && girdi.url);
-                if (hareketIstegiMi(url)) {
-                    var bas = basliklariDuzle((ayar && ayar.headers) || (girdi && girdi.headers));
-                    sablonuKaydet((ayar && ayar.method) || 'GET', url, bas,
-                                  ayar && typeof ayar.body === 'string' ? ayar.body : null);
-                }
-            } catch (e) { /* sessiz */ }
-            return asil.apply(this, arguments);
-        };
-
-        asilAc = XMLHttpRequest.prototype.open;
-        asilYolla = XMLHttpRequest.prototype.send;
-        XMLHttpRequest.prototype.open = function (yontem, url) {
-            this.__jbYontem = yontem;
-            this.__jbUrl = url;
-            this.__jbBas = {};
-            var asilBaslik = this.setRequestHeader;
-            this.setRequestHeader = function (k, v) {
-                try { this.__jbBas[k] = v; } catch (e) { /* sessiz */ }
-                return asilBaslik.apply(this, arguments);
-            };
-            return asilAc.apply(this, arguments);
-        };
-        XMLHttpRequest.prototype.send = function (govde) {
-            var asil = asilYolla;   // yukarıdaki gerekçe
-            try {
-                if (hareketIstegiMi(this.__jbUrl)) {
-                    sablonuKaydet(this.__jbYontem, this.__jbUrl, this.__jbBas,
-                                  typeof govde === 'string' ? govde : null);
-                }
-            } catch (e) { /* sessiz */ }
-            return asil.apply(this, arguments);
-        };
-    }
-
-    function dinlemeyiBirak() {
-        if (asilFetch) { global.fetch = asilFetch; asilFetch = null; }
-        if (asilAc) { XMLHttpRequest.prototype.open = asilAc; asilAc = null; }
-        if (asilYolla) { XMLHttpRequest.prototype.send = asilYolla; asilYolla = null; }
-    }
-
-    // ==================================================================
-    // İsteği tekrarlama
-    // ==================================================================
-
-    /* fetch bu başlıkları kendisi kuruyor; yakalanan istekten kopyalamak
-       ya hata veriyor ya sessizce yok sayılıyor. */
-    var YASAKLI = ['content-length', 'host', 'connection', 'origin', 'referer',
-                   'cookie', 'user-agent', 'accept-encoding'];
-
-    function temizBasliklar(bas) {
-        var o = {};
-        Object.keys(bas || {}).forEach(function (k) {
-            if (YASAKLI.indexOf(String(k).toLowerCase()) === -1) o[k] = bas[k];
-        });
-        return o;
-    }
-
-    function sayfaCek(offset, limit) {
-        var u = new URL(sablon.url, location.origin);
-        u.searchParams.set('offset', String(offset));
-        u.searchParams.set('limit', String(limit));
-
-        var ayar = {
-            method: sablon.yontem,
-            headers: temizBasliklar(sablon.basliklar),
-            credentials: 'include'
-        };
-        if (sablon.govde && sablon.yontem !== 'GET' && sablon.yontem !== 'HEAD') {
-            ayar.body = sablon.govde;
-        }
-
-        return fetch(u.toString(), ayar).then(function (y) {
-            if (y.status === 401 || y.status === 403) {
-                throw new Error('Oturum düştü. Sayfayı yenile ve baştan başla.');
-            }
-            if (!y.ok) throw new Error('Sunucu ' + y.status);
-            return y.json();
-        });
-    }
-
-    // ==================================================================
-    // Yanıttan fiyat ayıklama
-    // ==================================================================
-
-    function coklu(deger) {
-        if (deger == null) return '';
-        if (typeof deger === 'string') return deger;
-        if (typeof deger === 'object') return deger.tr || deger.en || '';
-        return String(deger);
-    }
-
-    function urunBarkodu(u) {
-        try {
-            var p = u.packagingInfo && u.packagingInfo['1'];
-            if (p && p.barcodes && p.barcodes.length) return String(p.barcodes[0]).trim();
-        } catch (e) { /* sessiz */ }
-        return '';
-    }
-
-    function fiyatKaydi(u) {
-        var k = {};
-        Object.keys(FIYAT_ALANLARI).forEach(function (alan) {
-            var v = u[alan];
-            if (v === undefined || v === null || v === '') return;
-            k[FIYAT_ALANLARI[alan]] = (typeof v === 'object') ? coklu(v) : v;
-        });
-        return k;
-    }
-
-    function satirlariAyikla(veri) {
-        if (Array.isArray(veri)) return veri;
-        if (!veri || typeof veri !== 'object') return [];
-        if (Array.isArray(veri.data)) return veri.data;
-        if (veri.data && Array.isArray(veri.data.data)) return veri.data.data;
-        return [];
-    }
-
-    function devamVarMi(veri) {
-        if (!veri || typeof veri !== 'object') return false;
-        if (typeof veri.hasNext === 'boolean') return veri.hasNext;
-        if (veri.data && typeof veri.data.hasNext === 'boolean') return veri.data.hasNext;
-        return true;
     }
 
     // ==================================================================
@@ -361,9 +166,7 @@
     // ==================================================================
 
     var API = {
-        ARA_MS: 2000,
-        SAYFA_BOYU: 100,
-        EN_COK_SAYFA: 120,
+        ARA_MS: 1500,
         sonuc: null,
 
         basla: function (adMetni) {
@@ -373,163 +176,165 @@
                                 'JBFiyat.basla() yaz.', 'color:#ffb454');
                     return;
                 }
-                return API._listeyleBasla(metin);
+                return API._yurut(metin);
             });
         },
 
-        _listeyleBasla: function (adMetni) {
-            if (location.pathname.indexOf('/stock/movements') === -1) {
-                console.log('%c⚠ Yanlış sayfadasın. Stok > Stok Hareketleri sayfasını aç:',
-                            'color:#ffb454;font-weight:bold');
-                console.log('   https://franchise.getir.com/stock/movements');
-                return;
+        _yurut: function (adMetni) {
+            var s = sistem();
+            if (!s || typeof s._fetchApiProductRowByProductId !== 'function') {
+                console.log('%c⚠ Sayım sistemi yüklü değil. Bu betik Jet Barkod sayım ' +
+                            'sayfasında çalışır:', 'color:#ffb454;font-weight:bold');
+                console.log('   https://jetbarkod.com.tr/sayim/');
+                return Promise.resolve();
             }
 
-            sablon = null;
+            var liste = urunleri();
+            if (!liste.length) {
+                console.log('%c⚠ Katalog daha yüklenmemiş. Birkaç saniye sonra tekrar dene.',
+                            'color:#ffb454');
+                return Promise.resolve();
+            }
+
             var adlar = adlariAyikla(adMetni);
             console.log('%c› ' + adlar.length + ' ad okundu.', 'color:#8ab4ff');
 
-            return katalogYukle().then(function () {
-                var c = adlariCoz(adlar);
-                if (c.eksik.length) {
-                    console.log('%c⚠ Katalogda bulunamayan ' + c.eksik.length + ' ad:', 'color:#ffb454');
-                    c.eksik.forEach(function (a) { console.log('    ' + a); });
+            var islenecek = [];
+            var katalogdaYok = [];
+            adlar.forEach(function (ad) {
+                var u = adiCoz(ad, liste);
+                var pid = u && (u.id || u.productId);
+                if (u && pid) {
+                    islenecek.push({ istenen: ad, ad: u.name, urunId: String(pid), barkod: barkodBul(u) });
+                } else {
+                    katalogdaYok.push(ad);
                 }
-                if (!c.cozulen.length) {
-                    console.log('%cHiçbir ad barkoda çözülemedi, duruyorum.', 'color:#ff7676');
-                    return;
-                }
-                API._islenecek = c.cozulen;
-                API._eksik = c.eksik;
-
-                dinlemeyeBasla();
-                console.log('%c\n  ŞİMDİ SEN YAP  ', 'background:#135bec;color:#fff;font-weight:bold');
-                console.log('%cTablonun altındaki sayfa okuna bir kez bas (ileri ya da geri, fark etmez).',
-                            'color:#f2f4f8');
-                console.log('Bastığın anda ' + c.cozulen.length + ' ürünün fiyatını kendim toplarım.\n');
-
-                return new Promise(function (coz) { sablonuCozen = coz; }).then(API._yurut);
             });
-        },
 
-        _yurut: function () {
-            var aranan = new Map();
-            API._islenecek.forEach(function (x) { aranan.set(x.barkod, x); });
-
-            var bulunan = new Map();
-            var offset = 0;
-            var sayfa = 0;
-            var hatalar = [];
-
-            console.log('%c› Toplama başladı. Sayfa başına ' + API.SAYFA_BOYU +
-                        ' kayıt, sayfalar arası ' + API.ARA_MS + ' ms.', 'color:#8ab4ff');
-
-            function tur() {
-                if (sayfa >= API.EN_COK_SAYFA) return Promise.resolve();
-                if (bulunan.size >= aranan.size) return Promise.resolve();
-
-                return sayfaCek(offset, API.SAYFA_BOYU).then(function (veri) {
-                    var satirlar = satirlariAyikla(veri);
-                    sayfa++;
-
-                    satirlar.forEach(function (satir) {
-                        var u = satir && satir.product;
-                        if (!u || typeof u !== 'object') return;
-                        var kod = urunBarkodu(u);
-                        if (!kod || !aranan.has(kod) || bulunan.has(kod)) return;
-                        var istek = aranan.get(kod);
-                        bulunan.set(kod, {
-                            istenen: istek.istenen,
-                            ad: istek.ad,
-                            barkod: kod,
-                            panelAdi: coklu(u.fullName) || coklu(u.name) || '',
-                            stok: (satir.productStock && typeof satir.productStock.available === 'number')
-                                ? satir.productStock.available : null,
-                            fiyat: fiyatKaydi(u)
-                        });
-                    });
-
-                    console.log('  ' + sayfa + '. sayfa · ' + satirlar.length + ' kayıt · ' +
-                                bulunan.size + '/' + aranan.size + ' ürün bulundu');
-
-                    if (!satirlar.length || !devamVarMi(veri)) return;
-                    if (bulunan.size >= aranan.size) return;
-                    offset += API.SAYFA_BOYU;
-                    return bekle(API.ARA_MS).then(tur);
-                }).catch(function (e) {
-                    hatalar.push({ sayfa: sayfa + 1, sebep: String(e && e.message || e) });
-                    console.log('%c  ' + (sayfa + 1) + '. sayfada hata: ' +
-                                (e && e.message || e), 'color:#ff7676');
-                });
+            if (katalogdaYok.length) {
+                console.log('%c⚠ Katalogda bulunamayan ' + katalogdaYok.length + ' ad:', 'color:#ffb454');
+                katalogdaYok.forEach(function (a) { console.log('    ' + a); });
+            }
+            if (!islenecek.length) {
+                console.log('%cHiçbir ad ürüne çözülemedi, duruyorum.', 'color:#ff7676');
+                return Promise.resolve();
             }
 
-            return tur().then(function () {
-                var urunler = [];
-                var bulunamayan = [];
-                API._islenecek.forEach(function (x) {
-                    if (bulunan.has(x.barkod)) urunler.push(bulunan.get(x.barkod));
-                    else bulunamayan.push({ ad: x.ad, barkod: x.barkod });
+            return s._resolveApiInfoForDebug().then(function (apiInfo) {
+                if (!apiInfo || !apiInfo.token) {
+                    console.log('%c⚠ Jeton yok. Getir franchise sekmesini açıp sayfayı yenile, ' +
+                                'sonra tekrar dene.', 'color:#ff7676;font-weight:bold');
+                    return;
+                }
+                /* Depo kimliği koda yazılmıyor. Bulunamazsa istek atmıyoruz;
+                   sabit bir kimlikle istek atmak başkasının deposunu sormak olur. */
+                if (!apiInfo.warehouseId) {
+                    console.log('%c⚠ Depo kimliği okunamadı. Franchise sekmesinde stok ' +
+                                'sayfasını bir kez aç, sonra tekrar dene.', 'color:#ff7676;font-weight:bold');
+                    return;
+                }
+
+                console.log('%c› ' + islenecek.length + ' ürün, aralarında ' + API.ARA_MS +
+                            ' ms. Yaklaşık ' + Math.ceil(islenecek.length * API.ARA_MS / 1000) +
+                            ' saniye sürer.', 'color:#8ab4ff');
+
+                var kayitlar = [];
+                var basarisiz = [];
+                var i = 0;
+
+                function tur() {
+                    if (i >= islenecek.length) return Promise.resolve();
+                    var it = islenecek[i];
+
+                    return Promise.resolve(s._fetchApiProductRowByProductId(it.urunId, it.barkod))
+                        .then(function (satir) {
+                            var f = fiyatCikar(satir);
+                            if (f && (f.toptanFiyat != null || f.satisFiyati != null)) {
+                                kayitlar.push({
+                                    ad: it.ad,
+                                    barkod: it.barkod,
+                                    toptanFiyat: f.toptanFiyat,
+                                    toptanFiyatYazi: f.toptanFiyatYazi,
+                                    satisFiyati: f.satisFiyati,
+                                    satisFiyatiYazi: f.satisFiyatiYazi,
+                                    kdv: f.kdv,
+                                    toptanKdv: f.toptanKdv,
+                                    stok: f.stok
+                                });
+                            } else {
+                                basarisiz.push({ ad: it.ad, barkod: it.barkod,
+                                                 sebep: satir ? 'yanıtta fiyat yok' : 'ürün dönmedi' });
+                            }
+                        })
+                        .catch(function (e) {
+                            basarisiz.push({ ad: it.ad, barkod: it.barkod,
+                                             sebep: String((e && e.message) || e) });
+                        })
+                        .then(function () {
+                            i++;
+                            console.log('  ' + i + '/' + islenecek.length + '  ' + it.ad);
+                            if (i >= islenecek.length) return;
+                            return bekle(API.ARA_MS).then(tur);
+                        });
+                }
+
+                return tur().then(function () {
+                    var cikti = {
+                        olusturma: new Date().toISOString(),
+                        istenen: islenecek.length,
+                        alinan: kayitlar.length,
+                        katalogdaBulunamayan: katalogdaYok,
+                        fiyatiAlinamayan: basarisiz,
+                        urunler: kayitlar
+                    };
+                    API.sonuc = cikti;
+
+                    console.log('%c\n✓ Bitti. ' + kayitlar.length + '/' + islenecek.length +
+                                ' ürünün fiyatı alındı.', 'color:#7ddc9a;font-weight:bold');
+                    if (basarisiz.length) {
+                        console.log('%c  Fiyatı alınamayan ' + basarisiz.length + ':', 'color:#ffb454');
+                        basarisiz.forEach(function (b) { console.log('    ' + b.ad + '  (' + b.sebep + ')'); });
+                    }
+                    if (kayitlar.length && console.table) {
+                        console.table(kayitlar.map(function (u) {
+                            return {
+                                'Ürün': u.ad,
+                                'Toptan': u.toptanFiyatYazi,
+                                'Satış': u.satisFiyatiYazi,
+                                'Stok': u.stok
+                            };
+                        }));
+                    }
+
+                    var json = JSON.stringify(cikti, null, 2);
+                    console.log('JSON `JBFiyat.sonuc` içinde. Panoya kopyalamayı deniyorum…');
+                    try {
+                        navigator.clipboard.writeText(json).then(function () {
+                            console.log('%c✓ Panoya kopyalandı.', 'color:#7ddc9a');
+                        }, function () {
+                            console.log('%cPano izni yok. `copy(JSON.stringify(JBFiyat.sonuc,null,2))` yaz.',
+                                        'color:#ffb454');
+                        });
+                    } catch (e) {
+                        console.log('`copy(JSON.stringify(JBFiyat.sonuc,null,2))` yaz.');
+                    }
+                    return cikti;
                 });
-
-                var cikti = {
-                    olusturma: new Date().toISOString(),
-                    istenen: API._islenecek.length,
-                    alinan: urunler.length,
-                    tarananSayfa: sayfa,
-                    katalogdaBulunamayan: API._eksik,
-                    hareketlerdeBulunamayan: bulunamayan,
-                    hatalar: hatalar,
-                    urunler: urunler
-                };
-                API.sonuc = cikti;
-                var json = JSON.stringify(cikti, null, 2);
-
-                console.log('%c\n✓ Bitti. ' + urunler.length + '/' + API._islenecek.length +
-                            ' ürünün fiyatı alındı. ' + sayfa + ' sayfa tarandı.',
-                            'color:#7ddc9a;font-weight:bold');
-                if (bulunamayan.length) {
-                    console.log('%c  Stok hareketlerinde geçmeyen ' + bulunamayan.length +
-                                ' ürün (uzun süredir hareket görmemiş olabilir):', 'color:#ffb454');
-                    bulunamayan.forEach(function (b) { console.log('    ' + b.ad); });
-                }
-                if (urunler.length && console.table) {
-                    console.table(urunler.map(function (u) {
-                        return {
-                            'ürün': u.ad,
-                            'satış': u.fiyat.satisFiyati,
-                            'toptan': u.fiyat.toptanFiyat,
-                            'stok': u.stok
-                        };
-                    }));
-                }
-                console.log('\nJSON `JBFiyat.sonuc` içinde. Panoya kopyalamayı deniyorum…');
-
-                try {
-                    navigator.clipboard.writeText(json).then(function () {
-                        console.log('%c✓ Panoya kopyalandı.', 'color:#7ddc9a');
-                    }, function () {
-                        console.log('%cPano izni yok. `copy(JSON.stringify(JBFiyat.sonuc,null,2))` yaz.',
-                                    'color:#ffb454');
-                    });
-                } catch (e) {
-                    console.log('`copy(JSON.stringify(JBFiyat.sonuc,null,2))` yaz.');
-                }
-                return cikti;
             });
         },
 
-        /** Yarıda bırakırsan sayfanın fetch/XHR sarmalarını geri alır. */
-        iptal: function () {
-            dinlemeyiBirak();
-            sablonuCozen = null;
-            console.log('Dinleme kapatıldı.');
+        /** Sadece tabloyu yeniden bas. */
+        tablo: function () {
+            if (!API.sonuc) { console.log('Henüz sonuç yok.'); return; }
+            console.table(API.sonuc.urunler.map(function (u) {
+                return { 'Ürün': u.ad, 'Toptan': u.toptanFiyatYazi, 'Satış': u.satisFiyatiYazi, 'Stok': u.stok };
+            }));
         }
     };
 
     global.JBFiyat = API;
 
     console.log('%cJBFiyat hazır.', 'color:#7ddc9a;font-weight:bold');
-    console.log('Sayfa: Stok > Stok Hareketleri olmalı.');
-    console.log('Kullanım: ürün adlarını KOPYALA, sonra şunu yaz:  JBFiyat.basla()');
-    console.log('Sayfalar arası bekleme: JBFiyat.ARA_MS = ' + API.ARA_MS + ' ms');
+    console.log('Ürün adlarını KOPYALA, sonra şunu yaz:  JBFiyat.basla()');
+    console.log('İstekler arası bekleme: JBFiyat.ARA_MS = ' + API.ARA_MS + ' ms');
 })(window);
