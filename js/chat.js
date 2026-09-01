@@ -9,6 +9,7 @@ class ChatSystem {
         this.hasUnreadMessages = false;
         this.initialLoadComplete = false; // İlk yükleme tamamlandı mı
         this.lastKnownMessageIds = new Set(); // Bilinen mesaj ID'leri
+        this.oncedenGorulen = new Set();      // Bu açılıştan ÖNCE görülmüş olanlar
         this.lastRenderedDate = null; // Son render edilen tarih (tarih ayraçları için)
         this.chatScrollHandler = null; // Scroll handler reference
         this.init();
@@ -351,7 +352,11 @@ class ChatSystem {
            yerelde kalıyor. Sayfa yenilenince aynı mesaj için tekrar
            bildirim çıkmıyor. */
         (this.messages || []).forEach((msg) => {
-            this.lastKnownMessageIds.add(msg.timestamp + msg.sender + msg.message);
+            const msgId = msg.timestamp + msg.sender + msg.message;
+            this.lastKnownMessageIds.add(msgId);
+            /* Aynı oturumda tekrar kontrol edilirse de görülmüş sayılsın;
+               `oncedenGorulen` yalnızca sayfa açılışında tazeleniyor. */
+            this.oncedenGorulen.add(msgId);
         });
         this._gorulenleriKaydet();
         document.querySelectorAll('.chat-notification').forEach((n) => n.remove());
@@ -1115,9 +1120,14 @@ class ChatSystem {
     }
 
     recordExistingMessages(chatMessages) {
-        // Mevcut tüm mesajlar görülmüş sayılıyor: bunlar için BİLDİRİM YOK
         this.lastKnownMessageIds.clear();
         this._gorulenleriYukle();
+
+        /* Bu sayfa açılmadan ÖNCE görülmüş olanlar ayrı tutuluyor. Aşağıda
+           hepsi `lastKnownMessageIds`e ekleneceği için, "daha önce görüldü
+           mü" sorusunu sormanın tek yolu bu kopya. */
+        this.oncedenGorulen = new Set(this.lastKnownMessageIds);
+
         chatMessages.forEach(msg => {
             const msgId = msg.timestamp + msg.sender + msg.message;
             this.lastKnownMessageIds.add(msgId);
@@ -1174,8 +1184,26 @@ class ChatSystem {
         console.log('🔍 Toplam admin mesajı:', adminMessages.length);
         
         if (adminMessages.length > 0) {
-            // UNREAD olan admin mesajlarını bul - BASİT KONTROL!
-            const unreadAdminMessages = adminMessages.filter(msg => msg.userStatus === 'unread');
+            /*
+             * SINIRSIZ BİLDİRİM SORUNU
+             *
+             * Burada yalnızca veritabanındaki `userStatus` alanına
+             * bakılıyordu. Kullanıcı bildirime dokunup mesajı okusa bile o
+             * alan güncellenemezse (yazma hakkı yok, ağ koptu, misafir
+             * oturumu) her sayfa yenilemesinde aynı bildirim yeniden
+             * çıkıyordu.
+             *
+             * Artık yerel hafıza da sözü geçiyor: bu cihazda daha önce
+             * görülmüş bir mesaj için bildirim gösterilmiyor. Veritabanı
+             * güncellenebiliyorsa zaten `read` olur; güncellenemezse bile
+             * kullanıcı aynı uyarıyı ikinci kez görmüyor.
+             */
+            const oncedenGorulen = this.oncedenGorulen || new Set();
+            const unreadAdminMessages = adminMessages.filter((msg) => {
+                if (msg.userStatus !== 'unread') return false;
+                const msgId = msg.timestamp + msg.sender + msg.message;
+                return !oncedenGorulen.has(msgId);
+            });
             
             console.log('🔔 UNREAD admin mesajları:', unreadAdminMessages.length);
             
