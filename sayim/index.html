@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <script src="../js/jb-diyalog.js?v=20260901b"></script>
     <script src="../js/console-quiet.js?v=20260828i"></script>
     <script src="../js/app-boot.js?v=20260828i"></script>
     <meta charset="UTF-8" />
@@ -2407,6 +2408,7 @@
         }
     </style>
     <link rel="stylesheet" href="../css/motion.css?v=20260828i" />
+    <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
 </head>
 <body class="bg-gray-50">
     <div id="appBoot" class="app-boot app-boot--active" data-boot-steps="auth,data,ui" role="status" aria-live="polite" aria-label="Sayfa yükleniyor">
@@ -4113,7 +4115,7 @@
                 if (!hasCountingFeature) {
                     // Uyarıyı perdenin üstünde göstermeyelim
                     window.AppBoot?.dismiss('yetki-yok');
-                    alert('Bu özellik premium üyeler için. Lütfen premium üyelik satın alın.');
+                    JBDiyalog.uyari('Bu özellik premium üyeler için. Lütfen premium üyelik satın alın.');
                     window.location.replace('../arama/');
                     return;
                 }

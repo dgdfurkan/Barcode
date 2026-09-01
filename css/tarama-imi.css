@@ -1,0 +1,71 @@
+/**
+ * Tarama imi.
+ * ============================================================================
+ *
+ * Üst şeritte "Scan" yazan bir yazı duruyordu. Okunacak bir bilgi değildi,
+ * yalnızca yer kaplıyordu; ayrıca İngilizceydi ve sayfanın geri kalanına
+ * yabancı duruyordu.
+ *
+ * Yerine bir im kondu: barkod çizgilerinin üstünden geçen bir tarayıcı.
+ * Bir şey söylemiyor, sistemin ayakta olduğunu gösteriyor.
+ *
+ * GÖZ YORMUYOR
+ * Işık sürekli gidip gelmiyor. Üç buçuk saniyede bir geçiyor ve arada
+ * duruyor; göz ucuyla fark ediliyor, bakışı çekmiyor. Çizgi boyları sabit
+ * bir desen: her yüklemede değişseydi göz her seferinde yeniden okumaya
+ * çalışırdı.
+ *
+ * MALİYET
+ * Tek bir öğe `transform` ile kayıyor. Yerleşim hesabı yok, gölge yok.
+ * ============================================================================
+ */
+
+.tarama-imi {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 26px;
+    padding: 0 11px;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 9px;
+    background: var(--color-background, #f8fafc);
+    overflow: hidden;
+}
+
+.tarama-imi i {
+    display: block;
+    width: 2px;
+    height: var(--b, 12px);
+    border-radius: 1px;
+    background: #cbd5e1;
+}
+
+.tarama-imi__isik {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 32px;
+    height: 100%;
+    pointer-events: none;
+    background: linear-gradient(90deg,
+        rgb(19 91 236 / 0), rgb(19 91 236 / 0.45), rgb(19 91 236 / 0));
+    transform: translate3d(-36px, 0, 0);
+    animation: tarama-gec 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes tarama-gec {
+    0%, 10% { transform: translate3d(-36px, 0, 0); opacity: 0; }
+    16% { opacity: 1; }
+    50% { transform: translate3d(118px, 0, 0); opacity: 1; }
+    58%, 100% { transform: translate3d(150px, 0, 0); opacity: 0; }
+}
+
+/* Dar ekranda üst şerit zaten kalabalık; im gizleniyor */
+@media (max-width: 900px) {
+    .tarama-imi { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tarama-imi__isik { animation: none; opacity: 0; }
+}

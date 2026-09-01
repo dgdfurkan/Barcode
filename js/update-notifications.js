@@ -1565,13 +1565,13 @@
         async completeUpdate() {
             try {
                 if (!window.jbDb) {
-                    alert('Supabase bağlantısı yok!');
+                    JBDiyalog.uyari('Supabase bağlantısı yok!');
                     return;
                 }
 
                 const session = window.authUtils?.checkAuth();
                 if (!session || !session.username) {
-                    alert('Oturum bulunamadı!');
+                    JBDiyalog.uyari('Oturum bulunamadı!');
                     return;
                 }
 
@@ -1694,7 +1694,7 @@
                 await this.checkForUpdates();
             } catch (error) {
                 console.error('Error completing update:', error);
-                alert('Güncelleme tamamlanırken hata oluştu: ' + error.message);
+                JBDiyalog.uyari('Güncelleme tamamlanırken hata oluştu: ' + error.message);
             }
         }
     }

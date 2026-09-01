@@ -48,7 +48,7 @@ class BarcodeScanner {
 
             // Check if browser supports getUserMedia
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert('Tarayıcınız kamera erişimini desteklemiyor');
+                JBDiyalog.uyari('Tarayıcınız kamera erişimini desteklemiyor');
                 return;
             }
 
@@ -163,7 +163,7 @@ class BarcodeScanner {
             if (window.countingSystem && window.countingSystem.showToast) {
                 window.countingSystem.showToast(errorMessage, 'error', 5000);
             } else {
-                alert(errorMessage);
+                JBDiyalog.uyari(errorMessage);
             }
             
             this.stopScanning();
@@ -1094,7 +1094,7 @@ class BarcodeScanner {
         if (window.countingSystem && window.countingSystem.showToast) {
             window.countingSystem.showToast('Barkod okuma kütüphanesi yüklenemedi. Lütfen ürün adı veya barkod ile manuel ekleme yapın.', 'warning', 5000);
         } else {
-            alert('Barkod okuma kütüphanesi yüklenemedi. Lütfen ürün adı veya barkod ile manuel ekleme yapın.');
+            JBDiyalog.uyari('Barkod okuma kütüphanesi yüklenemedi. Lütfen ürün adı veya barkod ile manuel ekleme yapın.');
         }
         
         // Seri okuma modu aktif değilse kamerayı kapat

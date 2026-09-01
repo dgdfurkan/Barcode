@@ -1854,8 +1854,10 @@ class CountingSystem {
         }
         if (clearBtn) {
             clearBtn.addEventListener('click', async () => {
-                const ok = typeof window !== 'undefined' && window.confirm
-                    ? window.confirm('Tüm işlem kayıtları silinsin mi?')
+                const ok = (typeof window !== 'undefined' && window.JBDiyalog)
+                    ? await window.JBDiyalog.onay('Bütün işlem kayıtları silinecek.', {
+                          baslik: 'Kayıtları temizle', tehlikeli: true, onayYazi: 'Temizle'
+                      })
                     : true;
                 if (!ok) return;
                 this.auditLog = [];
@@ -8856,7 +8858,7 @@ class CountingSystem {
                 if (window.barcodeScanner) {
                     window.barcodeScanner.startScanning();
                 } else {
-                    alert('Barkod okuyucu henüz yüklenmedi. Lütfen sayfayı yenileyin.');
+                    JBDiyalog.uyari('Barkod okuyucu henüz yüklenmedi. Lütfen sayfayı yenileyin.');
                 }
             });
         }
@@ -8868,7 +8870,7 @@ class CountingSystem {
                 if (window.terminalScanner) {
                     window.terminalScanner.startScanning();
                 } else {
-                    alert('Terminal okuyucu henüz yüklenmedi. Lütfen sayfayı yenileyin.');
+                    JBDiyalog.uyari('Terminal okuyucu henüz yüklenmedi. Lütfen sayfayı yenileyin.');
                 }
             });
         }
@@ -14061,7 +14063,7 @@ class CountingSystem {
         if (window.showNotification) {
             window.showNotification(message, type);
         } else {
-            alert(message);
+            JBDiyalog.uyari(message);
         }
     }
     

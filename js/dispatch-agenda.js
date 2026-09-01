@@ -762,7 +762,7 @@ class DispatchAgendaApp {
     _toast(msg, type = 'info') {
         const el = document.getElementById('agendaToast');
         if (!el) {
-            if (type === 'error') alert(msg);
+            if (type === 'error') JBDiyalog.uyari(msg);
             return;
         }
         const colors = {

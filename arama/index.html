@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <script src="../js/jb-diyalog.js?v=20260901b"></script>
     <script src="../js/console-quiet.js?v=20260828i"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -1982,6 +1983,8 @@
     <link rel="stylesheet" href="../css/motion.css?v=20260828i" />
     <link rel="stylesheet" href="../css/banko.css?v=20260901d" />
     <link rel="stylesheet" href="../css/oneri.css?v=20260901a" />
+    <link rel="stylesheet" href="../css/tarama-imi.css?v=20260901a" />
+    <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
 </head>
 <body class="bg-background min-h-screen">
     <!-- Açılış perdesi. İlk karede boyanır; JS hiç çalışmasa bile
@@ -2028,7 +2031,16 @@
                 
                 <!-- Animated Scan Effect -->
                 <div id="scanEffectContainer" class="flex items-center">
-                    <p class="loader"><span>Scan</span></p>
+                    <!-- Tarama imi: okunacak bir yazı değil, sistemin ayakta
+                         olduğunu gösteren sessiz bir im. Ayrıntı css/tarama-imi.css -->
+                    <div class="tarama-imi" aria-hidden="true">
+                        <i style="--b:9px"></i><i style="--b:15px"></i><i style="--b:7px"></i>
+                        <i style="--b:13px"></i><i style="--b:17px"></i><i style="--b:8px"></i>
+                        <i style="--b:14px"></i><i style="--b:10px"></i><i style="--b:16px"></i>
+                        <i style="--b:7px"></i><i style="--b:12px"></i><i style="--b:15px"></i>
+                        <i style="--b:9px"></i><i style="--b:13px"></i>
+                        <span class="tarama-imi__isik"></span>
+                    </div>
                 </div>
                 
                 <!-- Sağ toolbar -->
@@ -3765,7 +3777,7 @@
                         } else {
                             // Reset to false and show message
                             autoPasteEnabledEl.checked = false;
-                            alert('Bu özellik premium üyeler için mevcuttur. Lütfen admin ile iletişime geçin.');
+                            JBDiyalog.uyari('Bu özellik premium üyeler için mevcuttur. Lütfen admin ile iletişime geçin.');
                         }
                     });
                 }
@@ -8253,7 +8265,7 @@
             const activeProducts = currentResults.filter(product => !outOfStockProducts.has(product.id));
             
             if (activeProducts.length === 0) {
-                alert('Dışa aktarılacak aktif ürün bulunamadı.');
+                JBDiyalog.uyari('Dışa aktarılacak aktif ürün bulunamadı.');
                 return;
             }
             
@@ -9082,7 +9094,7 @@
                             await copyToClipboard('limit-override', content);
                         } catch (error) {
                             console.error('Error loading file:', error);
-                            alert('Dosya yüklenemedi. Lütfen tekrar deneyin.');
+                            JBDiyalog.uyari('Dosya yüklenemedi. Lütfen tekrar deneyin.');
                         }
                     });
                 }
@@ -9095,7 +9107,7 @@
                             await copyToClipboard('excel-export', content);
                         } catch (error) {
                             console.error('Error loading file:', error);
-                            alert('Dosya yüklenemedi. Lütfen tekrar deneyin.');
+                            JBDiyalog.uyari('Dosya yüklenemedi. Lütfen tekrar deneyin.');
                         }
                     });
                 }
@@ -9209,7 +9221,7 @@
                 }
             } catch (err) {
                 console.error('Kopyalama hatası:', err);
-                alert('Kopyalama başarısız oldu. Lütfen manuel olarak kopyalayın.');
+                JBDiyalog.uyari('Kopyalama başarısız oldu. Lütfen manuel olarak kopyalayın.');
             }
         }
         
@@ -9565,10 +9577,13 @@
             document.querySelectorAll('.delete-shortcut-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const key = btn.dataset.key;
-                    if (confirm(`"${key}" kısayolunu silmek istediğinizden emin misiniz?`)) {
-                        await deleteKeyboardShortcut(key);
-                        await renderKeyboardShortcutsUI();
-                    }
+                    const onay = await JBDiyalog.onay(
+                        `"${key}" kısayolu silinecek.`,
+                        { baslik: 'Kısayolu sil', tehlikeli: true, onayYazi: 'Sil' }
+                    );
+                    if (!onay) return;
+                    await deleteKeyboardShortcut(key);
+                    await renderKeyboardShortcutsUI();
                 });
             });
         }
@@ -9813,13 +9828,16 @@
             // Check premium
             const hasPremium = window.premiumFeatures?.checkPremiumFeature('keyboardShortcuts');
             if (!hasPremium) {
-                alert('Bu özellik premium üyeler için mevcuttur.');
+                JBDiyalog.uyari('Bu özellik premium üyeler için mevcuttur.');
                 return;
             }
             
             // Check if user has enabled the feature
             if (!isKeyboardShortcutsEnabled()) {
-                const enable = confirm('Klavye kısayolları özelliği kapalı. Açmak ister misiniz?');
+                const enable = await JBDiyalog.onay(
+                    'Klavye kısayolları şu anda kapalı.',
+                    { baslik: 'Özelliği açalım mı?', onayYazi: 'Aç' }
+                );
                 if (enable) {
                     setKeyboardShortcutsEnabled(true);
                     // Update checkbox in settings if visible
@@ -10319,15 +10337,16 @@
         }
 
         // Delete single product
-        function deleteSingleProduct(productId) {
-            if (confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
-                window.userDataManager.removeProduct(productId);
-                pmSelectedIds.delete(String(productId));
-                loadProductsForManagement();
-                // Refresh main products array (will merge custom + default from PRODUCTS_DATA)
-                products = window.userDataManager.getAllProducts();
-                updateSettingsInfo();
-            }
+        async function deleteSingleProduct(productId) {
+            const onay = await JBDiyalog.onay('Bu ürün listenden kalkacak.',
+                { baslik: 'Ürünü sil', tehlikeli: true, onayYazi: 'Sil' });
+            if (!onay) return;
+            window.userDataManager.removeProduct(productId);
+            pmSelectedIds.delete(String(productId));
+            loadProductsForManagement();
+            // Refresh main products array (will merge custom + default from PRODUCTS_DATA)
+            products = window.userDataManager.getAllProducts();
+            updateSettingsInfo();
         }
 
         // Select all products (filtrelenmiş kümenin tamamı — sadece görünenler değil)
@@ -10349,25 +10368,32 @@
         }
 
         // Delete selected products
-        function deleteSelectedProducts() {
+        async function deleteSelectedProducts() {
             if (pmSelectedIds.size === 0) {
-                alert('Lütfen silmek istediğiniz ürünleri seçin');
+                JBDiyalog.uyari('Lütfen silmek istediğiniz ürünleri seçin');
                 return;
             }
 
-            if (confirm(`${pmSelectedIds.size} ürünü silmek istediğinizden emin misiniz?`)) {
-                window.userDataManager.removeProducts(Array.from(pmSelectedIds));
-                pmSelectedIds.clear();
-                loadProductsForManagement();
-                // Refresh main products array (will merge custom + default from PRODUCTS_DATA)
-                products = window.userDataManager.getAllProducts();
-                updateSettingsInfo();
-            }
+            const onay = await JBDiyalog.onay(
+                `${pmSelectedIds.size} ürün listenden kalkacak.`,
+                { baslik: 'Seçilenleri sil', tehlikeli: true, onayYazi: 'Sil' }
+            );
+            if (!onay) return;
+            window.userDataManager.removeProducts(Array.from(pmSelectedIds));
+            pmSelectedIds.clear();
+            loadProductsForManagement();
+            // Refresh main products array (will merge custom + default from PRODUCTS_DATA)
+            products = window.userDataManager.getAllProducts();
+            updateSettingsInfo();
         }
 
         // Force reload default products for existing users
-        function forceReloadDefaults() {
-            if (confirm('Varsayılan ürünleri yeniden yüklemek istediğinizden emin misiniz?\n\nBu işlem mevcut ürünlerinizi etkilemez, sadece varsayılan ürünleri ekler.')) {
+        async function forceReloadDefaults() {
+            const onay = await JBDiyalog.onay(
+                'Varsayılan ürünler yeniden yüklenecek. Kendi eklediğin ürünler etkilenmez.',
+                { baslik: 'Varsayılanları yükle', onayYazi: 'Yükle' }
+            );
+            if (onay) {
                 // Clear existing default products
                 if (window.userDataManager && window.userDataManager.currentUser) {
                     // Clear default products from user_data (they should never be stored there)
@@ -10387,7 +10413,7 @@
                         performSearch(searchInput.value);
                     }
                     
-                    alert('✅ Varsayılan ürünler başarıyla yeniden yüklendi!');
+                    JBDiyalog.uyari('✅ Varsayılan ürünler başarıyla yeniden yüklendi!');
                 }
             }
         }
@@ -10396,7 +10422,7 @@
         function exportUserProducts() {
             try {
                 if (!window.userDataManager || !window.userDataManager.currentUser) {
-                    alert('Kullanıcı verisi yok. Önce giriş yapın.');
+                    JBDiyalog.uyari('Kullanıcı verisi yok. Önce giriş yapın.');
                     return;
                 }
                 const custom = window.userDataManager.getProducts();
@@ -10416,7 +10442,7 @@
                 URL.revokeObjectURL(url);
             } catch (e) {
                 console.error('exportUserProducts:', e);
-                alert('Dışa aktarılamadı: ' + (e && e.message ? e.message : String(e)));
+                JBDiyalog.uyari('Dışa aktarılamadı: ' + (e && e.message ? e.message : String(e)));
             }
         }
         
@@ -10615,27 +10641,26 @@
                 });
                 
                 updateSettingsInfo();
-                alert('Veriler başarıyla yenilendi!');
+                JBDiyalog.uyari('Veriler başarıyla yenilendi!');
             } catch (error) {
                 console.error('Veri yenileme hatası:', error);
-                alert('Veri yenileme başarısız: ' + error.message);
+                JBDiyalog.uyari('Veri yenileme başarısız: ' + error.message);
             }
         }
         
         // Clean duplicates and create clean JSON
-        function cleanDuplicates() {
+        async function cleanDuplicates() {
             const result = analyzeDuplicates();
             
             if (result.duplicates.length === 0) {
-                alert('Tekrar eden ürün bulunamadı!');
+                JBDiyalog.uyari('Tekrar eden ürün bulunamadı!');
                 return;
             }
             
-            const confirmClean = confirm(
-                `${result.duplicates.length} tekrar eden ürün bulundu!\n\n` +
-                `Toplam: ${products.length} ürün\n` +
-                `Benzersiz: ${result.uniqueProducts.length} ürün\n\n` +
-                `Tekrar eden ürünleri silmek istiyor musunuz?`
+            const confirmClean = await JBDiyalog.onay(
+                `${result.duplicates.length} tekrar eden ürün bulundu.\n` +
+                `Toplam ${products.length} ürün, benzersiz ${result.uniqueProducts.length} ürün.`,
+                { baslik: 'Tekrarları temizle', tehlikeli: true, onayYazi: 'Temizle' }
             );
             
             if (confirmClean) {
@@ -10669,7 +10694,7 @@
                 // Update settings info
                 updateSettingsInfo();
                 
-                alert(`✅ TEMİZLEME TAMAMLANDI!\n\n` +
+                JBDiyalog.uyari(`✅ TEMİZLEME TAMAMLANDI!\n\n` +
                       `📊 Sonuç: ${result.uniqueProducts.length} benzersiz ürün kaldı\n` +
                       `🗑️ ${result.duplicates.length} tekrar eden ürün silindi\n\n` +
                       `Ana products.json dosyasını indirilen products_clean.json ile değiştirin!`);
@@ -10703,14 +10728,14 @@
             document.getElementById('parseHtmlTable').addEventListener('click', () => {
                 const htmlContent = document.getElementById('htmlTableInput').value.trim();
                 if (!htmlContent) {
-                    alert('❌ Lütfen HTML tablo verisini girin!');
+                    JBDiyalog.uyari('❌ Lütfen HTML tablo verisini girin!');
                     return;
                 }
                 
                 parsedProducts = parseHtmlTable(htmlContent);
                 
                 if (parsedProducts.length === 0) {
-                    alert('❌ HTML tablosundan ürün verisi çıkarılamadı!\n\nLütfen doğru HTML formatını kontrol edin.');
+                    JBDiyalog.uyari('❌ HTML tablosundan ürün verisi çıkarılamadı!\n\nLütfen doğru HTML formatını kontrol edin.');
                     return;
                 }
                 
@@ -10757,7 +10782,7 @@
                 
                 // Show summary
                 const summary = `📊 Analiz Tamamlandı!\n\n✅ Yeni ürünler: ${newProductsToAdd.length}\n⚠️ Mevcut ürünler: ${duplicates.length}\n\nYeni ürünleri eklemek için "Tümünü Ekle" veya "Seçilenleri Ekle" butonunu kullanın.`;
-                alert(summary);
+                JBDiyalog.uyari(summary);
             });
             
             document.getElementById('clearHtmlInput').addEventListener('click', () => {
@@ -10768,13 +10793,13 @@
             
             document.getElementById('addAllProducts').addEventListener('click', () => {
                 if (parsedProducts.length === 0) {
-                    alert('❌ Eklenebilecek ürün bulunamadı!');
+                    JBDiyalog.uyari('❌ Eklenebilecek ürün bulunamadı!');
                     return;
                 }
                 
                 addProductsToSystem(parsedProducts);
                 
-                alert(`🎉 Başarılı!\n\n${parsedProducts.length} yeni ürün sisteme eklendi!\n\nArtık arama yapabilirsiniz.`);
+                JBDiyalog.uyari(`🎉 Başarılı!\n\n${parsedProducts.length} yeni ürün sisteme eklendi!\n\nArtık arama yapabilirsiniz.`);
                 
                 hideAddProductModal();
             });
@@ -10784,13 +10809,13 @@
                 const selectedProducts = Array.from(checkboxes).map(cb => parsedProducts[cb.dataset.index]);
                 
                 if (selectedProducts.length === 0) {
-                    alert('❌ Lütfen eklemek istediğiniz ürünleri seçin!');
+                    JBDiyalog.uyari('❌ Lütfen eklemek istediğiniz ürünleri seçin!');
                     return;
                 }
                 
                 addProductsToSystem(selectedProducts);
                 
-                alert(`🎉 Başarılı!\n\n${selectedProducts.length} ürün sisteme eklendi!\n\nArtık arama yapabilirsiniz.`);
+                JBDiyalog.uyari(`🎉 Başarılı!\n\n${selectedProducts.length} ürün sisteme eklendi!\n\nArtık arama yapabilirsiniz.`);
                 
                 hideAddProductModal();
             });
@@ -10808,7 +10833,7 @@
                 console.log('window.fullProductList:', window.fullProductList);
                 
                 if (!window.fullProductList) {
-                    alert('❌ Önce ürünleri analiz edin!');
+                    JBDiyalog.uyari('❌ Önce ürünleri analiz edin!');
                     return;
                 }
                 
@@ -10878,13 +10903,13 @@
                 console.log('Selected products:', selectedProducts.length);
                 
                 if (selectedProducts.length === 0) {
-                    alert('❌ Lütfen eklemek istediğiniz ürünleri seçin!');
+                    JBDiyalog.uyari('❌ Lütfen eklemek istediğiniz ürünleri seçin!');
                     return;
                 }
                 
                 addProductsToSystem(selectedProducts);
                 
-                alert(`🎉 Başarılı!\n\n${selectedProducts.length} ürün sisteme eklendi!\n\nArtık arama yapabilirsiniz.`);
+                JBDiyalog.uyari(`🎉 Başarılı!\n\n${selectedProducts.length} ürün sisteme eklendi!\n\nArtık arama yapabilirsiniz.`);
                 
                 document.getElementById('productListModal').classList.add('hidden');
                 hideAddProductModal();
@@ -10949,7 +10974,7 @@
             document.getElementById('refreshData').addEventListener('click', refreshData);
             document.getElementById('analyzeDuplicates').addEventListener('click', () => {
                 const result = analyzeDuplicates();
-                alert(`Analiz tamamlandı!\n\nToplam ürün: ${products.length}\nTekrar eden: ${result.duplicates.length}\nBenzersiz: ${result.uniqueProducts.length}\n\nDetayları console'da görebilirsiniz.`);
+                JBDiyalog.uyari(`Analiz tamamlandı!\n\nToplam ürün: ${products.length}\nTekrar eden: ${result.duplicates.length}\nBenzersiz: ${result.uniqueProducts.length}\n\nDetayları console'da görebilirsiniz.`);
             });
             document.getElementById('cleanDuplicates').addEventListener('click', cleanDuplicates);
             
@@ -11646,9 +11671,13 @@
             
             // Add logout functionality
             document.getElementById('logoutBtn').addEventListener('click', () => {
-                if (confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
-                    window.authUtils.logout();
-                }
+                JBDiyalog.onay('Oturumun kapanacak.', {
+                    baslik: 'Çıkış yap',
+                    onayYazi: 'Çıkış yap',
+                    tehlikeli: true
+                }).then(function (onay) {
+                    if (onay) window.authUtils.logout();
+                });
             });
             
             // Add contact functionality

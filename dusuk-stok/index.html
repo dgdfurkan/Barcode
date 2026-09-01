@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
+    <script src="../js/jb-diyalog.js?v=20260901b"></script>
     <script src="../js/console-quiet.js?v=20260828i"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -14,6 +15,7 @@
     <link rel="stylesheet" href="../css/main.css?v=20260828i" />
     <link rel="stylesheet" href="../css/tailwind.css?v=20260828i" />
     <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
+    <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
     <script src="../js/auth-token.js?v=20260828i"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20260828i"></script>
@@ -220,7 +222,7 @@
 
             function showNotification(msg, type) {
                 if (window.showNotification) window.showNotification(msg, type || 'info');
-                else alert(msg);
+                else JBDiyalog.uyari(msg);
             }
             function escapeHtml(s) {
                 if (!s) return '';
@@ -529,13 +531,17 @@
                 }
 
                 if (clearLowStockBtn) {
-                    clearLowStockBtn.addEventListener('click', () => {
+                    clearLowStockBtn.addEventListener('click', async () => {
                         const sess = window.authUtils && window.authUtils.checkAuth && window.authUtils.checkAuth();
                         if (!sess || !sess.username) {
                             showNotification('Giriş yapılmış değil.', 'error');
                             return;
                         }
-                        if (!confirm('Düşük stok listesini ve \"Tamam, kontrol ettim\" işaretlerini temizlemek istediğinizden emin misiniz?')) return;
+                        const onay = await JBDiyalog.onay(
+                            'Düşük stok listesi ve "Tamam, kontrol ettim" işaretleri temizlenecek.',
+                            { baslik: 'Listeyi temizle', tehlikeli: true, onayYazi: 'Temizle' }
+                        );
+                        if (!onay) return;
                         window.postMessage({ type: 'CLEAR_LOW_STOCK', username: sess.username }, '*');
                     });
                 }

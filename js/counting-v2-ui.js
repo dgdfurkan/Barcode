@@ -209,9 +209,39 @@
      * Ayrıca seçimin görüldüğünü belli etmek için başlık kısa bir an
      * vurgulanıyor, sonra çekmece kapanıyor.
      */
+    /*
+     * Çekmece, kullanıcı bir tablo SEÇTİĞİNDE kapanıyor. Bunu aktif tablo
+     * başlığındaki değişimden anlıyor.
+     *
+     * SORUN
+     * "Genel" ve "Günlük" sekmelerine basınca da aktif tablo değişiyordu
+     * (sayfa o türün ilk tablosunu seçiyor). Başlık değiştiği için çekmece
+     * kapanıyordu. Oysa kullanıcı henüz seçim yapmadı, sadece listeyi
+     * değiştirdi; kapanması işi bozuyordu.
+     *
+     * ÇÖZÜM
+     * Sekmeye basıldığı an işaretleniyor. O andan sonraki kısa süre içinde
+     * gelen başlık değişimi "seçim" sayılmıyor: çip yenileniyor ama çekmece
+     * açık kalıyor. Listeden gerçek bir tabloya basıldığında kapanma yine
+     * çalışıyor.
+     */
+    var sekmeAni = 0;
+    var SEKME_PENCERESI = 900;
+
+    function sekmeIzle() {
+        ['sayimTabGeneralBtn', 'sayimTabDailyBtn'].forEach(function (id) {
+            var d = el(id);
+            if (!d || d._v2SekmeBagli) return;
+            d._v2SekmeBagli = true;
+            d.addEventListener('click', function () { sekmeAni = Date.now(); }, true);
+        });
+    }
+
     function cekmeceOtomatikKapanma() {
         var kaynak = el('sayimActiveTableTitle');
         if (!kaynak || !('MutationObserver' in window)) return;
+
+        sekmeIzle();
 
         var sonAd = (kaynak.textContent || '').trim();
 
@@ -221,6 +251,9 @@
             sonAd = ad;
             cipiTazele();
             if (!document.body.classList.contains('v2-drawer-open')) return;
+
+            // Sekme değişiminden geliyorsa kapatma
+            if (Date.now() - sekmeAni < SEKME_PENCERESI) return;
 
             var kart = el('sayimActiveTableHost');
             if (kart) {
