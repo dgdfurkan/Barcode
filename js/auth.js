@@ -704,6 +704,9 @@ function logout() {
     
     localStorage.removeItem('userSession');
     localStorage.removeItem('authToken');
+    /* Kaldığı yer hatırlatması da gitsin; çıkış yapan kullanıcı bir daha
+       girdiğinde eski sayım ekranına fırlatılmasın. */
+    try { window.JBOturumYeri && window.JBOturumYeri.sil(); } catch (e) { /* sessiz */ }
     
     /* Sayfalar artık /arama/, /sayim/ gibi kendi klasörlerinde. Nerede
        olursak olalım kökten yazılan adres doğru yere gider; eskiden
