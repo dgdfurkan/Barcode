@@ -114,6 +114,35 @@
 
     var apiBilgi = null;
 
+    /**
+     * Depo kimliğini Jet Barkod'un kendi belleğinde arar. Sayım sistemi bu
+     * değeri birkaç yere yazıyor; hangisi doluysa o kullanılıyor.
+     */
+    function depoKimligiAra() {
+        var s = sistem();
+        var adaylar = [];
+        try { if (s && s.countingData && s.countingData._api_info) adaylar.push(s.countingData._api_info); } catch (e) {}
+        try { if (s && s.cachedFullData && s.cachedFullData._api_info) adaylar.push(s.cachedFullData._api_info); } catch (e) {}
+        try {
+            var ham = localStorage.getItem('getir_api_info');
+            if (ham) adaylar.push(JSON.parse(ham));
+        } catch (e) {}
+        try {
+            for (var i = 0; i < localStorage.length; i++) {
+                var k = localStorage.key(i);
+                if (!k || k.toLowerCase().indexOf('api_info') === -1) continue;
+                var v = localStorage.getItem(k);
+                if (v && v.charAt(0) === '{') adaylar.push(JSON.parse(v));
+            }
+        } catch (e) {}
+
+        for (var j = 0; j < adaylar.length; j++) {
+            var a = adaylar[j];
+            if (a && a.warehouseId) return String(a.warehouseId);
+        }
+        return null;
+    }
+
     function jetonHazirla(t) {
         var j = String(t || '').trim();
         return j.indexOf('Bearer ') === 0 ? j : 'Bearer ' + j;
@@ -124,6 +153,29 @@
      * hataları yutmaması. `_fetchApiProductRowByProductId` her hatada sessizce
      * null dönüyor, o yüzden neyin ters gittiği hiç görünmüyordu.
      */
+    /**
+     * Depo kimliği elimizde yoksa gövdeye hiç konmuyor; sunucu jetondan
+     * çözüyor ve yanıttaki `warehouse` alanından kimliği öğreniyoruz.
+     * Koda sabit kimlik yazmak yok: o değer depodan depoya değişiyor ve
+     * yanlışı başkasının deposunu sormak demek.
+     */
+    function istekGovdesi(urunId) {
+        var g = { productIds: [String(urunId)], sort: { available: 1 } };
+        if (apiBilgi.warehouseId) g.warehouseIds = [apiBilgi.warehouseId];
+        return g;
+    }
+
+    /** Yanıttaki satırdan depo kimliğini öğrenir ve saklar. */
+    function depoyuOgren(satir) {
+        if (apiBilgi.warehouseId || !satir) return;
+        var w = satir.warehouse || (satir.productStock && satir.productStock.warehouse);
+        if (w && typeof w === 'object') w = w._id || w.id;
+        if (w) {
+            apiBilgi.warehouseId = String(w);
+            console.log('[Fiyat] Depo kimliği yanıttan öğrenildi.');
+        }
+    }
+
     function satirCek(urunId, barkod) {
         var uc = apiBilgi.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks';
         return fetch(uc + '?limit=100&offset=0', {
@@ -133,11 +185,7 @@
                 'Authorization': jetonHazirla(apiBilgi.token),
                 'Accept': '*/*'
             },
-            body: JSON.stringify({
-                warehouseIds: [apiBilgi.warehouseId],
-                productIds: [String(urunId)],
-                sort: { available: 1 }
-            })
+            body: JSON.stringify(istekGovdesi(urunId))
         }).then(function (y) {
             return y.text().then(function (metin) {
                 if (!y.ok) {
@@ -152,16 +200,22 @@
                 var satirlar = (veri && Array.isArray(veri.data)) ? veri.data : [];
                 if (!satirlar.length) return null;
 
+                var secili = null;
                 if (barkod) {
-                    for (var i = 0; i < satirlar.length; i++) {
+                    for (var i = 0; i < satirlar.length && !secili; i++) {
                         var p = satirlar[i].packagingInfo;
                         if (!p) continue;
                         for (var k in p) {
-                            if (p[k] && p[k].barcodes && p[k].barcodes.indexOf(barkod) !== -1) return satirlar[i];
+                            if (p[k] && p[k].barcodes && p[k].barcodes.indexOf(barkod) !== -1) {
+                                secili = satirlar[i];
+                                break;
+                            }
                         }
                     }
                 }
-                return satirlar[0];
+                if (!secili) secili = satirlar[0];
+                depoyuOgren(secili);
+                return secili;
             });
         });
     }
@@ -355,11 +409,16 @@
                     durumYaz('Jeton yok. Getir franchise sekmesini açıp yenile, sonra tekrar dene.', '#ff7676');
                     return;
                 }
-                if (!bilgi.warehouseId) {
-                    durumYaz('Depo kimliği okunamadı. Franchise sekmesinde stok sayfasını bir kez aç.', '#ff7676');
-                    return;
+                apiBilgi = {
+                    token: bilgi.token,
+                    stockEndpoint: bilgi.stockEndpoint,
+                    warehouseId: bilgi.warehouseId || depoKimligiAra()
+                };
+                if (!apiBilgi.warehouseId) {
+                    /* Durmuyoruz. İlk istek depo kimliği olmadan gidiyor,
+                       sunucu jetondan çözüyor, kimliği yanıttan öğreniyoruz. */
+                    console.log('[Fiyat] Depo kimliği yerelde yok; ilk istekten öğrenilecek.');
                 }
-                apiBilgi = bilgi;
 
                 durumYaz('Deneme isteği gönderiliyor…');
                 return satirCek(islenecek[0].urunId, islenecek[0].barkod).then(function (satir) {
