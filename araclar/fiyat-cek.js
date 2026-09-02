@@ -2,29 +2,33 @@
  * Fiyat Çek — konsol aracı (Jet Barkod sayım sayfası)
  * ============================================================================
  *
- * Verdiğin ürün adlarının TOPTAN fiyatını toplar. Çıktı iki sütun: ürün adı
- * ve toptan fiyat.
+ * Ürün adlarının TOPTAN fiyatını toplar. Çıktı iki sütun: ad ve toptan fiyat.
  *
  * NASIL KULLANILIR
  *   1. https://jetbarkod.com.tr/sayim/ aç, giriş yapmış ol.
  *      Franchise sekmesi de açık olsun; jeton oradan geliyor.
  *   2. F12 -> Console. "allow pasting" yaz, dosyanın tamamını yapıştır.
- *   3. Ürün adlarını KOPYALA, sonra:  JBFiyat.basla()
+ *   3. Yaz:  JBFiyat.ac()
+ *      Sayfada bir panel açılır. Ürün adlarını oraya yapıştır, Başlat'a bas.
+ *      Sonuç aynı panelde çıkar, Kopyala düğmesi de orada.
  *
- * Listeyi tırnak içinde koda yazma; adlarda kesme işareti var ("Nuh'un",
- * "Lay's", "(15'li)") ve tırnağı ortadan kapatıyor. Araç panodan okur.
+ * NEDEN PANEL
+ * Önce liste konsola argüman olarak yazılıyordu; ürün adlarındaki kesme
+ * işareti ("Nuh'un", "Lay's", "(15'li)") tırnaklı diziyi kapatıyor ve konsol
+ * sözdizimi hatası veriyordu. Sonra panodan okumaya geçildi; `readText()`
+ * kullanıcı hareketi istiyor, konsoldan çağrılınca izin çıkmıyor ve araç
+ * sessizce boş dönüyordu. Metin kutusu ikisini de çözüyor: yapıştırma
+ * tarayıcının kendi işi, izin gerekmiyor.
  *
  * NE YAPIYOR
- * Sayım sayfasının zaten kullandığı isteği atıyor: `POST /stocks` gövdesinde
- * yalnız o ürünün kimliği. Ürün başına tek istek, aralarında 1,5 saniye.
- * Jeton ve depo kimliği `countingSystem._resolveApiInfoForDebug()` üzerinden
- * geliyor, ikisi de koda yazılmıyor. Depo kimliği okunamazsa hiç istek
- * atmadan duruyor; o değer depodan depoya değişiyor.
+ * Sayım sayfasının zaten attığı isteği atıyor: `POST /stocks`, gövdede yalnız
+ * o ürünün kimliği. Ürün başına tek istek, aralarında 1,5 saniye. Jeton ve
+ * depo kimliği `countingSystem._resolveApiInfoForDebug()` üzerinden geliyor,
+ * ikisi de koda yazılmıyor. Depo kimliği okunamazsa hiç istek atmıyor; o
+ * değer depodan depoya değişiyor.
  *
- * HATA GÖRÜNÜR
- * Önce tek ürünle deneme isteği atılıyor. O tutmazsa sunucunun döndüğü kod
- * ve gövde ekrana yazılıp duruluyor. Altmış altı isteği boşuna atıp sonunda
- * boş tablo göstermenin âlemi yok.
+ * Başlamadan önce tek ürünle deneme isteği gidiyor. Tutmazsa sunucunun
+ * döndüğü kod yazılıp duruluyor, kalan istekler atılmıyor.
  * ============================================================================
  */
 (function (global) {
@@ -66,21 +70,6 @@
 
     function bekle(ms) {
         return new Promise(function (c) { setTimeout(c, ms); });
-    }
-
-    function metniAl(verilen) {
-        if (verilen && String(verilen).trim()) return Promise.resolve(String(verilen));
-        var panodan = (global.navigator && navigator.clipboard && navigator.clipboard.readText)
-            ? navigator.clipboard.readText().catch(function () { return ''; })
-            : Promise.resolve('');
-        return panodan.then(function (pano) {
-            if (pano && pano.trim()) {
-                console.log('%c› Liste panodan alındı.', 'color:#8ab4ff');
-                return pano;
-            }
-            console.log('%c› Pano okunamadı, kutu açılıyor.', 'color:#ffb454');
-            return global.prompt('Ürün adlarını yapıştır (virgülle ya da alt alta):', '') || '';
-        });
     }
 
     // ==================================================================
@@ -131,9 +120,9 @@
     }
 
     /**
-     * Tek ürünün stok satırını çeker. Sayım sayfasındaki isteğin aynısı;
-     * fark, hataları yutmaması. `_fetchApiProductRowByProductId` her hatada
-     * sessizce null dönüyor, o yüzden neyin ters gittiği görünmüyordu.
+     * Tek ürünün stok satırını çeker. Sayım sayfasındaki isteğin aynısı; fark,
+     * hataları yutmaması. `_fetchApiProductRowByProductId` her hatada sessizce
+     * null dönüyor, o yüzden neyin ters gittiği hiç görünmüyordu.
      */
     function satirCek(urunId, barkod) {
         var uc = apiBilgi.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks';
@@ -203,6 +192,115 @@
     }
 
     // ==================================================================
+    // Panel
+    // ==================================================================
+
+    var panel = null;
+    var oge = {};
+
+    function stilVer(e, s) { Object.keys(s).forEach(function (k) { e.style[k] = s[k]; }); return e; }
+
+    function yap(etiket, stil, metin) {
+        var e = document.createElement(etiket);
+        if (stil) stilVer(e, stil);
+        if (metin != null) e.textContent = metin;
+        return e;
+    }
+
+    function panelAc() {
+        if (panel) { panel.remove(); panel = null; }
+
+        panel = yap('div', {
+            position: 'fixed', right: '20px', bottom: '20px', width: '440px',
+            maxWidth: 'calc(100vw - 40px)', maxHeight: 'calc(100vh - 40px)',
+            display: 'flex', flexDirection: 'column',
+            background: '#131720', color: '#f2f4f8', borderRadius: '14px',
+            padding: '16px', zIndex: '2147483000', boxShadow: '0 18px 48px rgba(0,0,0,.45)',
+            font: '13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif'
+        });
+
+        var ust = yap('div', { display: 'flex', alignItems: 'center', marginBottom: '4px' });
+        ust.appendChild(yap('strong', { fontSize: '15px', flex: '1' }, 'Toptan Fiyat Çek'));
+        var kapat = yap('button', {
+            background: 'none', border: '0', color: '#7b8798', fontSize: '20px',
+            lineHeight: '1', cursor: 'pointer', padding: '0 2px'
+        }, '×');
+        kapat.onclick = function () { panel.remove(); panel = null; };
+        ust.appendChild(kapat);
+        panel.appendChild(ust);
+
+        panel.appendChild(yap('p', { margin: '0 0 10px', color: '#9aa3b2', fontSize: '12px' },
+            'Ürün adlarını buraya yapıştır. Virgülle ya da alt alta, ikisi de olur.'));
+
+        oge.giris = yap('textarea', {
+            width: '100%', height: '110px', boxSizing: 'border-box', background: '#0c0f16',
+            color: '#f2f4f8', border: '1px solid #29313f', borderRadius: '9px', padding: '9px',
+            font: '12px/1.45 inherit', resize: 'vertical'
+        });
+        oge.giris.placeholder = 'Magnum Badem (100 ml), Kiraz Paket (500 g), …';
+        panel.appendChild(oge.giris);
+
+        var satir = yap('div', { display: 'flex', gap: '8px', marginTop: '10px' });
+        oge.baslat = yap('button', {
+            flex: '1', border: '0', borderRadius: '9px', padding: '9px 10px',
+            font: '600 13px inherit', cursor: 'pointer', background: '#135bec', color: '#fff'
+        }, 'Başlat');
+        oge.kopyala = yap('button', {
+            flex: '1', border: '0', borderRadius: '9px', padding: '9px 10px',
+            font: '600 13px inherit', cursor: 'pointer', background: '#232b38', color: '#cdd4e0',
+            opacity: '.45'
+        }, 'Kopyala');
+        oge.kopyala.disabled = true;
+        satir.appendChild(oge.baslat);
+        satir.appendChild(oge.kopyala);
+        panel.appendChild(satir);
+
+        oge.durum = yap('div', { marginTop: '10px', minHeight: '18px', fontSize: '12px', color: '#9aa3b2' });
+        panel.appendChild(oge.durum);
+
+        oge.sonuc = yap('div', {
+            marginTop: '8px', overflowY: 'auto', flex: '1', minHeight: '0',
+            borderTop: '1px solid #232b38', paddingTop: '8px', display: 'none'
+        });
+        panel.appendChild(oge.sonuc);
+
+        oge.baslat.onclick = function () { API._basla(oge.giris.value); };
+        oge.kopyala.onclick = function () { API._kopyala(); };
+
+        document.body.appendChild(panel);
+        oge.giris.focus();
+        return panel;
+    }
+
+    function durumYaz(metin, renk) {
+        if (oge.durum) {
+            oge.durum.textContent = metin;
+            oge.durum.style.color = renk || '#9aa3b2';
+        }
+        console.log('[Fiyat] ' + metin);
+    }
+
+    function sonucBas(kayitlar) {
+        if (!oge.sonuc) return;
+        oge.sonuc.innerHTML = '';
+        oge.sonuc.style.display = 'block';
+        var t = yap('table', { width: '100%', borderCollapse: 'collapse', fontSize: '12px' });
+        kayitlar.forEach(function (k) {
+            var tr = document.createElement('tr');
+            var a = yap('td', { padding: '4px 6px 4px 0', borderBottom: '1px solid #1c2330' }, k.ad);
+            var b = yap('td', {
+                padding: '4px 0', borderBottom: '1px solid #1c2330', textAlign: 'right',
+                whiteSpace: 'nowrap', fontWeight: '600',
+                color: k.toptanFiyat ? '#7ddc9a' : '#ff7676'
+            }, k.toptanFiyat || 'yok');
+            tr.appendChild(a);
+            tr.appendChild(b);
+            t.appendChild(tr);
+        });
+        oge.sonuc.appendChild(t);
+    }
+
+    // ==================================================================
     // Akış
     // ==================================================================
 
@@ -210,32 +308,32 @@
         ARA_MS: 1500,
         sonuc: null,
 
-        basla: function (adMetni) {
-            return metniAl(adMetni).then(function (metin) {
-                if (!metin || !metin.trim()) {
-                    console.log('%cListe boş. Adları kopyalayıp JBFiyat.basla() yaz.', 'color:#ffb454');
-                    return;
-                }
-                return API._yurut(metin);
-            });
-        },
-
-        _yurut: function (adMetni) {
+        /** Paneli açar. Asıl giriş noktası bu. */
+        ac: function () {
             var s = sistem();
             if (!s || typeof s._resolveApiInfoForDebug !== 'function') {
-                console.log('%c⚠ Bu betik Jet Barkod sayım sayfasında çalışır: ' +
+                console.log('%c⚠ Bu araç Jet Barkod sayım sayfasında çalışır: ' +
                             'https://jetbarkod.com.tr/sayim/', 'color:#ff7676;font-weight:bold');
-                return Promise.resolve();
+                return;
             }
+            panelAc();
+            durumYaz('Listeyi yapıştır ve Başlat\'a bas.');
+        },
 
+        /** Panel olmadan, doğrudan metinle. */
+        basla: function (adMetni) {
+            if (adMetni && String(adMetni).trim()) return API._basla(String(adMetni));
+            API.ac();
+        },
+
+        _basla: function (adMetni) {
+            var s = sistem();
             var liste = katalogListesi();
-            if (!liste.length) {
-                console.log('%c⚠ Katalog henüz yüklenmemiş. Birkaç saniye sonra tekrar dene.',
-                            'color:#ffb454');
-                return Promise.resolve();
-            }
+            if (!liste.length) { durumYaz('Katalog henüz yüklenmedi, birkaç saniye bekle.', '#ffb454'); return; }
 
             var adlar = adlariAyikla(adMetni);
+            if (!adlar.length) { durumYaz('Liste boş.', '#ffb454'); return; }
+
             var islenecek = [];
             var katalogdaYok = [];
             adlar.forEach(function (ad) {
@@ -245,136 +343,128 @@
                 else katalogdaYok.push(ad);
             });
 
-            console.log('%c› ' + adlar.length + ' ad okundu, ' + islenecek.length +
-                        ' tanesi ürüne çözüldü.', 'color:#8ab4ff');
-            if (katalogdaYok.length) {
-                console.log('%c⚠ Katalogda bulunamayan ' + katalogdaYok.length + ':', 'color:#ffb454');
-                katalogdaYok.forEach(function (a) { console.log('    ' + a); });
+            if (!islenecek.length) {
+                durumYaz(adlar.length + ' addan hiçbiri katalogda bulunamadı.', '#ff7676');
+                return;
             }
-            if (!islenecek.length) return Promise.resolve();
+            durumYaz(adlar.length + ' ad okundu, ' + islenecek.length + ' tanesi çözüldü. Jeton alınıyor…');
+            if (oge.baslat) { oge.baslat.disabled = true; oge.baslat.style.opacity = '.45'; }
 
             return Promise.resolve(s._resolveApiInfoForDebug()).then(function (bilgi) {
                 if (!bilgi || !bilgi.token) {
-                    console.log('%c⚠ Jeton yok. Getir franchise sekmesini açıp sayfayı yenile, ' +
-                                'sonra tekrar dene.', 'color:#ff7676;font-weight:bold');
+                    durumYaz('Jeton yok. Getir franchise sekmesini açıp yenile, sonra tekrar dene.', '#ff7676');
                     return;
                 }
                 if (!bilgi.warehouseId) {
-                    console.log('%c⚠ Depo kimliği okunamadı. Franchise sekmesinde stok sayfasını ' +
-                                'bir kez aç, sonra tekrar dene.', 'color:#ff7676;font-weight:bold');
+                    durumYaz('Depo kimliği okunamadı. Franchise sekmesinde stok sayfasını bir kez aç.', '#ff7676');
                     return;
                 }
                 apiBilgi = bilgi;
 
-                // Deneme isteği. Tutmazsa 66 isteği boşuna atmayalım.
-                console.log('%c› Deneme isteği gönderiliyor…', 'color:#8ab4ff');
+                durumYaz('Deneme isteği gönderiliyor…');
                 return satirCek(islenecek[0].urunId, islenecek[0].barkod).then(function (satir) {
-                    var f = toptanFiyat(satir);
                     if (!satir) {
-                        console.log('%c⚠ Deneme isteği yanıt verdi ama ürün dönmedi. ' +
-                                    'Depo kimliği bu ürünü tanımıyor olabilir. Duruyorum.',
-                                    'color:#ff7676;font-weight:bold');
+                        durumYaz('Yanıt geldi ama ürün dönmedi. Depo bu ürünü tanımıyor olabilir.', '#ff7676');
                         return;
                     }
+                    var f = toptanFiyat(satir);
                     if (!f.yazi) {
-                        console.log('%c⚠ Ürün geldi ama toptan fiyat alanı yok. ' +
-                                    'Ham satır aşağıda, bakalım nerede duruyor:',
-                                    'color:#ff7676;font-weight:bold');
+                        durumYaz('Ürün geldi ama toptan fiyat alanı yok. Ham satır konsolda.', '#ff7676');
                         console.log(satir);
                         return;
                     }
-                    console.log('%c✓ Deneme tuttu: ' + islenecek[0].ad + ' → ' + f.yazi,
-                                'color:#7ddc9a;font-weight:bold');
                     return API._topla(islenecek, katalogdaYok, satir);
                 }).catch(function (e) {
-                    console.log('%c⚠ Deneme isteği başarısız: ' + ((e && e.message) || e),
-                                'color:#ff7676;font-weight:bold');
+                    var m = (e && e.message) || e;
+                    durumYaz('Deneme isteği başarısız: ' + m, '#ff7676');
                     if (e && e.durum === 401) {
-                        console.log('   Jetonun süresi dolmuş. Franchise sekmesini yenile.');
+                        durumYaz('Jetonun süresi dolmuş. Franchise sekmesini yenile.', '#ff7676');
                     }
                 });
+            }).then(function (r) {
+                if (oge.baslat) { oge.baslat.disabled = false; oge.baslat.style.opacity = '1'; }
+                return r;
             });
         },
 
         _topla: function (islenecek, katalogdaYok, ilkSatir) {
             var kayitlar = [];
             var basarisiz = [];
-            var i = 0;
 
             var f0 = toptanFiyat(ilkSatir);
-            kayitlar.push({ ad: islenecek[0].ad, toptanFiyat: f0.yazi, toptanSayi: f0.sayi });
-            i = 1;
+            kayitlar.push({ ad: islenecek[0].ad, toptanFiyat: f0.yazi });
+            sonucBas(kayitlar);
 
-            console.log('%c› ' + islenecek.length + ' ürün, aralarında ' + API.ARA_MS + ' ms. ' +
-                        'Yaklaşık ' + Math.ceil(islenecek.length * API.ARA_MS / 1000) + ' saniye.',
-                        'color:#8ab4ff');
+            var i = 1;
 
             function tur() {
                 if (i >= islenecek.length) return Promise.resolve();
                 var it = islenecek[i];
+                durumYaz((i + 1) + '/' + islenecek.length + '  ' + it.ad);
                 return bekle(API.ARA_MS).then(function () {
                     return satirCek(it.urunId, it.barkod);
                 }).then(function (satir) {
                     var f = toptanFiyat(satir);
-                    if (f.yazi) kayitlar.push({ ad: it.ad, toptanFiyat: f.yazi, toptanSayi: f.sayi });
-                    else basarisiz.push({ ad: it.ad, sebep: satir ? 'toptan fiyat yok' : 'ürün dönmedi' });
+                    kayitlar.push({ ad: it.ad, toptanFiyat: f.yazi });
+                    if (!f.yazi) basarisiz.push(it.ad);
                 }).catch(function (e) {
-                    basarisiz.push({ ad: it.ad, sebep: String((e && e.message) || e) });
+                    kayitlar.push({ ad: it.ad, toptanFiyat: null });
+                    basarisiz.push(it.ad + ' (' + ((e && e.message) || e) + ')');
                 }).then(function () {
                     i++;
-                    console.log('  ' + i + '/' + islenecek.length + '  ' + it.ad);
+                    sonucBas(kayitlar);
                     return tur();
                 });
             }
 
             return tur().then(function () {
+                var tutan = kayitlar.filter(function (k) { return !!k.toptanFiyat; });
                 API.sonuc = {
                     olusturma: new Date().toISOString(),
                     istenen: islenecek.length,
-                    alinan: kayitlar.length,
+                    alinan: tutan.length,
                     katalogdaBulunamayan: katalogdaYok,
                     fiyatiAlinamayan: basarisiz,
-                    urunler: kayitlar.map(function (k) {
-                        return { ad: k.ad, toptanFiyat: k.toptanFiyat };
-                    })
+                    urunler: kayitlar
                 };
-
-                console.log('%c\n✓ Bitti. ' + kayitlar.length + '/' + islenecek.length +
-                            ' ürünün toptan fiyatı alındı.', 'color:#7ddc9a;font-weight:bold');
-                if (basarisiz.length) {
-                    console.log('%c  Alınamayan ' + basarisiz.length + ':', 'color:#ffb454');
-                    basarisiz.forEach(function (b) { console.log('    ' + b.ad + '  (' + b.sebep + ')'); });
-                }
-                API.tablo();
-
-                var json = JSON.stringify(API.sonuc.urunler, null, 2);
-                try {
-                    navigator.clipboard.writeText(json).then(function () {
-                        console.log('%c✓ Liste panoya kopyalandı.', 'color:#7ddc9a');
-                    }, function () {
-                        console.log('Pano izni yok: copy(JSON.stringify(JBFiyat.sonuc.urunler,null,2))');
-                    });
-                } catch (e) {
-                    console.log('copy(JSON.stringify(JBFiyat.sonuc.urunler,null,2))');
+                durumYaz('Bitti. ' + tutan.length + '/' + islenecek.length +
+                         ' ürünün toptan fiyatı alındı.' +
+                         (katalogdaYok.length ? '  ' + katalogdaYok.length + ' ad katalogda yok.' : ''),
+                         '#7ddc9a');
+                if (oge.kopyala) { oge.kopyala.disabled = false; oge.kopyala.style.opacity = '1'; }
+                if (console.table) {
+                    var t = {};
+                    kayitlar.forEach(function (k) { t[k.ad] = { 'Toptan Fiyat': k.toptanFiyat || '—' }; });
+                    console.table(t);
                 }
                 return API.sonuc;
             });
         },
 
-        /** Sonucu iki sütunlu tablo olarak basar. */
-        tablo: function () {
-            if (!API.sonuc || !API.sonuc.urunler.length) {
-                console.log('Gösterilecek sonuç yok.');
-                return;
-            }
-            var satirlar = {};
-            API.sonuc.urunler.forEach(function (u) { satirlar[u.ad] = { 'Toptan Fiyat': u.toptanFiyat }; });
-            console.table(satirlar);
+        /** Panoya yazar. Clipboard API izin istemesin diye seç-kopyala yolu. */
+        _kopyala: function () {
+            if (!API.sonuc) return;
+            var metin = API.sonuc.urunler.map(function (k) {
+                return k.ad + '\t' + (k.toptanFiyat || '');
+            }).join('\n');
+
+            var alan = document.createElement('textarea');
+            alan.value = metin;
+            alan.style.position = 'fixed';
+            alan.style.opacity = '0';
+            document.body.appendChild(alan);
+            alan.select();
+            var oldu = false;
+            try { oldu = document.execCommand('copy'); } catch (e) { oldu = false; }
+            alan.remove();
+            durumYaz(oldu ? 'Panoya kopyalandı, tabloya yapıştırabilirsin.'
+                          : 'Kopyalanamadı. Sonuç JBFiyat.sonuc içinde.',
+                     oldu ? '#7ddc9a' : '#ffb454');
         }
     };
 
     global.JBFiyat = API;
 
     console.log('%cJBFiyat hazır.', 'color:#7ddc9a;font-weight:bold');
-    console.log('Ürün adlarını KOPYALA, sonra:  JBFiyat.basla()');
+    console.log('Paneli açmak için:  JBFiyat.ac()');
 })(window);
