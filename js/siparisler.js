@@ -28,11 +28,11 @@
     var durum = {
         siparisler: [],
         secili: null,
-        sekme: 'bekliyor',
+        sekme: 'hazir',
         gorunum: 'kart',
         detayGorunum: 'liste',
         bantSirasi: null,
-        acikBarkodlar: {},
+        kodUrun: null,
         yukleniyor: true,
         sonImza: '',
         sonYenileme: null
@@ -144,14 +144,16 @@
     }
 
     /**
-     * Siparişin ekranda görünecek başlığı. Banko henüz atanmamış olabiliyor;
-     * "Banko yok" yazmak yerine siparişin son dört hanesi gösteriliyor.
-     * Depocu o kodu panelde de görüyor, karşılığı var.
+     * Siparişin kimliği. Banko varsa o; depocu bankoya yürüyor, aradığı sayı
+     * bu. Banko henüz atanmadıysa eskiden siparişin son dört hanesi
+     * yazılıyordu, kullanıcının hiçbir yerde görmediği bir koddu. Onun yerine
+     * ne kadar zamandır beklediği yazıyor; anlamı olan tek şey o.
+     *
+     * @returns {{etiket: string, deger: string, bankoVar: boolean}}
      */
-    function siparisBasligi(s) {
-        if (s.banko) return s.banko;
-        var k = String(s.order_id || s.id || '').slice(-4);
-        return k ? '#' + k : 'Sipariş';
+    function siparisKimligi(s) {
+        if (s.banko) return { etiket: 'Banko', deger: String(s.banko), bankoVar: true };
+        return { etiket: 'Banko yok', deger: '–', bankoVar: false };
     }
 
     /**
@@ -192,10 +194,12 @@
         return sonuc;
     }
 
-    var DURUM_ADI = {
-        bekliyor: 'Bekliyor',
-        toplaniyor: 'Toplanıyor',
-        toplandi: 'Toplandı'
+    /* Bant adları panelin kendi kolon adlarıyla aynı; depocu iki ekranda
+       aynı kelimeyi görüyor. */
+    var BANT_ADI = {
+        hazir: 'Hazırlandı',
+        hazirlaniyor: 'Hazırlanıyor',
+        bitti: 'Kapandı'
     };
 
     // ==================================================================
@@ -346,13 +350,43 @@
     // ==================================================================
 
     /*
-     * Panel siparişi teslim akışına geçirdiyse toplama işi bitmiştir.
-     * Kolon adı panelin kendi metni; sayı koduna göre tahmin yürütmüyoruz.
+     * Panelin kolon adına göre bant. Kolon adı panelin kendi metni; sayı
+     * koduna göre tahmin yürütmüyoruz.
+     *
+     *   hazir         Hazırlandı. Depocunun asıl işi bu, varsayılan sekme.
+     *   hazirlaniyor  Toplayıcı Bekliyor, Doğrulanıyor, Hazırlanıyor.
+     *   bitti         El Değiştiriliyor, Yolda, Ulaştı, Teslim, iptal.
+     *                 Listede hiç görünmüyor; kullanıcı "toplandılarla işim
+     *                 yok" dedi, sayfayı doldurmaktan başka işe yaramıyordu.
      */
-    var BITMIS_KOLON = /(el de[ğg]i[şs]tir|yolda|ula[şs]t|teslim)/i;
+    /* Kolon adı sade()'den geçiriliyor. Doğrudan /i ile denemek yetmiyordu:
+       "İptal" büyük harfli noktalı İ ile geliyor ve JS onu 'iptal' saymıyor. */
+    var KOLON_BITTI = /(el degistir|yolda|ulast|teslim|iptal|tamamlan)/;
+    var KOLON_HAZIR = /hazirland/;
+
+    function kolonAdi(s) { return sade(s && s.kolon); }
+
+    /* Panelden düşen sipariş bir daha güncellenmiyor; kaydı bizde kalıyor.
+       Üç saati geçmiş bir sipariş panelde kesinlikle yok. Ekranda tutmak
+       listeyi şişiriyor, o yüzden kapanmış sayılıyor. Sunucuya yazılmıyor. */
+    var ESKIME_MS = 3 * 60 * 60 * 1000;
+
+    function eskimisMi(s) {
+        var t = s.sepet_zamani || s.created_at;
+        if (!t) return false;
+        var ms = Date.now() - new Date(t).getTime();
+        return isFinite(ms) && ms > ESKIME_MS;
+    }
 
     function panelBitirmisMi(s) {
-        return BITMIS_KOLON.test(String(s.kolon || ''));
+        return KOLON_BITTI.test(kolonAdi(s));
+    }
+
+    function panelBandi(s) {
+        var k = kolonAdi(s);
+        if (KOLON_BITTI.test(k)) return 'bitti';
+        if (KOLON_HAZIR.test(k)) return 'hazir';
+        return 'hazirlaniyor';
     }
 
     /** Panelde biten siparişleri sunucuda da kapatır. Bir kez yazar. */
@@ -370,9 +404,12 @@
         return true;
     }
 
+    /* Ekranda görünen bant. Kendi toplama durumumuz "toplandı" ise, panel
+       siparişi teslime geçirdiyse ya da sipariş eskidiyse kapanmış sayılıyor. */
     function bandaGore(s) {
-        var d = s.toplama_durumu || 'bekliyor';
-        return d === 'toplandi' ? 'toplandi' : (d === 'toplaniyor' ? 'toplaniyor' : 'bekliyor');
+        if (s.toplama_durumu === 'toplandi') return 'bitti';
+        if (eskimisMi(s)) return 'bitti';
+        return panelBandi(s);
     }
 
     function listele() {
@@ -418,80 +455,92 @@
         var urunler = s.urunler || [];
         var toplam = urunler.length;
         var alinan = urunler.filter(function (u) { return u.alindi; }).length;
-        var d = bandaGore(s);
+        var oran = toplam ? Math.round(alinan / toplam * 100) : 0;
+        var kimlik = siparisKimligi(s);
         var kisi = s.kurye || s.toplayici || '';
-        var kisiNot = s.kurye ? 'Kurye' : (s.toplayici ? 'Toplayıcı' : 'Atanmadı');
-        var ilkler = urunler.slice(0, 3);
-        var kalan = toplam - ilkler.length;
+        var parca = s.toplam_adet != null ? s.toplam_adet : toplam;
 
-        return '<button type="button" class="sip-kart" data-siparis="' + kacir(s.id) +
-               '" style="--kategori:' + kategoriRengi(s) + '">' +
-            '<div class="sip-kart__ust">' +
-                '<span class="sip-banko">' +
-                    '<b class="sip-parca">x' + (s.toplam_adet != null ? s.toplam_adet : toplam) + '</b>' +
-                    kacir(siparisBasligi(s)) +
+        var meta = [];
+        if (kisi) meta.push(kacir(kisi));
+        if (s.poset_sayisi != null) meta.push(s.poset_sayisi + ' poşet');
+        meta.push(toplam + ' çeşit');
+
+        return '<button type="button" class="sip-kart' + (alinan ? ' sip-kart--basladi' : '') +
+               '" data-siparis="' + kacir(s.id) + '" style="--kategori:' + kategoriRengi(s) + '">' +
+            '<span class="sip-kart__no' + (kimlik.bankoVar ? '' : ' sip-kart__no--yok') + '">' +
+                '<b>' + kacir(kimlik.deger) + '</b><span>' + kacir(kimlik.etiket) + '</span>' +
+            '</span>' +
+            '<span class="sip-kart__orta">' +
+                '<span class="sip-kart__ust">' +
+                    '<strong>' + parca + ' parça</strong>' +
+                    '<span class="sip-kart__sure">' + kacir(gecenSure(s)) + '</span>' +
                 '</span>' +
-                '<span class="sip-sure">' + kacir(gecenSure(s)) + '</span>' +
-            '</div>' +
-            '<div class="sip-kisi">' +
-                '<span class="sip-avatar">' + kacir(basHarfler(kisi)) + '</span>' +
-                '<span class="sip-kisi__ad">' +
-                    '<strong>' + kacir(kisi || 'Kişi atanmadı') + '</strong>' +
-                    '<span>' + kacir(kisiNot) +
-                        (s.poset_sayisi != null ? '  ·  ' + s.poset_sayisi + ' poşet' : '') +
-                    '</span>' +
-                '</span>' +
-            '</div>' +
-            (ilkler.length
-                ? '<div class="sip-urunler">' +
-                    ilkler.map(function (u) {
-                        return '<div class="sip-satir"><span>' + kacir(urunBasligi(u, barkodBul(u))) +
-                               '</span><b>x' + adetYaz(u.adet) + '</b></div>';
-                    }).join('') +
-                    (kalan > 0 ? '<div class="sip-daha">+' + kalan + ' ürün daha</div>' : '') +
-                  '</div>'
-                : '') +
-            '<div class="sip-alt-satir">' +
-                '<span class="sip-rozet sip-rozet--' + d + '"><i></i>' + kacir(DURUM_ADI[d]) + '</span>' +
-                '<span class="sip-ilerleme-yazi">' + alinan + '/' + toplam + ' alındı</span>' +
-            '</div>' +
+                '<span class="sip-kart__meta">' + meta.join(' · ') + '</span>' +
+                '<span class="sip-kart__cubuk"><i style="width:' + oran + '%"></i></span>' +
+            '</span>' +
+            '<span class="sip-kart__sayi">' + alinan + '<em>/' + toplam + '</em></span>' +
         '</button>';
     }
 
-    var TIK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9 17.5 20 6.5"/></svg>';
+    var TIK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9 17.5 20 6.5"/></svg>';
 
-    function urunCiz(u) {
+    /* Satırda tek barkod duruyor: depocu okutacağı kodu aramasın. Fazlası
+       varsa ada dokununca açılan pencerede hepsi görünüyor. */
+    function kodOzeti(bilgi) {
+        if (!bilgi.barkodlar.length) return '<span class="sip-kod-yok">barkod yok</span>';
+        return '<span class="sip-kod-ozet">' + kacir(bilgi.barkodlar[0]) +
+               (bilgi.barkodlar.length > 1 ? '<i>+' + (bilgi.barkodlar.length - 1) + '</i>' : '') +
+               '</span>';
+    }
+
+    function gorselEtiketi(u, sinif) {
+        if (!u.gorsel) return '<span class="' + sinif + ' ' + sinif + '--bos"></span>';
+        return '<span class="' + sinif + '" data-buyut="' + u.sira + '">' +
+               '<img src="' + kacir(u.gorsel) + '" alt="" loading="lazy"></span>';
+    }
+
+    /* Liste görünümü: yatay satır. Görsel, ad, barkod, adet, kutu. */
+    function urunSatir(u) {
         var bilgi = barkodBul(u);
-        var baslik = urunBasligi(u, bilgi);
-        var acik = !!durum.acikBarkodlar[u.sira];
-        /* İlk barkod hep görünüyor; depocu okutacağı kodu aramasın. Birden
-           fazlaysa ada dokununca hepsi açılıyor ve yana kaydırılabiliyor. */
-        var gosterilecek = acik ? bilgi.barkodlar : bilgi.barkodlar.slice(0, 1);
-
-        var barkodlar = gosterilecek.length
-            ? gosterilecek.map(function (b) { return '<span class="sip-barkod">' + kacir(b) + '</span>'; }).join('') +
-              (!acik && bilgi.barkodlar.length > 1
-                  ? '<span class="sip-barkod sip-barkod--yok">+' + (bilgi.barkodlar.length - 1) + '</span>'
-                  : '')
-            : '<span class="sip-barkod sip-barkod--yok">Barkod bulunamadı</span>';
-
-        var gorsel = u.gorsel
-            ? '<img class="sip-urun__gorsel" src="' + kacir(u.gorsel) + '" alt="" loading="lazy" data-buyut="' + u.sira + '">'
-            : '<div class="sip-urun__gorsel"></div>';
-
         return '<div class="sip-urun' + (u.alindi ? ' sip-urun--alindi' : '') +
                '" data-sira="' + u.sira + '">' +
-            gorsel +
-            '<div class="sip-urun__orta">' +
-                '<button type="button" class="sip-urun__ad-dugme" data-barkod-ac="' + u.sira + '">' +
-                    '<span class="sip-urun__ad">' + kacir(baslik) + '</span>' +
+            gorselEtiketi(u, 'sip-urun__gorsel') +
+            '<span class="sip-urun__orta">' +
+                '<button type="button" class="sip-urun__ad" data-barkod="' + u.sira + '">' +
+                    kacir(urunBasligi(u, bilgi)) +
                 '</button>' +
-                '<div class="sip-barkodlar">' + barkodlar + '</div>' +
-            '</div>' +
-            '<div class="sip-urun__sag" data-isaretle="' + u.sira + '">' +
-                '<span class="sip-adet">' + adetYaz(u.adet) + (u.birim ? ' ' + kacir(u.birim) : '') + '</span>' +
+                kodOzeti(bilgi) +
+            '</span>' +
+            '<button type="button" class="sip-urun__al" data-isaretle="' + u.sira + '"' +
+                ' aria-pressed="' + (u.alindi ? 'true' : 'false') + '">' +
+                '<span class="sip-adet">' + adetYaz(u.adet) + (u.birim ? '<i>' + kacir(u.birim) + '</i>' : '') + '</span>' +
                 '<span class="sip-kutu">' + TIK + '</span>' +
-            '</div>' +
+            '</button>' +
+        '</div>';
+    }
+
+    /* Izgara görünümü: dikey kutucuk. Satır düzenini iki sütuna sıkıştırmak
+       görseli ortalıyor ve adetleri kaydırıyordu; bu yüzden ızgaranın kendi
+       yerleşimi var. Görsel üstte tam genişlik, adet görselin köşesinde,
+       "Aldım" düğmesi kutucuğun tabanında. */
+    function urunKutucuk(u) {
+        var bilgi = barkodBul(u);
+        return '<div class="sip-kutucuk' + (u.alindi ? ' sip-kutucuk--alindi' : '') +
+               '" data-sira="' + u.sira + '">' +
+            '<span class="sip-kutucuk__resim">' +
+                gorselEtiketi(u, 'sip-kutucuk__gorsel') +
+                '<span class="sip-kutucuk__adet">' + adetYaz(u.adet) +
+                    (u.birim ? ' ' + kacir(u.birim) : '') + '</span>' +
+            '</span>' +
+            '<button type="button" class="sip-kutucuk__ad" data-barkod="' + u.sira + '">' +
+                kacir(urunBasligi(u, bilgi)) +
+            '</button>' +
+            kodOzeti(bilgi) +
+            '<button type="button" class="sip-kutucuk__al" data-isaretle="' + u.sira + '"' +
+                ' aria-pressed="' + (u.alindi ? 'true' : 'false') + '">' +
+                '<span class="sip-kutu">' + TIK + '</span>' +
+                (u.alindi ? 'Alındı' : 'Aldım') +
+            '</button>' +
         '</div>';
     }
 
@@ -506,6 +555,7 @@
      */
     function bantlaraAyir(urunler) {
         var etiketler = (global.JBSiparisSirala && global.JBSiparisSirala.BANT_ETIKET) || {};
+        var ciz = durum.detayGorunum === 'izgara' ? urunKutucuk : urunSatir;
         var parcalar = [];
         var suanki = null;
         var kume = [];
@@ -522,7 +572,7 @@
                     '<span class="sip-bant__cizgi"></span>' +
                     '<span class="sip-bant__sayi">' + alinan + '/' + kume.length + '</span>' +
                 '</div>' +
-                kume.map(urunCiz).join('')
+                '<div class="sip-kume">' + kume.map(ciz).join('') + '</div>'
             );
             kume = [];
         }
@@ -536,35 +586,35 @@
         return parcalar.join('');
     }
 
-    /** İlerleme halkası. Çevre 2*pi*r, r = 20. */
-    function halkaCiz(alinan, toplam) {
-        var halka = el('detayHalka');
-        if (!halka) return;
-        var cevre = 2 * Math.PI * 20;
-        var oran = toplam ? alinan / toplam : 0;
-        var dolu = halka.querySelector('.dolu');
-        dolu.setAttribute('stroke-dasharray', (cevre * oran).toFixed(1) + ' ' + cevre.toFixed(1));
-        halka.classList.toggle('tam', oran === 1 && toplam > 0);
-        halka.querySelector('b').textContent = toplam ? Math.round(oran * 100) + '%' : '0%';
-    }
-
-    function kunyeCiz(s) {
+    /**
+     * Siparişin sayıları. Eskiden "11 parça 1 poşet 6 çeşit toplayıcı Berna"
+     * diye tek satır düz yazıydı ve hiçbir şey okunmuyordu. Her sayı kendi
+     * kutusunda, altında ne olduğu yazıyor.
+     */
+    function olcuCiz(s) {
         var urunler = s.urunler || [];
-        var d = bandaGore(s);
+        var kisi = s.kurye || s.toplayici || '';
+        var kisiNot = s.kurye ? 'Kurye' : (s.toplayici ? 'Toplayıcı' : '');
+
+        var kutu = function (deger, ad) {
+            return '<span class="sip-olcu__oge"><b>' + kacir(deger) + '</b><span>' + ad + '</span></span>';
+        };
+
         var parcalar = [
-            '<span class="sip-kunye__oge sip-kunye__oge--vurgu"><b>' +
-                (s.toplam_adet != null ? s.toplam_adet : urunler.length) + '</b> parça</span>'
+            kutu(s.toplam_adet != null ? s.toplam_adet : urunler.length, 'parça'),
+            kutu(urunler.length, 'çeşit'),
+            kutu(s.poset_sayisi != null ? s.poset_sayisi : '–', 'poşet')
         ];
-        if (s.poset_sayisi != null) {
-            parcalar.push('<span class="sip-kunye__oge"><b>' + s.poset_sayisi + '</b> poşet</span>');
+
+        if (kisi) {
+            parcalar.push(
+                '<span class="sip-olcu__kisi">' +
+                    '<span class="sip-avatar">' + kacir(basHarfler(kisi)) + '</span>' +
+                    '<span><strong>' + kacir(kisi) + '</strong><small>' + kisiNot + '</small></span>' +
+                '</span>'
+            );
         }
-        parcalar.push('<span class="sip-kunye__oge"><b>' + urunler.length + '</b> çeşit</span>');
-        if (s.kurye) parcalar.push('<span class="sip-kunye__oge">Kurye <span>' + kacir(s.kurye) + '</span></span>');
-        if (s.toplayici) parcalar.push('<span class="sip-kunye__oge">Toplayıcı <span>' + kacir(s.toplayici) + '</span></span>');
-        parcalar.push('<span class="sip-rozet sip-rozet--' + d + '"><i></i>' + kacir(DURUM_ADI[d]) + '</span>');
-        if (s.eksik_urun_var) {
-            parcalar.push('<span class="sip-kunye__oge">Eksik ürün var</span>');
-        }
+        if (s.eksik_urun_var) parcalar.push('<span class="sip-olcu__uyari">Eksik</span>');
         return parcalar.join('');
     }
 
@@ -578,20 +628,19 @@
         var izgara = el('siparisIzgara');
         var detay = el('siparisDetay');
 
-        var sayac = { bekliyor: 0, toplaniyor: 0, toplandi: 0 };
+        var sayac = { hazir: 0, hazirlaniyor: 0, bitti: 0 };
         durum.siparisler.forEach(function (s) { sayac[bandaGore(s)]++; });
 
-        el('sayacBekliyor').textContent = sayac.bekliyor;
-        el('sayacToplaniyor').textContent = sayac.toplaniyor;
-        el('sayacToplandi').textContent = sayac.toplandi;
-        el('ozetBekleyen').textContent = sayac.bekliyor;
-        el('ozetToplaniyor').textContent = sayac.toplaniyor;
-        el('ozetToplandi').textContent = sayac.toplandi;
+        el('sayacHazir').textContent = sayac.hazir;
+        el('sayacHazirlaniyor').textContent = sayac.hazirlaniyor;
+        el('ozetHazir').textContent = sayac.hazir;
+        el('ozetHazirlaniyor').textContent = sayac.hazirlaniyor;
+        el('ozetBitti').textContent = sayac.bitti;
 
-        var bekleyenParca = durum.siparisler
-            .filter(function (s) { return bandaGore(s) === 'bekliyor'; })
+        var hazirParca = durum.siparisler
+            .filter(function (s) { return bandaGore(s) === 'hazir'; })
             .reduce(function (a, s) { return a + (s.toplam_adet || (s.urunler || []).length); }, 0);
-        el('ozetBekleyenNot').textContent = bekleyenParca ? bekleyenParca + ' parça bekliyor' : 'Toplanmayı bekliyor';
+        el('ozetHazirNot').textContent = hazirParca ? hazirParca + ' parça bankoda' : 'Bankoda seni bekliyor';
         el('sonGuncelleme').textContent = durum.sonYenileme
             ? 'Son güncelleme ' + saatYaz(durum.sonYenileme)
             : 'Yükleniyor';
@@ -612,11 +661,9 @@
             izgara.innerHTML = '<div class="sip-iskelet"></div><div class="sip-iskelet"></div><div class="sip-iskelet"></div>';
         } else if (!liste.length) {
             izgara.innerHTML = '<div class="sip-bos">' +
-                (durum.sekme === 'bekliyor'
-                    ? 'Bekleyen sipariş yok.<br>Depo panelinde yeni sipariş düştüğünde burada görünür.'
-                    : durum.sekme === 'toplaniyor'
-                        ? 'Şu an toplanan sipariş yok.'
-                        : 'Henüz tamamlanan sipariş yok.') +
+                (durum.sekme === 'hazir'
+                    ? 'Bankoda bekleyen sipariş yok.<br>Panelde bir sipariş hazırlandığında burada belirir.'
+                    : 'Arkada hazırlanan sipariş yok.') +
                 '</div>';
         } else {
             izgara.innerHTML = liste.map(kartCiz).join('');
@@ -627,10 +674,20 @@
         var s = durum.secili;
         var urunler = s.urunler || [];
         var alinan = urunler.filter(function (u) { return u.alindi; }).length;
+        var kimlik = siparisKimligi(s);
+        var bant = bandaGore(s);
 
-        el('detayBanko').textContent = siparisBasligi(s);
-        el('detayAlt').textContent = gecenSure(s) ? gecenSure(s) + ' önce düştü' : '';
-        el('detayKunye').innerHTML = kunyeCiz(s);
+        /* Banko yoksa büyük yazıya geçen süre yazılıyor: "–" yazmak hiçbir
+           şey söylemiyor, süre depocuya aciliyeti söylüyor. */
+        el('detayEtiket').textContent = kimlik.bankoVar ? kimlik.etiket : 'Banko atanmadı';
+        el('detayBanko').textContent = kimlik.bankoVar ? kimlik.deger : (gecenSure(s) || 'Yeni');
+        el('detayBanko').classList.toggle('sip-tepe__banko--yok', !kimlik.bankoVar);
+
+        var rozet = el('detayRozet');
+        rozet.className = 'sip-rozet sip-rozet--' + bant;
+        rozet.innerHTML = '<i></i>' + kacir(BANT_ADI[bant] || '');
+        el('detayAlt').textContent = kimlik.bankoVar ? (gecenSure(s) ? gecenSure(s) + ' önce' : '') : '';
+        el('detayOlcu').innerHTML = olcuCiz(s);
 
         var govde = el('detayGovde');
         govde.className = 'sip-detay__govde sip-detay__govde--' + durum.detayGorunum;
@@ -643,10 +700,12 @@
         el('detaySayac').innerHTML = '<b>' + alinan + '</b> / ' + urunler.length + ' ürün alındı';
 
         var oran = urunler.length ? alinan / urunler.length : 0;
+        var yuzde = Math.round(oran * 100);
         var cubuk = el('detayCubuk');
         cubuk.classList.toggle('tam', oran === 1 && urunler.length > 0);
-        cubuk.firstElementChild.style.width = Math.round(oran * 100) + '%';
-        halkaCiz(alinan, urunler.length);
+        cubuk.firstElementChild.style.width = yuzde + '%';
+        el('detayCizgi').style.width = yuzde + '%';
+        el('detayCizgi').parentNode.classList.toggle('tam', oran === 1 && urunler.length > 0);
 
         var bitir = el('detayBitir');
         bitir.textContent = s.toplama_durumu === 'toplandi' ? 'Geri al' : 'Toplandı';
@@ -707,12 +766,12 @@
                 return;
             }
 
-            // Ada dokunuş: barkodları aç/kapat
-            var ad = e.target.closest('[data-barkod-ac]');
+            // Ada dokunuş: barkod penceresi
+            var ad = e.target.closest('[data-barkod]');
             if (ad) {
-                var s2 = Number(ad.getAttribute('data-barkod-ac'));
-                durum.acikBarkodlar[s2] = !durum.acikBarkodlar[s2];
-                ciz();
+                var s2 = Number(ad.getAttribute('data-barkod'));
+                var u2 = (durum.secili.urunler || []).filter(function (x) { return x.sira === s2; })[0];
+                if (u2) kodlariAc(u2);
                 return;
             }
 
@@ -737,6 +796,13 @@
         el('buyukKapat').addEventListener('click', gorseliKapat);
         el('siparisBuyuk').addEventListener('click', function (e) {
             if (e.target === el('siparisBuyuk')) gorseliKapat();
+        });
+
+        el('kodKapat').addEventListener('click', kodlariKapat);
+        el('siparisKodlar').addEventListener('click', function (e) {
+            if (e.target === el('siparisKodlar')) { kodlariKapat(); return; }
+            var kod = e.target.closest('[data-kopyala]');
+            if (kod) kodKopyala(kod);
         });
 
         el('siparisAyarAc').addEventListener('click', ayarAc);
@@ -771,6 +837,7 @@
             if (e.key !== 'Escape') return;
             // Üstteki katman önce kapanmalı; Esc bir seferde ikisini kapatmasın.
             if (!el('siparisBuyuk').hidden) { gorseliKapat(); return; }
+            if (!el('siparisKodlar').hidden) { kodlariKapat(); return; }
             if (!el('siparisAyar').hidden) { ayarKapat(); return; }
             if (durum.secili) { durum.secili = null; ciz(); }
         });
@@ -796,6 +863,48 @@
     function gorseliKapat() {
         el('siparisBuyuk').hidden = true;
         el('buyukGorsel').removeAttribute('src');
+    }
+
+    // ==================================================================
+    // Barkod penceresi
+    //
+    // Ada dokununca açılıyor. Satırda tek kod duruyor, burada hepsi;
+    // koda dokunmak panoya kopyalıyor.
+    // ==================================================================
+
+    function kodlariAc(u) {
+        var bilgi = barkodBul(u);
+        durum.kodUrun = u;
+        var g = el('kodGorsel');
+        if (u.gorsel) { g.src = u.gorsel; g.hidden = false; }
+        else { g.removeAttribute('src'); g.hidden = true; }
+        el('kodAd').textContent = urunBasligi(u, bilgi);
+        el('kodNot').textContent = bilgi.barkodlar.length
+            ? (bilgi.barkodlar.length === 1 ? 'Tek barkod' : bilgi.barkodlar.length + ' barkod')
+            : 'Katalogda barkod bulunamadı';
+        el('kodListe').innerHTML = bilgi.barkodlar.length
+            ? bilgi.barkodlar.map(function (b) {
+                return '<button type="button" class="sip-kod__oge" data-kopyala="' + kacir(b) + '">' +
+                    '<span>' + kacir(b) + '</span>' +
+                    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>' +
+                '</button>';
+            }).join('')
+            : '<p class="sip-kod__bos">Bu ürün katalogda eşleşmedi. Panelde barkodu elle okutman gerekiyor.</p>';
+        el('siparisKodlar').hidden = false;
+    }
+
+    function kodlariKapat() {
+        el('siparisKodlar').hidden = true;
+        durum.kodUrun = null;
+    }
+
+    function kodKopyala(dugme) {
+        var kod = dugme.getAttribute('data-kopyala');
+        try {
+            navigator.clipboard.writeText(kod);
+            dugme.classList.add('kopyalandi');
+            setTimeout(function () { dugme.classList.remove('kopyalandi'); }, 900);
+        } catch (e) { /* pano izni yoksa sessiz geç, kod zaten ekranda */ }
     }
 
     // ==================================================================
@@ -873,7 +982,7 @@
         }
         var ayar = ayarOku();
         if (ayar.gorunum === 'kart' || ayar.gorunum === 'liste') durum.gorunum = ayar.gorunum;
-        if (['liste', 'ikili', 'kart'].indexOf(ayar.detayGorunum) !== -1) durum.detayGorunum = ayar.detayGorunum;
+        if (['liste', 'izgara'].indexOf(ayar.detayGorunum) !== -1) durum.detayGorunum = ayar.detayGorunum;
         var vars = (global.JBSiparisSirala && global.JBSiparisSirala.VARSAYILAN_SIRA) || ['firin', 'dondurma', 'orta', 'su'];
         durum.bantSirasi = Array.isArray(ayar.bantSirasi) && ayar.bantSirasi.length
             ? ayar.bantSirasi.slice()

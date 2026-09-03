@@ -1210,6 +1210,39 @@
            girdiğinde buraya giriyor, gönderildikten sonra çıkıyor. */
         const gonderilecek = new Set();
 
+        /* Siparişin en son hangi kolonda görüldüğü. Sipariş gövdesi bir kez
+           yazılıyor; kolon sonradan değişince kaydımız eskiyor ve bitmiş
+           sipariş Jet Barkod listesinde duruyordu. Burada yalnız değişimi
+           yakalıyoruz, ilk görüş taban değer sayılıyor ve istek doğurmuyor. */
+        const sonKolon = new Map();
+
+        const kolonlariYolla = (liste) => {
+            const degisen = [];
+            liste.forEach((s) => {
+                if (!s || !s.siparisId) return;
+                const yeni = String(s.kolon || '');
+                const eski = sonKolon.get(s.siparisId);
+                sonKolon.set(s.siparisId, yeni);
+                if (eski !== undefined && eski !== yeni) degisen.push(s);
+            });
+            if (!degisen.length) return;
+            /* Kolon değişimi seyrek; gövde yollanmıyor, yalnız kolon ve
+               durum gidiyor. Getir'e tek ek istek çıkmıyor. */
+            try {
+                chrome.runtime.sendMessage(
+                    { type: 'JBA_SIPARIS_KOLON', siparisler: degisen.map((s) => ({
+                        siparisId: s.siparisId,
+                        kolon: s.kolon,
+                        durum: s.durum,
+                        banko: s.banko,
+                        toplayici: s.toplayici,
+                        kurye: s.kurye
+                    })) },
+                    () => { if (chrome.runtime.lastError) { /* hizmet işçisi uyuyor olabilir */ } }
+                );
+            } catch (e) { /* sessiz */ }
+        };
+
         const siparisBul = (siparisId) => {
             for (var i = 0; i < sonSiparisListesi.length; i++) {
                 if (sonSiparisListesi[i].siparisId === siparisId) return sonSiparisListesi[i];
@@ -1304,6 +1337,7 @@
                    girdiğinde yapılıyor; her tarama sonrası bütün siparişleri
                    yollamak boşuna trafikti. */
                 sonSiparisListesi = event.data.liste;
+                kolonlariYolla(sonSiparisListesi);
             }
             if (event.data.type === 'GETIR_DATA_RECEIVED') findOrderIds(event.data.payload);
             if (event.data.type === 'GETIR_TOKEN_CAPTURED') {

@@ -171,6 +171,48 @@ async function satirlariYaz(yetki, siparisUuid, urunler) {
     }
 }
 
+/**
+ * Yalnız kolon bilgisini günceller.
+ *
+ * Sipariş gövdesi bir kez yazılıyor (kullanıcı karta girdiğinde) ve orada
+ * kalıyordu. Sipariş panelde "Hazırlandı"dan "El Değiştiriliyor"a geçince
+ * bizim kaydımız eskiyordu; Jet Barkod'da bitmiş siparişler listede
+ * duruyordu. Panel listesi zaten elimizde, Getir'e ek istek gitmiyor;
+ * yalnız değişen kolonlar için küçük bir PATCH atılıyor.
+ *
+ * Kaydı olmayan sipariş için PATCH hiçbir satır bulmuyor, zararsız.
+ */
+async function kolonYaz(yetki, liste) {
+    for (let i = 0; i < liste.length; i++) {
+        const s = liste[i];
+        if (!s || !s.siparisId) continue;
+
+        const adres = SIPARIS_API + '/rest/v1/orders' +
+            '?username=eq.' + encodeURIComponent(yetki.username) +
+            '&order_id=eq.' + encodeURIComponent(s.siparisId);
+
+        const govde = {
+            kolon: s.kolon || null,
+            durum: typeof s.durum === 'number' ? s.durum : null,
+            updated_at: new Date().toISOString()
+        };
+        if (s.banko) govde.banko = s.banko;
+        if (s.toplayici) govde.toplayici = s.toplayici;
+        if (s.kurye) govde.kurye = s.kurye;
+
+        try {
+            const yanit = await fetch(adres, {
+                method: 'PATCH',
+                headers: apiBasliklari(yetki, { 'Prefer': 'return=minimal' }),
+                body: JSON.stringify(govde)
+            });
+            if (yanit.status === 401) break;
+        } catch (e) { /* ağ yoksa sonraki listede yine denenir */ }
+
+        if (i < liste.length - 1) await bekle(SIPARIS_ARA_MS);
+    }
+}
+
 // ==================================================================
 // Kuyruk
 // ==================================================================
@@ -178,6 +220,7 @@ async function satirlariYaz(yetki, siparisUuid, urunler) {
 function bekle(ms) {
     return new Promise((c) => setTimeout(c, ms));
 }
+
 
 async function kuyrugaAl(siparisler) {
     if (!Array.isArray(siparisler) || !siparisler.length) return { ok: false, sebep: 'liste boş' };
@@ -250,6 +293,19 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
         kuyrugaAl(istek.siparisler).then(cevapla, (e) =>
             cevapla({ ok: false, sebep: (e && e.message) || 'hata' })
         );
+        return true;
+    }
+
+    if (istek.type === 'JBA_SIPARIS_KOLON') {
+        const liste = Array.isArray(istek.siparisler) ? istek.siparisler.slice(0, 25) : [];
+        if (!liste.length) { cevapla({ ok: false, sebep: 'liste boş' }); return true; }
+        yetkiOku().then((y) => {
+            if (!y) { cevapla({ ok: false, sebep: 'yetki yok' }); return; }
+            kolonYaz(y, liste).then(
+                () => cevapla({ ok: true, sayi: liste.length }),
+                (e) => cevapla({ ok: false, sebep: (e && e.message) || 'hata' })
+            );
+        });
         return true;
     }
 

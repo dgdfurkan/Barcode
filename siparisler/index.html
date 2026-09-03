@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
     <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
-    <link rel="stylesheet" href="../css/siparisler.css?v=20260903g" />
+    <link rel="stylesheet" href="../css/siparisler.css?v=20260903h" />
     <script src="../js/auth-token.js?v=20260828i"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20260828i"></script>
@@ -85,39 +85,36 @@
             </section>
 
             <section class="sip-ozet" aria-label="Sipariş özeti">
+                <article class="sip-ozet--asil">
+                    <span class="sip-ozet__ikon sip-ozet__ikon--mavi">
+                        <svg viewBox="0 0 20 20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h14v11H3zM3 6l2-3h10l2 3M8 10h4"></path></svg>
+                    </span>
+                    <div class="sip-ozet__bilgi"><span>Hazırlandı</span><strong id="ozetHazir">0</strong></div>
+                    <small id="ozetHazirNot">Bankoda seni bekliyor</small>
+                </article>
                 <article>
                     <span class="sip-ozet__ikon sip-ozet__ikon--sari">
                         <svg viewBox="0 0 20 20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3a7 7 0 1 0 7 7M10 6v4l3 2"></path></svg>
                     </span>
-                    <div class="sip-ozet__bilgi"><span>Bekleyen</span><strong id="ozetBekleyen">0</strong></div>
-                    <small id="ozetBekleyenNot">Toplanmayı bekliyor</small>
-                </article>
-                <article>
-                    <span class="sip-ozet__ikon sip-ozet__ikon--mavi">
-                        <svg viewBox="0 0 20 20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h14v11H3zM6 2h8v3"></path></svg>
-                    </span>
-                    <div class="sip-ozet__bilgi"><span>Toplanıyor</span><strong id="ozetToplaniyor">0</strong></div>
-                    <small id="ozetToplaniyorNot">Elde olan sipariş</small>
+                    <div class="sip-ozet__bilgi"><span>Hazırlanıyor</span><strong id="ozetHazirlaniyor">0</strong></div>
+                    <small id="ozetHazirlaniyorNot">Arkada toplanıyor</small>
                 </article>
                 <article>
                     <span class="sip-ozet__ikon sip-ozet__ikon--yesil">
                         <svg viewBox="0 0 20 20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10 4 4 8-9"></path></svg>
                     </span>
-                    <div class="sip-ozet__bilgi"><span>Toplandı</span><strong id="ozetToplandi">0</strong></div>
-                    <small id="ozetToplandiNot">Bugün tamamlanan</small>
+                    <div class="sip-ozet__bilgi"><span>Kapandı</span><strong id="ozetBitti">0</strong></div>
+                    <small id="ozetBittiNot">Listeden düştü</small>
                 </article>
             </section>
 
             <section class="sip-panel">
                 <div class="sip-sekmeler" role="tablist">
-                    <button type="button" class="sip-sekme" data-sekme="bekliyor" role="tab" aria-selected="true">
-                        Bekleyen <span id="sayacBekliyor">0</span>
+                    <button type="button" class="sip-sekme" data-sekme="hazir" role="tab" aria-selected="true">
+                        Hazırlandı <span id="sayacHazir">0</span>
                     </button>
-                    <button type="button" class="sip-sekme" data-sekme="toplaniyor" role="tab" aria-selected="false">
-                        Toplanıyor <span id="sayacToplaniyor">0</span>
-                    </button>
-                    <button type="button" class="sip-sekme" data-sekme="toplandi" role="tab" aria-selected="false">
-                        Toplandı <span id="sayacToplandi">0</span>
+                    <button type="button" class="sip-sekme" data-sekme="hazirlaniyor" role="tab" aria-selected="false">
+                        Hazırlanıyor <span id="sayacHazirlaniyor">0</span>
                     </button>
                 </div>
 
@@ -143,24 +140,28 @@
       kullanıyor, yan panel dar ekranda işe yaramıyordu.
     -->
     <section class="sip-detay" id="siparisDetay" hidden aria-label="Sipariş detayı">
-        <div class="sip-detay__ust">
-            <button type="button" class="sip-geri" id="detayGeri" aria-label="Geri">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>
-            </button>
-            <div class="sip-detay__baslik">
-                <strong id="detayBanko">-</strong>
-                <span id="detayAlt"></span>
+        <!--
+          Künye artık düz cümle değil. Solda siparişin kimliği (banko), sağda
+          durumu ve süresi, altında sayılar ayrı ayrı kutularda. Depocu tek
+          bakışta "banko 6, on bir parça, bir poşet" diyebiliyor.
+        -->
+        <header class="sip-tepe">
+            <div class="sip-tepe__satir">
+                <button type="button" class="sip-geri" id="detayGeri" aria-label="Geri">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>
+                </button>
+                <div class="sip-tepe__kimlik">
+                    <span id="detayEtiket">Banko</span>
+                    <strong id="detayBanko">-</strong>
+                </div>
+                <div class="sip-tepe__durum">
+                    <span class="sip-rozet" id="detayRozet"><i></i>Hazırlandı</span>
+                    <span class="sip-tepe__sure" id="detayAlt"></span>
+                </div>
             </div>
-            <div class="sip-halka" id="detayHalka">
-                <svg viewBox="0 0 46 46" width="46" height="46" aria-hidden="true">
-                    <circle class="iz" cx="23" cy="23" r="20"></circle>
-                    <circle class="dolu" cx="23" cy="23" r="20" stroke-dasharray="0 126"></circle>
-                </svg>
-                <b>0%</b>
-            </div>
-        </div>
-
-        <div class="sip-kunye" id="detayKunye"></div>
+            <div class="sip-olcu" id="detayOlcu"></div>
+            <div class="sip-tepe__cizgi"><span id="detayCizgi" style="width:0%"></span></div>
+        </header>
 
         <div class="sip-detay__araclar">
             <span class="sip-bant-yazi">Toplama sırası</span>
@@ -168,10 +169,7 @@
                 <button type="button" data-detay-gorunum="liste" aria-selected="true" aria-label="Liste">
                     <svg viewBox="0 0 18 18" stroke-linecap="round"><path d="M6 4h10M6 9h10M6 14h10"></path><circle cx="3" cy="4" r=".9"></circle><circle cx="3" cy="9" r=".9"></circle><circle cx="3" cy="14" r=".9"></circle></svg>
                 </button>
-                <button type="button" data-detay-gorunum="ikili" aria-selected="false" aria-label="İkili">
-                    <svg viewBox="0 0 18 18"><rect x="2" y="2" width="5" height="14" rx="1"></rect><rect x="11" y="2" width="5" height="14" rx="1"></rect></svg>
-                </button>
-                <button type="button" data-detay-gorunum="kart" aria-selected="false" aria-label="Kart">
+                <button type="button" data-detay-gorunum="izgara" aria-selected="false" aria-label="Izgara">
                     <svg viewBox="0 0 18 18"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="11" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="11" width="5" height="5" rx="1"></rect><rect x="11" y="11" width="5" height="5" rx="1"></rect></svg>
                 </button>
             </div>
@@ -185,6 +183,23 @@
             <button type="button" class="sip-bitir" id="detayBitir">Toplandı</button>
         </div>
     </section>
+
+    <!-- Barkodlar: ürün adına dokununca açılıyor. -->
+    <div class="sip-kod" id="siparisKodlar" hidden>
+        <div class="sip-kod__kutu" role="dialog" aria-label="Ürün barkodları">
+            <div class="sip-kod__ust">
+                <img id="kodGorsel" alt="">
+                <div class="sip-kod__ad">
+                    <strong id="kodAd"></strong>
+                    <span id="kodNot"></span>
+                </div>
+                <button type="button" class="sip-geri" id="kodKapat" aria-label="Kapat">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+            </div>
+            <div class="sip-kod__liste" id="kodListe"></div>
+        </div>
+    </div>
 
     <!-- Görsel büyütme -->
     <div class="sip-buyuk" id="siparisBuyuk" hidden>
@@ -212,7 +227,7 @@
     </div>
 
     <script src="../js/siparis-sirala.js?v=20260903d"></script>
-    <script src="../js/siparisler.js?v=20260903g"></script>
+    <script src="../js/siparisler.js?v=20260903h"></script>
     <script>
         // Başlıktaki kullanıcı adı; diğer sayfalarla aynı davranış.
         (function () {
