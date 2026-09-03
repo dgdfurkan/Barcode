@@ -1,0 +1,319 @@
+/*
+ * Siparişler sayfası
+ * ============================================================================
+ *
+ * Depocu bunu telefonda, elinde barkod okuyucuyla kullanıyor. Bu yüzden
+ * telefon önce tasarlandı: tek sütun, geniş dokunma alanı, kaydırırken
+ * kaybolmayan üst başlık. Geniş ekranda ızgara üç sütuna açılıyor.
+ *
+ * Palet sitenin paleti: kırık beyaz kağıt, mürekkep yazı, logo mavisi.
+ * ============================================================================
+ */
+
+.sip-kok {
+    --kagit: #f7f6f2;
+    --yuzey: #ffffff;
+    --cizgi: #e7e5de;
+    --yazi: #131720;
+    --sonuk: #6b7280;
+    --mavi: #135bec;
+    --mavi-yumusak: #eef3ff;
+    --yesil: #16a34a;
+    --yesil-yumusak: #f0fdf4;
+    --sari: #b45309;
+    --sari-yumusak: #fffbeb;
+}
+
+/* ---------------- SEKMELER ---------------- */
+.sip-sekmeler {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    background: var(--kagit);
+    border: 1px solid var(--cizgi);
+    border-radius: 12px;
+    padding: 4px;
+}
+.sip-sekme {
+    border: 0;
+    background: transparent;
+    color: var(--sonuk);
+    font: 600 13px inherit;
+    padding: 10px 8px;
+    border-radius: 9px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 42px;
+    transition: background 0.14s ease, color 0.14s ease;
+}
+.sip-sekme:hover { color: var(--yazi); }
+.sip-sekme[aria-selected="true"] {
+    background: var(--yuzey);
+    color: var(--yazi);
+    box-shadow: 0 1px 3px rgba(19,23,32,0.08);
+}
+.sip-sayac {
+    min-width: 22px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--cizgi);
+    color: var(--sonuk);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.sip-sekme[aria-selected="true"] .sip-sayac { background: var(--mavi); color: #fff; }
+
+/* ---------------- IZGARA ---------------- */
+.sip-izgara {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 14px;
+}
+@media (min-width: 640px)  { .sip-izgara { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .sip-izgara { grid-template-columns: repeat(3, 1fr); } }
+
+/* ---------------- SİPARİŞ KARTI ---------------- */
+.sip-kart {
+    background: var(--yuzey);
+    border: 1px solid var(--cizgi);
+    border-radius: 14px;
+    padding: 14px;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.sip-kart:hover { border-color: var(--mavi); box-shadow: 0 4px 14px rgba(19,91,236,0.08); }
+.sip-kart:focus-visible { outline: 2px solid var(--mavi); outline-offset: 2px; }
+
+.sip-kart__ust { display: flex; align-items: center; gap: 8px; }
+.sip-banko {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--yazi);
+    font-variant-numeric: tabular-nums;
+}
+.sip-rozet {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid;
+    white-space: nowrap;
+}
+.sip-rozet--bekliyor { color: var(--sari);  border-color: #fce8b2; background: var(--sari-yumusak); }
+.sip-rozet--toplaniyor { color: var(--mavi); border-color: #cddffb; background: var(--mavi-yumusak); }
+.sip-rozet--toplandi { color: var(--yesil); border-color: #bbf0cc; background: var(--yesil-yumusak); }
+
+.sip-kart__olculer { display: flex; flex-wrap: wrap; gap: 6px; }
+.sip-olcu {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--sonuk);
+    background: var(--kagit);
+    border: 1px solid var(--cizgi);
+    border-radius: 8px;
+    padding: 4px 9px;
+}
+.sip-olcu b { color: var(--yazi); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.sip-kart__kisi {
+    font-size: 12px;
+    color: var(--sonuk);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* İlerleme çubuğu: kaç ürün alındı */
+.sip-ilerleme {
+    height: 5px;
+    background: var(--cizgi);
+    border-radius: 999px;
+    overflow: hidden;
+}
+.sip-ilerleme > span {
+    display: block;
+    height: 100%;
+    background: var(--mavi);
+    border-radius: 999px;
+    transition: width 0.2s ease;
+}
+.sip-kart--tam .sip-ilerleme > span { background: var(--yesil); }
+
+/* ---------------- DETAY ---------------- */
+.sip-detay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    background: var(--kagit);
+}
+.sip-detay[hidden] { display: none !important; }
+
+.sip-detay__ust {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--yuzey);
+    border-bottom: 1px solid var(--cizgi);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sip-geri {
+    border: 1px solid var(--cizgi);
+    background: var(--yuzey);
+    border-radius: 10px;
+    width: 38px; height: 38px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--yazi);
+    flex: none;
+}
+.sip-geri:hover { background: var(--kagit); }
+.sip-detay__baslik { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sip-detay__baslik strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.sip-detay__baslik span { font-size: 12px; color: var(--sonuk); }
+
+.sip-detay__govde {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* ---------------- ÜRÜN SATIRI ---------------- */
+.sip-urun {
+    display: grid;
+    grid-template-columns: 52px 1fr auto;
+    gap: 12px;
+    align-items: center;
+    background: var(--yuzey);
+    border: 1px solid var(--cizgi);
+    border-radius: 12px;
+    padding: 10px;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    /* Dokunma alanı: eldiven ya da acele ile ıskalanmasın. */
+    min-height: 72px;
+    transition: border-color 0.14s ease, background 0.14s ease;
+}
+.sip-urun:hover { border-color: var(--mavi); }
+.sip-urun--alindi { background: var(--yesil-yumusak); border-color: #bbf0cc; }
+.sip-urun--alindi .sip-urun__ad { color: var(--sonuk); text-decoration: line-through; }
+
+.sip-urun__gorsel {
+    width: 52px; height: 52px;
+    border-radius: 9px;
+    object-fit: contain;
+    background: var(--kagit);
+    border: 1px solid var(--cizgi);
+}
+.sip-urun__orta { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.sip-urun__ad {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--yazi);
+    line-height: 1.35;
+    /* İki satırda kes; kart yüksekliği oynamasın. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.sip-urun__kume {
+    font-size: 10.5px;
+    color: var(--sonuk);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.sip-urun__sag { display: flex; align-items: center; gap: 10px; flex: none; }
+.sip-adet {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--yazi);
+    font-variant-numeric: tabular-nums;
+    min-width: 34px;
+    text-align: right;
+}
+.sip-kutu {
+    width: 26px; height: 26px;
+    border-radius: 8px;
+    border: 2px solid var(--cizgi);
+    display: flex; align-items: center; justify-content: center;
+    color: transparent;
+    flex: none;
+}
+.sip-urun--alindi .sip-kutu { background: var(--yesil); border-color: var(--yesil); color: #fff; }
+
+/* ---------------- ALT ÇUBUK ---------------- */
+.sip-alt {
+    position: sticky;
+    bottom: 0;
+    background: var(--yuzey);
+    border-top: 1px solid var(--cizgi);
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.sip-alt__sayac { font-size: 13px; color: var(--sonuk); font-variant-numeric: tabular-nums; }
+.sip-alt__sayac b { color: var(--yazi); }
+.sip-bitir {
+    margin-left: auto;
+    background: var(--mavi);
+    color: #fff;
+    border: 0;
+    border-radius: 10px;
+    padding: 11px 18px;
+    font: 600 14px inherit;
+    cursor: pointer;
+    min-height: 44px;
+}
+.sip-bitir:hover { background: #0f4bc4; }
+.sip-bitir[disabled] { opacity: 0.45; cursor: default; }
+
+/* ---------------- BOŞ DURUM ---------------- */
+.sip-bos {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--sonuk);
+    font-size: 13px;
+    line-height: 1.7;
+    padding: 40px 16px;
+    background: var(--yuzey);
+    border: 1px dashed var(--cizgi);
+    border-radius: 14px;
+}
+
+/* İskelet: yükleme sırasında kart boyu değişmesin, sayfa zıplamasın. */
+.sip-iskelet {
+    height: 132px;
+    border-radius: 14px;
+    background: linear-gradient(90deg, #f2f0ea 25%, #e9e7e0 37%, #f2f0ea 63%);
+    background-size: 400% 100%;
+    animation: sip-parla 1.3s ease infinite;
+}
+@keyframes sip-parla { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) {
+    .sip-iskelet { animation: none; }
+    .sip-kart, .sip-urun, .sip-ilerleme > span { transition: none; }
+}

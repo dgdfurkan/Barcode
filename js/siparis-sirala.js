@@ -95,12 +95,17 @@
         return null;
     }
 
-    /** Orta bandın kümesi: panelin sınıfı varsa o, yoksa ürün adının ilk sözü. */
+    /**
+     * Orta bandın kümesi. Panelin sınıfı varsa o kullanılıyor; yoksa ürün
+     * adının ilk sözüne düşülüyor. İkisi arasındaki fark önemli: adın ilk
+     * sözü ("lay", "ruffles") kümelemeye yarıyor ama ekranda etiket olarak
+     * gösterilmemeli, depocuya bir şey anlatmıyor. `kaynak` bunu ayırıyor.
+     */
     function ortaKume(urun) {
         var sinif = sade(urun.sinif || urun.anaKategori || '');
-        if (sinif) return sinif;
+        if (sinif) return { kume: sinif, kaynak: 'kategori' };
         var ad = sade(urun.ad || '');
-        return ad ? ad.split(' ')[0] : 'diger';
+        return { kume: ad ? ad.split(' ')[0] : 'diger', kaynak: 'ad' };
     }
 
     /**
@@ -120,10 +125,12 @@
 
         var isaretli = urunler.map(function (u, i) {
             var kural = kuralBul(u);
+            var orta = kural ? null : ortaKume(u);
             var bant = kural ? kural.bant : BANT.ORTA;
-            var kume = kural ? kural.kume : ortaKume(u);
+            var kume = kural ? kural.kume : orta.kume;
+            var kaynak = kural ? 'kural' : orta.kaynak;
             if (!kumeSirasi.has(bant + '|' + kume)) kumeSirasi.set(bant + '|' + kume, i);
-            return { urun: u, giris: i, bant: bant, kume: kume };
+            return { urun: u, giris: i, bant: bant, kume: kume, kaynak: kaynak };
         });
 
         isaretli.sort(function (a, b) {
@@ -137,7 +144,8 @@
         return isaretli.map(function (x, i) {
             return Object.assign({}, x.urun, {
                 toplamaSirasi: i + 1,
-                toplamaKumesi: x.kume
+                toplamaKumesi: x.kume,
+                toplamaKumeKaynagi: x.kaynak
             });
         });
     }
