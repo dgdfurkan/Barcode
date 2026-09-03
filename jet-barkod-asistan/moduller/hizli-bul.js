@@ -1217,6 +1217,24 @@
             return null;
         };
 
+        /* Karttaki dört haneli kod siparişin kimliğinin sonu. Listede zaten
+           tam kimlik var, eşleştirmek için ek istek atmaya gerek yok. */
+        const kodaGoreSiparis = (kod) => {
+            for (var i = 0; i < sonSiparisListesi.length; i++) {
+                var id = String(sonSiparisListesi[i].siparisId || '');
+                if (id.slice(-4) === kod) return sonSiparisListesi[i];
+            }
+            return null;
+        };
+
+        /* Sayfa köprüsü listeyi yalnız DEĞİŞTİĞİNDE yayınlıyor. Sonradan
+           başlayan dinleyici o yayını kaçırıyor ve elinde liste olmuyordu.
+           Bu mesaj yeniden yayın istiyor. */
+        const listeyiIste = () => {
+            try { window.postMessage({ type: 'JB_SIPARIS_SOR' }, location.origin); }
+            catch (e) { /* sessiz */ }
+        };
+
         const siparisiYolla = (siparisId) => {
             var s = siparisBul(siparisId);
             if (!s) return;
@@ -1241,8 +1259,14 @@
         const kartAcildi = (card) => {
             const kod = getShortCode(card);
             if (!kod) return;
-            const uzunId = idMap[kod];
-            if (!uzunId) { forceRadarFetch(); return; }
+
+            const s = kodaGoreSiparis(kod);
+            const uzunId = (s && s.siparisId) || idMap[kod];
+            if (!uzunId) {
+                // Liste elimizde değil: yeniden yayın iste, kullanıcı tekrar girerse yakalarız.
+                listeyiIste();
+                return;
+            }
 
             const girdi = orderCache[kod];
             const detayVar = girdi && !Array.isArray(girdi) && Array.isArray(girdi.detay) && girdi.detay.length;
@@ -1349,6 +1373,7 @@
             checkAndSync();
             applyUI();
             forceRadarFetch();
+            listeyiIste();
         };
 
         const adresiIzle = () => {
@@ -1376,6 +1401,7 @@
         // === INIT ===
         const init = () => {
             nobet();
+            listeyiIste();
             observer.observe(document.body, { childList: true, subtree: true });
             adresiIzle();
 
