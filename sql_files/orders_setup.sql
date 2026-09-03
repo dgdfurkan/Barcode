@@ -70,24 +70,53 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order      ON order_items (order_uuid
 ALTER TABLE orders      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies WHERE tablename = 'orders' AND policyname = 'orders_open_access'
-    ) THEN
-        CREATE POLICY orders_open_access ON orders FOR ALL USING (true) WITH CHECK (true);
-    END IF;
+-- ---------------------------------------------------------------------
+-- Yetki
+--
+-- Roller bu sunucuda web_anon / web_user / web_admin. Supabase'in
+-- anon/authenticated rolleri YOK; ilk yazımda onlar kullanılmıştı ve
+-- GRANT'lar "role does not exist" ile düştü.
+--
+-- Politika da "herkese açık" değil. Her kullanıcı yalnız kendi siparişini
+-- görüyor; kalıp security_01_roles_and_rls.sql içindeki kullanıcı bazlı
+-- tablolarla aynı. Sipariş satırlarının kendi username'i yok, bağlı olduğu
+-- siparişin sahibi üzerinden süzülüyor.
+-- ---------------------------------------------------------------------
 
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_policies WHERE tablename = 'order_items' AND policyname = 'order_items_open_access'
-    ) THEN
-        CREATE POLICY order_items_open_access ON order_items FOR ALL USING (true) WITH CHECK (true);
-    END IF;
-END $$;
+DROP POLICY IF EXISTS orders_open_access      ON public.orders;
+DROP POLICY IF EXISTS order_items_open_access ON public.order_items;
 
-GRANT USAGE ON SCHEMA public TO anon;
-GRANT USAGE ON SCHEMA public TO authenticated;
-GRANT ALL ON orders      TO anon;
-GRANT ALL ON orders      TO authenticated;
-GRANT ALL ON order_items TO anon;
-GRANT ALL ON order_items TO authenticated;
+DROP POLICY IF EXISTS orders_self ON public.orders;
+CREATE POLICY orders_self ON public.orders
+    FOR ALL TO web_user
+    USING (username = public.auth_username())
+    WITH CHECK (username = public.auth_username());
+
+DROP POLICY IF EXISTS orders_admin ON public.orders;
+CREATE POLICY orders_admin ON public.orders
+    FOR ALL TO web_admin
+    USING (public.auth_is_admin())
+    WITH CHECK (public.auth_is_admin());
+
+DROP POLICY IF EXISTS order_items_self ON public.order_items;
+CREATE POLICY order_items_self ON public.order_items
+    FOR ALL TO web_user
+    USING (EXISTS (
+        SELECT 1 FROM public.orders o
+        WHERE o.id = order_items.order_uuid
+          AND o.username = public.auth_username()
+    ))
+    WITH CHECK (EXISTS (
+        SELECT 1 FROM public.orders o
+        WHERE o.id = order_items.order_uuid
+          AND o.username = public.auth_username()
+    ));
+
+DROP POLICY IF EXISTS order_items_admin ON public.order_items;
+CREATE POLICY order_items_admin ON public.order_items
+    FOR ALL TO web_admin
+    USING (public.auth_is_admin())
+    WITH CHECK (public.auth_is_admin());
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.orders      TO web_user, web_admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.order_items TO web_user, web_admin;
