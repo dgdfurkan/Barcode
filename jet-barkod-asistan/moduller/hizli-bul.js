@@ -241,7 +241,7 @@
     box-shadow: 0 0 0 1px rgba(19,23,32,0.12) inset;
 }
 
-#jba-hb .queue-status-text {
+#jba-hb .jba-hb-kuyruk-text {
     font-size: 10.5px;
     color: var(--sonuk);
     text-align: right;
