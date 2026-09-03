@@ -234,6 +234,33 @@
     // Sipariş çekme
     // ==================================================================
 
+    /**
+     * Detay yanıtının ALAN ADLARINI bir kez yerel depoya yazar. Değer değil,
+     * yalnız ad. Ürün kimliği ve görsel alanının adı belgelenmiş değil;
+     * tahmin edip yanlış alan okumaktansa gerçek yanıttan öğreniyoruz.
+     * Kayıt bir kez yazılıyor, sonraki çekimlerde dokunulmuyor.
+     */
+    function semayiKaydet(siparis) {
+        try {
+            if (!siparis || localStorage.getItem('jba_detay_sema')) return;
+            var p0 = (Array.isArray(siparis.products) && siparis.products[0]) || null;
+            var altlar = {};
+            if (p0) {
+                Object.keys(p0).forEach(function (k) {
+                    var v = p0[k];
+                    if (v && typeof v === 'object' && !Array.isArray(v)) altlar[k] = Object.keys(v);
+                });
+            }
+            localStorage.setItem('jba_detay_sema', JSON.stringify({
+                siparisAlanlari: Object.keys(siparis),
+                urunAlanlari: p0 ? Object.keys(p0) : null,
+                urunAltNesneler: altlar,
+                urunSatiri: Array.isArray(siparis.products) ? siparis.products.length : 0,
+                zaman: new Date().toISOString()
+            }));
+        } catch (e) { /* sessiz */ }
+    }
+
     function urunler(siparis) {
         var liste = siparis && siparis.products;
         if (!Array.isArray(liste)) return [];
@@ -275,6 +302,7 @@
                         .then(function (r) { return r.json(); })
                         .then(function (detay) {
                             var o = detay.data && detay.data.order;
+                            semayiKaydet(o);
                             if (o) {
                                 sonuc.push({
                                     orderId: o.id,
@@ -294,10 +322,110 @@
             });
     }
 
+    // ==================================================================
+    // Sipariş listesi toplayıcı
+    //
+    // Panel siparişleri soket üzerinden alıyor ve React durumunda tutuyor;
+    // HTTP trafiğinde görünmüyorlar. İçerik betiği yalıtılmış dünyada olduğu
+    // için React'in DOM üzerine koyduğu alanları göremiyor, o yüzden okuma
+    // burada, sayfanın kendi dünyasında yapılıyor. Getir'e tek bir ek istek
+    // gitmiyor; veri zaten ekranda.
+    // ==================================================================
+
+    function fiberBul(el) {
+        for (var k in el) {
+            if (k.indexOf('__reactFiber$') === 0 || k.indexOf('__reactInternalInstance$') === 0) return el[k];
+        }
+        return null;
+    }
+
+    function metin(v) {
+        if (v == null) return '';
+        if (typeof v === 'string') return v;
+        if (typeof v === 'object') return v.tr || v.en || '';
+        return String(v);
+    }
+
+    function sadeSiparis(o, kolon) {
+        var kon = Array.isArray(o.productLocations) ? o.productLocations : [];
+        return {
+            siparisId: o.id,
+            banko: (kon[0] && kon[0].locationBarcode) || '',
+            kolon: metin(kolon),
+            durum: o.status,
+            toplamAdet: o.basketProductCount,
+            posetSayisi: o.totalBagUsageCount,
+            eksikUrunVar: !!o.hasMissingProduct,
+            toplayici: (o.picker && o.picker.name) || '',
+            kurye: (o.courier && o.courier.name) || '',
+            sepetZamani: o.checkoutDate || null,
+            urunler: (Array.isArray(o.products) ? o.products : []).map(function (p) {
+                var k = p.masterCategory || {};
+                return {
+                    sira: p.index,
+                    adet: p.count,
+                    siparisAdedi: p.orderCount,
+                    tur: p.type,
+                    altTur: p.subType,
+                    anaKategori: metin(k.masterMainCategory),
+                    sinif: metin(k.masterClass),
+                    altSinif: metin(k.masterSubClass)
+                };
+            })
+        };
+    }
+
+    function siparisleriTopla() {
+        var cikti = [];
+        var gorulen = {};
+        var kartlar = document.querySelectorAll('[class*="orderCard--"]');
+        for (var i = 0; i < kartlar.length; i++) {
+            var n = fiberBul(kartlar[i]);
+            var adim = 0;
+            while (n && adim < 25) {
+                var p = n.memoizedProps;
+                if (p && Array.isArray(p.orders)) {
+                    for (var j = 0; j < p.orders.length; j++) {
+                        var o = p.orders[j];
+                        if (!o || !o.id || gorulen[o.id]) continue;
+                        gorulen[o.id] = 1;
+                        cikti.push(sadeSiparis(o, p.title));
+                    }
+                    break;
+                }
+                n = n.return; adim++;
+            }
+        }
+        return cikti;
+    }
+
+    /* Aynı listeyi tekrar tekrar yollamamak için imza karşılaştırılıyor.
+       Sipariş kimliği, durumu ve adedi değişmediyse mesaj gitmiyor. */
+    var sonImza = '';
+
+    function siparisleriDuyur() {
+        try {
+            if (!/^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/.test(location.pathname)) return;
+            var liste = siparisleriTopla();
+            if (!liste.length) return;
+            var imza = liste.map(function (o) {
+                return o.siparisId + ':' + o.durum + ':' + o.toplamAdet + ':' + o.banko;
+            }).join('|');
+            if (imza === sonImza) return;
+            sonImza = imza;
+            gonder({ type: 'JB_SIPARISLER', liste: liste });
+            try { localStorage.setItem('jba_son_siparisler', JSON.stringify({ adet: liste.length, ornek: liste[0] })); } catch (e) {}
+        } catch (e) { /* sessiz */ }
+    }
+
+    setInterval(siparisleriDuyur, 2000);
+    setTimeout(siparisleriDuyur, 3000);
+
     global.addEventListener('message', function (e) {
         if (e.source !== global) return;
         if (e.origin !== KAYNAK) return;
         var d = e.data;
+        if (d && d.type === 'JB_SIPARIS_SOR') { sonImza = ''; siparisleriDuyur(); return; }
         if (!d || d.type !== 'JB_SIPARIS_GETIR') return;
         if (!d.warehouseId) {
             return gonder({ type: 'JB_SIPARIS_SONUC', data: [], error: 'Depo bilgisi yok' });
