@@ -231,6 +231,35 @@
 }
 #jba-hb .kat-rozetler { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
 
+/* Form listeyi eziyordu. Artık kapalı başlıyor, liste ana içerik. */
+#jba-hb .ekle-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    background: #fff;
+    border: 1px dashed #c9bff0;
+    border-radius: 8px;
+    color: #5d3ebc;
+    font: 700 12px inherit;
+    padding: 9px 10px;
+    cursor: pointer;
+}
+#jba-hb .ekle-btn:hover { background: #f4f1ff; border-color: #5d3ebc; }
+#jba-hb .ekle-btn .isaret { font-size: 14px; line-height: 1; }
+#jba-hb #jba-hb-form-govde { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+#jba-hb .renk-satiri input[type="color"] {
+    border-radius: 6px;
+    overflow: hidden;
+}
+/* Yeşil dahil, kırmızı hariç. İşaretsizken hangisinin ne olduğu
+   anlaşılmıyordu. */
+#jba-hb .badge::before { font-weight: 700; margin-right: 3px; opacity: .85; }
+#jba-hb .badge.inc::before { content: '+'; }
+#jba-hb .badge.exc::before { content: '-'; }
+#jba-hb .advanced-section { padding: 12px; }
+
 #jba-hb #jba-hb-fab {
     width: 56px;
     height: 56px;
@@ -910,8 +939,13 @@
 
                     <div class="settings-body" id="jba-hb-ayar" style="display:none;">
                         <div class="settings-form">
+                            <button type="button" class="ekle-btn" id="jba-hb-form-ac">
+                                <span id="jba-hb-form-ac-yazi">Yeni kategori ekle</span>
+                                <span class="isaret" id="jba-hb-form-ac-isaret">+</span>
+                            </button>
+                            <div id="jba-hb-form-govde" hidden>
                             <div class="ayar-baslik">
-                                <h4>Kategori Düzenleyici</h4>
+                                <h4>Kategori</h4>
                                 <span>Kart arka planını boyar</span>
                             </div>
                             <div class="alan">
@@ -935,6 +969,7 @@
                             <div class="form-dugmeler" id="jba-hb-form-dugmeler">
                                 <button id="jba-hb-kat-kaydet" class="btn-primary">Kategoriyi Kaydet</button>
                                 <button id="jba-hb-kat-vazgec" class="btn-vazgec" hidden>Vazgeç</button>
+                            </div>
                             </div>
                         </div>
                         <div id="jba-hb-kat-liste"></div>
@@ -1003,6 +1038,13 @@
                 }
             };
             document.getElementById('jba-hb-kat-vazgec').onclick = duzenlemeyiBitir;
+            document.getElementById('jba-hb-form-ac').onclick = () => {
+                const govde = document.getElementById('jba-hb-form-govde');
+                const acilacak = govde.hidden;
+                formuAc(acilacak);
+                if (acilacak) document.getElementById('jba-hb-kat-ad').focus();
+                else duzenlemeyiBitir();
+            };
             /* Her tuşta sekiz kartı yeniden tarayıp yeniden çizmek yerine
                120 ms bekleniyor ve çizim tek kareye toplanıyor. */
             let aramaZaman = null;
@@ -1076,8 +1118,19 @@
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
 
+        const formuAc = (ac) => {
+            const govde = document.getElementById('jba-hb-form-govde');
+            const yazi = document.getElementById('jba-hb-form-ac-yazi');
+            const isaret = document.getElementById('jba-hb-form-ac-isaret');
+            if (!govde) return;
+            govde.hidden = !ac;
+            if (yazi) yazi.textContent = ac ? 'Formu kapat' : 'Yeni kategori ekle';
+            if (isaret) isaret.textContent = ac ? '−' : '+';
+        };
+
         const duzenlemeyiBitir = () => {
             editingCategoryIndex = -1;
+            formuAc(false);
             const kaydet = document.getElementById('jba-hb-kat-kaydet');
             const vazgec = document.getElementById('jba-hb-kat-vazgec');
             const kap = document.getElementById('jba-hb-form-dugmeler');
@@ -1129,6 +1182,7 @@
                     document.getElementById('jba-hb-kat-haric').value = (cat.excludes || []).join(', ');
                     document.getElementById('jba-hb-kat-renk').value = cat.color;
                     editingCategoryIndex = idx;
+                    formuAc(true);
                     document.getElementById('jba-hb-kat-kaydet').innerText = 'Güncelle';
                     document.getElementById('jba-hb-kat-vazgec').hidden = false;
                     document.getElementById('jba-hb-form-dugmeler').classList.add('duzenleme');
