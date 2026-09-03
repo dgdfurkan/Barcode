@@ -240,7 +240,8 @@
 }
 #jba-hb .sr-row:hover { background: rgba(255,255,255,0.045); }
 #jba-hb .sr-row:last-child { border-bottom: none; }
-#jba-hb .sr-ust { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#jba-hb .sr-ust { display: flex; align-items: center; gap: 8px; }
+#jba-hb .sr-ust .sr-courier { margin-left: auto; }
 #jba-hb .sr-alt { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; color: var(--sonuk); }
 #jba-hb .sr-bnk {
     font-weight: 700;
@@ -257,6 +258,14 @@
     max-width: 170px;
 }
 #jba-hb .sr-courier { font-size: 11px; color: var(--sonuk); }
+/* Kategori renkleri. Koyu yüzeyde soluk arka plan okunmuyordu; renk artık
+   satırın içinde küçük noktalar hâlinde. */
+#jba-hb .sr-noktalar { display: flex; gap: 3px; flex: none; }
+#jba-hb .sr-noktalar i {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    display: block;
+}
 #jba-hb .sr-adet { color: var(--mavi-ac); font-weight: 600; }
 
 #jba-hb .queue-status-text {
@@ -685,6 +694,7 @@
                     <div class="sr-row" data-idx="${i}">
                         <div class="sr-ust">
                             <span class="sr-bnk">${m.bnk}</span>
+                            <span class="sr-noktalar">${(m.colors || []).map((c) => `<i style="background:${c}"></i>`).join('')}</span>
                             <span class="sr-courier">${m.courier}</span>
                         </div>
                         <div class="sr-alt">
@@ -779,7 +789,7 @@
                 // Eşleşenleri listeye ekle
                 if (term && isMatch) {
                     const courier = nameTexts.length >= 3 ? nameTexts[2] : 'Bilinmiyor';
-                    matches.push({ card, bnk, courier, hitCount, count, bgColor: newBg });
+                    matches.push({ card, bnk, courier, hitCount, count, bgColor: newBg, colors });
                 }
 
                 if (card.dataset.gBg !== newBg) {
