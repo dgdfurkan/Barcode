@@ -55,3 +55,7 @@ DEPO QR KODLARI*.pdf
 /temp_products.js
 pages/temp_products.js
 pages/products.json
+
+# Sipariş ekranı tasarım referansı. Depoya girmiyor: örnek verisinde
+# kişi adları var, depo herkese açık.
+Jet-Barkod-Siparisler-Premium/
