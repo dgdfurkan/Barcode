@@ -66,7 +66,11 @@
         {
             kume: 'su',
             etiket: 'Su',
-            dahil: ['su ', ' su', 'dogal kaynak suyu', 'mineralli su', 'maden suyu',
+            /* "su" parça olarak aranırsa "süper", "suşi", "sunta" hepsi su
+               oluyordu; cips "Süper Boy" yüzünden su bandına düşüyordu.
+               Kısa kelimeler artık tam kelime olarak aranıyor. */
+            tamKelime: ['su', 'sular'],
+            dahil: ['dogal kaynak suyu', 'mineralli su', 'maden suyu', 'kaynak suyu',
                     'erikli', 'hayat su', 'kuzeyden', 'damla su', 'sırma', 'sirma'],
             haric: ['sut', 'süt', 'suyu konsantre', 'meyve suyu', 'sebze suyu',
                     'cam sise', 'cam şişe', 'susam', 'sucuk']
@@ -88,6 +92,12 @@
         return metin.indexOf(sade(kelime)) !== -1;
     }
 
+    /* Tam kelime araması. `metin` sade() çıktısı olduğu için sözcükler tek
+       boşlukla ayrılıyor; başına ve sonuna boşluk koyup arıyoruz. */
+    function tamGecerMi(metin, kelime) {
+        return (' ' + metin + ' ').indexOf(' ' + sade(kelime) + ' ') !== -1;
+    }
+
     function kuralBul(urun) {
         var metin = sade(
             [urun.ad, urun.anaKategori, urun.sinif, urun.altSinif].filter(Boolean).join(' ')
@@ -97,6 +107,7 @@
         for (var i = 0; i < KURALLAR.length; i++) {
             var k = KURALLAR[i];
             if ((k.haric || []).some(function (h) { return gecerMi(metin, h); })) continue;
+            if ((k.tamKelime || []).some(function (t) { return tamGecerMi(metin, t); })) return k;
             if (k.dahil.some(function (d) { return gecerMi(metin, d); })) return k;
         }
         return null;
