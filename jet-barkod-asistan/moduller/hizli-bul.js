@@ -1235,9 +1235,17 @@
             catch (e) { /* sessiz */ }
         };
 
+        /* Getir'in kartında iç içe tıklanabilir parçalar var; tek dokunuş iki
+           click olayı üretebiliyor ve aynı sipariş iki kez yollanıyordu. Arka
+           plan zaten aynı imzayı yazmıyor ama boşuna mesaj da gitmesin. */
+        const sonGonderim = new Map();
+
         const siparisiYolla = (siparisId) => {
             var s = siparisBul(siparisId);
             if (!s) return;
+            var simdi = Date.now();
+            if (simdi - (sonGonderim.get(siparisId) || 0) < 3000) return;
+            sonGonderim.set(siparisId, simdi);
             gonderilecek.delete(siparisId);
             try {
                 chrome.runtime.sendMessage(
