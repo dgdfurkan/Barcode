@@ -829,6 +829,39 @@
             updateQueueStatus();
         };
 
+        /**
+         * Detay yanıtının ALAN ADLARINI bir kez yerel depoya yazar. Değer
+         * değil, yalnız ad. Ürün kimliği ve görsel alanının adı belgelenmiş
+         * değil; tahmin edip yanlış alan okumaktansa gerçek yanıttan
+         * öğreniyoruz. Kayıt bir kez yazılıyor.
+         *
+         * Sayfa köprüsündeki `JB_SIPARIS_GETIR` yolu bu iş için kullanılamadı:
+         * o yol sayfanın attığı bir `/orders` isteğini şablon alıyor, panel
+         * ise sipariş listesini soketten aldığı için öyle bir istek hiç
+         * geçmiyor ve çağrı "Failed to fetch" ile düşüyor. Buradaki kuyruk
+         * yakalanan jetonla çalışıyor ve sorunsuz dönüyor.
+         */
+        const semayiKaydet = (siparis) => {
+            try {
+                if (!siparis || localStorage.getItem('jba_detay_sema')) return;
+                const p0 = (Array.isArray(siparis.products) && siparis.products[0]) || null;
+                const altlar = {};
+                if (p0) {
+                    Object.keys(p0).forEach((k) => {
+                        const v = p0[k];
+                        if (v && typeof v === 'object' && !Array.isArray(v)) altlar[k] = Object.keys(v);
+                    });
+                }
+                localStorage.setItem('jba_detay_sema', JSON.stringify({
+                    siparisAlanlari: Object.keys(siparis),
+                    urunAlanlari: p0 ? Object.keys(p0) : null,
+                    urunAltNesneler: altlar,
+                    urunSatiri: Array.isArray(siparis.products) ? siparis.products.length : 0,
+                    zaman: new Date().toISOString()
+                }));
+            } catch (e) { /* sessiz */ }
+        };
+
         // === KUYRUK İŞLEMCİ ===
         const processQueue = async () => {
             if (isFetching || fetchQueue.length === 0 || !userToken || !warehouseId) return;
@@ -844,6 +877,7 @@
                 if (res.ok) {
                     const d = await res.json();
                     const order = d?.data?.order;
+                    semayiKaydet(order);
                     if (order?.products && Array.isArray(order.products)) {
                         orderCache[oId.slice(-4)] = {
                             products: order.products.map(p => {
