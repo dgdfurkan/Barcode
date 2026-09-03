@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
     <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
-    <link rel="stylesheet" href="../css/siparisler.css?v=20260904a" />
+    <link rel="stylesheet" href="../css/siparisler.css?v=20260904c" />
     <script src="../js/auth-token.js?v=20260828i"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20260828i"></script>
@@ -32,38 +32,36 @@
     <script src="../veri/temp_products.js?v=20260901a"></script>
 </head>
 <body class="min-h-screen sip-kok">
-    <header class="bg-surface border-b border-border shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
-                <a href="../arama/" class="flex items-center space-x-3">
-                    <img src="../assets/logo.png" alt="Jet Barkod" class="w-8 h-8 object-contain">
-                    <div>
-                        <h1 class="text-xl sm:text-2xl font-bold text-text-primary">Jet Barkod</h1>
-                        <p class="text-xs sm:text-sm text-text-secondary">Siparişler</p>
-                    </div>
-                </a>
-                <div class="flex items-center space-x-3 sm:space-x-4">
-                    <a href="../arama/" class="btn-secondary text-sm inline-flex items-center">Ürün Arama</a>
-                    <a href="../sayim/" class="btn-secondary text-sm hidden sm:inline-flex items-center">Sayım</a>
-                    <span id="headerUserName" class="text-sm font-medium text-text-secondary hidden sm:block"></span>
-                </div>
-            </div>
+    <header class="sip-ust">
+        <div class="sip-ust__ic">
+            <a class="sip-marka" href="../arama/" aria-label="Jet Barkod ana sayfa">
+                <span class="sip-marka__im"><img src="../assets/logo.png" alt=""></span>
+                <span><strong>Jet Barkod</strong><small>Siparişler</small></span>
+            </a>
+            <nav class="sip-ust__yol" aria-label="Ürün alanları">
+                <a href="../arama/"><svg viewBox="0 0 20 20"><circle cx="8.5" cy="8.5" r="4.8"/><path d="m12 12 4.5 4.5"/></svg><span>Ürün Arama</span></a>
+                <a href="../sayim/"><svg viewBox="0 0 20 20"><path d="M4 4h12v12H4zM7 4v12M13 4v12"/></svg><span>Sayım</span></a>
+                <span class="sip-hesap" id="headerUserName"></span>
+            </nav>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div id="siparisGiris" hidden>
-            <div class="bg-surface rounded-xl border border-border shadow-sm p-12 text-center">
-                <p class="text-text-secondary mb-6">Bu sayfayı kullanmak için giriş yapın.</p>
-                <a href="/" class="btn-primary inline-flex items-center">Giriş Yap</a>
+    <main class="sip-sayfa">
+        <div id="siparisGiris" class="sip-icerik" hidden>
+            <div class="sip-kapi">
+                <span><svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg></span>
+                <strong>Giriş yapman gerekiyor</strong>
+                <p>Siparişler ekranı depo hesabına bağlı çalışıyor.</p>
+                <a href="/" class="sip-kapi__dugme">Giriş yap</a>
             </div>
         </div>
 
-        <div id="siparisYetkiYok" hidden>
-            <div class="bg-surface rounded-xl border border-border shadow-sm p-12 text-center">
-                <p class="text-text-primary font-semibold mb-2">Sipariş Takibi hesabında açık değil.</p>
-                <p class="text-text-secondary mb-6">Bu özelliği açtırmak için bize yazabilirsin.</p>
-                <a href="../arama/" class="btn-primary inline-flex items-center">Ürün Aramaya dön</a>
+        <div id="siparisYetkiYok" class="sip-icerik" hidden>
+            <div class="sip-kapi">
+                <span class="sari"><svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg></span>
+                <strong>Sipariş Takibi hesabında açık değil</strong>
+                <p>Bu özelliği açtırmak için bize yazabilirsin.</p>
+                <a href="../arama/" class="sip-kapi__dugme">Ürün Aramaya dön</a>
             </div>
         </div>
 
@@ -225,19 +223,52 @@
 
             <fieldset>
                 <legend>Sipariş listesi görünümü</legend>
-                <label><input type="radio" name="ayarGorunum" value="kart"><span><svg viewBox="0 0 18 18"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="11" y="2" width="5" height="5" rx="1"/><rect x="2" y="11" width="5" height="5" rx="1"/><rect x="11" y="11" width="5" height="5" rx="1"/></svg>Kart</span></label>
-                <label><input type="radio" name="ayarGorunum" value="liste"><span><svg viewBox="0 0 18 18"><path d="M6 4h10M6 9h10M6 14h10"/><circle cx="3" cy="4" r=".8"/><circle cx="3" cy="9" r=".8"/><circle cx="3" cy="14" r=".8"/></svg>Liste</span></label>
+                <label class="sip-secim"><input type="radio" name="ayarGorunum" value="kart"><span><svg viewBox="0 0 18 18"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="11" y="2" width="5" height="5" rx="1"/><rect x="2" y="11" width="5" height="5" rx="1"/><rect x="11" y="11" width="5" height="5" rx="1"/></svg>Kart</span></label>
+                <label class="sip-secim"><input type="radio" name="ayarGorunum" value="liste"><span><svg viewBox="0 0 18 18"><path d="M6 4h10M6 9h10M6 14h10"/><circle cx="3" cy="4" r=".8"/><circle cx="3" cy="9" r=".8"/><circle cx="3" cy="14" r=".8"/></svg>Liste</span></label>
             </fieldset>
 
             <fieldset>
                 <legend>Ürün toplama görünümü</legend>
-                <label><input type="radio" name="ayarDetayGorunum" value="liste"><span><svg viewBox="0 0 18 18"><path d="M6 4h10M6 9h10M6 14h10"/><circle cx="3" cy="4" r=".8"/><circle cx="3" cy="9" r=".8"/><circle cx="3" cy="14" r=".8"/></svg>Liste</span></label>
-                <label><input type="radio" name="ayarDetayGorunum" value="izgara"><span><svg viewBox="0 0 18 18"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="11" y="2" width="5" height="5" rx="1"/><rect x="2" y="11" width="5" height="5" rx="1"/><rect x="11" y="11" width="5" height="5" rx="1"/></svg>Izgara</span></label>
+                <label class="sip-secim"><input type="radio" name="ayarDetayGorunum" value="liste"><span><svg viewBox="0 0 18 18"><path d="M6 4h10M6 9h10M6 14h10"/><circle cx="3" cy="4" r=".8"/><circle cx="3" cy="9" r=".8"/><circle cx="3" cy="14" r=".8"/></svg>Liste</span></label>
+                <label class="sip-secim"><input type="radio" name="ayarDetayGorunum" value="izgara"><span><svg viewBox="0 0 18 18"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="11" y="2" width="5" height="5" rx="1"/><rect x="2" y="11" width="5" height="5" rx="1"/><rect x="11" y="11" width="5" height="5" rx="1"/></svg>Izgara</span></label>
             </fieldset>
 
             <fieldset>
                 <legend>Toplama sırası</legend>
                 <div class="sip-sira" id="ayarSira"></div>
+            </fieldset>
+
+            <!--
+              Geçici test alanı. Örnek sipariş yalnız bu cihazın deposunda
+              duruyor, sunucuya hiçbir şey yazılmıyor; işaretlemeleri de
+              yerelde kalıyor. Deneme bitince bu bölüm kaldırılacak.
+            -->
+            <fieldset class="sip-ornek">
+                <legend>Örnek sipariş <em>test</em></legend>
+                <p class="sip-ornek__not">Sunucuya yazılmaz, yalnız bu cihazda görünür. Listede <b>ÖRNEK</b> rozetiyle çıkar.</p>
+                <div class="sip-ornek__satir">
+                    <label>Banko<input type="text" id="ornekBanko" placeholder="6" maxlength="8"></label>
+                    <label>Poşet<input type="number" id="ornekPoset" placeholder="1" min="0" max="99"></label>
+                </div>
+                <div class="sip-ornek__satir">
+                    <label>Toplayıcı<input type="text" id="ornekToplayici" placeholder="Ad Soyad" maxlength="40"></label>
+                    <label>Kurye<input type="text" id="ornekKurye" placeholder="Ad Soyad" maxlength="40"></label>
+                </div>
+                <label class="sip-ornek__tam">Kolon
+                    <select id="ornekKolon">
+                        <option value="Hazırlandı">Hazırlandı</option>
+                        <option value="Hazırlanıyor">Hazırlanıyor</option>
+                        <option value="Toplayıcı Bekliyor">Toplayıcı Bekliyor</option>
+                    </select>
+                </label>
+                <label class="sip-ornek__tam">Ürünler
+                    <textarea id="ornekUrunler" rows="6" placeholder="Her satıra bir ürün:&#10;Eti Canga (45 g) x3&#10;Erikli Doğal Kaynak Suyu (5 L) x2&#10;Domates x 1,35 kg"></textarea>
+                </label>
+                <div class="sip-ornek__dugmeler">
+                    <button type="button" class="sip-ornek__ekle" id="ornekEkle">Örnek siparişi ekle</button>
+                    <button type="button" class="sip-ornek__sil" id="ornekSil">Hepsini sil</button>
+                </div>
+                <div class="sip-ornek__liste" id="ornekListe"></div>
             </fieldset>
         </div>
     </div>
@@ -254,14 +285,18 @@
     <div class="sip-bildirim" id="siparisBildirim" role="status" aria-live="polite"><svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-9"/></svg><span></span></div>
 
     <script src="../js/siparis-sirala.js?v=20260903e"></script>
-    <script src="../js/siparisler.js?v=20260904a"></script>
+    <script src="../js/siparisler.js?v=20260904c"></script>
     <script>
         // Başlıktaki kullanıcı adı; diğer sayfalarla aynı davranış.
         (function () {
             try {
                 var o = window.authUtils && window.authUtils.checkAuth();
                 var el = document.getElementById('headerUserName');
-                if (o && o.username && el) el.textContent = o.username;
+                if (o && o.username && el) {
+                    var ad = String(o.username);
+                    el.innerHTML = '<i>' + ad.slice(0, 2).toLocaleUpperCase('tr') + '</i><b></b>';
+                    el.querySelector('b').textContent = ad;
+                }
             } catch (e) { /* sessiz */ }
         })();
     </script>

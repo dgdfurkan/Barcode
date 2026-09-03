@@ -68,6 +68,107 @@
     var zamanlayici = null;
 
     // ==================================================================
+    // Örnek sipariş (geçici test aracı)
+    //
+    // Ayarlardan girilen kurgusal sipariş. Yalnız bu cihazın yerel
+    // deposunda duruyor; sunucuya hiçbir istek gitmiyor, işaretlemeleri de
+    // yerelde kalıyor. Listede ÖRNEK rozetiyle ayırt ediliyor.
+    // Deneme bitince bu bölüm ve ayarlardaki alan kaldırılacak.
+    // ==================================================================
+
+    var ORNEK_ANAHTARI = 'jb_siparis_ornek';
+
+    function ornekOku() {
+        try {
+            var h = JSON.parse(localStorage.getItem(ORNEK_ANAHTARI) || '[]');
+            if (Array.isArray(h)) return h;
+        } catch (e) { /* sessiz */ }
+        return [];
+    }
+
+    function ornekYaz(liste) {
+        try { localStorage.setItem(ORNEK_ANAHTARI, JSON.stringify(liste)); }
+        catch (e) { /* sessiz */ }
+    }
+
+    /**
+     * "Eti Canga (45 g) x3" -> { ad: 'Eti Canga (45 g)', adet: 3 }
+     * "Domates x 1,35 kg"   -> { ad: 'Domates', adet: 1.35, birim: 'kg' }
+     * Adet yazılmamışsa 1. Ürün adında parantez ve virgül olabildiği için
+     * ayırma yalnız satır sonundaki çarpı işaretine bakıyor.
+     */
+    function ornekUrunAyikla(metin) {
+        return String(metin || '').split(/\r?\n/)
+            .map(function (satir) { return satir.trim(); })
+            .filter(Boolean)
+            .map(function (satir) {
+                var e = /^(.*?)\s*[x*×]\s*([\d]+(?:[.,][\d]+)?)\s*(kg|g|lt|l|ml)?\s*$/i.exec(satir);
+                if (!e || !e[1]) return { ad: satir, adet: 1, birim: '' };
+                return {
+                    ad: e[1].trim(),
+                    adet: parseFloat(e[2].replace(',', '.')) || 1,
+                    birim: (e[3] || '').toLowerCase()
+                };
+            });
+    }
+
+    /** Katalogdan ürün görselini bulur; örnek sipariş gerçeğe benzesin. */
+    function katalogGorseli(ad) {
+        katalogHazirla();
+        var u = katalogDizin && katalogDizin.get(sade(ad));
+        return (u && u.image) || '';
+    }
+
+    /** Yerel kayıtları sipariş nesnesine çevirir. */
+    function ornekleriKur() {
+        return ornekOku().map(function (o) {
+            var ham = (o.urunler || []).map(function (u, i) {
+                return {
+                    sira: i + 1,
+                    ad: u.ad || '',
+                    gorsel: katalogGorseli(u.ad),
+                    adet: u.adet,
+                    birim: u.birim || '',
+                    anaKategori: '',
+                    sinif: '',
+                    altSinif: '',
+                    alindi: !!u.alindi
+                };
+            });
+            var alinan = ham.filter(function (u) { return u.alindi; }).length;
+            return {
+                id: o.id,
+                ornek: true,
+                order_id: o.id,
+                banko: o.banko || null,
+                kolon: o.kolon || 'Hazırlandı',
+                durum: 400,
+                toplama_durumu: o.toplama_durumu ||
+                    (alinan === ham.length && ham.length ? 'toplandi' : (alinan ? 'toplaniyor' : 'bekliyor')),
+                toplam_adet: ham.reduce(function (a, u) { return a + (Number(u.adet) || 0); }, 0),
+                poset_sayisi: o.poset != null ? o.poset : null,
+                eksik_urun_var: false,
+                toplayici: o.toplayici || null,
+                kurye: o.kurye || null,
+                sepet_zamani: o.olusturma,
+                created_at: o.olusturma,
+                urunler: (global.JBSiparisSirala && global.JBSiparisSirala.sirala)
+                    ? global.JBSiparisSirala.sirala(ham, { sira: durum.bantSirasi })
+                    : ham
+            };
+        });
+    }
+
+    /** Örnek siparişin bir alanını yerel kayda yazar. */
+    function ornegiGuncelle(siparisId, degistir) {
+        var liste = ornekOku();
+        var k = liste.filter(function (o) { return o.id === siparisId; })[0];
+        if (!k) return;
+        degistir(k);
+        ornekYaz(liste);
+    }
+
+    // ==================================================================
     // Yardımcılar
     // ==================================================================
 
@@ -228,7 +329,7 @@
 
         if (siparisSonuc.error) throw new Error(siparisSonuc.error.message || 'Siparişler alınamadı');
         var siparisler = siparisSonuc.data || [];
-        if (!siparisler.length) return [];
+        if (!siparisler.length) return ornekleriKur();
 
         var kimlikler = siparisler.map(function (s) { return s.id; });
         var satirSonuc = await d.from('order_items')
@@ -262,7 +363,7 @@
                 : ham;
         });
 
-        return siparisler;
+        return ornekleriKur().concat(siparisler);
     }
 
     function imzaCikar(siparisler) {
@@ -304,6 +405,24 @@
     // ==================================================================
 
     async function urunIsaretle(siparis, urun, alindi) {
+        /* Örnek sipariş sunucuya yazılmıyor; işaret yerel kayda gidiyor. */
+        if (siparis.ornek) {
+            urun.alindi = alindi;
+            ornegiGuncelle(siparis.id, function (k) {
+                var y = (k.urunler || []).filter(function (u) { return u.ad === urun.ad; })[0];
+                if (y) y.alindi = alindi;
+            });
+            satiriTazele(urun);
+            durum.detayImzasi = siparis.id + '|' + durum.detayGorunum + '|' +
+                (siparis.urunler || []).map(function (u) { return u.sira + (u.alindi ? '1' : '0'); }).join('');
+            var hepsi = (siparis.urunler || []).every(function (u) { return u.alindi; });
+            siparis.toplama_durumu = hepsi ? 'toplandi'
+                : ((siparis.urunler || []).some(function (u) { return u.alindi; }) ? 'toplaniyor' : 'bekliyor');
+            ornegiGuncelle(siparis.id, function (k) { k.toplama_durumu = siparis.toplama_durumu; });
+            ciz();
+            return;
+        }
+
         var d = db();
         if (!d) {
             /* Sessizce hiçbir şey yapmak en kötüsü: depocu işaretlediğini
@@ -342,6 +461,12 @@
     }
 
     async function siparisDurumu(siparis, yeni, sessiz) {
+        if (siparis.ornek) {
+            siparis.toplama_durumu = yeni;
+            ornegiGuncelle(siparis.id, function (k) { k.toplama_durumu = yeni; });
+            if (!sessiz) ciz(); else ilerlemeyiTazele();
+            return;
+        }
         var d = db();
         if (!d) {
             if (global.JBDiyalog) global.JBDiyalog.hata('Veri bağlantısı yok, durum kaydedilemez.');
@@ -501,9 +626,10 @@
         }).join('');
 
         return '<button type="button" class="sip-kart' + (sira != null ? ' sip-kart--gir' : '') +
-               (oran === 100 ? ' sip-kart--tam' : '') +
+               (oran === 100 ? ' sip-kart--tam' : '') + (s.ornek ? ' sip-kart--ornek' : '') +
                '" data-siparis="' + kacir(s.id) + '" style="--vurgu:' + kategoriRengi(s) +
                ';--i:' + (sira || 0) + '">' +
+            (s.ornek ? '<span class="sip-ornek-rozet">ÖRNEK</span>' : '') +
             '<div class="sip-kart__ust">' +
                 '<div class="sip-kart__kimlik">' +
                     '<span class="sip-banko' + (kimlik.bankoVar ? '' : ' sip-banko--yok') + '">' +
@@ -511,7 +637,7 @@
                         '<small>' + kacir(kimlik.etiket) + '</small>' +
                     '</span>' +
                     '<span class="sip-kart__ozet">' +
-                        '<strong>' + (s.toplam_adet != null ? s.toplam_adet : toplam) + ' parça</strong>' +
+                        '<strong>' + adetYaz(s.toplam_adet != null ? s.toplam_adet : toplam) + ' parça</strong>' +
                         '<span>' + toplam + ' çeşit' +
                             (s.poset_sayisi != null ? ' · ' + s.poset_sayisi + ' poşet' : '') + '</span>' +
                     '</span>' +
@@ -553,7 +679,7 @@
             gorsel +
             '<div class="sip-urun__bilgi">' +
                 '<button type="button" class="sip-urun__ad" data-barkod="' + u.sira + '">' +
-                    kacir(urunBasligi(u, bilgi)) +
+                    '<span>' + kacir(urunBasligi(u, bilgi)) + '</span>' +
                 '</button>' +
                 kodCiz(bilgi) +
             '</div>' +
@@ -691,7 +817,7 @@
             .filter(function (s) { return bandaGore(s) === 'hazir'; })
             .reduce(function (a, s) { return a + (s.toplam_adet || (s.urunler || []).length); }, 0);
         el('ozetHazirNot').innerHTML = hazirParca
-            ? '<b>' + hazirParca + '</b> parça bankoda'
+            ? '<b>' + adetYaz(hazirParca) + '</b> parça bankoda'
             : 'Bankoda seni bekliyor';
 
         var saat = durum.sonYenileme ? saatYaz(durum.sonYenileme) : '—';
@@ -753,7 +879,7 @@
         rozet.querySelector('b').textContent = BANT_ADI[bant] || '';
         el('detayYas').textContent = gecenSure(s) ? gecenSure(s) + ' önce' : '';
 
-        el('olcuParca').textContent = s.toplam_adet != null ? s.toplam_adet : urunler.length;
+        el('olcuParca').textContent = adetYaz(s.toplam_adet != null ? s.toplam_adet : urunler.length);
         el('olcuCesit').textContent = urunler.length;
         el('olcuPoset').textContent = s.poset_sayisi != null ? s.poset_sayisi : '–';
         el('detayKisiler').innerHTML = yanKisiler(s);
@@ -886,8 +1012,47 @@
         }).join('');
     }
 
+    var SIL_IKON = '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>';
+
+    function ornekListeCiz() {
+        var liste = ornekOku();
+        el('ornekListe').innerHTML = liste.map(function (o) {
+            var say = (o.urunler || []).length;
+            return '<div class="sip-ornek__kayit">' +
+                '<strong>' + kacir(o.banko ? 'Banko ' + o.banko : 'Bankosuz') + '</strong>' +
+                '<span>' + say + ' çeşit · ' + kacir(o.kolon || 'Hazırlandı') + '</span>' +
+                '<button type="button" data-ornek-sil="' + kacir(o.id) + '" aria-label="Sil">' + SIL_IKON + '</button>' +
+            '</div>';
+        }).join('');
+    }
+
+    function ornekEkle() {
+        var urunler = ornekUrunAyikla(el('ornekUrunler').value);
+        if (!urunler.length) { bildir('Önce en az bir ürün yaz'); return; }
+
+        var kayit = {
+            id: 'ornek-' + Date.now().toString(36),
+            banko: el('ornekBanko').value.trim(),
+            kolon: el('ornekKolon').value,
+            poset: el('ornekPoset').value === '' ? null : Number(el('ornekPoset').value),
+            toplayici: el('ornekToplayici').value.trim(),
+            kurye: el('ornekKurye').value.trim(),
+            urunler: urunler,
+            toplama_durumu: 'bekliyor',
+            olusturma: new Date().toISOString()
+        };
+        var liste = ornekOku();
+        liste.unshift(kayit);
+        ornekYaz(liste);
+        ornekListeCiz();
+        el('ornekUrunler').value = '';
+        bildir('Örnek sipariş eklendi');
+        tazele(true);
+    }
+
     function ayarAc() {
         siraCiz();
+        ornekListeCiz();
         var isaretle = function (ad, deger) {
             var r = document.querySelector('input[name="' + ad + '"][value="' + deger + '"]');
             if (r) r.checked = true;
@@ -1020,6 +1185,25 @@
                 ciz();
                 bildir('Toplama görünümü güncellendi');
             }
+        });
+
+        el('ornekEkle').addEventListener('click', ornekEkle);
+        el('ornekSil').addEventListener('click', function () {
+            if (!ornekOku().length) { bildir('Örnek sipariş yok'); return; }
+            ornekYaz([]);
+            ornekListeCiz();
+            if (durum.secili && durum.secili.ornek) detayiKapat();
+            bildir('Örnek siparişler silindi');
+            tazele(true);
+        });
+        el('ornekListe').addEventListener('click', function (e) {
+            var d = e.target.closest('[data-ornek-sil]');
+            if (!d) return;
+            var id = d.getAttribute('data-ornek-sil');
+            ornekYaz(ornekOku().filter(function (o) { return o.id !== id; }));
+            ornekListeCiz();
+            if (durum.secili && durum.secili.id === id) detayiKapat();
+            tazele(true);
         });
 
         el('ayarSira').addEventListener('click', function (e) {

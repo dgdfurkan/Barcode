@@ -60,6 +60,7 @@
     --yesil-50:  #eafbf3;
     --sari:      #d97706;
     --sari-50:   #fff7e8;
+    --sari-cizgi:#fbdba7;
     --mor:       #7c3aed;
 
     --golge-s: 0 2px 8px rgba(16,24,40,0.04);
@@ -88,6 +89,113 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     outline: 3px solid rgba(21,94,239,0.24);
     outline-offset: 3px;
 }
+
+/* ============================== SAYFA ÜSTÜ ==============================
+ * Site başlığı. Eskisi Tailwind kutu düğmeleriydi ve sayfanın geri kalanıyla
+ * aynı dili konuşmuyordu. Referanstaki yapışkan başlık: marka karosu, yol
+ * düğmeleri, hesap rozeti.
+ */
+.sip-ust {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    height: 72px;
+    border-bottom: 1px solid rgba(228,231,236,0.9);
+    background: rgba(255,255,255,0.94);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+}
+.sip-ust__ic {
+    width: min(1440px, calc(100% - 48px));
+    height: 100%;
+    margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+}
+.sip-marka { display: flex; align-items: center; gap: 11px; text-decoration: none; color: inherit; }
+.sip-marka__im {
+    width: 42px; height: 42px;
+    display: grid; place-items: center;
+    border-radius: 13px;
+    background: linear-gradient(145deg, #eef4ff, #fff);
+    box-shadow: inset 0 0 0 1px #dce7ff, 0 6px 15px rgba(21,94,239,0.12);
+}
+.sip-marka__im img { width: 26px; height: 26px; object-fit: contain; }
+.sip-marka > span:last-child { display: flex; flex-direction: column; }
+.sip-marka strong { font-family: var(--baslik-font); font-size: 20px; font-weight: 700; letter-spacing: -0.03em; color: var(--lacivert); }
+.sip-marka small { margin-top: -1px; color: var(--sonuk); font-size: 12.5px; font-weight: 600; }
+
+.sip-ust__yol { display: flex; align-items: center; gap: 8px; }
+.sip-ust__yol > a {
+    height: 42px;
+    padding: 0 13px;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    display: flex; align-items: center; gap: 8px;
+    background: #f4f6f8;
+    color: #455067;
+    font-size: 13px; font-weight: 700;
+    text-decoration: none;
+    transition: 0.16s ease;
+}
+.sip-ust__yol > a:hover { border-color: #dce2ea; background: #fff; box-shadow: var(--golge-s); }
+.sip-ust__yol > a svg { width: 17px; }
+.sip-hesap {
+    margin-left: 5px;
+    height: 42px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 4px;
+}
+.sip-hesap i {
+    width: 28px; height: 28px;
+    border-radius: 9px;
+    display: grid; place-items: center;
+    background: var(--mavi-50); color: var(--mavi);
+    font-size: 11px; font-style: normal; font-weight: 800;
+}
+.sip-hesap b { color: #455067; font-size: 13px; font-weight: 700; }
+.sip-hesap:empty { display: none; }
+
+.sip-sayfa { width: min(1440px, calc(100% - 48px)); margin: 0 auto; padding: 30px 0 64px; }
+
+/* Giriş ve yetki ekranları. Eskisi Tailwind kutusuydu, sayfanın geri
+   kalanıyla aynı dili konuşmuyordu. */
+.sip-kapi {
+    max-width: 460px;
+    margin: 40px auto;
+    padding: 40px 32px;
+    border: 1px solid var(--cizgi);
+    border-radius: 18px;
+    background: var(--yuzey);
+    box-shadow: var(--golge-s);
+    text-align: center;
+}
+.sip-kapi > span {
+    width: 56px; height: 56px;
+    margin: 0 auto 16px;
+    border-radius: 16px;
+    display: grid; place-items: center;
+    background: var(--mavi-50); color: var(--mavi);
+}
+.sip-kapi > span.sari { background: var(--sari-50); color: var(--sari); }
+.sip-kapi > span svg { width: 26px; }
+.sip-kapi strong {
+    display: block;
+    font-family: var(--baslik-font);
+    font-size: 19px; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--lacivert);
+}
+.sip-kapi p { margin: 8px 0 22px; color: var(--sonuk); font-size: 13.5px; line-height: 1.55; }
+.sip-kapi__dugme {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 46px; padding: 0 22px;
+    border-radius: 12px;
+    background: var(--mavi); color: #fff;
+    font-size: 13.5px; font-weight: 800;
+    text-decoration: none;
+    box-shadow: 0 8px 18px rgba(21,94,239,0.22);
+    transition: 0.18s var(--yay);
+}
+.sip-kapi__dugme:hover { background: var(--mavi-koyu); transform: translateY(-1px); }
 
 /* ============================== BAŞLIK ============================== */
 .sip-baslik { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
@@ -549,13 +657,16 @@ button.sip-ozet__oge:hover { background: #fbfcfe; }
     color: var(--lacivert);
     text-align: left;
     font-size: 13.5px; font-weight: 700; line-height: 1.35;
-    /* İki satırda kesiliyor. Kesilmezse uzun adlar satırı 200 piksele
-       çıkarıyor, liste kademe kademe oluyordu. Tamamı barkod penceresinde. */
+    transition: color 0.16s;
+}
+/* Kırpma düğmenin kendisinde değil içindeki span'de. Chrome `button`
+   üzerinde `-webkit-box` değerini `flow-root`a çeviriyor ve satır kırpma
+   çalışmıyor; uzun adlar üçüncü satırı yarım gösteriyordu. */
+.sip-urun__ad span {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    transition: color 0.16s;
 }
 .sip-urun__ad:hover { color: var(--mavi); }
 .sip-kod {
@@ -586,7 +697,7 @@ button.sip-ozet__oge:hover { background: #fbfcfe; }
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
-.sip-adet u { text-decoration: none; font-size: 10px; font-weight: 600; color: var(--sonuk); }
+.sip-adet u { margin-left: 3px; text-decoration: none; font-size: 10px; font-weight: 600; color: var(--sonuk); }
 .sip-al {
     width: 42px; height: 42px;
     border: 2px solid #d5dbe4; border-radius: 50%;
@@ -661,6 +772,12 @@ button.sip-ozet__oge:hover { background: #fbfcfe; }
 .sip-kutu {
     position: relative;
     width: min(460px, 100%);
+    /* Ayarlar penceresi örnek veri alanıyla 1078 piksele çıkıyor ve 812
+       piksellik telefonda alt yarısına ulaşılamıyordu. Pencere kendi içinde
+       kayıyor; katman ortalı kalıyor. */
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 20px;
     border-radius: 18px;
     background: #fff;
@@ -678,7 +795,7 @@ button.sip-ozet__oge:hover { background: #fbfcfe; }
 .sip-kapat svg { width: 16px; }
 .sip-kapat:hover { color: var(--mavi); border-color: #bfd0f5; }
 
-.sip-kutu--barkod > .sip-kapat { position: absolute; right: 16px; top: 16px; }
+.sip-kutu--barkod > .sip-kapat { position: absolute; right: 16px; top: 16px; z-index: 2; }
 .sip-barkod__urun { padding-right: 38px; display: flex; align-items: center; gap: 12px; }
 .sip-barkod__urun img { width: 66px; height: 66px; padding: 4px; border: 1px solid var(--cizgi); border-radius: 11px; object-fit: contain; }
 .sip-barkod__urun small, .sip-kutu__ust small { color: var(--mavi); font-size: 11px; font-weight: 800; letter-spacing: 0.1em; }
@@ -719,9 +836,11 @@ button.sip-ozet__oge:hover { background: #fbfcfe; }
 .sip-ayar__not { margin: 11px 0 17px; color: var(--sonuk); font-size: 12.5px; line-height: 1.5; }
 .sip-ayar fieldset { padding: 0; margin: 0 0 14px; border: 0; }
 .sip-ayar legend { margin-bottom: 8px; color: #475467; font-size: 12.5px; font-weight: 700; }
-.sip-ayar label { display: inline-block; margin: 0 6px 6px 0; }
-.sip-ayar input { position: absolute; opacity: 0; }
-.sip-ayar label span {
+.sip-secim { display: inline-block; margin: 0 6px 6px 0; }
+/* Yalnız radyo düğmeleri gizleniyor. Genel `input` seçicisi örnek veri
+   alanındaki metin kutularını da görünmez yapıyordu. */
+.sip-ayar input[type="radio"] { position: absolute; opacity: 0; }
+.sip-ayar input[type="radio"] + span {
     height: 38px; padding: 0 12px;
     border: 1px solid var(--cizgi); border-radius: 9px;
     display: inline-flex; align-items: center; gap: 7px;
@@ -729,8 +848,8 @@ button.sip-ozet__oge:hover { background: #fbfcfe; }
     color: var(--sonuk); font-size: 12.5px; font-weight: 700;
     transition: 0.16s;
 }
-.sip-ayar label span svg { width: 15px; }
-.sip-ayar input:checked + span { border-color: #a9c2f8; background: var(--mavi-50); color: var(--mavi); }
+.sip-ayar input[type="radio"] + span svg { width: 15px; }
+.sip-ayar input[type="radio"]:checked + span { border-color: #a9c2f8; background: var(--mavi-50); color: var(--mavi); }
 .sip-sira { display: flex; flex-direction: column; gap: 6px; }
 .sip-sira__oge {
     display: flex; align-items: center; gap: 10px;
@@ -744,6 +863,84 @@ button.sip-ozet__oge:hover { background: #fbfcfe; }
 .sip-sira__oge button svg { width: 14px; }
 .sip-sira__oge button:hover:not([disabled]) { border-color: var(--mavi); color: var(--mavi); }
 .sip-sira__oge button[disabled] { opacity: 0.3; cursor: default; }
+
+/* ---- Örnek veri alanı (geçici test) ---- */
+.sip-ornek { padding-top: 4px; border-top: 1px solid var(--cizgi) !important; }
+.sip-ornek legend { display: flex; align-items: center; gap: 7px; padding-top: 14px; }
+.sip-ornek legend em {
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: var(--sari-50); border: 1px solid var(--sari-cizgi);
+    color: var(--sari);
+    font-size: 10px; font-style: normal; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.sip-ornek__not { margin: 0 0 11px; color: var(--soluk); font-size: 12px; line-height: 1.5; }
+.sip-ornek__not b { color: var(--sari); }
+.sip-ornek__satir { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.sip-ornek label, .sip-ornek__tam {
+    display: flex; flex-direction: column; gap: 5px;
+    margin: 0 0 8px;
+    color: var(--sonuk); font-size: 11.5px; font-weight: 700;
+}
+.sip-ornek__satir label { margin: 0; }
+.sip-ornek input, .sip-ornek select, .sip-ornek textarea {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--cizgi); border-radius: 9px;
+    background: #fff;
+    color: var(--yazi);
+    font: 500 13px inherit;
+    transition: 0.16s;
+}
+.sip-ornek textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
+.sip-ornek input:focus, .sip-ornek select:focus, .sip-ornek textarea:focus {
+    border-color: var(--mavi); outline: none; box-shadow: 0 0 0 3px rgba(21,94,239,0.12);
+}
+.sip-ornek input::placeholder, .sip-ornek textarea::placeholder { color: #b6bdc9; font-weight: 400; }
+.sip-ornek__dugmeler { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.sip-ornek__ekle, .sip-ornek__sil {
+    height: 42px;
+    border-radius: 11px;
+    border: 1px solid transparent;
+    font-size: 13px; font-weight: 800;
+    transition: 0.16s;
+}
+.sip-ornek__ekle { background: var(--mavi); color: #fff; box-shadow: 0 8px 18px rgba(21,94,239,0.20); }
+.sip-ornek__ekle:hover { background: var(--mavi-koyu); }
+.sip-ornek__sil { padding: 0 14px; background: #fff; border-color: var(--cizgi); color: var(--sonuk); }
+.sip-ornek__sil:hover { border-color: #f1b0b0; color: #d92d20; }
+.sip-ornek__liste { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.sip-ornek__liste:empty { display: none; }
+.sip-ornek__kayit {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 9px 8px 11px;
+    border: 1px solid var(--cizgi); border-radius: 10px;
+    background: #f8f9fb;
+    font-size: 12.5px; color: var(--sonuk);
+}
+.sip-ornek__kayit strong { color: var(--yazi); font-weight: 700; }
+.sip-ornek__kayit span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sip-ornek__kayit button {
+    width: 28px; height: 28px; flex: none;
+    border: 1px solid var(--cizgi); border-radius: 8px;
+    display: grid; place-items: center;
+    background: #fff; color: var(--soluk);
+    transition: 0.16s;
+}
+.sip-ornek__kayit button svg { width: 13px; }
+.sip-ornek__kayit button:hover { border-color: #f1b0b0; color: #d92d20; }
+
+/* Örnek sipariş kartı ayırt edilsin; gerçek siparişle karışmasın. */
+.sip-kart--ornek { border-style: dashed; }
+.sip-ornek-rozet {
+    position: absolute; right: 0; top: 0;
+    padding: 3px 9px;
+    border-radius: 0 13px 0 10px;
+    background: var(--sari-50);
+    color: var(--sari);
+    font-size: 9.5px; font-weight: 800; letter-spacing: 0.1em;
+}
+.sip-izgara--liste .sip-kart--ornek .sip-kart__sure { right: 62px; }
 
 /* Görsel büyütme */
 .sip-buyuk { background: rgba(16,24,40,0.82); }
@@ -785,6 +982,17 @@ button.sip-ozet__oge:hover { background: #fbfcfe; }
     .sip-urunler--izgara .sip-bolum { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 820px) {
+    .sip-ust { height: 62px; }
+    .sip-ust__ic, .sip-sayfa { width: calc(100% - 30px); }
+    .sip-marka__im { width: 36px; height: 36px; border-radius: 11px; }
+    .sip-marka__im img { width: 22px; height: 22px; }
+    .sip-marka strong { font-size: 16px; }
+    .sip-marka small { font-size: 11px; }
+    .sip-ust__yol > a { width: 38px; padding: 0; justify-content: center; }
+    .sip-ust__yol > a span { display: none; }
+    .sip-hesap b { display: none; }
+    .sip-sayfa { padding-top: 21px; }
+    .sip-ornek__satir { grid-template-columns: 1fr; }
     .sip-baslik { align-items: center; }
     .sip-baslik h1 { font-size: 26px; }
     .sip-baslik__not { display: none; }
@@ -835,6 +1043,7 @@ button.sip-ozet__oge:hover { background: #fbfcfe; }
     .sip-alt { min-height: 78px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); grid-template-columns: 1fr 130px; gap: 12px; }
 }
 @media (max-width: 520px) {
+    .sip-ust__yol > a:first-child { display: none; }
     .sip-canli { font-size: 10.5px; }
     .sip-baslik h1 { font-size: 24px; }
     .sip-panel { margin-left: -4px; margin-right: -4px; }
