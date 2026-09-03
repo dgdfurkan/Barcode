@@ -892,7 +892,8 @@
                         };
                         saveCache();
                         applyUI();
-                        siparisleriYolla();
+                        // Kullanıcı bu siparişi açtıysa artık gönderilebilir.
+                        if (gonderilecek.has(oId)) siparisiYolla(oId);
                     }
                 } else if (res.status === 401) {
                     fetchQueue.unshift(oId);
@@ -1205,22 +1206,72 @@
             return Object.assign({}, s, { urunler: urunler });
         };
 
-        const siparisleriYolla = () => {
-            if (!sonSiparisListesi.length) return;
+        /* Hangi siparişler gönderilmeyi bekliyor. Kullanıcı bir siparişe
+           girdiğinde buraya giriyor, gönderildikten sonra çıkıyor. */
+        const gonderilecek = new Set();
+
+        const siparisBul = (siparisId) => {
+            for (var i = 0; i < sonSiparisListesi.length; i++) {
+                if (sonSiparisListesi[i].siparisId === siparisId) return sonSiparisListesi[i];
+            }
+            return null;
+        };
+
+        const siparisiYolla = (siparisId) => {
+            var s = siparisBul(siparisId);
+            if (!s) return;
+            gonderilecek.delete(siparisId);
             try {
                 chrome.runtime.sendMessage(
-                    { type: 'JBA_SIPARIS_YAZ', siparisler: sonSiparisListesi.map(birlestir) },
+                    { type: 'JBA_SIPARIS_YAZ', siparisler: [birlestir(s)] },
                     () => { if (chrome.runtime.lastError) { /* hizmet işçisi uyuyor olabilir */ } }
                 );
             } catch (e) { /* sessiz */ }
         };
 
+        /**
+         * Kullanıcı bir sipariş kartına girdi.
+         *
+         * Eskiden her liste taramasından sonra bütün siparişler yollanıyordu.
+         * Gerek yoktu: kullanıcı yalnız girdiği siparişi topluyor. Artık tetik
+         * tıklama. Ayrıntı önbellekte yoksa önce kuyruğa alınıyor, geldiğinde
+         * gönderim kendiliğinden oluyor. Arka plan zaten değişmeyen siparişi
+         * tekrar yazmıyor, aynı sipariş iki kez açılsa da tek yazma oluyor.
+         */
+        const kartAcildi = (card) => {
+            const kod = getShortCode(card);
+            if (!kod) return;
+            const uzunId = idMap[kod];
+            if (!uzunId) { forceRadarFetch(); return; }
+
+            const girdi = orderCache[kod];
+            const detayVar = girdi && !Array.isArray(girdi) && Array.isArray(girdi.detay) && girdi.detay.length;
+
+            if (detayVar) { siparisiYolla(uzunId); return; }
+
+            gonderilecek.add(uzunId);
+            if (!fetchQueueSet.has(uzunId)) {
+                /* Öne alınıyor: kullanıcının açtığı sipariş, arka planda
+                   sıradaki başkalarını beklemesin. */
+                fetchQueue.unshift(uzunId);
+                fetchQueueSet.add(uzunId);
+                if (!isFetching) processQueue();
+            }
+        };
+
+        document.addEventListener('click', (e) => {
+            const kart = e.target.closest && e.target.closest('[class*="orderCard--"]');
+            if (kart) kartAcildi(kart);
+        }, true);
+
         // === MESAJ DİNLEYİCİ ===
         window.addEventListener('message', (event) => {
             if (!event.data || event.source !== window) return;
             if (event.data.type === 'JB_SIPARISLER' && Array.isArray(event.data.liste)) {
+                /* Liste yalnız saklanıyor. Gönderim kullanıcı siparişe
+                   girdiğinde yapılıyor; her tarama sonrası bütün siparişleri
+                   yollamak boşuna trafikti. */
                 sonSiparisListesi = event.data.liste;
-                siparisleriYolla();
             }
             if (event.data.type === 'GETIR_DATA_RECEIVED') findOrderIds(event.data.payload);
             if (event.data.type === 'GETIR_TOKEN_CAPTURED') {
