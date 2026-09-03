@@ -48,9 +48,10 @@
     var SIPARIS_YOLU = /^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/;
 
     /*
-     * Palet Jet Barkod'un kendi paleti: mürekkep siyahı yüzey, kırık beyaz
-     * kağıt, logo mavisi tek vurgu. Getir'in moru ve sarısı kaldırıldı; iki
-     * renk arası degrade yok. Simgeler emoji değil, satır içi SVG.
+     * Açık zemin. Koyu denendi ve kategori renkleri (mor, sarı) siyah üstünde
+     * bozuluyordu; kullanıcının seçtiği renkler beyaz zeminde doğru okunuyor.
+     * Palet: beyaz yüzey, kırık beyaz kağıt, mürekkep yazı, logo mavisi tek
+     * vurgu. İki renk arası degrade yok, emoji yok, simgeler satır içi SVG.
      */
     var STIL = `#jba-hb {
     position: fixed;
@@ -64,15 +65,14 @@
     opacity: 0.32;
     transition: opacity 0.18s ease;
 
-    --mrk: #131720;
-    --mrk-2: #1c2230;
-    --cizgi: #2a3242;
-    --yazi: #f2f4f8;
-    --sonuk: #98a2b3;
+    --yuzey: #ffffff;
+    --kagit: #f7f6f2;
+    --cizgi: #e7e5de;
+    --cizgi-2: #f0eeE8;
+    --yazi: #131720;
+    --sonuk: #6b7280;
     --mavi: #135bec;
-    --mavi-ac: #3b82f6;
-    --yesil: #16a34a;
-    --kirmizi: #dc2626;
+    --mavi-yumusak: #eef3ff;
 }
 #jba-hb:hover,
 #jba-hb:focus-within,
@@ -89,31 +89,29 @@
 #jba-hb #jba-hb-fab {
     width: 48px;
     height: 48px;
-    background: var(--mrk);
-    color: var(--yazi);
+    background: var(--yazi);
+    color: #fff;
     border-radius: 14px;
     display: flex;
     justify-content: center;
     align-items: center;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.28);
+    box-shadow: 0 6px 18px rgba(19,23,32,0.24);
     cursor: pointer;
-    border: 1px solid var(--cizgi);
     transition: transform 0.15s ease, background 0.15s ease;
 }
-#jba-hb #jba-hb-fab:hover { transform: translateY(-1px); background: var(--mrk-2); }
+#jba-hb #jba-hb-fab:hover { transform: translateY(-1px); background: var(--mavi); }
 
 /* ---------------- PANEL ---------------- */
 #jba-hb #jba-hb-panel {
     width: 372px;
-    background: var(--mrk);
+    background: var(--yuzey);
     border: 1px solid var(--cizgi);
     border-radius: 16px;
-    box-shadow: 0 20px 48px rgba(0,0,0,0.42);
+    box-shadow: 0 18px 44px rgba(19,23,32,0.16);
     display: flex;
     flex-direction: column;
     max-height: 620px;
     color: var(--yazi);
-    /* Menü ve açılır parçalar kırpılmasın diye taşma serbest. */
     overflow: visible;
 }
 
@@ -141,7 +139,7 @@
     border-radius: 8px;
     padding: 0;
 }
-#jba-hb .icon-btn:hover { background: var(--mrk-2); color: var(--yazi); }
+#jba-hb .icon-btn:hover { background: var(--kagit); color: var(--yazi); }
 
 #jba-hb .panel-body {
     padding: 12px 14px 14px;
@@ -152,7 +150,7 @@
 
 #jba-hb .token-expiry-badge {
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--sonuk);
     display: flex;
     align-items: center;
@@ -162,38 +160,10 @@
     content: '';
     width: 6px; height: 6px;
     border-radius: 50%;
-    background: var(--yesil);
+    background: #16a34a;
     flex: none;
 }
 #jba-hb .auto-token-note { display: none; }
-
-/* ---------------- KAPSAM: BÖLMELİ DÜĞME ---------------- */
-/* Açılır menü panelin içinde kırpılıyordu ve dört seçenek için fazla
-   ağırdı. Dört kısa seçenek tek satırda dursun, tek dokunuşla değişsin. */
-#jba-hb .kapsam {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 2px;
-    background: var(--mrk-2);
-    border: 1px solid var(--cizgi);
-    border-radius: 10px;
-    padding: 2px;
-}
-#jba-hb .kapsam button {
-    border: 0;
-    background: transparent;
-    color: var(--sonuk);
-    font: 600 11.5px inherit;
-    padding: 6px 0;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.12s ease, color 0.12s ease;
-}
-#jba-hb .kapsam button:hover { color: var(--yazi); }
-#jba-hb .kapsam button[aria-selected="true"] {
-    background: var(--mavi);
-    color: #fff;
-}
 
 #jba-hb .arama-kutu { position: relative; }
 #jba-hb .arama-kutu svg {
@@ -210,7 +180,7 @@
 
 /* ---------------- SONUÇLAR ---------------- */
 #jba-hb .search-results {
-    background: var(--mrk-2);
+    background: var(--kagit);
     border: 1px solid var(--cizgi);
     border-radius: 10px;
     overflow: hidden auto;
@@ -225,7 +195,7 @@
     border-bottom: 1px solid var(--cizgi);
     position: sticky;
     top: 0;
-    background: var(--mrk-2);
+    background: var(--kagit);
 }
 #jba-hb .sr-empty { padding: 14px 11px; color: var(--sonuk); text-align: center; }
 #jba-hb .sr-row {
@@ -234,11 +204,12 @@
     gap: 3px;
     padding: 9px 11px;
     min-height: 44px;
-    border-bottom: 1px solid var(--cizgi);
+    border-bottom: 1px solid var(--cizgi-2);
     cursor: pointer;
+    background: var(--yuzey);
     transition: background 0.12s ease;
 }
-#jba-hb .sr-row:hover { background: rgba(255,255,255,0.045); }
+#jba-hb .sr-row:hover { background: var(--mavi-yumusak); }
 #jba-hb .sr-row:last-child { border-bottom: none; }
 #jba-hb .sr-ust { display: flex; align-items: center; gap: 8px; }
 #jba-hb .sr-ust .sr-courier { margin-left: auto; }
@@ -258,15 +229,17 @@
     max-width: 170px;
 }
 #jba-hb .sr-courier { font-size: 11px; color: var(--sonuk); }
-/* Kategori renkleri. Koyu yüzeyde soluk arka plan okunmuyordu; renk artık
-   satırın içinde küçük noktalar hâlinde. */
+#jba-hb .sr-adet { color: var(--mavi); font-weight: 600; }
+
+/* Kategori renkleri kullanıcının seçtiği renkler; beyaz zeminde nokta
+   olarak doğru okunuyor. */
 #jba-hb .sr-noktalar { display: flex; gap: 3px; flex: none; }
 #jba-hb .sr-noktalar i {
     width: 7px; height: 7px;
     border-radius: 50%;
     display: block;
+    box-shadow: 0 0 0 1px rgba(19,23,32,0.12) inset;
 }
-#jba-hb .sr-adet { color: var(--mavi-ac); font-weight: 600; }
 
 #jba-hb .queue-status-text {
     font-size: 10.5px;
@@ -278,7 +251,7 @@
 #jba-hb .custom-input {
     width: 100%;
     padding: 9px 10px;
-    background: var(--mrk-2);
+    background: var(--yuzey);
     border: 1px solid var(--cizgi);
     border-radius: 10px;
     color: var(--yazi);
@@ -286,11 +259,11 @@
     box-sizing: border-box;
     font-family: inherit;
 }
-#jba-hb .custom-input::placeholder { color: #6b7480; }
+#jba-hb .custom-input::placeholder { color: #9aa1ad; }
 #jba-hb .custom-input:focus {
     outline: none;
     border-color: var(--mavi);
-    box-shadow: 0 0 0 3px rgba(19,91,236,0.18);
+    box-shadow: 0 0 0 3px rgba(19,91,236,0.14);
 }
 #jba-hb textarea.custom-input { resize: vertical; min-height: 54px; }
 
@@ -308,9 +281,9 @@
 }
 #jba-hb .btn-primary:hover { background: #0f4bc4; }
 #jba-hb .btn-danger {
-    background: transparent;
-    color: #f87171;
-    border: 1px solid #4c2323;
+    background: #fff;
+    color: #dc2626;
+    border: 1px solid #f3c9c9;
     padding: 8px;
     font-weight: 600;
     font-size: 12px;
@@ -318,9 +291,9 @@
     cursor: pointer;
     min-height: 38px;
 }
-#jba-hb .btn-danger:hover { background: rgba(220,38,38,0.12); }
+#jba-hb .btn-danger:hover { background: #fdf1f1; }
 #jba-hb .btn-vazgec {
-    background: transparent;
+    background: #fff;
     border: 1px solid var(--cizgi);
     border-radius: 10px;
     color: var(--sonuk);
@@ -328,10 +301,10 @@
     cursor: pointer;
     min-height: 38px;
 }
-#jba-hb .btn-vazgec:hover { background: var(--mrk-2); color: var(--yazi); }
+#jba-hb .btn-vazgec:hover { background: var(--kagit); color: var(--yazi); }
 #jba-hb .btn-secondary-sm {
     width: 100%;
-    background: transparent;
+    background: #fff;
     border: 1px solid var(--cizgi);
     border-radius: 10px;
     padding: 9px 10px;
@@ -343,7 +316,7 @@
     gap: 7px;
     min-height: 38px;
 }
-#jba-hb .btn-secondary-sm:hover { background: var(--mrk-2); color: var(--yazi); }
+#jba-hb .btn-secondary-sm:hover { background: var(--kagit); color: var(--yazi); }
 
 /* ---------------- AYARLAR ---------------- */
 #jba-hb .settings-body {
@@ -364,15 +337,15 @@
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    background: transparent;
-    border: 1px dashed var(--cizgi);
+    background: #fff;
+    border: 1px dashed #d5d2c8;
     border-radius: 10px;
     color: var(--sonuk);
     font: 600 12px inherit;
     padding: 10px;
     cursor: pointer;
 }
-#jba-hb .ekle-btn:hover { border-color: var(--mavi); color: var(--yazi); }
+#jba-hb .ekle-btn:hover { border-color: var(--mavi); color: var(--mavi); }
 #jba-hb #jba-hb-form-govde { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
 
 #jba-hb .ayar-baslik { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
@@ -386,12 +359,12 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
-#jba-hb .alan > small { font-size: 10.5px; color: #6b7480; }
+#jba-hb .alan > small { font-size: 10.5px; color: #9aa1ad; }
 #jba-hb .renk-satiri {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: var(--mrk-2);
+    background: var(--kagit);
     border: 1px solid var(--cizgi);
     border-radius: 10px;
     padding: 8px 10px;
@@ -417,6 +390,7 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    background: var(--kagit);
 }
 #jba-hb .kat-bos {
     text-align: center;
@@ -424,11 +398,12 @@
     font-size: 12px;
     line-height: 1.6;
     padding: 22px 12px;
-    border: 1px dashed var(--cizgi);
+    background: #fff;
+    border: 1px dashed #d5d2c8;
     border-radius: 10px;
 }
 #jba-hb .category-card {
-    background: var(--mrk-2);
+    background: #fff;
     border: 1px solid var(--cizgi);
     border-left: 3px solid;
     padding: 11px 12px;
@@ -454,8 +429,8 @@
     border-radius: 7px;
     padding: 0;
 }
-#jba-hb .action-btn:hover { background: rgba(255,255,255,0.07); color: var(--yazi); }
-#jba-hb .action-btn.sil-btn:hover { color: #f87171; }
+#jba-hb .action-btn:hover { background: var(--kagit); color: var(--yazi); }
+#jba-hb .action-btn.sil-btn:hover { color: #dc2626; background: #fdf1f1; }
 
 #jba-hb .badge {
     padding: 3px 8px;
@@ -465,9 +440,9 @@
     display: inline-block;
     border: 1px solid;
 }
-#jba-hb .badge.inc { color: #4ade80; border-color: rgba(74,222,128,0.28); background: rgba(22,163,74,0.12); }
-#jba-hb .badge.exc { color: #f87171; border-color: rgba(248,113,113,0.28); background: rgba(220,38,38,0.12); }
-#jba-hb .badge::before { font-weight: 700; margin-right: 4px; opacity: 0.7; }
+#jba-hb .badge.inc { color: #15803d; border-color: #bbf0cc; background: #f0fdf4; }
+#jba-hb .badge.exc { color: #b91c1c; border-color: #f3c9c9; background: #fef2f2; }
+#jba-hb .badge::before { font-weight: 700; margin-right: 4px; opacity: 0.65; }
 #jba-hb .badge.inc::before { content: '+'; }
 #jba-hb .badge.exc::before { content: '-'; }
 
@@ -479,10 +454,10 @@
 }
 #jba-hb .advanced-note {
     font-size: 11px;
-    color: #fbbf24;
+    color: #92610a;
     margin: 0 0 8px 0;
-    background: rgba(251,191,36,0.1);
-    border: 1px solid rgba(251,191,36,0.22);
+    background: #fffbeb;
+    border: 1px solid #fce8b2;
     padding: 7px 9px;
     border-radius: 8px;
     line-height: 1.45;
@@ -718,23 +693,14 @@
         /* Arama kapsamı. Tek kutu hem ürün hem kurye hem banko içinde arayınca
            kurye adı yazan ürün sonucu, ürün adı yazan kurye sonucu görüyordu.
            Artık nerede aranacağı seçili. */
-        const KAPSAM_ADI = { hepsi: 'Hepsi', urun: 'Ürün', kurye: 'Kurye', banko: 'Banko' };
-        let kapsamDeger = localStorage.getItem('getir_hb_kapsam') || 'hepsi';
-        if (!KAPSAM_ADI[kapsamDeger]) kapsamDeger = 'hepsi';
-
-        const kapsamOku = () => kapsamDeger;
-
-        /* "BNK.008" ya da "8" gibi bir şey yazıldıysa kapsam ürün olsa bile
-           bankoya da bakılıyor. Bu sürpriz üretmiyor, yalnız ekliyor. */
-        const bankoyaBenzer = (t) => /^bnk/i.test(t) || /^\d{1,3}$/.test(t);
+        /* Kapsam seçici kaldırıldı. Dört düğme hem yer kaplıyordu hem de
+           kullanıcı her seferinde doğru olanı seçmek zorunda kalıyordu.
+           Arama artık her zaman ürün adında, kurye adında ve bankoda birden
+           yapılıyor. Eski `getir_hb_kapsam` ayarı okunmuyor. */
 
         // === UI GÜNCELLEME ===
         const applyUI = () => {
             const term = document.getElementById('jba-hb-girdi')?.value?.trim?.() || '';
-            const kapsam = kapsamOku();
-            const urunAra = kapsam === 'urun' || kapsam === 'hepsi';
-            const kuryeAra = kapsam === 'kurye' || kapsam === 'hepsi';
-            const bankoAra = kapsam === 'banko' || kapsam === 'hepsi' || bankoyaBenzer(term);
             const cards = document.querySelectorAll('[class*="orderCard--"]');
             const matches = [];
 
@@ -757,7 +723,7 @@
                         );
                         if (hit) colors.push(cat.color);
                     });
-                    if (term && urunAra) {
+                    if (term) {
                         hitCount = products.filter(p => wordsMatch(p, term)).length;
                         if (hitCount > 0) isMatch = true;
                     }
@@ -769,8 +735,8 @@
                 const bnk = getBnkCode(card) || 'BNK.?';
             
                 if (term) {
-                    if (kuryeAra && nameTexts.some(t => wordsMatch(t, term))) isMatch = true;
-                    if (bankoAra && wordsMatch(bnk, term)) isMatch = true;
+                    if (nameTexts.some(t => wordsMatch(t, term))) isMatch = true;
+                    if (wordsMatch(bnk, term)) isMatch = true;
                 }
 
                 // --- Soft arka plan boyama hesaplaması ---
@@ -977,15 +943,9 @@
 
                     <div class="panel-body" id="jba-hb-ana">
                         <div id="jba-hb-jeton-durum" class="token-expiry-badge">${getTokenExpiry(userToken)}</div>
-                        <div class="kapsam" id="jba-hb-kapsam">
-                            <button type="button" data-deger="hepsi">Hepsi</button>
-                            <button type="button" data-deger="urun">Ürün</button>
-                            <button type="button" data-deger="kurye">Kurye</button>
-                            <button type="button" data-deger="banko">Banko</button>
-                        </div>
                         <div class="arama-kutu">
                             ${SVG.ara}
-                            <input type="text" id="jba-hb-girdi" class="custom-input search-input" placeholder="Ara">
+                            <input type="text" id="jba-hb-girdi" class="custom-input search-input" placeholder="Ürün, kurye ya da banko ara">
                         </div>
                         <div id="jba-hb-sonuc" class="search-results" style="display:none;"></div>
                         <div id="jba-hb-kuyruk" class="jba-hb-kuyruk-text">Kuyruk: 0 | Hafıza: 0 sipariş</div>
@@ -1116,34 +1076,6 @@
                 }, 120);
             };
             document.getElementById('jba-hb-girdi').oninput = aramaDegisti;
-
-            kapsamKur();
-        };
-
-        /* === KAPSAM SEÇİCİ ===
-           Açılır menüydü: panelin içinde kırpılıyordu ve dört kısa seçenek
-           için fazla ağırdı. Dört bölmeli tek satır oldu, tek dokunuş. */
-        const kapsamYaz = () => {
-            const kap = document.getElementById('jba-hb-kapsam');
-            if (!kap) return;
-            kap.querySelectorAll('button').forEach((b) => {
-                b.setAttribute('aria-selected', String(b.getAttribute('data-deger') === kapsamDeger));
-            });
-        };
-
-        const kapsamKur = () => {
-            const kap = document.getElementById('jba-hb-kapsam');
-            if (!kap) return;
-            kapsamYaz();
-            kap.querySelectorAll('button').forEach((b) => {
-                b.onclick = () => {
-                    kapsamDeger = b.getAttribute('data-deger');
-                    localStorage.setItem('getir_hb_kapsam', kapsamDeger);
-                    kapsamYaz();
-                    applyUI();
-                    document.getElementById('jba-hb-girdi')?.focus();
-                };
-            });
         };
 
         /* Kullanıcı metni HTML'e gömülüyor; kaçırılmazsa kendi ayar yazısı
