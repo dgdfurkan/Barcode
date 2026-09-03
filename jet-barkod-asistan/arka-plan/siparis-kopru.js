@@ -1,0 +1,262 @@
+/**
+ * Arka plan işi: Sipariş Köprüsü
+ * ============================================================================
+ *
+ * Depo panelinden toplanan siparişleri Jet Barkod'a yazar.
+ *
+ * NEDEN ARKA PLANDA
+ * İçerik betiği warehouse.getir.com kaynağında çalışıyor; oradan
+ * api.flowcobalt.com'a atılan istek CORS'a takılır. Arka plan hizmet
+ * işçisinin kaynak kısıtı yok, host izni yeterli.
+ *
+ * YETKİ
+ * Jet Barkod jetonunu biz aramıyoruz. Kullanıcı jetbarkod.com.tr'ye
+ * girdiğinde site köprüsü jetonu ve kullanıcı adını buraya aktarıyor
+ * (JBA_SIPARIS_YETKI). Saklanan jeton yalnız kendi API'mize gidiyor.
+ * Jeton yoksa hiçbir istek atılmıyor, sessizce bekleniyor.
+ *
+ * SIRA VE HIZ
+ * Siparişler tek tek, aralarında bekleme ile yazılıyor. Aynı sipariş
+ * değişmediyse tekrar yazılmıyor; imza karşılaştırması bunun için.
+ *
+ * MÜŞTERİ VERİSİ
+ * Panelin detay yanıtı `clientName` ve `clientNote` taşıyor. Bunlar hiçbir
+ * yere yazılmıyor, gövdeye hiç girmiyor.
+ * ============================================================================
+ */
+
+const SIPARIS_API = 'https://api.flowcobalt.com';
+const SIPARIS_ARA_MS = 400;
+const YETKI_ANAHTARI = 'jbaSiparisYetki';
+const IMZA_ANAHTARI = 'jbaSiparisImzalari';
+
+let siparisKuyrugu = [];
+let siparisIsliyor = false;
+
+// ==================================================================
+// Yetki
+// ==================================================================
+
+async function yetkiOku() {
+    try {
+        const r = await chrome.storage.local.get(YETKI_ANAHTARI);
+        const y = r && r[YETKI_ANAHTARI];
+        if (y && y.token && y.username) return y;
+    } catch (e) { /* sessiz */ }
+    return null;
+}
+
+async function yetkiYaz(token, username) {
+    const y = { token: String(token || ''), username: String(username || ''), zaman: Date.now() };
+    if (!y.token || !y.username) return false;
+    try {
+        await chrome.storage.local.set({ [YETKI_ANAHTARI]: y });
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// ==================================================================
+// İmza: aynı siparişi boşuna tekrar yazma
+// ==================================================================
+
+async function imzalariOku() {
+    try {
+        const r = await chrome.storage.local.get(IMZA_ANAHTARI);
+        return (r && r[IMZA_ANAHTARI]) || {};
+    } catch (e) {
+        return {};
+    }
+}
+
+async function imzalariYaz(imzalar) {
+    // Sınırsız büyümesin; en yeni iki yüz sipariş yeter.
+    const anahtarlar = Object.keys(imzalar);
+    if (anahtarlar.length > 200) {
+        const kirp = {};
+        anahtarlar.slice(-200).forEach((k) => { kirp[k] = imzalar[k]; });
+        imzalar = kirp;
+    }
+    try { await chrome.storage.local.set({ [IMZA_ANAHTARI]: imzalar }); } catch (e) { /* sessiz */ }
+}
+
+function siparisImzasi(s) {
+    const urun = (s.urunler || [])
+        .map((u) => u.sira + ':' + u.adet + ':' + (u.ad || ''))
+        .join('|');
+    return [s.durum, s.banko, s.toplamAdet, s.posetSayisi, s.toplayici, s.kurye, urun].join('~');
+}
+
+// ==================================================================
+// PostgREST
+// ==================================================================
+
+function apiBasliklari(yetki, ekstra) {
+    const h = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer ' + yetki.token
+    };
+    if (ekstra) Object.keys(ekstra).forEach((k) => { h[k] = ekstra[k]; });
+    return h;
+}
+
+async function siparisYaz(yetki, s) {
+    const govde = {
+        username: yetki.username,
+        order_id: s.siparisId,
+        banko: s.banko || null,
+        kolon: s.kolon || null,
+        durum: typeof s.durum === 'number' ? s.durum : null,
+        toplam_adet: typeof s.toplamAdet === 'number' ? s.toplamAdet : null,
+        poset_sayisi: typeof s.posetSayisi === 'number' ? s.posetSayisi : null,
+        eksik_urun_var: !!s.eksikUrunVar,
+        toplayici: s.toplayici || null,
+        kurye: s.kurye || null,
+        sepet_zamani: s.sepetZamani || null,
+        updated_at: new Date().toISOString()
+    };
+
+    const yanit = await fetch(
+        SIPARIS_API + '/rest/v1/orders?on_conflict=username,order_id',
+        {
+            method: 'POST',
+            headers: apiBasliklari(yetki, {
+                'Prefer': 'resolution=merge-duplicates,return=representation'
+            }),
+            body: JSON.stringify([govde])
+        }
+    );
+
+    const metin = await yanit.text();
+    if (!yanit.ok) throw new Error('orders ' + yanit.status + ': ' + metin.slice(0, 160));
+
+    let satir = null;
+    try { satir = JSON.parse(metin)[0]; } catch (e) { /* sessiz */ }
+    if (!satir || !satir.id) throw new Error('orders: kimlik dönmedi');
+    return satir.id;
+}
+
+async function satirlariYaz(yetki, siparisUuid, urunler) {
+    if (!urunler.length) return;
+
+    const govde = urunler.map((u) => ({
+        order_uuid: siparisUuid,
+        sira: u.sira,
+        urun_id: u.urunId || null,
+        urun_adi: u.ad || null,
+        gorsel_id: u.gorsel || null,
+        adet: typeof u.adet === 'number' ? u.adet : 1,
+        birim: u.birim || null,
+        ana_kategori: u.anaKategori || null,
+        sinif: u.sinif || null,
+        alt_sinif: u.altSinif || null
+    }));
+
+    const yanit = await fetch(
+        SIPARIS_API + '/rest/v1/order_items?on_conflict=order_uuid,sira',
+        {
+            method: 'POST',
+            headers: apiBasliklari(yetki, {
+                'Prefer': 'resolution=merge-duplicates,return=minimal'
+            }),
+            body: JSON.stringify(govde)
+        }
+    );
+
+    if (!yanit.ok) {
+        const metin = await yanit.text();
+        throw new Error('order_items ' + yanit.status + ': ' + metin.slice(0, 160));
+    }
+}
+
+// ==================================================================
+// Kuyruk
+// ==================================================================
+
+function bekle(ms) {
+    return new Promise((c) => setTimeout(c, ms));
+}
+
+async function kuyrugaAl(siparisler) {
+    if (!Array.isArray(siparisler) || !siparisler.length) return { ok: false, sebep: 'liste boş' };
+
+    const yetki = await yetkiOku();
+    if (!yetki) return { ok: false, sebep: 'yetki yok' };
+
+    const imzalar = await imzalariOku();
+    let eklenen = 0;
+
+    siparisler.forEach((s) => {
+        if (!s || !s.siparisId) return;
+        const imza = siparisImzasi(s);
+        if (imzalar[s.siparisId] === imza) return;
+        // Kuyrukta aynı sipariş varsa yenisiyle değiştir.
+        const yer = siparisKuyrugu.findIndex((x) => x.siparisId === s.siparisId);
+        if (yer > -1) siparisKuyrugu[yer] = s;
+        else siparisKuyrugu.push(s);
+        eklenen++;
+    });
+
+    if (eklenen && !siparisIsliyor) kuyrugaBak();
+    return { ok: true, eklenen: eklenen, kuyruk: siparisKuyrugu.length };
+}
+
+async function kuyrugaBak() {
+    if (siparisIsliyor) return;
+    siparisIsliyor = true;
+
+    try {
+        while (siparisKuyrugu.length) {
+            const yetki = await yetkiOku();
+            if (!yetki) break;
+
+            const s = siparisKuyrugu.shift();
+            try {
+                const uuid = await siparisYaz(yetki, s);
+                await satirlariYaz(yetki, uuid, s.urunler || []);
+
+                const imzalar = await imzalariOku();
+                imzalar[s.siparisId] = siparisImzasi(s);
+                await imzalariYaz(imzalar);
+            } catch (e) {
+                console.warn('[Jet Barkod] Sipariş yazılamadı:', (e && e.message) || e);
+                /* Yetki hatasıysa kuyruğu boşuna döndürmeyelim; jeton
+                   yenilenene kadar duruyoruz. */
+                if (String((e && e.message) || '').indexOf('401') !== -1) break;
+            }
+
+            if (siparisKuyrugu.length) await bekle(SIPARIS_ARA_MS);
+        }
+    } finally {
+        siparisIsliyor = false;
+    }
+}
+
+// ==================================================================
+// Mesajlar
+// ==================================================================
+
+chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
+    if (!istek || typeof istek.type !== 'string') return;
+
+    if (istek.type === 'JBA_SIPARIS_YETKI') {
+        yetkiYaz(istek.token, istek.username).then((ok) => cevapla({ ok: ok }));
+        return true;
+    }
+
+    if (istek.type === 'JBA_SIPARIS_YAZ') {
+        kuyrugaAl(istek.siparisler).then(cevapla, (e) =>
+            cevapla({ ok: false, sebep: (e && e.message) || 'hata' })
+        );
+        return true;
+    }
+
+    if (istek.type === 'JBA_SIPARIS_DURUM') {
+        yetkiOku().then((y) =>
+            cevapla({ yetkiVar: !!y, kuyruk: siparisKuyrugu.length, isliyor: siparisIsliyor })
+        );
+        return true;
+    }
+});

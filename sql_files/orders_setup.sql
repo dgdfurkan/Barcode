@@ -56,7 +56,10 @@ CREATE TABLE IF NOT EXISTS order_items (
     -- yan yana. Site tarafında hesaplanıp buraya yazılıyor.
     toplama_sirasi  INTEGER,
     alindi          BOOLEAN     NOT NULL DEFAULT false,
-    created_at      TIMESTAMPTZ DEFAULT NOW()
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    -- Aynı satır iki kez yazılmasın. Eklenti aynı siparişi her tazelemede
+    -- gönderiyor; upsert bu kısıtla çalışıyor, silme gerekmiyor.
+    CONSTRAINT order_items_order_sira_key UNIQUE (order_uuid, sira)
 );
 
 CREATE INDEX IF NOT EXISTS idx_orders_username        ON orders (username);

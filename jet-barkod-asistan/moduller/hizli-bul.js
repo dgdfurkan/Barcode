@@ -877,10 +877,22 @@
                                 const n = p?.name?.tr || p?.name?.en || '';
                                 return typeof n === 'string' ? n.toLowerCase() : '';
                             }).filter(Boolean),
-                            count: order.basketProductCount ?? null
+                            count: order.basketProductCount ?? null,
+                            /* Jet Barkod'a gidecek satırlar. Alan adları gerçek
+                               yanıttan okundu: index, name.tr, picURL.tr,
+                               orderCount. Ürün kimliği yanıtta yok; site
+                               tarafı ad + görsel ile katalogdan buluyor.
+                               clientName ve clientNote alınmıyor. */
+                            detay: order.products.map(p => ({
+                                sira: p?.index,
+                                ad: (p?.name?.tr || p?.name?.en || '').trim(),
+                                gorsel: (p?.picURL?.tr || p?.picURL?.en || '') || '',
+                                adet: typeof p?.orderCount === 'number' ? p.orderCount : null
+                            })).filter(u => u.sira != null)
                         };
                         saveCache();
                         applyUI();
+                        siparisleriYolla();
                     }
                 } else if (res.status === 401) {
                     fetchQueue.unshift(oId);
@@ -1158,9 +1170,58 @@
             });
         };
 
+        // ==================================================================
+        // Jet Barkod'a aktarım
+        //
+        // Liste verisi (banko, adet, poşet, toplayıcı, kurye, kategori) sayfa
+        // köprüsünden geliyor; ürün adı ve görseli detay kuyruğundan. İkisi
+        // satır sırası (`index`) üzerinden birleşiyor.
+        // ==================================================================
+
+        let sonSiparisListesi = [];
+
+        const birlestir = (s) => {
+            const kod = String(s.siparisId || '').slice(-4);
+            const girdi = orderCache[kod];
+            const detay = (girdi && !Array.isArray(girdi) && girdi.detay) || [];
+            const detayHarita = new Map();
+            detay.forEach((d) => detayHarita.set(d.sira, d));
+
+            const urunler = (s.urunler || []).map((u) => {
+                const d = detayHarita.get(u.sira) || {};
+                return {
+                    sira: u.sira,
+                    ad: d.ad || '',
+                    gorsel: d.gorsel || '',
+                    /* Liste ile detay aynı adedi veriyor. Getir kilogramla
+                       satılan üründe de bu alanı kullanıyor; çevirmiyoruz. */
+                    adet: (typeof u.adet === 'number' ? u.adet : d.adet) || 1,
+                    anaKategori: u.anaKategori || '',
+                    sinif: u.sinif || '',
+                    altSinif: u.altSinif || ''
+                };
+            });
+
+            return Object.assign({}, s, { urunler: urunler });
+        };
+
+        const siparisleriYolla = () => {
+            if (!sonSiparisListesi.length) return;
+            try {
+                chrome.runtime.sendMessage(
+                    { type: 'JBA_SIPARIS_YAZ', siparisler: sonSiparisListesi.map(birlestir) },
+                    () => { if (chrome.runtime.lastError) { /* hizmet işçisi uyuyor olabilir */ } }
+                );
+            } catch (e) { /* sessiz */ }
+        };
+
         // === MESAJ DİNLEYİCİ ===
         window.addEventListener('message', (event) => {
             if (!event.data || event.source !== window) return;
+            if (event.data.type === 'JB_SIPARISLER' && Array.isArray(event.data.liste)) {
+                sonSiparisListesi = event.data.liste;
+                siparisleriYolla();
+            }
             if (event.data.type === 'GETIR_DATA_RECEIVED') findOrderIds(event.data.payload);
             if (event.data.type === 'GETIR_TOKEN_CAPTURED') {
                 const t = event.data.token;

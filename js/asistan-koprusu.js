@@ -69,6 +69,22 @@
     function moduleriBildir() {
         if (!durum.kurulu) return;
         gonder({ type: 'JB_ASISTAN_MODULLER', moduller: acikModuller() });
+        yetkiBildir();
+    }
+
+    /**
+     * Oturum jetonunu eklentiye verir. Eklenti depo panelinden topladığı
+     * siparişleri bizim API'mize bu jetonla yazıyor; site sekmesi kapalıyken
+     * de yazabilmesi için jetonu kendi tarafında saklıyor.
+     */
+    function yetkiBildir() {
+        if (!durum.kurulu) return;
+        try {
+            var oturum = global.authUtils && global.authUtils.checkAuth();
+            var jeton = global.authUtils && global.authUtils.getToken && global.authUtils.getToken();
+            if (!oturum || !oturum.username || !jeton) return;
+            gonder({ type: 'JB_SIPARIS_YETKI', token: jeton, username: oturum.username });
+        } catch (e) { /* sessiz */ }
     }
 
     global.addEventListener('message', function (e) {

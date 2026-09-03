@@ -88,6 +88,15 @@
             return;
         }
 
+        /* Sayfa Jet Barkod oturum jetonunu veriyor. Jetonu biz aramıyoruz;
+           site kendi isteğiyle aktarıyor ve yalnız kendi API'mize gidiyor.
+           Site kapalıyken de sipariş yazabilmemiz bu sayede. */
+        if (d.type === 'JB_SIPARIS_YETKI' && d.token && d.username) {
+            arkaPlana({ type: 'JBA_SIPARIS_YETKI', token: d.token, username: d.username },
+                function (y) { gonder({ type: 'JB_SIPARIS_YETKI_TAMAM', ok: !!(y && y.ok) }); });
+            return;
+        }
+
         // Sayfa açık modül listesini bildiriyor.
         if (d.type === 'JB_ASISTAN_MODULLER' && Array.isArray(d.moduller)) {
             var temiz = d.moduller.filter(function (x) { return typeof x === 'string'; });
