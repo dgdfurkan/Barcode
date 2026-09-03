@@ -89,28 +89,147 @@
 }
 #jba-hb .action-btn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
 
+/* [hidden] tek başına yetmiyor: aşağıda display veren kurallar var ve
+   belirlilik yarışını onlar kazanıyor. Bu satır olmazsa menü hiç kapanmaz. */
+#jba-hb [hidden] { display: none !important; }
+
 /* Arama satırı: kapsam seçici + kutu */
 #jba-hb .jba-hb-arama {
     display: grid;
-    grid-template-columns: 92px 1fr;
+    grid-template-columns: 104px 1fr;
     gap: 6px;
     align-items: stretch;
 }
-#jba-hb .jba-hb-kapsam {
+
+/* Kapsam seçici. Tarayıcının kendi <select> kabuğu panelin içinde yabancı
+   duruyordu; kendi düğmemiz ve kendi menümüz var. */
+#jba-hb .jba-hb-kapsam { position: relative; }
+#jba-hb .jba-hb-kapsam__dugme {
+    width: 100%;
+    height: 100%;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    background: #f0ecff;
     border: 2px solid #5d3ebc;
-    border-radius: 6px;
-    background: #fff;
+    border-radius: 8px;
     color: #5d3ebc;
-    font-weight: 700;
-    font-size: 12px;
-    padding: 0 6px;
+    font: 700 12px inherit;
+    padding: 0 8px;
     cursor: pointer;
+}
+#jba-hb .jba-hb-kapsam__dugme:hover { background: #e6dfff; }
+#jba-hb .jba-hb-kapsam__ok { font-size: 10px; opacity: .7; transition: transform .15s ease; }
+#jba-hb .jba-hb-kapsam.acik .jba-hb-kapsam__ok { transform: rotate(180deg); }
+
+#jba-hb .jba-hb-kapsam__menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 100%;
+    background: #fff;
+    border: 1.5px solid #5d3ebc;
+    border-radius: 8px;
+    box-shadow: 0 8px 20px rgba(93,62,188,0.22);
+    overflow: hidden;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+}
+#jba-hb .jba-hb-kapsam__menu button {
+    background: transparent;
+    border: 0;
+    text-align: left;
+    padding: 8px 10px;
+    font: 600 12px inherit;
+    color: #3b3357;
+    cursor: pointer;
+    white-space: nowrap;
+}
+#jba-hb .jba-hb-kapsam__menu button:hover { background: #f0ecff; }
+#jba-hb .jba-hb-kapsam__menu button[aria-selected="true"] {
+    background: #5d3ebc;
+    color: #ffd300;
 }
 #jba-hb .jba-hb-ipucu {
     font-size: 10px;
     color: #8b83a8;
     margin-top: -4px;
 }
+
+/* ---------------- AYARLAR ---------------- */
+#jba-hb .ayar-baslik {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+#jba-hb .ayar-baslik h4 { margin: 0; font-size: 13px; color: #5d3ebc; }
+#jba-hb .ayar-baslik span { font-size: 10px; color: #8b83a8; }
+#jba-hb .alan { display: flex; flex-direction: column; gap: 3px; }
+#jba-hb .alan > label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #6b6383;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+}
+#jba-hb .alan > small { font-size: 10px; color: #9a93b0; }
+#jba-hb .renk-satiri {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #e3dff2;
+    border-radius: 8px;
+    padding: 6px 8px;
+}
+#jba-hb .renk-satiri label { flex: 1; font-size: 11px; font-weight: 700; color: #6b6383; }
+#jba-hb .renk-satiri input[type="color"] {
+    border: none;
+    background: none;
+    width: 34px;
+    height: 26px;
+    padding: 0;
+    cursor: pointer;
+}
+#jba-hb .form-dugmeler { display: grid; grid-template-columns: 1fr; gap: 6px; }
+#jba-hb .form-dugmeler.duzenleme { grid-template-columns: 1fr 88px; }
+#jba-hb .btn-vazgec {
+    background: #fff;
+    border: 1px solid #d8d0f5;
+    border-radius: 6px;
+    color: #6b6383;
+    font: 600 12px inherit;
+    cursor: pointer;
+}
+#jba-hb .btn-vazgec:hover { background: #f0ecff; color: #5d3ebc; }
+#jba-hb .kat-bos {
+    text-align: center;
+    color: #9a93b0;
+    font-size: 12px;
+    padding: 18px 10px;
+    background: #fff;
+    border: 1px dashed #d8d0f5;
+    border-radius: 8px;
+}
+#jba-hb .kat-ust {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+}
+#jba-hb .kat-ad {
+    font-size: 13px;
+    font-weight: 700;
+    color: #2f2a45;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#jba-hb .kat-rozetler { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
 
 #jba-hb #jba-hb-fab {
     width: 56px;
@@ -543,10 +662,11 @@
         /* Arama kapsamı. Tek kutu hem ürün hem kurye hem banko içinde arayınca
            kurye adı yazan ürün sonucu, ürün adı yazan kurye sonucu görüyordu.
            Artık nerede aranacağı seçili. */
-        const kapsamOku = () => {
-            const el = document.getElementById('jba-hb-kapsam');
-            return (el && el.value) || localStorage.getItem('getir_hb_kapsam') || 'urun';
-        };
+        const KAPSAM_ADI = { hepsi: 'Hepsi', urun: 'Ürün', kurye: 'Kurye', banko: 'Banko' };
+        let kapsamDeger = localStorage.getItem('getir_hb_kapsam') || 'hepsi';
+        if (!KAPSAM_ADI[kapsamDeger]) kapsamDeger = 'hepsi';
+
+        const kapsamOku = () => kapsamDeger;
 
         /* "BNK.008" ya da "8" gibi bir şey yazıldıysa kapsam ürün olsa bile
            bankoya da bakılıyor. Bu sürpriz üretmiyor, yalnız ekliyor. */
@@ -769,30 +889,53 @@
                         <div id="jba-hb-jeton-durum" class="token-expiry-badge">${getTokenExpiry(userToken)}</div>
                         <div class="auto-token-note">🔄 Token otomatik alınıyor</div>
                         <div class="jba-hb-arama">
-                            <select id="jba-hb-kapsam" class="jba-hb-kapsam" title="Nerede aransın">
-                                <option value="urun">Ürün</option>
-                                <option value="kurye">Kurye</option>
-                                <option value="banko">Banko</option>
-                                <option value="hepsi">Hepsi</option>
-                            </select>
+                            <div class="jba-hb-kapsam" id="jba-hb-kapsam">
+                                <button type="button" class="jba-hb-kapsam__dugme" id="jba-hb-kapsam-dugme">
+                                    <span id="jba-hb-kapsam-etiket">Hepsi</span>
+                                    <span class="jba-hb-kapsam__ok">▾</span>
+                                </button>
+                                <div class="jba-hb-kapsam__menu" id="jba-hb-kapsam-menu" hidden>
+                                    <button type="button" data-deger="hepsi">Hepsi</button>
+                                    <button type="button" data-deger="urun">Ürün</button>
+                                    <button type="button" data-deger="kurye">Kurye</button>
+                                    <button type="button" data-deger="banko">Banko</button>
+                                </div>
+                            </div>
                             <input type="text" id="jba-hb-girdi" class="custom-input search-input" placeholder="🔍 Ara...">
                         </div>
-                        <div class="jba-hb-ipucu">Kapsam seçili değilse ürün adında aranır.</div>
+                        <div class="jba-hb-ipucu">Varsayılan hepsinde arar. Daraltmak istersen soldan seç.</div>
                         <div id="jba-hb-sonuc" class="search-results" style="display:none;"></div>
                         <div id="jba-hb-kuyruk" class="jba-hb-kuyruk-text">Kuyruk: 0 | Hafıza: 0 sipariş</div>
                     </div>
 
                     <div class="settings-body" id="jba-hb-ayar" style="display:none;">
                         <div class="settings-form">
-                            <h4 style="margin:0; color:#5d3ebc;">Kategori Düzenleyici</h4>
-                            <input type="text" id="jba-hb-kat-ad" class="custom-input" placeholder="Başlık (Örn: Sular)">
-                            <textarea id="jba-hb-kat-dahil" class="custom-input" placeholder="Dahil (erikli, hayat)" rows="2"></textarea>
-                            <textarea id="jba-hb-kat-haric" class="custom-input" placeholder="Hariç (cam, 1lt)" rows="2"></textarea>
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <label style="font-size:11px; font-weight:bold;">Renk:</label>
-                                <input type="color" id="jba-hb-kat-renk" value="#0088ff" style="border:none; width:40px; height:25px; cursor:pointer;">
+                            <div class="ayar-baslik">
+                                <h4>Kategori Düzenleyici</h4>
+                                <span>Kart arka planını boyar</span>
                             </div>
-                            <button id="jba-hb-kat-kaydet" class="btn-primary">Kategoriyi Kaydet</button>
+                            <div class="alan">
+                                <label for="jba-hb-kat-ad">Başlık</label>
+                                <input type="text" id="jba-hb-kat-ad" class="custom-input" placeholder="Örnek: Sular">
+                            </div>
+                            <div class="alan">
+                                <label for="jba-hb-kat-dahil">Dahil edilecek kelimeler</label>
+                                <textarea id="jba-hb-kat-dahil" class="custom-input" placeholder="erikli, hayat su" rows="2"></textarea>
+                                <small>Virgülle ayır. Biri geçiyorsa kart boyanır.</small>
+                            </div>
+                            <div class="alan">
+                                <label for="jba-hb-kat-haric">Hariç tutulacaklar</label>
+                                <textarea id="jba-hb-kat-haric" class="custom-input" placeholder="cam, 1 lt" rows="2"></textarea>
+                                <small>İsteğe bağlı. Bunlardan biri geçiyorsa boyanmaz.</small>
+                            </div>
+                            <div class="renk-satiri">
+                                <label for="jba-hb-kat-renk">Kart rengi</label>
+                                <input type="color" id="jba-hb-kat-renk" value="#0088ff">
+                            </div>
+                            <div class="form-dugmeler" id="jba-hb-form-dugmeler">
+                                <button id="jba-hb-kat-kaydet" class="btn-primary">Kategoriyi Kaydet</button>
+                                <button id="jba-hb-kat-vazgec" class="btn-vazgec" hidden>Vazgeç</button>
+                            </div>
                         </div>
                         <div id="jba-hb-kat-liste"></div>
                         <div class="advanced-section">
@@ -854,13 +997,12 @@
                     if (idx > -1) userSettings[idx] = cat;
                     else userSettings.push(cat);
                     localStorage.setItem('getir_settings', JSON.stringify(userSettings));
-                    ['jba-hb-kat-ad', 'jba-hb-kat-dahil', 'jba-hb-kat-haric'].forEach(id => { document.getElementById(id).value = ''; });
-                    editingCategoryIndex = -1;
-                    document.getElementById('jba-hb-kat-kaydet').innerText = 'Kategoriyi Kaydet';
+                    duzenlemeyiBitir();
                     renderCategories();
                     applyUI();
                 }
             };
+            document.getElementById('jba-hb-kat-vazgec').onclick = duzenlemeyiBitir;
             /* Her tuşta sekiz kartı yeniden tarayıp yeniden çizmek yerine
                120 ms bekleniyor ve çizim tek kareye toplanıyor. */
             let aramaZaman = null;
@@ -878,32 +1020,96 @@
             };
             document.getElementById('jba-hb-girdi').oninput = aramaDegisti;
 
-            const kapsamEl = document.getElementById('jba-hb-kapsam');
-            kapsamEl.value = localStorage.getItem('getir_hb_kapsam') || 'urun';
-            kapsamEl.onchange = () => {
-                localStorage.setItem('getir_hb_kapsam', kapsamEl.value);
-                applyUI();
+            kapsamKur();
+        };
+
+        // === KAPSAM SEÇİCİ ===
+        const kapsamMenuKapat = () => {
+            const kap = document.getElementById('jba-hb-kapsam');
+            const menu = document.getElementById('jba-hb-kapsam-menu');
+            if (!kap || !menu) return;
+            menu.hidden = true;
+            kap.classList.remove('acik');
+        };
+
+        const kapsamYaz = () => {
+            const etiket = document.getElementById('jba-hb-kapsam-etiket');
+            if (etiket) etiket.textContent = KAPSAM_ADI[kapsamDeger];
+            const menu = document.getElementById('jba-hb-kapsam-menu');
+            if (!menu) return;
+            menu.querySelectorAll('button').forEach((b) => {
+                b.setAttribute('aria-selected', String(b.getAttribute('data-deger') === kapsamDeger));
+            });
+        };
+
+        const kapsamKur = () => {
+            const dugme = document.getElementById('jba-hb-kapsam-dugme');
+            const menu = document.getElementById('jba-hb-kapsam-menu');
+            const kap = document.getElementById('jba-hb-kapsam');
+            if (!dugme || !menu || !kap) return;
+
+            kapsamYaz();
+
+            dugme.onclick = (e) => {
+                e.stopPropagation();
+                const acik = !menu.hidden;
+                menu.hidden = acik;
+                kap.classList.toggle('acik', !acik);
             };
+
+            menu.querySelectorAll('button').forEach((b) => {
+                b.onclick = (e) => {
+                    e.stopPropagation();
+                    kapsamDeger = b.getAttribute('data-deger');
+                    localStorage.setItem('getir_hb_kapsam', kapsamDeger);
+                    kapsamYaz();
+                    kapsamMenuKapat();
+                    applyUI();
+                    document.getElementById('jba-hb-girdi')?.focus();
+                };
+            });
+        };
+
+        /* Kullanıcı metni HTML'e gömülüyor; kaçırılmazsa kendi ayar yazısı
+           paneli bozabilir. */
+        const kacir = (t) => String(t == null ? '' : t)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+        const duzenlemeyiBitir = () => {
+            editingCategoryIndex = -1;
+            const kaydet = document.getElementById('jba-hb-kat-kaydet');
+            const vazgec = document.getElementById('jba-hb-kat-vazgec');
+            const kap = document.getElementById('jba-hb-form-dugmeler');
+            if (kaydet) kaydet.innerText = 'Kategoriyi Kaydet';
+            if (vazgec) vazgec.hidden = true;
+            if (kap) kap.classList.remove('duzenleme');
+            ['jba-hb-kat-ad', 'jba-hb-kat-dahil', 'jba-hb-kat-haric'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
         };
 
         const renderCategories = () => {
             const list = document.getElementById('jba-hb-kat-liste');
             if (!list) return;
             if (userSettings.length === 0) {
-                list.innerHTML = `<div style="text-align:center;color:#999;font-size:12px;padding:10px;">Henüz kategori yok.</div>`;
+                list.innerHTML = `<div class="kat-bos">Henüz kategori yok.<br>Yukarıdan ekleyebilirsin.</div>`;
                 return;
             }
             list.innerHTML = userSettings.map((cat, idx) => `
-                <div class="category-card" style="border-left-color:${cat.color};background:${hexToRgba(cat.color, 0.07)}">
-                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-                        <strong style="font-size:13px;">${cat.name}</strong>
-                        <div style="display:flex;gap:4px;">
-                            <button class="action-btn edit-btn" data-idx="${idx}">✏️</button>
-                            <button class="action-btn del-btn" data-idx="${idx}">🗑️</button>
+                <div class="category-card" style="border-left-color:${kacir(cat.color)};background:${hexToRgba(cat.color, 0.07)}">
+                    <div class="kat-ust">
+                        <span class="kat-ad">${kacir(cat.name)}</span>
+                        <div style="display:flex;gap:2px;flex-shrink:0;">
+                            <button class="action-btn edit-btn" data-idx="${idx}" title="Düzenle">✏️</button>
+                            <button class="action-btn del-btn" data-idx="${idx}" title="Sil">🗑️</button>
                         </div>
                     </div>
-                    <div style="margin-top:5px;">${cat.includes.map(k => `<span class="badge inc">+ ${k}</span>`).join('')}</div>
-                    ${(cat.excludes || []).length > 0 ? `<div>${cat.excludes.map(k => `<span class="badge exc">- ${k}</span>`).join('')}</div>` : ''}
+                    <div class="kat-rozetler">
+                        ${cat.includes.map(k => `<span class="badge inc">${kacir(k)}</span>`).join('')}
+                        ${(cat.excludes || []).map(k => `<span class="badge exc">${kacir(k)}</span>`).join('')}
+                    </div>
                 </div>
             `).join('');
 
@@ -924,7 +1130,10 @@
                     document.getElementById('jba-hb-kat-renk').value = cat.color;
                     editingCategoryIndex = idx;
                     document.getElementById('jba-hb-kat-kaydet').innerText = 'Güncelle';
+                    document.getElementById('jba-hb-kat-vazgec').hidden = false;
+                    document.getElementById('jba-hb-form-dugmeler').classList.add('duzenleme');
                     document.getElementById('jba-hb-ayar').scrollTop = 0;
+                    document.getElementById('jba-hb-kat-ad').focus();
                 };
             });
         };
@@ -969,12 +1178,23 @@
         document.addEventListener('click', (e) => {
             if (!panelAcikMi()) return;
             const kap = document.getElementById('jba-hb');
-            if (!kap || kap.contains(e.target)) return;
+            if (!kap) return;
+            if (kap.contains(e.target)) {
+                // Panel içi tıklama paneli kapatmaz ama açık menüyü kapatır.
+                const kapsam = document.getElementById('jba-hb-kapsam');
+                if (kapsam && !kapsam.contains(e.target)) kapsamMenuKapat();
+                return;
+            }
+            kapsamMenuKapat();
             paneliKapat();
         }, true);
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && panelAcikMi()) paneliKapat();
+            if (e.key !== 'Escape' || !panelAcikMi()) return;
+            const menu = document.getElementById('jba-hb-kapsam-menu');
+            // Menü açıksa önce o kapansın; Esc bir seferde iki şeyi kapatmasın.
+            if (menu && !menu.hidden) { kapsamMenuKapat(); return; }
+            paneliKapat();
         });
 
         // === YAŞAM DÖNGÜSÜ ===
