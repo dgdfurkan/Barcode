@@ -35,15 +35,84 @@
     var JBA = global.JBA;
     if (!JBA) return;
 
-    var STIL = `#getir-fab-container {
+    /*
+     * Getir'in CSS sınıf adlarında karma var (orderCard--LDG_w gibi). Karma
+     * her yayında değişebiliyor ve değiştiği gün eklenti sessizce ölürdü.
+     * Seçiciler artık öneke bakıyor, karmaya değil.
+     */
+
+    /**
+     * Yalnız sipariş listesi sayfası. Depo kimliği 24 haneli onaltılık ve
+     * her depoda farklı, o yüzden desende sabit değil kalıp var.
+     */
+    var SIPARIS_YOLU = /^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/;
+
+    var STIL = `#jba-hb {
     position: fixed;
     bottom: 30px;
     right: 30px;
     z-index: 999999;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+    /* Kurye adının üstüne denk gelip göz yorduğu için sönük duruyor.
+       Fare yaklaşınca, içine odaklanınca ya da panel açıkken tam görünür. */
+    opacity: 0.32;
+    transition: opacity 0.18s ease;
+}
+#jba-hb:hover,
+#jba-hb:focus-within,
+#jba-hb.jba-hb--acik { opacity: 1; }
+
+/* Yerleşim sertleştirme: taşan metin kırpılıyor, düğmeler tek ızgarada,
+   satır yükseklikleri sabit. Yarım kalan düğme ve okunmayan yazı kalmasın. */
+#jba-hb .sr-row { min-height: 42px; }
+#jba-hb .sr-bnk,
+#jba-hb .sr-courier {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 160px;
+}
+#jba-hb .search-results { max-height: 260px; overflow-y: auto; }
+#jba-hb .header-buttons button {
+    width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; padding: 0;
+}
+#jba-hb .header-buttons button:hover { background: rgba(255,255,255,0.16); }
+#jba-hb .btn-primary,
+#jba-hb .btn-danger,
+#jba-hb .btn-secondary-sm {
+    min-height: 34px;
+    line-height: 1.15;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+#jba-hb .action-btn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Arama satırı: kapsam seçici + kutu */
+#jba-hb .jba-hb-arama {
+    display: grid;
+    grid-template-columns: 92px 1fr;
+    gap: 6px;
+    align-items: stretch;
+}
+#jba-hb .jba-hb-kapsam {
+    border: 2px solid #5d3ebc;
+    border-radius: 6px;
+    background: #fff;
+    color: #5d3ebc;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 0 6px;
+    cursor: pointer;
+}
+#jba-hb .jba-hb-ipucu {
+    font-size: 10px;
+    color: #8b83a8;
+    margin-top: -4px;
 }
 
-#getir-fab-container #getir-fab {
+#jba-hb #jba-hb-fab {
     width: 56px;
     height: 56px;
     background: #5d3ebc;
@@ -57,9 +126,9 @@
     font-size: 22px;
     transition: transform 0.15s ease;
 }
-#getir-fab-container #getir-fab:hover { transform: scale(1.08); }
+#jba-hb #jba-hb-fab:hover { transform: scale(1.08); }
 
-#getir-fab-container #getir-panel {
+#jba-hb #jba-hb-panel {
     width: 360px;
     background: #fff;
     border: 1.5px solid #5d3ebc;
@@ -71,7 +140,7 @@
     overflow: hidden;
 }
 
-#getir-fab-container .panel-header {
+#jba-hb .panel-header {
     background: linear-gradient(135deg, #5d3ebc, #7b5ce6);
     padding: 11px 14px;
     display: flex;
@@ -82,18 +151,18 @@
     font-size: 14px;
     flex-shrink: 0;
 }
-#getir-fab-container .header-buttons { display: flex; gap: 8px; }
-#getir-fab-container .icon-btn { background: transparent; border: none; color: white; cursor: pointer; font-size: 17px; opacity: 0.9; }
-#getir-fab-container .icon-btn:hover { opacity: 1; }
+#jba-hb .header-buttons { display: flex; gap: 8px; }
+#jba-hb .icon-btn { background: transparent; border: none; color: white; cursor: pointer; font-size: 17px; opacity: 0.9; }
+#jba-hb .icon-btn:hover { opacity: 1; }
 
-#getir-fab-container .panel-body {
+#jba-hb .panel-body {
     padding: 14px;
     display: flex;
     flex-direction: column;
     gap: 9px;
 }
 
-#getir-fab-container .token-expiry-badge {
+#jba-hb .token-expiry-badge {
     font-size: 12px;
     text-align: center;
     font-weight: 700;
@@ -103,43 +172,43 @@
     padding: 5px 8px;
 }
 
-#getir-fab-container .auto-token-note {
+#jba-hb .auto-token-note {
     font-size: 10px;
     text-align: center;
     color: #28a745;
     margin-top: -4px;
 }
 
-#getir-fab-container .search-input {
+#jba-hb .search-input {
     border: 2px solid #5d3ebc !important;
     font-size: 14px !important;
     padding: 9px 10px !important;
 }
 
-#getir-fab-container .search-results {
+#jba-hb .search-results {
     background: #f7f5ff;
     border: 1px solid #d8d0f5;
     border-radius: 8px;
     overflow: hidden;
     font-size: 12px;
 }
-#getir-fab-container .sr-header {
+#jba-hb .sr-header {
     background: #5d3ebc;
     color: white;
     padding: 5px 10px;
     font-weight: 600;
     font-size: 11px;
 }
-#getir-fab-container .sr-row {
+#jba-hb .sr-row {
     display: flex;
     flex-direction: column;
     padding: 7px 10px;
     border-bottom: 1px solid #ede9ff;
     transition: filter 0.15s ease;
 }
-#getir-fab-container .sr-row:hover { filter: brightness(0.95); }
-#getir-fab-container .sr-row:last-child { border-bottom: none; }
-#getir-fab-container .sr-bnk {
+#jba-hb .sr-row:hover { filter: brightness(0.95); }
+#jba-hb .sr-row:last-child { border-bottom: none; }
+#jba-hb .sr-bnk {
     font-weight: 700;
     color: #5d3ebc;
     background: #ede9ff;
@@ -147,22 +216,22 @@
     border-radius: 6px;
     font-size: 11px;
 }
-#getir-fab-container .sr-count { color: #555; font-size: 11px; }
-#getir-fab-container .sr-empty { padding: 8px 10px; color: #999; text-align: center; font-size: 11px; }
+#jba-hb .sr-count { color: #555; font-size: 11px; }
+#jba-hb .sr-empty { padding: 8px 10px; color: #999; text-align: center; font-size: 11px; }
 
-#getir-fab-container .queue-status-text {
+#jba-hb .jba-hb-kuyruk-text {
     font-size: 11px;
     color: #888;
     text-align: center;
 }
 
 /* AYARLAR */
-#getir-fab-container .settings-body {
+#jba-hb .settings-body {
     display: none;
     flex-direction: column;
     max-height: 580px;
 }
-#getir-fab-container .settings-form {
+#jba-hb .settings-form {
     padding: 14px;
     background: #fafafa;
     border-bottom: 1px solid #eee;
@@ -171,7 +240,7 @@
     gap: 8px;
     flex-shrink: 0;
 }
-#getir-fab-container #category-list {
+#jba-hb #jba-hb-kat-liste {
     padding: 10px 12px;
     overflow-y: auto;
     flex-grow: 1;
@@ -182,13 +251,13 @@
 }
 
 /* GELİŞMİŞ AYARLAR */
-#getir-fab-container .advanced-section {
+#jba-hb .advanced-section {
     padding: 10px 12px;
     background: #fafafa;
     border-top: 1px solid #eee;
     flex-shrink: 0;
 }
-#getir-fab-container .btn-secondary-sm {
+#jba-hb .btn-secondary-sm {
     width: 100%;
     background: transparent;
     border: 1px solid #ccc;
@@ -199,8 +268,8 @@
     color: #666;
     text-align: left;
 }
-#getir-fab-container .btn-secondary-sm:hover { background: #f0ecff; border-color: #5d3ebc; color: #5d3ebc; }
-#getir-fab-container .advanced-note {
+#jba-hb .btn-secondary-sm:hover { background: #f0ecff; border-color: #5d3ebc; color: #5d3ebc; }
+#jba-hb .advanced-note {
     font-size: 11px;
     color: #f57c00;
     margin: 0 0 8px 0;
@@ -209,7 +278,7 @@
     border-radius: 6px;
 }
 
-#getir-fab-container .custom-input {
+#jba-hb .custom-input {
     width: 100%;
     padding: 8px;
     border: 1px solid #ccc;
@@ -219,11 +288,11 @@
     font-family: inherit;
 }
 
-#getir-fab-container .btn-primary { background: #ffd300; color: #5d3ebc; border: none; padding: 9px; font-weight: 700; border-radius: 6px; cursor: pointer; width: 100%; }
-#getir-fab-container .btn-primary:hover { background: #f5c800; }
-#getir-fab-container .btn-danger { background: #dc3545; color: white; border: none; padding: 6px; font-weight: 700; border-radius: 6px; cursor: pointer; }
+#jba-hb .btn-primary { background: #ffd300; color: #5d3ebc; border: none; padding: 9px; font-weight: 700; border-radius: 6px; cursor: pointer; width: 100%; }
+#jba-hb .btn-primary:hover { background: #f5c800; }
+#jba-hb .btn-danger { background: #dc3545; color: white; border: none; padding: 6px; font-weight: 700; border-radius: 6px; cursor: pointer; }
 
-#getir-fab-container .category-card {
+#jba-hb .category-card {
     background: #fff;
     border: 1px solid #ddd;
     border-left: 5px solid;
@@ -231,7 +300,7 @@
     border-radius: 8px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
-#getir-fab-container .action-btn {
+#jba-hb .action-btn {
     background: transparent;
     border: none;
     cursor: pointer;
@@ -239,9 +308,9 @@
     padding: 2px 5px;
     border-radius: 4px;
 }
-#getir-fab-container .action-btn:hover { background: #f0f0f0; }
+#jba-hb .action-btn:hover { background: #f0f0f0; }
 
-#getir-fab-container .badge {
+#jba-hb .badge {
     padding: 2px 7px;
     border-radius: 10px;
     font-size: 10px;
@@ -250,11 +319,11 @@
     display: inline-block;
     margin-top: 3px;
 }
-#getir-fab-container .badge.inc { background: #28a745; }
-#getir-fab-container .badge.exc { background: #dc3545; }
+#jba-hb .badge.inc { background: #28a745; }
+#jba-hb .badge.exc { background: #dc3545; }
 
 /* Parça sayısı badge — BNK etiketinin soluna */
-#getir-fab-container .g-count-badge {
+#jba-hb .g-count-badge {
     display: inline-flex;
     align-items: center;
     background: #5d3ebc;
@@ -394,7 +463,7 @@
 
         // Sipariş kodu: barcode ikonlu ilk span
         const getShortCode = (card) => {
-            const firstSpan = card.querySelector('.textWithIcons--hkMjY span.ant-typography');
+            const firstSpan = card.querySelector('[class*="textWithIcons--"] span.ant-typography');
             if (firstSpan) {
                 const t = firstSpan.innerText?.trim();
                 if (t && t.length === 4) return t;
@@ -409,7 +478,7 @@
 
         // BNK kodu
         const getBnkCode = (card) => {
-            const tag = card.querySelector('.locationContainer--PWiXO .ant-tag');
+            const tag = card.querySelector('[class*="locationContainer--"] .ant-tag');
             return tag ? tag.innerText?.trim() : null;
         };
 
@@ -436,7 +505,7 @@
 
         // === ARAMA SONUÇLARI ===
         const renderSearchResults = (term, matches) => {
-            const el = document.getElementById('getir-search-results');
+            const el = document.getElementById('jba-hb-sonuc');
             if (!el) return;
             if (!term) { el.style.display = 'none'; el.innerHTML = ''; return; }
 
@@ -471,10 +540,26 @@
             });
         };
 
+        /* Arama kapsamı. Tek kutu hem ürün hem kurye hem banko içinde arayınca
+           kurye adı yazan ürün sonucu, ürün adı yazan kurye sonucu görüyordu.
+           Artık nerede aranacağı seçili. */
+        const kapsamOku = () => {
+            const el = document.getElementById('jba-hb-kapsam');
+            return (el && el.value) || localStorage.getItem('getir_hb_kapsam') || 'urun';
+        };
+
+        /* "BNK.008" ya da "8" gibi bir şey yazıldıysa kapsam ürün olsa bile
+           bankoya da bakılıyor. Bu sürpriz üretmiyor, yalnız ekliyor. */
+        const bankoyaBenzer = (t) => /^bnk/i.test(t) || /^\d{1,3}$/.test(t);
+
         // === UI GÜNCELLEME ===
         const applyUI = () => {
-            const term = document.getElementById('getir-search-input')?.value?.trim?.() || '';
-            const cards = document.querySelectorAll('.orderCard--LDG_w');
+            const term = document.getElementById('jba-hb-girdi')?.value?.trim?.() || '';
+            const kapsam = kapsamOku();
+            const urunAra = kapsam === 'urun' || kapsam === 'hepsi';
+            const kuryeAra = kapsam === 'kurye' || kapsam === 'hepsi';
+            const bankoAra = kapsam === 'banko' || kapsam === 'hepsi' || bankoyaBenzer(term);
+            const cards = document.querySelectorAll('[class*="orderCard--"]');
             const matches = [];
 
             cards.forEach(card => {
@@ -496,20 +581,20 @@
                         );
                         if (hit) colors.push(cat.color);
                     });
-                    if (term) {
+                    if (term && urunAra) {
                         hitCount = products.filter(p => wordsMatch(p, term)).length;
                         if (hitCount > 0) isMatch = true;
                     }
                 }
 
                 // Kurye, müşteri ve BNK isimlerinde ara
-                const nameElements = Array.from(card.querySelectorAll('.textWithIcons--hkMjY span.ant-typography'));
+                const nameElements = Array.from(card.querySelectorAll('[class*="textWithIcons--"] span.ant-typography'));
                 const nameTexts = nameElements.map(s => s.innerText?.trim() || '');
                 const bnk = getBnkCode(card) || 'BNK.?';
             
                 if (term) {
-                    if (nameTexts.some(t => wordsMatch(t, term))) isMatch = true;
-                    if (wordsMatch(bnk, term)) isMatch = true;
+                    if (kuryeAra && nameTexts.some(t => wordsMatch(t, term))) isMatch = true;
+                    if (bankoAra && wordsMatch(bnk, term)) isMatch = true;
                 }
 
                 // --- Soft arka plan boyama hesaplaması ---
@@ -537,7 +622,7 @@
                 }
 
                 // --- Parça sayısı badge (BNK soluna) ---
-                const locationDiv = card.querySelector('.locationContainer--PWiXO');
+                const locationDiv = card.querySelector('[class*="locationContainer--"]');
                 if (locationDiv && count !== null) {
                     let badge = locationDiv.querySelector('.g-count-badge');
                     const txt = `×${count}`;
@@ -562,12 +647,12 @@
 
         // === SYNC ===
         const updateQueueStatus = () => {
-            const el = document.getElementById('queue-status');
+            const el = document.getElementById('jba-hb-kuyruk');
             if (el) el.innerText = `Kuyruk: ${fetchQueue.length} | Hafıza: ${Object.keys(orderCache).length} sipariş`;
         };
 
         const checkAndSync = () => {
-            const cards = document.querySelectorAll('.orderCard--LDG_w');
+            const cards = document.querySelectorAll('[class*="orderCard--"]');
             if (cards.length === 0) return;
             const visible = new Set();
             let needsRadar = false;
@@ -635,51 +720,89 @@
             if (fetchQueue.length > 0) setTimeout(processQueue, 1500);
         };
 
+        // === PANEL AÇ / KAPA ===
+        const panelAcikMi = () => {
+            const p = document.getElementById('jba-hb-panel');
+            return !!p && p.style.display !== 'none';
+        };
+
+        const paneliAc = () => {
+            const kap = document.getElementById('jba-hb');
+            if (!kap) return;
+            document.getElementById('jba-hb-fab').style.display = 'none';
+            document.getElementById('jba-hb-panel').style.display = 'flex';
+            kap.classList.add('jba-hb--acik');
+            setTimeout(() => { document.getElementById('jba-hb-girdi')?.focus(); }, 50);
+        };
+
+        const paneliKapat = () => {
+            const kap = document.getElementById('jba-hb');
+            if (!kap) return;
+            document.getElementById('jba-hb-panel').style.display = 'none';
+            document.getElementById('jba-hb-fab').style.display = 'flex';
+            kap.classList.remove('jba-hb--acik');
+            isSettingsOpen = false;
+            document.getElementById('jba-hb-ana').style.display = 'flex';
+            document.getElementById('jba-hb-ayar').style.display = 'none';
+
+            const g = document.getElementById('jba-hb-girdi');
+            if (g) { g.value = ''; applyUI(); }
+        };
+
         // === WIDGET ===
         const buildWidget = () => {
-            if (document.getElementById('getir-fab-container')) return;
+            if (document.getElementById('jba-hb')) return;
             const container = document.createElement('div');
-            container.id = 'getir-fab-container';
+            container.id = 'jba-hb';
             container.innerHTML = `
-                <div id="getir-fab">🔍</div>
-                <div id="getir-panel" style="display:none;">
+                <div id="jba-hb-fab">🔍</div>
+                <div id="jba-hb-panel" style="display:none;">
                     <div class="panel-header">
                         <span>🚀 Hızlı Bul</span>
                         <div class="header-buttons">
-                            <button id="getir-settings-btn" class="icon-btn">⚙️</button>
-                            <button id="getir-close" class="icon-btn">✖</button>
+                            <button id="jba-hb-ayar-btn" class="icon-btn">⚙️</button>
+                            <button id="jba-hb-kapat" class="icon-btn">✖</button>
                         </div>
                     </div>
 
-                    <div class="panel-body" id="getir-main-view">
-                        <div id="token-status" class="token-expiry-badge">${getTokenExpiry(userToken)}</div>
+                    <div class="panel-body" id="jba-hb-ana">
+                        <div id="jba-hb-jeton-durum" class="token-expiry-badge">${getTokenExpiry(userToken)}</div>
                         <div class="auto-token-note">🔄 Token otomatik alınıyor</div>
-                        <input type="text" id="getir-search-input" class="custom-input search-input" placeholder="🔍 Ürün Ara...">
-                        <div id="getir-search-results" class="search-results" style="display:none;"></div>
-                        <div id="queue-status" class="queue-status-text">Kuyruk: 0 | Hafıza: 0 sipariş</div>
+                        <div class="jba-hb-arama">
+                            <select id="jba-hb-kapsam" class="jba-hb-kapsam" title="Nerede aransın">
+                                <option value="urun">Ürün</option>
+                                <option value="kurye">Kurye</option>
+                                <option value="banko">Banko</option>
+                                <option value="hepsi">Hepsi</option>
+                            </select>
+                            <input type="text" id="jba-hb-girdi" class="custom-input search-input" placeholder="🔍 Ara...">
+                        </div>
+                        <div class="jba-hb-ipucu">Kapsam seçili değilse ürün adında aranır.</div>
+                        <div id="jba-hb-sonuc" class="search-results" style="display:none;"></div>
+                        <div id="jba-hb-kuyruk" class="jba-hb-kuyruk-text">Kuyruk: 0 | Hafıza: 0 sipariş</div>
                     </div>
 
-                    <div class="settings-body" id="getir-settings-view" style="display:none;">
+                    <div class="settings-body" id="jba-hb-ayar" style="display:none;">
                         <div class="settings-form">
                             <h4 style="margin:0; color:#5d3ebc;">Kategori Düzenleyici</h4>
-                            <input type="text" id="cat-name" class="custom-input" placeholder="Başlık (Örn: Sular)">
-                            <textarea id="cat-inc" class="custom-input" placeholder="Dahil (erikli, hayat)" rows="2"></textarea>
-                            <textarea id="cat-exc" class="custom-input" placeholder="Hariç (cam, 1lt)" rows="2"></textarea>
+                            <input type="text" id="jba-hb-kat-ad" class="custom-input" placeholder="Başlık (Örn: Sular)">
+                            <textarea id="jba-hb-kat-dahil" class="custom-input" placeholder="Dahil (erikli, hayat)" rows="2"></textarea>
+                            <textarea id="jba-hb-kat-haric" class="custom-input" placeholder="Hariç (cam, 1lt)" rows="2"></textarea>
                             <div style="display:flex; justify-content:space-between; align-items:center;">
                                 <label style="font-size:11px; font-weight:bold;">Renk:</label>
-                                <input type="color" id="cat-color" value="#0088ff" style="border:none; width:40px; height:25px; cursor:pointer;">
+                                <input type="color" id="jba-hb-kat-renk" value="#0088ff" style="border:none; width:40px; height:25px; cursor:pointer;">
                             </div>
-                            <button id="add-category-btn" class="btn-primary">Kategoriyi Kaydet</button>
+                            <button id="jba-hb-kat-kaydet" class="btn-primary">Kategoriyi Kaydet</button>
                         </div>
-                        <div id="category-list"></div>
+                        <div id="jba-hb-kat-liste"></div>
                         <div class="advanced-section">
-                            <button id="toggle-advanced" class="btn-secondary-sm">🔐 Gelişmiş Ayarlar</button>
-                            <div id="advanced-content" style="display:none; padding:10px; border-top:1px solid #eee;">
+                            <button id="jba-hb-gelismis" class="btn-secondary-sm">🔐 Gelişmiş Ayarlar</button>
+                            <div id="jba-hb-gelismis-icerik" style="display:none; padding:10px; border-top:1px solid #eee;">
                                 <p class="advanced-note">Token otomatik alınmaktadır. Gerekmedikçe kullanmayın.</p>
-                                <input type="password" id="getir-token-input" class="custom-input" placeholder="Manuel Token">
+                                <input type="password" id="jba-hb-jeton-girdi" class="custom-input" placeholder="Manuel Token">
                                 <div style="display:flex; gap:5px; margin-top:6px;">
-                                    <button id="getir-save-token" class="btn-primary" style="flex:2">Kaydet</button>
-                                    <button id="getir-reset-token" class="btn-danger" style="flex:1">Sıfırla</button>
+                                    <button id="jba-hb-jeton-kaydet" class="btn-primary" style="flex:2">Kaydet</button>
+                                    <button id="jba-hb-jeton-sifirla" class="btn-danger" style="flex:1">Sıfırla</button>
                                 </div>
                             </div>
                         </div>
@@ -688,79 +811,79 @@
             `;
             document.body.appendChild(container);
 
-            document.getElementById('getir-fab').onclick = () => {
-                document.getElementById('getir-fab').style.display = 'none';
-                document.getElementById('getir-panel').style.display = 'flex';
-                setTimeout(() => {
-                    document.getElementById('getir-search-input')?.focus();
-                }, 50);
-            };
-            document.getElementById('getir-close').onclick = () => {
-                document.getElementById('getir-panel').style.display = 'none';
-                document.getElementById('getir-fab').style.display = 'flex';
-                isSettingsOpen = false;
-                document.getElementById('getir-main-view').style.display = 'flex';
-                document.getElementById('getir-settings-view').style.display = 'none';
-            
-                const searchInput = document.getElementById('getir-search-input');
-                if (searchInput) {
-                    searchInput.value = '';
-                    applyUI();
-                }
-            };
-            document.getElementById('getir-settings-btn').onclick = () => {
+            document.getElementById('jba-hb-fab').onclick = paneliAc;
+            document.getElementById('jba-hb-kapat').onclick = paneliKapat;
+            document.getElementById('jba-hb-ayar-btn').onclick = () => {
                 isSettingsOpen = !isSettingsOpen;
-                document.getElementById('getir-main-view').style.display = isSettingsOpen ? 'none' : 'flex';
-                document.getElementById('getir-settings-view').style.display = isSettingsOpen ? 'flex' : 'none';
+                document.getElementById('jba-hb-ana').style.display = isSettingsOpen ? 'none' : 'flex';
+                document.getElementById('jba-hb-ayar').style.display = isSettingsOpen ? 'flex' : 'none';
                 if (isSettingsOpen) renderCategories();
             };
-            document.getElementById('toggle-advanced').onclick = () => {
-                const c = document.getElementById('advanced-content');
+            document.getElementById('jba-hb-gelismis').onclick = () => {
+                const c = document.getElementById('jba-hb-gelismis-icerik');
                 const open = c.style.display !== 'none';
                 c.style.display = open ? 'none' : 'block';
-                document.getElementById('toggle-advanced').innerText = open ? '🔐 Gelişmiş Ayarlar' : '🔐 Gizle';
+                document.getElementById('jba-hb-gelismis').innerText = open ? '🔐 Gelişmiş Ayarlar' : '🔐 Gizle';
             };
-            document.getElementById('getir-save-token').onclick = () => {
-                const val = document.getElementById('getir-token-input').value;
+            document.getElementById('jba-hb-jeton-kaydet').onclick = () => {
+                const val = document.getElementById('jba-hb-jeton-girdi').value;
                 if (val) {
                     userToken = val.trim();
                     localStorage.setItem('getir_manual_token', userToken);
-                    document.getElementById('token-status').innerText = getTokenExpiry(userToken);
-                    const btn = document.getElementById('getir-save-token');
+                    document.getElementById('jba-hb-jeton-durum').innerText = getTokenExpiry(userToken);
+                    const btn = document.getElementById('jba-hb-jeton-kaydet');
                     btn.innerText = '✅ Kaydedildi';
                     setTimeout(() => { btn.innerText = 'Kaydet'; }, 2000);
                     if (!isFetching && fetchQueue.length > 0) processQueue();
                 }
             };
-            document.getElementById('getir-reset-token').onclick = () => {
+            document.getElementById('jba-hb-jeton-sifirla').onclick = () => {
                 if (confirm('Tüm hafıza silinsin mi?')) {
                     ['getir_order_cache', 'getir_settings', 'getir_manual_token'].forEach(k => localStorage.removeItem(k));
                     window.location.reload();
                 }
             };
-            document.getElementById('add-category-btn').onclick = () => {
-                const name = document.getElementById('cat-name').value.trim();
-                const inc = document.getElementById('cat-inc').value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-                const exc = document.getElementById('cat-exc').value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-                const color = document.getElementById('cat-color').value;
+            document.getElementById('jba-hb-kat-kaydet').onclick = () => {
+                const name = document.getElementById('jba-hb-kat-ad').value.trim();
+                const inc = document.getElementById('jba-hb-kat-dahil').value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                const exc = document.getElementById('jba-hb-kat-haric').value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+                const color = document.getElementById('jba-hb-kat-renk').value;
                 if (name && inc.length > 0) {
                     const cat = { name, includes: inc, excludes: exc, color };
                     const idx = Number(editingCategoryIndex);
                     if (idx > -1) userSettings[idx] = cat;
                     else userSettings.push(cat);
                     localStorage.setItem('getir_settings', JSON.stringify(userSettings));
-                    ['cat-name', 'cat-inc', 'cat-exc'].forEach(id => { document.getElementById(id).value = ''; });
+                    ['jba-hb-kat-ad', 'jba-hb-kat-dahil', 'jba-hb-kat-haric'].forEach(id => { document.getElementById(id).value = ''; });
                     editingCategoryIndex = -1;
-                    document.getElementById('add-category-btn').innerText = 'Kategoriyi Kaydet';
+                    document.getElementById('jba-hb-kat-kaydet').innerText = 'Kategoriyi Kaydet';
                     renderCategories();
                     applyUI();
                 }
             };
-            document.getElementById('getir-search-input').oninput = () => applyUI();
+            /* Her tuşta sekiz kartı yeniden tarayıp yeniden çizmek yerine
+               120 ms bekleniyor ve çizim tek kareye toplanıyor. */
+            let aramaZaman = null;
+            let cizimKare = 0;
+            const aramaDegisti = () => {
+                clearTimeout(aramaZaman);
+                aramaZaman = setTimeout(() => {
+                    if (cizimKare) return;
+                    cizimKare = requestAnimationFrame(() => { cizimKare = 0; applyUI(); });
+                }, 120);
+            };
+            document.getElementById('jba-hb-girdi').oninput = aramaDegisti;
+
+            const kapsamEl = document.getElementById('jba-hb-kapsam');
+            kapsamEl.value = localStorage.getItem('getir_hb_kapsam') || 'urun';
+            kapsamEl.onchange = () => {
+                localStorage.setItem('getir_hb_kapsam', kapsamEl.value);
+                applyUI();
+            };
         };
 
         const renderCategories = () => {
-            const list = document.getElementById('category-list');
+            const list = document.getElementById('jba-hb-kat-liste');
             if (!list) return;
             if (userSettings.length === 0) {
                 list.innerHTML = `<div style="text-align:center;color:#999;font-size:12px;padding:10px;">Henüz kategori yok.</div>`;
@@ -791,13 +914,13 @@
                 btn.onclick = (e) => {
                     const idx = Number(e.currentTarget.getAttribute('data-idx'));
                     const cat = userSettings[idx];
-                    document.getElementById('cat-name').value = cat.name;
-                    document.getElementById('cat-inc').value = cat.includes.join(', ');
-                    document.getElementById('cat-exc').value = (cat.excludes || []).join(', ');
-                    document.getElementById('cat-color').value = cat.color;
+                    document.getElementById('jba-hb-kat-ad').value = cat.name;
+                    document.getElementById('jba-hb-kat-dahil').value = cat.includes.join(', ');
+                    document.getElementById('jba-hb-kat-haric').value = (cat.excludes || []).join(', ');
+                    document.getElementById('jba-hb-kat-renk').value = cat.color;
                     editingCategoryIndex = idx;
-                    document.getElementById('add-category-btn').innerText = 'Güncelle';
-                    document.getElementById('getir-settings-view').scrollTop = 0;
+                    document.getElementById('jba-hb-kat-kaydet').innerText = 'Güncelle';
+                    document.getElementById('jba-hb-ayar').scrollTop = 0;
                 };
             });
         };
@@ -811,7 +934,7 @@
                 if (t && t !== userToken) {
                     userToken = t;
                     localStorage.setItem('getir_manual_token', t);
-                    const el = document.getElementById('token-status');
+                    const el = document.getElementById('jba-hb-jeton-durum');
                     if (el) el.innerText = getTokenExpiry(t);
                     if (!isFetching && fetchQueue.length > 0) processQueue();
                 }
@@ -825,7 +948,7 @@
                 if (m.type !== 'childList') return false;
                 let node = m.target;
                 while (node && node !== document.body) {
-                    if (node.id === 'getir-fab-container') return false;
+                    if (node.id === 'jba-hb') return false;
                     node = node.parentNode;
                 }
                 return true;
@@ -835,14 +958,90 @@
             obDebounce = setTimeout(() => { checkAndSync(); applyUI(); }, 300);
         });
 
+        // === DIŞARI TIKLAMA / ESC ===
+        /* Aramadan siparişe geçince panel açık kalıyordu. Kartın kendisine
+           tıklamak da dışarı tıklamak sayılıyor, o yüzden sonuçtan siparişe
+           gidince panel kendiliğinden kapanıyor. */
+        document.addEventListener('click', (e) => {
+            if (!panelAcikMi()) return;
+            const kap = document.getElementById('jba-hb');
+            if (!kap || kap.contains(e.target)) return;
+            paneliKapat();
+        }, true);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && panelAcikMi()) paneliKapat();
+        });
+
+        // === YAŞAM DÖNGÜSÜ ===
+        /*
+         * Eklenti başka sekmeye gidip dönünce ölüyordu. Sebep tarayıcı sekmesi
+         * değil, panelin kendi içindeki gezinme: içerik betiği sayfa başına bir
+         * kez çalışıyor, React sipariş ekranından çıkınca kabuğu söküyor ve
+         * geri dönüldüğünde kimse yeniden kurmuyordu. Nöbetçi hem adresi hem
+         * kabuğun varlığını denetliyor.
+         */
+        const yolUygun = () => SIPARIS_YOLU.test(location.pathname);
+
+        const nobet = () => {
+            if (!yolUygun()) {
+                const k = document.getElementById('jba-hb');
+                if (k) k.style.display = 'none';
+                return false;
+            }
+            if (!document.getElementById('jba-hb')) buildWidget();
+            const k = document.getElementById('jba-hb');
+            if (k) k.style.display = '';
+            return true;
+        };
+
+        /* Sipariş ekranına dönüldüğü an yeni siparişleri de yakala; kullanıcı
+           akışı kaybetmesin diye radar bir kez zorlanıyor. */
+        const geriDondu = () => {
+            if (!nobet()) return;
+            checkAndSync();
+            applyUI();
+            forceRadarFetch();
+        };
+
+        const adresiIzle = () => {
+            var sonYol = location.pathname;
+            const bak = () => {
+                if (location.pathname === sonYol) return;
+                sonYol = location.pathname;
+                geriDondu();
+            };
+            ['pushState', 'replaceState'].forEach((ad) => {
+                const asil = history[ad];
+                if (typeof asil !== 'function' || asil.__jbSarildi) return;
+                const sarmal = function () {
+                    const r = asil.apply(this, arguments);
+                    setTimeout(bak, 0);
+                    return r;
+                };
+                sarmal.__jbSarildi = true;
+                history[ad] = sarmal;
+            });
+            window.addEventListener('popstate', () => setTimeout(bak, 0));
+            setInterval(bak, 1000);   // yalnız dize karşılaştırması, ölçülebilir yük yok
+        };
+
         // === INIT ===
         const init = () => {
-            buildWidget();
+            nobet();
             observer.observe(document.body, { childList: true, subtree: true });
+            adresiIzle();
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') geriDondu();
+            });
+            window.addEventListener('focus', geriDondu);
+
             setInterval(() => {
+                if (!nobet()) return;
                 checkAndSync();
                 applyUI();
-                const el = document.getElementById('token-status');
+                const el = document.getElementById('jba-hb-jeton-durum');
                 if (el) el.innerText = getTokenExpiry(userToken);
             }, 5000);
         };
@@ -850,32 +1049,28 @@
         setTimeout(init, 1500);
     }
 
-    /**
-     * Yalnız sipariş listesi sayfası. Depo kimliği 24 haneli onaltılık ve
-     * her depoda farklı, o yüzden desende sabit değil kalıp var.
-     */
-    var SIPARIS_YOLU = /^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/;
-
     JBA.kayit({
         kimlik: 'hizliBul',
         ad: 'Hızlı Bul',
         ozet: 'Sipariş kartlarının içindeki ürünleri anında arar, kategorilere göre renklendirir.',
         hostlar: ['warehouse.getir.com'],
-        yol: function (yol) { return SIPARIS_YOLU.test(yol); },
+        /* Yol kapısı kaldırıldı. Kullanıcı panelin başka bir sekmesinde
+           açılıp sonra siparişlere geçtiğinde modül hiç kurulmuyordu; artık
+           kurulup görünürlüğü kendi yönetiyor. */
 
         baslat: function () {
             calistir();
         },
 
         durdur: function () {
-            var w = document.getElementById('getir-fab-container');
+            var w = document.getElementById('jba-hb');
             if (w) w.remove();
             JBA.bildir('Hızlı Bul kapandı, sayfayı yenile.', null);
         },
 
         eylemler: [
             { ad: 'Arama kutusuna git', calistir: function () {
-                var g = document.getElementById('getir-search-input');
+                var g = document.getElementById('jba-hb-girdi');
                 if (g) { g.scrollIntoView({ block: 'center' }); g.focus(); }
                 else JBA.bildir('Arama kutusu bu sayfada yok.', 'olumsuz');
             } }
