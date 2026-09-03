@@ -7,15 +7,20 @@
  * dönüyordu. Bu dosya listeyi toplama sırasına diziyor.
  *
  * KURAL
- *   1. Fırın ve dondurma ürünleri en başta.
- *   2. Su en sonda.
- *   3. Aradakiler kendi sınıflarında kümelenip yan yana duruyor; kek kekle,
- *      cips cipsle. Ayrı ayrı gezmek yerine tek durakta toplanıyor.
+ *   1. Bantlar kullanıcının seçtiği sırada geliyor. Varsayılan: fırın,
+ *      dondurma, diğerleri, su.
+ *   2. Aynı bandın içinde ürünler kendi sınıflarında kümelenip yan yana
+ *      duruyor; kek kekle, cips cipsle.
  *
  * NASIL KARAR VERİYOR
  * Önce panelden gelen kategori ağacına bakıyor (`anaKategori`, `sinif`).
  * O boşsa ürün adındaki anahtar kelimelere düşüyor. Yapay zeka çağrısı yok;
  * karar yerel, anlık ve her seferinde aynı.
+ *
+ * ETİKET AYRI TUTULUYOR
+ * Kümenin anahtarı sadeleştirilmiş ("firin"), ekranda görünen etiket düzgün
+ * Türkçe ("Fırın"). Eskiden anahtar doğrudan basılıyordu ve ekranda "FİRİN",
+ * "SU" gibi çirkin yazılar çıkıyordu.
  *
  * SIRA KORUNUR
  * Aynı bandın ve aynı kümenin içinde Getir'in verdiği sıra bozulmuyor.
@@ -38,42 +43,46 @@
             .trim();
     }
 
-    /* Bant numarası küçükse önce toplanıyor. Aradaki her şey 50'de duruyor ve
-       kendi içinde sınıfa göre kümeleniyor. */
-    var BANT = { ONCE: 10, ORTA: 50, SON: 90 };
-
     /* Anahtar kelimeler Hızlı Bul'daki varsayılan kategorilerden büyütüldü.
-       `haric` listesi yanlış yakalamayı kesiyor: "kuzeyden cam" su değil,
+       `haric` listesi yanlış yakalamayı kesiyor: "erikli cam şişe" su değil,
        "dondurma külahı" dondurma değil. */
     var KURALLAR = [
         {
-            ad: 'fırın',
-            bant: BANT.ONCE,
             kume: 'firin',
+            etiket: 'Fırın',
             dahil: ['ekmek', 'baget', 'simit', 'poğaça', 'pogaca', 'börek', 'borek',
                     'kruvasan', 'la lorraine', 'firin', 'fırın', 'donut', 'berliner',
                     'sandvic', 'sandviç', 'tost'],
             haric: ['uno', 'untad', 'ekmek kırıntısı', 'galeta']
         },
         {
-            ad: 'dondurma',
-            bant: BANT.ONCE,
             kume: 'dondurma',
+            etiket: 'Dondurma',
             dahil: ['dondurma', 'dondurulmus', 'donuk', 'cornetto', 'magnum', 'algida',
                     'carte d or', 'golf', 'buz kupu', 'buz küpü', 'frigo', 'feast',
                     'mochiko', 'superfresh', 'pizza donuk', 'dondurmali'],
             haric: ['dondurma kulahi', 'dondurma külahı', 'dondurma sosu']
         },
         {
-            ad: 'su',
-            bant: BANT.SON,
             kume: 'su',
+            etiket: 'Su',
             dahil: ['su ', ' su', 'dogal kaynak suyu', 'mineralli su', 'maden suyu',
                     'erikli', 'hayat su', 'kuzeyden', 'damla su', 'sırma', 'sirma'],
             haric: ['sut', 'süt', 'suyu konsantre', 'meyve suyu', 'sebze suyu',
                     'cam sise', 'cam şişe', 'susam', 'sucuk']
         }
     ];
+
+    /* Bant sırası kullanıcı ayarı. 'orta' kural tutmayan her şeyin yeri.
+       Ayarlar ekranı bu diziyi yeniden diziyor. */
+    var VARSAYILAN_SIRA = ['firin', 'dondurma', 'orta', 'su'];
+
+    var BANT_ETIKET = {
+        firin: 'Fırın',
+        dondurma: 'Dondurma',
+        su: 'Su',
+        orta: 'Diğer ürünler'
+    };
 
     function gecerMi(metin, kelime) {
         return metin.indexOf(sade(kelime)) !== -1;
@@ -87,36 +96,55 @@
 
         for (var i = 0; i < KURALLAR.length; i++) {
             var k = KURALLAR[i];
-            var haric = (k.haric || []).some(function (h) { return gecerMi(metin, h); });
-            if (haric) continue;
-            var dahil = k.dahil.some(function (d) { return gecerMi(metin, d); });
-            if (dahil) return k;
+            if ((k.haric || []).some(function (h) { return gecerMi(metin, h); })) continue;
+            if (k.dahil.some(function (d) { return gecerMi(metin, d); })) return k;
         }
         return null;
     }
 
     /**
-     * Orta bandın kümesi. Panelin sınıfı varsa o kullanılıyor; yoksa ürün
-     * adının ilk sözüne düşülüyor. İkisi arasındaki fark önemli: adın ilk
-     * sözü ("lay", "ruffles") kümelemeye yarıyor ama ekranda etiket olarak
-     * gösterilmemeli, depocuya bir şey anlatmıyor. `kaynak` bunu ayırıyor.
+     * Kural tutmayan ürünün kümesi. Panelin sınıfı varsa o kullanılıyor ve
+     * etiketi olduğu gibi gösteriliyor (zaten Türkçe geliyor). Sınıf da yoksa
+     * ürün adının ilk sözüne düşülüyor; o küme yalnız gruplamaya yarıyor,
+     * ekranda gösterilmiyor.
      */
     function ortaKume(urun) {
-        var sinif = sade(urun.sinif || urun.anaKategori || '');
-        if (sinif) return { kume: sinif, kaynak: 'kategori' };
+        var ham = urun.sinif || urun.anaKategori || '';
+        var anahtar = sade(ham);
+        if (anahtar) return { kume: anahtar, etiket: String(ham).trim() };
         var ad = sade(urun.ad || '');
-        return { kume: ad ? ad.split(' ')[0] : 'diger', kaynak: 'ad' };
+        return { kume: ad ? ad.split(' ')[0] : 'diger', etiket: '' };
+    }
+
+    function siraOku(ayar) {
+        var istenen = (ayar && Array.isArray(ayar.sira)) ? ayar.sira : VARSAYILAN_SIRA;
+        var temiz = [];
+        istenen.forEach(function (k) {
+            if (BANT_ETIKET[k] && temiz.indexOf(k) === -1) temiz.push(k);
+        });
+        // Eksik kalan bant sona ekleniyor; ayar bozuksa da liste tam olsun.
+        VARSAYILAN_SIRA.forEach(function (k) { if (temiz.indexOf(k) === -1) temiz.push(k); });
+        return temiz;
     }
 
     /**
      * Ürünleri toplama sırasına dizer.
      *
-     * @param {Array} urunler  {sira, ad, anaKategori, sinif, altSinif, ...}
-     * @returns {Array} yeni dizi; her öğeye `toplamaSirasi` (1'den başlar) ve
-     *                  `toplamaKumesi` eklenir. Girdi dizisi değiştirilmez.
+     * @param {Array}  urunler  {sira, ad, anaKategori, sinif, altSinif, ...}
+     * @param {Object} [ayar]   { sira: ['firin','dondurma','orta','su'] }
+     * @returns {Array} yeni dizi. Eklenen alanlar:
+     *                  toplamaSirasi   1'den başlayan sıra
+     *                  toplamaKumesi   gruplama anahtarı
+     *                  toplamaEtiketi  ekranda görünecek Türkçe ad ('' olabilir)
+     *                  toplamaBandi    'firin' | 'dondurma' | 'su' | 'orta'
+     *                  Girdi dizisi değiştirilmez.
      */
-    function sirala(urunler) {
+    function sirala(urunler, ayar) {
         if (!Array.isArray(urunler) || !urunler.length) return [];
+
+        var sira = siraOku(ayar);
+        var bantNo = {};
+        sira.forEach(function (k, i) { bantNo[k] = i; });
 
         /* Kümenin ilk göründüğü yer, kümenin sırasını belirliyor. Böylece
            Getir'in verdiği sıra tamamen alt üst olmuyor, yalnız benzerler
@@ -126,17 +154,20 @@
         var isaretli = urunler.map(function (u, i) {
             var kural = kuralBul(u);
             var orta = kural ? null : ortaKume(u);
-            var bant = kural ? kural.bant : BANT.ORTA;
+            var bant = kural ? kural.kume : 'orta';
             var kume = kural ? kural.kume : orta.kume;
-            var kaynak = kural ? 'kural' : orta.kaynak;
-            if (!kumeSirasi.has(bant + '|' + kume)) kumeSirasi.set(bant + '|' + kume, i);
-            return { urun: u, giris: i, bant: bant, kume: kume, kaynak: kaynak };
+            var etiket = kural ? kural.etiket : orta.etiket;
+            var anahtar = bant + '|' + kume;
+            if (!kumeSirasi.has(anahtar)) kumeSirasi.set(anahtar, i);
+            return { urun: u, giris: i, bant: bant, kume: kume, etiket: etiket, anahtar: anahtar };
         });
 
         isaretli.sort(function (a, b) {
-            if (a.bant !== b.bant) return a.bant - b.bant;
-            var ak = kumeSirasi.get(a.bant + '|' + a.kume);
-            var bk = kumeSirasi.get(b.bant + '|' + b.kume);
+            var ab = bantNo[a.bant];
+            var bb = bantNo[b.bant];
+            if (ab !== bb) return ab - bb;
+            var ak = kumeSirasi.get(a.anahtar);
+            var bk = kumeSirasi.get(b.anahtar);
             if (ak !== bk) return ak - bk;
             return a.giris - b.giris;
         });
@@ -145,16 +176,17 @@
             return Object.assign({}, x.urun, {
                 toplamaSirasi: i + 1,
                 toplamaKumesi: x.kume,
-                toplamaKumeKaynagi: x.kaynak
+                toplamaEtiketi: x.etiket,
+                toplamaBandi: x.bant
             });
         });
     }
 
     global.JBSiparisSirala = {
         sirala: sirala,
-        // Sınama ve ayar ekranı için açık duruyor.
         kuralBul: kuralBul,
-        BANT: BANT,
+        VARSAYILAN_SIRA: VARSAYILAN_SIRA,
+        BANT_ETIKET: BANT_ETIKET,
         KURALLAR: KURALLAR
     };
 })(typeof window !== 'undefined' ? window : globalThis);

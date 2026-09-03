@@ -379,11 +379,12 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+/* Büyük harfe çevirme kaldırıldı: "Fırın" -> "FIRIN" oluyordu ve Türkçe
+   noktalı harfler bozuk görünüyordu. Etiket zaten düzgün geliyor. */
 .sip-urun__kume {
-    font-size: 10.5px;
+    font-size: 11px;
     color: var(--soluk);
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.1px;
 }
 .sip-urun__sag { display: flex; align-items: center; gap: 10px; flex: none; }
 .sip-adet {
@@ -454,3 +455,214 @@
     .sip-iskelet, .sip-ustyazi::before { animation: none; }
     .sip-kart, .sip-urun, .sip-yenile svg { transition: none; }
 }
+
+/* ============================================================================
+ * DETAY: künye, görünüm modları, barkodlar, görsel büyütme
+ * ==========================================================================*/
+
+/* Sipariş bilgileri detayda kaybolmasın: banko, parça, poşet, kurye,
+   toplayıcı hepsi künye satırında duruyor. */
+.sip-kunye {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 14px;
+    background: var(--yuzey);
+    border-bottom: 1px solid var(--cizgi);
+    flex: none;
+}
+.sip-kunye__oge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--kagit);
+    border: 1px solid var(--cizgi);
+    border-radius: 9px;
+    padding: 5px 10px;
+    font-size: 12px;
+    color: var(--sonuk);
+    max-width: 100%;
+}
+.sip-kunye__oge b { color: var(--yazi); font-weight: 600; font-variant-numeric: tabular-nums; }
+.sip-kunye__oge span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sip-kunye__oge--vurgu { background: var(--mavi-yumusak); border-color: #cddffb; color: var(--mavi); }
+
+.sip-detay__araclar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--yuzey);
+    border-bottom: 1px solid var(--cizgi);
+    flex: none;
+}
+.sip-detay__araclar .sip-gorunum { margin-left: auto; }
+.sip-bant-yazi { font-size: 12px; color: var(--soluk); }
+
+/* ---- Görünüm modları ---- */
+.sip-detay__govde--ikili,
+.sip-detay__govde--kart { display: grid; gap: 8px; }
+.sip-detay__govde--ikili { grid-template-columns: repeat(2, 1fr); }
+.sip-detay__govde--kart  { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+
+/* İkili ve kart modunda satır dikey akıyor; dar ekranda ad ve adet
+   birbirine girmesin diye ızgara yeniden kuruluyor. */
+.sip-detay__govde--ikili .sip-urun,
+.sip-detay__govde--kart .sip-urun {
+    grid-template-columns: 1fr;
+    grid-template-areas: 'gorsel' 'orta' 'sag';
+    justify-items: stretch;
+    min-height: 0;
+}
+.sip-detay__govde--ikili .sip-urun__gorsel,
+.sip-detay__govde--kart .sip-urun__gorsel {
+    grid-area: gorsel;
+    width: 100%;
+    height: 92px;
+}
+.sip-detay__govde--ikili .sip-urun__orta,
+.sip-detay__govde--kart .sip-urun__orta { grid-area: orta; }
+.sip-detay__govde--ikili .sip-urun__sag,
+.sip-detay__govde--kart .sip-urun__sag { grid-area: sag; justify-content: space-between; }
+.sip-detay__govde--ikili .sip-urun__ad,
+.sip-detay__govde--kart .sip-urun__ad { -webkit-line-clamp: 3; }
+
+/* ---- Barkodlar ---- */
+.sip-barkodlar {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-top: 2px;
+    scrollbar-width: none;
+}
+.sip-barkodlar::-webkit-scrollbar { display: none; }
+.sip-barkod {
+    flex: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    color: var(--yazi);
+    background: var(--kagit);
+    border: 1px solid var(--cizgi);
+    border-radius: 7px;
+    padding: 3px 8px;
+    white-space: nowrap;
+}
+.sip-barkod--yok { color: var(--soluk); font-family: inherit; letter-spacing: 0; }
+.sip-urun__ad-dugme {
+    background: none;
+    border: 0;
+    padding: 0;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+}
+.sip-urun__ad-dugme:hover .sip-urun__ad { color: var(--mavi); }
+
+/* ---- Görsel büyütme ---- */
+.sip-buyuk {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    background: rgba(19,23,32,0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+.sip-buyuk[hidden] { display: none !important; }
+.sip-buyuk img {
+    max-width: min(560px, 92vw);
+    max-height: 76vh;
+    border-radius: 14px;
+    background: #fff;
+    object-fit: contain;
+}
+.sip-buyuk__ad {
+    position: absolute;
+    left: 0; right: 0; bottom: 26px;
+    text-align: center;
+    color: #fff;
+    font-size: 13px;
+    padding: 0 24px;
+}
+.sip-buyuk__kapat {
+    position: absolute;
+    top: 18px; right: 18px;
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 0;
+    background: rgba(255,255,255,0.16);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+}
+
+/* ---- Ayarlar tabakası ---- */
+.sip-ayar {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    background: rgba(19,23,32,0.42);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+.sip-ayar[hidden] { display: none !important; }
+.sip-ayar__kutu {
+    background: var(--yuzey);
+    width: 100%;
+    max-width: 460px;
+    border-radius: 16px 16px 0 0;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    max-height: 84vh;
+    overflow-y: auto;
+}
+@media (min-width: 560px) {
+    .sip-ayar { align-items: center; }
+    .sip-ayar__kutu { border-radius: 16px; }
+}
+.sip-ayar__ust { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.sip-ayar__ust h2 { margin: 0; font-size: 16px; font-weight: 700; flex: 1; }
+.sip-ayar__aciklama { margin: 0 0 14px; font-size: 12px; color: var(--sonuk); line-height: 1.5; }
+.sip-ayar__baslik {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--soluk);
+    margin: 16px 0 8px;
+}
+.sip-sira-liste { display: flex; flex-direction: column; gap: 6px; }
+.sip-sira-oge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--kagit);
+    border: 1px solid var(--cizgi);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+.sip-sira-oge__no {
+    width: 22px; height: 22px;
+    border-radius: 7px;
+    background: var(--yazi);
+    color: #fff;
+    font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex: none;
+}
+.sip-sira-oge__ad { flex: 1; font-size: 13px; font-weight: 600; color: var(--yazi); }
+.sip-sira-oge button {
+    width: 30px; height: 30px;
+    border: 1px solid var(--cizgi);
+    background: var(--yuzey);
+    border-radius: 8px;
+    color: var(--sonuk);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.sip-sira-oge button:hover:not([disabled]) { border-color: var(--mavi); color: var(--mavi); }
+.sip-sira-oge button[disabled] { opacity: 0.35; cursor: default; }
