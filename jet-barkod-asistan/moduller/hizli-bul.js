@@ -868,6 +868,10 @@
             const aramaDegisti = () => {
                 clearTimeout(aramaZaman);
                 aramaZaman = setTimeout(() => {
+                    /* Sekme arka plandayken requestAnimationFrame hiç
+                       çalışmıyor; kuyruğa atılan çizim orada asılı kalıyordu.
+                       Görünmezken doğrudan çiziliyor. */
+                    if (document.visibilityState !== 'visible') { applyUI(); return; }
                     if (cizimKare) return;
                     cizimKare = requestAnimationFrame(() => { cizimKare = 0; applyUI(); });
                 }, 120);
