@@ -143,6 +143,29 @@
         } catch (e) { gorselDizin = null; }
     }
 
+    /**
+     * Siparişin ekranda görünecek başlığı. Banko henüz atanmamış olabiliyor;
+     * "Banko yok" yazmak yerine siparişin son dört hanesi gösteriliyor.
+     * Depocu o kodu panelde de görüyor, karşılığı var.
+     */
+    function siparisBasligi(s) {
+        if (s.banko) return s.banko;
+        var k = String(s.order_id || s.id || '').slice(-4);
+        return k ? '#' + k : 'Sipariş';
+    }
+
+    /**
+     * Ürünün ekranda görünecek adı. Panelden ad gelmediyse katalogdan
+     * bulunan ad kullanılıyor; o da yoksa barkod yazılıyor. "Adı gelmedi"
+     * gibi bir hata metni kullanıcıya gösterilmiyor.
+     */
+    function urunBasligi(u, bilgi) {
+        if (u.ad) return u.ad;
+        if (bilgi.katalogAdi) return bilgi.katalogAdi;
+        if (bilgi.barkodlar.length) return bilgi.barkodlar[0];
+        return 'Ürün';
+    }
+
     /** @returns {{barkodlar: string[], katalogAdi: string}} */
     function barkodBul(u) {
         var anahtar = (u.gorsel || '') + '|' + (u.ad || '');
@@ -253,6 +276,8 @@
         if (!zorla && imza === durum.sonImza) return;
         durum.sonImza = imza;
         durum.siparisler = yeni;
+        // Panelde teslim akışına geçmiş siparişler burada kapanıyor.
+        bitenleriKapat(yeni);
 
         if (durum.secili) {
             var guncel = yeni.filter(function (s) { return s.id === durum.secili.id; })[0];
@@ -295,7 +320,7 @@
         if (hedef !== siparis.toplama_durumu) await siparisDurumu(siparis, hedef);
     }
 
-    async function siparisDurumu(siparis, yeni) {
+    async function siparisDurumu(siparis, yeni, sessiz) {
         var d = db();
         if (!d) {
             if (global.JBDiyalog) global.JBDiyalog.hata('Veri bağlantısı yok, durum kaydedilemez.');
@@ -303,7 +328,7 @@
         }
         var eski = siparis.toplama_durumu;
         siparis.toplama_durumu = yeni;
-        ciz();
+        if (!sessiz) ciz();
 
         var sonuc = await d.from('orders')
             .update({ toplama_durumu: yeni, updated_at: new Date().toISOString() })
@@ -311,14 +336,39 @@
 
         if (sonuc.error) {
             siparis.toplama_durumu = eski;
-            ciz();
-            if (global.JBDiyalog) global.JBDiyalog.hata('Sipariş durumu kaydedilemedi.');
+            if (!sessiz) ciz();
+            if (!sessiz && global.JBDiyalog) global.JBDiyalog.hata('Sipariş durumu kaydedilemedi.');
         }
     }
 
     // ==================================================================
     // Çizim
     // ==================================================================
+
+    /*
+     * Panel siparişi teslim akışına geçirdiyse toplama işi bitmiştir.
+     * Kolon adı panelin kendi metni; sayı koduna göre tahmin yürütmüyoruz.
+     */
+    var BITMIS_KOLON = /(el de[ğg]i[şs]tir|yolda|ula[şs]t|teslim)/i;
+
+    function panelBitirmisMi(s) {
+        return BITMIS_KOLON.test(String(s.kolon || ''));
+    }
+
+    /** Panelde biten siparişleri sunucuda da kapatır. Bir kez yazar. */
+    async function bitenleriKapat(liste) {
+        var kapatilacak = liste.filter(function (s) {
+            return s.toplama_durumu !== 'toplandi' && panelBitirmisMi(s);
+        });
+        if (!kapatilacak.length) return false;
+
+        for (var i = 0; i < kapatilacak.length; i++) {
+            var s = kapatilacak[i];
+            s.toplama_durumu = 'toplandi';
+            await siparisDurumu(s, 'toplandi', true);
+        }
+        return true;
+    }
 
     function bandaGore(s) {
         var d = s.toplama_durumu || 'bekliyor';
@@ -379,7 +429,7 @@
             '<div class="sip-kart__ust">' +
                 '<span class="sip-banko">' +
                     '<b class="sip-parca">x' + (s.toplam_adet != null ? s.toplam_adet : toplam) + '</b>' +
-                    kacir(s.banko || 'Banko yok') +
+                    kacir(siparisBasligi(s)) +
                 '</span>' +
                 '<span class="sip-sure">' + kacir(gecenSure(s)) + '</span>' +
             '</div>' +
@@ -395,7 +445,7 @@
             (ilkler.length
                 ? '<div class="sip-urunler">' +
                     ilkler.map(function (u) {
-                        return '<div class="sip-satir"><span>' + kacir(u.ad || 'Adı gelmedi') +
+                        return '<div class="sip-satir"><span>' + kacir(urunBasligi(u, barkodBul(u))) +
                                '</span><b>x' + adetYaz(u.adet) + '</b></div>';
                     }).join('') +
                     (kalan > 0 ? '<div class="sip-daha">+' + kalan + ' ürün daha</div>' : '') +
@@ -412,6 +462,7 @@
 
     function urunCiz(u) {
         var bilgi = barkodBul(u);
+        var baslik = urunBasligi(u, bilgi);
         var acik = !!durum.acikBarkodlar[u.sira];
         /* İlk barkod hep görünüyor; depocu okutacağı kodu aramasın. Birden
            fazlaysa ada dokununca hepsi açılıyor ve yana kaydırılabiliyor. */
@@ -433,17 +484,68 @@
             gorsel +
             '<div class="sip-urun__orta">' +
                 '<button type="button" class="sip-urun__ad-dugme" data-barkod-ac="' + u.sira + '">' +
-                    '<span class="sip-urun__ad">' + kacir(u.ad || 'Adı gelmedi') + '</span>' +
+                    '<span class="sip-urun__ad">' + kacir(baslik) + '</span>' +
                 '</button>' +
-                (u.toplamaEtiketi
-                    ? '<span class="sip-urun__kume">' + kacir(u.toplamaEtiketi) + '</span>' : '') +
+                '<div class="sip-barkodlar">' + barkodlar + '</div>' +
             '</div>' +
             '<div class="sip-urun__sag" data-isaretle="' + u.sira + '">' +
                 '<span class="sip-adet">' + adetYaz(u.adet) + (u.birim ? ' ' + kacir(u.birim) : '') + '</span>' +
                 '<span class="sip-kutu">' + TIK + '</span>' +
             '</div>' +
-            '<div class="sip-barkodlar">' + barkodlar + '</div>' +
         '</div>';
+    }
+
+    /* Bant renkleri kart şeridiyle aynı; depocu aynı rengi iki yerde görüyor. */
+    var BANT_RENK = { firin: '#f59e0b', dondurma: '#7c5cf0', su: '#0ea5e9', orta: '#94a3b8' };
+
+    /**
+     * Ürünleri bantlara ayırıp her bandın üstüne başlık koyar. Depocu fırını
+     * bitirip buzluğa geçtiğini görüyor; tek uzun liste bunu göstermiyordu.
+     * Sıra `siparis-sirala` tarafından zaten kurulmuş durumda, burada yalnız
+     * ardışık aynı bantlar gruplanıyor.
+     */
+    function bantlaraAyir(urunler) {
+        var etiketler = (global.JBSiparisSirala && global.JBSiparisSirala.BANT_ETIKET) || {};
+        var parcalar = [];
+        var suanki = null;
+        var kume = [];
+
+        function bosalt() {
+            if (!kume.length) return;
+            var bitti = kume.every(function (u) { return u.alindi; });
+            var alinan = kume.filter(function (u) { return u.alindi; }).length;
+            parcalar.push(
+                '<div class="sip-bant' + (bitti ? ' sip-bant--bitti' : '') +
+                '" style="--bant-renk:' + (BANT_RENK[suanki] || BANT_RENK.orta) + '">' +
+                    '<span class="sip-bant__nokta"></span>' +
+                    '<span class="sip-bant__ad">' + kacir(etiketler[suanki] || 'Ürünler') + '</span>' +
+                    '<span class="sip-bant__cizgi"></span>' +
+                    '<span class="sip-bant__sayi">' + alinan + '/' + kume.length + '</span>' +
+                '</div>' +
+                kume.map(urunCiz).join('')
+            );
+            kume = [];
+        }
+
+        urunler.forEach(function (u) {
+            var b = u.toplamaBandi || 'orta';
+            if (b !== suanki) { bosalt(); suanki = b; }
+            kume.push(u);
+        });
+        bosalt();
+        return parcalar.join('');
+    }
+
+    /** İlerleme halkası. Çevre 2*pi*r, r = 20. */
+    function halkaCiz(alinan, toplam) {
+        var halka = el('detayHalka');
+        if (!halka) return;
+        var cevre = 2 * Math.PI * 20;
+        var oran = toplam ? alinan / toplam : 0;
+        var dolu = halka.querySelector('.dolu');
+        dolu.setAttribute('stroke-dasharray', (cevre * oran).toFixed(1) + ' ' + cevre.toFixed(1));
+        halka.classList.toggle('tam', oran === 1 && toplam > 0);
+        halka.querySelector('b').textContent = toplam ? Math.round(oran * 100) + '%' : '0%';
     }
 
     function kunyeCiz(s) {
@@ -526,22 +628,29 @@
         var urunler = s.urunler || [];
         var alinan = urunler.filter(function (u) { return u.alindi; }).length;
 
-        el('detayBanko').textContent = s.banko || 'Banko yok';
+        el('detayBanko').textContent = siparisBasligi(s);
         el('detayAlt').textContent = gecenSure(s) ? gecenSure(s) + ' önce düştü' : '';
         el('detayKunye').innerHTML = kunyeCiz(s);
 
         var govde = el('detayGovde');
         govde.className = 'sip-detay__govde sip-detay__govde--' + durum.detayGorunum;
         govde.innerHTML = urunler.length
-            ? urunler.map(urunCiz).join('')
+            ? bantlaraAyir(urunler)
             : '<div class="sip-bos">Bu siparişin ürünleri henüz gelmedi.</div>';
         document.querySelectorAll('#detayGorunum button').forEach(function (b) {
             b.setAttribute('aria-selected', String(b.getAttribute('data-detay-gorunum') === durum.detayGorunum));
         });
-        el('detaySayac').innerHTML = '<b>' + alinan + '</b> / ' + urunler.length + ' alındı';
+        el('detaySayac').innerHTML = '<b>' + alinan + '</b> / ' + urunler.length + ' ürün alındı';
+
+        var oran = urunler.length ? alinan / urunler.length : 0;
+        var cubuk = el('detayCubuk');
+        cubuk.classList.toggle('tam', oran === 1 && urunler.length > 0);
+        cubuk.firstElementChild.style.width = Math.round(oran * 100) + '%';
+        halkaCiz(alinan, urunler.length);
 
         var bitir = el('detayBitir');
         bitir.textContent = s.toplama_durumu === 'toplandi' ? 'Geri al' : 'Toplandı';
+        bitir.classList.toggle('sip-bitir--tam', oran === 1 && s.toplama_durumu !== 'toplandi');
         bitir.disabled = !urunler.length;
         detay.hidden = false;
     }

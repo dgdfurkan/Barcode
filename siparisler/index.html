@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
     <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
-    <link rel="stylesheet" href="../css/siparisler.css?v=20260903d" />
+    <link rel="stylesheet" href="../css/siparisler.css?v=20260903g" />
     <script src="../js/auth-token.js?v=20260828i"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20260828i"></script>
@@ -151,6 +151,13 @@
                 <strong id="detayBanko">-</strong>
                 <span id="detayAlt"></span>
             </div>
+            <div class="sip-halka" id="detayHalka">
+                <svg viewBox="0 0 46 46" width="46" height="46" aria-hidden="true">
+                    <circle class="iz" cx="23" cy="23" r="20"></circle>
+                    <circle class="dolu" cx="23" cy="23" r="20" stroke-dasharray="0 126"></circle>
+                </svg>
+                <b>0%</b>
+            </div>
         </div>
 
         <div class="sip-kunye" id="detayKunye"></div>
@@ -173,6 +180,7 @@
         <div class="sip-detay__govde sip-detay__govde--liste" id="detayGovde"></div>
 
         <div class="sip-alt">
+            <div class="sip-alt__cubuk" id="detayCubuk"><span style="width:0%"></span></div>
             <span class="sip-alt__sayac" id="detaySayac"></span>
             <button type="button" class="sip-bitir" id="detayBitir">Toplandı</button>
         </div>
@@ -204,7 +212,7 @@
     </div>
 
     <script src="../js/siparis-sirala.js?v=20260903d"></script>
-    <script src="../js/siparisler.js?v=20260903d"></script>
+    <script src="../js/siparisler.js?v=20260903g"></script>
     <script>
         // Başlıktaki kullanıcı adı; diğer sayfalarla aynı davranış.
         (function () {
