@@ -47,443 +47,449 @@
      */
     var SIPARIS_YOLU = /^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/;
 
+    /*
+     * Palet Jet Barkod'un kendi paleti: mürekkep siyahı yüzey, kırık beyaz
+     * kağıt, logo mavisi tek vurgu. Getir'in moru ve sarısı kaldırıldı; iki
+     * renk arası degrade yok. Simgeler emoji değil, satır içi SVG.
+     */
     var STIL = `#jba-hb {
     position: fixed;
-    bottom: 30px;
-    right: 30px;
+    bottom: 24px;
+    right: 24px;
     z-index: 999999;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
     /* Kurye adının üstüne denk gelip göz yorduğu için sönük duruyor.
        Fare yaklaşınca, içine odaklanınca ya da panel açıkken tam görünür. */
     opacity: 0.32;
     transition: opacity 0.18s ease;
+
+    --mrk: #131720;
+    --mrk-2: #1c2230;
+    --cizgi: #2a3242;
+    --yazi: #f2f4f8;
+    --sonuk: #98a2b3;
+    --mavi: #135bec;
+    --mavi-ac: #3b82f6;
+    --yesil: #16a34a;
+    --kirmizi: #dc2626;
 }
 #jba-hb:hover,
 #jba-hb:focus-within,
 #jba-hb.jba-hb--acik { opacity: 1; }
 
-/* Yerleşim sertleştirme: taşan metin kırpılıyor, düğmeler tek ızgarada,
-   satır yükseklikleri sabit. Yarım kalan düğme ve okunmayan yazı kalmasın. */
-#jba-hb .sr-row { min-height: 42px; }
-#jba-hb .sr-bnk,
-#jba-hb .sr-courier {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 160px;
-}
-#jba-hb .search-results { max-height: 260px; overflow-y: auto; }
-#jba-hb .header-buttons button {
-    width: 26px; height: 26px;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 6px; padding: 0;
-}
-#jba-hb .header-buttons button:hover { background: rgba(255,255,255,0.16); }
-#jba-hb .btn-primary,
-#jba-hb .btn-danger,
-#jba-hb .btn-secondary-sm {
-    min-height: 34px;
-    line-height: 1.15;
-    display: inline-flex; align-items: center; justify-content: center;
-}
-#jba-hb .action-btn { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; }
-
 /* [hidden] tek başına yetmiyor: aşağıda display veren kurallar var ve
-   belirlilik yarışını onlar kazanıyor. Bu satır olmazsa menü hiç kapanmaz. */
+   belirlilik yarışını onlar kazanıyor. Bu satır olmazsa hiç kapanmaz. */
 #jba-hb [hidden] { display: none !important; }
 
-/* Arama satırı: kapsam seçici + kutu */
-#jba-hb .jba-hb-arama {
-    display: grid;
-    grid-template-columns: 104px 1fr;
-    gap: 6px;
-    align-items: stretch;
-}
+#jba-hb button { font-family: inherit; }
+#jba-hb svg { display: block; flex: none; }
 
-/* Kapsam seçici. Tarayıcının kendi <select> kabuğu panelin içinde yabancı
-   duruyordu; kendi düğmemiz ve kendi menümüz var. */
-#jba-hb .jba-hb-kapsam { position: relative; }
-#jba-hb .jba-hb-kapsam__dugme {
-    width: 100%;
-    height: 100%;
-    min-height: 38px;
+/* ---------------- AÇMA DÜĞMESİ ---------------- */
+#jba-hb #jba-hb-fab {
+    width: 48px;
+    height: 48px;
+    background: var(--mrk);
+    color: var(--yazi);
+    border-radius: 14px;
     display: flex;
+    justify-content: center;
     align-items: center;
-    justify-content: space-between;
-    gap: 4px;
-    background: #f0ecff;
-    border: 2px solid #5d3ebc;
-    border-radius: 8px;
-    color: #5d3ebc;
-    font: 700 12px inherit;
-    padding: 0 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.28);
     cursor: pointer;
+    border: 1px solid var(--cizgi);
+    transition: transform 0.15s ease, background 0.15s ease;
 }
-#jba-hb .jba-hb-kapsam__dugme:hover { background: #e6dfff; }
-#jba-hb .jba-hb-kapsam__ok { font-size: 10px; opacity: .7; transition: transform .15s ease; }
-#jba-hb .jba-hb-kapsam.acik .jba-hb-kapsam__ok { transform: rotate(180deg); }
+#jba-hb #jba-hb-fab:hover { transform: translateY(-1px); background: var(--mrk-2); }
 
-#jba-hb .jba-hb-kapsam__menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    min-width: 100%;
-    background: #fff;
-    border: 1.5px solid #5d3ebc;
-    border-radius: 8px;
-    box-shadow: 0 8px 20px rgba(93,62,188,0.22);
-    overflow: hidden;
-    z-index: 5;
+/* ---------------- PANEL ---------------- */
+#jba-hb #jba-hb-panel {
+    width: 372px;
+    background: var(--mrk);
+    border: 1px solid var(--cizgi);
+    border-radius: 16px;
+    box-shadow: 0 20px 48px rgba(0,0,0,0.42);
     display: flex;
     flex-direction: column;
-}
-#jba-hb .jba-hb-kapsam__menu button {
-    background: transparent;
-    border: 0;
-    text-align: left;
-    padding: 8px 10px;
-    font: 600 12px inherit;
-    color: #3b3357;
-    cursor: pointer;
-    white-space: nowrap;
-}
-#jba-hb .jba-hb-kapsam__menu button:hover { background: #f0ecff; }
-#jba-hb .jba-hb-kapsam__menu button[aria-selected="true"] {
-    background: #5d3ebc;
-    color: #ffd300;
-}
-#jba-hb .jba-hb-ipucu {
-    font-size: 10px;
-    color: #8b83a8;
-    margin-top: -4px;
+    max-height: 620px;
+    color: var(--yazi);
+    /* Menü ve açılır parçalar kırpılmasın diye taşma serbest. */
+    overflow: visible;
 }
 
-/* ---------------- AYARLAR ---------------- */
-#jba-hb .ayar-baslik {
+#jba-hb .panel-header {
+    background: transparent;
+    border-bottom: 1px solid var(--cizgi);
+    padding: 13px 14px;
     display: flex;
-    align-items: baseline;
     justify-content: space-between;
-    gap: 8px;
-}
-#jba-hb .ayar-baslik h4 { margin: 0; font-size: 13px; color: #5d3ebc; }
-#jba-hb .ayar-baslik span { font-size: 10px; color: #8b83a8; }
-#jba-hb .alan { display: flex; flex-direction: column; gap: 3px; }
-#jba-hb .alan > label {
-    font-size: 10px;
-    font-weight: 700;
-    color: #6b6383;
-    text-transform: uppercase;
-    letter-spacing: .3px;
-}
-#jba-hb .alan > small { font-size: 10px; color: #9a93b0; }
-#jba-hb .renk-satiri {
-    display: flex;
     align-items: center;
-    gap: 8px;
-    background: #fff;
-    border: 1px solid #e3dff2;
-    border-radius: 8px;
-    padding: 6px 8px;
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
 }
-#jba-hb .renk-satiri label { flex: 1; font-size: 11px; font-weight: 700; color: #6b6383; }
-#jba-hb .renk-satiri input[type="color"] {
-    border: none;
-    background: none;
-    width: 34px;
-    height: 26px;
+#jba-hb .panel-header > span { display: flex; align-items: center; gap: 8px; }
+#jba-hb .header-buttons { display: flex; gap: 4px; }
+#jba-hb .icon-btn {
+    background: transparent;
+    border: 0;
+    color: var(--sonuk);
+    cursor: pointer;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px;
     padding: 0;
-    cursor: pointer;
 }
-#jba-hb .form-dugmeler { display: grid; grid-template-columns: 1fr; gap: 6px; }
-#jba-hb .form-dugmeler.duzenleme { grid-template-columns: 1fr 88px; }
-#jba-hb .btn-vazgec {
-    background: #fff;
-    border: 1px solid #d8d0f5;
-    border-radius: 6px;
-    color: #6b6383;
-    font: 600 12px inherit;
-    cursor: pointer;
-}
-#jba-hb .btn-vazgec:hover { background: #f0ecff; color: #5d3ebc; }
-#jba-hb .kat-bos {
-    text-align: center;
-    color: #9a93b0;
-    font-size: 12px;
-    padding: 18px 10px;
-    background: #fff;
-    border: 1px dashed #d8d0f5;
-    border-radius: 8px;
-}
-#jba-hb .kat-ust {
+#jba-hb .icon-btn:hover { background: var(--mrk-2); color: var(--yazi); }
+
+#jba-hb .panel-body {
+    padding: 12px 14px 14px;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#jba-hb .token-expiry-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--sonuk);
+    display: flex;
     align-items: center;
     gap: 6px;
 }
-#jba-hb .kat-ad {
-    font-size: 13px;
+#jba-hb .token-expiry-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--yesil);
+    flex: none;
+}
+#jba-hb .auto-token-note { display: none; }
+
+/* ---------------- KAPSAM: BÖLMELİ DÜĞME ---------------- */
+/* Açılır menü panelin içinde kırpılıyordu ve dört seçenek için fazla
+   ağırdı. Dört kısa seçenek tek satırda dursun, tek dokunuşla değişsin. */
+#jba-hb .kapsam {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2px;
+    background: var(--mrk-2);
+    border: 1px solid var(--cizgi);
+    border-radius: 10px;
+    padding: 2px;
+}
+#jba-hb .kapsam button {
+    border: 0;
+    background: transparent;
+    color: var(--sonuk);
+    font: 600 11.5px inherit;
+    padding: 6px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+#jba-hb .kapsam button:hover { color: var(--yazi); }
+#jba-hb .kapsam button[aria-selected="true"] {
+    background: var(--mavi);
+    color: #fff;
+}
+
+#jba-hb .arama-kutu { position: relative; }
+#jba-hb .arama-kutu svg {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--sonuk);
+}
+#jba-hb .search-input {
+    padding-left: 34px !important;
+    font-size: 13px !important;
+}
+
+/* ---------------- SONUÇLAR ---------------- */
+#jba-hb .search-results {
+    background: var(--mrk-2);
+    border: 1px solid var(--cizgi);
+    border-radius: 10px;
+    overflow: hidden auto;
+    max-height: 260px;
+    font-size: 12px;
+}
+#jba-hb .sr-header {
+    padding: 7px 11px;
+    font-weight: 600;
+    font-size: 11px;
+    color: var(--sonuk);
+    border-bottom: 1px solid var(--cizgi);
+    position: sticky;
+    top: 0;
+    background: var(--mrk-2);
+}
+#jba-hb .sr-empty { padding: 14px 11px; color: var(--sonuk); text-align: center; }
+#jba-hb .sr-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 9px 11px;
+    min-height: 44px;
+    border-bottom: 1px solid var(--cizgi);
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+#jba-hb .sr-row:hover { background: rgba(255,255,255,0.045); }
+#jba-hb .sr-row:last-child { border-bottom: none; }
+#jba-hb .sr-ust { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#jba-hb .sr-alt { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; color: var(--sonuk); }
+#jba-hb .sr-bnk {
     font-weight: 700;
-    color: #2f2a45;
+    font-size: 12px;
+    color: var(--yazi);
+    letter-spacing: 0.02em;
+}
+#jba-hb .sr-courier,
+#jba-hb .sr-bnk,
+#jba-hb .sr-count {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 170px;
 }
-#jba-hb .kat-rozetler { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 3px; }
+#jba-hb .sr-courier { font-size: 11px; color: var(--sonuk); }
+#jba-hb .sr-adet { color: var(--mavi-ac); font-weight: 600; }
 
-/* Form listeyi eziyordu. Artık kapalı başlıyor, liste ana içerik. */
+#jba-hb .queue-status-text {
+    font-size: 10.5px;
+    color: var(--sonuk);
+    text-align: right;
+}
+
+/* ---------------- ORTAK KONTROLLER ---------------- */
+#jba-hb .custom-input {
+    width: 100%;
+    padding: 9px 10px;
+    background: var(--mrk-2);
+    border: 1px solid var(--cizgi);
+    border-radius: 10px;
+    color: var(--yazi);
+    font-size: 13px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+#jba-hb .custom-input::placeholder { color: #6b7480; }
+#jba-hb .custom-input:focus {
+    outline: none;
+    border-color: var(--mavi);
+    box-shadow: 0 0 0 3px rgba(19,91,236,0.18);
+}
+#jba-hb textarea.custom-input { resize: vertical; min-height: 54px; }
+
+#jba-hb .btn-primary {
+    background: var(--mavi);
+    color: #fff;
+    border: none;
+    padding: 10px;
+    font-weight: 600;
+    font-size: 13px;
+    border-radius: 10px;
+    cursor: pointer;
+    width: 100%;
+    min-height: 38px;
+}
+#jba-hb .btn-primary:hover { background: #0f4bc4; }
+#jba-hb .btn-danger {
+    background: transparent;
+    color: #f87171;
+    border: 1px solid #4c2323;
+    padding: 8px;
+    font-weight: 600;
+    font-size: 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    min-height: 38px;
+}
+#jba-hb .btn-danger:hover { background: rgba(220,38,38,0.12); }
+#jba-hb .btn-vazgec {
+    background: transparent;
+    border: 1px solid var(--cizgi);
+    border-radius: 10px;
+    color: var(--sonuk);
+    font: 600 12px inherit;
+    cursor: pointer;
+    min-height: 38px;
+}
+#jba-hb .btn-vazgec:hover { background: var(--mrk-2); color: var(--yazi); }
+#jba-hb .btn-secondary-sm {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--cizgi);
+    border-radius: 10px;
+    padding: 9px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--sonuk);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 38px;
+}
+#jba-hb .btn-secondary-sm:hover { background: var(--mrk-2); color: var(--yazi); }
+
+/* ---------------- AYARLAR ---------------- */
+#jba-hb .settings-body {
+    display: none;
+    flex-direction: column;
+    max-height: 560px;
+}
+#jba-hb .settings-form {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--cizgi);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
 #jba-hb .ekle-btn {
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 6px;
-    background: #fff;
-    border: 1px dashed #c9bff0;
-    border-radius: 8px;
-    color: #5d3ebc;
-    font: 700 12px inherit;
-    padding: 9px 10px;
+    background: transparent;
+    border: 1px dashed var(--cizgi);
+    border-radius: 10px;
+    color: var(--sonuk);
+    font: 600 12px inherit;
+    padding: 10px;
     cursor: pointer;
 }
-#jba-hb .ekle-btn:hover { background: #f4f1ff; border-color: #5d3ebc; }
-#jba-hb .ekle-btn .isaret { font-size: 14px; line-height: 1; }
-#jba-hb #jba-hb-form-govde { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-#jba-hb .renk-satiri input[type="color"] {
-    border-radius: 6px;
-    overflow: hidden;
-}
-/* Yeşil dahil, kırmızı hariç. İşaretsizken hangisinin ne olduğu
-   anlaşılmıyordu. */
-#jba-hb .badge::before { font-weight: 700; margin-right: 3px; opacity: .85; }
-#jba-hb .badge.inc::before { content: '+'; }
-#jba-hb .badge.exc::before { content: '-'; }
-#jba-hb .advanced-section { padding: 12px; }
+#jba-hb .ekle-btn:hover { border-color: var(--mavi); color: var(--yazi); }
+#jba-hb #jba-hb-form-govde { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
 
-#jba-hb #jba-hb-fab {
-    width: 56px;
-    height: 56px;
-    background: #5d3ebc;
-    color: #ffd300;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    box-shadow: 0 4px 16px rgba(93,62,188,0.45);
-    cursor: pointer;
-    font-size: 22px;
-    transition: transform 0.15s ease;
-}
-#jba-hb #jba-hb-fab:hover { transform: scale(1.08); }
-
-#jba-hb #jba-hb-panel {
-    width: 360px;
-    background: #fff;
-    border: 1.5px solid #5d3ebc;
-    border-radius: 14px;
-    box-shadow: 0 12px 32px rgba(0,0,0,0.18);
-    display: flex;
-    flex-direction: column;
-    max-height: 620px;
-    overflow: hidden;
-}
-
-#jba-hb .panel-header {
-    background: linear-gradient(135deg, #5d3ebc, #7b5ce6);
-    padding: 11px 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: white;
-    font-weight: 700;
-    font-size: 14px;
-    flex-shrink: 0;
-}
-#jba-hb .header-buttons { display: flex; gap: 8px; }
-#jba-hb .icon-btn { background: transparent; border: none; color: white; cursor: pointer; font-size: 17px; opacity: 0.9; }
-#jba-hb .icon-btn:hover { opacity: 1; }
-
-#jba-hb .panel-body {
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 9px;
-}
-
-#jba-hb .token-expiry-badge {
-    font-size: 12px;
-    text-align: center;
-    font-weight: 700;
-    color: #5d3ebc;
-    background: #f0ecff;
-    border-radius: 8px;
-    padding: 5px 8px;
-}
-
-#jba-hb .auto-token-note {
+#jba-hb .ayar-baslik { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+#jba-hb .ayar-baslik h4 { margin: 0; font-size: 13px; font-weight: 600; color: var(--yazi); }
+#jba-hb .ayar-baslik span { font-size: 10.5px; color: var(--sonuk); }
+#jba-hb .alan { display: flex; flex-direction: column; gap: 4px; }
+#jba-hb .alan > label {
     font-size: 10px;
-    text-align: center;
-    color: #28a745;
-    margin-top: -4px;
-}
-
-#jba-hb .search-input {
-    border: 2px solid #5d3ebc !important;
-    font-size: 14px !important;
-    padding: 9px 10px !important;
-}
-
-#jba-hb .search-results {
-    background: #f7f5ff;
-    border: 1px solid #d8d0f5;
-    border-radius: 8px;
-    overflow: hidden;
-    font-size: 12px;
-}
-#jba-hb .sr-header {
-    background: #5d3ebc;
-    color: white;
-    padding: 5px 10px;
     font-weight: 600;
-    font-size: 11px;
+    color: var(--sonuk);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
-#jba-hb .sr-row {
+#jba-hb .alan > small { font-size: 10.5px; color: #6b7480; }
+#jba-hb .renk-satiri {
     display: flex;
-    flex-direction: column;
-    padding: 7px 10px;
-    border-bottom: 1px solid #ede9ff;
-    transition: filter 0.15s ease;
-}
-#jba-hb .sr-row:hover { filter: brightness(0.95); }
-#jba-hb .sr-row:last-child { border-bottom: none; }
-#jba-hb .sr-bnk {
-    font-weight: 700;
-    color: #5d3ebc;
-    background: #ede9ff;
-    padding: 2px 7px;
-    border-radius: 6px;
-    font-size: 11px;
-}
-#jba-hb .sr-count { color: #555; font-size: 11px; }
-#jba-hb .sr-empty { padding: 8px 10px; color: #999; text-align: center; font-size: 11px; }
-
-#jba-hb .jba-hb-kuyruk-text {
-    font-size: 11px;
-    color: #888;
-    text-align: center;
-}
-
-/* AYARLAR */
-#jba-hb .settings-body {
-    display: none;
-    flex-direction: column;
-    max-height: 580px;
-}
-#jba-hb .settings-form {
-    padding: 14px;
-    background: #fafafa;
-    border-bottom: 1px solid #eee;
-    display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 8px;
-    flex-shrink: 0;
+    background: var(--mrk-2);
+    border: 1px solid var(--cizgi);
+    border-radius: 10px;
+    padding: 8px 10px;
 }
+#jba-hb .renk-satiri label { flex: 1; font-size: 11.5px; font-weight: 600; color: var(--sonuk); }
+#jba-hb .renk-satiri input[type="color"] {
+    border: none;
+    background: none;
+    width: 36px;
+    height: 26px;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 6px;
+    overflow: hidden;
+}
+#jba-hb .form-dugmeler { display: grid; grid-template-columns: 1fr; gap: 8px; }
+#jba-hb .form-dugmeler.duzenleme { grid-template-columns: 1fr 92px; }
+
 #jba-hb #jba-hb-kat-liste {
-    padding: 10px 12px;
+    padding: 12px 14px;
     overflow-y: auto;
     flex-grow: 1;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    background: #f3f3f3;
 }
-
-/* GELİŞMİŞ AYARLAR */
-#jba-hb .advanced-section {
-    padding: 10px 12px;
-    background: #fafafa;
-    border-top: 1px solid #eee;
-    flex-shrink: 0;
-}
-#jba-hb .btn-secondary-sm {
-    width: 100%;
-    background: transparent;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 6px 10px;
+#jba-hb .kat-bos {
+    text-align: center;
+    color: var(--sonuk);
     font-size: 12px;
-    cursor: pointer;
-    color: #666;
-    text-align: left;
+    line-height: 1.6;
+    padding: 22px 12px;
+    border: 1px dashed var(--cizgi);
+    border-radius: 10px;
 }
-#jba-hb .btn-secondary-sm:hover { background: #f0ecff; border-color: #5d3ebc; color: #5d3ebc; }
-#jba-hb .advanced-note {
-    font-size: 11px;
-    color: #f57c00;
-    margin: 0 0 8px 0;
-    background: #fff8e1;
-    padding: 5px 8px;
-    border-radius: 6px;
-}
-
-#jba-hb .custom-input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 13px;
-    box-sizing: border-box;
-    font-family: inherit;
-}
-
-#jba-hb .btn-primary { background: #ffd300; color: #5d3ebc; border: none; padding: 9px; font-weight: 700; border-radius: 6px; cursor: pointer; width: 100%; }
-#jba-hb .btn-primary:hover { background: #f5c800; }
-#jba-hb .btn-danger { background: #dc3545; color: white; border: none; padding: 6px; font-weight: 700; border-radius: 6px; cursor: pointer; }
-
 #jba-hb .category-card {
-    background: #fff;
-    border: 1px solid #ddd;
-    border-left: 5px solid;
-    padding: 9px 10px;
-    border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    background: var(--mrk-2);
+    border: 1px solid var(--cizgi);
+    border-left: 3px solid;
+    padding: 11px 12px;
+    border-radius: 10px;
 }
+#jba-hb .kat-ust { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+#jba-hb .kat-ad {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--yazi);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#jba-hb .kat-rozetler { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
 #jba-hb .action-btn {
     background: transparent;
     border: none;
     cursor: pointer;
-    font-size: 14px;
-    padding: 2px 5px;
-    border-radius: 4px;
+    color: var(--sonuk);
+    width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 7px;
+    padding: 0;
 }
-#jba-hb .action-btn:hover { background: #f0f0f0; }
+#jba-hb .action-btn:hover { background: rgba(255,255,255,0.07); color: var(--yazi); }
+#jba-hb .action-btn.sil-btn:hover { color: #f87171; }
 
 #jba-hb .badge {
-    padding: 2px 7px;
-    border-radius: 10px;
-    font-size: 10px;
-    color: white;
-    margin-right: 3px;
+    padding: 3px 8px;
+    border-radius: 7px;
+    font-size: 10.5px;
+    font-weight: 500;
     display: inline-block;
-    margin-top: 3px;
+    border: 1px solid;
 }
-#jba-hb .badge.inc { background: #28a745; }
-#jba-hb .badge.exc { background: #dc3545; }
+#jba-hb .badge.inc { color: #4ade80; border-color: rgba(74,222,128,0.28); background: rgba(22,163,74,0.12); }
+#jba-hb .badge.exc { color: #f87171; border-color: rgba(248,113,113,0.28); background: rgba(220,38,38,0.12); }
+#jba-hb .badge::before { font-weight: 700; margin-right: 4px; opacity: 0.7; }
+#jba-hb .badge.inc::before { content: '+'; }
+#jba-hb .badge.exc::before { content: '-'; }
 
-/* Parça sayısı badge — BNK etiketinin soluna */
-#jba-hb .g-count-badge {
-    display: inline-flex;
-    align-items: center;
-    background: #5d3ebc;
-    color: #ffd300;
+/* ---------------- GELİŞMİŞ ---------------- */
+#jba-hb .advanced-section {
+    padding: 12px 14px;
+    border-top: 1px solid var(--cizgi);
+    flex-shrink: 0;
+}
+#jba-hb .advanced-note {
+    font-size: 11px;
+    color: #fbbf24;
+    margin: 0 0 8px 0;
+    background: rgba(251,191,36,0.1);
+    border: 1px solid rgba(251,191,36,0.22);
+    padding: 7px 9px;
+    border-radius: 8px;
+    line-height: 1.45;
+}
+
+/* Kart üstüne konan parça sayısı rozeti (panelin dışında, Getir'in kartında) */
+.g-count-badge {
+    display: inline-block;
+    background: #131720;
+    color: #fff;
     font-size: 10px;
     font-weight: 700;
     padding: 1px 6px;
-    border-radius: 4px;
-    margin-right: 5px;
-    line-height: 1.6;
-    letter-spacing: 0.3px;
-    vertical-align: middle;
+    border-radius: 6px;
+    margin-right: 6px;
+    letter-spacing: 0.02em;
 }`;
 
     function stilKur() {
@@ -493,6 +499,18 @@
         s.textContent = STIL;
         (document.head || document.documentElement).appendChild(s);
     }
+
+    /* Emoji yerine satır içi SVG. Emoji her işletim sisteminde başka
+       görünüyor ve panelin dilini bozuyordu. */
+    var SVG = {
+        ara: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>',
+        araBuyuk: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>',
+        ayar: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h8M17 6h3M4 12h3M12 12h8M4 18h8M17 18h3"/><circle cx="14.5" cy="6" r="2"/><circle cx="9.5" cy="12" r="2"/><circle cx="14.5" cy="18" r="2"/></svg>',
+        kapat: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+        kalem: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+        cop: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>',
+        kilit: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>'
+    };
 
     var kuruldu = false;
 
@@ -558,15 +576,14 @@
         };
 
         const getTokenExpiry = (token) => {
-            if (!token) return '⚠️ Token Yok';
+            if (!token) return 'Oturum anahtarı yok';
             try {
                 const raw = token.replace(/^Bearer\s+/i, '');
                 const payload = JSON.parse(atob(raw.split('.')[1]));
                 const timeLeft = Math.floor((payload.exp * 1000 - Date.now()) / 60000);
-                if (timeLeft <= 0) return '⚠️ Süresi Doldu!';
-                if (timeLeft < 3) return `⚠️ ${timeLeft} dk kaldı`;
-                return `✅ ${timeLeft} dk kaldı`;
-            } catch (e) { return '✅ Token Aktif'; }
+                if (timeLeft <= 0) return 'Oturum süresi doldu';
+                return `Oturum ${timeLeft} dk geçerli`;
+            } catch (e) { return 'Oturum aktif'; }
         };
 
         const findOrderIds = (obj) => {
@@ -659,20 +676,20 @@
 
             el.style.display = 'block';
             if (matches.length === 0) {
-                el.innerHTML = `<div class="sr-empty">Hiçbir siparişte bulunamadı</div>`;
+                el.innerHTML = `<div class="sr-empty">Eşleşen sipariş yok</div>`;
                 return;
             }
 
-            el.innerHTML = `<div class="sr-header">🔍 ${matches.length} siparişte bulundu</div>` +
+            el.innerHTML = `<div class="sr-header">${matches.length} siparişte bulundu</div>` +
                 matches.map((m, i) => `
-                    <div class="sr-row" data-idx="${i}" style="cursor: pointer; background: ${m.bgColor || 'transparent'};">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <div class="sr-row" data-idx="${i}">
+                        <div class="sr-ust">
                             <span class="sr-bnk">${m.bnk}</span>
-                            <span class="sr-courier" style="font-weight:600; color:#444; font-size:11px;">🏍️ ${m.courier}</span>
+                            <span class="sr-courier">${m.courier}</span>
                         </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#666;">
-                            <span style="font-weight:600; color:#5d3ebc;">📦 Sipariş: ${m.count !== null ? m.count + ' Adet' : '? Adet'}</span>
-                            <span class="sr-count">🔍 ${m.hitCount} ürün eşleşti</span>
+                        <div class="sr-alt">
+                            <span class="sr-adet">${m.count !== null ? m.count + ' parça' : 'parça bilinmiyor'}</span>
+                            <span class="sr-count">${m.hitCount ? m.hitCount + ' ürün eşleşti' : ''}</span>
                         </div>
                     </div>`).join('');
 
@@ -938,35 +955,28 @@
             const container = document.createElement('div');
             container.id = 'jba-hb';
             container.innerHTML = `
-                <div id="jba-hb-fab">🔍</div>
+                <div id="jba-hb-fab" title="Hızlı Bul">${SVG.araBuyuk}</div>
                 <div id="jba-hb-panel" style="display:none;">
                     <div class="panel-header">
-                        <span>🚀 Hızlı Bul</span>
+                        <span>Hızlı Bul</span>
                         <div class="header-buttons">
-                            <button id="jba-hb-ayar-btn" class="icon-btn">⚙️</button>
-                            <button id="jba-hb-kapat" class="icon-btn">✖</button>
+                            <button id="jba-hb-ayar-btn" class="icon-btn" title="Ayarlar">${SVG.ayar}</button>
+                            <button id="jba-hb-kapat" class="icon-btn" title="Kapat">${SVG.kapat}</button>
                         </div>
                     </div>
 
                     <div class="panel-body" id="jba-hb-ana">
                         <div id="jba-hb-jeton-durum" class="token-expiry-badge">${getTokenExpiry(userToken)}</div>
-                        <div class="auto-token-note">🔄 Token otomatik alınıyor</div>
-                        <div class="jba-hb-arama">
-                            <div class="jba-hb-kapsam" id="jba-hb-kapsam">
-                                <button type="button" class="jba-hb-kapsam__dugme" id="jba-hb-kapsam-dugme">
-                                    <span id="jba-hb-kapsam-etiket">Hepsi</span>
-                                    <span class="jba-hb-kapsam__ok">▾</span>
-                                </button>
-                                <div class="jba-hb-kapsam__menu" id="jba-hb-kapsam-menu" hidden>
-                                    <button type="button" data-deger="hepsi">Hepsi</button>
-                                    <button type="button" data-deger="urun">Ürün</button>
-                                    <button type="button" data-deger="kurye">Kurye</button>
-                                    <button type="button" data-deger="banko">Banko</button>
-                                </div>
-                            </div>
-                            <input type="text" id="jba-hb-girdi" class="custom-input search-input" placeholder="🔍 Ara...">
+                        <div class="kapsam" id="jba-hb-kapsam">
+                            <button type="button" data-deger="hepsi">Hepsi</button>
+                            <button type="button" data-deger="urun">Ürün</button>
+                            <button type="button" data-deger="kurye">Kurye</button>
+                            <button type="button" data-deger="banko">Banko</button>
                         </div>
-                        <div class="jba-hb-ipucu">Varsayılan hepsinde arar. Daraltmak istersen soldan seç.</div>
+                        <div class="arama-kutu">
+                            ${SVG.ara}
+                            <input type="text" id="jba-hb-girdi" class="custom-input search-input" placeholder="Ara">
+                        </div>
                         <div id="jba-hb-sonuc" class="search-results" style="display:none;"></div>
                         <div id="jba-hb-kuyruk" class="jba-hb-kuyruk-text">Kuyruk: 0 | Hafıza: 0 sipariş</div>
                     </div>
@@ -1008,7 +1018,7 @@
                         </div>
                         <div id="jba-hb-kat-liste"></div>
                         <div class="advanced-section">
-                            <button id="jba-hb-gelismis" class="btn-secondary-sm">🔐 Gelişmiş Ayarlar</button>
+                            <button id="jba-hb-gelismis" class="btn-secondary-sm">${SVG.kilit}<span>Gelişmiş ayarlar</span></button>
                             <div id="jba-hb-gelismis-icerik" style="display:none; padding:10px; border-top:1px solid #eee;">
                                 <p class="advanced-note">Token otomatik alınmaktadır. Gerekmedikçe kullanmayın.</p>
                                 <input type="password" id="jba-hb-jeton-girdi" class="custom-input" placeholder="Manuel Token">
@@ -1035,7 +1045,8 @@
                 const c = document.getElementById('jba-hb-gelismis-icerik');
                 const open = c.style.display !== 'none';
                 c.style.display = open ? 'none' : 'block';
-                document.getElementById('jba-hb-gelismis').innerText = open ? '🔐 Gelişmiş Ayarlar' : '🔐 Gizle';
+                document.getElementById('jba-hb-gelismis').innerHTML =
+                    SVG.kilit + '<span>' + (open ? 'Gelişmiş ayarlar' : 'Gizle') + '</span>';
             };
             document.getElementById('jba-hb-jeton-kaydet').onclick = () => {
                 const val = document.getElementById('jba-hb-jeton-girdi').value;
@@ -1044,7 +1055,7 @@
                     localStorage.setItem('getir_manual_token', userToken);
                     document.getElementById('jba-hb-jeton-durum').innerText = getTokenExpiry(userToken);
                     const btn = document.getElementById('jba-hb-jeton-kaydet');
-                    btn.innerText = '✅ Kaydedildi';
+                    btn.innerText = 'Kaydedildi';
                     setTimeout(() => { btn.innerText = 'Kaydet'; }, 2000);
                     if (!isFetching && fetchQueue.length > 0) processQueue();
                 }
@@ -1099,47 +1110,26 @@
             kapsamKur();
         };
 
-        // === KAPSAM SEÇİCİ ===
-        const kapsamMenuKapat = () => {
-            const kap = document.getElementById('jba-hb-kapsam');
-            const menu = document.getElementById('jba-hb-kapsam-menu');
-            if (!kap || !menu) return;
-            menu.hidden = true;
-            kap.classList.remove('acik');
-        };
-
+        /* === KAPSAM SEÇİCİ ===
+           Açılır menüydü: panelin içinde kırpılıyordu ve dört kısa seçenek
+           için fazla ağırdı. Dört bölmeli tek satır oldu, tek dokunuş. */
         const kapsamYaz = () => {
-            const etiket = document.getElementById('jba-hb-kapsam-etiket');
-            if (etiket) etiket.textContent = KAPSAM_ADI[kapsamDeger];
-            const menu = document.getElementById('jba-hb-kapsam-menu');
-            if (!menu) return;
-            menu.querySelectorAll('button').forEach((b) => {
+            const kap = document.getElementById('jba-hb-kapsam');
+            if (!kap) return;
+            kap.querySelectorAll('button').forEach((b) => {
                 b.setAttribute('aria-selected', String(b.getAttribute('data-deger') === kapsamDeger));
             });
         };
 
         const kapsamKur = () => {
-            const dugme = document.getElementById('jba-hb-kapsam-dugme');
-            const menu = document.getElementById('jba-hb-kapsam-menu');
             const kap = document.getElementById('jba-hb-kapsam');
-            if (!dugme || !menu || !kap) return;
-
+            if (!kap) return;
             kapsamYaz();
-
-            dugme.onclick = (e) => {
-                e.stopPropagation();
-                const acik = !menu.hidden;
-                menu.hidden = acik;
-                kap.classList.toggle('acik', !acik);
-            };
-
-            menu.querySelectorAll('button').forEach((b) => {
-                b.onclick = (e) => {
-                    e.stopPropagation();
+            kap.querySelectorAll('button').forEach((b) => {
+                b.onclick = () => {
                     kapsamDeger = b.getAttribute('data-deger');
                     localStorage.setItem('getir_hb_kapsam', kapsamDeger);
                     kapsamYaz();
-                    kapsamMenuKapat();
                     applyUI();
                     document.getElementById('jba-hb-girdi')?.focus();
                 };
@@ -1189,8 +1179,8 @@
                     <div class="kat-ust">
                         <span class="kat-ad">${kacir(cat.name)}</span>
                         <div style="display:flex;gap:2px;flex-shrink:0;">
-                            <button class="action-btn edit-btn" data-idx="${idx}" title="Düzenle">✏️</button>
-                            <button class="action-btn del-btn" data-idx="${idx}" title="Sil">🗑️</button>
+                            <button class="action-btn edit-btn" data-idx="${idx}" title="Düzenle">${SVG.kalem}</button>
+                            <button class="action-btn del-btn sil-btn" data-idx="${idx}" title="Sil">${SVG.cop}</button>
                         </div>
                     </div>
                     <div class="kat-rozetler">
@@ -1267,21 +1257,12 @@
             if (!panelAcikMi()) return;
             const kap = document.getElementById('jba-hb');
             if (!kap) return;
-            if (kap.contains(e.target)) {
-                // Panel içi tıklama paneli kapatmaz ama açık menüyü kapatır.
-                const kapsam = document.getElementById('jba-hb-kapsam');
-                if (kapsam && !kapsam.contains(e.target)) kapsamMenuKapat();
-                return;
-            }
-            kapsamMenuKapat();
+            if (kap.contains(e.target)) return;
             paneliKapat();
         }, true);
 
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape' || !panelAcikMi()) return;
-            const menu = document.getElementById('jba-hb-kapsam-menu');
-            // Menü açıksa önce o kapansın; Esc bir seferde iki şeyi kapatmasın.
-            if (menu && !menu.hidden) { kapsamMenuKapat(); return; }
             paneliKapat();
         });
 
