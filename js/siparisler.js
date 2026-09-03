@@ -28,9 +28,11 @@
     var durum = {
         siparisler: [],
         secili: null,
-        sekme: 'aktif',
+        sekme: 'bekliyor',
+        gorunum: 'kart',
         yukleniyor: true,
-        sonImza: ''
+        sonImza: '',
+        sonYenileme: null
     };
     var zamanlayici = null;
 
@@ -141,6 +143,7 @@
 
         var imza = imzaCikar(yeni);
         durum.yukleniyor = false;
+        durum.sonYenileme = Date.now();
         if (!zorla && imza === durum.sonImza) return;
         durum.sonImza = imza;
         durum.siparisler = yeni;
@@ -211,44 +214,95 @@
     // Çizim
     // ==================================================================
 
-    function aktifMi(s) { return s.toplama_durumu !== 'toplandi'; }
+    function bandaGore(s) {
+        var d = s.toplama_durumu || 'bekliyor';
+        return d === 'toplandi' ? 'toplandi' : (d === 'toplaniyor' ? 'toplaniyor' : 'bekliyor');
+    }
 
     function listele() {
-        return durum.siparisler.filter(function (s) {
-            return durum.sekme === 'aktif' ? aktifMi(s) : !aktifMi(s);
+        return durum.siparisler.filter(function (s) { return bandaGore(s) === durum.sekme; });
+    }
+
+    /** "2 dk.", "1 sa. 20 dk." — depocu kaç dakikadır beklediğini görsün. */
+    function gecenSure(s) {
+        var t = s.sepet_zamani || s.created_at;
+        if (!t) return '';
+        var ms = Date.now() - new Date(t).getTime();
+        if (!isFinite(ms) || ms < 0) return '';
+        var dk = Math.floor(ms / 60000);
+        if (dk < 1) return 'az önce';
+        if (dk < 60) return dk + ' dk.';
+        var sa = Math.floor(dk / 60);
+        return sa + ' sa. ' + (dk % 60) + ' dk.';
+    }
+
+    function basHarfler(ad) {
+        var p = String(ad || '').trim().split(/\s+/).filter(Boolean);
+        if (!p.length) return '—';
+        if (p.length === 1) return p[0].slice(0, 2).toLocaleUpperCase('tr');
+        return (p[0][0] + p[p.length - 1][0]).toLocaleUpperCase('tr');
+    }
+
+    /* Kart şeridinin rengi siparişin ağırlıklı kategorisinden geliyor.
+       Süs değil: depocu daha karta bakarken fırına mı buzluğa mı gideceğini
+       biliyor. */
+    var KUME_RENK = { firin: '#f59e0b', dondurma: '#7c5cf0', su: '#0ea5e9' };
+
+    function kategoriRengi(s) {
+        var sayim = {};
+        (s.urunler || []).forEach(function (u) {
+            if (KUME_RENK[u.toplamaKumesi]) sayim[u.toplamaKumesi] = (sayim[u.toplamaKumesi] || 0) + 1;
         });
+        var en = null;
+        Object.keys(sayim).forEach(function (k) { if (!en || sayim[k] > sayim[en]) en = k; });
+        return en ? KUME_RENK[en] : '#cbd5e1';
     }
 
     function kartCiz(s) {
-        var toplam = (s.urunler || []).length;
-        var alinan = (s.urunler || []).filter(function (u) { return u.alindi; }).length;
-        var yuzde = toplam ? Math.round((alinan / toplam) * 100) : 0;
-        var d = s.toplama_durumu || 'bekliyor';
+        var urunler = s.urunler || [];
+        var toplam = urunler.length;
+        var alinan = urunler.filter(function (u) { return u.alindi; }).length;
+        var d = bandaGore(s);
+        var kisi = s.kurye || s.toplayici || '';
+        var kisiNot = s.kurye ? 'Kurye' : (s.toplayici ? 'Toplayıcı' : 'Atanmadı');
+        var ilkler = urunler.slice(0, 3);
+        var kalan = toplam - ilkler.length;
 
-        return '<button type="button" class="sip-kart' + (yuzde === 100 ? ' sip-kart--tam' : '') +
-               '" data-siparis="' + kacir(s.id) + '">' +
+        return '<button type="button" class="sip-kart" data-siparis="' + kacir(s.id) +
+               '" style="--kategori:' + kategoriRengi(s) + '">' +
             '<div class="sip-kart__ust">' +
-                '<span class="sip-banko">' + kacir(s.banko || 'Banko yok') + '</span>' +
-                '<span class="sip-rozet sip-rozet--' + d + '">' + kacir(DURUM_ADI[d] || d) + '</span>' +
+                '<span class="sip-banko">' +
+                    '<b class="sip-parca">x' + (s.toplam_adet != null ? s.toplam_adet : toplam) + '</b>' +
+                    kacir(s.banko || 'Banko yok') +
+                '</span>' +
+                '<span class="sip-sure">' + kacir(gecenSure(s)) + '</span>' +
             '</div>' +
-            '<div class="sip-kart__olculer">' +
-                '<span class="sip-olcu"><b>' + (s.toplam_adet != null ? s.toplam_adet : toplam) + '</b> parça</span>' +
-                (s.poset_sayisi != null ? '<span class="sip-olcu"><b>' + s.poset_sayisi + '</b> poşet</span>' : '') +
-                '<span class="sip-olcu"><b>' + alinan + '/' + toplam + '</b> alındı</span>' +
+            '<div class="sip-kisi">' +
+                '<span class="sip-avatar">' + kacir(basHarfler(kisi)) + '</span>' +
+                '<span class="sip-kisi__ad">' +
+                    '<strong>' + kacir(kisi || 'Kişi atanmadı') + '</strong>' +
+                    '<span>' + kacir(kisiNot) +
+                        (s.poset_sayisi != null ? '  ·  ' + s.poset_sayisi + ' poşet' : '') +
+                    '</span>' +
+                '</span>' +
             '</div>' +
-            (s.kurye || s.toplayici
-                ? '<div class="sip-kart__kisi">' +
-                    (s.kurye ? 'Kurye: ' + kacir(s.kurye) : '') +
-                    (s.kurye && s.toplayici ? '  ·  ' : '') +
-                    (s.toplayici ? 'Toplayıcı: ' + kacir(s.toplayici) : '') +
+            (ilkler.length
+                ? '<div class="sip-urunler">' +
+                    ilkler.map(function (u) {
+                        return '<div class="sip-satir"><span>' + kacir(u.ad || 'Adı gelmedi') +
+                               '</span><b>x' + adetYaz(u.adet) + '</b></div>';
+                    }).join('') +
+                    (kalan > 0 ? '<div class="sip-daha">+' + kalan + ' ürün daha</div>' : '') +
                   '</div>'
                 : '') +
-            '<div class="sip-ilerleme"><span style="width:' + yuzde + '%"></span></div>' +
+            '<div class="sip-alt-satir">' +
+                '<span class="sip-rozet sip-rozet--' + d + '"><i></i>' + kacir(DURUM_ADI[d]) + '</span>' +
+                '<span class="sip-ilerleme-yazi">' + alinan + '/' + toplam + ' alındı</span>' +
+            '</div>' +
         '</button>';
     }
 
     var TIK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5 9 17.5 20 6.5"/></svg>';
-    var GERI = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5 8 12l7 7"/></svg>';
 
     function urunCiz(u) {
         var gorsel = u.gorsel
@@ -272,36 +326,59 @@
         '</button>';
     }
 
+    function saatYaz(t) {
+        if (!t) return '';
+        var d = new Date(t);
+        return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    }
+
     function ciz() {
-        var liste = listele();
         var izgara = el('siparisIzgara');
         var detay = el('siparisDetay');
 
-        // Sekme sayaçları
-        var aktifSayi = durum.siparisler.filter(aktifMi).length;
-        var bitenSayi = durum.siparisler.length - aktifSayi;
-        el('sayacAktif').textContent = aktifSayi;
-        el('sayacBiten').textContent = bitenSayi;
-        el('sekmeAktif').setAttribute('aria-selected', String(durum.sekme === 'aktif'));
-        el('sekmeBiten').setAttribute('aria-selected', String(durum.sekme !== 'aktif'));
+        var sayac = { bekliyor: 0, toplaniyor: 0, toplandi: 0 };
+        durum.siparisler.forEach(function (s) { sayac[bandaGore(s)]++; });
 
+        el('sayacBekliyor').textContent = sayac.bekliyor;
+        el('sayacToplaniyor').textContent = sayac.toplaniyor;
+        el('sayacToplandi').textContent = sayac.toplandi;
+        el('ozetBekleyen').textContent = sayac.bekliyor;
+        el('ozetToplaniyor').textContent = sayac.toplaniyor;
+        el('ozetToplandi').textContent = sayac.toplandi;
+
+        var bekleyenParca = durum.siparisler
+            .filter(function (s) { return bandaGore(s) === 'bekliyor'; })
+            .reduce(function (a, s) { return a + (s.toplam_adet || (s.urunler || []).length); }, 0);
+        el('ozetBekleyenNot').textContent = bekleyenParca ? bekleyenParca + ' parça bekliyor' : 'Toplanmayı bekliyor';
+        el('sonGuncelleme').textContent = durum.sonYenileme
+            ? 'Son güncelleme ' + saatYaz(durum.sonYenileme)
+            : 'Yükleniyor';
+
+        document.querySelectorAll('.sip-sekme').forEach(function (b) {
+            b.setAttribute('aria-selected', String(b.getAttribute('data-sekme') === durum.sekme));
+        });
+        document.querySelectorAll('.sip-gorunum button').forEach(function (b) {
+            b.setAttribute('aria-selected', String(b.getAttribute('data-gorunum') === durum.gorunum));
+        });
+        izgara.classList.toggle('sip-izgara--liste', durum.gorunum === 'liste');
+
+        var liste = listele();
         if (durum.yukleniyor) {
             izgara.innerHTML = '<div class="sip-iskelet"></div><div class="sip-iskelet"></div><div class="sip-iskelet"></div>';
         } else if (!liste.length) {
             izgara.innerHTML = '<div class="sip-bos">' +
-                (durum.sekme === 'aktif'
+                (durum.sekme === 'bekliyor'
                     ? 'Bekleyen sipariş yok.<br>Depo panelinde yeni sipariş düştüğünde burada görünür.'
-                    : 'Henüz tamamlanan sipariş yok.') +
+                    : durum.sekme === 'toplaniyor'
+                        ? 'Şu an toplanan sipariş yok.'
+                        : 'Henüz tamamlanan sipariş yok.') +
                 '</div>';
         } else {
             izgara.innerHTML = liste.map(kartCiz).join('');
         }
 
-        // Detay
-        if (!durum.secili) {
-            detay.hidden = true;
-            return;
-        }
+        if (!durum.secili) { detay.hidden = true; return; }
+
         var s = durum.secili;
         var urunler = s.urunler || [];
         var alinan = urunler.filter(function (u) { return u.alindi; }).length;
@@ -327,11 +404,26 @@
     // ==================================================================
 
     function baglan() {
-        el('sekmeAktif').addEventListener('click', function () {
-            durum.sekme = 'aktif'; ciz();
+        document.querySelectorAll('.sip-sekme').forEach(function (b) {
+            b.addEventListener('click', function () {
+                durum.sekme = b.getAttribute('data-sekme');
+                ciz();
+            });
         });
-        el('sekmeBiten').addEventListener('click', function () {
-            durum.sekme = 'biten'; ciz();
+
+        document.querySelectorAll('.sip-gorunum button').forEach(function (b) {
+            b.addEventListener('click', function () {
+                durum.gorunum = b.getAttribute('data-gorunum');
+                try { localStorage.setItem('jb_siparis_gorunum', durum.gorunum); } catch (e) {}
+                ciz();
+            });
+        });
+
+        el('siparisYenile').addEventListener('click', function () {
+            var d = el('siparisYenile');
+            d.classList.add('donuyor');
+            setTimeout(function () { d.classList.remove('donuyor'); }, 600);
+            tazele(true);
         });
 
         el('siparisIzgara').addEventListener('click', function (e) {
@@ -384,15 +476,42 @@
     // Açılış
     // ==================================================================
 
-    function basla() {
+    async function hakVarMi() {
+        var p = global.premiumFeatures;
+        if (!p) return false;
+        try {
+            if (typeof p.init === 'function' && !p.checkPremiumFeature('siparisTakibi')) await p.init();
+            if (!p.checkPremiumFeature('siparisTakibi') && typeof p.loadPremiumFeatures === 'function') {
+                await p.loadPremiumFeatures();
+            }
+        } catch (e) { /* sessiz */ }
+        return !!p.checkPremiumFeature('siparisTakibi');
+    }
+
+    /* Üç bölümden yalnız biri açık kalmalı. Tek tek açıp kapatınca ikisi
+       birden görünebiliyordu. */
+    function bolumGoster(id) {
+        ['siparisGiris', 'siparisYetkiYok', 'siparisIcerik'].forEach(function (x) {
+            var e = el(x);
+            if (e) e.hidden = (x !== id);
+        });
+    }
+
+    async function basla() {
         var o = oturum();
         if (!o || !o.username) {
-            el('siparisIcerik').hidden = true;
-            el('siparisGiris').hidden = false;
+            bolumGoster('siparisGiris');
             return;
         }
-        el('siparisGiris').hidden = true;
-        el('siparisIcerik').hidden = false;
+        if (!(await hakVarMi())) {
+            bolumGoster('siparisYetkiYok');
+            return;
+        }
+        try {
+            var g = localStorage.getItem('jb_siparis_gorunum');
+            if (g === 'kart' || g === 'liste') durum.gorunum = g;
+        } catch (e) { /* sessiz */ }
+        bolumGoster('siparisIcerik');
         baglan();
         ciz();
         tazele(true);
