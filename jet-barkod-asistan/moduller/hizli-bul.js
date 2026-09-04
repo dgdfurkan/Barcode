@@ -1225,17 +1225,21 @@
 
         const kunyeleriYolla = (liste) => {
             const degisen = [];
+            const tumIdler = [];
             liste.forEach((s) => {
                 if (!s || !s.siparisId) return;
+                tumIdler.push(s.siparisId);
                 const yeni = kunyeImzasi(s);
                 const eski = sonKunye.get(s.siparisId);
                 sonKunye.set(s.siparisId, yeni);
                 if (eski !== yeni) degisen.push(s);
             });
-            if (!degisen.length) return;
+            if (!degisen.length && !tumIdler.length) return;
             try {
                 chrome.runtime.sendMessage(
-                    { type: 'JBA_SIPARIS_KUNYE', siparisler: degisen.map((s) => ({
+                    { type: 'JBA_SIPARIS_KUNYE',
+                      tumIdler: tumIdler,
+                      siparisler: degisen.map((s) => ({
                         siparisId: s.siparisId,
                         kolon: s.kolon,
                         durum: s.durum,

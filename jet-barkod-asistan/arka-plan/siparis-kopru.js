@@ -189,7 +189,7 @@ async function satirlariYaz(yetki, siparisUuid, urunler) {
    kurye o aşamada hâlâ depoda olabiliyor, sipariş kapananlarda dursun.
    `order_items` foreign key'de ON DELETE CASCADE, ürün satırları
    siparişle birlikte gidiyor. */
-const GIDEN_KOLON = /(teslim|iptal|tamamlan)/i;
+const GIDEN_KOLON = /(teslim|iptal|tamamlan|ulast)/i;
 
 const ESKIME_MS = 3 * 60 * 60 * 1000;
 
@@ -266,6 +266,40 @@ async function kunyeYaz(yetki, liste) {
 
         if (i < liste.length - 1) await bekle(SIPARIS_ARA_MS);
     }
+}
+
+/* Panelde artık olmayan siparişleri DB'den siler. Eklenti paneldeki
+   tüm sipariş kimliklerini gönderir; DB'de olup panelde olmayan ve
+   20 dakikadan eski kayıtlar temizlenir. Böylece panel ile DB
+   birebir eşleşir. */
+const TEMIZLIK_MS = 20 * 60 * 1000;
+let sonTemizlik = 0;
+const TEMIZLIK_ARALIK = 2 * 60 * 1000;
+
+async function paneldeOlmayanlariSil(yetki, panelIdleri) {
+    if (!panelIdleri.length) return;
+    if (Date.now() - sonTemizlik < TEMIZLIK_ARALIK) return;
+    sonTemizlik = Date.now();
+
+    const adres = SIPARIS_API + '/rest/v1/orders' +
+        '?username=eq.' + encodeURIComponent(yetki.username) +
+        '&select=order_id,sepet_zamani';
+    try {
+        const yanit = await fetch(adres, { headers: apiBasliklari(yetki) });
+        if (!yanit.ok) return;
+        const dbListe = await yanit.json();
+        const panelSet = new Set(panelIdleri);
+        for (const s of dbListe) {
+            if (panelSet.has(s.order_id)) continue;
+            var t = s.sepet_zamani;
+            if (t) {
+                var ms = Date.now() - new Date(t).getTime();
+                if (isFinite(ms) && ms < TEMIZLIK_MS) continue;
+            }
+            await siparisSil(yetki, s.order_id);
+            await bekle(SIPARIS_ARA_MS);
+        }
+    } catch (e) { /* sessiz */ }
 }
 
 // ==================================================================
@@ -352,11 +386,12 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
     }
 
     if (istek.type === 'JBA_SIPARIS_KUNYE') {
-        const liste = Array.isArray(istek.siparisler) ? istek.siparisler.slice(0, 25) : [];
-        if (!liste.length) { cevapla({ ok: false, sebep: 'liste boş' }); return true; }
+        const liste = Array.isArray(istek.siparisler) ? istek.siparisler.slice(0, 50) : [];
+        const tumIdler = Array.isArray(istek.tumIdler) ? istek.tumIdler : [];
+        if (!liste.length && !tumIdler.length) { cevapla({ ok: false, sebep: 'liste boş' }); return true; }
         yetkiOku().then((y) => {
             if (!y) { cevapla({ ok: false, sebep: 'yetki yok' }); return; }
-            kunyeYaz(y, liste).then(
+            kunyeYaz(y, liste).then(() => paneldeOlmayanlariSil(y, tumIdler)).then(
                 () => cevapla({ ok: true, sayi: liste.length }),
                 (e) => cevapla({ ok: false, sebep: (e && e.message) || 'hata' })
             );

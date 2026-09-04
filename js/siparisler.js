@@ -397,11 +397,11 @@
      *
      *   hazir         Hazırlandı. Depocunun asıl işi bu.
      *   hazirlaniyor  Toplayıcı Bekliyor, Doğrulanıyor, Hazırlanıyor.
-     *   yolda         El Değiştiriliyor, Yolda, Ulaştı. Kurye üzerine almış.
-     *   bitti         Teslim Edildi, İptal, Tamamlandı. Kapananlar listesinde.
+     *   yolda         El Değiştiriliyor, Yolda. Kurye üzerine almış.
+     *   bitti         Teslim Edildi, İptal, Tamamlandı, Ulaştı. Bitmiş siparişler.
      */
-    var KOLON_BITTI = /(teslim|iptal|tamamlan)/;
-    var KOLON_YOLDA = /(el degistir|yolda|ulast)/;
+    var KOLON_BITTI = /(teslim|iptal|tamamlan|ulast)/;
+    var KOLON_YOLDA = /(el degistir|yolda)/;
     var KOLON_HAZIR = /hazirland/;
 
     function kolonAdi(s) { return sade(s && s.kolon); }
@@ -453,7 +453,7 @@
      * `order_items` foreign key'de ON DELETE CASCADE; ürün satırları
      * siparişle birlikte gidiyor, ayrı silme gerekmiyor.
      */
-    var GIDEN_KOLON = /(teslim|iptal|tamamlan)/;
+    var GIDEN_KOLON = /(teslim|iptal|tamamlan|ulast)/;
     function gitmisMi(s) {
         var k = kolonAdi(s);
         if (GIDEN_KOLON.test(k)) return true;
@@ -577,9 +577,17 @@
     // Çizim: sipariş kartı
     // ==================================================================
 
-    function ogeYaz(rol, deger) {
-        return '<div class="sip-kart__ogeye"><small>' + rol + '</small><strong>' +
-               kacir(deger || 'Atanmadı') + '</strong></div>';
+    function kisiFotoYaz(foto) {
+        if (!foto) return '';
+        return '<img class="sip-kart__avatar" src="' + kacir(foto) + '" alt="" loading="lazy" onerror="this.remove()">';
+    }
+
+    function kisiYaz(ad, foto) {
+        if (!ad) return '';
+        return '<span class="sip-kart__kisi">' +
+            kisiFotoYaz(foto) +
+            '<span>' + kacir(ad) + '</span>' +
+        '</span>';
     }
 
     function kartCiz(s, sira) {
@@ -589,27 +597,22 @@
         var oran = toplam ? Math.round(alinan / toplam * 100) : 0;
         var kimlik = siparisKimligi(s);
         var tam = oran === 100 && toplam > 0;
-
-        var icerik = (s.poset_sayisi != null ? POSET_IKON + s.poset_sayisi + ' poşet · ' : '') + toplam + ' çeşit';
+        var parcaSayisi = s.toplam_adet != null ? s.toplam_adet : toplam;
 
         return '<button type="button" class="sip-kart' + (sira != null ? ' sip-kart--gir' : '') +
                (tam ? ' sip-kart--tam' : '') +
                '" data-siparis="' + kacir(s.id) + '" style="--kart-zemin:' + kartArkaPlan(s) +
                ';--i:' + (sira || 0) + '" aria-label="' + kacir(kimlik.deger) + ' siparişini aç">' +
             '<span class="sip-kart__ust">' +
-                '<span class="sip-kart__sure">' + kacir(gecenSure(s)) + '</span>' +
-            '</span>' +
-            '<span class="sip-kart__orta">' +
-                '<span class="sip-kart__banko' + (kimlik.bankoVar ? '' : ' sip-kart__banko--yok') + '">' +
-                    '<small>' + kacir(kimlik.etiket) + '</small>' +
-                    '<strong>' + kacir(kimlik.deger) + '</strong>' +
+                '<strong class="sip-kart__numara' + (kimlik.bankoVar ? '' : ' sip-kart__numara--yok') + '">' + kacir(kimlik.deger) + '</strong>' +
+                '<span class="sip-kart__meta">' +
+                    '<span class="sip-kart__parca"><b>' + adetYaz(parcaSayisi) + '</b> parça</span>' +
+                    '<span class="sip-kart__sure">' + kacir(gecenSure(s)) + '</span>' +
                 '</span>' +
-                '<span class="sip-kart__parca"><b>' + adetYaz(s.toplam_adet != null ? s.toplam_adet : toplam) + '</b> parça</span>' +
             '</span>' +
-            '<span class="sip-kart__ozellik">' +
-                ogeYaz('Toplayıcı', s.toplayici) +
-                ogeYaz('Kurye', s.kurye) +
-                '<div class="sip-kart__ogeye"><small>İçerik</small><strong>' + icerik + '</strong></div>' +
+            '<span class="sip-kart__kisiler">' +
+                kisiYaz(s.toplayici, s.toplayici_foto) +
+                kisiYaz(s.kurye, s.kurye_foto) +
             '</span>' +
             '<span class="sip-kart__alt">' +
                 '<span class="sip-kart__ilerleme">' +
@@ -1612,7 +1615,7 @@
         if (!(await hakVarMi())) { bolumGoster('siparisYetkiYok'); return; }
 
         var ayar = ayarOku();
-        if (['liste', 'ikili', 'uclu'].indexOf(ayar.detayGorunum) !== -1) durum.detayGorunum = ayar.detayGorunum;
+        if (['liste', 'ikili', 'uclu', 'dortlu'].indexOf(ayar.detayGorunum) !== -1) durum.detayGorunum = ayar.detayGorunum;
 
         var vars = (global.JBSiparisSirala && global.JBSiparisSirala.VARSAYILAN_SIRA) || ['firin', 'dondurma', 'orta', 'su'];
         durum.bantSirasi = Array.isArray(ayar.bantSirasi) && ayar.bantSirasi.length

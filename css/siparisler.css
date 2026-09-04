@@ -501,41 +501,37 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-serit--hazir .sip-kart { --vurgu: #6390f8; }
 .sip-serit--yolda .sip-kart { --vurgu: #34d399; }
 
-.sip-kart__ust { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
-.sip-kart__sure { color: var(--soluk); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-
-.sip-kart__orta { margin-top: 15px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.sip-kart__banko { min-width: 0; }
-.sip-kart__banko small { display: block; margin-bottom: 2px; color: var(--soluk); font-size: 9.5px; font-weight: 800; letter-spacing: 0.12em; }
-.sip-kart__banko strong {
-    display: block;
+.sip-kart__ust { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sip-kart__numara {
     color: var(--lacivert);
     font-family: var(--baslik-font);
-    font-size: 26px; font-weight: 700; line-height: 1; letter-spacing: -0.045em;
+    font-size: 22px; font-weight: 700; line-height: 1; letter-spacing: -0.04em;
     font-variant-numeric: tabular-nums;
 }
-.sip-kart__banko--yok strong { font-size: 18px; color: var(--sonuk); }
-.sip-kart__parca { color: #344054; font-size: 12.5px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.sip-kart__parca b { color: var(--yazi); font-size: 18px; }
+.sip-kart__numara--yok { font-size: 16px; color: var(--sonuk); }
+.sip-kart__meta { display: flex; align-items: center; gap: 8px; }
+.sip-kart__parca { color: #344054; font-size: 12px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sip-kart__parca b { color: var(--yazi); font-size: 15px; }
+.sip-kart__sure { color: var(--soluk); font-size: 11.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-.sip-kart__ozellik {
-    margin-top: 15px;
-    padding: 11px 0;
-    display: grid; grid-template-columns: repeat(3, 1fr);
-    border-top: 1px solid #eef0f3; border-bottom: 1px solid #eef0f3;
+.sip-kart__kisiler {
+    margin-top: 10px;
+    display: flex; flex-direction: column; gap: 6px;
 }
-.sip-kart__ogeye {
+.sip-kart__kisi {
+    display: flex; align-items: center; gap: 7px;
     min-width: 0;
-    padding: 0 10px;
-    border-right: 1px solid #eef0f3;
 }
-.sip-kart__ogeye:first-child { padding-left: 0; }
-.sip-kart__ogeye:last-child { padding-right: 0; border-right: 0; }
-.sip-kart__ogeye small { display: flex; align-items: center; gap: 3px; color: var(--soluk); font-size: 10.5px; }
-.sip-kart__ogeye strong {
-    display: block; margin-top: 2px;
+.sip-kart__avatar {
+    width: 26px; height: 26px; flex: none;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #edf0f4;
+}
+.sip-kart__kisi > span {
+    min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    color: #344054; font-size: 12.5px; font-weight: 700;
+    color: #344054; font-size: 13px; font-weight: 600;
 }
 
 .sip-kart__alt { margin-top: 13px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -821,14 +817,8 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     font-size: 15px; font-weight: 700; line-height: 1.35;
     transition: color 0.16s;
 }
-/* Kırpma düğmenin kendisinde değil içindeki span'de. Chrome `button`
-   üzerinde `-webkit-box` değerini `flow-root`a çeviriyor ve satır kırpma
-   çalışmıyor; uzun adlar üçüncü satırı yarım gösteriyordu. */
 .sip-urun__ad span {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    display: block;
 }
 .sip-urun__ad:hover { color: var(--mavi); }
 .sip-urun__alt { margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -837,7 +827,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     padding: 4px 8px;
     border: 1px solid #e1e5eb; border-radius: 7px;
     display: block;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    word-break: break-all;
     background: #f7f8fa;
     color: var(--sonuk);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -906,6 +896,18 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-urunler--uclu .sip-urun__eylem { margin-top: 2px; justify-content: space-between; gap: 7px; }
 .sip-urunler--uclu .sip-adet { min-width: 48px; flex: none; }
 .sip-urunler--uclu .sip-al { min-width: 0; flex: 1; }
+
+.sip-urunler--dortlu .sip-bolum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; align-content: start; }
+.sip-urunler--dortlu .sip-bant { grid-column: 1 / -1; }
+.sip-urunler--dortlu .sip-urun { padding: 7px; grid-template-columns: minmax(0, 1fr); align-content: start; }
+.sip-urunler--dortlu .sip-urun__gorsel { width: 100%; height: 120px; }
+.sip-urunler--dortlu .sip-urun__ad { min-height: 44px; font-size: 12.5px; line-height: 1.25; }
+.sip-urunler--dortlu .sip-urun__alt { min-height: 24px; }
+.sip-urunler--dortlu .sip-urun__not { display: none; }
+.sip-urunler--dortlu .sip-kod { font-size: 10px; padding: 3px 5px; }
+.sip-urunler--dortlu .sip-urun__eylem { margin-top: 2px; justify-content: space-between; gap: 5px; }
+.sip-urunler--dortlu .sip-adet { min-width: 40px; height: 34px; padding: 0 4px; font-size: 12px; flex: none; }
+.sip-urunler--dortlu .sip-al { min-width: 0; flex: 1; height: 34px; padding: 0 6px; }
 
 /* ---------------------------- ALT ÇUBUK ---------------------------- */
 /* Alt çubuk akışta, `position: fixed` değil. Sabitken sayfanın üstüne
@@ -1367,16 +1369,16 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-serit__liste { gap: 5px; }
 
     .sip-kart { min-height: 0; padding: 6px; border-radius: 8px; font-size: 11px; }
-    .sip-kart__ozellik { display: none; }
-    .sip-kart__ogeye { padding: 0; border: 0; }
-    .sip-kart__ogeye + .sip-kart__ogeye { margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(152,162,179,0.18); }
-    .sip-kart__ogeye:nth-child(3) { display: none; }
-    .sip-kart__banko strong { font-size: 15px; }
-    .sip-kart__orta { margin-top: 3px; display: block; }
-    .sip-kart__parca { display: block; margin-top: 3px; font-size: 10.5px; }
+    .sip-kart__numara { font-size: 14px; }
+    .sip-kart__numara--yok { font-size: 12px; }
+    .sip-kart__meta { gap: 5px; }
+    .sip-kart__parca { font-size: 10px; }
     .sip-kart__parca b { font-size: 11px; }
-    .sip-kart__sure { font-size: 9.5px; }
-    .sip-kart__alt { margin-top: 5px; gap: 5px; }
+    .sip-kart__sure { font-size: 9px; }
+    .sip-kart__kisiler { margin-top: 4px; gap: 3px; }
+    .sip-kart__avatar { width: 18px; height: 18px; }
+    .sip-kart__kisi > span { font-size: 10.5px; }
+    .sip-kart__alt { margin-top: 4px; gap: 5px; }
     .sip-kart__ilerleme strong { font-size: 10px; }
     .sip-kart__ac { width: 22px; height: 22px; border-radius: 6px; }
 
@@ -1413,6 +1415,15 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-urunler--uclu .sip-urun__eylem { gap: 4px; }
     .sip-urunler--uclu .sip-adet { min-width: 35px; height: 34px; padding: 0 5px; font-size: 12.5px; }
     .sip-urunler--uclu .sip-al { min-width: 0; width: auto; height: 34px; padding: 0 6px; }
+
+    .sip-urunler--dortlu { padding: 6px; gap: 5px; }
+    .sip-urunler--dortlu .sip-urun { padding: 5px; border-radius: 9px; }
+    .sip-urunler--dortlu .sip-urun__gorsel { height: 72px; }
+    .sip-urunler--dortlu .sip-urun__ad { min-height: 44px; font-size: 11px; line-height: 1.2; }
+    .sip-urunler--dortlu .sip-kod { font-size: 9px; padding: 2px 4px; }
+    .sip-urunler--dortlu .sip-urun__eylem { gap: 3px; }
+    .sip-urunler--dortlu .sip-adet { min-width: 30px; height: 30px; padding: 0 3px; font-size: 11px; }
+    .sip-urunler--dortlu .sip-al { min-width: 0; width: auto; height: 30px; padding: 0 5px; }
 
     .sip-alt__yol p { margin-top: 6px; font-size: 11.5px; }
     .sip-bitir { height: 46px; }
