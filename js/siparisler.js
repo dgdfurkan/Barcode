@@ -585,19 +585,25 @@
         return BAS_RENKLER[Math.abs(h) % BAS_RENKLER.length];
     }
 
+    var BOS_ICON_KURYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="18.5" cy="17.5" r="2.5"/><path d="M15 17.5h-4L8 8h3l1.5 3h5.5l-1.5 5"/></svg>';
+    var BOS_ICON_TOPLAYICI = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.4-3.6 4.2-5.5 7-5.5s5.6 1.9 7 5.5"/></svg>';
+
     function kisiCip(ad, foto, kurye) {
-        if (!ad) return '';
-        var bas = basHarfler(ad);
-        var renk = basRenk(ad);
-        var fotoHtml = foto
+        var varMi = !!ad;
+        var bas = varMi ? basHarfler(ad) : '';
+        var renk = varMi ? basRenk(ad) : '#cbd5e1';
+        var fotoHtml = (varMi && foto)
             ? '<img src="' + kacir(foto) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">'
             : '';
-        return '<span class="sip-kart__kisi' + (kurye ? ' sip-kart__kisi--kurye' : '') + '">' +
+        var icerik = varMi
+            ? '<b>' + kacir(bas) + '</b>'
+            : (kurye ? BOS_ICON_KURYE : BOS_ICON_TOPLAYICI);
+        return '<span class="sip-kart__kisi' + (kurye ? ' sip-kart__kisi--kurye' : '') +
+                    (varMi ? '' : ' sip-kart__kisi--bos') + '">' +
             '<span class="sip-kart__bas" style="background:' + renk + '">' +
-                fotoHtml +
-                '<b>' + kacir(bas) + '</b>' +
+                fotoHtml + icerik +
             '</span>' +
-            '<span class="sip-kart__kisiad">' + kacir(ad) + '</span>' +
+            (varMi ? '<span class="sip-kart__kisiad">' + kacir(ad) + '</span>' : '') +
         '</span>';
     }
 
@@ -618,16 +624,16 @@
                '" data-siparis="' + kacir(s.id) + '" style="--kart-zemin:' + kartArkaPlan(s) +
                ';--i:' + (sira || 0) + '" aria-label="' + kacir(kimlik.deger) + ' siparişini aç">' +
             '<span class="sip-kart__ust">' +
-                '<strong class="sip-kart__numara' + (kimlik.bankoVar ? '' : ' sip-kart__numara--yok') + '">' + kacir(kimlik.deger) + '</strong>' +
+                '<span class="sip-kart__baslik">' +
+                    '<strong class="sip-kart__numara' + (kimlik.bankoVar ? '' : ' sip-kart__numara--yok') + '">' + kacir(kimlik.deger) + '</strong>' +
+                    '<span class="sip-kart__parca">' + adetYaz(parcaSayisi) + '</span>' +
+                '</span>' +
                 '<span class="sip-kart__sure">' + kacir(gecenSure(s)) + '</span>' +
             '</span>' +
-            (kisiler ? '<span class="sip-kart__kisiler">' + kisiler + '</span>' : '') +
-            '<span class="sip-kart__alt">' +
-                '<span class="sip-kart__ilerleme">' +
-                    '<span><i style="width:' + oran + '%"></i></span>' +
-                    '<strong>' + alinan + '<span>/' + toplam + '</span></strong>' +
-                '</span>' +
-                '<span class="sip-kart__parca"><b>' + adetYaz(parcaSayisi) + '</b></span>' +
+            '<span class="sip-kart__kisiler">' + kisiler + '</span>' +
+            '<span class="sip-kart__ilerleme">' +
+                '<span><i style="width:' + oran + '%"></i></span>' +
+                '<strong>' + alinan + '<span>/' + toplam + '</span></strong>' +
             '</span>' +
         '</button>';
     }

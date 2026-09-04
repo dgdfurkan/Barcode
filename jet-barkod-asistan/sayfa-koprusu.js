@@ -496,7 +496,7 @@
             var liste = siparisleriTopla();
             if (!liste.length) return;
             var imza = liste.map(function (o) {
-                return o.siparisId + ':' + o.durum + ':' + o.toplamAdet + ':' + o.banko;
+                return o.siparisId + ':' + o.durum + ':' + o.kolon + ':' + o.toplamAdet + ':' + o.banko + ':' + o.toplayici + ':' + o.kurye;
             }).join('|');
             if (imza === sonImza) return;
             sonImza = imza;

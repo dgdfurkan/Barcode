@@ -235,32 +235,36 @@ async function kunyeYaz(yetki, liste) {
             continue;
         }
 
-        const adres = SIPARIS_API + '/rest/v1/orders' +
-            '?username=eq.' + encodeURIComponent(yetki.username) +
-            '&order_id=eq.' + encodeURIComponent(s.siparisId);
-
-        /* Ürün satırları burada yazılmıyor: onlar yalnız detay çekilince
-           değişiyor, künye ise panelde sürekli oynuyor (banko atanıyor,
-           toplayıcı değişiyor, kolon ilerliyor). */
+        /* UPSERT: kayıt yoksa oluştur, varsa güncelle. Önceden PATCH idi,
+           yalnız var olan kaydı güncelliyordu ve panelin yeni siparişi
+           bize hiç gelmiyordu. Artık Hazırlanıyor'a düşen sipariş anında
+           burada beliriyor. Ürünler kullanıcı karta girdiğinde geliyor. */
         const govde = {
+            username: yetki.username,
+            order_id: s.siparisId,
+            banko: s.banko || null,
             kolon: s.kolon || null,
             durum: typeof s.durum === 'number' ? s.durum : null,
+            toplayici: s.toplayici || null,
+            kurye: s.kurye || null,
+            toplayici_foto: s.toplayiciFoto || null,
+            kurye_foto: s.kuryeFoto || null,
+            toplam_adet: typeof s.toplamAdet === 'number' ? s.toplamAdet : null,
+            poset_sayisi: typeof s.posetSayisi === 'number' ? s.posetSayisi : null,
             updated_at: new Date().toISOString()
         };
-        if (s.banko) govde.banko = s.banko;
-        if (s.toplayici) govde.toplayici = s.toplayici;
-        if (s.kurye) govde.kurye = s.kurye;
-        if (s.toplayiciFoto) govde.toplayici_foto = s.toplayiciFoto;
-        if (s.kuryeFoto) govde.kurye_foto = s.kuryeFoto;
-        if (typeof s.toplamAdet === 'number') govde.toplam_adet = s.toplamAdet;
-        if (typeof s.posetSayisi === 'number') govde.poset_sayisi = s.posetSayisi;
 
         try {
-            const yanit = await fetch(adres, {
-                method: 'PATCH',
-                headers: apiBasliklari(yetki, { 'Prefer': 'return=minimal' }),
-                body: JSON.stringify(govde)
-            });
+            const yanit = await fetch(
+                SIPARIS_API + '/rest/v1/orders?on_conflict=username,order_id',
+                {
+                    method: 'POST',
+                    headers: apiBasliklari(yetki, {
+                        'Prefer': 'resolution=merge-duplicates,return=minimal'
+                    }),
+                    body: JSON.stringify([govde])
+                }
+            );
             if (yanit.status === 401) break;
         } catch (e) { /* ağ yoksa sonraki listede yine denenir */ }
 
