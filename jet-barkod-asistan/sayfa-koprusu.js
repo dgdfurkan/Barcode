@@ -339,6 +339,33 @@
         return null;
     }
 
+    var _fotoHaritasi = {};
+
+    function fotoHaritasiniGuncelle() {
+        _fotoHaritasi = {};
+        var avatarlar = document.querySelectorAll('[class*="avatar"] img, .ant-avatar img');
+        for (var i = 0; i < avatarlar.length; i++) {
+            var src = avatarlar[i].src || avatarlar[i].getAttribute('src') || '';
+            if (src.indexOf('cdn.getir.com/person/') < 0) continue;
+            var eslesme = src.match(/person\/([a-f0-9]{24})\./);
+            if (eslesme) _fotoHaritasi[eslesme[1]] = src;
+        }
+        var kaplamalar = document.querySelectorAll('[class*="avatar"]');
+        for (var j = 0; j < kaplamalar.length; j++) {
+            var fiber = fiberBul(kaplamalar[j]);
+            var adim = 0;
+            while (fiber && adim < 8) {
+                var p = fiber.memoizedProps;
+                if (p && typeof p.src === 'string' && p.src.indexOf('cdn.getir.com/person/') >= 0) {
+                    var m = p.src.match(/person\/([a-f0-9]{24})\./);
+                    if (m && !_fotoHaritasi[m[1]]) _fotoHaritasi[m[1]] = p.src;
+                    break;
+                }
+                fiber = fiber.return; adim++;
+            }
+        }
+    }
+
     function metin(v) {
         if (v == null) return '';
         if (typeof v === 'string') return v;
@@ -379,15 +406,31 @@
         if (!kisi || typeof kisi !== 'object') return '';
         var id = kisi._id || kisi.id || '';
         if (!id || typeof id !== 'string') return '';
-        return KISI_CDN + id + '.png';
+        return KISI_CDN + id + '.png?' + Date.now();
     }
 
     function kisiFoto(kisi) {
         var url = fotoBul(kisi);
-        return url || kisiFotoUret(kisi);
+        if (url) return url;
+        var id = (kisi && (kisi._id || kisi.id)) || '';
+        if (id && _fotoHaritasi[id]) return _fotoHaritasi[id];
+        return kisiFotoUret(kisi);
     }
 
     function sadeSiparis(o, kolon) {
+        try {
+            if (!localStorage.getItem('jba_kisi_sema')) {
+                var kisi = o.picker || o.courier;
+                if (kisi && typeof kisi === 'object') {
+                    localStorage.setItem('jba_kisi_sema', JSON.stringify({
+                        alanlar: Object.keys(kisi),
+                        idVar: !!(kisi._id || kisi.id),
+                        fotoHaritaSayac: Object.keys(_fotoHaritasi).length,
+                        zaman: new Date().toISOString()
+                    }));
+                }
+            }
+        } catch (e) { /* sessiz */ }
         var kon = Array.isArray(o.productLocations) ? o.productLocations : [];
         return {
             siparisId: o.id,
@@ -449,6 +492,7 @@
     function siparisleriDuyur() {
         try {
             if (!/^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/.test(location.pathname)) return;
+            fotoHaritasiniGuncelle();
             var liste = siparisleriTopla();
             if (!liste.length) return;
             var imza = liste.map(function (o) {

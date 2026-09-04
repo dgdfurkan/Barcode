@@ -590,7 +590,7 @@
         var bas = basHarfler(ad);
         var renk = basRenk(ad);
         var fotoHtml = foto
-            ? '<img src="' + kacir(foto) + '" alt="" loading="lazy" onerror="this.remove()">'
+            ? '<img src="' + kacir(foto) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">'
             : '';
         return '<span class="sip-kart__kisi' + (kurye ? ' sip-kart__kisi--kurye' : '') + '">' +
             '<span class="sip-kart__bas" style="background:' + renk + '">' +
