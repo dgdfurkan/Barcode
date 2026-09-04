@@ -705,6 +705,34 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     color: var(--sonuk); font-family: inherit; font-size: 12px; font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
+/* Görünüm anahtarı: liste / ikili ızgara / üçlü ızgara. Toplama alanının
+   kendi başlığında, sağ uçta. Sipariş listesindeki eski anahtar kaldırılırken
+   bu stil de yanlışlıkla silinmişti; düğmeler duruyordu ama stilsiz kaldığı
+   için görünmüyorlardı. */
+.sip-gorunum {
+    flex: none;
+    display: flex;
+    padding: 3px;
+    border: 1px solid var(--cizgi);
+    border-radius: 10px;
+    background: #f4f6f8;
+}
+.sip-gorunum button {
+    width: 33px; height: 30px;
+    border: 0; border-radius: 7px;
+    display: grid; place-items: center;
+    background: transparent;
+    color: var(--soluk);
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.sip-gorunum button svg { width: 16px; }
+.sip-gorunum button:hover { color: var(--sonuk); }
+.sip-gorunum button[aria-selected="true"] {
+    background: #fff;
+    color: var(--yazi);
+    box-shadow: 0 1px 5px rgba(16,24,40,0.12);
+}
+
 .sip-urunler { flex: 1; min-height: 0; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 9px; scroll-behavior: smooth; }
 
 /* Toplama bandı ayracı. Ürünler fırın, dondurma, su diye ayrılıyor ve her

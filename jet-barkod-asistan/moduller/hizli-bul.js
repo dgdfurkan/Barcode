@@ -1210,27 +1210,32 @@
            girdiğinde buraya giriyor, gönderildikten sonra çıkıyor. */
         const gonderilecek = new Set();
 
-        /* Siparişin en son hangi kolonda görüldüğü. Sipariş gövdesi bir kez
-           yazılıyor; kolon sonradan değişince kaydımız eskiyor ve bitmiş
-           sipariş Jet Barkod listesinde duruyordu. Burada yalnız değişimi
-           yakalıyoruz, ilk görüş taban değer sayılıyor ve istek doğurmuyor. */
-        const sonKolon = new Map();
+        /* Siparişin künyesi en son nasıl görüldü. Sipariş gövdesi bir kez
+           yazılıyor (kullanıcı karta girdiğinde); sonrasında panelde banko
+           atanıyor, toplayıcı değişiyor, kolon ilerliyor ve bizim kayıt
+           eskiyordu. Burada yalnız DEĞİŞİM yakalanıyor; ilk görüş taban
+           değer sayılıyor ve istek doğurmuyor. Getir'e ek istek çıkmıyor,
+           veri zaten panelin kendi listesinde. */
+        const sonKunye = new Map();
 
-        const kolonlariYolla = (liste) => {
+        const kunyeImzasi = (s) => [
+            s.kolon, s.banko, s.durum, s.toplayici, s.kurye,
+            s.toplayiciFoto, s.kuryeFoto, s.toplamAdet, s.posetSayisi
+        ].join('~');
+
+        const kunyeleriYolla = (liste) => {
             const degisen = [];
             liste.forEach((s) => {
                 if (!s || !s.siparisId) return;
-                const yeni = String(s.kolon || '');
-                const eski = sonKolon.get(s.siparisId);
-                sonKolon.set(s.siparisId, yeni);
+                const yeni = kunyeImzasi(s);
+                const eski = sonKunye.get(s.siparisId);
+                sonKunye.set(s.siparisId, yeni);
                 if (eski !== undefined && eski !== yeni) degisen.push(s);
             });
             if (!degisen.length) return;
-            /* Kolon değişimi seyrek; gövde yollanmıyor, yalnız kolon ve
-               durum gidiyor. Getir'e tek ek istek çıkmıyor. */
             try {
                 chrome.runtime.sendMessage(
-                    { type: 'JBA_SIPARIS_KOLON', siparisler: degisen.map((s) => ({
+                    { type: 'JBA_SIPARIS_KUNYE', siparisler: degisen.map((s) => ({
                         siparisId: s.siparisId,
                         kolon: s.kolon,
                         durum: s.durum,
@@ -1238,11 +1243,62 @@
                         toplayici: s.toplayici,
                         kurye: s.kurye,
                         toplayiciFoto: s.toplayiciFoto,
-                        kuryeFoto: s.kuryeFoto
+                        kuryeFoto: s.kuryeFoto,
+                        toplamAdet: s.toplamAdet,
+                        posetSayisi: s.posetSayisi
                     })) },
                     () => { if (chrome.runtime.lastError) { /* hizmet işçisi uyuyor olabilir */ } }
                 );
             } catch (e) { /* sessiz */ }
+        };
+
+        /* Bankosu atanmış ama bizde kaydı olmayan sipariş otomatik alınıyor.
+           Senaryo: depocu panelde siparişe girmeden "tümünü kopyala" ile
+           barkodları alıyor, sonra bankoyu okutuyor. O ana kadar sipariş
+           bizde hiç yok; banko okununca Jet Barkod'da da belirmeli.
+           Banko atanması güçlü bir sinyal: depocu o siparişle ilgileniyor.
+           Bir tur en fazla üç sipariş alıyor ki panel trafiği patlamasın;
+           gerisi sonraki turda geliyor. */
+        const otoSorulan = new Set();
+        const OTO_TUR_SINIRI = 3;
+
+        const bankoluYenileriYakala = (liste) => {
+            const adaylar = liste.filter((s) =>
+                s && s.siparisId && s.banko && !otoSorulan.has(s.siparisId) &&
+                !fetchQueueSet.has(s.siparisId)
+            );
+            if (!adaylar.length) return;
+
+            const kimlikler = adaylar.map((s) => s.siparisId);
+            kimlikler.forEach((id) => otoSorulan.add(id));
+
+            try {
+                chrome.runtime.sendMessage(
+                    { type: 'JBA_SIPARIS_BILINEN', siparisler: kimlikler },
+                    (cevap) => {
+                        if (chrome.runtime.lastError || !cevap || !cevap.ok) {
+                            /* Arka plan uyuyorsa bir dahaki listede yine denensin. */
+                            kimlikler.forEach((id) => otoSorulan.delete(id));
+                            return;
+                        }
+                        const bilinen = new Set(cevap.bilinen || []);
+                        const eksik = kimlikler.filter((id) => !bilinen.has(id)).slice(0, OTO_TUR_SINIRI);
+                        eksik.forEach((id) => {
+                            gonderilecek.add(id);
+                            if (fetchQueueSet.has(id)) return;
+                            fetchQueue.push(id);
+                            fetchQueueSet.add(id);
+                        });
+                        /* Sınırın dışında kalanlar bir sonraki turda alınsın. */
+                        kimlikler.slice(OTO_TUR_SINIRI).forEach((id) => {
+                            if (!bilinen.has(id)) otoSorulan.delete(id);
+                        });
+                        if (eksik.length && !isFetching) processQueue();
+                    }
+                );
+            } catch (e) {
+                kimlikler.forEach((id) => otoSorulan.delete(id));
+            }
         };
 
         const siparisBul = (siparisId) => {
@@ -1339,7 +1395,8 @@
                    girdiğinde yapılıyor; her tarama sonrası bütün siparişleri
                    yollamak boşuna trafikti. */
                 sonSiparisListesi = event.data.liste;
-                kolonlariYolla(sonSiparisListesi);
+                kunyeleriYolla(sonSiparisListesi);
+                bankoluYenileriYakala(sonSiparisListesi);
             }
             if (event.data.type === 'GETIR_DATA_RECEIVED') findOrderIds(event.data.payload);
             if (event.data.type === 'GETIR_TOKEN_CAPTURED') {

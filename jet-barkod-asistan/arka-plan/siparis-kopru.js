@@ -185,7 +185,7 @@ async function satirlariYaz(yetki, siparisUuid, urunler) {
  *
  * Kaydı olmayan sipariş için PATCH hiçbir satır bulmuyor, zararsız.
  */
-async function kolonYaz(yetki, liste) {
+async function kunyeYaz(yetki, liste) {
     for (let i = 0; i < liste.length; i++) {
         const s = liste[i];
         if (!s || !s.siparisId) continue;
@@ -194,6 +194,9 @@ async function kolonYaz(yetki, liste) {
             '?username=eq.' + encodeURIComponent(yetki.username) +
             '&order_id=eq.' + encodeURIComponent(s.siparisId);
 
+        /* Ürün satırları burada yazılmıyor: onlar yalnız detay çekilince
+           değişiyor, künye ise panelde sürekli oynuyor (banko atanıyor,
+           toplayıcı değişiyor, kolon ilerliyor). */
         const govde = {
             kolon: s.kolon || null,
             durum: typeof s.durum === 'number' ? s.durum : null,
@@ -204,6 +207,8 @@ async function kolonYaz(yetki, liste) {
         if (s.kurye) govde.kurye = s.kurye;
         if (s.toplayiciFoto) govde.toplayici_foto = s.toplayiciFoto;
         if (s.kuryeFoto) govde.kurye_foto = s.kuryeFoto;
+        if (typeof s.toplamAdet === 'number') govde.toplam_adet = s.toplamAdet;
+        if (typeof s.posetSayisi === 'number') govde.poset_sayisi = s.posetSayisi;
 
         try {
             const yanit = await fetch(adres, {
@@ -301,15 +306,27 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
         return true;
     }
 
-    if (istek.type === 'JBA_SIPARIS_KOLON') {
+    if (istek.type === 'JBA_SIPARIS_KUNYE') {
         const liste = Array.isArray(istek.siparisler) ? istek.siparisler.slice(0, 25) : [];
         if (!liste.length) { cevapla({ ok: false, sebep: 'liste boş' }); return true; }
         yetkiOku().then((y) => {
             if (!y) { cevapla({ ok: false, sebep: 'yetki yok' }); return; }
-            kolonYaz(y, liste).then(
+            kunyeYaz(y, liste).then(
                 () => cevapla({ ok: true, sayi: liste.length }),
                 (e) => cevapla({ ok: false, sebep: (e && e.message) || 'hata' })
             );
+        });
+        return true;
+    }
+
+    /* İçerik betiği "bu siparişler bende kayıtlı mı" diye soruyor. İmza
+       kaydı zaten hangi siparişin yazıldığını tutuyor; ek istek atmadan
+       cevaplanıyor. Sayfa yenilense de cevap aynı kalıyor, o yüzden aynı
+       sipariş ikinci kez çekilmiyor. */
+    if (istek.type === 'JBA_SIPARIS_BILINEN') {
+        const sorulan = Array.isArray(istek.siparisler) ? istek.siparisler : [];
+        imzalariOku().then((imzalar) => {
+            cevapla({ ok: true, bilinen: sorulan.filter((id) => !!imzalar[id]) });
         });
         return true;
     }
