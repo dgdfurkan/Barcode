@@ -446,18 +446,46 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-serit__ikon.sari { background: var(--sari-50); color: var(--sari); }
 .sip-serit__ikon.mavi { background: var(--mavi-50); color: var(--mavi); }
 .sip-serit__ikon.yesil { background: var(--yesil-50); color: var(--yesil); }
-.sip-serit__ust h2 { margin: 0; color: var(--lacivert); font-family: var(--baslik-font); font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+.sip-serit__ust h2 { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 5px; color: var(--lacivert); font-family: var(--baslik-font); font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
 .sip-serit__ust h2 span {
     min-width: 24px; height: 24px;
-    margin-left: 5px; padding: 0 6px;
+    padding: 0 6px;
     border-radius: 20px;
     display: inline-grid; place-items: center;
     background: #f0f2f5; color: #344054;
     font-family: inherit; font-size: 12px; font-weight: 600;
     font-variant-numeric: tabular-nums;
+    flex-basis: 100%;
+    width: fit-content;
 }
+.sip-serit__ust { cursor: pointer; }
 .sip-serit__ust p { margin: 3px 0 0; color: var(--sonuk); font-size: 12px; }
 .sip-serit__ust p b { color: #344054; }
+
+.sip-sira-menu {
+    position: absolute; left: 0; right: 0; top: 100%;
+    margin-top: 4px; padding: 4px;
+    border: 1px solid var(--cizgi);
+    border-radius: 11px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(16,24,40,0.12);
+    z-index: 20;
+    display: flex; flex-direction: column; gap: 2px;
+}
+.sip-sira-menu__oge {
+    padding: 8px 12px;
+    border: 0; border-radius: 8px;
+    background: transparent;
+    color: var(--yazi);
+    font-size: 13px; font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.sip-sira-menu__oge:hover { background: #f2f4f7; }
+.sip-sira-menu__oge--secili { background: var(--mavi-50); color: var(--mavi); }
+.sip-sira-menu__oge--secili:hover { background: var(--mavi-50); }
+
 .sip-serit__liste { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 11px; }
 .sip-serit__bos {
     min-height: 130px;
@@ -501,29 +529,31 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-serit--hazir .sip-kart { --vurgu: #6390f8; }
 .sip-serit--yolda .sip-kart { --vurgu: #34d399; }
 
-.sip-kart__ust { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sip-kart__ust { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .sip-kart__numara {
     color: var(--lacivert);
     font-family: var(--baslik-font);
-    font-size: 22px; font-weight: 700; line-height: 1; letter-spacing: -0.04em;
+    font-size: 26px; font-weight: 700; line-height: 1; letter-spacing: -0.045em;
     font-variant-numeric: tabular-nums;
 }
-.sip-kart__numara--yok { font-size: 16px; color: var(--sonuk); }
-.sip-kart__meta { display: flex; align-items: center; gap: 8px; }
-.sip-kart__parca { color: #344054; font-size: 12px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.sip-kart__parca b { color: var(--yazi); font-size: 15px; }
-.sip-kart__sure { color: var(--soluk); font-size: 11.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sip-kart__numara--yok { font-size: 18px; color: var(--sonuk); }
+.sip-kart__meta { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.sip-kart__parca { color: #344054; font-size: 12.5px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sip-kart__parca b { color: var(--yazi); font-size: 18px; }
+.sip-kart__sure { color: var(--soluk); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .sip-kart__kisiler {
-    margin-top: 10px;
-    display: flex; flex-direction: column; gap: 6px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #eef0f3;
+    display: flex; flex-direction: column; gap: 8px;
 }
 .sip-kart__kisi {
-    display: flex; align-items: center; gap: 7px;
+    display: flex; align-items: center; gap: 9px;
     min-width: 0;
 }
 .sip-kart__avatar {
-    width: 26px; height: 26px; flex: none;
+    width: 30px; height: 30px; flex: none;
     border-radius: 50%;
     object-fit: cover;
     background: #edf0f4;
@@ -531,7 +561,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-kart__kisi > span {
     min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    color: #344054; font-size: 13px; font-weight: 600;
+    color: #344054; font-size: 13.5px; font-weight: 700;
 }
 
 .sip-kart__alt { margin-top: 13px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }

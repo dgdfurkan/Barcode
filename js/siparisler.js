@@ -53,7 +53,8 @@
            Her yoklamada yeniden oynasa ekran titrerdi. İki şerit ayrı ayrı
            izleniyor. */
         kartImzasi: { hazirlaniyor: '', hazir: '', yolda: '' },
-        detayImzasi: ''
+        detayImzasi: '',
+        seritSira: { hazirlaniyor: 'sure', hazir: 'sure', yolda: 'sure' }
     };
 
     /* Cihaza özel ayarlar. Depocunun telefonu ile ofisteki bilgisayar aynı
@@ -799,8 +800,45 @@
      *
      * @returns {Array} o şeritteki siparişler (sayaç ve toplam için)
      */
+    var SIRA_SECENEKLERI = [
+        { anahtar: 'sure', etiket: 'Süreye göre' },
+        { anahtar: 'banko', etiket: 'Banko numarasına göre' },
+        { anahtar: 'kurye', etiket: 'Kurye adına göre' }
+    ];
+
+    function bankoSiraDegeri(s) {
+        var k = siparisKimligi(s);
+        if (!k.bankoVar) return 99999;
+        var m = String(k.deger).match(/\d+/);
+        return m ? parseInt(m[0], 10) : 99999;
+    }
+
+    function sirala(liste, kriter) {
+        var kopy = liste.slice();
+        if (kriter === 'banko') {
+            kopy.sort(function (a, b) { return bankoSiraDegeri(a) - bankoSiraDegeri(b); });
+        } else if (kriter === 'kurye') {
+            kopy.sort(function (a, b) {
+                var ka = (a.kurye || '').toLocaleLowerCase('tr');
+                var kb = (b.kurye || '').toLocaleLowerCase('tr');
+                if (!ka && !kb) return 0;
+                if (!ka) return 1;
+                if (!kb) return -1;
+                return ka.localeCompare(kb, 'tr');
+            });
+        } else {
+            kopy.sort(function (a, b) {
+                var ta = new Date(a.sepet_zamani || a.created_at || 0).getTime();
+                var tb = new Date(b.sepet_zamani || b.created_at || 0).getTime();
+                return ta - tb;
+            });
+        }
+        return kopy;
+    }
+
     function seritCiz(bant, listeId, bosId, imzaAnahtari) {
         var liste = durum.siparisler.filter(function (s) { return bandaGore(s) === bant; });
+        liste = sirala(liste, durum.seritSira[bant] || 'sure');
         var kutu = el(listeId);
 
         var kartImza = durum.yukleniyor ? 'y' : liste.map(function (s) { return s.id; }).join(',');
@@ -1391,12 +1429,71 @@
         ciz();
     }
 
+    var BANT_HARITA = {
+        'sip-serit--hazirlaniyor': 'hazirlaniyor',
+        'sip-serit--hazir': 'hazir',
+        'sip-serit--yolda': 'yolda'
+    };
+
+    function seritBantBul(baslik) {
+        var serit = baslik.closest('.sip-serit');
+        if (!serit) return null;
+        for (var sinif in BANT_HARITA) {
+            if (serit.classList.contains(sinif)) return BANT_HARITA[sinif];
+        }
+        return null;
+    }
+
+    function siraMenuAc(baslik) {
+        var mevcut = baslik.querySelector('.sip-sira-menu');
+        if (mevcut) { mevcut.remove(); return; }
+
+        document.querySelectorAll('.sip-sira-menu').forEach(function (m) { m.remove(); });
+
+        var bant = seritBantBul(baslik);
+        if (!bant) return;
+
+        var secili = durum.seritSira[bant] || 'sure';
+        var html = '<div class="sip-sira-menu">';
+        SIRA_SECENEKLERI.forEach(function (s) {
+            html += '<button type="button" class="sip-sira-menu__oge' +
+                    (s.anahtar === secili ? ' sip-sira-menu__oge--secili' : '') +
+                    '" data-sira="' + s.anahtar + '">' + s.etiket + '</button>';
+        });
+        html += '</div>';
+        baslik.insertAdjacentHTML('beforeend', html);
+
+        var menu = baslik.querySelector('.sip-sira-menu');
+        menu.addEventListener('click', function (e) {
+            var oge = e.target.closest('[data-sira]');
+            if (!oge) return;
+            e.stopPropagation();
+            durum.seritSira[bant] = oge.getAttribute('data-sira');
+            durum.kartImzasi[bant] = '';
+            menu.remove();
+            ciz();
+        });
+
+        setTimeout(function () {
+            var kapat = function (e) {
+                if (!menu.contains(e.target)) {
+                    menu.remove();
+                    document.removeEventListener('click', kapat, true);
+                }
+            };
+            document.addEventListener('click', kapat, true);
+        }, 0);
+    }
+
     function baglan() {
         /* İki şerit de aynı kapsayıcının altında; tek dinleyici kartı
            bulup açıyor. */
         el('siparisAkis').addEventListener('click', function (e) {
             var kart = e.target.closest('.sip-kart');
-            if (kart) siparisAc(kart.getAttribute('data-siparis'));
+            if (kart) { siparisAc(kart.getAttribute('data-siparis')); return; }
+
+            var baslik = e.target.closest('.sip-serit__ust');
+            if (baslik) siraMenuAc(baslik);
         });
 
         el('siparisYenile').addEventListener('click', function () {
