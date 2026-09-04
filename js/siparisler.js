@@ -22,8 +22,13 @@
  *
  * EKRAN
  * Yerleşim ve görsel dil `Jet-Barkod-Siparisler-Premium/` referansından:
- * özet şeridi, sipariş kartı, iki sütunlu detay, sabit alt çubuk, barkod ve
- * ayar pencereleri, bildirim.
+ * iki şerit (Hazırlanıyor / Hazırlandı), sipariş kartı, sağdan kayan detay
+ * (solda ürünler, sağda künye), sabit alt çubuk, barkod ve ayar pencereleri,
+ * bildirim.
+ *
+ * BANT RENKLERİ
+ * Fırın/dondurma/su rengi ayarlardan değişebiliyor. Kart zemini o renklerin
+ * soluk karışımından hesaplanıyor (sipariş hangi kategoriden ağırlıklıysa).
  * ============================================================================
  */
 (function (global) {
@@ -33,17 +38,17 @@
     var durum = {
         siparisler: [],
         secili: null,
-        sekme: 'hazir',
-        gorunum: 'kart',
         detayGorunum: 'liste',
         bantSirasi: null,
+        bantRenkleri: null,
         kodUrun: null,
         yukleniyor: true,
         sonImza: '',
         sonYenileme: null,
         /* Giriş animasyonu yalnız içerik gerçekten değiştiğinde oynuyor.
-           Her yoklamada yeniden oynasa ekran titrerdi. */
-        kartImzasi: '',
+           Her yoklamada yeniden oynasa ekran titrerdi. İki şerit ayrı ayrı
+           izleniyor. */
+        kartImzasi: { hazirlaniyor: '', hazir: '' },
         detayImzasi: ''
     };
 
@@ -210,7 +215,7 @@
         return String(metin == null ? '' : metin)
             .toLocaleLowerCase('tr')
             .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[̀-ͯ]/g, '')
             .replace(/[ığüşöçâîû]/g, function (m) { return HARF[m] || m; })
             .replace(/(\d)[.,](\d)/g, '$1$2')
             .replace(/[^a-z0-9]+/g, ' ')
@@ -435,7 +440,7 @@
            satır güncelleniyor: gövdeyi yeniden yazmak kaydırmayı başa
            atıyor ve bütün satırları yeniden belirtiyordu. */
         urun.alindi = alindi;
-        satiriTazele(urun, true);
+        satiriTazele(urun);
         durum.detayImzasi = siparis.id + '|' + durum.detayGorunum + '|' +
             (siparis.urunler || []).map(function (u) { return u.sira + (u.alindi ? '1' : '0'); }).join('');
 
@@ -446,7 +451,7 @@
 
         if (sonuc.error) {
             urun.alindi = !alindi;
-            satiriTazele(urun, false);
+            satiriTazele(urun);
             if (global.JBDiyalog) global.JBDiyalog.hata('Ürün işaretlenemedi. Bağlantını kontrol et.');
             return;
         }
@@ -489,17 +494,17 @@
 
 
     // ==================================================================
-    // Çizim
+    // Bant: sınıflandırma, renk, arka plan
     // ==================================================================
 
     /*
      * Panelin kolon adına göre bant. Kolon adı panelin kendi metni; sayı
      * koduna göre tahmin yürütmüyoruz.
      *
-     *   hazir         Hazırlandı. Depocunun asıl işi bu, varsayılan sekme.
+     *   hazir         Hazırlandı. Depocunun asıl işi bu.
      *   hazirlaniyor  Toplayıcı Bekliyor, Doğrulanıyor, Hazırlanıyor.
      *   bitti         El Değiştiriliyor, Yolda, Ulaştı, Teslim, iptal.
-     *                 Listede hiç görünmüyor.
+     *                 Hiçbir şeritte görünmüyor.
      */
     /* Kolon adı sade()'den geçiriliyor. Doğrudan /i ile denemek yetmiyordu:
        "İptal" büyük harfli noktalı İ ile geliyor ve JS onu 'iptal' saymıyor. */
@@ -547,12 +552,6 @@
         return panelBandi(s);
     }
 
-    function listele() {
-        return durum.siparisler.filter(function (s) { return bandaGore(s) === durum.sekme; });
-    }
-
-    var BANT_ADI = { hazir: 'Hazırlandı', hazirlaniyor: 'Hazırlanıyor', bitti: 'Kapandı' };
-
     /** "2 dk.", "1 sa. 20 dk." */
     function gecenSure(s) {
         var t = s.sepet_zamani || s.created_at;
@@ -578,9 +577,18 @@
         return (p[0][0] + p[p.length - 1][0]).toLocaleUpperCase('tr');
     }
 
-    /* Bant renkleri: kartın sol şeridi, kart etiketleri ve bant başlıkları
-       aynı rengi kullanıyor. Süs değil; depocu rengi tanıyor. */
-    var BANT_RENK = { firin: '#f59e0b', dondurma: '#7c3aed', su: '#0284c7', orta: '#98a2b3' };
+    /* Fırın sarı, dondurma mor, su mavi: varsayılan. Ayarlardan değişirse
+       durum.bantRenkleri bunun üstüne geçiyor. "Diğer ürünler" bandının
+       belirli bir kategorisi yok, sabit gri kalıyor. */
+    var BANT_RENK_VARSAYILAN = { firin: '#d97706', dondurma: '#7c3aed', su: '#0284c7' };
+    var BANT_RENK_ETIKET = { firin: 'Fırın', dondurma: 'Dondurma', su: 'Su' };
+    var BANT_RENK_SIRA = ['firin', 'dondurma', 'su'];
+
+    function bantRengi(bant) {
+        if (!bant || bant === 'orta') return '#98a2b3';
+        var ozel = durum.bantRenkleri && durum.bantRenkleri[bant];
+        return ozel || BANT_RENK_VARSAYILAN[bant] || '#98a2b3';
+    }
 
     /** Siparişin bant dağılımı: [{bant, sayi}] çoktan aza. */
     function bantDagilimi(s) {
@@ -594,22 +602,41 @@
             .sort(function (a, b) { return b.sayi - a.sayi; });
     }
 
-    function kategoriRengi(s) {
-        var d = bantDagilimi(s).filter(function (x) { return x.bant !== 'orta'; })[0];
-        return d ? BANT_RENK[d.bant] : '#c7d0dd';
+    /** Renk + beyaz karışımı, kart zemininde soluk bir ipucu. */
+    function pastel(hex) {
+        return 'color-mix(in srgb, ' + hex + ' 14%, white)';
+    }
+
+    /**
+     * Kart zemini siparişin içindeki kategorileri gösteriyor: tek kategori
+     * varsa düz soluk renk, birden fazlaysa yatay şeritler halinde bölünmüş
+     * gradyan. "Diğer ürünler" zemine yansımıyor, yalnız fırın/dondurma/su.
+     */
+    function kartArkaPlan(s) {
+        var dagilim = bantDagilimi(s).filter(function (x) { return x.bant !== 'orta'; });
+        if (!dagilim.length) return '#ffffff';
+        var renkler = dagilim.map(function (x) { return pastel(bantRengi(x.bant)); });
+        if (renkler.length === 1) return renkler[0];
+        var adim = 100 / renkler.length;
+        var duraklar = [];
+        renkler.forEach(function (r, i) {
+            duraklar.push(r + ' ' + (i * adim).toFixed(2) + '%');
+            duraklar.push(r + ' ' + ((i + 1) * adim).toFixed(2) + '%');
+        });
+        return 'linear-gradient(90deg, ' + duraklar.join(', ') + ')';
     }
 
     var TIK = '<svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-9"/></svg>';
+    var OK_SAG = '<svg viewBox="0 0 18 18"><path d="m7 4 5 5-5 5"/></svg>';
+    var POSET_IKON = '<svg class="sip-poset-ikon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 7h12l1.2 13.2a1 1 0 0 1-1 1.1H5.8a1 1 0 0 1-1-1.1L6 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>';
 
-    function kisiCiz(ad, rol, kurye) {
-        if (!ad) {
-            return '<span class="sip-kisi"><i>–</i><span><small>' + rol +
-                   '</small><strong>Atanmadı</strong></span></span>';
-        }
-        return '<span class="sip-kisi' + (kurye ? ' sip-kisi--kurye' : '') + '">' +
-            '<i>' + kacir(basHarfler(ad)) + '</i>' +
-            '<span><small>' + rol + '</small><strong>' + kacir(ad) + '</strong></span>' +
-        '</span>';
+    // ==================================================================
+    // Çizim: sipariş kartı
+    // ==================================================================
+
+    function ogeYaz(rol, deger) {
+        return '<div class="sip-kart__ogeye"><small>' + rol + '</small><strong>' +
+               kacir(deger || 'Atanmadı') + '</strong></div>';
     }
 
     function kartCiz(s, sira) {
@@ -618,45 +645,43 @@
         var alinan = urunler.filter(function (u) { return u.alindi; }).length;
         var oran = toplam ? Math.round(alinan / toplam * 100) : 0;
         var kimlik = siparisKimligi(s);
-        var etiketler = (global.JBSiparisSirala && global.JBSiparisSirala.BANT_ETIKET) || {};
+        var tam = oran === 100 && toplam > 0;
 
-        var meta = bantDagilimi(s).slice(0, 3).map(function (d) {
-            return '<span><i style="background:' + (BANT_RENK[d.bant] || BANT_RENK.orta) + '"></i>' +
-                   kacir(etiketler[d.bant] || 'Ürün') + ' ' + d.sayi + '</span>';
-        }).join('');
+        var icerik = (s.poset_sayisi != null ? POSET_IKON + s.poset_sayisi + ' poşet · ' : '') + toplam + ' çeşit';
 
         return '<button type="button" class="sip-kart' + (sira != null ? ' sip-kart--gir' : '') +
-               (oran === 100 ? ' sip-kart--tam' : '') + (s.ornek ? ' sip-kart--ornek' : '') +
-               '" data-siparis="' + kacir(s.id) + '" style="--vurgu:' + kategoriRengi(s) +
-               ';--i:' + (sira || 0) + '">' +
-            (s.ornek ? '<span class="sip-ornek-rozet">ÖRNEK</span>' : '') +
-            '<div class="sip-kart__ust">' +
-                '<div class="sip-kart__kimlik">' +
-                    '<span class="sip-banko' + (kimlik.bankoVar ? '' : ' sip-banko--yok') + '">' +
-                        '<strong>' + kacir(kimlik.deger) + '</strong>' +
-                        '<small>' + kacir(kimlik.etiket) + '</small>' +
-                    '</span>' +
-                    '<span class="sip-kart__ozet">' +
-                        '<strong>' + adetYaz(s.toplam_adet != null ? s.toplam_adet : toplam) + ' parça</strong>' +
-                        '<span>' + toplam + ' çeşit' +
-                            (s.poset_sayisi != null ? ' · ' + s.poset_sayisi + ' poşet' : '') + '</span>' +
-                    '</span>' +
-                '</div>' +
+               (tam ? ' sip-kart--tam' : '') + (s.ornek ? ' sip-kart--ornek' : '') +
+               '" data-siparis="' + kacir(s.id) + '" style="--kart-zemin:' + kartArkaPlan(s) +
+               ';--i:' + (sira || 0) + '" aria-label="' + kacir(kimlik.deger) + ' siparişini aç">' +
+            '<span class="sip-kart__ust">' +
+                (s.ornek ? '<span class="sip-kart__ornek">ÖRNEK</span>' : '') +
                 '<span class="sip-kart__sure">' + kacir(gecenSure(s)) + '</span>' +
-            '</div>' +
-            '<div class="sip-kart__kisiler">' +
-                kisiCiz(s.toplayici, 'Toplayıcı', false) +
-                kisiCiz(s.kurye, 'Kurye', true) +
-            '</div>' +
-            '<div class="sip-kart__alt">' +
-                '<div class="sip-kart__meta">' + meta + '</div>' +
-                '<div class="sip-kart__ilerleme">' +
-                    '<strong>' + alinan + '<span>/' + toplam + '</span></strong>' +
+            '</span>' +
+            '<span class="sip-kart__orta">' +
+                '<span class="sip-kart__banko' + (kimlik.bankoVar ? '' : ' sip-kart__banko--yok') + '">' +
+                    '<small>' + kacir(kimlik.etiket) + '</small>' +
+                    '<strong>' + kacir(kimlik.deger) + '</strong>' +
+                '</span>' +
+                '<span class="sip-kart__parca"><b>' + adetYaz(s.toplam_adet != null ? s.toplam_adet : toplam) + '</b> parça</span>' +
+            '</span>' +
+            '<span class="sip-kart__ozellik">' +
+                ogeYaz('Toplayıcı', s.toplayici) +
+                ogeYaz('Kurye', s.kurye) +
+                '<div class="sip-kart__ogeye"><small>İçerik</small><strong>' + icerik + '</strong></div>' +
+            '</span>' +
+            '<span class="sip-kart__alt">' +
+                '<span class="sip-kart__ilerleme">' +
                     '<span><i style="width:' + oran + '%"></i></span>' +
-                '</div>' +
-            '</div>' +
+                    '<strong>' + alinan + '<span>/' + toplam + '</span></strong>' +
+                '</span>' +
+                '<span class="sip-kart__ac">' + (tam ? TIK : OK_SAG) + '</span>' +
+            '</span>' +
         '</button>';
     }
+
+    // ==================================================================
+    // Çizim: ürün satırı / kutucuğu
+    // ==================================================================
 
     /* Satırda tek barkod duruyor: depocu okutacağı kodu aramasın. Fazlası
        varsa ada dokununca açılan pencerede hepsi görünüyor. */
@@ -667,24 +692,34 @@
                '</span>';
     }
 
+    function urunNotYaz(u) {
+        var miktar = adetYaz(u.adet);
+        return u.birim ? (miktar + ' ' + u.birim + ' alınacak') : (miktar + ' adet alınacak');
+    }
+
     function urunCiz(u, sira) {
         var bilgi = barkodBul(u);
         var gorsel = u.gorsel
-            ? '<span class="sip-urun__gorsel" data-buyut="' + u.sira + '">' +
-                  '<img src="' + kacir(u.gorsel) + '" alt="" loading="lazy"></span>'
+            ? '<button type="button" class="sip-urun__gorsel" data-buyut="' + u.sira + '" aria-label="' +
+                  kacir(urunBasligi(u, bilgi)) + ' görselini büyüt">' +
+                  '<img src="' + kacir(u.gorsel) + '" alt="" loading="lazy" referrerpolicy="no-referrer"></button>'
             : '<span class="sip-urun__gorsel sip-urun__gorsel--bos"></span>';
 
         return '<div class="sip-urun' + (u.alindi ? ' sip-urun--alindi' : '') +
-               '" data-sira="' + u.sira + '" style="--i:' + (sira || 0) + '">' +
+               '" data-sira="' + u.sira + '" style="--i:' + Math.min(Math.max((sira || 1) - 1, 0), 16) + '">' +
+            '<span class="sip-urun__no">' + (sira || 1) + '</span>' +
             gorsel +
             '<div class="sip-urun__bilgi">' +
                 '<button type="button" class="sip-urun__ad" data-barkod="' + u.sira + '">' +
                     '<span>' + kacir(urunBasligi(u, bilgi)) + '</span>' +
                 '</button>' +
-                kodCiz(bilgi) +
+                '<div class="sip-urun__alt">' +
+                    kodCiz(bilgi) +
+                    '<span class="sip-urun__not">' + urunNotYaz(u) + '</span>' +
+                '</div>' +
             '</div>' +
             '<div class="sip-urun__eylem">' +
-                '<span class="sip-adet">' + adetYaz(u.adet) +
+                '<span class="sip-adet' + (u.birim ? ' sip-adet--birim' : '') + '">' + adetYaz(u.adet) +
                     (u.birim ? '<u>' + kacir(u.birim) + '</u>' : '') + '</span>' +
                 '<button type="button" class="sip-al" data-isaretle="' + u.sira + '"' +
                     ' aria-pressed="' + (u.alindi ? 'true' : 'false') +
@@ -709,9 +744,11 @@
     }
 
     /**
-     * Ürünleri bantlara ayırıp her bandın üstüne başlık koyar. Her bant kendi
-     * bölümünde: yapışkan başlıklar aynı kapsayıcıda olsaydı geçilen bantların
-     * başlıkları tepede üst üste yığılırdı.
+     * Ürünleri bantlara ayırıp her bandın üstüne başlık koyar. Numara rozeti
+     * bantları aşıp tüm siparişte kesintisiz devam ediyor; depocu "12
+     * üründen kaçıncısındayım" diye tek bakışta görüyor. Her bant kendi
+     * bölümünde: yapışkan başlıklar aynı kapsayıcıda olsaydı geçilen
+     * bantların başlıkları tepede üst üste yığılırdı.
      */
     function bantlaraAyir(urunler) {
         var etiketler = (global.JBSiparisSirala && global.JBSiparisSirala.BANT_ETIKET) || {};
@@ -720,11 +757,11 @@
             var alinan = g.urunler.filter(function (u) { return u.alindi; }).length;
             return '<section class="sip-bolum">' +
                 '<div class="sip-bant' + (alinan === g.urunler.length ? ' sip-bant--bitti' : '') +
-                '" style="--bant:' + (BANT_RENK[g.bant] || BANT_RENK.orta) + '">' +
+                '" style="--bant:' + bantRengi(g.bant) + '">' +
                     '<i></i><b>' + kacir(etiketler[g.bant] || 'Ürünler') + '</b><s></s>' +
                     '<span>' + alinan + '/' + g.urunler.length + '</span>' +
                 '</div>' +
-                g.urunler.map(function (u) { return urunCiz(u, Math.min(sayac++, 16)); }).join('') +
+                g.urunler.map(function (u) { sayac++; return urunCiz(u, sayac); }).join('') +
             '</section>';
         }).join('');
     }
@@ -744,13 +781,6 @@
     }
 
     var BOS_IKON = '<svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9Z"/><path d="m4.5 7.8 7.5 4.3 7.5-4.3"/></svg>';
-
-    function bosCiz(sekme) {
-        var b = sekme === 'hazir'
-            ? ['Bankoda bekleyen sipariş yok', 'Panelde bir sipariş hazırlandığında burada belirir.']
-            : ['Arkada hazırlanan sipariş yok', 'Toplayıcı bekleyen siparişler bu sekmede görünür.'];
-        return '<div class="sip-bos"><span>' + BOS_IKON + '</span><strong>' + b[0] + '</strong><p>' + b[1] + '</p></div>';
-    }
 
     /* Ürün işaretlenince bütün gövdeyi yeniden çizmek iki şeyi bozuyordu:
        kaydırma başa dönüyor ve bütün satırlar yeniden beliriyordu. Artık
@@ -801,56 +831,57 @@
         bitir.disabled = !toplam;
     }
 
-    function ciz() {
-        var izgara = el('siparisIzgara');
+    // ==================================================================
+    // Çizim: şeritler + detay
+    // ==================================================================
 
-        var sayac = { hazir: 0, hazirlaniyor: 0, bitti: 0 };
-        durum.siparisler.forEach(function (s) { sayac[bandaGore(s)]++; });
+    var ISKELET_SAYISI = 2;
 
-        el('sayacHazir').textContent = sayac.hazir;
-        el('sayacHazirlaniyor').textContent = sayac.hazirlaniyor;
-        el('ozetHazir').textContent = sayac.hazir;
-        el('ozetHazirlaniyor').textContent = sayac.hazirlaniyor;
-        el('ozetBitti').textContent = sayac.bitti;
+    /**
+     * Tek bir şeridi (Hazırlanıyor ya da Hazırlandı) çizer. Kartlar yalnız
+     * liste gerçekten değiştiğinde sıralı beliriyor; her yoklamada oynasa
+     * ekran titrerdi. Şeritler birbirinden bağımsız: biri değişirken öbürü
+     * yeniden yazılmıyor.
+     *
+     * @returns {Array} o şeritteki siparişler (sayaç ve toplam için)
+     */
+    function seritCiz(bant, listeId, bosId, imzaAnahtari) {
+        var liste = durum.siparisler.filter(function (s) { return bandaGore(s) === bant; });
+        var kutu = el(listeId);
 
-        var hazirParca = durum.siparisler
-            .filter(function (s) { return bandaGore(s) === 'hazir'; })
-            .reduce(function (a, s) { return a + (s.toplam_adet || (s.urunler || []).length); }, 0);
-        el('ozetHazirNot').innerHTML = hazirParca
-            ? '<b>' + adetYaz(hazirParca) + '</b> parça bankoda'
-            : 'Bankoda seni bekliyor';
-
-        var saat = durum.sonYenileme ? saatYaz(durum.sonYenileme) : '—';
-        el('ozetSaat').textContent = saat;
-        el('sonGuncelleme').textContent = durum.sonYenileme ? 'Son güncelleme ' + saat : 'Yükleniyor';
-
-        document.querySelectorAll('.sip-sekme').forEach(function (b) {
-            b.setAttribute('aria-selected', String(b.getAttribute('data-sekme') === durum.sekme));
-        });
-        document.querySelectorAll('.sip-ozet__oge[data-sekme]').forEach(function (b) {
-            b.classList.toggle('secili', b.getAttribute('data-sekme') === durum.sekme);
-        });
-        document.querySelectorAll('.sip-meta .sip-gorunum button').forEach(function (b) {
-            b.setAttribute('aria-selected', String(b.getAttribute('data-gorunum') === durum.gorunum));
-        });
-        izgara.classList.toggle('sip-izgara--liste', durum.gorunum === 'liste');
-
-        var liste = listele();
-        /* Kartlar yalnız liste gerçekten değiştiğinde sıralı beliriyor; her
-           yoklamada oynasa ekran titrerdi. */
-        var kartImza = durum.yukleniyor ? 'y' : durum.gorunum + '|' + liste.map(function (s) { return s.id; }).join(',');
-        var kartYeni = kartImza !== durum.kartImzasi;
-        durum.kartImzasi = kartImza;
+        var kartImza = durum.yukleniyor ? 'y' : liste.map(function (s) { return s.id; }).join(',');
+        var kartYeni = kartImza !== durum.kartImzasi[imzaAnahtari];
+        durum.kartImzasi[imzaAnahtari] = kartImza;
 
         if (durum.yukleniyor) {
-            izgara.innerHTML = '<div class="sip-iskelet"></div><div class="sip-iskelet"></div><div class="sip-iskelet"></div>';
+            var iskelet = '';
+            for (var i = 0; i < ISKELET_SAYISI; i++) iskelet += '<div class="sip-iskelet"></div>';
+            kutu.innerHTML = iskelet;
+            el(bosId).hidden = true;
         } else if (!liste.length) {
-            izgara.innerHTML = bosCiz(durum.sekme);
+            kutu.innerHTML = '';
+            el(bosId).hidden = false;
         } else {
-            izgara.innerHTML = liste.map(function (s, i) {
-                return kartCiz(s, kartYeni ? Math.min(i, 12) : null);
+            el(bosId).hidden = true;
+            kutu.innerHTML = liste.map(function (s, idx) {
+                return kartCiz(s, kartYeni ? Math.min(idx, 12) : null);
             }).join('');
         }
+        return liste;
+    }
+
+    function ciz() {
+        var hazirlaniyor = seritCiz('hazirlaniyor', 'izgaraHazirlaniyor', 'bosHazirlaniyor', 'hazirlaniyor');
+        var hazir = seritCiz('hazir', 'izgaraHazir', 'bosHazir', 'hazir');
+
+        el('sayacHazirlaniyor').textContent = hazirlaniyor.length;
+        el('sayacHazir').textContent = hazir.length;
+
+        var hazirParca = hazir.reduce(function (a, s) { return a + (s.toplam_adet || (s.urunler || []).length); }, 0);
+        el('ozetHazirParca').textContent = adetYaz(hazirParca);
+
+        var saat = durum.sonYenileme ? saatYaz(durum.sonYenileme) : null;
+        el('sonGuncelleme').textContent = 'Canlı · ' + (saat || 'yükleniyor');
 
         detayiCiz();
     }
@@ -881,7 +912,7 @@
 
         el('olcuParca').textContent = adetYaz(s.toplam_adet != null ? s.toplam_adet : urunler.length);
         el('olcuCesit').textContent = urunler.length;
-        el('olcuPoset').textContent = s.poset_sayisi != null ? s.poset_sayisi : '–';
+        el('olcuPoset').innerHTML = (s.poset_sayisi != null ? s.poset_sayisi : '–');
         el('detayKisiler').innerHTML = yanKisiler(s);
         el('yanNot').textContent = s.eksik_urun_var
             ? 'Panelde eksik ürün işaretli. Bulamazsan panelden bildir.'
@@ -949,12 +980,15 @@
         } catch (e) { /* pano izni yoksa kod zaten ekranda */ }
     }
 
-    /** Barkod penceresi. Ana kod büyük, diğerleri altında rozet olarak. */
+    /** Barkod penceresi. Ana kod büyük, diğerleri altında rozet olarak.
+        Üstteki görsele dokunmak da büyük fotoğrafı açıyor. */
     function kodlariAc(u) {
         var bilgi = barkodBul(u);
+        durum.kodUrun = u;
         var g = el('kodGorsel');
-        if (u.gorsel) { g.src = u.gorsel; g.hidden = false; }
-        else { g.removeAttribute('src'); g.hidden = true; }
+        var gd = el('kodGorselDugme');
+        if (u.gorsel) { g.src = u.gorsel; gd.hidden = false; }
+        else { g.removeAttribute('src'); gd.hidden = true; }
 
         el('kodAd').textContent = urunBasligi(u, bilgi);
         el('kodNot').textContent = adetYaz(u.adet) + (u.birim ? ' ' + u.birim : '') + ' adet' +
@@ -988,7 +1022,7 @@
     }
 
     function gorseliBuyut(u) {
-        if (!u.gorsel) return;
+        if (!u || !u.gorsel) return;
         el('buyukGorsel').src = u.gorsel;
         el('buyukAd').textContent = u.ad || '';
         katAc('siparisBuyuk');
@@ -1010,6 +1044,31 @@
                     '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>' +
             '</div>';
         }).join('');
+    }
+
+    /* Fırın/dondurma/su rengi. Hızlı Bul eklentisindeki kategori renk
+       satırıyla aynı düzen: yerel renk girdisi, değişince anında
+       uygulanıyor. */
+    function renklerCiz() {
+        el('ayarRenkler').innerHTML = BANT_RENK_SIRA.map(function (b) {
+            var renk = bantRengi(b);
+            return '<div class="sip-renk-satiri" style="--renk:' + renk + '">' +
+                '<i></i>' +
+                '<label for="sip-renk-' + b + '">' + BANT_RENK_ETIKET[b] + '</label>' +
+                '<input type="color" id="sip-renk-' + b + '" data-bant-renk="' + b + '" value="' + renk + '">' +
+            '</div>';
+        }).join('');
+    }
+
+    function bantRenkleriGuncelle(bant, deger) {
+        durum.bantRenkleri = Object.assign({}, durum.bantRenkleri || BANT_RENK_VARSAYILAN);
+        durum.bantRenkleri[bant] = deger;
+        ayarYaz({ bantRenkleri: durum.bantRenkleri });
+        renklerCiz();
+        /* Kart zemini ve bant başlıkları yeni renkle yeniden çizilsin. */
+        durum.kartImzasi = { hazirlaniyor: '', hazir: '' };
+        durum.detayImzasi = '';
+        ciz();
     }
 
     var SIL_IKON = '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>';
@@ -1052,12 +1111,12 @@
 
     function ayarAc() {
         siraCiz();
+        renklerCiz();
         ornekListeCiz();
         var isaretle = function (ad, deger) {
             var r = document.querySelector('input[name="' + ad + '"][value="' + deger + '"]');
             if (r) r.checked = true;
         };
-        isaretle('ayarGorunum', durum.gorunum);
         isaretle('ayarDetayGorunum', durum.detayGorunum);
         katAc('siparisAyar');
     }
@@ -1073,28 +1132,18 @@
     }
 
     function siparisAc(id) {
-        durum.secili = durum.siparisler.filter(function (s) { return s.id === id; })[0] || null;
+        var tumu = durum.siparisler;
+        durum.secili = tumu.filter(function (s) { return s.id === id; })[0] || null;
         durum.detayImzasi = '';
         ciz();
     }
 
-    function sekmeSec(ad) {
-        if (!ad || ad === durum.sekme) return;
-        durum.sekme = ad;
-        ciz();
-    }
-
     function baglan() {
-        document.querySelectorAll('[data-sekme]').forEach(function (b) {
-            b.addEventListener('click', function () { sekmeSec(b.getAttribute('data-sekme')); });
-        });
-
-        document.querySelectorAll('.sip-meta .sip-gorunum button').forEach(function (b) {
-            b.addEventListener('click', function () {
-                durum.gorunum = b.getAttribute('data-gorunum');
-                ayarYaz({ gorunum: durum.gorunum });
-                ciz();
-            });
+        /* İki şerit de aynı kapsayıcının altında; tek dinleyici kartı
+           bulup açıyor. */
+        el('siparisAkis').addEventListener('click', function (e) {
+            var kart = e.target.closest('.sip-kart');
+            if (kart) siparisAc(kart.getAttribute('data-siparis'));
         });
 
         el('siparisYenile').addEventListener('click', function () {
@@ -1103,11 +1152,6 @@
             void d.offsetWidth;
             d.classList.add('donuyor');
             tazele(true);
-        });
-
-        el('siparisIzgara').addEventListener('click', function (e) {
-            var kart = e.target.closest('.sip-kart');
-            if (kart) siparisAc(kart.getAttribute('data-siparis'));
         });
 
         el('detayGeri').addEventListener('click', detayiKapat);
@@ -1151,6 +1195,7 @@
 
         // ---- Katmanlar ----
         el('kodKapat').addEventListener('click', function () { katKapat('siparisKodlar'); });
+        el('kodGorselDugme').addEventListener('click', function () { gorseliBuyut(durum.kodUrun); });
         el('siparisKodlar').addEventListener('click', function (e) {
             if (e.target === el('siparisKodlar')) { katKapat('siparisKodlar'); return; }
             var k = e.target.closest('[data-kopyala]');
@@ -1172,19 +1217,29 @@
 
         el('siparisAyar').addEventListener('change', function (e) {
             var t = e.target;
-            if (t.name === 'ayarGorunum') {
-                durum.gorunum = t.value;
-                ayarYaz({ gorunum: t.value });
-                durum.kartImzasi = '';
-                ciz();
-                bildir('Liste görünümü güncellendi');
-            }
             if (t.name === 'ayarDetayGorunum') {
                 durum.detayGorunum = t.value;
                 ayarYaz({ detayGorunum: t.value });
                 ciz();
                 bildir('Toplama görünümü güncellendi');
             }
+        });
+
+        /* Renk girdisi sürüklenirken anında uygulanıyor; "input" olayı
+           "change"den daha erken ve daha sık geliyor. */
+        el('ayarRenkler').addEventListener('input', function (e) {
+            var t = e.target.closest('[data-bant-renk]');
+            if (!t) return;
+            bantRenkleriGuncelle(t.getAttribute('data-bant-renk'), t.value);
+        });
+        el('ayarRenkSifirla').addEventListener('click', function () {
+            durum.bantRenkleri = Object.assign({}, BANT_RENK_VARSAYILAN);
+            ayarYaz({ bantRenkleri: durum.bantRenkleri });
+            renklerCiz();
+            durum.kartImzasi = { hazirlaniyor: '', hazir: '' };
+            durum.detayImzasi = '';
+            ciz();
+            bildir('Bant renkleri sıfırlandı');
         });
 
         el('ornekEkle').addEventListener('click', ornekEkle);
@@ -1271,18 +1326,32 @@
         });
     }
 
+    /** Ayarlardan gelen renkleri doğrular: yalnız #rrggbb kabul edilir. */
+    function bantRenkleriDogrula(ham) {
+        if (!ham || typeof ham !== 'object') return null;
+        var sonuc = {};
+        var buldu = false;
+        BANT_RENK_SIRA.forEach(function (b) {
+            if (typeof ham[b] === 'string' && /^#[0-9a-f]{6}$/i.test(ham[b])) {
+                sonuc[b] = ham[b];
+                buldu = true;
+            }
+        });
+        return buldu ? sonuc : null;
+    }
+
     async function basla() {
         var o = oturum();
         if (!o || !o.username) { bolumGoster('siparisGiris'); return; }
         if (!(await hakVarMi())) { bolumGoster('siparisYetkiYok'); return; }
 
         var ayar = ayarOku();
-        if (ayar.gorunum === 'kart' || ayar.gorunum === 'liste') durum.gorunum = ayar.gorunum;
-        if (['liste', 'izgara'].indexOf(ayar.detayGorunum) !== -1) durum.detayGorunum = ayar.detayGorunum;
+        if (['liste', 'ikili', 'uclu'].indexOf(ayar.detayGorunum) !== -1) durum.detayGorunum = ayar.detayGorunum;
         var vars = (global.JBSiparisSirala && global.JBSiparisSirala.VARSAYILAN_SIRA) || ['firin', 'dondurma', 'orta', 'su'];
         durum.bantSirasi = Array.isArray(ayar.bantSirasi) && ayar.bantSirasi.length
             ? ayar.bantSirasi.slice()
             : vars.slice();
+        durum.bantRenkleri = bantRenkleriDogrula(ayar.bantRenkleri) || Object.assign({}, BANT_RENK_VARSAYILAN);
 
         bolumGoster('siparisIcerik');
         baglan();
