@@ -361,6 +361,14 @@
             var v = kisi[FOTO_ALANLARI[i]];
             if (typeof v === 'string' && /^https?:\/\//.test(v)) return v;
         }
+        /* Bilinen alan adlarının hiçbirinde URL bulunamadıysa nesnenin
+           tüm string alanlarını tara: panelin sürümüne göre yeni bir
+           alan adı eklenmiş olabilir. */
+        var anahtarlar = Object.keys(kisi);
+        for (var j = 0; j < anahtarlar.length; j++) {
+            var d = kisi[anahtarlar[j]];
+            if (typeof d === 'string' && /^https?:\/\//.test(d) && /\.(jpg|jpeg|png|webp|svg)/i.test(d)) return d;
+        }
         return '';
     }
 

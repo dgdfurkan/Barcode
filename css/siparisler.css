@@ -1405,7 +1405,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-urunler--uclu .sip-urun { padding: 6px; border-radius: 11px; }
     .sip-urunler--uclu .sip-urun__gorsel { height: 94px; }
     .sip-urunler--uclu .sip-urun__ad { min-height: 54px; font-size: 12.5px; line-height: 1.22; }
-    .sip-urunler--uclu .sip-kod { display: none; }
+    .sip-urunler--uclu .sip-kod { max-width: 100%; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .sip-urunler--uclu .sip-urun__eylem { gap: 4px; }
     .sip-urunler--uclu .sip-adet { min-width: 35px; height: 34px; padding: 0 5px; font-size: 12.5px; }
     .sip-urunler--uclu .sip-al { min-width: 0; width: auto; height: 34px; padding: 0 6px; }
