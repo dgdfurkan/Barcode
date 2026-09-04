@@ -52,7 +52,7 @@
         /* Giriş animasyonu yalnız içerik gerçekten değiştiğinde oynuyor.
            Her yoklamada yeniden oynasa ekran titrerdi. İki şerit ayrı ayrı
            izleniyor. */
-        kartImzasi: { hazirlaniyor: '', hazir: '' },
+        kartImzasi: { hazirlaniyor: '', hazir: '', yolda: '' },
         detayImzasi: ''
     };
 
@@ -217,6 +217,7 @@
     var BANT_ADI = {
         hazir: 'Hazırlandı',
         hazirlaniyor: 'Hazırlanıyor',
+        yolda: 'Yolda',
         bitti: 'Kapandı'
     };
 
@@ -396,12 +397,11 @@
      *
      *   hazir         Hazırlandı. Depocunun asıl işi bu.
      *   hazirlaniyor  Toplayıcı Bekliyor, Doğrulanıyor, Hazırlanıyor.
-     *   bitti         El Değiştiriliyor, Yolda, Ulaştı, Teslim, iptal.
-     *                 Hiçbir şeritte görünmüyor.
+     *   yolda         El Değiştiriliyor, Yolda, Ulaştı. Kurye üzerine almış.
+     *   bitti         Teslim Edildi, İptal, Tamamlandı. Kapananlar listesinde.
      */
-    /* Kolon adı sade()'den geçiriliyor. Doğrudan /i ile denemek yetmiyordu:
-       "İptal" büyük harfli noktalı İ ile geliyor ve JS onu 'iptal' saymıyor. */
-    var KOLON_BITTI = /(el degistir|yolda|ulast|teslim|iptal|tamamlan)/;
+    var KOLON_BITTI = /(teslim|iptal|tamamlan)/;
+    var KOLON_YOLDA = /(el degistir|yolda|ulast)/;
     var KOLON_HAZIR = /hazirland/;
 
     function kolonAdi(s) { return sade(s && s.kolon); }
@@ -422,6 +422,7 @@
     function panelBandi(s) {
         var k = kolonAdi(s);
         if (KOLON_BITTI.test(k)) return 'bitti';
+        if (KOLON_YOLDA.test(k)) return 'yolda';
         if (KOLON_HAZIR.test(k)) return 'hazir';
         return 'hazirlaniyor';
     }
@@ -452,7 +453,7 @@
      * `order_items` foreign key'de ON DELETE CASCADE; ürün satırları
      * siparişle birlikte gidiyor, ayrı silme gerekmiyor.
      */
-    var GIDEN_KOLON = /(yolda|ulast|teslim|iptal|tamamlan)/;
+    var GIDEN_KOLON = /(teslim|iptal|tamamlan)/;
     var SILME_ESKIME_MS = 24 * 60 * 60 * 1000;
 
     function gitmisMi(s) {
@@ -478,9 +479,11 @@
     }
 
     function bandaGore(s) {
-        if (s.toplama_durumu === 'toplandi') return 'bitti';
         if (eskimisMi(s)) return 'bitti';
-        return panelBandi(s);
+        var pb = panelBandi(s);
+        if (pb === 'yolda' || pb === 'bitti') return pb;
+        if (s.toplama_durumu === 'toplandi') return 'yolda';
+        return pb;
     }
 
     /** "2 dk.", "1 sa. 20 dk." */
@@ -833,9 +836,11 @@
     function ciz() {
         var hazirlaniyor = seritCiz('hazirlaniyor', 'izgaraHazirlaniyor', 'bosHazirlaniyor', 'hazirlaniyor');
         var hazir = seritCiz('hazir', 'izgaraHazir', 'bosHazir', 'hazir');
+        var yolda = seritCiz('yolda', 'izgaraYolda', 'bosYolda', 'yolda');
 
         el('sayacHazirlaniyor').textContent = hazirlaniyor.length;
         el('sayacHazir').textContent = hazir.length;
+        el('sayacYolda').textContent = yolda.length;
 
         var hazirParca = hazir.reduce(function (a, s) { return a + (s.toplam_adet || (s.urunler || []).length); }, 0);
         el('ozetHazirParca').textContent = adetYaz(hazirParca);
@@ -1110,7 +1115,7 @@
         bantSirasiOnar();
         ayarYaz({ bantSirasi: durum.bantSirasi });
         siraCiz();
-        durum.kartImzasi = { hazirlaniyor: '', hazir: '' };
+        durum.kartImzasi = { hazirlaniyor: '', hazir: '', yolda: '' };
         durum.detayImzasi = '';
         tazele(true);
     }
