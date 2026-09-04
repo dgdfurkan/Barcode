@@ -301,9 +301,18 @@
         durum.yukleniyor = false;
         durum.sonYenileme = Date.now();
         if (!zorla && imza === durum.sonImza) return;
+        /* Kurye alıp gitmiş ve eskimiş kayıtlar siliniyor; ekrana da
+           girmiyorlar. Silme başarısız olursa liste yine de çizilir,
+           yalnız o kayıt bir sonraki turda tekrar denenir. */
+        var silinen = await gidenleriSil(yeni);
+        if (silinen.length) {
+            yeni = yeni.filter(function (s) { return silinen.indexOf(s.id) === -1; });
+            imza = imzaCikar(yeni);
+        }
+
         durum.sonImza = imza;
         durum.siparisler = yeni;
-        // Panelde teslim akışına geçmiş siparişler burada kapanıyor.
+        // Panelde el değiştirmeye geçmiş siparişler burada kapanıyor.
         bitenleriKapat(yeni);
 
         if (durum.secili) {
@@ -428,6 +437,44 @@
             await siparisDurumu(kapatilacak[i], 'toplandi', true);
         }
         return true;
+    }
+
+    /*
+     * Kurye alıp gittiyse kayıt yer kaplamasın: sipariş veritabanından
+     * siliniyor, kapananlar listesinde de görünmüyor. "El değiştiriliyor"
+     * silinmiyor; kurye henüz depoda olabiliyor, o aşamada sipariş
+     * kapananlarda dursun ki bakılabilsin. Yolda/ulaştı/teslim/iptal ise
+     * iş bitmiş demektir.
+     *
+     * Eskiyen kayıtlar da gidiyor: panelden düşmüş, bir daha güncellenmeyecek
+     * ve kimsenin işine yaramayan satırlar.
+     *
+     * `order_items` foreign key'de ON DELETE CASCADE; ürün satırları
+     * siparişle birlikte gidiyor, ayrı silme gerekmiyor.
+     */
+    var GIDEN_KOLON = /(yolda|ulast|teslim|iptal|tamamlan)/;
+    var SILME_ESKIME_MS = 24 * 60 * 60 * 1000;
+
+    function gitmisMi(s) {
+        if (GIDEN_KOLON.test(kolonAdi(s))) return true;
+        var t = s.sepet_zamani || s.created_at;
+        if (!t) return false;
+        var ms = Date.now() - new Date(t).getTime();
+        return isFinite(ms) && ms > SILME_ESKIME_MS;
+    }
+
+    async function gidenleriSil(liste) {
+        var d = db();
+        if (!d) return [];
+        var silinecek = liste.filter(gitmisMi);
+        if (!silinecek.length) return [];
+
+        var silinen = [];
+        for (var i = 0; i < silinecek.length; i++) {
+            var sonuc = await d.from('orders').delete().eq('id', silinecek[i].id);
+            if (!sonuc.error) silinen.push(silinecek[i].id);
+        }
+        return silinen;
     }
 
     function bandaGore(s) {
@@ -1260,9 +1307,17 @@
 
     var KAPANAN_SINIRI = 30;
 
+    /* En yeni kapanan başta. Panelden düşen sipariş silindiği için burada
+       yalnız elle kapatılanlar ve henüz silinmemiş olanlar kalıyor. */
     function kapananlar() {
         return durum.siparisler
             .filter(function (s) { return bandaGore(s) === 'bitti'; })
+            .slice()
+            .sort(function (a, b) {
+                var ta = new Date(a.sepet_zamani || a.created_at || 0).getTime() || 0;
+                var tb = new Date(b.sepet_zamani || b.created_at || 0).getTime() || 0;
+                return tb - ta;
+            })
             .slice(0, KAPANAN_SINIRI);
     }
 
@@ -1275,28 +1330,37 @@
         var liste = kapananlar();
         if (!liste.length) {
             el('kapananListe').innerHTML =
-                '<p class="sip-kapanan__bos">Bugün kapanan sipariş yok.</p>';
+                '<p class="sip-kapanan__bos">Kapanan sipariş yok.</p>';
             return;
         }
         el('kapananListe').innerHTML = liste.map(function (s) {
             var urunler = s.urunler || [];
             var kimlik = siparisKimligi(s);
             var panelBitti = panelBitirmisMi(s);
-            var neden = panelBitti ? 'Panelde teslim akışına geçti'
-                : (eskimisMi(s) ? 'Eskidi, panelde yok' : 'Elle toplandı denildi');
+            var eskidi = eskimisMi(s);
+            var neden = panelBitti ? 'Panelde teslime geçti'
+                : (eskidi ? 'Eskidi, panelde yok' : 'Elle kapatıldı');
+            var zaman = s.sepet_zamani || s.created_at;
+            /* Aynı banko gün içinde birden çok siparişe verilebiliyor;
+               saat olmadan hangisi olduğu ayırt edilemiyordu. */
+            var saat = zaman ? saatYaz(new Date(zaman).getTime()) : '';
+
             return '<div class="sip-kapanan__oge">' +
                 '<span class="sip-kapanan__banko' + (kimlik.bankoVar ? '' : ' yok') + '">' +
                     kacir(kimlik.deger) + '</span>' +
-                '<span class="sip-kapanan__bilgi">' +
-                    '<strong>' + (kimlik.bankoVar ? 'Banko ' + kacir(kimlik.deger) : 'Bankosuz') + '</strong>' +
+                '<div class="sip-kapanan__bilgi">' +
+                    '<strong>' + (kimlik.bankoVar ? 'Banko ' + kacir(kimlik.deger) : 'Bankosuz') +
+                        (saat ? '<span>' + saat + '</span>' : '') + '</strong>' +
                     '<small>' + urunler.length + ' çeşit · ' + kacir(neden) + '</small>' +
-                '</span>' +
-                '<button type="button" class="sip-kapanan__ac" data-kapanan-ac="' + kacir(s.id) + '">İçeriği aç</button>' +
-                /* Geri açma yalnız elle kapatılanlara. Panelde teslime geçmiş
-                   ya da eskimiş siparişi geri açmak yalan olurdu: bir sonraki
-                   yoklamada yine kapanır. */
-                (panelBitti || eskimisMi(s) ? '' :
-                    '<button type="button" class="sip-kapanan__geri" data-kapanan-geri="' + kacir(s.id) + '">Geri aç</button>') +
+                '</div>' +
+                '<div class="sip-kapanan__eylem">' +
+                    '<button type="button" class="sip-kapanan__ac" data-kapanan-ac="' + kacir(s.id) + '">Aç</button>' +
+                    /* Geri açma yalnız elle kapatılanlara. Panelde teslime
+                       geçmiş ya da eskimiş siparişi geri açmak yalan olurdu:
+                       bir sonraki yoklamada yine kapanır. */
+                    (panelBitti || eskidi ? '' :
+                        '<button type="button" class="sip-kapanan__geri" data-kapanan-geri="' + kacir(s.id) + '">Geri aç</button>') +
+                '</div>' +
             '</div>';
         }).join('');
     }

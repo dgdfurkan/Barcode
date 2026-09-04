@@ -185,10 +185,50 @@ async function satirlariYaz(yetki, siparisUuid, urunler) {
  *
  * Kaydı olmayan sipariş için PATCH hiçbir satır bulmuyor, zararsız.
  */
+/* Kurye alıp gittiyse kayıt yer kaplamasın. "El değiştiriliyor" değil:
+   kurye o aşamada hâlâ depoda olabiliyor, sipariş kapananlarda dursun.
+   `order_items` foreign key'de ON DELETE CASCADE, ürün satırları
+   siparişle birlikte gidiyor. */
+const GIDEN_KOLON = /(yolda|ulast|ulaşt|teslim|iptal|tamamlan)/i;
+
+function gitmisMi(s) {
+    return GIDEN_KOLON.test(String(s && s.kolon || '')
+        .toLocaleLowerCase('tr')
+        .replace(/ş/g, 's').replace(/ı/g, 'i'));
+}
+
+async function siparisSil(yetki, siparisId) {
+    const adres = SIPARIS_API + '/rest/v1/orders' +
+        '?username=eq.' + encodeURIComponent(yetki.username) +
+        '&order_id=eq.' + encodeURIComponent(siparisId);
+    try {
+        const yanit = await fetch(adres, {
+            method: 'DELETE',
+            headers: apiBasliklari(yetki, { 'Prefer': 'return=minimal' })
+        });
+        return yanit.ok;
+    } catch (e) {
+        return false;
+    }
+}
+
 async function kunyeYaz(yetki, liste) {
     for (let i = 0; i < liste.length; i++) {
         const s = liste[i];
         if (!s || !s.siparisId) continue;
+
+        /* Gitmişse güncellemeye gerek yok, siliniyor. İmzası da düşüyor ki
+           aynı sipariş bir daha panelde görünürse yeniden yazılabilsin. */
+        if (gitmisMi(s)) {
+            await siparisSil(yetki, s.siparisId);
+            const imzalar = await imzalariOku();
+            if (imzalar[s.siparisId]) {
+                delete imzalar[s.siparisId];
+                await imzalariYaz(imzalar);
+            }
+            if (i < liste.length - 1) await bekle(SIPARIS_ARA_MS);
+            continue;
+        }
 
         const adres = SIPARIS_API + '/rest/v1/orders' +
             '?username=eq.' + encodeURIComponent(yetki.username) +

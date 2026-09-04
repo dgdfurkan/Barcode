@@ -356,32 +356,51 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     font-variant-numeric: tabular-nums;
 }
 
-/* ---- Kapananlar penceresi ---- */
+/* ---- Kapananlar penceresi ----
+ * Karo + iki satır bilgi + eylemler. Önceden hepsi tek satırda yan yanaydı
+ * ve dar ekranda yazılar birbirinin içine giriyordu; artık eylemler alta
+ * iniyor, metinler kendi satırında duruyor.
+ */
 .sip-kapanan { display: flex; flex-direction: column; gap: 7px; max-height: 52vh; overflow-y: auto; }
 .sip-kapanan__bos { margin: 0; padding: 22px 12px; color: var(--soluk); font-size: 12.5px; text-align: center; }
 .sip-kapanan__oge {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 10px;
-    border: 1px solid var(--cizgi); border-radius: 11px;
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: center;
+    gap: 4px 11px;
+    padding: 10px 11px;
+    border: 1px solid var(--cizgi); border-radius: 12px;
     background: #f8f9fb;
 }
 .sip-kapanan__banko {
-    width: 40px; height: 40px; flex: none;
-    border-radius: 10px;
+    grid-row: span 2;
+    width: 42px; height: 42px;
+    border-radius: 11px;
     display: grid; place-items: center;
     background: var(--yesil-50); color: var(--yesil);
     font-family: var(--baslik-font);
-    font-size: 15px; font-weight: 700;
+    font-size: 16px; font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
 .sip-kapanan__banko.yok { background: #f2f4f7; color: var(--soluk); font-size: 13px; }
-.sip-kapanan__bilgi { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.sip-kapanan__bilgi strong { font-size: 13px; font-weight: 700; color: var(--yazi); }
-.sip-kapanan__bilgi small { margin-top: 2px; color: var(--soluk); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sip-kapanan__bilgi { min-width: 0; }
+.sip-kapanan__bilgi strong {
+    display: flex; align-items: baseline; gap: 7px;
+    font-size: 13.5px; font-weight: 700; color: var(--yazi);
+}
+.sip-kapanan__bilgi strong span {
+    color: var(--soluk); font-size: 11.5px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.sip-kapanan__bilgi small {
+    display: block; margin-top: 2px;
+    color: var(--soluk); font-size: 11.5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sip-kapanan__eylem { grid-column: 2; display: flex; gap: 6px; margin-top: 3px; }
 .sip-kapanan__ac, .sip-kapanan__geri {
-    flex: none;
-    height: 32px; padding: 0 11px;
-    border-radius: 9px;
+    height: 30px; padding: 0 12px;
+    border-radius: 8px;
     font-size: 12px; font-weight: 700;
     transition: 0.16s;
 }
