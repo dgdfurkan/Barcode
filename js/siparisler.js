@@ -637,15 +637,9 @@
        gerisi "+2" rozetine sıkışıyordu; depocu elindeki kodu listede
        göremeyip her seferinde pencereyi açmak zorunda kalıyordu. Üçten
        fazlası satırı şişirdiği için gerisi rozette kalıyor. */
-    var KOD_SINIRI = 3;
-
     function kodCiz(bilgi) {
         if (!bilgi.barkodlar.length) return '<span class="sip-kod sip-kod--yok">barkod yok</span>';
-        var gosterilen = bilgi.barkodlar.slice(0, KOD_SINIRI);
-        var kalan = bilgi.barkodlar.length - gosterilen.length;
-        return gosterilen.map(function (k) {
-            return '<span class="sip-kod">' + kacir(k) + '</span>';
-        }).join('') + (kalan ? '<span class="sip-kod sip-kod--kalan">+' + kalan + '</span>' : '');
+        return '<span class="sip-kod">' + kacir(bilgi.barkodlar[0]) + '</span>';
     }
 
     function urunNotYaz(u) {

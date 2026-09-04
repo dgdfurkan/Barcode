@@ -353,7 +353,8 @@
      * yoksa boş dönüyor ve ekranda baş harfler kalıyor.
      */
     var FOTO_ALANLARI = ['imageURL', 'imageUrl', 'photoURL', 'photoUrl', 'avatarURL',
-                         'avatarUrl', 'avatar', 'picture', 'photo', 'image'];
+                         'avatarUrl', 'avatar', 'picture', 'photo', 'image', 'src',
+                         'profileImageUrl', 'profileImageURL', 'profilePhoto'];
 
     function fotoBul(kisi) {
         if (!kisi || typeof kisi !== 'object') return '';
