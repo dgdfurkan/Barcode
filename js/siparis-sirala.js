@@ -17,6 +17,14 @@
  * O boşsa ürün adındaki anahtar kelimelere düşüyor. Yapay zeka çağrısı yok;
  * karar yerel, anlık ve her seferinde aynı.
  *
+ * İKİ TÜR EŞLEŞME
+ * Kategoriye ürün iki yoldan giriyor:
+ *   1. `urunler` — katalogdan elle seçilmiş ürün adları. Ad birebir
+ *      tutuyorsa kategori kesin; hiçbir anahtar kelime bunu ezemiyor.
+ *   2. `dahil` — anahtar kelime. Tek tek seçmenin anlamsız olduğu geniş
+ *      gruplar için ("ekmek" bütün ekmekleri yakalıyor).
+ * Sıra da bu: önce seçilmiş ürünler, sonra kelimeler.
+ *
  * KURALLAR DIŞARIDAN DEĞİŞEBİLİR
  * `sirala(urunler, { kurallar })` verilirse modülün kendi `KURALLAR` dizisi
  * yerine o kullanılıyor. Siparişler ekranındaki ayarlar bunu kullanıyor:
@@ -130,6 +138,16 @@
             [urun.ad, urun.anaKategori, urun.sinif, urun.altSinif].filter(Boolean).join(' ')
         );
         if (!metin) return null;
+        var ad = sade(urun.ad);
+
+        /* Önce katalogdan seçilmiş ürünler: ad birebir tutuyorsa başka
+           hiçbir şeye bakılmıyor. Kullanıcı o ürünü eliyle seçmiş, anahtar
+           kelime tahminlerinin onu ezmesi yanlış olur. Hariç listesi de
+           burada devreye girmiyor; seçim açık bir karardır. */
+        for (var s = 0; s < liste.length; s++) {
+            var sk = liste[s];
+            if ((sk.urunler || []).some(function (u) { return sade(u) === ad; })) return sk;
+        }
 
         for (var i = 0; i < liste.length; i++) {
             var k = liste[i];

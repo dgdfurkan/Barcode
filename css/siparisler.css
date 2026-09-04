@@ -438,14 +438,6 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-serit--hazir .sip-kart { --vurgu: #6390f8; }
 
 .sip-kart__ust { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
-.sip-kart__ornek {
-    margin-right: auto;
-    padding: 2px 8px;
-    border-radius: 20px;
-    background: var(--sari-50); border: 1px solid var(--sari-cizgi);
-    color: var(--sari);
-    font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
-}
 .sip-kart__sure { color: var(--soluk); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .sip-kart__orta { margin-top: 15px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
@@ -1057,83 +1049,116 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 }
 .sip-kategori-ekle button:hover { background: var(--mavi-koyu); }
 
-/* ---- Örnek veri alanı (geçici test) ---- */
-.sip-ornek { padding-top: 4px; border-top: 1px solid var(--cizgi) !important; }
-.sip-ornek legend { display: flex; align-items: center; gap: 7px; padding-top: 14px; }
-.sip-ornek legend em {
-    padding: 2px 7px;
+/* ---- Kategoriye katalogdan ürün seçme ----
+ * Asıl yol bu: 9.000 küsür ürünlük katalogdan arayıp tıklıyorsun. Anahtar
+ * kelime kutusu "gelişmiş" başlığının altında kapalı duruyor.
+ */
+.sip-kat-kart__sayi {
+    margin-left: auto;
+    padding: 2px 8px;
     border-radius: 20px;
-    background: var(--sari-50); border: 1px solid var(--sari-cizgi);
-    color: var(--sari);
-    font-size: 10px; font-style: normal; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    background: #eff2f6;
+    color: var(--sonuk);
+    font-size: 11px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
-.sip-ornek__not { margin: 0 0 11px; color: var(--soluk); font-size: 12px; line-height: 1.5; }
-.sip-ornek__not b { color: var(--sari); }
-.sip-ornek__satir { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
-.sip-ornek label, .sip-ornek__tam {
-    display: flex; flex-direction: column; gap: 5px;
-    margin: 0 0 8px;
-    color: var(--sonuk); font-size: 11.5px; font-weight: 700;
+.sip-kat-kart__bos { margin: 0 0 8px; color: var(--soluk); font-size: 12px; }
+.sip-kat-cipler { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+.sip-kat-cip {
+    display: inline-flex; align-items: center; gap: 4px;
+    max-width: 100%;
+    padding: 4px 4px 4px 9px;
+    border: 1px solid var(--cizgi); border-radius: 8px;
+    background: #fff;
+    color: var(--yazi);
+    font-size: 11.5px; font-weight: 600;
+    overflow: hidden;
 }
-.sip-ornek__satir label { margin: 0; }
-.sip-ornek input, .sip-ornek select, .sip-ornek textarea {
+.sip-kat-cip button {
+    width: 18px; height: 18px; flex: none;
+    border: 0; border-radius: 5px;
+    display: grid; place-items: center;
+    background: transparent; color: var(--soluk);
+    transition: 0.14s;
+}
+.sip-kat-cip button svg { width: 11px; }
+.sip-kat-cip button:hover { background: #fdecec; color: #d92d20; }
+
+.sip-kat-arama { position: relative; }
+.sip-kat-arama input {
     width: 100%;
-    padding: 9px 11px;
+    padding: 8px 10px;
     border: 1px solid var(--cizgi); border-radius: 9px;
     background: #fff;
     color: var(--yazi);
-    font: 500 13px inherit;
+    font: 500 12.5px inherit;
     transition: 0.16s;
 }
-.sip-ornek textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
-.sip-ornek input:focus, .sip-ornek select:focus, .sip-ornek textarea:focus {
-    border-color: var(--mavi); outline: none; box-shadow: 0 0 0 3px rgba(21,94,239,0.12);
+.sip-kat-arama input:focus { border-color: var(--mavi); outline: none; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+.sip-kat-arama input::placeholder { color: #b6bdc9; font-weight: 400; }
+.sip-kat-oneri {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px);
+    z-index: 5;
+    max-height: 232px;
+    overflow-y: auto;
+    padding: 4px;
+    border: 1px solid var(--cizgi); border-radius: 11px;
+    background: #fff;
+    box-shadow: var(--golge-o);
 }
-.sip-ornek input::placeholder, .sip-ornek textarea::placeholder { color: #b6bdc9; font-weight: 400; }
-.sip-ornek__dugmeler { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-.sip-ornek__ekle, .sip-ornek__sil {
-    height: 42px;
-    border-radius: 11px;
-    border: 1px solid transparent;
-    font-size: 13px; font-weight: 800;
-    transition: 0.16s;
+.sip-kat-oneri[hidden] { display: none !important; }
+.sip-kat-oneri__oge {
+    width: 100%;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 7px;
+    border: 0; border-radius: 8px;
+    background: transparent;
+    color: var(--yazi);
+    text-align: left;
+    font-size: 12px; font-weight: 600;
+    transition: background 0.14s;
 }
-.sip-ornek__ekle { background: var(--mavi); color: #fff; box-shadow: 0 8px 18px rgba(21,94,239,0.20); }
-.sip-ornek__ekle:hover { background: var(--mavi-koyu); }
-.sip-ornek__sil { padding: 0 14px; background: #fff; border-color: var(--cizgi); color: var(--sonuk); }
-.sip-ornek__sil:hover { border-color: #f1b0b0; color: #d92d20; }
-.sip-ornek__liste { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
-.sip-ornek__liste:empty { display: none; }
-.sip-ornek__kayit {
-    display: flex; align-items: center; gap: 9px;
-    padding: 8px 9px 8px 11px;
-    border: 1px solid var(--cizgi); border-radius: 10px;
-    background: #f8f9fb;
-    font-size: 12.5px; color: var(--sonuk);
+.sip-kat-oneri__oge:hover { background: var(--mavi-50); }
+.sip-kat-oneri__oge img,
+.sip-kat-oneri__bosgorsel {
+    width: 30px; height: 30px; flex: none;
+    border: 1px solid var(--cizgi); border-radius: 7px;
+    background: #fff;
+    object-fit: contain;
 }
-.sip-ornek__kayit strong { color: var(--yazi); font-weight: 700; }
-.sip-ornek__kayit span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sip-ornek__kayit button {
-    width: 28px; height: 28px; flex: none;
-    border: 1px solid var(--cizgi); border-radius: 8px;
-    display: grid; place-items: center;
-    background: #fff; color: var(--soluk);
-    transition: 0.16s;
+.sip-kat-oneri__oge > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sip-kat-oneri__oge em {
+    flex: none;
+    padding: 2px 6px;
+    border-radius: 20px;
+    background: #f1f3f6;
+    color: var(--soluk);
+    font-size: 10px; font-style: normal; font-weight: 700;
 }
-.sip-ornek__kayit button svg { width: 13px; }
-.sip-ornek__kayit button:hover { border-color: #f1b0b0; color: #d92d20; }
+.sip-kat-oneri__oge.dolu > span { color: var(--sonuk); }
+.sip-kat-oneri__bos { margin: 0; padding: 10px; color: var(--soluk); font-size: 12px; text-align: center; }
 
-/* Örnek sipariş kartı ayırt edilsin; gerçek siparişle karışmasın. */
-.sip-kart--ornek { border-style: dashed; }
-.sip-ornek-rozet {
-    position: absolute; right: 0; top: 0;
-    padding: 3px 9px;
-    border-radius: 0 13px 0 10px;
-    background: var(--sari-50);
-    color: var(--sari);
-    font-size: 9.5px; font-weight: 800; letter-spacing: 0.1em;
+.sip-kat-gelismis { margin-top: 9px; }
+.sip-kat-gelismis summary {
+    color: var(--soluk);
+    font-size: 11.5px; font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+    display: flex; align-items: center; gap: 5px;
 }
-.sip-izgara--liste .sip-kart--ornek .sip-kart__sure { right: 62px; }
+.sip-kat-gelismis summary::-webkit-details-marker { display: none; }
+.sip-kat-gelismis summary::before {
+    content: '';
+    width: 0; height: 0;
+    border-left: 4px solid currentColor;
+    border-top: 3.5px solid transparent;
+    border-bottom: 3.5px solid transparent;
+    transition: transform 0.16s;
+}
+.sip-kat-gelismis[open] summary::before { transform: rotate(90deg); }
+.sip-kat-gelismis summary:hover { color: var(--mavi); }
+.sip-kat-gelismis > label { margin-top: 8px; }
 
 /* Görsel büyütme */
 .sip-buyuk { background: rgba(16,24,40,0.82); }
@@ -1182,7 +1207,6 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-ust__yol > a span { display: none; }
     .sip-hesap b { display: none; }
     .sip-sayfa { padding-top: 21px; }
-    .sip-ornek__satir { grid-template-columns: 1fr; }
     .sip-baslik { align-items: center; }
     .sip-baslik__not { display: none; }
     .sip-dugme { width: 42px; padding: 0; }

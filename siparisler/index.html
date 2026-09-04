@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
     <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
-    <link rel="stylesheet" href="../css/siparisler.css?v=20260904f" />
+    <link rel="stylesheet" href="../css/siparisler.css?v=20260904g" />
     <script src="../js/auth-token.js?v=20260828i"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20260828i"></script>
@@ -202,13 +202,6 @@
             <p class="sip-ayar__not">Bu tercihler yalnızca kullandığın cihazda geçerli. Telefonundaki seçim bilgisayarınkini etkilemez.</p>
 
             <fieldset>
-                <legend>Ürün toplama görünümü</legend>
-                <label class="sip-secim"><input type="radio" name="ayarDetayGorunum" value="liste"><span><svg viewBox="0 0 18 18"><path d="M6 4h10M6 9h10M6 14h10"/><circle cx="3" cy="4" r=".8"/><circle cx="3" cy="9" r=".8"/><circle cx="3" cy="14" r=".8"/></svg>Liste</span></label>
-                <label class="sip-secim"><input type="radio" name="ayarDetayGorunum" value="ikili"><span><svg viewBox="0 0 18 18"><rect x="2" y="2" width="6" height="6" rx="1"/><rect x="10" y="2" width="6" height="6" rx="1"/><rect x="2" y="10" width="6" height="6" rx="1"/><rect x="10" y="10" width="6" height="6" rx="1"/></svg>İkili</span></label>
-                <label class="sip-secim"><input type="radio" name="ayarDetayGorunum" value="uclu"><span><svg viewBox="0 0 18 18"><path d="M2 2h3v6H2zM7.5 2h3v6h-3zM13 2h3v6h-3zM2 10h3v6H2zM7.5 10h3v6h-3zM13 10h3v6h-3z"/></svg>Üçlü</span></label>
-            </fieldset>
-
-            <fieldset>
                 <legend>Toplama sırası</legend>
                 <div class="sip-sira" id="ayarSira"></div>
             </fieldset>
@@ -223,7 +216,7 @@
             -->
             <fieldset>
                 <legend>Kategoriler</legend>
-                <p class="sip-ayar__not">Ürün adında hangi kelime geçerse hangi kategoriye gireceğini belirle. Kelimeleri virgülle ayır.</p>
+                <p class="sip-ayar__not">Katalogdan ürün arayıp kategoriye ekle. Tek tek seçmenin uzun süreceği geniş gruplar için "anahtar kelimeler" bölümü var.</p>
                 <div class="sip-kategoriler" id="ayarKategoriler"></div>
                 <div class="sip-kategori-ekle">
                     <input type="text" id="kategoriAdi" placeholder="Yeni kategori adı, örn. Temizlik" maxlength="24">
@@ -232,38 +225,6 @@
                 </div>
             </fieldset>
 
-            <!--
-              Geçici test alanı. Örnek sipariş yalnız bu cihazın deposunda
-              duruyor, sunucuya hiçbir şey yazılmıyor; işaretlemeleri de
-              yerelde kalıyor. Deneme bitince bu bölüm kaldırılacak.
-            -->
-            <fieldset class="sip-ornek">
-                <legend>Örnek sipariş <em>test</em></legend>
-                <p class="sip-ornek__not">Sunucuya yazılmaz, yalnız bu cihazda görünür. Listede <b>ÖRNEK</b> rozetiyle çıkar.</p>
-                <div class="sip-ornek__satir">
-                    <label>Banko<input type="text" id="ornekBanko" placeholder="6" maxlength="8"></label>
-                    <label>Poşet<input type="number" id="ornekPoset" placeholder="1" min="0" max="99"></label>
-                </div>
-                <div class="sip-ornek__satir">
-                    <label>Toplayıcı<input type="text" id="ornekToplayici" placeholder="Ad Soyad" maxlength="40"></label>
-                    <label>Kurye<input type="text" id="ornekKurye" placeholder="Ad Soyad" maxlength="40"></label>
-                </div>
-                <label class="sip-ornek__tam">Kolon
-                    <select id="ornekKolon">
-                        <option value="Hazırlandı">Hazırlandı</option>
-                        <option value="Hazırlanıyor">Hazırlanıyor</option>
-                        <option value="Toplayıcı Bekliyor">Toplayıcı Bekliyor</option>
-                    </select>
-                </label>
-                <label class="sip-ornek__tam">Ürünler
-                    <textarea id="ornekUrunler" rows="6" placeholder="Her satıra bir ürün:&#10;Eti Canga (45 g) x3&#10;Erikli Doğal Kaynak Suyu (5 L) x2&#10;Domates x 1,35 kg"></textarea>
-                </label>
-                <div class="sip-ornek__dugmeler">
-                    <button type="button" class="sip-ornek__ekle" id="ornekEkle">Örnek siparişi ekle</button>
-                    <button type="button" class="sip-ornek__sil" id="ornekSil">Hepsini sil</button>
-                </div>
-                <div class="sip-ornek__liste" id="ornekListe"></div>
-            </fieldset>
         </div>
     </div>
 
@@ -278,8 +239,8 @@
 
     <div class="sip-bildirim" id="siparisBildirim" role="status" aria-live="polite"><svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-9"/></svg><span></span></div>
 
-    <script src="../js/siparis-sirala.js?v=20260904a"></script>
-    <script src="../js/siparisler.js?v=20260904f"></script>
+    <script src="../js/siparis-sirala.js?v=20260904b"></script>
+    <script src="../js/siparisler.js?v=20260904g"></script>
     <script>
         // Başlıktaki kullanıcı adı; diğer sayfalarla aynı davranış.
         (function () {
