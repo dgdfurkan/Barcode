@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
     <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
-    <link rel="stylesheet" href="../css/siparisler.css?v=20260904e" />
+    <link rel="stylesheet" href="../css/siparisler.css?v=20260904f" />
     <script src="../js/auth-token.js?v=20260828i"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20260828i"></script>
@@ -214,15 +214,22 @@
             </fieldset>
 
             <!--
-              Bant renkleri. Fırın/dondurma/su ürünleri hem kart zemininde hem
-              toplama başlıklarında bu renklerle ayırt ediliyor. Hızlı Bul
-              eklentisindeki kategori renk seçimiyle aynı düzen: yerel bir
-              renk girdisi, anında uygulanıyor.
+              Kategoriler. Hangi ürünün fırın, hangisinin dondurma ya da su
+              sayılacağı burada: her kategorinin kendi rengi ve anahtar
+              kelime listesi var, ikisi de düzenlenebiliyor. Kullanıcı
+              tamamen yeni bir kategori de açabiliyor; toplama sırasına
+              otomatik giriyor, oradan yerini değiştirebiliyor. Renk girdisi
+              Hızlı Bul eklentisindeki kategori renk seçimiyle aynı düzen.
             -->
             <fieldset>
-                <legend>Bant renkleri</legend>
-                <div class="sip-renkler" id="ayarRenkler"></div>
-                <button type="button" class="sip-renk-sifirla" id="ayarRenkSifirla">Varsayılana dön</button>
+                <legend>Kategoriler</legend>
+                <p class="sip-ayar__not">Ürün adında hangi kelime geçerse hangi kategoriye gireceğini belirle. Kelimeleri virgülle ayır.</p>
+                <div class="sip-kategoriler" id="ayarKategoriler"></div>
+                <div class="sip-kategori-ekle">
+                    <input type="text" id="kategoriAdi" placeholder="Yeni kategori adı, örn. Temizlik" maxlength="24">
+                    <input type="color" id="kategoriRenk" value="#16a34a" aria-label="Yeni kategori rengi">
+                    <button type="button" id="kategoriEkle">Ekle</button>
+                </div>
             </fieldset>
 
             <!--
@@ -271,8 +278,8 @@
 
     <div class="sip-bildirim" id="siparisBildirim" role="status" aria-live="polite"><svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-9"/></svg><span></span></div>
 
-    <script src="../js/siparis-sirala.js?v=20260903e"></script>
-    <script src="../js/siparisler.js?v=20260904e"></script>
+    <script src="../js/siparis-sirala.js?v=20260904a"></script>
+    <script src="../js/siparisler.js?v=20260904f"></script>
     <script>
         // Başlıktaki kullanıcı adı; diğer sayfalarla aynı davranış.
         (function () {

@@ -17,6 +17,20 @@
  * O boşsa ürün adındaki anahtar kelimelere düşüyor. Yapay zeka çağrısı yok;
  * karar yerel, anlık ve her seferinde aynı.
  *
+ * KURALLAR DIŞARIDAN DEĞİŞEBİLİR
+ * `sirala(urunler, { kurallar })` verilirse modülün kendi `KURALLAR` dizisi
+ * yerine o kullanılıyor. Siparişler ekranındaki ayarlar bunu kullanıyor:
+ * kullanıcı fırın/dondurma/su anahtar kelimelerini düzenleyebiliyor, hatta
+ * tamamen yeni bir bant ekleyebiliyor. Modülün kendi `KURALLAR`'ı yalnız
+ * varsayılan; hiçbir zaman dışarıdan değiştirilmiyor.
+ *
+ * KISA KELİME TUZAĞI
+ * "su" tek kelime olarak arandığında "süper", "suşi" gibi kelimelerin içine
+ * de giriyordu. İki harf ve altındaki anahtar kelimeler otomatik olarak tam
+ * kelime eşleşmesine geçiyor; üç ve üstü harfli anahtar kelimeler metnin
+ * herhangi bir yerinde geçebiliyor. Bu davranış hem yerleşik hem kullanıcının
+ * eklediği kategoriler için aynı.
+ *
  * ETİKET AYRI TUTULUYOR
  * Kümenin anahtarı sadeleştirilmiş ("firin"), ekranda görünen etiket düzgün
  * Türkçe ("Fırın"). Eskiden anahtar doğrudan basılıyordu ve ekranda "FİRİN",
@@ -36,7 +50,7 @@
         return String(metin == null ? '' : metin)
             .toLocaleLowerCase('tr')
             .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[̀-ͯ]/g, '')
             .replace(/[ığüşöçâîû]/g, function (m) { return HARF[m] || m; })
             .replace(/[^a-z0-9]+/g, ' ')
             .replace(/\s+/g, ' ')
@@ -45,11 +59,14 @@
 
     /* Anahtar kelimeler Hızlı Bul'daki varsayılan kategorilerden büyütüldü.
        `haric` listesi yanlış yakalamayı kesiyor: "erikli cam şişe" su değil,
-       "dondurma külahı" dondurma değil. */
+       "dondurma külahı" dondurma değil. Bunlar depodaki VARSAYILAN kurallar;
+       kullanıcının ayarlardan yaptığı değişiklikler burayı değiştirmiyor,
+       yalnız `sirala()`'ya ayrıca `kurallar` olarak veriliyor. */
     var KURALLAR = [
         {
             kume: 'firin',
             etiket: 'Fırın',
+            renk: '#d97706',
             dahil: ['ekmek', 'baget', 'simit', 'poğaça', 'pogaca', 'börek', 'borek',
                     'kruvasan', 'la lorraine', 'firin', 'fırın', 'donut', 'berliner',
                     'sandvic', 'sandviç', 'tost'],
@@ -58,6 +75,7 @@
         {
             kume: 'dondurma',
             etiket: 'Dondurma',
+            renk: '#7c3aed',
             dahil: ['dondurma', 'dondurulmus', 'donuk', 'cornetto', 'magnum', 'algida',
                     'carte d or', 'golf', 'buz kupu', 'buz küpü', 'frigo', 'feast',
                     'mochiko', 'superfresh', 'pizza donuk', 'dondurmali'],
@@ -66,12 +84,12 @@
         {
             kume: 'su',
             etiket: 'Su',
-            /* "su" parça olarak aranırsa "süper", "suşi", "sunta" hepsi su
-               oluyordu; cips "Süper Boy" yüzünden su bandına düşüyordu.
-               Kısa kelimeler artık tam kelime olarak aranıyor. */
-            tamKelime: ['su', 'sular'],
-            dahil: ['dogal kaynak suyu', 'mineralli su', 'maden suyu', 'kaynak suyu',
-                    'erikli', 'hayat su', 'kuzeyden', 'damla su', 'sırma', 'sirma'],
+            renk: '#0284c7',
+            /* Bare "su" iki harfli; aşağıdaki otomatik kural onu tam kelime
+               yapıyor, "süper"in içine girmiyor. */
+            dahil: ['su', 'sular', 'dogal kaynak suyu', 'mineralli su', 'maden suyu',
+                    'kaynak suyu', 'erikli', 'hayat su', 'kuzeyden', 'damla su',
+                    'sırma', 'sirma'],
             haric: ['sut', 'süt', 'suyu konsantre', 'meyve suyu', 'sebze suyu',
                     'cam sise', 'cam şişe', 'susam', 'sucuk']
         }
@@ -88,27 +106,35 @@
         orta: 'Diğer ürünler'
     };
 
-    function gecerMi(metin, kelime) {
-        return metin.indexOf(sade(kelime)) !== -1;
+    var BANT_RENK_VARSAYILAN = { firin: '#d97706', dondurma: '#7c3aed', su: '#0284c7', orta: '#98a2b3' };
+
+    /* Kısa anahtar kelime tam kelime, uzun anahtar kelime metnin herhangi
+       bir yerinde aranıyor. Eşik iki harf: "su" tam kelimeye düşüyor,
+       "sut" (üç harf) yine substring kalıyor, davranışı değişmiyor. */
+    function kelimeGecerMi(metin, kelimeHam) {
+        var kelime = sade(kelimeHam);
+        if (!kelime) return false;
+        if (kelime.length <= 2) {
+            return (' ' + metin + ' ').indexOf(' ' + kelime + ' ') !== -1;
+        }
+        return metin.indexOf(kelime) !== -1;
     }
 
-    /* Tam kelime araması. `metin` sade() çıktısı olduğu için sözcükler tek
-       boşlukla ayrılıyor; başına ve sonuna boşluk koyup arıyoruz. */
-    function tamGecerMi(metin, kelime) {
-        return (' ' + metin + ' ').indexOf(' ' + sade(kelime) + ' ') !== -1;
-    }
-
-    function kuralBul(urun) {
+    /**
+     * @param {Object} urun
+     * @param {Array}  [kurallar]  Verilmezse modülün varsayılan KURALLAR'ı.
+     */
+    function kuralBul(urun, kurallar) {
+        var liste = (Array.isArray(kurallar) && kurallar.length) ? kurallar : KURALLAR;
         var metin = sade(
             [urun.ad, urun.anaKategori, urun.sinif, urun.altSinif].filter(Boolean).join(' ')
         );
         if (!metin) return null;
 
-        for (var i = 0; i < KURALLAR.length; i++) {
-            var k = KURALLAR[i];
-            if ((k.haric || []).some(function (h) { return gecerMi(metin, h); })) continue;
-            if ((k.tamKelime || []).some(function (t) { return tamGecerMi(metin, t); })) return k;
-            if (k.dahil.some(function (d) { return gecerMi(metin, d); })) return k;
+        for (var i = 0; i < liste.length; i++) {
+            var k = liste[i];
+            if ((k.haric || []).some(function (h) { return kelimeGecerMi(metin, h); })) continue;
+            if ((k.dahil || []).some(function (d) { return kelimeGecerMi(metin, d); })) return k;
         }
         return null;
     }
@@ -127,33 +153,65 @@
         return { kume: ad ? ad.split(' ')[0] : 'diger', etiket: '' };
     }
 
-    function siraOku(ayar) {
-        var istenen = (ayar && Array.isArray(ayar.sira)) ? ayar.sira : VARSAYILAN_SIRA;
+    /**
+     * Sıra belirtilmediğinde kullanılacak taban: fırın, dondurma, orta, su
+     * (su hep en sonda). Kullanıcının eklediği kategoriler bu tabanda yok;
+     * su'dan hemen önce ekleniyor ki "su en sonda" alışkanlığı bozulmasın.
+     * Kullanıcı isterse ayarlardaki oklarla yeniden sıralayabiliyor.
+     */
+    function varsayilanSiraHesapla(kurallar) {
+        var taban = VARSAYILAN_SIRA.slice();
+        var eldeki = {};
+        taban.forEach(function (k) { eldeki[k] = true; });
+        var suIndex = taban.indexOf('su');
+        if (suIndex === -1) suIndex = taban.length;
+        kurallar.forEach(function (k) {
+            if (!eldeki[k.kume]) {
+                taban.splice(suIndex, 0, k.kume);
+                suIndex++;
+                eldeki[k.kume] = true;
+            }
+        });
+        return taban;
+    }
+
+    function siraOku(ayar, varsayilanSira, gecerli) {
+        var istenen = (ayar && Array.isArray(ayar.sira)) ? ayar.sira : varsayilanSira;
         var temiz = [];
         istenen.forEach(function (k) {
-            if (BANT_ETIKET[k] && temiz.indexOf(k) === -1) temiz.push(k);
+            if (gecerli[k] && temiz.indexOf(k) === -1) temiz.push(k);
         });
         // Eksik kalan bant sona ekleniyor; ayar bozuksa da liste tam olsun.
-        VARSAYILAN_SIRA.forEach(function (k) { if (temiz.indexOf(k) === -1) temiz.push(k); });
+        varsayilanSira.forEach(function (k) { if (temiz.indexOf(k) === -1) temiz.push(k); });
         return temiz;
     }
 
     /**
      * Ürünleri toplama sırasına dizer.
      *
-     * @param {Array}  urunler  {sira, ad, anaKategori, sinif, altSinif, ...}
-     * @param {Object} [ayar]   { sira: ['firin','dondurma','orta','su'] }
+     * @param {Array}  urunler   {sira, ad, anaKategori, sinif, altSinif, ...}
+     * @param {Object} [ayar]
+     * @param {Array}  [ayar.sira]      Bant sırası, örn. ['firin','dondurma','orta','su']
+     * @param {Array}  [ayar.kurallar]  Kullanıcının kendi kategori kuralları.
+     *                                  Verilmezse modülün varsayılan KURALLAR'ı.
      * @returns {Array} yeni dizi. Eklenen alanlar:
      *                  toplamaSirasi   1'den başlayan sıra
      *                  toplamaKumesi   gruplama anahtarı
      *                  toplamaEtiketi  ekranda görünecek Türkçe ad ('' olabilir)
-     *                  toplamaBandi    'firin' | 'dondurma' | 'su' | 'orta'
+     *                  toplamaBandi    bant anahtarı ('firin' | 'su' | ... | 'orta')
      *                  Girdi dizisi değiştirilmez.
      */
     function sirala(urunler, ayar) {
         if (!Array.isArray(urunler) || !urunler.length) return [];
 
-        var sira = siraOku(ayar);
+        var kurallar = (ayar && Array.isArray(ayar.kurallar) && ayar.kurallar.length) ? ayar.kurallar : KURALLAR;
+        var etiketler = {};
+        var gecerliBantlar = { orta: true };
+        kurallar.forEach(function (k) { etiketler[k.kume] = k.etiket; gecerliBantlar[k.kume] = true; });
+        etiketler.orta = BANT_ETIKET.orta;
+
+        var varsayilanSira = varsayilanSiraHesapla(kurallar);
+        var sira = siraOku(ayar, varsayilanSira, gecerliBantlar);
         var bantNo = {};
         sira.forEach(function (k, i) { bantNo[k] = i; });
 
@@ -163,7 +221,7 @@
         var kumeSirasi = new Map();
 
         var isaretli = urunler.map(function (u, i) {
-            var kural = kuralBul(u);
+            var kural = kuralBul(u, kurallar);
             var orta = kural ? null : ortaKume(u);
             var bant = kural ? kural.kume : 'orta';
             var kume = kural ? kural.kume : orta.kume;
@@ -196,8 +254,10 @@
     global.JBSiparisSirala = {
         sirala: sirala,
         kuralBul: kuralBul,
+        sade: sade,
         VARSAYILAN_SIRA: VARSAYILAN_SIRA,
         BANT_ETIKET: BANT_ETIKET,
+        BANT_RENK_VARSAYILAN: BANT_RENK_VARSAYILAN,
         KURALLAR: KURALLAR
     };
 })(typeof window !== 'undefined' ? window : globalThis);

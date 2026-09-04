@@ -26,9 +26,13 @@
  * (solda ürünler, sağda künye), sabit alt çubuk, barkod ve ayar pencereleri,
  * bildirim.
  *
- * BANT RENKLERİ
- * Fırın/dondurma/su rengi ayarlardan değişebiliyor. Kart zemini o renklerin
- * soluk karışımından hesaplanıyor (sipariş hangi kategoriden ağırlıklıysa).
+ * KATEGORİLER
+ * Fırın/dondurma/su hangi ürünleri kapsayacağı (anahtar kelime + renk)
+ * ayarlardan değişebiliyor; kullanıcı yepyeni bir kategori de açabiliyor.
+ * Sınıflandırmayı gerçekten yapan `js/siparis-sirala.js`, burası yalnız
+ * kullanıcının ayarını o modülün beklediği biçime çeviriyor. Kart zemini
+ * kategori renklerinin soluk karışımından hesaplanıyor (sipariş hangi
+ * kategoriden ağırlıklıysa).
  * ============================================================================
  */
 (function (global) {
@@ -40,7 +44,7 @@
         secili: null,
         detayGorunum: 'liste',
         bantSirasi: null,
-        bantRenkleri: null,
+        kategoriler: null,
         kodUrun: null,
         yukleniyor: true,
         sonImza: '',
@@ -158,7 +162,7 @@
                 sepet_zamani: o.olusturma,
                 created_at: o.olusturma,
                 urunler: (global.JBSiparisSirala && global.JBSiparisSirala.sirala)
-                    ? global.JBSiparisSirala.sirala(ham, { sira: durum.bantSirasi })
+                    ? global.JBSiparisSirala.sirala(ham, { sira: durum.bantSirasi, kurallar: kategoriKurallari() })
                     : ham
             };
         });
@@ -364,7 +368,7 @@
                 };
             });
             s.urunler = (global.JBSiparisSirala && global.JBSiparisSirala.sirala)
-                ? global.JBSiparisSirala.sirala(ham, { sira: durum.bantSirasi })
+                ? global.JBSiparisSirala.sirala(ham, { sira: durum.bantSirasi, kurallar: kategoriKurallari() })
                 : ham;
         });
 
@@ -577,17 +581,32 @@
         return (p[0][0] + p[p.length - 1][0]).toLocaleUpperCase('tr');
     }
 
-    /* Fırın sarı, dondurma mor, su mavi: varsayılan. Ayarlardan değişirse
-       durum.bantRenkleri bunun üstüne geçiyor. "Diğer ürünler" bandının
-       belirli bir kategorisi yok, sabit gri kalıyor. */
-    var BANT_RENK_VARSAYILAN = { firin: '#d97706', dondurma: '#7c3aed', su: '#0284c7' };
-    var BANT_RENK_ETIKET = { firin: 'Fırın', dondurma: 'Dondurma', su: 'Su' };
-    var BANT_RENK_SIRA = ['firin', 'dondurma', 'su'];
+    /* Kategori tanımları: hangi kelime hangi bandı tetikliyor, rengi ne.
+       Yerleşik üçü (fırın/dondurma/su) `siparis-sirala.js`in varsayılanından
+       geliyor; kullanıcı ayarlardan hem bunların kelimelerini değiştirebiliyor
+       hem yepyeni bir kategori açabiliyor. "Diğer ürünler" bandının belirli
+       bir kategorisi yok, sabit gri kalıyor. */
+    function kategoriBul(bant) {
+        return (durum.kategoriler || []).filter(function (k) { return k.kume === bant; })[0] || null;
+    }
 
     function bantRengi(bant) {
         if (!bant || bant === 'orta') return '#98a2b3';
-        var ozel = durum.bantRenkleri && durum.bantRenkleri[bant];
-        return ozel || BANT_RENK_VARSAYILAN[bant] || '#98a2b3';
+        var k = kategoriBul(bant);
+        return (k && k.renk) || '#98a2b3';
+    }
+
+    function bantEtiket(bant) {
+        if (!bant || bant === 'orta') return 'Diğer ürünler';
+        var k = kategoriBul(bant);
+        return (k && k.etiket) || bant;
+    }
+
+    /** `siparis-sirala.js`e verilecek biçim: yalnız sınıflandırmada gereken alanlar. */
+    function kategoriKurallari() {
+        return (durum.kategoriler || []).map(function (k) {
+            return { kume: k.kume, etiket: k.etiket, dahil: k.dahil, haric: k.haric };
+        });
     }
 
     /** Siparişin bant dağılımı: [{bant, sayi}] çoktan aza. */
@@ -751,14 +770,13 @@
      * bantların başlıkları tepede üst üste yığılırdı.
      */
     function bantlaraAyir(urunler) {
-        var etiketler = (global.JBSiparisSirala && global.JBSiparisSirala.BANT_ETIKET) || {};
         var sayac = 0;
         return bantlariTopla(urunler).map(function (g) {
             var alinan = g.urunler.filter(function (u) { return u.alindi; }).length;
             return '<section class="sip-bolum">' +
                 '<div class="sip-bant' + (alinan === g.urunler.length ? ' sip-bant--bitti' : '') +
                 '" style="--bant:' + bantRengi(g.bant) + '">' +
-                    '<i></i><b>' + kacir(etiketler[g.bant] || 'Ürünler') + '</b><s></s>' +
+                    '<i></i><b>' + kacir(bantEtiket(g.bant)) + '</b><s></s>' +
                     '<span>' + alinan + '/' + g.urunler.length + '</span>' +
                 '</div>' +
                 g.urunler.map(function (u) { sayac++; return urunCiz(u, sayac); }).join('') +
@@ -1031,11 +1049,10 @@
     // ---- Ayarlar ----
 
     function siraCiz() {
-        var etiketler = (global.JBSiparisSirala && global.JBSiparisSirala.BANT_ETIKET) || {};
         el('ayarSira').innerHTML = durum.bantSirasi.map(function (k, i) {
             return '<div class="sip-sira__oge">' +
                 '<span class="sip-sira__no">' + (i + 1) + '</span>' +
-                '<span class="sip-sira__ad">' + kacir(etiketler[k] || k) + '</span>' +
+                '<span class="sip-sira__ad">' + kacir(bantEtiket(k)) + '</span>' +
                 '<button type="button" data-bant="' + k + '" data-tasi="-1" aria-label="Yukarı"' +
                     (i === 0 ? ' disabled' : '') + '>' +
                     '<svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></button>' +
@@ -1046,29 +1063,175 @@
         }).join('');
     }
 
-    /* Fırın/dondurma/su rengi. Hızlı Bul eklentisindeki kategori renk
-       satırıyla aynı düzen: yerel renk girdisi, değişince anında
-       uygulanıyor. */
-    function renklerCiz() {
-        el('ayarRenkler').innerHTML = BANT_RENK_SIRA.map(function (b) {
-            var renk = bantRengi(b);
-            return '<div class="sip-renk-satiri" style="--renk:' + renk + '">' +
-                '<i></i>' +
-                '<label for="sip-renk-' + b + '">' + BANT_RENK_ETIKET[b] + '</label>' +
-                '<input type="color" id="sip-renk-' + b + '" data-bant-renk="' + b + '" value="' + renk + '">' +
+    // ==================================================================
+    // Kategoriler: hangi ürün hangi banda giriyor
+    //
+    // Yerleşik üçü (fırın/dondurma/su) `siparis-sirala.js`in varsayılanından
+    // geliyor; kullanıcı bunların kelimelerini ve rengini değiştirebiliyor,
+    // ayrıca tamamen yeni kategori açabiliyor. Hepsi cihaza özel, sunucuya
+    // yazılmıyor. Renk girdisi Hızlı Bul eklentisindeki kategori renk
+    // satırıyla aynı düzen.
+    // ==================================================================
+
+    function kelimeleriOku(metin) {
+        return String(metin || '').split(',')
+            .map(function (k) { return k.trim(); })
+            .filter(Boolean);
+    }
+
+    function kelimeleriYaz(dizi) {
+        return (dizi || []).join(', ');
+    }
+
+    /**
+     * Ayarlarda saklanan ham veriyi doğrulayıp kullanılabilir kategori
+     * dizisine çevirir. Kayıt yoksa ya da tamamen bozuksa `siparis-sirala`
+     * modülünün varsayılanına dönülüyor.
+     */
+    function kategorileriYukle(ayar) {
+        var varsayilan = (global.JBSiparisSirala && global.JBSiparisSirala.KURALLAR) || [];
+        var kayitli = ayar && Array.isArray(ayar.kategoriler) ? ayar.kategoriler : null;
+
+        if (!kayitli || !kayitli.length) {
+            return varsayilan.map(function (k) {
+                return {
+                    kume: k.kume, etiket: k.etiket, renk: k.renk || '#98a2b3',
+                    dahil: (k.dahil || []).slice(), haric: (k.haric || []).slice(), yerlesik: true
+                };
+            });
+        }
+
+        var temiz = kayitli.filter(function (k) {
+            return k && typeof k.kume === 'string' && k.kume && typeof k.etiket === 'string' && k.etiket;
+        }).map(function (k) {
+            return {
+                kume: k.kume,
+                etiket: k.etiket,
+                renk: (typeof k.renk === 'string' && /^#[0-9a-f]{6}$/i.test(k.renk)) ? k.renk : '#98a2b3',
+                dahil: Array.isArray(k.dahil) ? k.dahil.filter(function (x) { return typeof x === 'string' && x; }) : [],
+                haric: Array.isArray(k.haric) ? k.haric.filter(function (x) { return typeof x === 'string' && x; }) : [],
+                yerlesik: !!k.yerlesik
+            };
+        });
+        return temiz.length ? temiz : kategorileriYukle({});
+    }
+
+    /* Bant sırası ile kategori listesi birbirinden kopmasın: silinen
+       kategorinin kalıntısı sırada kalmasın, yeni eklenen kategori sıraya
+       düşmemiş olmasın. Her açılışta ve her değişiklikte çalışıyor. */
+    function bantSirasiOnar() {
+        var gecerli = { orta: true };
+        (durum.kategoriler || []).forEach(function (k) { gecerli[k.kume] = true; });
+        durum.bantSirasi = (durum.bantSirasi || []).filter(function (k) { return gecerli[k]; });
+
+        var suIndex = durum.bantSirasi.indexOf('su');
+        (durum.kategoriler || []).forEach(function (k) {
+            if (durum.bantSirasi.indexOf(k.kume) !== -1) return;
+            var yer = suIndex === -1 ? durum.bantSirasi.length : suIndex;
+            durum.bantSirasi.splice(yer, 0, k.kume);
+            if (suIndex !== -1) suIndex++;
+        });
+        if (durum.bantSirasi.indexOf('orta') === -1) durum.bantSirasi.push('orta');
+    }
+
+    function kategoriSlugUret(ad) {
+        var taban = (global.JBSiparisSirala && global.JBSiparisSirala.sade)
+            ? global.JBSiparisSirala.sade(ad).replace(/\s+/g, '-')
+            : String(ad || '').toLocaleLowerCase('tr').replace(/[^a-z0-9]+/g, '-');
+        if (!taban) taban = 'kategori';
+        var mevcut = (durum.kategoriler || []).map(function (k) { return k.kume; }).concat(['orta']);
+        var aday = taban, sayac = 2;
+        while (mevcut.indexOf(aday) !== -1) { aday = taban + '-' + sayac; sayac++; }
+        return aday;
+    }
+
+    /*
+     * Kategori tanımı değişince kaydediliyor, sıra listesi güncelleniyor.
+     * Ekrandaki siparişler yalnız yeniden ÇİZİLMÜYOR, gerçekten yeniden
+     * SINIFLANDIRILIYOR: `tazele(true)` siparişleri güncel kurallarla tekrar
+     * `sirala()`dan geçiriyor. Yalnız ciz() çağırmak yetmezdi; ürünlerin
+     * `toplamaBandi`'ı zaten hesaplanmış haliyle önbellekte kalır, "Temizlik"
+     * kategorisini silince ürün ekranda hâlâ "temizlik" bandında görünürdü.
+     * İmzalar sıfırlanıyor ki kart zemini ve bant başlıkları da tazelensin;
+     * onlar sipariş id'sine göre atlanıyordu, kategori değişince aynı id
+     * için farklı renk/bant çizilmesi gerekiyor.
+     *
+     * Ayarlar penceresindeki kategori kartları burada yeniden ÇİZİLMİYOR:
+     * kullanıcı bir kelime kutusuna yazarken kartı yeniden basmak imleci
+     * kaybettirirdi.
+     */
+    function kategorileriDegisti() {
+        ayarYaz({ kategoriler: durum.kategoriler });
+        bantSirasiOnar();
+        ayarYaz({ bantSirasi: durum.bantSirasi });
+        siraCiz();
+        durum.kartImzasi = { hazirlaniyor: '', hazir: '' };
+        durum.detayImzasi = '';
+        tazele(true);
+    }
+
+    function kategorileriCiz() {
+        el('ayarKategoriler').innerHTML = (durum.kategoriler || []).map(function (k) {
+            var adAlani = k.yerlesik
+                ? '<strong class="sip-kat-kart__ad">' + kacir(k.etiket) + '</strong>'
+                : '<input type="text" class="sip-kat-kart__ad--ozel" data-kategori-ad="' + kacir(k.kume) +
+                  '" value="' + kacir(k.etiket) + '" maxlength="24" aria-label="Kategori adı">';
+            var silDugmesi = k.yerlesik ? '' :
+                '<button type="button" class="sip-kat-kart__sil" data-kategori-sil="' + kacir(k.kume) +
+                '" aria-label="' + kacir(k.etiket) + ' kategorisini sil">' + SIL_IKON + '</button>';
+            return '<div class="sip-kat-kart" data-kume="' + kacir(k.kume) + '">' +
+                '<div class="sip-kat-kart__ust">' +
+                    '<input type="color" data-kategori-renk="' + k.kume + '" value="' + k.renk +
+                    '" aria-label="' + kacir(k.etiket) + ' rengi">' +
+                    adAlani +
+                    silDugmesi +
+                '</div>' +
+                '<label>Bu kategoriye girecek kelimeler' +
+                    '<textarea data-kategori-dahil="' + k.kume + '" rows="2" placeholder="ör. deterjan, çamaşır suyu, bulaşık">' +
+                        kacir(kelimeleriYaz(k.dahil)) +
+                    '</textarea>' +
+                '</label>' +
+                '<label>Hariç tutulacaklar (opsiyonel)' +
+                    '<textarea data-kategori-haric="' + k.kume + '" rows="1" placeholder="yanlış yakalananları buraya yaz">' +
+                        kacir(kelimeleriYaz(k.haric)) +
+                    '</textarea>' +
+                '</label>' +
             '</div>';
         }).join('');
     }
 
-    function bantRenkleriGuncelle(bant, deger) {
-        durum.bantRenkleri = Object.assign({}, durum.bantRenkleri || BANT_RENK_VARSAYILAN);
-        durum.bantRenkleri[bant] = deger;
-        ayarYaz({ bantRenkleri: durum.bantRenkleri });
-        renklerCiz();
-        /* Kart zemini ve bant başlıkları yeni renkle yeniden çizilsin. */
-        durum.kartImzasi = { hazirlaniyor: '', hazir: '' };
-        durum.detayImzasi = '';
-        ciz();
+    function kategoriEkle() {
+        var adGirdi = el('kategoriAdi');
+        var ad = adGirdi.value.trim();
+        if (!ad) { bildir('Önce kategoriye bir ad yaz'); adGirdi.focus(); return; }
+
+        var kume = kategoriSlugUret(ad);
+        var renk = el('kategoriRenk').value || '#16a34a';
+        durum.kategoriler.push({ kume: kume, etiket: ad, renk: renk, dahil: [], haric: [], yerlesik: false });
+        kategorileriDegisti();
+        kategorileriCiz();
+
+        adGirdi.value = '';
+        bildir(ad + ' kategorisi eklendi, şimdi kelimelerini yaz');
+        /* Kullanıcı direkt kelime yazmaya devam etsin; yeni kartın kelime
+           kutusuna odaklanıp göze getiriliyor. */
+        var yeniKutu = document.querySelector('.sip-kat-kart[data-kume="' + kume + '"] [data-kategori-dahil]');
+        if (yeniKutu) {
+            yeniKutu.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            yeniKutu.focus();
+        }
+    }
+
+    function kategoriSil(kume) {
+        var k = kategoriBul(kume);
+        if (!k || k.yerlesik) return;
+        durum.kategoriler = durum.kategoriler.filter(function (x) { return x.kume !== kume; });
+        kategorileriDegisti();
+        kategorileriCiz();
+        if (durum.secili && durum.secili.urunler && durum.secili.urunler.some(function (u) { return u.toplamaBandi === kume; })) {
+            durum.detayImzasi = '';
+        }
+        bildir(k.etiket + ' kategorisi silindi');
     }
 
     var SIL_IKON = '<svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>';
@@ -1111,7 +1274,7 @@
 
     function ayarAc() {
         siraCiz();
-        renklerCiz();
+        kategorileriCiz();
         ornekListeCiz();
         var isaretle = function (ad, deger) {
             var r = document.querySelector('input[name="' + ad + '"][value="' + deger + '"]');
@@ -1226,21 +1389,45 @@
         });
 
         /* Renk girdisi sürüklenirken anında uygulanıyor; "input" olayı
-           "change"den daha erken ve daha sık geliyor. */
-        el('ayarRenkler').addEventListener('input', function (e) {
-            var t = e.target.closest('[data-bant-renk]');
+           "change"den daha erken ve daha sık geliyor. Kelime kutuları ise
+           "change"de kaydediyor: her tuşta yeniden sıralamak yazarken
+           rahatsız ederdi. */
+        el('ayarKategoriler').addEventListener('input', function (e) {
+            var t = e.target.closest('[data-kategori-renk]');
             if (!t) return;
-            bantRenkleriGuncelle(t.getAttribute('data-bant-renk'), t.value);
+            var k = kategoriBul(t.getAttribute('data-kategori-renk'));
+            if (!k) return;
+            k.renk = t.value;
+            kategorileriDegisti();
         });
-        el('ayarRenkSifirla').addEventListener('click', function () {
-            durum.bantRenkleri = Object.assign({}, BANT_RENK_VARSAYILAN);
-            ayarYaz({ bantRenkleri: durum.bantRenkleri });
-            renklerCiz();
-            durum.kartImzasi = { hazirlaniyor: '', hazir: '' };
-            durum.detayImzasi = '';
-            ciz();
-            bildir('Bant renkleri sıfırlandı');
+        el('ayarKategoriler').addEventListener('change', function (e) {
+            var dahilEl = e.target.closest('[data-kategori-dahil]');
+            if (dahilEl) {
+                var k1 = kategoriBul(dahilEl.getAttribute('data-kategori-dahil'));
+                if (k1) { k1.dahil = kelimeleriOku(dahilEl.value); kategorileriDegisti(); }
+                return;
+            }
+            var haricEl = e.target.closest('[data-kategori-haric]');
+            if (haricEl) {
+                var k2 = kategoriBul(haricEl.getAttribute('data-kategori-haric'));
+                if (k2) { k2.haric = kelimeleriOku(haricEl.value); kategorileriDegisti(); }
+                return;
+            }
+            var adEl = e.target.closest('[data-kategori-ad]');
+            if (adEl) {
+                var k3 = kategoriBul(adEl.getAttribute('data-kategori-ad'));
+                if (!k3) return;
+                var yeniAd = adEl.value.trim();
+                if (!yeniAd) { adEl.value = k3.etiket; return; }
+                k3.etiket = yeniAd;
+                kategorileriDegisti();
+            }
         });
+        el('ayarKategoriler').addEventListener('click', function (e) {
+            var sil = e.target.closest('[data-kategori-sil]');
+            if (sil) kategoriSil(sil.getAttribute('data-kategori-sil'));
+        });
+        el('kategoriEkle').addEventListener('click', kategoriEkle);
 
         el('ornekEkle').addEventListener('click', ornekEkle);
         el('ornekSil').addEventListener('click', function () {
@@ -1326,20 +1513,6 @@
         });
     }
 
-    /** Ayarlardan gelen renkleri doğrular: yalnız #rrggbb kabul edilir. */
-    function bantRenkleriDogrula(ham) {
-        if (!ham || typeof ham !== 'object') return null;
-        var sonuc = {};
-        var buldu = false;
-        BANT_RENK_SIRA.forEach(function (b) {
-            if (typeof ham[b] === 'string' && /^#[0-9a-f]{6}$/i.test(ham[b])) {
-                sonuc[b] = ham[b];
-                buldu = true;
-            }
-        });
-        return buldu ? sonuc : null;
-    }
-
     async function basla() {
         var o = oturum();
         if (!o || !o.username) { bolumGoster('siparisGiris'); return; }
@@ -1347,11 +1520,13 @@
 
         var ayar = ayarOku();
         if (['liste', 'ikili', 'uclu'].indexOf(ayar.detayGorunum) !== -1) durum.detayGorunum = ayar.detayGorunum;
+
         var vars = (global.JBSiparisSirala && global.JBSiparisSirala.VARSAYILAN_SIRA) || ['firin', 'dondurma', 'orta', 'su'];
         durum.bantSirasi = Array.isArray(ayar.bantSirasi) && ayar.bantSirasi.length
             ? ayar.bantSirasi.slice()
             : vars.slice();
-        durum.bantRenkleri = bantRenkleriDogrula(ayar.bantRenkleri) || Object.assign({}, BANT_RENK_VARSAYILAN);
+        durum.kategoriler = kategorileriYukle(ayar);
+        bantSirasiOnar();
 
         bolumGoster('siparisIcerik');
         baglan();
