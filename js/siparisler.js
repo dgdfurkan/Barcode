@@ -477,10 +477,7 @@
 
     function bandaGore(s) {
         if (eskimisMi(s)) return 'bitti';
-        var pb = panelBandi(s);
-        if (pb === 'yolda' || pb === 'bitti') return pb;
-        if (s.toplama_durumu === 'toplandi') return 'yolda';
-        return pb;
+        return panelBandi(s);
     }
 
     /** "2 dk.", "1 sa. 20 dk." */
