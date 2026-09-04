@@ -1230,7 +1230,7 @@
                 const yeni = kunyeImzasi(s);
                 const eski = sonKunye.get(s.siparisId);
                 sonKunye.set(s.siparisId, yeni);
-                if (eski !== undefined && eski !== yeni) degisen.push(s);
+                if (eski !== yeni) degisen.push(s);
             });
             if (!degisen.length) return;
             try {
