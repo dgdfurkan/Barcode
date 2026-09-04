@@ -191,10 +191,15 @@ async function satirlariYaz(yetki, siparisUuid, urunler) {
    siparişle birlikte gidiyor. */
 const GIDEN_KOLON = /(teslim|iptal|tamamlan)/i;
 
+const ESKIME_MS = 3 * 60 * 60 * 1000;
+
 function gitmisMi(s) {
-    return GIDEN_KOLON.test(String(s && s.kolon || '')
-        .toLocaleLowerCase('tr')
-        .replace(/ş/g, 's').replace(/ı/g, 'i'));
+    var k = String(s && s.kolon || '').toLocaleLowerCase('tr').replace(/ş/g, 's').replace(/ı/g, 'i');
+    if (GIDEN_KOLON.test(k)) return true;
+    var t = s && (s.sepetZamani || s.sepet_zamani);
+    if (!t) return false;
+    var ms = Date.now() - new Date(t).getTime();
+    return isFinite(ms) && ms > ESKIME_MS;
 }
 
 async function siparisSil(yetki, siparisId) {

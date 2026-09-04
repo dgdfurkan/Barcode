@@ -454,14 +454,11 @@
      * siparişle birlikte gidiyor, ayrı silme gerekmiyor.
      */
     var GIDEN_KOLON = /(teslim|iptal|tamamlan)/;
-    var SILME_ESKIME_MS = 24 * 60 * 60 * 1000;
-
     function gitmisMi(s) {
-        if (GIDEN_KOLON.test(kolonAdi(s))) return true;
-        var t = s.sepet_zamani || s.created_at;
-        if (!t) return false;
-        var ms = Date.now() - new Date(t).getTime();
-        return isFinite(ms) && ms > SILME_ESKIME_MS;
+        var k = kolonAdi(s);
+        if (GIDEN_KOLON.test(k)) return true;
+        if (eskimisMi(s)) return true;
+        return false;
     }
 
     async function gidenleriSil(liste) {

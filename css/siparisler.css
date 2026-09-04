@@ -1311,9 +1311,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 
     /* Üç şerit dar ekranda sığmıyor: yatay kaydırma ile depocu
        istediği şeridi görebiliyor. Snap ile şeritler hizalı duruyor. */
-    .sip-akis { gap: 10px; grid-template-columns: repeat(3, minmax(260px, 1fr)) !important; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-    .sip-akis::-webkit-scrollbar { display: none; }
-    .sip-akis > .sip-serit { scroll-snap-align: start; }
+    .sip-akis { gap: 4px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .sip-ayrac { display: none; }
     .sip-serit__ust { top: 72px; padding: 10px; }
     .sip-serit__ikon { width: 36px; height: 36px; }
@@ -1358,29 +1356,29 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-baslik h1 { font-size: 25px; }
     .sip-canli { font-size: 10.5px; }
 
-    .sip-akis { margin-top: 17px; gap: 7px; grid-template-columns: repeat(3, minmax(260px, 1fr)) !important; }
-    .sip-serit__ust { top: 68px; min-height: 58px; margin-bottom: 8px; padding: 8px; gap: 7px; border-radius: 11px; }
-    .sip-serit__ikon { width: 30px; height: 30px; border-radius: 8px; }
-    .sip-serit__ikon svg { width: 16px; }
-    .sip-serit__ust h2 { font-size: 12.5px; line-height: 1.2; }
-    .sip-serit__ust h2 span { min-width: 20px; height: 20px; margin-left: 2px; padding: 0 5px; font-size: 10.5px; }
-    .sip-serit__ust p { font-size: 10.5px; line-height: 1.25; }
+    .sip-akis { margin-top: 10px; gap: 3px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .sip-serit__ust { top: 68px; min-height: 0; margin-bottom: 5px; padding: 6px; gap: 5px; border-radius: 9px; }
+    .sip-serit__ikon { width: 24px; height: 24px; border-radius: 6px; }
+    .sip-serit__ikon svg { width: 13px; }
+    .sip-serit__ust h2 { font-size: 11px; line-height: 1.2; }
+    .sip-serit__ust h2 span { min-width: 17px; height: 17px; margin-left: 2px; padding: 0 4px; font-size: 9.5px; }
+    .sip-serit__ust p { display: none; }
     .sip-ayrac { min-height: 520px; }
-    .sip-serit__liste { gap: 8px; }
+    .sip-serit__liste { gap: 5px; }
 
-    .sip-kart { min-height: 216px; padding: 11px; border-radius: 12px; }
-    .sip-kart__ozellik { grid-template-columns: 1fr; margin-top: 11px; padding: 8px 0; }
+    .sip-kart { min-height: 0; padding: 6px; border-radius: 8px; font-size: 11px; }
+    .sip-kart__ozellik { display: none; }
     .sip-kart__ogeye { padding: 0; border: 0; }
-    .sip-kart__ogeye + .sip-kart__ogeye { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(152,162,179,0.18); }
+    .sip-kart__ogeye + .sip-kart__ogeye { margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(152,162,179,0.18); }
     .sip-kart__ogeye:nth-child(3) { display: none; }
-    .sip-kart__banko strong { font-size: 21px; }
-    .sip-kart__orta { margin-top: 8px; display: block; }
-    .sip-kart__parca { display: block; margin-top: 6px; font-size: 11.5px; }
-    .sip-kart__parca b { font-size: 14.5px; }
-    .sip-kart__sure { font-size: 10.5px; }
-    .sip-kart__alt { margin-top: 9px; gap: 7px; }
-    .sip-kart__ilerleme strong { font-size: 11px; }
-    .sip-kart__ac { width: 28px; height: 28px; border-radius: 8px; }
+    .sip-kart__banko strong { font-size: 15px; }
+    .sip-kart__orta { margin-top: 3px; display: block; }
+    .sip-kart__parca { display: block; margin-top: 3px; font-size: 10.5px; }
+    .sip-kart__parca b { font-size: 11px; }
+    .sip-kart__sure { font-size: 9.5px; }
+    .sip-kart__alt { margin-top: 5px; gap: 5px; }
+    .sip-kart__ilerleme strong { font-size: 10px; }
+    .sip-kart__ac { width: 22px; height: 22px; border-radius: 6px; }
 
     .sip-tepe__durum .sip-rozet { padding: 4px 7px; }
     .sip-yan-etiket { font-size: 10.5px; }
