@@ -85,7 +85,8 @@ function siparisImzasi(s) {
     const urun = (s.urunler || [])
         .map((u) => u.sira + ':' + u.adet + ':' + (u.ad || ''))
         .join('|');
-    return [s.durum, s.banko, s.toplamAdet, s.posetSayisi, s.toplayici, s.kurye, urun].join('~');
+    return [s.durum, s.banko, s.toplamAdet, s.posetSayisi, s.toplayici, s.kurye,
+            s.toplayiciFoto, s.kuryeFoto, urun].join('~');
 }
 
 // ==================================================================
@@ -114,6 +115,8 @@ async function siparisYaz(yetki, s) {
         eksik_urun_var: !!s.eksikUrunVar,
         toplayici: s.toplayici || null,
         kurye: s.kurye || null,
+        toplayici_foto: s.toplayiciFoto || null,
+        kurye_foto: s.kuryeFoto || null,
         sepet_zamani: s.sepetZamani || null,
         updated_at: new Date().toISOString()
     };
@@ -199,6 +202,8 @@ async function kolonYaz(yetki, liste) {
         if (s.banko) govde.banko = s.banko;
         if (s.toplayici) govde.toplayici = s.toplayici;
         if (s.kurye) govde.kurye = s.kurye;
+        if (s.toplayiciFoto) govde.toplayici_foto = s.toplayiciFoto;
+        if (s.kuryeFoto) govde.kurye_foto = s.kuryeFoto;
 
         try {
             const yanit = await fetch(adres, {

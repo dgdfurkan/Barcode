@@ -229,8 +229,13 @@
         var d = db();
         if (!o || !o.username || !d) return null;
 
+        /* Kolon listesi yerine `*`: `toplayici_foto`/`kurye_foto` kolonları
+           VPS'te göç çalışmadan önce yoksa, adı geçen kolon listesi
+           PostgREST'te hata veriyor ve bütün sipariş çekimi patlıyordu.
+           `*` ile eksik kolon yalnız gelmemiş oluyor. Tabloda müşteri
+           verisi yok, hepsi bizim yazdığımız alanlar. */
         var siparisSonuc = await d.from('orders')
-            .select('id,order_id,banko,kolon,durum,toplama_durumu,toplam_adet,poset_sayisi,eksik_urun_var,toplayici,kurye,sepet_zamani,created_at')
+            .select('*')
             .eq('username', o.username)
             .order('created_at', { ascending: false })
             .limit(60);
@@ -578,11 +583,19 @@
 
     /* Satırda tek barkod duruyor: depocu okutacağı kodu aramasın. Fazlası
        varsa ada dokununca açılan pencerede hepsi görünüyor. */
+    /* Ürünün barkodlarının hepsi satırda. Önceden yalnız ilki yazılıp
+       gerisi "+2" rozetine sıkışıyordu; depocu elindeki kodu listede
+       göremeyip her seferinde pencereyi açmak zorunda kalıyordu. Üçten
+       fazlası satırı şişirdiği için gerisi rozette kalıyor. */
+    var KOD_SINIRI = 3;
+
     function kodCiz(bilgi) {
         if (!bilgi.barkodlar.length) return '<span class="sip-kod sip-kod--yok">barkod yok</span>';
-        return '<span class="sip-kod">' + kacir(bilgi.barkodlar[0]) +
-               (bilgi.barkodlar.length > 1 ? '<b>+' + (bilgi.barkodlar.length - 1) + '</b>' : '') +
-               '</span>';
+        var gosterilen = bilgi.barkodlar.slice(0, KOD_SINIRI);
+        var kalan = bilgi.barkodlar.length - gosterilen.length;
+        return gosterilen.map(function (k) {
+            return '<span class="sip-kod">' + kacir(k) + '</span>';
+        }).join('') + (kalan ? '<span class="sip-kod sip-kod--kalan">+' + kalan + '</span>' : '');
     }
 
     function urunNotYaz(u) {
@@ -600,7 +613,6 @@
 
         return '<div class="sip-urun' + (u.alindi ? ' sip-urun--alindi' : '') +
                '" data-sira="' + u.sira + '" style="--i:' + Math.min(Math.max((sira || 1) - 1, 0), 16) + '">' +
-            '<span class="sip-urun__no">' + (sira || 1) + '</span>' +
             gorsel +
             '<div class="sip-urun__bilgi">' +
                 '<button type="button" class="sip-urun__ad" data-barkod="' + u.sira + '">' +
@@ -658,18 +670,27 @@
         }).join('');
     }
 
+    /* Panelden fotoğraf adresi geldiyse yüz görünüyor, gelmediyse baş
+       harfler. Adres bozuksa `onerror` ile baş harflere düşülüyor; kırık
+       görsel simgesi bırakmak en kötüsü. */
     function yanKisiler(s) {
-        var satir = function (ad, rol, kurye, aktif) {
+        var satir = function (ad, foto, rol, kurye, aktif) {
+            var bas = kacir(basHarfler(ad));
+            var ic = (ad && foto)
+                ? '<img src="' + kacir(foto) + '" alt="" referrerpolicy="no-referrer"' +
+                  ' onerror="this.remove()"><b>' + bas + '</b>'
+                : bas;
             return '<div class="sip-kisi-satir">' +
                 '<span class="sip-avatar' + (kurye ? ' sip-avatar--kurye' : '') +
-                    (ad ? '' : ' sip-avatar--bos') + '">' + kacir(basHarfler(ad)) + '</span>' +
+                    (ad ? '' : ' sip-avatar--bos') + (ad && foto ? ' sip-avatar--foto' : '') + '">' +
+                    ic + '</span>' +
                 '<div><small>' + rol + '</small><strong>' + kacir(ad || 'Atanmadı') + '</strong></div>' +
                 (ad && aktif ? '<span class="sip-kisi-durum"><i></i>Aktif</span>' : '') +
             '</div>';
         };
         return '<p class="sip-yan-etiket">GÖREVLİLER</p>' +
-               satir(s.toplayici, 'Toplayıcı', false, true) +
-               satir(s.kurye, 'Kurye', true, false);
+               satir(s.toplayici, s.toplayici_foto, 'Toplayıcı', false, true) +
+               satir(s.kurye, s.kurye_foto, 'Kurye', true, false);
     }
 
     var BOS_IKON = '<svg viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9Z"/><path d="m4.5 7.8 7.5 4.3 7.5-4.3"/></svg>';
@@ -774,6 +795,7 @@
 
         var saat = durum.sonYenileme ? saatYaz(durum.sonYenileme) : null;
         el('sonGuncelleme').textContent = 'Canlı · ' + (saat || 'yükleniyor');
+        kapananSayiTazele();
 
         detayiCiz();
     }
@@ -1227,6 +1249,72 @@
     }
 
     // ==================================================================
+    // Kapananlar
+    //
+    // Depocu yanlışlıkla "Toplandı" diyebiliyor ya da panelde sipariş ileri
+    // gidiyor; ikisinde de sipariş şeritlerden düşüyor ve bir daha
+    // bulunamıyordu. Buradan son kapananlar görünüyor: elle kapatılan geri
+    // açılabiliyor, panelde teslime geçen yalnız okunabiliyor (onu geri
+    // açmak yalan olurdu, panelde iş bitmiş).
+    // ==================================================================
+
+    var KAPANAN_SINIRI = 30;
+
+    function kapananlar() {
+        return durum.siparisler
+            .filter(function (s) { return bandaGore(s) === 'bitti'; })
+            .slice(0, KAPANAN_SINIRI);
+    }
+
+    function kapananSayiTazele() {
+        var d = el('kapananSayi');
+        if (d) d.textContent = kapananlar().length;
+    }
+
+    function kapananlariCiz() {
+        var liste = kapananlar();
+        if (!liste.length) {
+            el('kapananListe').innerHTML =
+                '<p class="sip-kapanan__bos">Bugün kapanan sipariş yok.</p>';
+            return;
+        }
+        el('kapananListe').innerHTML = liste.map(function (s) {
+            var urunler = s.urunler || [];
+            var kimlik = siparisKimligi(s);
+            var panelBitti = panelBitirmisMi(s);
+            var neden = panelBitti ? 'Panelde teslim akışına geçti'
+                : (eskimisMi(s) ? 'Eskidi, panelde yok' : 'Elle toplandı denildi');
+            return '<div class="sip-kapanan__oge">' +
+                '<span class="sip-kapanan__banko' + (kimlik.bankoVar ? '' : ' yok') + '">' +
+                    kacir(kimlik.deger) + '</span>' +
+                '<span class="sip-kapanan__bilgi">' +
+                    '<strong>' + (kimlik.bankoVar ? 'Banko ' + kacir(kimlik.deger) : 'Bankosuz') + '</strong>' +
+                    '<small>' + urunler.length + ' çeşit · ' + kacir(neden) + '</small>' +
+                '</span>' +
+                '<button type="button" class="sip-kapanan__ac" data-kapanan-ac="' + kacir(s.id) + '">İçeriği aç</button>' +
+                /* Geri açma yalnız elle kapatılanlara. Panelde teslime geçmiş
+                   ya da eskimiş siparişi geri açmak yalan olurdu: bir sonraki
+                   yoklamada yine kapanır. */
+                (panelBitti || eskimisMi(s) ? '' :
+                    '<button type="button" class="sip-kapanan__geri" data-kapanan-geri="' + kacir(s.id) + '">Geri aç</button>') +
+            '</div>';
+        }).join('');
+    }
+
+    function kapananlariAc() {
+        kapananlariCiz();
+        katAc('siparisKapananlar');
+    }
+
+    function kapananiGeriAc(id) {
+        var s = durum.siparisler.filter(function (x) { return x.id === id; })[0];
+        if (!s) return;
+        siparisDurumu(s, 'bekliyor');
+        katKapat('siparisKapananlar');
+        bildir((s.banko ? 'Banko ' + s.banko : 'Sipariş') + ' geri açıldı');
+    }
+
+    // ==================================================================
     // Olaylar
     // ==================================================================
 
@@ -1312,6 +1400,20 @@
             if (e.target === el('siparisBuyuk') || e.target.classList.contains('sip-buyuk__ic')) {
                 katKapat('siparisBuyuk');
             }
+        });
+
+        el('kapananlarAc').addEventListener('click', kapananlariAc);
+        el('kapananKapat').addEventListener('click', function () { katKapat('siparisKapananlar'); });
+        el('siparisKapananlar').addEventListener('click', function (e) {
+            if (e.target === el('siparisKapananlar')) { katKapat('siparisKapananlar'); return; }
+            var ac = e.target.closest('[data-kapanan-ac]');
+            if (ac) {
+                katKapat('siparisKapananlar');
+                siparisAc(ac.getAttribute('data-kapanan-ac'));
+                return;
+            }
+            var geri = e.target.closest('[data-kapanan-geri]');
+            if (geri) kapananiGeriAc(geri.getAttribute('data-kapanan-geri'));
         });
 
         el('siparisAyarAc').addEventListener('click', ayarAc);
@@ -1405,6 +1507,7 @@
             if (!el('siparisBuyuk').hidden) { katKapat('siparisBuyuk'); return; }
             if (!el('siparisKodlar').hidden) { katKapat('siparisKodlar'); return; }
             if (!el('siparisAyar').hidden) { katKapat('siparisAyar'); return; }
+            if (!el('siparisKapananlar').hidden) { katKapat('siparisKapananlar'); return; }
             if (durum.secili) detayiKapat();
         });
 

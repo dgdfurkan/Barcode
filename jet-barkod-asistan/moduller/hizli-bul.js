@@ -1236,7 +1236,9 @@
                         durum: s.durum,
                         banko: s.banko,
                         toplayici: s.toplayici,
-                        kurye: s.kurye
+                        kurye: s.kurye,
+                        toplayiciFoto: s.toplayiciFoto,
+                        kuryeFoto: s.kuryeFoto
                     })) },
                     () => { if (chrome.runtime.lastError) { /* hizmet işçisi uyuyor olabilir */ } }
                 );

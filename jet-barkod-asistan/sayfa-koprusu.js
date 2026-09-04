@@ -346,6 +346,24 @@
         return String(v);
     }
 
+    /**
+     * Kişi nesnesindeki fotoğraf adresi. Panelin alan adı sürümden sürüme
+     * değişebiliyor (imageURL, photoUrl, avatar...); tahmin etmek yerine
+     * bilinen adları sırayla deniyoruz, ilk geçerli adres alınıyor. Hiçbiri
+     * yoksa boş dönüyor ve ekranda baş harfler kalıyor.
+     */
+    var FOTO_ALANLARI = ['imageURL', 'imageUrl', 'photoURL', 'photoUrl', 'avatarURL',
+                         'avatarUrl', 'avatar', 'picture', 'photo', 'image'];
+
+    function fotoBul(kisi) {
+        if (!kisi || typeof kisi !== 'object') return '';
+        for (var i = 0; i < FOTO_ALANLARI.length; i++) {
+            var v = kisi[FOTO_ALANLARI[i]];
+            if (typeof v === 'string' && /^https?:\/\//.test(v)) return v;
+        }
+        return '';
+    }
+
     function sadeSiparis(o, kolon) {
         var kon = Array.isArray(o.productLocations) ? o.productLocations : [];
         return {
@@ -358,6 +376,8 @@
             eksikUrunVar: !!o.hasMissingProduct,
             toplayici: (o.picker && o.picker.name) || '',
             kurye: (o.courier && o.courier.name) || '',
+            toplayiciFoto: fotoBul(o.picker),
+            kuryeFoto: fotoBul(o.courier),
             sepetZamani: o.checkoutDate || null,
             urunler: (Array.isArray(o.products) ? o.products : []).map(function (p) {
                 var k = p.masterCategory || {};

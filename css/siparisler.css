@@ -346,6 +346,49 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-yenile svg { width: 19px; }
 .sip-dugme:hover, .sip-yenile:hover { transform: translateY(-1px); border-color: #aeb8c7; box-shadow: var(--golge-o); color: var(--mavi); }
 .sip-dugme:active, .sip-yenile:active { transform: scale(0.96); }
+.sip-dugme b {
+    min-width: 18px;
+    padding: 1px 6px;
+    border-radius: 20px;
+    background: #eff2f6;
+    color: var(--sonuk);
+    font-size: 11px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Kapananlar penceresi ---- */
+.sip-kapanan { display: flex; flex-direction: column; gap: 7px; max-height: 52vh; overflow-y: auto; }
+.sip-kapanan__bos { margin: 0; padding: 22px 12px; color: var(--soluk); font-size: 12.5px; text-align: center; }
+.sip-kapanan__oge {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px;
+    border: 1px solid var(--cizgi); border-radius: 11px;
+    background: #f8f9fb;
+}
+.sip-kapanan__banko {
+    width: 40px; height: 40px; flex: none;
+    border-radius: 10px;
+    display: grid; place-items: center;
+    background: var(--yesil-50); color: var(--yesil);
+    font-family: var(--baslik-font);
+    font-size: 15px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.sip-kapanan__banko.yok { background: #f2f4f7; color: var(--soluk); font-size: 13px; }
+.sip-kapanan__bilgi { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sip-kapanan__bilgi strong { font-size: 13px; font-weight: 700; color: var(--yazi); }
+.sip-kapanan__bilgi small { margin-top: 2px; color: var(--soluk); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sip-kapanan__ac, .sip-kapanan__geri {
+    flex: none;
+    height: 32px; padding: 0 11px;
+    border-radius: 9px;
+    font-size: 12px; font-weight: 700;
+    transition: 0.16s;
+}
+.sip-kapanan__ac { border: 1px solid var(--cizgi); background: #fff; color: var(--sonuk); }
+.sip-kapanan__ac:hover { border-color: var(--mavi); color: var(--mavi); }
+.sip-kapanan__geri { border: 0; background: var(--mavi); color: #fff; }
+.sip-kapanan__geri:hover { background: var(--mavi-koyu); }
 .sip-yenile.donuyor svg { animation: sip-don 0.7s linear; }
 @keyframes sip-don { to { transform: rotate(360deg); } }
 
@@ -612,6 +655,16 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 }
 .sip-avatar--kurye { background: var(--yesil-50); color: #0e9f6e; }
 .sip-avatar--bos { background: #f2f4f7; color: var(--soluk); }
+/* Fotoğraflı avatar: görsel karonun tamamını kaplıyor, baş harfler altta
+   yedek duruyor. Görsel yüklenemezse img siliniyor ve harfler ortaya
+   çıkıyor; kırık görsel simgesi kalmıyor. */
+.sip-avatar--foto { position: relative; overflow: hidden; background: #eef2f7; }
+.sip-avatar--foto b { font-weight: 800; }
+.sip-avatar--foto img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+}
 .sip-kisi-satir > div { min-width: 0; flex: 1; }
 .sip-kisi-satir small, .sip-kisi-satir strong { display: block; }
 .sip-kisi-satir small { color: var(--soluk); font-size: 11px; }
@@ -693,18 +746,6 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-urun--alindi { border-color: #afe0cc; background: #f7fcfa; }
 .sip-urun--alindi .sip-urun__gorsel { opacity: 0.62; }
 
-/* Sıradaki ürünü bulmayı kolaylaştıran numara. Sıra `siparis-sirala`
-   tarafından kurulan toplama sırası; bant sınırlarını aşıp devam ediyor. */
-.sip-urun__no {
-    position: absolute; left: 6px; top: 6px; z-index: 2;
-    min-width: 22px; height: 22px; padding: 0 5px;
-    border-radius: 7px;
-    display: grid; place-items: center;
-    background: rgba(7,21,45,0.88); color: #fff;
-    font-size: 10.5px; font-weight: 800;
-    box-shadow: 0 2px 6px rgba(7,21,45,0.16);
-}
-
 .sip-urun__gorsel {
     width: 84px; height: 84px;
     padding: 6px;
@@ -754,6 +795,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     font-variant-numeric: tabular-nums;
 }
 .sip-kod b { color: var(--mavi); }
+.sip-kod--kalan { color: var(--mavi); background: var(--mavi-50); border-color: var(--mavi-100); }
 .sip-kod--yok { font-family: inherit; letter-spacing: 0; border-style: dashed; color: var(--soluk); background: transparent; }
 .sip-urun__not { color: var(--sonuk); font-size: 12.5px; font-weight: 700; }
 
@@ -816,8 +858,13 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-urunler--uclu .sip-al { min-width: 0; flex: 1; }
 
 /* ---------------------------- ALT ÇUBUK ---------------------------- */
+/* Alt çubuk akışta, `position: fixed` değil. Sabitken sayfanın üstüne
+   biniyordu: uzun siparişte son ürünün adet kutusu ve tik düğmesi çubuğun
+   altında kalıp tıklanamıyordu. Detay zaten flex sütun; çubuk en altta
+   duruyor ve ürün alanını kendi payına sıkıştırıyor. */
 .sip-alt {
-    position: fixed; inset: auto 0 0; z-index: 65;
+    position: relative; z-index: 65;
+    flex: 0 0 auto;
     min-height: 80px;
     padding: 11px 24px calc(11px + env(safe-area-inset-bottom));
     display: grid; grid-template-columns: 1fr 160px; align-items: center; gap: 24px;
@@ -1292,7 +1339,6 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-araclar { min-height: 66px; padding: 11px 10px 11px 13px; }
     .sip-urun { grid-template-columns: 70px minmax(0, 1fr) auto; gap: 9px; padding: 8px; }
     .sip-urun__gorsel { width: 70px; height: 70px; }
-    .sip-urun__no { left: 4px; top: 4px; }
     .sip-urun__ad { font-size: 13.5px; line-height: 1.3; }
     .sip-urun__alt { margin-top: 6px; }
     .sip-kod { max-width: 130px; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
@@ -1311,7 +1357,6 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-urunler--uclu { padding: 7px; gap: 6px; }
     .sip-urunler--uclu .sip-urun { padding: 6px; border-radius: 11px; }
     .sip-urunler--uclu .sip-urun__gorsel { height: 94px; }
-    .sip-urunler--uclu .sip-urun__no { left: 3px; top: 3px; min-width: 19px; height: 19px; font-size: 9.5px; }
     .sip-urunler--uclu .sip-urun__ad { min-height: 54px; font-size: 12.5px; line-height: 1.22; }
     .sip-urunler--uclu .sip-kod { display: none; }
     .sip-urunler--uclu .sip-urun__eylem { gap: 4px; }
