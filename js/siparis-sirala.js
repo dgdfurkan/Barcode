@@ -74,7 +74,7 @@
         {
             kume: 'firin',
             etiket: 'Fırın',
-            renk: '#d97706',
+            renk: '#ffff00',
             dahil: ['ekmek', 'baget', 'simit', 'poğaça', 'pogaca', 'börek', 'borek',
                     'kruvasan', 'la lorraine', 'firin', 'fırın', 'donut', 'berliner',
                     'sandvic', 'sandviç', 'tost'],
@@ -83,7 +83,7 @@
         {
             kume: 'dondurma',
             etiket: 'Dondurma',
-            renk: '#7c3aed',
+            renk: '#bb00ff',
             dahil: ['dondurma', 'dondurulmus', 'donuk', 'cornetto', 'magnum', 'algida',
                     'carte d or', 'golf', 'buz kupu', 'buz küpü', 'frigo', 'feast',
                     'mochiko', 'superfresh', 'pizza donuk', 'dondurmali'],
@@ -92,7 +92,7 @@
         {
             kume: 'su',
             etiket: 'Su',
-            renk: '#0284c7',
+            renk: '#0088ff',
             /* Bare "su" iki harfli; aşağıdaki otomatik kural onu tam kelime
                yapıyor, "süper"in içine girmiyor. */
             dahil: ['su', 'sular', 'dogal kaynak suyu', 'mineralli su', 'maden suyu',
