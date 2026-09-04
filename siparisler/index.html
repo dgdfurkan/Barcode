@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
     <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
-    <link rel="stylesheet" href="../css/siparisler.css?v=20260904q" />
+    <link rel="stylesheet" href="../css/siparisler.css?v=20260904r" />
     <script src="../js/auth-token.js?v=20260828i"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20260828i"></script>
@@ -93,6 +93,7 @@
                     <header class="sip-serit__ust">
                         <span class="sip-serit__ikon sari"><svg viewBox="0 0 20 20"><path d="M10 3a7 7 0 1 0 7 7M10 6v4l3 2"/></svg></span>
                         <div><h2>Hazırlanıyor <span id="sayacHazirlaniyor">0</span></h2><p>Toplayıcı ürünleri hazırlıyor</p></div>
+                        <span class="sip-sira-rozet" title="Süreye göre">⏱</span>
                     </header>
                     <div class="sip-serit__liste" id="izgaraHazirlaniyor"></div>
                     <div class="sip-serit__bos" id="bosHazirlaniyor" hidden>Hazırlanan sipariş yok</div>
@@ -102,6 +103,7 @@
                     <header class="sip-serit__ust">
                         <span class="sip-serit__ikon mavi"><svg viewBox="0 0 20 20"><path d="M3.5 6h13v11h-13zM3.5 6l2-3h9l2 3M8 10h4"/></svg></span>
                         <div><h2>Hazırlandı <span id="sayacHazir">0</span></h2><p><b id="ozetHazirParca">0</b> parça bankoda bekliyor</p></div>
+                        <span class="sip-sira-rozet" title="Süreye göre">⏱</span>
                     </header>
                     <div class="sip-serit__liste" id="izgaraHazir"></div>
                     <div class="sip-serit__bos" id="bosHazir" hidden>Bankoda sipariş yok</div>
@@ -111,6 +113,7 @@
                     <header class="sip-serit__ust">
                         <span class="sip-serit__ikon yesil"><svg viewBox="0 0 20 20"><path d="M2 12h3l2-4h6l1.5 4H18M6 15a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM15 15a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/></svg></span>
                         <div><h2>Yolda <span id="sayacYolda">0</span></h2><p>Kurye teslimata çıktı</p></div>
+                        <span class="sip-sira-rozet" title="Süreye göre">⏱</span>
                     </header>
                     <div class="sip-serit__liste" id="izgaraYolda"></div>
                     <div class="sip-serit__bos" id="bosYolda" hidden>Yolda sipariş yok</div>
@@ -270,7 +273,7 @@
     <div class="sip-bildirim" id="siparisBildirim" role="status" aria-live="polite"><svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-9"/></svg><span></span></div>
 
     <script src="../js/siparis-sirala.js?v=20260904d"></script>
-    <script src="../js/siparisler.js?v=20260904q"></script>
+    <script src="../js/siparisler.js?v=20260904r"></script>
     <script>
         // Başlıktaki kullanıcı adı; diğer sayfalarla aynı davranış.
         (function () {

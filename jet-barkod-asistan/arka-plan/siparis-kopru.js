@@ -189,7 +189,7 @@ async function satirlariYaz(yetki, siparisUuid, urunler) {
    kurye o aşamada hâlâ depoda olabiliyor, sipariş kapananlarda dursun.
    `order_items` foreign key'de ON DELETE CASCADE, ürün satırları
    siparişle birlikte gidiyor. */
-const GIDEN_KOLON = /(teslim|iptal|tamamlan|ulast)/i;
+const GIDEN_KOLON = /(teslim|iptal|tamamlan)/i;
 
 const ESKIME_MS = 3 * 60 * 60 * 1000;
 
