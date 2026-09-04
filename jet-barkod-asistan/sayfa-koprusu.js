@@ -373,6 +373,20 @@
         return '';
     }
 
+    var KISI_CDN = 'https://cdn.getir.com/person/';
+
+    function kisiFotoUret(kisi) {
+        if (!kisi || typeof kisi !== 'object') return '';
+        var id = kisi._id || kisi.id || '';
+        if (!id || typeof id !== 'string') return '';
+        return KISI_CDN + id + '.png';
+    }
+
+    function kisiFoto(kisi) {
+        var url = fotoBul(kisi);
+        return url || kisiFotoUret(kisi);
+    }
+
     function sadeSiparis(o, kolon) {
         var kon = Array.isArray(o.productLocations) ? o.productLocations : [];
         return {
@@ -385,8 +399,8 @@
             eksikUrunVar: !!o.hasMissingProduct,
             toplayici: (o.picker && o.picker.name) || '',
             kurye: (o.courier && o.courier.name) || '',
-            toplayiciFoto: fotoBul(o.picker),
-            kuryeFoto: fotoBul(o.courier),
+            toplayiciFoto: kisiFoto(o.picker),
+            kuryeFoto: kisiFoto(o.courier),
             sepetZamani: o.checkoutDate || null,
             urunler: (Array.isArray(o.products) ? o.products : []).map(function (p) {
                 var k = p.masterCategory || {};
