@@ -526,8 +526,21 @@
         // web_accessible_resources'a gerek kalmadı.
 
         // === STATE ===
+        /* Cache şeması sürüm etiketi. Eklenti güncellenip yeni alanlar
+           (ör. toplayiciFoto, kuryeFoto) eklendiğinde eski localStorage
+           cache'i geçersiz sayılıyor ki tekrar fetch olsun ve DB doğru
+           dolsun. Yeni alan eklediğinde bu numarayı artır. */
+        const CACHE_SURUMU = 3;
         let orderCache = {};
-        try { orderCache = JSON.parse(localStorage.getItem('getir_order_cache')) || {}; } catch (e) {}
+        try {
+            const kaydedilen = JSON.parse(localStorage.getItem('getir_order_cache')) || {};
+            if (kaydedilen && kaydedilen.__v === CACHE_SURUMU) {
+                orderCache = kaydedilen;
+                delete orderCache.__v;
+            } else {
+                try { localStorage.removeItem('getir_order_cache'); } catch (e) {}
+            }
+        } catch (e) {}
 
         let idMap = {};
         let fetchQueue = [];
@@ -573,7 +586,10 @@
 
         // === HELPERS ===
         const saveCache = () => {
-            try { localStorage.setItem('getir_order_cache', JSON.stringify(orderCache)); } catch (e) {}
+            try {
+                const paket = Object.assign({ __v: CACHE_SURUMU }, orderCache);
+                localStorage.setItem('getir_order_cache', JSON.stringify(paket));
+            } catch (e) {}
         };
 
         const getTokenExpiry = (token) => {
@@ -1316,6 +1332,9 @@
             s.toplayiciFoto, s.kuryeFoto, s.toplamAdet, s.posetSayisi
         ].join('~');
 
+        const kisiImzasi = (s) => (s.toplayici || '') + '~' + (s.kurye || '');
+        const sonKisi = new Map();
+
         const kunyeleriYolla = (liste) => {
             const degisen = [];
             const tumIdler = [];
@@ -1326,6 +1345,16 @@
                 const eski = sonKunye.get(s.siparisId);
                 sonKunye.set(s.siparisId, yeni);
                 if (eski !== yeni) degisen.push(s);
+                /* Kişi (toplayıcı/kurye) değiştiyse cache eskimiş demektir:
+                   yeni kişinin fotoğrafını da almak için detayı yeniden çek. */
+                const yeniKisi = kisiImzasi(s);
+                const eskiKisi = sonKisi.get(s.siparisId);
+                sonKisi.set(s.siparisId, yeniKisi);
+                if (eskiKisi !== undefined && eskiKisi !== yeniKisi) {
+                    const kod = s.siparisId.slice(-4);
+                    if (orderCache[kod]) { delete orderCache[kod]; saveCache(); }
+                    otoSorulan.delete(s.siparisId);
+                }
             });
             /* Panel boş bile olsa arka plana bildir; DB temizlensin.
                sayfa-koprusu boş listeyi ancak panelin yüklendiğinden emin
