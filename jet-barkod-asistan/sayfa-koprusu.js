@@ -475,6 +475,7 @@
                         var o = p.orders[j];
                         if (!o || !o.id || gorulen[o.id]) continue;
                         gorulen[o.id] = 1;
+                        if (!global.__jbaHamOrnek) global.__jbaHamOrnek = o;
                         cikti.push(sadeSiparis(o, p.title));
                     }
                     break;
@@ -482,8 +483,52 @@
                 n = n.return; adim++;
             }
         }
+        if (cikti.length) global.__jbaSadeOrnek = cikti[0];
+        /* Debug: kullanıcı panelde bir kez sipariş gördüğünde console'a
+           tek seferlik ayrıntılı dökümü yazıyoruz. Aynı oturumda tekrar
+           basılmıyor. Görmek için: pencere konsolunda `jba()` yaz. */
+        if (global.__jbaHamOrnek && !global.__jbaHamDoktu) {
+            global.__jbaHamDoktu = true;
+            jbaHamDok(global.__jbaHamOrnek, global.__jbaSadeOrnek);
+        }
         return cikti;
     }
+
+    function jbaHamDok(ham, sade) {
+        var stil = 'background:#131720;color:#fff;padding:3px 10px;border-radius:6px;font-weight:700';
+        var b1 = 'color:#3b82f6;font-weight:700';
+        var b2 = 'color:#10b981;font-weight:700';
+        var b3 = 'color:#f59e0b;font-weight:700';
+        var b4 = 'color:#ef4444;font-weight:700';
+        console.group('%c[JBA] Panel siparişinin HAM verisi (React fiber)', stil);
+        console.log('%cSipariş nesnesinin alan adları:', b1, Object.keys(ham || {}));
+        console.log('%cTam ham nesne:', b1, ham);
+        console.log('%cpicker (toplayıcı) alanları:', b2, ham && ham.picker ? Object.keys(ham.picker) : null);
+        console.log('%cpicker nesnesi:', b2, ham && ham.picker);
+        console.log('%ccourier (kurye) alanları:', b2, ham && ham.courier ? Object.keys(ham.courier) : null);
+        console.log('%ccourier nesnesi:', b2, ham && ham.courier);
+        console.log('%cproductLocations (banko):', b3, ham && ham.productLocations);
+        var u0 = ham && Array.isArray(ham.products) ? ham.products[0] : null;
+        console.log('%cilk ürün alan adları:', b3, u0 ? Object.keys(u0) : null);
+        console.log('%cilk ürün:', b3, u0);
+        console.log('%cBIZIM sadeleştirdiğimiz (DB\'ye giden):', b4, sade);
+        console.log('%cKomutlar: jba() | jbaHam() | jbaSade() | jbaKopya()', 'color:#94a3b8');
+        console.groupEnd();
+    }
+
+    global.jba = function () { jbaHamDok(global.__jbaHamOrnek, global.__jbaSadeOrnek); };
+    global.jbaHam = function () { return global.__jbaHamOrnek; };
+    global.jbaSade = function () { return global.__jbaSadeOrnek; };
+    global.jbaKopya = function () {
+        var v = { ham: global.__jbaHamOrnek, sade: global.__jbaSadeOrnek };
+        var m = JSON.stringify(v, function (k, x) {
+            if (x && typeof x === 'object' && x.stateNode) return '[React node]';
+            return x;
+        }, 2);
+        (navigator.clipboard && navigator.clipboard.writeText)
+            ? navigator.clipboard.writeText(m).then(function () { console.log('[JBA] panoya kopyalandı, ' + m.length + ' karakter'); })
+            : console.log(m);
+    };
 
     /* Aynı listeyi tekrar tekrar yollamamak için imza karşılaştırılıyor.
        Sipariş kimliği, durumu ve adedi değişmediyse mesaj gitmiyor.
