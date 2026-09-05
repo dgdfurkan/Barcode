@@ -858,6 +858,10 @@
                 if (!orderCache[code]) {
                     const longId = idMap[code];
                     if (longId) {
+                        /* Görülen her kart için `gonderilecek`'e ekle:
+                           detay geldiğinde siparisiYolla otomatik yazsın.
+                           Kullanıcının kart tıklamasını beklemesin. */
+                        gonderilecek.add(longId);
                         if (!fetchQueueSet.has(longId)) {
                             fetchQueue.push(longId);
                             fetchQueueSet.add(longId);
@@ -953,12 +957,15 @@
                                orderCount. Ürün kimliği yanıtta yok; site
                                tarafı ad + görsel ile katalogdan buluyor.
                                clientName ve clientNote alınmıyor. */
-                            detay: order.products.map(p => ({
-                                sira: p?.index,
+                            /* Toplayıcı Bekliyor ürünlerinde `index` boş
+                               olabiliyor; öyleyse dizi konumu (1'den) sıra
+                               olur. Boş sıra yüzünden ürün düşmemeli. */
+                            detay: order.products.map((p, i) => ({
+                                sira: (p && p.index != null) ? p.index : (i + 1),
                                 ad: (p?.name?.tr || p?.name?.en || '').trim(),
                                 gorsel: (p?.picURL?.tr || p?.picURL?.en || '') || '',
                                 adet: typeof p?.orderCount === 'number' ? p.orderCount : null
-                            })).filter(u => u.sira != null)
+                            }))
                         };
                         saveCache();
                         applyUI();
@@ -1255,21 +1262,28 @@
             const kod = String(s.siparisId || '').slice(-4);
             const girdi = orderCache[kod];
             const detay = (girdi && !Array.isArray(girdi) && girdi.detay) || [];
-            const detayHarita = new Map();
-            detay.forEach((d) => detayHarita.set(d.sira, d));
-
-            const urunler = (s.urunler || []).map((u) => {
-                const d = detayHarita.get(u.sira) || {};
+            const panelUrunler = Array.isArray(s.urunler) ? s.urunler : [];
+            const panelHarita = new Map();
+            panelUrunler.forEach((u) => panelHarita.set(u.sira, u));
+            /* Toplayıcı Bekliyor / Doğrulanıyor gibi durumlarda panel React
+               state'ine `products` dizisi henüz düşmemiş olabiliyor. Bu
+               yüzden ürün ana kaynağı DETAY dizisi; kategori ve panelden
+               gelen adet bilgisi varsa panelHarita'dan ekleniyor. Böylece
+               panel `s.urunler` boş bile olsa DB'ye ürün satırları yazılır. */
+            const kaynak = detay.length ? detay : panelUrunler;
+            const urunler = kaynak.map((k) => {
+                const p = panelHarita.get(k.sira) || {};
+                const dSira = k.sira;
                 return {
-                    sira: u.sira,
-                    ad: d.ad || '',
-                    gorsel: d.gorsel || '',
+                    sira: dSira,
+                    ad: k.ad || p.ad || '',
+                    gorsel: k.gorsel || '',
                     /* Liste ile detay aynı adedi veriyor. Getir kilogramla
                        satılan üründe de bu alanı kullanıyor; çevirmiyoruz. */
-                    adet: (typeof u.adet === 'number' ? u.adet : d.adet) || 1,
-                    anaKategori: u.anaKategori || '',
-                    sinif: u.sinif || '',
-                    altSinif: u.altSinif || ''
+                    adet: (typeof p.adet === 'number' ? p.adet : k.adet) || 1,
+                    anaKategori: p.anaKategori || '',
+                    sinif: p.sinif || '',
+                    altSinif: p.altSinif || ''
                 };
             });
 
@@ -1348,43 +1362,25 @@
         const HAZIRLIK_KOLON = /(hazirlan|dogrulan|topla)/;
 
         const otomatikYakala = (liste) => {
+            /* Panelde bulunan hazırlık/bankolu her siparişi kuyruğa at:
+               arka plan zaten aynı imzayı tekrar yazmıyor, boşuna istek
+               olmuyor. BILINEN filtresi kaldırıldı çünkü eski hatalı imzalı
+               (ürünsüz) siparişleri "biliniyor" sayıp bir daha yazmıyordu. */
             const adaylar = liste.filter((s) => {
                 if (!s || !s.siparisId) return false;
                 if (otoSorulan.has(s.siparisId) || fetchQueueSet.has(s.siparisId)) return false;
                 return !!s.banko || HAZIRLIK_KOLON.test(_turkce(s.kolon));
             });
             if (!adaylar.length) return;
-
-            const kimlikler = adaylar.map((s) => s.siparisId);
-            kimlikler.forEach((id) => otoSorulan.add(id));
-
-            try {
-                chrome.runtime.sendMessage(
-                    { type: 'JBA_SIPARIS_BILINEN', siparisler: kimlikler },
-                    (cevap) => {
-                        if (chrome.runtime.lastError || !cevap || !cevap.ok) {
-                            /* Arka plan uyuyorsa bir dahaki listede yine denensin. */
-                            kimlikler.forEach((id) => otoSorulan.delete(id));
-                            return;
-                        }
-                        const bilinen = new Set(cevap.bilinen || []);
-                        const eksik = kimlikler.filter((id) => !bilinen.has(id)).slice(0, OTO_TUR_SINIRI);
-                        eksik.forEach((id) => {
-                            gonderilecek.add(id);
-                            if (fetchQueueSet.has(id)) return;
-                            fetchQueue.push(id);
-                            fetchQueueSet.add(id);
-                        });
-                        /* Sınırın dışında kalanlar bir sonraki turda alınsın. */
-                        kimlikler.slice(OTO_TUR_SINIRI).forEach((id) => {
-                            if (!bilinen.has(id)) otoSorulan.delete(id);
-                        });
-                        if (eksik.length && !isFetching) processQueue();
-                    }
-                );
-            } catch (e) {
-                kimlikler.forEach((id) => otoSorulan.delete(id));
-            }
+            adaylar.slice(0, OTO_TUR_SINIRI).forEach((s) => {
+                otoSorulan.add(s.siparisId);
+                gonderilecek.add(s.siparisId);
+                if (!fetchQueueSet.has(s.siparisId)) {
+                    fetchQueue.push(s.siparisId);
+                    fetchQueueSet.add(s.siparisId);
+                }
+            });
+            if (adaylar.length && !isFetching) processQueue();
         };
 
         const siparisBul = (siparisId) => {
