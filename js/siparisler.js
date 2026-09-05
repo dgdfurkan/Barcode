@@ -1490,11 +1490,12 @@
         durum.secili = tumu.filter(function (s) { return s.id === id; })[0] || null;
         durum.detayImzasi = '';
         ciz();
-        /* Yeni siparişe geçince sayfa tepede olsun; önceki siparişin
-           scroll pozisyonu kalmasın. Detay gövdesi zaten ciz() içinde
-           sıfırlanıyor, buradaki dış pencere kaydırması. */
-        try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (e) { window.scrollTo(0, 0); }
+        /* Sadece detay panelinin kendi scroll'unu sıfırla; window.scrollTo
+           kullanmıyoruz ki detay kapatıldığında siparişler sayfasının
+           scroll pozisyonu bozulmasın. Yeni siparişte detay içi en üstte,
+           listedeyken listenin scroll'u nerede kaldıysa orada. */
         var detay = el('siparisDetay'); if (detay) detay.scrollTop = 0;
+        var govde = el('detayGovde'); if (govde) govde.scrollTop = 0;
     }
 
     var BANT_HARITA = {
