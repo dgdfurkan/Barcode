@@ -1490,11 +1490,19 @@
         durum.secili = tumu.filter(function (s) { return s.id === id; })[0] || null;
         durum.detayImzasi = '';
         ciz();
-        /* Sadece detay panelinin kendi scroll'unu sıfırla; window.scrollTo
-           kullanmıyoruz ki detay kapatıldığında siparişler sayfasının
-           scroll pozisyonu bozulmasın. Yeni siparişte detay içi en üstte,
-           listedeyken listenin scroll'u nerede kaldıysa orada. */
-        var detay = el('siparisDetay'); if (detay) detay.scrollTop = 0;
+        /* Detay panelindeki TÜM scroll'lu elementleri sıfırla; window
+           scroll'una dokunma (siparişler sayfası kaldığı yerde kalsın).
+           Mobil layout `.sip-detay__yerlesim` üzerinde, masaüstünde
+           `.sip-yan` yan panelde ve `#detayGovde` ürün listesinde scroll
+           tutar. Üçünü de baştan alıyoruz ki yeni siparişte üstte olsun. */
+        var detay = el('siparisDetay');
+        if (detay) {
+            detay.scrollTop = 0;
+            var yerlesim = detay.querySelector('.sip-detay__yerlesim');
+            if (yerlesim) yerlesim.scrollTop = 0;
+            var yan = detay.querySelector('.sip-yan');
+            if (yan) yan.scrollTop = 0;
+        }
         var govde = el('detayGovde'); if (govde) govde.scrollTop = 0;
     }
 
