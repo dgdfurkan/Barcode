@@ -9078,6 +9078,12 @@
                                         autoPasteCheckbox.checked = enabled;
                                     }
                                 }
+                                /* Nav butonları da tercihe bakıyorsa (siparisTakibi
+                                   gibi) hemen güncelle: kullanıcı toggle'ı çevirince
+                                   sağdaki menü/header de canlı yansısın. */
+                                if (typeof updatePremiumNavVisibility === 'function') {
+                                    updatePremiumNavVisibility();
+                                }
                             } catch (err) {
                                 console.error('Error saving preference:', err);
                             }

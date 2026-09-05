@@ -473,13 +473,8 @@
             }
         }
         if (cikti.length) global.__jbaSadeOrnek = cikti[0];
-        /* Debug: kullanıcı panelde bir kez sipariş gördüğünde console'a
-           tek seferlik ayrıntılı dökümü yazıyoruz. Aynı oturumda tekrar
-           basılmıyor. Görmek için: pencere konsolunda `jba()` yaz. */
-        if (global.__jbaHamOrnek && !global.__jbaHamDoktu) {
-            global.__jbaHamDoktu = true;
-            jbaHamDok(global.__jbaHamOrnek, global.__jbaSadeOrnek);
-        }
+        /* Otomatik döküm KAPALI: Getir konsolunu kirletmesin. İhtiyaç
+           olursa kullanıcı `jba()` yazıp elle görebilir. */
         return cikti;
     }
 
@@ -544,29 +539,33 @@
     var sonImza = null;
     var _panelBirGorunmus = false;
     var _sayfaGirisi = 0;
+    var _sonZorunluDuyuru = 0;
+    /* 20 saniyede bir zorunlu heartbeat: liste değişmese de yollarız.
+       Sebep: sipariş panelden düştüğünde imza aynı kalırsa mesaj gitmez,
+       DB'de eski kayıt "5 dk kala kalır". Zorunlu duyuru ile background
+       her 20 sn'de bir güncel tumIdler'i alır, panelde olmayan silinir. */
+    var ZORUNLU_DUYURU_MS = 20000;
 
     function siparisleriDuyur() {
         try {
             if (!/^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/.test(location.pathname)) {
-                _sayfaGirisi = 0; _panelBirGorunmus = false; sonImza = null;
+                _sayfaGirisi = 0; _panelBirGorunmus = false; sonImza = null; _sonZorunluDuyuru = 0;
                 return;
             }
             if (!_sayfaGirisi) _sayfaGirisi = Date.now();
             fotoHaritasiniGuncelle();
             var liste = siparisleriTopla();
             if (liste.length) _panelBirGorunmus = true;
-            /* Boş listeyi ancak panelin bir kez göründüğünü ya da 6 saniyenin
-               geçtiğini bilince duyur. İlk anda 0 kart panel henüz
-               yüklenmemiş de olabilir; hemen "boş" bildirmek DB'yi haksız
-               yere siler. */
             var boslukGercek = !liste.length && (_panelBirGorunmus || Date.now() - _sayfaGirisi > 6000);
             if (!liste.length && !boslukGercek) return;
 
             var imza = liste.map(function (o) {
                 return o.siparisId + ':' + o.durum + ':' + o.kolon + ':' + o.toplamAdet + ':' + o.banko + ':' + o.toplayici + ':' + o.kurye;
             }).join('|');
-            if (imza === sonImza) return;
+            var zorunlu = Date.now() - _sonZorunluDuyuru > ZORUNLU_DUYURU_MS;
+            if (imza === sonImza && !zorunlu) return;
             sonImza = imza;
+            _sonZorunluDuyuru = Date.now();
             gonder({ type: 'JB_SIPARISLER', liste: liste });
             try { localStorage.setItem('jba_son_siparisler', JSON.stringify({ adet: liste.length, ornek: liste[0] || null })); } catch (e) {}
         } catch (e) { /* sessiz */ }

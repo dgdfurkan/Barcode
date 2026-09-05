@@ -105,10 +105,15 @@
     }
 
     /* Toplam ve alınan: ürün ÇEŞİTİ değil ADET bazlı. Aynı üründen 5 varsa
-       5 parçadır, 1 değil. Sayaçlar ve ilerleme çubuğu buna göre çalışır. */
+       5 parçadır, 1 değil. Kilo bazlı ürünlerde (Erpiliç bonfile, baget vb.)
+       adet 0.882, 1.867 gibi kesirli geliyor; bunlar en yakın tam sayıya
+       (0.88 → 1, 1.87 → 2) yuvarlanır. Böylece "8.874 parça" yerine "9 parça"
+       gibi kartta anlamlı sayı çıkar; birim ve gerçek miktar ayrıntıda "0,882 kg
+       alınacak" olarak korunur. */
     function urunAdet(u) {
         var n = Number(u && u.adet);
-        return isFinite(n) && n > 0 ? n : 1;
+        if (!isFinite(n) || n <= 0) return 1;
+        return Math.max(1, Math.round(n));
     }
     function toplamAdet(urunler) {
         return (urunler || []).reduce(function (a, u) { return a + urunAdet(u); }, 0);
@@ -1561,16 +1566,26 @@
         (function swipeGeri() {
             var el2 = el('siparisDetay');
             if (!el2) return;
-            var basX = 0, basY = 0, aktif = false, kilitli = null;
-            var esik = 80, kenar = 32, orjT = '';
+            /* Yön kilidi katı: dx en az 1.7x dy olacak ki çapraz swipe
+               tetiklemesin. Kilitten önce ölçüm eşiği 14px, küçük parmak
+               titreklerini ele almaz. Sol kenar 30px. Dikey yön saptanırsa
+               tüm swipe iptal, sayfa normal scroll eder. */
+            var basX = 0, basY = 0, aktif = false, yon = null;
+            var esik = 70, kenar = 30;
+            var swipeKapamaZamani = 0;
+
+            function resetStil() {
+                el2.style.transition = '';
+                el2.style.transform = '';
+                el2.style.opacity = '';
+            }
 
             el2.addEventListener('touchstart', function (e) {
                 if (!durum.secili || e.touches.length !== 1) return;
                 var t = e.touches[0];
                 if (t.clientX > kenar) return;
                 basX = t.clientX; basY = t.clientY;
-                aktif = true; kilitli = null;
-                orjT = el2.style.transition;
+                aktif = true; yon = null;
                 el2.style.transition = 'none';
             }, { passive: true });
 
@@ -1579,37 +1594,53 @@
                 var t = e.touches[0];
                 var dx = t.clientX - basX;
                 var dy = t.clientY - basY;
-                if (kilitli === null) {
-                    if (Math.abs(dx) + Math.abs(dy) < 8) return;
-                    kilitli = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-                    if (kilitli === 'y') { aktif = false; el2.style.transition = orjT; return; }
+                if (yon === null) {
+                    var m = Math.abs(dx), n = Math.abs(dy);
+                    if (m + n < 14) return;
+                    if (dx > 0 && m > n * 1.7) {
+                        yon = 'x';
+                    } else {
+                        yon = 'y'; aktif = false; resetStil(); return;
+                    }
                 }
-                if (dx < 0) dx = 0;
+                if (yon !== 'x') return;
+                if (e.cancelable) e.preventDefault();
+                dx = Math.max(0, dx);
                 el2.style.transform = 'translateX(' + dx + 'px)';
-                el2.style.opacity = String(1 - Math.min(dx / 400, 0.35));
-            }, { passive: true });
+                el2.style.opacity = String(1 - Math.min(dx / 400, 0.28));
+            }, { passive: false });
 
             var bitir = function (e) {
                 if (!aktif) return;
                 aktif = false;
-                el2.style.transition = 'transform 0.22s var(--yay, ease-out), opacity 0.22s ease-out';
                 var son = (e.changedTouches && e.changedTouches[0]) || null;
                 var dx = son ? son.clientX - basX : 0;
-                if (kilitli === 'x' && dx > esik) {
-                    /* Kapatma animasyonu: kartı dışarı kaydır, sonra kapat. */
-                    el2.style.transform = 'translateX(100%)';
+                if (yon !== 'x') { resetStil(); return; }
+                el2.style.transition = 'transform 0.2s cubic-bezier(.2,.8,.2,1), opacity 0.2s ease-out';
+                if (dx > esik) {
+                    var w = el2.getBoundingClientRect().width || window.innerWidth;
+                    el2.style.transform = 'translateX(' + w + 'px)';
                     el2.style.opacity = '0';
-                    setTimeout(function () {
-                        el2.style.transition = ''; el2.style.transform = ''; el2.style.opacity = '';
-                        detayiKapat();
-                    }, 200);
+                    swipeKapamaZamani = Date.now();
+                    setTimeout(function () { resetStil(); detayiKapat(); }, 210);
                 } else {
                     el2.style.transform = ''; el2.style.opacity = '';
-                    setTimeout(function () { el2.style.transition = orjT; }, 230);
+                    setTimeout(function () { el2.style.transition = ''; }, 220);
                 }
             };
             el2.addEventListener('touchend', bitir, { passive: true });
             el2.addEventListener('touchcancel', bitir, { passive: true });
+
+            /* Ghost-click yut: touchend'ten sonra 350ms içinde gelen ilk
+               click swipe kalıntısı olabilir; birinci tıklama boşa
+               gitmesin diye o click'i emen bir hindi katman. */
+            document.addEventListener('click', function (e) {
+                if (swipeKapamaZamani && Date.now() - swipeKapamaZamani < 350) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    swipeKapamaZamani = 0;
+                }
+            }, true);
         })();
 
         el('detayGovde').addEventListener('click', function (e) {

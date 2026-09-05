@@ -703,21 +703,10 @@
                 if (res.ok) {
                     const j = await res.json();
                     findOrderIds(j);
-                    if (!window.__jbaListeDoktu) {
-                        window.__jbaListeDoktu = true;
-                        window.__jbaListeSon = j;
-                        const stil = 'background:#131720;color:#fff;padding:3px 10px;border-radius:6px;font-weight:700';
-                        console.group('%c[JBA] Sipariş LİSTE API yanıtı (radar)', stil);
-                        console.log('%cURL:', 'color:#3b82f6;font-weight:700', url);
-                        console.log('%cHTTP:', 'color:#3b82f6;font-weight:700', res.status);
-                        console.log('%cTam yanıt:', 'color:#10b981;font-weight:700', j);
-                        var ilk = (j && j.data && Array.isArray(j.data.orders)) ? j.data.orders[0] : null;
-                        console.log('%cİlk sipariş alan adları:', 'color:#f59e0b;font-weight:700', ilk ? Object.keys(ilk) : null);
-                        console.log('%cİlk sipariş:', 'color:#f59e0b;font-weight:700', ilk);
-                        console.log('%cKomutlar: jbaListe()', 'color:#94a3b8');
-                        console.groupEnd();
-                        window.jbaListe = () => window.__jbaListeSon;
-                    }
+                    /* Debug dökümü kapalı: Getir konsolunu kirletmesin.
+                       İhtiyaç olursa `jbaListe()` çağrısıyla son yanıt alınır. */
+                    window.__jbaListeSon = j;
+                    window.jbaListe = () => window.__jbaListeSon;
                 }
             } catch (e) {}
             setTimeout(() => { isRadarActive = false; }, 5000);
@@ -960,24 +949,10 @@
                     const d = await res.json();
                     const order = d?.data?.order;
                     semayiKaydet(order);
-                    // Debug: ilk detay yanıtını console'a bir kez döküyoruz.
-                    if (!window.__jbaDetayDoktu && order) {
-                        window.__jbaDetayDoktu = true;
+                    /* Debug dökümü kapalı: Getir konsolunu kirletmesin.
+                       İhtiyaç olursa `jbaDetay()` çağrısıyla son yanıt alınır. */
+                    if (order) {
                         window.__jbaDetaySon = order;
-                        const stil = 'background:#131720;color:#fff;padding:3px 10px;border-radius:6px;font-weight:700';
-                        console.group('%c[JBA] Sipariş DETAY API yanıtı', stil);
-                        console.log('%cURL:', 'color:#3b82f6;font-weight:700', url);
-                        console.log('%cHTTP:', 'color:#3b82f6;font-weight:700', res.status);
-                        console.log('%cTam yanıt (d):', 'color:#10b981;font-weight:700', d);
-                        console.log('%corder alan adları:', 'color:#f59e0b;font-weight:700', Object.keys(order));
-                        console.log('%corder nesnesi:', 'color:#f59e0b;font-weight:700', order);
-                        console.log('%corder.picker:', 'color:#ef4444;font-weight:700', order.picker);
-                        console.log('%corder.courier:', 'color:#ef4444;font-weight:700', order.courier);
-                        const u0 = Array.isArray(order.products) ? order.products[0] : null;
-                        console.log('%cilk ürün alan adları:', 'color:#8b5cf6;font-weight:700', u0 ? Object.keys(u0) : null);
-                        console.log('%cilk ürün:', 'color:#8b5cf6;font-weight:700', u0);
-                        console.log('%cKomutlar: jbaDetay()', 'color:#94a3b8');
-                        console.groupEnd();
                         window.jbaDetay = () => window.__jbaDetaySon;
                     }
                     if (order?.products && Array.isArray(order.products)) {
