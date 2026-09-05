@@ -104,25 +104,26 @@ function apiBasliklari(yetki, ekstra) {
 }
 
 async function siparisYaz(yetki, s) {
+    /* UPSERT yalnız DOLU alanları gönderir; kısmi paket (cache-only,
+       kunye yok) mevcut DB verisini null'lamaz. sonuçta orders satırı
+       kesin oluşur (order_id gerekli), diğer alanlar yavaş yavaş
+       birleşir: kunyeYaz kolon/banko/toplayıcı, siparisYaz foto/ürün. */
     const govde = {
         username: yetki.username,
         order_id: s.siparisId,
-        banko: s.banko || null,
-        kolon: s.kolon || null,
-        durum: typeof s.durum === 'number' ? s.durum : null,
-        toplam_adet: typeof s.toplamAdet === 'number' ? s.toplamAdet : null,
-        poset_sayisi: typeof s.posetSayisi === 'number' ? s.posetSayisi : null,
-        eksik_urun_var: !!s.eksikUrunVar,
-        toplayici: s.toplayici || null,
-        kurye: s.kurye || null,
-        sepet_zamani: s.sepetZamani || null,
         updated_at: new Date().toISOString()
     };
-    /* Fotoları YALNIZ doluyken gönder. Boş foto UPSERT'e girerse
-       önceden yazılmış doğru foto null'lanır. Detay API foto veriyorsa
-       oradan geliyor; panel künyesi getirmediyse dokunmayın. */
+    if (s.banko) govde.banko = s.banko;
+    if (s.kolon) govde.kolon = s.kolon;
+    if (typeof s.durum === 'number') govde.durum = s.durum;
+    if (typeof s.toplamAdet === 'number') govde.toplam_adet = s.toplamAdet;
+    if (typeof s.posetSayisi === 'number') govde.poset_sayisi = s.posetSayisi;
+    if (s.eksikUrunVar !== undefined) govde.eksik_urun_var = !!s.eksikUrunVar;
+    if (s.toplayici) govde.toplayici = s.toplayici;
+    if (s.kurye) govde.kurye = s.kurye;
     if (s.toplayiciFoto) govde.toplayici_foto = s.toplayiciFoto;
     if (s.kuryeFoto) govde.kurye_foto = s.kuryeFoto;
+    if (s.sepetZamani) govde.sepet_zamani = s.sepetZamani;
 
     const yanit = await fetch(
         SIPARIS_API + '/rest/v1/orders?on_conflict=username,order_id',

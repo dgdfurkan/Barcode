@@ -707,13 +707,11 @@
                '" data-sira="' + u.sira + '" style="--i:' + Math.min(Math.max((sira || 1) - 1, 0), 16) + '">' +
             gorsel +
             '<div class="sip-urun__bilgi">' +
-                '<button type="button" class="sip-urun__ad" data-barkod="' + u.sira + '">' +
+                '<button type="button" class="sip-urun__ad" data-barkod="' + u.sira + '"' +
+                    ' aria-label="Barkodları göster">' +
                     '<span>' + kacir(urunBasligi(u, bilgi)) + '</span>' +
                 '</button>' +
-                '<div class="sip-urun__alt">' +
-                    kodCiz(bilgi) +
-                    '<span class="sip-urun__not">' + urunNotYaz(u) + '</span>' +
-                '</div>' +
+                '<span class="sip-urun__not">' + urunNotYaz(u) + '</span>' +
             '</div>' +
             '<div class="sip-urun__eylem">' +
                 '<span class="sip-adet' + (u.birim ? ' sip-adet--birim' : '') + '">' + adetYaz(u.adet) +

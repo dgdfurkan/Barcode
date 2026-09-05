@@ -845,8 +845,9 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-urun__ad span {
     display: block;
 }
+.sip-urun__ad { cursor: pointer; }
 .sip-urun__ad:hover { color: var(--mavi); }
-.sip-urun__alt { margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sip-urun__ad:hover span { text-decoration: underline; text-decoration-color: rgba(59,130,246,0.35); text-underline-offset: 3px; }
 .sip-kod {
     max-width: 100%;
     padding: 4px 8px;

@@ -1453,14 +1453,39 @@
 
         const siparisiYolla = (siparisId) => {
             var s = siparisBul(siparisId);
-            if (!s) return;
+            /* Sipariş sonSiparisListesi'nde yoksa (henüz JB_SIPARISLER
+               gelmedi ya da liste güncellendi) cache'ten asgari paket
+               kur: en azından ürünler yazılsın. Background siparisYaz
+               conditional gövde üretiyor, boş alanlar mevcut DB'yi bozmaz. */
+            if (!s) {
+                const kod = String(siparisId).slice(-4);
+                const girdi = orderCache[kod];
+                if (!girdi || Array.isArray(girdi) || !Array.isArray(girdi.detay) || !girdi.detay.length) return;
+                s = { siparisId: siparisId, urunler: [] };
+                if (girdi.toplayiciFoto) s.toplayiciFoto = girdi.toplayiciFoto;
+                if (girdi.kuryeFoto) s.kuryeFoto = girdi.kuryeFoto;
+            }
             var simdi = Date.now();
             if (simdi - (sonGonderim.get(siparisId) || 0) < 3000) return;
             sonGonderim.set(siparisId, simdi);
             gonderilecek.delete(siparisId);
+            var paket = birlestir(s);
+            /* Debug: son 20 yazma denemesini localStorage'a bırak.
+               Konsolda: JSON.parse(localStorage.getItem('jba_yazma_log')) */
+            try {
+                var log = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
+                log.push({
+                    id: siparisId.slice(-4),
+                    urunSay: (paket.urunler || []).length,
+                    listeVar: !!siparisBul(siparisId),
+                    saat: new Date().toLocaleTimeString('tr-TR')
+                });
+                if (log.length > 20) log = log.slice(-20);
+                localStorage.setItem('jba_yazma_log', JSON.stringify(log));
+            } catch (e) {}
             try {
                 chrome.runtime.sendMessage(
-                    { type: 'JBA_SIPARIS_YAZ', siparisler: [birlestir(s)] },
+                    { type: 'JBA_SIPARIS_YAZ', siparisler: [paket] },
                     () => { if (chrome.runtime.lastError) { /* hizmet işçisi uyuyor olabilir */ } }
                 );
             } catch (e) { /* sessiz */ }
