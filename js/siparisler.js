@@ -609,15 +609,32 @@
     var BOS_ICON_KURYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.5" cy="17.5" r="2.5"/><circle cx="18.5" cy="17.5" r="2.5"/><path d="M15 17.5h-4L8 8h3l1.5 3h5.5l-1.5 5"/></svg>';
     var BOS_ICON_TOPLAYICI = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c1.4-3.6 4.2-5.5 7-5.5s5.6 1.9 7 5.5"/></svg>';
 
+    /* Kişi fotoğrafını sayfaya bir kez indir. Sonraki `ciz`'lerde
+       aynı URL browser cache'ten anında paint edilir, harflerden
+       fotoğrafa "zıplama" olmuyor. */
+    var _fotoOnbellek = new Set();
+    function fotoOnyukle(url) {
+        if (!url || _fotoOnbellek.has(url)) return;
+        _fotoOnbellek.add(url);
+        var img = new Image();
+        img.decoding = 'async';
+        img.referrerPolicy = 'no-referrer';
+        img.src = url;
+    }
+
     function kisiCip(ad, foto, kurye) {
         var varMi = !!ad;
         var bas = varMi ? basHarfler(ad) : '';
         var renk = varMi ? basRenk(ad) : '#cbd5e1';
+        /* Foto varsa harf yazma; harf → foto geçişi göz yoruyordu.
+           Foto yüklenene kadar sadece renkli daire görünür, sonra
+           `yuklu` sınıfıyla belirir. Cache'ten geliyorsa yükleme
+           anlıktır ve geçiş görülmez. */
         var fotoHtml = (varMi && foto)
-            ? '<img src="' + kacir(foto) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">'
+            ? '<img src="' + kacir(foto) + '" alt="" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add(\'yuklu\')" onerror="this.remove()">'
             : '';
         var icerik = varMi
-            ? '<b>' + kacir(bas) + '</b>'
+            ? (foto ? '' : '<b>' + kacir(bas) + '</b>')
             : (kurye ? BOS_ICON_KURYE : BOS_ICON_TOPLAYICI);
         return '<span class="sip-kart__kisi' + (kurye ? ' sip-kart__kisi--kurye' : '') +
                     (varMi ? '' : ' sip-kart__kisi--bos') + '">' +
@@ -898,6 +915,14 @@
     }
 
     function ciz() {
+        /* Kişi fotoğraflarını çizim öncesi ön-yükle: browser cache'e
+           girsinler ki innerHTML sıfırlamalarında img mount edilir
+           edilmez paint olsun, harften fotoğrafa zıplama olmasın. */
+        (durum.siparisler || []).forEach(function (s) {
+            if (s.toplayici_foto) fotoOnyukle(s.toplayici_foto);
+            if (s.kurye_foto) fotoOnyukle(s.kurye_foto);
+        });
+
         var hazirlaniyor = seritCiz('hazirlaniyor', 'izgaraHazirlaniyor', 'bosHazirlaniyor', 'hazirlaniyor');
         var hazir = seritCiz('hazir', 'izgaraHazir', 'bosHazir', 'hazir');
         var yolda = seritCiz('yolda', 'izgaraYolda', 'bosYolda', 'yolda');
