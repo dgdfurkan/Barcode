@@ -1511,12 +1511,20 @@
         window.addEventListener('message', (event) => {
             if (!event.data || event.source !== window) return;
             if (event.data.type === 'JB_SIPARISLER' && Array.isArray(event.data.liste)) {
-                /* Liste yalnız saklanıyor. Gönderim kullanıcı siparişe
-                   girdiğinde yapılıyor; her tarama sonrası bütün siparişleri
-                   yollamak boşuna trafikti. */
                 sonSiparisListesi = event.data.liste;
                 kunyeleriYolla(sonSiparisListesi);
                 otomatikYakala(sonSiparisListesi);
+                /* Detay processQueue içinde çekilmiş ama o an sipariş henüz
+                   sonSiparisListesi'nde yoktu diye siparisiYolla no-op
+                   olmuş olabilir. Şimdi liste güncel, bekleyen ne varsa
+                   gönderelim ki DB'ye ürün satırları yazılsın. */
+                sonSiparisListesi.forEach((s) => {
+                    if (!s || !s.siparisId) return;
+                    const kod = String(s.siparisId).slice(-4);
+                    const girdi = orderCache[kod];
+                    const detayVar = girdi && !Array.isArray(girdi) && Array.isArray(girdi.detay) && girdi.detay.length;
+                    if (detayVar) siparisiYolla(s.siparisId);
+                });
             }
             if (event.data.type === 'GETIR_DATA_RECEIVED') findOrderIds(event.data.payload);
             if (event.data.type === 'GETIR_TOKEN_CAPTURED') {
