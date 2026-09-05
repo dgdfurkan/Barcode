@@ -1618,6 +1618,33 @@
             if (kart) kartAcildi(kart);
         }, true);
 
+        /* Jet Barkod sitesi "şu siparişlerin ürünü gelmemiş" diye haber
+           yolladı (arka plan üzerinden). Kullanıcı telefonda ya da başka
+           bir bilgisayarda olabilir; Getir'e istek atabilen tek yer burası.
+           Kimlikleri kuyruğun başına alıp önbelleği düşürüyoruz ki taze
+           detay çekilsin ve veritabanına ürünler yazılsın. */
+        try {
+            chrome.runtime.onMessage.addListener((istek) => {
+                if (!istek || istek.type !== 'JBA_URUN_CEK') return;
+                const idler = Array.isArray(istek.siparisler) ? istek.siparisler : [];
+                let eklendi = 0;
+                idler.forEach((id) => {
+                    if (typeof id !== 'string' || !id) return;
+                    const kod = id.slice(-4);
+                    if (orderCache[kod]) { delete orderCache[kod]; }
+                    otoSorulan.delete(id);
+                    sonGonderim.delete(id);
+                    gonderilecek.add(id);
+                    if (!fetchQueueSet.has(id)) {
+                        fetchQueue.unshift(id);
+                        fetchQueueSet.add(id);
+                        eklendi++;
+                    }
+                });
+                if (eklendi) { saveCache(); if (!isFetching) processQueue(); }
+            });
+        } catch (e) { /* sessiz */ }
+
         // === MESAJ DİNLEYİCİ ===
         window.addEventListener('message', (event) => {
             if (!event.data || event.source !== window) return;

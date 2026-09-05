@@ -97,6 +97,16 @@
             return;
         }
 
+        /* Siparişler sayfası ürünü gelmemiş sipariş gördü. Depo paneli
+           sekmesi açıksa oradaki eklenti bu kimlikleri öncelikli çekiyor.
+           Telefonda ya da eklentisiz bilgisayarda bu mesaj boşa gider,
+           zararı yok: veri yine de depo panelinin açık olduğu makineden
+           yazılıp herkese ulaşır. */
+        if (d.type === 'JB_SIPARIS_URUN_EKSIK' && Array.isArray(d.siparisler)) {
+            arkaPlana({ type: 'JBA_SIPARIS_URUN_EKSIK', siparisler: d.siparisler.slice(0, 40) });
+            return;
+        }
+
         // Sayfa açık modül listesini bildiriyor.
         if (d.type === 'JB_ASISTAN_MODULLER' && Array.isArray(d.moduller)) {
             var temiz = d.moduller.filter(function (x) { return typeof x === 'string'; });

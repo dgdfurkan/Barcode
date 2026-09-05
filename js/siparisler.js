@@ -210,7 +210,7 @@
         return 'Ürün';
     }
 
-    /** @returns {{barkodlar: string[], katalogAdi: string, gorselEsti: boolean}} */
+    /** @returns {{barkodlar: string[], katalogAdi: string, gorselEsti: boolean, katalogGorsel: string}} */
     function barkodBul(u) {
         var anahtar = (u.gorsel || '') + '|' + (u.ad || '');
         if (barkodOnbellek.has(anahtar)) return barkodOnbellek.get(anahtar);
@@ -233,7 +233,12 @@
                              .filter(Boolean)
                 : [],
             katalogAdi: (urun && urun.name) || '',
-            gorselEsti: gorselIle
+            gorselEsti: gorselIle,
+            /* Panelden görsel gelmediyse (ya da adres kırıksa) katalogdaki
+               görseli kullanıyoruz. Telefonda/başka bilgisayarda eklenti
+               olmadığı için oradan Getir'e istek atılamıyor; katalog
+               yerel dosya olduğundan her cihazda çalışıyor. */
+            katalogGorsel: (urun && urun.image) || ''
         };
         barkodOnbellek.set(anahtar, sonuc);
         return sonuc;
@@ -328,6 +333,10 @@
         var imza = imzaCikar(yeni);
         durum.yukleniyor = false;
         durum.sonYenileme = Date.now();
+        /* Erken çıkıştan ÖNCE: ürünü gelmemiş sipariş varken liste hiç
+           değişmiyor, imza sabit kalıyor ve aşağıdaki return bildirimi
+           hiç çalıştırmıyordu. Tam da bu durumda haber vermek gerekiyor. */
+        urunEksikleriBildir(yeni);
         if (!zorla && imza === durum.sonImza) return;
         /* Kurye alıp gitmiş ve eskimiş kayıtlar siliniyor; ekrana da
            girmiyorlar. Silme başarısız olursa liste yine de çizilir,
@@ -348,6 +357,36 @@
             durum.secili = guncel || null;
         }
         ciz();
+    }
+
+    /* Ürünü gelmemiş siparişleri eklentiye bildirir.
+
+       Neden gerekli: telefonda ya da eklentisiz bir bilgisayarda bu sayfa
+       yalnız veritabanını okuyabiliyor, Getir'e istek atamıyor. Ürünler
+       bir sebeple yazılamadıysa o cihaz kendi başına düzeltemez. Bu mesaj
+       depo panelinin açık olduğu makineye ulaşıyor, iş orada yapılıyor ve
+       sonuç veritabanı üzerinden bütün cihazlara dönüyor.
+
+       Eklenti yoksa mesajı kimse dinlemez, zararsız. Aynı sipariş için
+       60 saniyede birden fazla istek çıkmıyor. */
+    var _eksikSorulan = new Map();
+    var EKSIK_TEKRAR_MS = 60 * 1000;
+
+    function urunEksikleriBildir(liste) {
+        try {
+            var simdi = Date.now();
+            var eksik = [];
+            (liste || []).forEach(function (s) {
+                if (!s || !s.order_id) return;
+                if ((s.urunler || []).length) return;
+                if (eskimisMi(s) || panelBitirmisMi(s)) return;
+                if (simdi - (_eksikSorulan.get(s.order_id) || 0) < EKSIK_TEKRAR_MS) return;
+                _eksikSorulan.set(s.order_id, simdi);
+                eksik.push(s.order_id);
+            });
+            if (!eksik.length) return;
+            global.postMessage({ type: 'JB_SIPARIS_URUN_EKSIK', siparisler: eksik }, global.location.origin);
+        } catch (e) { /* eklenti yoksa sessiz */ }
     }
 
     // ==================================================================
@@ -711,12 +750,48 @@
         return u.birim ? (miktar + ' ' + u.birim + ' alınacak') : (miktar + ' adet alınacak');
     }
 
+    /**
+     * Ürün görselinin adresi. Önce panelden gelen, o yoksa katalogdaki.
+     * İkisi de yoksa boş kutu çiziliyor.
+     */
+    function urunGorseli(u, bilgi) {
+        if (u.gorsel) return u.gorsel;
+        return (bilgi && bilgi.katalogGorsel) || '';
+    }
+
+    /* Görsel yüklenemedi: varsa katalog adresine bir kez düş, o da
+       tutmazsa kutuyu "Görsel yok" durumuna al. Kırık görsel simgesi
+       bırakmıyoruz. Satır içi `onerror`'dan çağrılıyor. */
+    global.JBUrunGorselHata = function (img) {
+        if (!img) return;
+        var yedek = img.getAttribute('data-yedek');
+        if (yedek && img.getAttribute('src') !== yedek) {
+            img.removeAttribute('data-yedek');
+            img.setAttribute('src', yedek);
+            return;
+        }
+        var kap = img.parentElement;
+        img.remove();
+        if (kap && kap.classList) {
+            kap.classList.add('sip-urun__gorsel--bos');
+            kap.removeAttribute('data-buyut');
+        }
+    };
+
     function urunCiz(u, sira) {
         var bilgi = barkodBul(u);
-        var gorsel = u.gorsel
+        var adres = urunGorseli(u, bilgi);
+        /* Panel adresi yüklenemezse katalog adresine düşülüyor; o da
+           tutmazsa kutu boş görünüyor (kırık görsel simgesi kalmıyor).
+           `data-yedek` yalnız iki adres farklıysa yazılıyor. */
+        var yedek = (u.gorsel && bilgi.katalogGorsel && bilgi.katalogGorsel !== u.gorsel)
+            ? bilgi.katalogGorsel : '';
+        var gorsel = adres
             ? '<button type="button" class="sip-urun__gorsel" data-buyut="' + u.sira + '" aria-label="' +
                   kacir(urunBasligi(u, bilgi)) + ' görselini büyüt">' +
-                  '<img src="' + kacir(u.gorsel) + '" alt="" loading="lazy" referrerpolicy="no-referrer"></button>'
+                  '<img src="' + kacir(adres) + '" alt="" loading="lazy" referrerpolicy="no-referrer"' +
+                  (yedek ? ' data-yedek="' + kacir(yedek) + '"' : '') +
+                  ' onerror="JBUrunGorselHata(this)"></button>'
             : '<span class="sip-urun__gorsel sip-urun__gorsel--bos"></span>';
 
         return '<div class="sip-urun' + (u.alindi ? ' sip-urun--alindi' : '') +
@@ -1056,7 +1131,8 @@
         durum.kodUrun = u;
         var g = el('kodGorsel');
         var gd = el('kodGorselDugme');
-        if (u.gorsel) { g.src = u.gorsel; gd.hidden = false; }
+        var kodAdres = urunGorseli(u, bilgi);
+        if (kodAdres) { g.src = kodAdres; gd.hidden = false; }
         else { g.removeAttribute('src'); gd.hidden = true; }
 
         el('kodAd').textContent = urunBasligi(u, bilgi);
@@ -1091,9 +1167,12 @@
     }
 
     function gorseliBuyut(u) {
-        if (!u || !u.gorsel) return;
-        el('buyukGorsel').src = u.gorsel;
-        el('buyukAd').textContent = u.ad || '';
+        if (!u) return;
+        var bilgi = barkodBul(u);
+        var adres = urunGorseli(u, bilgi);
+        if (!adres) return;
+        el('buyukGorsel').src = adres;
+        el('buyukAd').textContent = urunBasligi(u, bilgi);
         katAc('siparisBuyuk');
     }
 

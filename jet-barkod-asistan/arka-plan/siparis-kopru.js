@@ -469,6 +469,34 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
         return true;
     }
 
+    /* Jet Barkod sitesi "şu siparişlerin ürünleri gelmemiş" diyor.
+       İsteği açık depo paneli sekmelerine iletiyoruz; oradaki eklenti
+       o siparişleri kuyruğun başına alıp detayını çekiyor.
+
+       Site telefonda ya da eklentisiz bir bilgisayarda açık olabilir;
+       orada Getir'e istek atma imkânı yok. Bu köprü sayesinde iş, depo
+       panelinin açık olduğu makinede yapılıp sonuç veritabanı üzerinden
+       bütün cihazlara ulaşıyor. Açık sekme yoksa istek sessizce düşer. */
+    if (istek.type === 'JBA_SIPARIS_URUN_EKSIK') {
+        const idler = Array.isArray(istek.siparisler) ? istek.siparisler.slice(0, 40) : [];
+        if (!idler.length) { cevapla({ ok: false, sebep: 'liste boş' }); return true; }
+        try {
+            chrome.tabs.query({ url: 'https://warehouse.getir.com/*' }, (sekmeler) => {
+                const liste = sekmeler || [];
+                liste.forEach((t) => {
+                    try {
+                        chrome.tabs.sendMessage(t.id, { type: 'JBA_URUN_CEK', siparisler: idler },
+                            () => { void chrome.runtime.lastError; });
+                    } catch (e) { /* sekme kapanmış olabilir */ }
+                });
+                cevapla({ ok: true, sekme: liste.length });
+            });
+        } catch (e) {
+            cevapla({ ok: false, sebep: (e && e.message) || 'hata' });
+        }
+        return true;
+    }
+
     /* İçerik betiği "bu siparişler bende kayıtlı mı" diye soruyor. İmza
        kaydı zaten hangi siparişin yazıldığını tutuyor; ek istek atmadan
        cevaplanıyor. Sayfa yenilense de cevap aynı kalıyor, o yüzden aynı
