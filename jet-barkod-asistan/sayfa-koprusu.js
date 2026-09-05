@@ -527,6 +527,13 @@
     global.jbaCacheOku = function () {
         try { return JSON.parse(localStorage.getItem('getir_order_cache') || '{}'); } catch (e) { return {}; }
     };
+    global.jbaCache = global.jbaCacheOku;
+    global.jbaHataLog = function () {
+        var l = [];
+        try { l = JSON.parse(localStorage.getItem('jba_hata_log') || '[]'); } catch (e) {}
+        console.table(l);
+        return l;
+    };
     global.jbaTemizle = function () {
         try { localStorage.removeItem('jba_yazma_log'); } catch (e) {}
         try { localStorage.removeItem('getir_order_cache'); } catch (e) {}

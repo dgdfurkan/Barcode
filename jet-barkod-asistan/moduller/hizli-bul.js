@@ -879,19 +879,20 @@
                 const code = getShortCode(card);
                 if (!code) return;
                 visible.add(code);
+                const longId = idMap[code];
+                if (!longId) { needsRadar = true; return; }
+                /* Görülen HER karta gonderilecek.add: cache olsun olmasın.
+                   Cache doluysa fetch atlanır, ama JB_SIPARISLER handler'ı
+                   siparişi yeniden yazma denemesi yapar. Böylece background
+                   sendMessage'ı yuttuysa (service worker uyudu) bir sonraki
+                   turda yeniden denenir. */
+                gonderilecek.add(longId);
                 if (!orderCache[code]) {
-                    const longId = idMap[code];
-                    if (longId) {
-                        /* Görülen her kart için `gonderilecek`'e ekle:
-                           detay geldiğinde siparisiYolla otomatik yazsın.
-                           Kullanıcının kart tıklamasını beklemesin. */
-                        gonderilecek.add(longId);
-                        if (!fetchQueueSet.has(longId)) {
-                            fetchQueue.push(longId);
-                            fetchQueueSet.add(longId);
-                            if (!isFetching) processQueue();
-                        }
-                    } else { needsRadar = true; }
+                    if (!fetchQueueSet.has(longId)) {
+                        fetchQueue.push(longId);
+                        fetchQueueSet.add(longId);
+                        if (!isFetching) processQueue();
+                    }
                 }
             });
 
@@ -1475,29 +1476,67 @@
             }
             var simdi = Date.now();
             /* 30 sn koruma: aynı sipariş için tekrar tekrar gönderim ve log
-               spam'i azaltılır. Background zaten imza karşılaştırıp değişmemiş
-               siparişi yazmıyor; sık göndermenin faydası yok. */
+               spam'i azaltılır. Background başarıyla yazarsa yeter. */
             if (simdi - (sonGonderim.get(siparisId) || 0) < 30000) return;
             sonGonderim.set(siparisId, simdi);
             gonderilecek.delete(siparisId);
             var paket = birlestir(s);
-            try {
-                var log = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
-                log.push({
-                    id: siparisId.slice(-4),
-                    urunSay: (paket.urunler || []).length,
-                    listeVar: !!siparisBul(siparisId),
-                    saat: new Date().toLocaleTimeString('tr-TR')
-                });
-                if (log.length > 60) log = log.slice(-60);
-                localStorage.setItem('jba_yazma_log', JSON.stringify(log));
-            } catch (e) {}
+            /* Ürün yoksa gönderme: DB'ye kunye yazılıp order_items boş kalırdı,
+               site "Ürünler henüz gelmedi" gösterirdi. Detay geldiğinde
+               tekrar denenir (gonderilecek.add + sonGonderim.delete). */
+            if (!paket.urunler || !paket.urunler.length) {
+                sonGonderim.delete(siparisId);
+                gonderilecek.add(siparisId);
+                try {
+                    var lg = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
+                    lg.push({ id: siparisId.slice(-4), urunSay: 0, sonuc: 'ATLA: urun_yok', saat: new Date().toLocaleTimeString('tr-TR') });
+                    if (lg.length > 60) lg = lg.slice(-60);
+                    localStorage.setItem('jba_yazma_log', JSON.stringify(lg));
+                } catch (e) {}
+                return;
+            }
+            var listedeVar = !!siparisBul(siparisId);
+            var logKaydet = function (sonuc) {
+                try {
+                    var log = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
+                    log.push({
+                        id: siparisId.slice(-4),
+                        urunSay: (paket.urunler || []).length,
+                        listeVar: listedeVar,
+                        sonuc: sonuc,
+                        saat: new Date().toLocaleTimeString('tr-TR')
+                    });
+                    if (log.length > 60) log = log.slice(-60);
+                    localStorage.setItem('jba_yazma_log', JSON.stringify(log));
+                } catch (e) {}
+            };
             try {
                 chrome.runtime.sendMessage(
                     { type: 'JBA_SIPARIS_YAZ', siparisler: [paket] },
-                    () => { if (chrome.runtime.lastError) { /* hizmet işçisi uyuyor olabilir */ } }
+                    function (yanit) {
+                        if (chrome.runtime.lastError) {
+                            /* Background service worker uyuyorsa mesaj yutulur.
+                               Koruma iznini geri al ki bir sonraki turda yeniden
+                               denensin, kullanıcı ürünsüz sipariş görmesin. */
+                            sonGonderim.delete(siparisId);
+                            gonderilecek.add(siparisId);
+                            logKaydet('SW_UYKU: ' + (chrome.runtime.lastError.message || ''));
+                            return;
+                        }
+                        if (yanit && yanit.ok === false) {
+                            sonGonderim.delete(siparisId);
+                            gonderilecek.add(siparisId);
+                            logKaydet('BG_HATA: ' + (yanit.sebep || 'x'));
+                            return;
+                        }
+                        logKaydet('OK');
+                    }
                 );
-            } catch (e) { /* sessiz */ }
+            } catch (e) {
+                sonGonderim.delete(siparisId);
+                gonderilecek.add(siparisId);
+                logKaydet('THROW: ' + ((e && e.message) || 'x'));
+            }
         };
 
         /**
