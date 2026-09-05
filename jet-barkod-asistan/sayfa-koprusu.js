@@ -552,11 +552,17 @@
        DB'de eski kayıt "5 dk kala kalır". Zorunlu duyuru ile background
        her 20 sn'de bir güncel tumIdler'i alır, panelde olmayan silinir. */
     var ZORUNLU_DUYURU_MS = 20000;
+    /* Sayfa açıldıktan/sekmeye dönüldükten sonraki İLK duyuruda `ilk: true`
+       gider. Arka plan bunu görünce temizlik kilidini atlayıp panelle tam
+       senkron olur. Kullanıcı saatler sonra döndüğünde eski kayıtlar bir
+       tur beklemeden gitsin. */
+    var _ilkDuyuruYapildi = false;
 
     function siparisleriDuyur() {
         try {
             if (!/^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/.test(location.pathname)) {
-                _sayfaGirisi = 0; _panelBirGorunmus = false; sonImza = null; _sonZorunluDuyuru = 0;
+                _sayfaGirisi = 0; _panelBirGorunmus = false; sonImza = null;
+                _sonZorunluDuyuru = 0; _ilkDuyuruYapildi = false;
                 return;
             }
             if (!_sayfaGirisi) _sayfaGirisi = Date.now();
@@ -571,12 +577,23 @@
             }).join('|');
             var zorunlu = Date.now() - _sonZorunluDuyuru > ZORUNLU_DUYURU_MS;
             if (imza === sonImza && !zorunlu) return;
+            var ilk = !_ilkDuyuruYapildi;
+            _ilkDuyuruYapildi = true;
             sonImza = imza;
             _sonZorunluDuyuru = Date.now();
-            gonder({ type: 'JB_SIPARISLER', liste: liste });
+            gonder({ type: 'JB_SIPARISLER', liste: liste, ilk: ilk });
             try { localStorage.setItem('jba_son_siparisler', JSON.stringify({ adet: liste.length, ornek: liste[0] || null })); } catch (e) {}
         } catch (e) { /* sessiz */ }
     }
+
+    /* Sekmeye geri dönüldüğünde tam senkron: kullanıcı saatlerce başka
+       yerdeyken panel değişmiş olabilir, DB'yi hemen panele eşitleyelim. */
+    global.document.addEventListener('visibilitychange', function () {
+        if (global.document.visibilityState !== 'visible') return;
+        _ilkDuyuruYapildi = false;
+        sonImza = null;
+        siparisleriDuyur();
+    });
 
     setInterval(siparisleriDuyur, 2000);
     setTimeout(siparisleriDuyur, 3000);
@@ -585,7 +602,12 @@
         if (e.source !== global) return;
         if (e.origin !== KAYNAK) return;
         var d = e.data;
-        if (d && d.type === 'JB_SIPARIS_SOR') { sonImza = ''; siparisleriDuyur(); return; }
+        /* İçerik betiği yeniden yayın istiyor (sayfa açılışı, sekmeye
+           dönüş, gezinme). Tam senkron sayılıyor: `ilk` bayrağıyla gidip
+           arka planın temizlik kilidini atlatıyor. */
+        if (d && d.type === 'JB_SIPARIS_SOR') {
+            sonImza = null; _ilkDuyuruYapildi = false; siparisleriDuyur(); return;
+        }
         if (!d || d.type !== 'JB_SIPARIS_GETIR') return;
         if (!d.warehouseId) {
             return gonder({ type: 'JB_SIPARIS_SONUC', data: [], error: 'Depo bilgisi yok' });

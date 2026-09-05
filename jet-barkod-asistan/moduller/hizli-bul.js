@@ -694,6 +694,15 @@
         });
 
         // === RADAR ===
+        /* Panelin kendi `/orders` yanıtı AKTİF siparişlerin tam listesi.
+           DOM'dan okunan kart listesi eksik kalabiliyor (panel henüz
+           render etmemiş, kolon görünmüyor, sanal liste). Bu yüzden
+           temizlik kararında radar listesi de hesaba katılıyor: panelde
+           duran bir sipariş DOM'da yakalanmadı diye silinmesin. */
+        let sonRadarIdler = null;
+        let sonRadarZamani = 0;
+        const RADAR_TAZE_MS = 90 * 1000;
+
         const forceRadarFetch = async () => {
             if (isRadarActive || !userToken || !warehouseId) return;
             isRadarActive = true;
@@ -703,6 +712,13 @@
                 if (res.ok) {
                     const j = await res.json();
                     findOrderIds(j);
+                    const siparisler = (j && j.data && Array.isArray(j.data.orders)) ? j.data.orders : null;
+                    if (siparisler) {
+                        sonRadarIdler = siparisler
+                            .map((o) => o && o.id)
+                            .filter((id) => typeof id === 'string' && id);
+                        sonRadarZamani = Date.now();
+                    }
                     /* Debug dökümü kapalı: Getir konsolunu kirletmesin.
                        İhtiyaç olursa `jbaListe()` çağrısıyla son yanıt alınır. */
                     window.__jbaListeSon = j;
@@ -1344,7 +1360,7 @@
         const kisiImzasi = (s) => (s.toplayici || '') + '~' + (s.kurye || '');
         const sonKisi = new Map();
 
-        const kunyeleriYolla = (liste) => {
+        const kunyeleriYolla = (liste, zorla) => {
             const degisen = [];
             const tumIdler = [];
             liste.forEach((s) => {
@@ -1365,17 +1381,39 @@
                     otoSorulan.delete(s.siparisId);
                 }
             });
-            /* Panel boş bile olsa arka plana bildir; DB temizlensin.
-               sayfa-koprusu boş listeyi ancak panelin yüklendiğinden emin
-               olduktan sonra yolladığı için ilk açılışta yanlış silme yok. */
-            const panelBos = liste.length === 0;
-            if (!panelBos && !degisen.length && !tumIdler.length) return;
+            /* KİMİN SÖZÜ GEÇER
+               DOM'da kart varsa panel çizmiş demektir; o liste TAM listedir
+               ve otoritedir. Teslim edilen sipariş DOM'dan düşer düşmez
+               silinsin diye radarı işin içine karıştırmıyoruz.
+
+               DOM boşsa iki ihtimal var: panel gerçekten boş, ya da React
+               henüz çizmedi (sekmeye yeni dönüldü). Ayırt etmek için taze
+               radar yanıtına bakıyoruz. Radar da bayatsa hiçbir şey
+               yapmıyoruz: radarı tetikleyip susuyoruz, bir sonraki turda
+               (2 sn) doğru kararı veriyoruz. Böylece "sekmeye döndüm, DB
+               komple silindi" kazası imkânsız. */
+            if (!tumIdler.length) {
+                const radarTaze = sonRadarIdler && (Date.now() - sonRadarZamani < RADAR_TAZE_MS);
+                if (!radarTaze) {
+                    try { forceRadarFetch(); } catch (e) {}
+                    return;
+                }
+                sonRadarIdler.forEach((id) => tumIdler.push(id));
+            }
+
+            /* Buraya geldiysek gönderiyoruz: künye değişmemiş olsa bile
+               `tumIdler` arka planın temizlik girdisi. Göndermezsek panelden
+               düşen sipariş DB'de kalır. sayfa-koprusu zaten imza aynıyken
+               mesaj yollamıyor (20 sn'de bir heartbeat hariç), o yüzden bu
+               yol seyrek işliyor ve fazladan trafik doğurmuyor. */
+            const panelBos = tumIdler.length === 0;
             if (panelBos) sonKunye.clear();
             try {
                 chrome.runtime.sendMessage(
                     { type: 'JBA_SIPARIS_KUNYE',
                       tumIdler: tumIdler,
                       panelBos: panelBos,
+                      zorla: !!zorla,
                       siparisler: degisen.map((s) => ({
                         siparisId: s.siparisId,
                         kolon: s.kolon,
@@ -1585,7 +1623,10 @@
             if (!event.data || event.source !== window) return;
             if (event.data.type === 'JB_SIPARISLER' && Array.isArray(event.data.liste)) {
                 sonSiparisListesi = event.data.liste;
-                kunyeleriYolla(sonSiparisListesi);
+                /* `ilk`: panel sayfası yeni açıldı ya da sekmeye dönüldü.
+                   Temizlik kilidini atlayıp tam senkron istiyoruz; saatler
+                   sonra dönüldüğünde eski kayıtlar bir an bile durmasın. */
+                kunyeleriYolla(sonSiparisListesi, !!event.data.ilk);
                 otomatikYakala(sonSiparisListesi);
                 /* Detay processQueue içinde çekilmiş ama o an sipariş henüz
                    sonSiparisListesi'nde yoktu diye siparisiYolla no-op

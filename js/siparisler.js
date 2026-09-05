@@ -433,15 +433,26 @@
 
     function kolonAdi(s) { return sade(s && s.kolon); }
 
-    /* Panelden düşen sipariş bir daha güncellenmiyor; kaydı bizde kalıyor.
-       Üç saati geçmiş bir sipariş panelde kesinlikle yok. */
+    /* Panelden düşen siparişi eklenti siliyor. Bu ikinci savunma katmanı:
+       eklenti kapalıysa ya da warehouse sekmesi hiç açılmadıysa silme
+       çalışmaz, DB'de kalıntı durur. Üç saati geçmiş bir sipariş panelde
+       kesinlikle yok, ekranda da göstermiyoruz.
+
+       `updated_at` de bakılıyor: eklenti siparişe her dokunduğunda bu alan
+       tazeleniyor. Yani "panel hâlâ bu siparişi gösteriyor" demek. Yalnız
+       sepet zamanına bakmak uzun süren siparişleri haksız yere gizliyordu. */
     var ESKIME_MS = 3 * 60 * 60 * 1000;
 
     function eskimisMi(s) {
-        var t = s.sepet_zamani || s.created_at;
-        if (!t) return false;
-        var ms = Date.now() - new Date(t).getTime();
-        return isFinite(ms) && ms > ESKIME_MS;
+        var damgalar = [s.updated_at, s.sepet_zamani, s.created_at];
+        var enYeni = 0;
+        for (var i = 0; i < damgalar.length; i++) {
+            if (!damgalar[i]) continue;
+            var t = new Date(damgalar[i]).getTime();
+            if (isFinite(t) && t > enYeni) enYeni = t;
+        }
+        if (!enYeni) return false;
+        return (Date.now() - enYeni) > ESKIME_MS;
     }
 
     function panelBitirmisMi(s) { return KOLON_BITTI.test(kolonAdi(s)); }

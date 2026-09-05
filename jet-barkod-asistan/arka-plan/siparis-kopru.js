@@ -279,33 +279,89 @@ async function kunyeYaz(yetki, liste) {
     }
 }
 
-/* Panelde artık olmayan siparişleri DB'den siler. Eklenti paneldeki
-   tüm sipariş kimliklerini gönderir; DB'de olup panelde olmayan
-   siparişler ANINDA temizlenir. Panel = DB birebir eşleşir. */
+/* ==================================================================
+   Panel = tek gerçek kaynak
+   ------------------------------------------------------------------
+   Getir panelinde o an ne varsa DB'de o olmalı. Panelde olmayan kayıt
+   çöptür ve anında gitmeli.
+
+   ESKİ YÖNTEM NEDEN YETMİYORDU
+   Her çöp sipariş için ayrı DELETE + storage okuma + storage yazma +
+   400 ms bekleme yapılıyordu. 50 kalıntı ≈ 30 saniye. MV3 hizmet işçisi
+   o süre dolmadan uyuyabiliyor, döngü yarıda kalıyor ve kalanlar bir
+   sonraki tura kalıyordu. Kullanıcı saatler sonra döndüğünde ekranda
+   50 tane teslim edilmiş sipariş görüyordu.
+
+   YENİ YÖNTEM
+   Silinecekler tek `order_id=in.(...)` isteğiyle gidiyor. 80'lik
+   parçalara bölünüyor ki URL uzunluk sınırına takılmasın. İmzalar tek
+   storage yazımıyla temizleniyor. 50 kalıntı ≈ 1 istek, ~200 ms.
+   ================================================================== */
 let sonTemizlik = 0;
 const TEMIZLIK_ARALIK = 8 * 1000;
+const SILME_PARCA = 80;
 
-async function paneldeOlmayanlariSil(yetki, panelIdleri, panelBos) {
-    /* Panel boşsa (panelBos true) idler dizisi boş olsa da temizleme yapılır:
-       tüm DB kayıtları silinir. Aksi hâlde en az bir id gerekli. */
+/* PostgREST `in.(...)` listesine yalnız güvenli kimlikler giriyor.
+   Getir'in sipariş kimliği hex; virgül/parantez taşıyan bir değer
+   sorguyu bozabilir, o yüzden desen dışındakiler atlanıyor. */
+function guvenliKimlik(id) {
+    return typeof id === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(id);
+}
+
+async function paneliSenkronla(yetki, panelIdleri, panelBos, zorla) {
+    /* Panel boşsa (panelBos true) idler dizisi boş olsa da temizlik
+       yapılır: DB'deki tüm kayıtlar gider. Aksi hâlde en az bir id
+       gerekli, yoksa panel okunamamış demektir ve dokunmuyoruz. */
     if (!panelIdleri.length && !panelBos) return;
-    if (Date.now() - sonTemizlik < TEMIZLIK_ARALIK) return;
+    if (!zorla && Date.now() - sonTemizlik < TEMIZLIK_ARALIK) return;
     sonTemizlik = Date.now();
 
-    const adres = SIPARIS_API + '/rest/v1/orders' +
-        '?username=eq.' + encodeURIComponent(yetki.username) +
-        '&select=order_id';
+    const temel = SIPARIS_API + '/rest/v1/orders' +
+        '?username=eq.' + encodeURIComponent(yetki.username);
+
     try {
-        const yanit = await fetch(adres, { headers: apiBasliklari(yetki) });
+        /* Panel tamamen boş: tek istekte hepsini sil, imza defterini
+           de sıfırla. Aynı sipariş bir daha panelde belirirse yeniden
+           yazılabilsin diye imza kalıntısı bırakmıyoruz. */
+        if (!panelIdleri.length) {
+            const hepsi = await fetch(temel, {
+                method: 'DELETE',
+                headers: apiBasliklari(yetki, { 'Prefer': 'return=minimal' })
+            });
+            if (hepsi.ok) await imzalariYaz({});
+            return;
+        }
+
+        const yanit = await fetch(temel + '&select=order_id', { headers: apiBasliklari(yetki) });
         if (!yanit.ok) return;
         const dbListe = await yanit.json();
         const panelSet = new Set(panelIdleri);
-        for (const s of dbListe) {
-            if (panelSet.has(s.order_id)) continue;
-            await siparisSil(yetki, s.order_id);
+        const silinecek = dbListe
+            .map((s) => s && s.order_id)
+            .filter((id) => guvenliKimlik(id) && !panelSet.has(id));
+        if (!silinecek.length) return;
+
+        const silinen = [];
+        for (let i = 0; i < silinecek.length; i += SILME_PARCA) {
+            const parca = silinecek.slice(i, i + SILME_PARCA);
+            const adres = temel + '&order_id=in.(' + parca.join(',') + ')';
+            const cevap = await fetch(adres, {
+                method: 'DELETE',
+                headers: apiBasliklari(yetki, { 'Prefer': 'return=minimal' })
+            });
+            if (cevap.ok) parca.forEach((id) => silinen.push(id));
+            if (i + SILME_PARCA < silinecek.length) await bekle(SIPARIS_ARA_MS);
+        }
+
+        /* İmzalar tek okuma-yazma turunda temizleniyor; silinen sipariş
+           tekrar panele düşerse ürünleriyle yeniden yazılabilsin. */
+        if (silinen.length) {
             const imzalar = await imzalariOku();
-            if (imzalar[s.order_id]) { delete imzalar[s.order_id]; await imzalariYaz(imzalar); }
-            await bekle(SIPARIS_ARA_MS);
+            let degisti = false;
+            silinen.forEach((id) => {
+                if (imzalar[id]) { delete imzalar[id]; degisti = true; }
+            });
+            if (degisti) await imzalariYaz(imzalar);
         }
     } catch (e) { /* sessiz */ }
 }
@@ -397,10 +453,15 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
         const liste = Array.isArray(istek.siparisler) ? istek.siparisler.slice(0, 50) : [];
         const tumIdler = Array.isArray(istek.tumIdler) ? istek.tumIdler : [];
         const panelBos = !!istek.panelBos;
+        /* `zorla`: panel sayfası yeni açıldı ya da sekmeye geri dönüldü.
+           8 saniyelik temizlik kilidini atlayıp hemen tam senkron yapıyoruz;
+           kullanıcı saatler sonra döndüğünde eski kayıtlar bir an bile
+           ekranda kalmasın. */
+        const zorla = !!istek.zorla;
         if (!liste.length && !tumIdler.length && !panelBos) { cevapla({ ok: false, sebep: 'liste boş' }); return true; }
         yetkiOku().then((y) => {
             if (!y) { cevapla({ ok: false, sebep: 'yetki yok' }); return; }
-            kunyeYaz(y, liste).then(() => paneldeOlmayanlariSil(y, tumIdler, panelBos)).then(
+            kunyeYaz(y, liste).then(() => paneliSenkronla(y, tumIdler, panelBos, zorla)).then(
                 () => cevapla({ ok: true, sayi: liste.length }),
                 (e) => cevapla({ ok: false, sebep: (e && e.message) || 'hata' })
             );
