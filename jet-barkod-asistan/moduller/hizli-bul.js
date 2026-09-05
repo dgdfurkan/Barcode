@@ -1499,12 +1499,13 @@
                 if (girdi.kuryeFoto) s.kuryeFoto = girdi.kuryeFoto;
             }
             var simdi = Date.now();
-            if (simdi - (sonGonderim.get(siparisId) || 0) < 3000) return;
+            /* 30 sn koruma: aynı sipariş için tekrar tekrar gönderim ve log
+               spam'i azaltılır. Background zaten imza karşılaştırıp değişmemiş
+               siparişi yazmıyor; sık göndermenin faydası yok. */
+            if (simdi - (sonGonderim.get(siparisId) || 0) < 30000) return;
             sonGonderim.set(siparisId, simdi);
             gonderilecek.delete(siparisId);
             var paket = birlestir(s);
-            /* Debug: son 20 yazma denemesini localStorage'a bırak.
-               Konsolda: JSON.parse(localStorage.getItem('jba_yazma_log')) */
             try {
                 var log = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
                 log.push({
@@ -1513,7 +1514,7 @@
                     listeVar: !!siparisBul(siparisId),
                     saat: new Date().toLocaleTimeString('tr-TR')
                 });
-                if (log.length > 20) log = log.slice(-20);
+                if (log.length > 60) log = log.slice(-60);
                 localStorage.setItem('jba_yazma_log', JSON.stringify(log));
             } catch (e) {}
             try {

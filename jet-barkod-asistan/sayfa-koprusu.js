@@ -519,6 +519,25 @@
             : console.log(m);
     };
 
+    /* Log/cache helper'ları MAIN world'de: `hizli-bul.js` içerik betiği
+       isolated world'de olduğu için window.jbaLog konsoldan görünmüyordu.
+       Buradaki tanımlar sayfa contextinde çalışıyor. localStorage aynı
+       origin'de paylaşılıyor, yani `jba_yazma_log` her iki tarafça görülür. */
+    global.jbaLog = function () {
+        var l = [];
+        try { l = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]'); } catch (e) {}
+        console.table(l);
+        return l;
+    };
+    global.jbaCacheOku = function () {
+        try { return JSON.parse(localStorage.getItem('getir_order_cache') || '{}'); } catch (e) { return {}; }
+    };
+    global.jbaTemizle = function () {
+        try { localStorage.removeItem('jba_yazma_log'); } catch (e) {}
+        try { localStorage.removeItem('getir_order_cache'); } catch (e) {}
+        console.log('[JBA] log ve cache silindi, sayfayı yenile.');
+    };
+
     /* Aynı listeyi tekrar tekrar yollamamak için imza karşılaştırılıyor.
        Sipariş kimliği, durumu ve adedi değişmediyse mesaj gitmiyor.
        null: hiç göndermedik. '' : boş liste gönderdik (panel boş). */
