@@ -592,6 +592,25 @@
             } catch (e) {}
         };
 
+        /* Konsol yardımcıları. warehouse.getir.com sekmesinde F12 → Console:
+           - jbaLog()   son 30 yazma denemesini tabloda gösterir
+           - jbaCache() orderCache içeriğini döner
+           - jbaTemizle() logu ve cache'i siler, taze başlar */
+        try {
+            window.jbaLog = function () {
+                var l = [];
+                try { l = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]'); } catch (e) {}
+                console.table(l);
+                return l;
+            };
+            window.jbaCache = function () { return orderCache; };
+            window.jbaTemizle = function () {
+                try { localStorage.removeItem('jba_yazma_log'); } catch (e) {}
+                try { localStorage.removeItem('getir_order_cache'); } catch (e) {}
+                console.log('[JBA] log ve cache silindi, sayfayı yenile.');
+            };
+        } catch (e) {}
+
         const getTokenExpiry = (token) => {
             if (!token) return 'Oturum anahtarı yok';
             try {
@@ -995,8 +1014,22 @@
                     isFetching = false;
                     updateQueueStatus();
                     return;
+                } else {
+                    try {
+                        var lg = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
+                        lg.push({ id: oId.slice(-4), sonuc: 'HTTP ' + res.status, saat: new Date().toLocaleTimeString('tr-TR') });
+                        if (lg.length > 30) lg = lg.slice(-30);
+                        localStorage.setItem('jba_yazma_log', JSON.stringify(lg));
+                    } catch (e) {}
                 }
-            } catch (e) {}
+            } catch (e) {
+                try {
+                    var lg2 = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
+                    lg2.push({ id: oId.slice(-4), sonuc: 'fetch err: ' + ((e && e.message) || 'x'), saat: new Date().toLocaleTimeString('tr-TR') });
+                    if (lg2.length > 30) lg2 = lg2.slice(-30);
+                    localStorage.setItem('jba_yazma_log', JSON.stringify(lg2));
+                } catch (e2) {}
+            }
 
             isFetching = false;
             updateQueueStatus();
