@@ -278,8 +278,10 @@ async function kunyeYaz(yetki, liste) {
 let sonTemizlik = 0;
 const TEMIZLIK_ARALIK = 8 * 1000;
 
-async function paneldeOlmayanlariSil(yetki, panelIdleri) {
-    if (!panelIdleri.length) return;
+async function paneldeOlmayanlariSil(yetki, panelIdleri, panelBos) {
+    /* Panel boşsa (panelBos true) idler dizisi boş olsa da temizleme yapılır:
+       tüm DB kayıtları silinir. Aksi hâlde en az bir id gerekli. */
+    if (!panelIdleri.length && !panelBos) return;
     if (Date.now() - sonTemizlik < TEMIZLIK_ARALIK) return;
     sonTemizlik = Date.now();
 
@@ -387,10 +389,11 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
     if (istek.type === 'JBA_SIPARIS_KUNYE') {
         const liste = Array.isArray(istek.siparisler) ? istek.siparisler.slice(0, 50) : [];
         const tumIdler = Array.isArray(istek.tumIdler) ? istek.tumIdler : [];
-        if (!liste.length && !tumIdler.length) { cevapla({ ok: false, sebep: 'liste boş' }); return true; }
+        const panelBos = !!istek.panelBos;
+        if (!liste.length && !tumIdler.length && !panelBos) { cevapla({ ok: false, sebep: 'liste boş' }); return true; }
         yetkiOku().then((y) => {
             if (!y) { cevapla({ ok: false, sebep: 'yetki yok' }); return; }
-            kunyeYaz(y, liste).then(() => paneldeOlmayanlariSil(y, tumIdler)).then(
+            kunyeYaz(y, liste).then(() => paneldeOlmayanlariSil(y, tumIdler, panelBos)).then(
                 () => cevapla({ ok: true, sayi: liste.length }),
                 (e) => cevapla({ ok: false, sebep: (e && e.message) || 'hata' })
             );

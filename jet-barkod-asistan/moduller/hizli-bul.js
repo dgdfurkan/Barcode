@@ -1267,11 +1267,17 @@
                 sonKunye.set(s.siparisId, yeni);
                 if (eski !== yeni) degisen.push(s);
             });
-            if (!degisen.length && !tumIdler.length) return;
+            /* Panel boş bile olsa arka plana bildir; DB temizlensin.
+               sayfa-koprusu boş listeyi ancak panelin yüklendiğinden emin
+               olduktan sonra yolladığı için ilk açılışta yanlış silme yok. */
+            const panelBos = liste.length === 0;
+            if (!panelBos && !degisen.length && !tumIdler.length) return;
+            if (panelBos) sonKunye.clear();
             try {
                 chrome.runtime.sendMessage(
                     { type: 'JBA_SIPARIS_KUNYE',
                       tumIdler: tumIdler,
+                      panelBos: panelBos,
                       siparisler: degisen.map((s) => ({
                         siparisId: s.siparisId,
                         kolon: s.kolon,

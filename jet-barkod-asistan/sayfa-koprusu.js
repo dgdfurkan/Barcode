@@ -486,22 +486,36 @@
     }
 
     /* Aynı listeyi tekrar tekrar yollamamak için imza karşılaştırılıyor.
-       Sipariş kimliği, durumu ve adedi değişmediyse mesaj gitmiyor. */
-    var sonImza = '';
+       Sipariş kimliği, durumu ve adedi değişmediyse mesaj gitmiyor.
+       null: hiç göndermedik. '' : boş liste gönderdik (panel boş). */
+    var sonImza = null;
+    var _panelBirGorunmus = false;
+    var _sayfaGirisi = 0;
 
     function siparisleriDuyur() {
         try {
-            if (!/^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/.test(location.pathname)) return;
+            if (!/^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/.test(location.pathname)) {
+                _sayfaGirisi = 0; _panelBirGorunmus = false; sonImza = null;
+                return;
+            }
+            if (!_sayfaGirisi) _sayfaGirisi = Date.now();
             fotoHaritasiniGuncelle();
             var liste = siparisleriTopla();
-            if (!liste.length) return;
+            if (liste.length) _panelBirGorunmus = true;
+            /* Boş listeyi ancak panelin bir kez göründüğünü ya da 6 saniyenin
+               geçtiğini bilince duyur. İlk anda 0 kart panel henüz
+               yüklenmemiş de olabilir; hemen "boş" bildirmek DB'yi haksız
+               yere siler. */
+            var boslukGercek = !liste.length && (_panelBirGorunmus || Date.now() - _sayfaGirisi > 6000);
+            if (!liste.length && !boslukGercek) return;
+
             var imza = liste.map(function (o) {
                 return o.siparisId + ':' + o.durum + ':' + o.kolon + ':' + o.toplamAdet + ':' + o.banko + ':' + o.toplayici + ':' + o.kurye;
             }).join('|');
             if (imza === sonImza) return;
             sonImza = imza;
             gonder({ type: 'JB_SIPARISLER', liste: liste });
-            try { localStorage.setItem('jba_son_siparisler', JSON.stringify({ adet: liste.length, ornek: liste[0] })); } catch (e) {}
+            try { localStorage.setItem('jba_son_siparisler', JSON.stringify({ adet: liste.length, ornek: liste[0] || null })); } catch (e) {}
         } catch (e) { /* sessiz */ }
     }
 
