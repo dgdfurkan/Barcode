@@ -1554,6 +1554,64 @@
 
         el('detayGeri').addEventListener('click', detayiKapat);
 
+        /* Soldan sağa kaydırma ile geri: sadece sol kenardan başlar,
+           dikey scroll'a karışmaz, mesafe ile canlı bir takip verir,
+           yeterli mesafede kapatır, değilse yumuşak geri döner. Yalnız
+           dokunmatik cihazda. */
+        (function swipeGeri() {
+            var el2 = el('siparisDetay');
+            if (!el2) return;
+            var basX = 0, basY = 0, aktif = false, kilitli = null;
+            var esik = 80, kenar = 32, orjT = '';
+
+            el2.addEventListener('touchstart', function (e) {
+                if (!durum.secili || e.touches.length !== 1) return;
+                var t = e.touches[0];
+                if (t.clientX > kenar) return;
+                basX = t.clientX; basY = t.clientY;
+                aktif = true; kilitli = null;
+                orjT = el2.style.transition;
+                el2.style.transition = 'none';
+            }, { passive: true });
+
+            el2.addEventListener('touchmove', function (e) {
+                if (!aktif) return;
+                var t = e.touches[0];
+                var dx = t.clientX - basX;
+                var dy = t.clientY - basY;
+                if (kilitli === null) {
+                    if (Math.abs(dx) + Math.abs(dy) < 8) return;
+                    kilitli = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+                    if (kilitli === 'y') { aktif = false; el2.style.transition = orjT; return; }
+                }
+                if (dx < 0) dx = 0;
+                el2.style.transform = 'translateX(' + dx + 'px)';
+                el2.style.opacity = String(1 - Math.min(dx / 400, 0.35));
+            }, { passive: true });
+
+            var bitir = function (e) {
+                if (!aktif) return;
+                aktif = false;
+                el2.style.transition = 'transform 0.22s var(--yay, ease-out), opacity 0.22s ease-out';
+                var son = (e.changedTouches && e.changedTouches[0]) || null;
+                var dx = son ? son.clientX - basX : 0;
+                if (kilitli === 'x' && dx > esik) {
+                    /* Kapatma animasyonu: kartı dışarı kaydır, sonra kapat. */
+                    el2.style.transform = 'translateX(100%)';
+                    el2.style.opacity = '0';
+                    setTimeout(function () {
+                        el2.style.transition = ''; el2.style.transform = ''; el2.style.opacity = '';
+                        detayiKapat();
+                    }, 200);
+                } else {
+                    el2.style.transform = ''; el2.style.opacity = '';
+                    setTimeout(function () { el2.style.transition = orjT; }, 230);
+                }
+            };
+            el2.addEventListener('touchend', bitir, { passive: true });
+            el2.addEventListener('touchcancel', bitir, { passive: true });
+        })();
+
         el('detayGovde').addEventListener('click', function (e) {
             if (!durum.secili) return;
             var urunBul = function (n) {

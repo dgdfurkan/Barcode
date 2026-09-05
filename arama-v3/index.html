@@ -1197,6 +1197,10 @@
             color: #0f172a;
         }
 
+        /* Tailwind .hidden aynı özgüllükte kalıyordu, .mobile-menu-item'ın
+           display: flex'i onu bastırıp premium kapalı butonları da açıyordu. */
+        .mobile-menu-item.hidden { display: none !important; }
+
         /* Icon Tooltip Styles */
         .icon-tooltip {
             position: absolute;
@@ -2069,6 +2073,12 @@
                             </svg>
                             <span>Raftaki Eksikler</span>
                         </button>
+                        <button id="headerOrdersPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Siparişler">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 4h4"/>
+                            </svg>
+                            <span>Siparişler</span>
+                        </button>
                         </nav>
                     </div>
 
@@ -2205,6 +2215,13 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                 </svg>
                 <span>Raftaki Eksikler</span>
+            </button>
+            <!-- Siparişler (sadece premium siparisTakibi aktifse görünür) -->
+            <button id="mobileOrdersPageBtn" class="mobile-menu-item hidden" type="button" aria-label="Siparişler">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 4h4"/>
+                </svg>
+                <span>Siparişler</span>
             </button>
 
             <button id="mobileSettingsBtn" class="mobile-menu-item">
@@ -3248,6 +3265,19 @@
                 window.location.replace('../eksikler/');
             });
         }
+        const headerOrdersPageBtn = document.getElementById('headerOrdersPageBtn');
+        if (headerOrdersPageBtn) {
+            headerOrdersPageBtn.addEventListener('click', () => {
+                window.location.replace('../siparisler/');
+            });
+        }
+        const mobileOrdersPageBtn = document.getElementById('mobileOrdersPageBtn');
+        if (mobileOrdersPageBtn) {
+            mobileOrdersPageBtn.addEventListener('click', () => {
+                closeMobileMenu();
+                window.location.replace('../siparisler/');
+            });
+        }
 
         // Sync user info to mobile menu
         function syncUserInfoToMobileMenu() {
@@ -3701,15 +3731,17 @@
             const mobileAgendaBtn = document.getElementById('mobileAgendaPageBtn');
             const headerShelfBtn = document.getElementById('headerShelfMissingPageBtn');
             const mobileShelfBtn = document.getElementById('mobileShelfMissingPageBtn');
+            const headerOrdersBtn = document.getElementById('headerOrdersPageBtn');
+            const mobileOrdersBtn = document.getElementById('mobileOrdersPageBtn');
 
             const hideAll = () => {
                 if (navWrap) navWrap.classList.add('hidden');
-                [headerBtn, mobileBtn, headerLowStockBtn, mobileLowStockBtn, headerAgendaBtn, mobileAgendaBtn, headerShelfBtn, mobileShelfBtn].forEach((el) => {
+                [headerBtn, mobileBtn, headerLowStockBtn, mobileLowStockBtn, headerAgendaBtn, mobileAgendaBtn, headerShelfBtn, mobileShelfBtn, headerOrdersBtn, mobileOrdersBtn].forEach((el) => {
                     if (el) el.classList.add('hidden');
                 });
             };
 
-            if (!headerBtn && !mobileBtn && !headerLowStockBtn && !mobileLowStockBtn && !headerAgendaBtn && !mobileAgendaBtn && !headerShelfBtn && !mobileShelfBtn) return;
+            if (!headerBtn && !mobileBtn && !headerLowStockBtn && !mobileLowStockBtn && !headerAgendaBtn && !mobileAgendaBtn && !headerShelfBtn && !mobileShelfBtn && !headerOrdersBtn && !mobileOrdersBtn) return;
 
             try {
                 if (!window.authUtils || !window.authUtils.checkAuth()) {
@@ -3752,6 +3784,13 @@
                 } else {
                     if (headerShelfBtn) headerShelfBtn.classList.add('hidden');
                     if (mobileShelfBtn) mobileShelfBtn.classList.add('hidden');
+                }
+
+                if (window.premiumFeatures?.checkPremiumFeature('siparisTakibi')) {
+                    show(headerOrdersBtn, mobileOrdersBtn);
+                } else {
+                    if (headerOrdersBtn) headerOrdersBtn.classList.add('hidden');
+                    if (mobileOrdersBtn) mobileOrdersBtn.classList.add('hidden');
                 }
 
                 if (navWrap) {
