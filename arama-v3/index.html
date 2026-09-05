@@ -3786,7 +3786,12 @@
                     if (mobileShelfBtn) mobileShelfBtn.classList.add('hidden');
                 }
 
-                if (window.premiumFeatures?.checkPremiumFeature('siparisTakibi')) {
+                /* Siparişler için hem admin hakkı hem kullanıcı tercihi:
+                   admin açsa da ayarlardan kapatan kullanıcı nav'da görmesin. */
+                var sipHak = !!window.premiumFeatures?.checkPremiumFeature('siparisTakibi');
+                var sipTercih = window.premiumFeatures?.featurePreferencesCache;
+                var sipAcik = sipHak && (!sipTercih || sipTercih.siparisTakibi !== false);
+                if (sipAcik) {
                     show(headerOrdersBtn, mobileOrdersBtn);
                 } else {
                     if (headerOrdersBtn) headerOrdersBtn.classList.add('hidden');
@@ -8871,6 +8876,13 @@
                 ikon: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d="M3 5h18M3 12h18M3 19h18"/><rect x="6" y="7" width="4" height="4" rx="0.8"/><rect x="13" y="14" width="4" height="4" rx="0.8"/><path d="M15 7l4 4m0-4l-4 4"/></svg>',
                 storageKey: null
             },
+            'siparisTakibi': {
+                renk: ['#0369a1', '#7dd3fc'],
+                name: 'Siparişler',
+                description: 'Depo panelindeki siparişleri telefona düşürür; banko, parça, poşet ve ürünlerle toplama listesi',
+                ikon: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d="M6 4h9l4 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M14 4v5h5"/><path d="M8 13h8M8 16h5"/></svg>',
+                storageKey: null
+            },
 
             /*
              * ---- Chrome eklentileri ----
@@ -8938,6 +8950,7 @@
         const PREMIUM_FEATURE_ACTIONS = {
             stokSayimi: { label: 'Sayım sayfası', run: () => window.location.replace('../sayim/') },
             lowStockAlert: { label: 'Düşük stok', run: () => window.location.replace('../dusuk-stok/') },
+            siparisTakibi: { label: 'Siparişler', run: () => window.location.replace('../siparisler/') },
             keyboardShortcuts: { label: 'Kısayolları yönet', run: () => showKeyboardShortcutsModal() },
             getirStockBarcodesExtension: { label: 'ZIP indir', run: (key) => showPremiumFeatureDetail(key) }
         };
@@ -8946,6 +8959,7 @@
         const PREMIUM_FEATURES_WITH_PREFERENCE = new Set([
             'lowStockAlert',
             'stokSayimi',
+            'siparisTakibi',
             'getirStockBarcodesExtension'
         ]);
 
