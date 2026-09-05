@@ -3168,6 +3168,12 @@
                 mobileMenuOverlay.classList.add('active');
                 mobileMenuPanel.classList.add('active');
                 document.body.style.overflow = 'hidden';
+                /* Menü her açıldığında premium buton görünürlüğü
+                   yeniden hesaplansın; admin haklarını değiştirdiyse ya da
+                   kullanıcı ayarlarda toggle çevirdiyse anında yansır. */
+                if (typeof updatePremiumNavVisibility === 'function') {
+                    updatePremiumNavVisibility();
+                }
             }
         }
 
@@ -8996,7 +9002,12 @@
 
             container.innerHTML = '';
 
-            // Tercihler: önbellekte varsa anında, yoksa boş — ağ beklenmiyor
+            /* Tercihler: cache boşsa (clearCache sonrası) bir kez sunucudan
+               yükle; yoksa kullanıcı toggle'ı açtığı özellikler her ayarlar
+               açılışında kapalı gözüküyordu. Cache doluysa ağ beklemiyoruz. */
+            if (window.premiumFeatures && !window.premiumFeatures.featurePreferencesCache) {
+                try { await window.premiumFeatures.loadFeaturePreferences(); } catch (e) {}
+            }
             let featurePreferences = window.premiumFeatures?.featurePreferencesCache || {};
 
             // Açık özellikler üstte, kilitliler listenin sonunda toplanır
