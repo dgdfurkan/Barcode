@@ -22,24 +22,17 @@
         kuruldu = true;
 
           'use strict';
-  
-          const LOG_PREFIX = '🟢';
-  
-          console.log(`${LOG_PREFIX} Getir Warehouse Shelf Label Fetcher - Content script yüklendi`);
-  
-          // Service worker'ı uyandırmak için ping gönder
+
+          // Service worker'ı uyandırmak için ping gönder. Konsola çıktı
+          // yazmıyoruz; Getir sayfasının kendi konsolunu kirletmesin.
           function wakeServiceWorker() {
             try {
-              chrome.runtime.sendMessage({ type: 'JBA_RAF_UYAN' }, (response) => {
+              chrome.runtime.sendMessage({ type: 'JBA_RAF_UYAN' }, () => {
                 if (chrome.runtime.lastError) {
-                  console.warn(`${LOG_PREFIX} Service worker uyandırılamadı:`, chrome.runtime.lastError.message);
                   setTimeout(wakeServiceWorker, 1000);
-                } else {
-                  console.log(`${LOG_PREFIX} Service worker uyandırıldı`);
                 }
               });
             } catch (e) {
-              console.warn('Service worker uyandırma hatası:', e);
               setTimeout(wakeServiceWorker, 1000);
             }
           }

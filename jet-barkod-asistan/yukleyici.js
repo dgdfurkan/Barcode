@@ -64,10 +64,7 @@
             }
         });
 
-        if (uygun.length) {
-            JBA.log(uygun.length + ' modül bu sayfaya uygun, ' +
-                    JBA.calisanlar.filter(function (c) { return c.calisiyor; }).length + ' tanesi çalışıyor.');
-        }
+        /* Getir konsolunu kirletmesin diye başlangıç bilgisi yazılmıyor. */
 
     }
 

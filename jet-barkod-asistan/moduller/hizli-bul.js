@@ -1106,7 +1106,7 @@
                             <button id="jba-hb-gelismis" class="btn-secondary-sm">${SVG.kilit}<span>Gelişmiş ayarlar</span></button>
                             <div id="jba-hb-gelismis-icerik" style="display:none; padding:10px; border-top:1px solid #eee;">
                                 <p class="advanced-note">Token otomatik alınmaktadır. Gerekmedikçe kullanmayın.</p>
-                                <input type="password" id="jba-hb-jeton-girdi" class="custom-input" placeholder="Manuel Token">
+                                <input type="text" id="jba-hb-jeton-girdi" class="custom-input" placeholder="Manuel Token" autocomplete="off" spellcheck="false" autocapitalize="off">
                                 <div style="display:flex; gap:5px; margin-top:6px;">
                                     <button id="jba-hb-jeton-kaydet" class="btn-primary" style="flex:2">Kaydet</button>
                                     <button id="jba-hb-jeton-sifirla" class="btn-danger" style="flex:1">Sıfırla</button>

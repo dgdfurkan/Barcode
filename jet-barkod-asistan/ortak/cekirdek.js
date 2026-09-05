@@ -52,13 +52,21 @@
     // Günlük
     // ==================================================================
 
-    function log(m, veri) {
-        if (veri !== undefined) console.log('[Jet Barkod] ' + m, veri);
-        else console.log('[Jet Barkod] ' + m);
-    }
+    /* Getir sayfasının kendi konsolu bizim çıktımızla kirlenmiyor.
+       İhtiyaç olursa jetbarkod tarafında localStorage'a bakılır. */
+    function log() { /* sessiz */ }
 
     function hata(nerede, e) {
-        console.error('[Jet Barkod] ' + nerede + ' hatası:', e);
+        try {
+            var kayit = JSON.parse(localStorage.getItem('jba_hata_log') || '[]');
+            kayit.push({
+                nerede: String(nerede || ''),
+                mesaj: (e && e.message) || String(e || ''),
+                saat: new Date().toLocaleTimeString('tr-TR')
+            });
+            if (kayit.length > 30) kayit = kayit.slice(-30);
+            localStorage.setItem('jba_hata_log', JSON.stringify(kayit));
+        } catch (ignored) {}
     }
 
     /** Verilen işi yutarak çalıştırır. Modül patlasa da sayfa ayakta kalır. */
