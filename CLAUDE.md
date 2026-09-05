@@ -85,7 +85,24 @@ jetbarkod.com.tr'de 3 eklenti aynı anda çalışıyor.
 
 **Yerel sunucu:** `.claude/launch.json` içinde `jetbarkod-static`, port 8899. `preview_start` ile aç.
 
-## 5. Açık işler
+**Tasarım kaynakları:** Renk, gölge ve font token'ları `css/siparisler.css` içindeki
+`:root`'ta. Hareket token'ları `css/motion.css` içinde (`--motion-micro/fast/normal/panel`,
+`--motion-ease-out/standard`). Yeni değer uydurulmaz, buradan seçilir.
+
+## 5. Arayüz işlerinde skill sırası
+
+Arayüze dokunan her işte üçü sırayla kullanılır:
+
+1. **`arayuz-sistemi`** karar verir. Tipografi ölçeği, boşluk, yarıçap, renk, hiyerarşi,
+   dört durum (yükleniyor/boş/hata/dolu), mobil dokunma hedefleri. "Çirkin oldu",
+   "AI işi gibi" geri bildirimi geldiğinde de buradan başlanır.
+2. **`hareket`** animasyonu yazar. Süre ve eğri `motion.css` token'larından seçilir,
+   yalnız `transform` ve `opacity` animate edilir, azaltılmış hareket desteklenir.
+   Sürükleme jesti kuralları (yön kilidi, `passive: false`, hayalet tık) burada.
+3. **`ui-dogrula`** kanıtlar. Kayma, taşma, kırılma noktası ve animasyon fazı ölçümle
+   doğrulanır. Ekran görüntüsü en son ve tek adet.
+
+## 6. Açık işler
 
 - Tek eklenti birleştirme (`Jet Barkod Asistan`). Eskiler silinmeden, yanına. Sıra:
   Toplu Kopyalama, Stok Barkodları, Fırın, Sipariş Arama, Düşük Stok, Sayım Hazırlığı.
