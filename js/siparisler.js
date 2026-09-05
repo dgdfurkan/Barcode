@@ -181,23 +181,30 @@
      * gibi bir hata metni kullanıcıya gösterilmiyor.
      */
     function urunBasligi(u, bilgi) {
+        /* Panel "Mantar Paket" gibi kısa ad veriyor, oysa katalogda
+           "Mantar Paket (400 g)" var. Görsele göre eşleştirdiğimiz
+           katalog adı 2 çeşitten doğru olanı bulur; onu öncelikli tut.
+           Görsel eşleşmezse panel adı, o da yoksa katalog adı. */
+        if (bilgi.gorselEsti && bilgi.katalogAdi) return bilgi.katalogAdi;
         if (u.ad) return u.ad;
         if (bilgi.katalogAdi) return bilgi.katalogAdi;
         if (bilgi.barkodlar.length) return bilgi.barkodlar[0];
         return 'Ürün';
     }
 
-    /** @returns {{barkodlar: string[], katalogAdi: string}} */
+    /** @returns {{barkodlar: string[], katalogAdi: string, gorselEsti: boolean}} */
     function barkodBul(u) {
         var anahtar = (u.gorsel || '') + '|' + (u.ad || '');
         if (barkodOnbellek.has(anahtar)) return barkodOnbellek.get(anahtar);
 
         katalogHazirla();
         var urun = null;
+        var gorselIle = false;
 
         if (gorselDizin && u.gorsel) {
             try {
                 urun = global.GetirCdnPaste.findProductByGetirImageUrlFromIndex(gorselDizin, u.gorsel);
+                if (urun) gorselIle = true;
             } catch (e) { urun = null; }
         }
         if (!urun && u.ad && katalogDizin) urun = katalogDizin.get(sade(u.ad)) || null;
@@ -207,7 +214,8 @@
                 ? urun.barcodes.map(function (b) { return b && b.code ? String(b.code).trim() : ''; })
                              .filter(Boolean)
                 : [],
-            katalogAdi: (urun && urun.name) || ''
+            katalogAdi: (urun && urun.name) || '',
+            gorselEsti: gorselIle
         };
         barkodOnbellek.set(anahtar, sonuc);
         return sonuc;

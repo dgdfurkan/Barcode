@@ -273,12 +273,10 @@ async function kunyeYaz(yetki, liste) {
 }
 
 /* Panelde artık olmayan siparişleri DB'den siler. Eklenti paneldeki
-   tüm sipariş kimliklerini gönderir; DB'de olup panelde olmayan ve
-   20 dakikadan eski kayıtlar temizlenir. Böylece panel ile DB
-   birebir eşleşir. */
-const TEMIZLIK_MS = 20 * 60 * 1000;
+   tüm sipariş kimliklerini gönderir; DB'de olup panelde olmayan
+   siparişler ANINDA temizlenir. Panel = DB birebir eşleşir. */
 let sonTemizlik = 0;
-const TEMIZLIK_ARALIK = 2 * 60 * 1000;
+const TEMIZLIK_ARALIK = 8 * 1000;
 
 async function paneldeOlmayanlariSil(yetki, panelIdleri) {
     if (!panelIdleri.length) return;
@@ -287,7 +285,7 @@ async function paneldeOlmayanlariSil(yetki, panelIdleri) {
 
     const adres = SIPARIS_API + '/rest/v1/orders' +
         '?username=eq.' + encodeURIComponent(yetki.username) +
-        '&select=order_id,sepet_zamani';
+        '&select=order_id';
     try {
         const yanit = await fetch(adres, { headers: apiBasliklari(yetki) });
         if (!yanit.ok) return;
@@ -295,12 +293,9 @@ async function paneldeOlmayanlariSil(yetki, panelIdleri) {
         const panelSet = new Set(panelIdleri);
         for (const s of dbListe) {
             if (panelSet.has(s.order_id)) continue;
-            var t = s.sepet_zamani;
-            if (t) {
-                var ms = Date.now() - new Date(t).getTime();
-                if (isFinite(ms) && ms < TEMIZLIK_MS) continue;
-            }
             await siparisSil(yetki, s.order_id);
+            const imzalar = await imzalariOku();
+            if (imzalar[s.order_id]) { delete imzalar[s.order_id]; await imzalariYaz(imzalar); }
             await bekle(SIPARIS_ARA_MS);
         }
     } catch (e) { /* sessiz */ }

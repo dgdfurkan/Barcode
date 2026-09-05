@@ -465,22 +465,32 @@
 
 /* Kart üstüne konan parça sayısı rozeti (panelin dışında, Getir'in kartında) */
 .g-count-badge {
-    display: inline-block;
-    background: #131720;
-    color: #fff;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 1px 6px;
-    border-radius: 6px;
-    margin-right: 6px;
-    letter-spacing: 0.02em;
+    display: inline-block !important;
+    background: #131720 !important;
+    color: #fff !important;
+    font-size: 10px !important;
+    font-weight: 700 !important;
+    padding: 1px 6px !important;
+    border-radius: 6px !important;
+    margin-right: 6px !important;
+    line-height: 1.4 !important;
+    letter-spacing: 0.02em !important;
+    width: auto !important;
+    max-width: max-content !important;
+    flex: none !important;
+    align-self: flex-start !important;
+    vertical-align: middle !important;
+    white-space: nowrap !important;
 }
 .g-count-badge--yuzen {
-    position: absolute;
-    top: 6px; left: 6px;
-    margin: 0;
-    z-index: 2;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    position: absolute !important;
+    top: 4px !important;
+    right: 4px !important;
+    left: auto !important;
+    bottom: auto !important;
+    margin: 0 !important;
+    z-index: 10 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.18) !important;
 }`;
 
     function stilKur() {
@@ -771,26 +781,28 @@
                 }
 
                 // --- Parça sayısı badge ---
-                // BNK atanmışsa locationContainer'ın başına, atanmamışsa
-                // kartın sol üstüne yüzen olarak. Yüzen sürüm kayma yapmıyor,
-                // BNK gelince badge otomatik ana yerine geçiyor.
+                // BNK etiketi varsa locationContainer'ın başına, yoksa
+                // kartın sağ üstüne yüzen olarak. Sadece BNK etiketi (ant-tag)
+                // varken container'ı hedefliyoruz; boş locationContainer'a
+                // yerleştirmek kartın üstünü kaplayabiliyor.
                 if (count !== null) {
                     const locationDiv = card.querySelector('[class*="locationContainer--"]');
+                    const bnkTag = locationDiv && locationDiv.querySelector('.ant-tag');
+                    const hedef = bnkTag ? locationDiv : card;
+                    const yuzenOlmali = !bnkTag;
                     const txt = `×${count}`;
                     let badge = card.querySelector('.g-count-badge');
-                    const olmasiGereken = locationDiv || card;
-                    if (badge && badge.parentElement !== olmasiGereken) { badge.remove(); badge = null; }
+                    if (badge && badge.parentElement !== hedef) { badge.remove(); badge = null; }
                     if (!badge) {
                         badge = document.createElement('span');
-                        badge.className = 'g-count-badge' + (locationDiv ? '' : ' g-count-badge--yuzen');
-                        if (locationDiv) {
-                            locationDiv.insertBefore(badge, locationDiv.firstChild);
-                        } else {
+                        badge.className = 'g-count-badge' + (yuzenOlmali ? ' g-count-badge--yuzen' : '');
+                        if (yuzenOlmali) {
                             if (getComputedStyle(card).position === 'static') card.style.position = 'relative';
                             card.appendChild(badge);
+                        } else {
+                            hedef.insertBefore(badge, hedef.firstChild);
                         }
                     } else {
-                        const yuzenOlmali = !locationDiv;
                         const yuzenSuAn = badge.classList.contains('g-count-badge--yuzen');
                         if (yuzenOlmali !== yuzenSuAn) badge.classList.toggle('g-count-badge--yuzen', yuzenOlmali);
                     }
