@@ -517,8 +517,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-serit--hazir .sip-kart { --vurgu: #6390f8; }
 .sip-serit--yolda .sip-kart { --vurgu: #34d399; }
 
-.sip-kart__ust { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.sip-kart__baslik { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.sip-kart__ust { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .sip-kart__numara {
     color: var(--lacivert);
     font-family: var(--baslik-font);
@@ -526,8 +525,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     font-variant-numeric: tabular-nums;
 }
 .sip-kart__numara--yok { font-size: 16px; color: var(--sonuk); }
-.sip-kart__sure { color: var(--soluk); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; margin-top: 2px; }
-.sip-kart__parca { color: #344054; font-size: 11px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.sip-kart__sure { color: var(--soluk); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .sip-kart__kisiler {
     margin-top: 12px;
@@ -1395,9 +1393,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-kart { min-height: 0; padding: 7px; border-radius: 9px; }
     .sip-kart__numara { font-size: 15px; }
     .sip-kart__numara--yok { font-size: 12px; }
-    .sip-kart__sure { font-size: 9.5px; margin-top: 1px; }
-    .sip-kart__baslik { gap: 2px; }
-    .sip-kart__parca { font-size: 9.5px; }
+    .sip-kart__sure { font-size: 9.5px; }
     .sip-kart__kisiler { margin-top: 6px; gap: 5px; }
     .sip-kart__bas { width: 18px; height: 18px; font-size: 7.5px; }
     .sip-kart__bas svg { width: 11px; height: 11px; }

@@ -104,6 +104,19 @@
         return s.toFixed(3).replace(/0+$/, '').replace(/\.$/, '').replace('.', ',');
     }
 
+    /* Toplam ve alınan: ürün ÇEŞİTİ değil ADET bazlı. Aynı üründen 5 varsa
+       5 parçadır, 1 değil. Sayaçlar ve ilerleme çubuğu buna göre çalışır. */
+    function urunAdet(u) {
+        var n = Number(u && u.adet);
+        return isFinite(n) && n > 0 ? n : 1;
+    }
+    function toplamAdet(urunler) {
+        return (urunler || []).reduce(function (a, u) { return a + urunAdet(u); }, 0);
+    }
+    function alinanAdet(urunler) {
+        return (urunler || []).reduce(function (a, u) { return a + (u.alindi ? urunAdet(u) : 0); }, 0);
+    }
+
     // ==================================================================
     // Katalog: ürün adı ve görselinden barkoda
     //
@@ -617,12 +630,14 @@
 
     function kartCiz(s, sira) {
         var urunler = s.urunler || [];
-        var toplam = urunler.length;
-        var alinan = urunler.filter(function (u) { return u.alindi; }).length;
+        var toplam = toplamAdet(urunler);
+        var alinan = alinanAdet(urunler);
+        /* Ürünler henüz gelmediyse panel künyesindeki toplam_adet
+           göstergesine düş; kullanıcı "3 parça var" bilsin. */
+        if (!toplam && s.toplam_adet != null) toplam = Number(s.toplam_adet) || 0;
         var oran = toplam ? Math.round(alinan / toplam * 100) : 0;
         var kimlik = siparisKimligi(s);
         var tam = oran === 100 && toplam > 0;
-        var parcaSayisi = s.toplam_adet != null ? s.toplam_adet : toplam;
 
         var kisiler = kisiCip(s.toplayici, s.toplayici_foto, false) +
                       kisiCip(s.kurye, s.kurye_foto, true);
@@ -632,16 +647,13 @@
                '" data-siparis="' + kacir(s.id) + '" style="--kart-zemin:' + kartArkaPlan(s) +
                ';--i:' + (sira || 0) + '" aria-label="' + kacir(kimlik.deger) + ' siparişini aç">' +
             '<span class="sip-kart__ust">' +
-                '<span class="sip-kart__baslik">' +
-                    '<strong class="sip-kart__numara' + (kimlik.bankoVar ? '' : ' sip-kart__numara--yok') + '">' + kacir(kimlik.deger) + '</strong>' +
-                    '<span class="sip-kart__parca">' + adetYaz(parcaSayisi) + '</span>' +
-                '</span>' +
+                '<strong class="sip-kart__numara' + (kimlik.bankoVar ? '' : ' sip-kart__numara--yok') + '">' + kacir(kimlik.deger) + '</strong>' +
                 '<span class="sip-kart__sure">' + kacir(gecenSure(s)) + '</span>' +
             '</span>' +
             '<span class="sip-kart__kisiler">' + kisiler + '</span>' +
             '<span class="sip-kart__ilerleme">' +
                 '<span><i style="width:' + oran + '%"></i></span>' +
-                '<strong>' + alinan + '<span>/' + toplam + '</span></strong>' +
+                '<strong>' + alinan + '<span>/' + toplam + ' parça</span></strong>' +
             '</span>' +
         '</button>';
     }
@@ -721,12 +733,13 @@
     function bantlaraAyir(urunler) {
         var sayac = 0;
         return bantlariTopla(urunler).map(function (g) {
-            var alinan = g.urunler.filter(function (u) { return u.alindi; }).length;
+            var toplam = toplamAdet(g.urunler);
+            var alinan = alinanAdet(g.urunler);
             return '<section class="sip-bolum">' +
-                '<div class="sip-bant' + (alinan === g.urunler.length ? ' sip-bant--bitti' : '') +
+                '<div class="sip-bant' + (alinan === toplam ? ' sip-bant--bitti' : '') +
                 '" style="--bant:' + bantRengi(g.bant) + '">' +
                     '<i></i><b>' + kacir(bantEtiket(g.bant)) + '</b><s></s>' +
-                    '<span>' + alinan + '/' + g.urunler.length + '</span>' +
+                    '<span>' + alinan + '/' + toplam + '</span>' +
                 '</div>' +
                 g.urunler.map(function (u) { sayac++; return urunCiz(u, sayac); }).join('') +
             '</section>';
@@ -776,8 +789,8 @@
         var s = durum.secili;
         if (!s) return;
         var urunler = s.urunler || [];
-        var alinan = urunler.filter(function (u) { return u.alindi; }).length;
-        var toplam = urunler.length;
+        var alinan = alinanAdet(urunler);
+        var toplam = toplamAdet(urunler);
         var oran = toplam ? Math.round(alinan / toplam * 100) : 0;
         var tam = oran === 100 && toplam > 0;
 
@@ -785,14 +798,15 @@
         bantlariTopla(urunler).forEach(function (g, i) {
             var b = basliklar[i];
             if (!b) return;
-            var a = g.urunler.filter(function (u) { return u.alindi; }).length;
-            b.querySelector('span').textContent = a + '/' + g.urunler.length;
-            b.classList.toggle('sip-bant--bitti', a === g.urunler.length);
+            var gt = toplamAdet(g.urunler);
+            var ga = alinanAdet(g.urunler);
+            b.querySelector('span').textContent = ga + '/' + gt;
+            b.classList.toggle('sip-bant--bitti', ga === gt);
         });
 
         el('olcuAlindi').textContent = alinan + '/' + toplam;
         el('araclarSayi').textContent = alinan + '/' + toplam;
-        el('yanSayac').textContent = alinan + ' / ' + toplam + ' ürün';
+        el('yanSayac').textContent = alinan + ' / ' + toplam + ' parça';
         el('altAlinan').textContent = alinan;
         el('altToplam').textContent = toplam;
 
