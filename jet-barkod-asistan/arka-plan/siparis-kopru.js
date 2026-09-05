@@ -115,11 +115,14 @@ async function siparisYaz(yetki, s) {
         eksik_urun_var: !!s.eksikUrunVar,
         toplayici: s.toplayici || null,
         kurye: s.kurye || null,
-        toplayici_foto: s.toplayiciFoto || null,
-        kurye_foto: s.kuryeFoto || null,
         sepet_zamani: s.sepetZamani || null,
         updated_at: new Date().toISOString()
     };
+    /* Fotoları YALNIZ doluyken gönder. Boş foto UPSERT'e girerse
+       önceden yazılmış doğru foto null'lanır. Detay API foto veriyorsa
+       oradan geliyor; panel künyesi getirmediyse dokunmayın. */
+    if (s.toplayiciFoto) govde.toplayici_foto = s.toplayiciFoto;
+    if (s.kuryeFoto) govde.kurye_foto = s.kuryeFoto;
 
     const yanit = await fetch(
         SIPARIS_API + '/rest/v1/orders?on_conflict=username,order_id',
@@ -247,12 +250,15 @@ async function kunyeYaz(yetki, liste) {
             durum: typeof s.durum === 'number' ? s.durum : null,
             toplayici: s.toplayici || null,
             kurye: s.kurye || null,
-            toplayici_foto: s.toplayiciFoto || null,
-            kurye_foto: s.kuryeFoto || null,
             toplam_adet: typeof s.toplamAdet === 'number' ? s.toplamAdet : null,
             poset_sayisi: typeof s.posetSayisi === 'number' ? s.posetSayisi : null,
             updated_at: new Date().toISOString()
         };
+        /* Foto YALNIZ doluyken UPSERT'e girsin: panel künyesinde çoğu
+           zaman picURL yok, detay yanıtından siparisYaz doğru fotoyu
+           yazıyor. Boş fotoyu buradan yazmak o veriyi siler. */
+        if (s.toplayiciFoto) govde.toplayici_foto = s.toplayiciFoto;
+        if (s.kuryeFoto) govde.kurye_foto = s.kuryeFoto;
 
         try {
             const yanit = await fetch(

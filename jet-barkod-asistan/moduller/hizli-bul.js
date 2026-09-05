@@ -952,20 +952,21 @@
                                 return typeof n === 'string' ? n.toLowerCase() : '';
                             }).filter(Boolean),
                             count: order.basketProductCount ?? null,
-                            /* Jet Barkod'a gidecek satırlar. Alan adları gerçek
-                               yanıttan okundu: index, name.tr, picURL.tr,
-                               orderCount. Ürün kimliği yanıtta yok; site
-                               tarafı ad + görsel ile katalogdan buluyor.
-                               clientName ve clientNote alınmıyor. */
                             /* Toplayıcı Bekliyor ürünlerinde `index` boş
                                olabiliyor; öyleyse dizi konumu (1'den) sıra
-                               olur. Boş sıra yüzünden ürün düşmemeli. */
+                               olur. */
                             detay: order.products.map((p, i) => ({
                                 sira: (p && p.index != null) ? p.index : (i + 1),
                                 ad: (p?.name?.tr || p?.name?.en || '').trim(),
                                 gorsel: (p?.picURL?.tr || p?.picURL?.en || '') || '',
                                 adet: typeof p?.orderCount === 'number' ? p.orderCount : null
-                            }))
+                            })),
+                            /* Kişi fotoğrafları detay yanıtından. Panel
+                               listesinde picURL çoğu zaman olmuyor; detay
+                               ise kesin veriyor: order.picker.picURL,
+                               order.courier.picURL. */
+                            toplayiciFoto: (order.picker && order.picker.picURL) || '',
+                            kuryeFoto: (order.courier && order.courier.picURL) || ''
                         };
                         saveCache();
                         applyUI();
@@ -1287,7 +1288,15 @@
                 };
             });
 
-            return Object.assign({}, s, { urunler: urunler });
+            const sonuc = Object.assign({}, s, { urunler: urunler });
+            /* Detay yanıtından foto varsa panel künyesindekini geçersin;
+               panel listesinde çoğu zaman picURL boş kalıyor, detay
+               kesin sonuç veriyor. */
+            if (girdi && !Array.isArray(girdi)) {
+                if (girdi.toplayiciFoto) sonuc.toplayiciFoto = girdi.toplayiciFoto;
+                if (girdi.kuryeFoto) sonuc.kuryeFoto = girdi.kuryeFoto;
+            }
+            return sonuc;
         };
 
         /* Hangi siparişler gönderilmeyi bekliyor. Kullanıcı bir siparişe

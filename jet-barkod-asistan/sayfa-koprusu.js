@@ -379,8 +379,11 @@
      * bilinen adları sırayla deniyoruz, ilk geçerli adres alınıyor. Hiçbiri
      * yoksa boş dönüyor ve ekranda baş harfler kalıyor.
      */
-    var FOTO_ALANLARI = ['imageURL', 'imageUrl', 'photoURL', 'photoUrl', 'avatarURL',
-                         'avatarUrl', 'avatar', 'picture', 'photo', 'image', 'src',
+    /* Getir'in gerçek alan adı `picURL`. Kişi nesnesinde başka form da
+       çıkabilir diye alternatifleri sırayla deniyoruz. */
+    var FOTO_ALANLARI = ['picURL', 'picUrl', 'imageURL', 'imageUrl',
+                         'photoURL', 'photoUrl', 'avatarURL', 'avatarUrl',
+                         'avatar', 'picture', 'photo', 'image',
                          'profileImageUrl', 'profileImageURL', 'profilePhoto'];
 
     function fotoBul(kisi) {
@@ -389,32 +392,18 @@
             var v = kisi[FOTO_ALANLARI[i]];
             if (typeof v === 'string' && /^https?:\/\//.test(v)) return v;
         }
-        /* Bilinen alan adlarının hiçbirinde URL bulunamadıysa nesnenin
-           tüm string alanlarını tara: panelin sürümüne göre yeni bir
-           alan adı eklenmiş olabilir. */
-        var anahtarlar = Object.keys(kisi);
-        for (var j = 0; j < anahtarlar.length; j++) {
-            var d = kisi[anahtarlar[j]];
-            if (typeof d === 'string' && /^https?:\/\//.test(d) && /\.(jpg|jpeg|png|webp|svg)/i.test(d)) return d;
-        }
         return '';
     }
 
-    var KISI_CDN = 'https://cdn.getir.com/person/';
-
-    function kisiFotoUret(kisi) {
-        if (!kisi || typeof kisi !== 'object') return '';
-        var id = kisi._id || kisi.id || '';
-        if (!id || typeof id !== 'string') return '';
-        return KISI_CDN + id + '.png?' + Date.now();
-    }
-
     function kisiFoto(kisi) {
+        /* Yalnız gerçek URL. `picker.id` medya hash'inden farklı olduğu
+           için ID'den URL üretmek 404 veriyordu; kaldırıldı. Panel
+           React state'inde picURL yoksa DOM avatar haritasına bakıyoruz. */
         var url = fotoBul(kisi);
         if (url) return url;
         var id = (kisi && (kisi._id || kisi.id)) || '';
         if (id && _fotoHaritasi[id]) return _fotoHaritasi[id];
-        return kisiFotoUret(kisi);
+        return '';
     }
 
     function sadeSiparis(o, kolon) {
