@@ -1485,6 +1485,11 @@
         durum.secili = tumu.filter(function (s) { return s.id === id; })[0] || null;
         durum.detayImzasi = '';
         ciz();
+        /* Yeni siparişe geçince sayfa tepede olsun; önceki siparişin
+           scroll pozisyonu kalmasın. Detay gövdesi zaten ciz() içinde
+           sıfırlanıyor, buradaki dış pencere kaydırması. */
+        try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch (e) { window.scrollTo(0, 0); }
+        var detay = el('siparisDetay'); if (detay) detay.scrollTop = 0;
     }
 
     var BANT_HARITA = {
