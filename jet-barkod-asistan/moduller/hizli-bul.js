@@ -474,6 +474,13 @@
     border-radius: 6px;
     margin-right: 6px;
     letter-spacing: 0.02em;
+}
+.g-count-badge--yuzen {
+    position: absolute;
+    top: 6px; left: 6px;
+    margin: 0;
+    z-index: 2;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }`;
 
     function stilKur() {
@@ -763,15 +770,29 @@
                     card.dataset.gBg = newBg;
                 }
 
-                // --- Parça sayısı badge (BNK soluna) ---
-                const locationDiv = card.querySelector('[class*="locationContainer--"]');
-                if (locationDiv && count !== null) {
-                    let badge = locationDiv.querySelector('.g-count-badge');
+                // --- Parça sayısı badge ---
+                // BNK atanmışsa locationContainer'ın başına, atanmamışsa
+                // kartın sol üstüne yüzen olarak. Yüzen sürüm kayma yapmıyor,
+                // BNK gelince badge otomatik ana yerine geçiyor.
+                if (count !== null) {
+                    const locationDiv = card.querySelector('[class*="locationContainer--"]');
                     const txt = `×${count}`;
+                    let badge = card.querySelector('.g-count-badge');
+                    const olmasiGereken = locationDiv || card;
+                    if (badge && badge.parentElement !== olmasiGereken) { badge.remove(); badge = null; }
                     if (!badge) {
                         badge = document.createElement('span');
-                        badge.className = 'g-count-badge';
-                        locationDiv.insertBefore(badge, locationDiv.firstChild);
+                        badge.className = 'g-count-badge' + (locationDiv ? '' : ' g-count-badge--yuzen');
+                        if (locationDiv) {
+                            locationDiv.insertBefore(badge, locationDiv.firstChild);
+                        } else {
+                            if (getComputedStyle(card).position === 'static') card.style.position = 'relative';
+                            card.appendChild(badge);
+                        }
+                    } else {
+                        const yuzenOlmali = !locationDiv;
+                        const yuzenSuAn = badge.classList.contains('g-count-badge--yuzen');
+                        if (yuzenOlmali !== yuzenSuAn) badge.classList.toggle('g-count-badge--yuzen', yuzenOlmali);
                     }
                     if (badge.innerText !== txt) badge.innerText = txt;
                 }
@@ -1256,21 +1277,27 @@
             } catch (e) { /* sessiz */ }
         };
 
-        /* Bankosu atanmış ama bizde kaydı olmayan sipariş otomatik alınıyor.
-           Senaryo: depocu panelde siparişe girmeden "tümünü kopyala" ile
-           barkodları alıyor, sonra bankoyu okutuyor. O ana kadar sipariş
-           bizde hiç yok; banko okununca Jet Barkod'da da belirmeli.
+        /* Hazırlık aşamasındaki (Toplayıcı Bekliyor, Doğrulanıyor,
+           Hazırlanıyor) ya da bankosu atanmış siparişler otomatik alınıyor.
            Banko atanması güçlü bir sinyal: depocu o siparişle ilgileniyor.
-           Bir tur en fazla üç sipariş alıyor ki panel trafiği patlamasın;
-           gerisi sonraki turda geliyor. */
+           Hazırlık kolonuna düşen sipariş için de ürünleri getir ki
+           Jet Barkod tarafında kart açık gelsin, "ürünler henüz gelmedi"
+           beklemesin. Bir tur en fazla üç sipariş alıyor ki panel trafiği
+           patlamasın; gerisi sonraki turda geliyor. */
         const otoSorulan = new Set();
         const OTO_TUR_SINIRI = 3;
 
-        const bankoluYenileriYakala = (liste) => {
-            const adaylar = liste.filter((s) =>
-                s && s.siparisId && s.banko && !otoSorulan.has(s.siparisId) &&
-                !fetchQueueSet.has(s.siparisId)
-            );
+        const _turkce = (t) => (t || '').toString().toLowerCase()
+            .replace(/[ıİI]/g, 'i').replace(/[ğĞ]/g, 'g').replace(/[üÜ]/g, 'u')
+            .replace(/[şŞ]/g, 's').replace(/[öÖ]/g, 'o').replace(/[çÇ]/g, 'c');
+        const HAZIRLIK_KOLON = /(hazirlan|dogrulan|topla)/;
+
+        const otomatikYakala = (liste) => {
+            const adaylar = liste.filter((s) => {
+                if (!s || !s.siparisId) return false;
+                if (otoSorulan.has(s.siparisId) || fetchQueueSet.has(s.siparisId)) return false;
+                return !!s.banko || HAZIRLIK_KOLON.test(_turkce(s.kolon));
+            });
             if (!adaylar.length) return;
 
             const kimlikler = adaylar.map((s) => s.siparisId);
@@ -1400,7 +1427,7 @@
                    yollamak boşuna trafikti. */
                 sonSiparisListesi = event.data.liste;
                 kunyeleriYolla(sonSiparisListesi);
-                bankoluYenileriYakala(sonSiparisListesi);
+                otomatikYakala(sonSiparisListesi);
             }
             if (event.data.type === 'GETIR_DATA_RECEIVED') findOrderIds(event.data.payload);
             if (event.data.type === 'GETIR_TOKEN_CAPTURED') {
