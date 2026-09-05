@@ -1042,7 +1042,19 @@
         }
 
         /* ===== RESPONSIVE MOBILE & TABLET STYLES ===== */
-        
+
+        /* iPhone çentik/dynamic island: header çentiğin altına düşmesin. */
+        .site-header {
+            padding-top: env(safe-area-inset-top);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+        .mobile-menu-panel {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-right: env(safe-area-inset-right);
+        }
+
         /* Hamburger Menu Styles */
         .hamburger-menu-btn {
             display: none;

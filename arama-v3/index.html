@@ -1041,6 +1041,16 @@
         /* ===== RESPONSIVE MOBILE & TABLET STYLES ===== */
         
         /* Hamburger Menu Styles */
+        /* iPhone çentik/dynamic island cihazları için güvenli alan.
+           `viewport-fit=cover` ile header çentiğin altına düşüyordu; şimdi
+           üstten env(safe-area-inset-top) kadar boşluk. Yan taraflar da
+           landscape'te kırpılmasın diye padding-left/right eklendi. */
+        .site-header {
+            padding-top: env(safe-area-inset-top);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+
         .hamburger-menu-btn {
             display: none;
             width: 44px;
@@ -1092,6 +1102,9 @@
             transition: transform 0.3s ease-in-out;
             box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
             overflow-y: auto;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-right: env(safe-area-inset-right);
         }
 
         .mobile-menu-panel.active {
