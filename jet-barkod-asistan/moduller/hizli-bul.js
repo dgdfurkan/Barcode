@@ -1818,8 +1818,61 @@
         } catch (e) { /* sessiz */ }
 
         // === MESAJ DİNLEYİCİ ===
+        /* SIFIRLAMA
+           Panelle veritabanı birbirine girdiğinde elle basılan düğme.
+           Konsol komutları MAIN world'de (`sayfa-koprusu.js`), asıl iş
+           burada: `chrome.runtime` yalnız bu tarafta var.
+
+           Neyi silmek gerekiyor: yalnız önbelleği silmek yetmiyor. İki
+           defter daha "bunu zaten hallettim" diyor ve aynı siparişin
+           yeniden çekilmesini engelliyor: bellekteki `otoSorulan`,
+           `sonKunye`, `urunsuzSoguma` gibi kümeler ve arka plandaki imza
+           defteri. Üçü birden temizlenmezse sıfırlama işe yaramıyor. */
+        const durumuSifirla = () => {
+            orderCache = {};
+            fetchQueue = [];
+            fetchQueueSet.clear();
+            otoSorulan.clear();
+            gonderilecek.clear();
+            sonKunye.clear();
+            sonKisi.clear();
+            sonGonderim.clear();
+            urunsuzSoguma.clear();
+            denemeler.clear();
+            try { localStorage.removeItem('getir_order_cache'); } catch (e) {}
+            try { localStorage.removeItem('jba_yazma_log'); } catch (e) {}
+        };
+
+        const sifirlamayiYurut = (dbdeSil) => {
+            durumuSifirla();
+            try {
+                chrome.runtime.sendMessage(
+                    { type: 'JBA_SIPARIS_SIFIRLA', dbdeSil: !!dbdeSil },
+                    (yanit) => {
+                        const hata = chrome.runtime.lastError;
+                        window.postMessage({
+                            type: 'JB_JBA_SIFIRLA_SONUC',
+                            ok: !hata && !!(yanit && yanit.ok),
+                            db: !!dbdeSil,
+                            sebep: hata ? hata.message : (yanit && yanit.sebep) || ''
+                        }, location.origin);
+                        /* Defterler boş; panel bir sonraki duyuruda her
+                           siparişi "yeni" sayıp baştan çekecek. Beklemeden
+                           duyuru istiyoruz. */
+                        try { window.postMessage({ type: 'JB_SIPARIS_SOR' }, location.origin); } catch (e) {}
+                    }
+                );
+            } catch (e) {
+                window.postMessage({ type: 'JB_JBA_SIFIRLA_SONUC', ok: false, sebep: (e && e.message) || 'hata' }, location.origin);
+            }
+        };
+
         window.addEventListener('message', (event) => {
             if (!event.data || event.source !== window) return;
+            if (event.data.type === 'JB_JBA_SIFIRLA') {
+                sifirlamayiYurut(event.data.dbdeSil);
+                return;
+            }
             if (event.data.type === 'JB_SIPARISLER' && Array.isArray(event.data.liste)) {
                 sonSiparisListesi = event.data.liste;
                 /* `ilk`: panel sayfası yeni açıldı ya da sekmeye dönüldü.

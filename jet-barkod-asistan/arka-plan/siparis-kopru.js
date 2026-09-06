@@ -582,6 +582,40 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
         return true;
     }
 
+    /* SIFIRLAMA
+       Panelle veritabanı birbirine girdiğinde kullanılan acil düğme.
+       Konsoldan `jbaTazele()` / `jbaSifirla(true)` ile tetikleniyor.
+
+       İmza defteri her hâlükârda siliniyor: defter "bu siparişi zaten
+       yazdım" dediği sürece aynı sipariş bir daha yazılmıyor, yani
+       karışıklık kendi kendine düzelmiyordu.
+
+       `dbdeSil` ayrı bir karar. Kayıtları silmek depocunun topladığı
+       ürün işaretlerini de siler; panelden yeniden kurulan sipariş
+       sıfırdan başlar. O yüzden çağıran tarafta ayrıca onay isteniyor. */
+    if (istek.type === 'JBA_SIPARIS_SIFIRLA') {
+        const dbdeSil = !!istek.dbdeSil;
+        (async () => {
+            siparisKuyrugu = [];
+            siparisIsliyor = false;
+            sonTemizlik = 0;
+            sonNabiz = 0;
+            await imzalariYaz({});
+            if (!dbdeSil) return { ok: true, imza: true, db: false };
+
+            const yetki = await yetkiOku();
+            if (!yetki) return { ok: false, sebep: 'yetki yok' };
+            const adres = SIPARIS_API + '/rest/v1/orders' +
+                '?username=eq.' + encodeURIComponent(yetki.username);
+            const yanit = await fetch(adres, {
+                method: 'DELETE',
+                headers: apiBasliklari(yetki, { 'Prefer': 'return=minimal' })
+            });
+            return { ok: yanit.ok, imza: true, db: true, durum: yanit.status };
+        })().then(cevapla, (e) => cevapla({ ok: false, sebep: (e && e.message) || 'hata' }));
+        return true;
+    }
+
     if (istek.type === 'JBA_SIPARIS_DURUM') {
         yetkiOku().then((y) =>
             cevapla({ yetkiVar: !!y, kuyruk: siparisKuyrugu.length, isliyor: siparisIsliyor })

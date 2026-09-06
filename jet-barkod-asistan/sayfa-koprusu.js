@@ -496,7 +496,7 @@
         console.log('%cilk ürün alan adları:', b3, u0 ? Object.keys(u0) : null);
         console.log('%cilk ürün:', b3, u0);
         console.log('%cBIZIM sadeleştirdiğimiz (DB\'ye giden):', b4, sade);
-        console.log('%cKomutlar: jba() | jbaHam() | jbaSade() | jbaKopya()', 'color:#94a3b8');
+        console.log('%cKomutlar: jba() | jbaHam() | jbaSade() | jbaKopya() | jbaLog() | jbaTazele() | jbaSifirla(true)', 'color:#94a3b8');
         console.groupEnd();
     }
 
@@ -538,6 +538,54 @@
         try { localStorage.removeItem('jba_yazma_log'); } catch (e) {}
         try { localStorage.removeItem('getir_order_cache'); } catch (e) {}
         console.log('[JBA] log ve cache silindi, sayfayı yenile.');
+    };
+
+    /* SIFIRLAMA KOMUTLARI
+       Panelle veritabanı birbirine girdiğinde kullanılır.
+
+       jbaTazele()      Defterleri siler, panelden her şeyi baştan çeker.
+                        Veritabanındaki kayıtlara ve depocunun topladığı
+                        ürün işaretlerine dokunmaz. Önce bu denenir.
+
+       jbaSifirla(true) Yukarıdakine ek olarak veritabanındaki bütün
+                        siparişleri siler ve panelden sıfırdan kurar.
+                        TOPLAMA İŞARETLERİ GİDER, o yüzden onay istiyor.
+
+       Asıl iş isolated world'de yapılıyor; `chrome.runtime` yalnız orada
+       var. Buradan yalnız sinyal gidiyor. */
+    /* Bu betik franchise.getir.com'da da çalışıyor ama sipariş modülü
+       orada yok: sinyali dinleyen kimse olmaz. Sessiz beklemek yerine
+       süre dolunca söylüyoruz. */
+    var _sifirlamaBekleyen = 0;
+
+    function sifirlamaSinyali(dbdeSil) {
+        _sifirlamaBekleyen = Date.now();
+        gonder({ type: 'JB_JBA_SIFIRLA', dbdeSil: !!dbdeSil });
+        setTimeout(function () {
+            if (!_sifirlamaBekleyen) return;
+            _sifirlamaBekleyen = 0;
+            console.warn('[JBA] Yanıt gelmedi. Bu komut yalnız depo paneli sekmesinde ' +
+                'çalışıyor: warehouse.getir.com siparişler ekranı. Eklenti güncellendiyse ' +
+                'sayfayı bir kez yenile.');
+        }, 5000);
+    }
+
+    global.jbaTazele = function () {
+        sifirlamaSinyali(false);
+        console.log('%c[JBA] Tazeleniyor: defterler silindi, panel baştan okunuyor…', 'color:#0ea5e9');
+        return 'bekleniyor';
+    };
+
+    global.jbaSifirla = function (onay) {
+        if (onay !== true) {
+            console.warn('[JBA] Bu komut veritabanındaki BÜTÜN siparişleri siler.\n' +
+                'Toplanmış ürün işaretleri de gider ve panelden sıfırdan kurulur.\n' +
+                'Önce jbaTazele() dene; yine düzelmezse jbaSifirla(true) yaz.');
+            return 'onay gerekli: jbaSifirla(true)';
+        }
+        sifirlamaSinyali(true);
+        console.log('%c[JBA] Sıfırlanıyor: kayıtlar siliniyor, panel baştan yazılıyor…', 'color:#ef4444');
+        return 'bekleniyor';
     };
 
     /* Aynı listeyi tekrar tekrar yollamamak için imza karşılaştırılıyor.
@@ -607,6 +655,17 @@
            arka planın temizlik kilidini atlatıyor. */
         if (d && d.type === 'JB_SIPARIS_SOR') {
             sonImza = null; _ilkDuyuruYapildi = false; siparisleriDuyur(); return;
+        }
+        if (d && d.type === 'JB_JBA_SIFIRLA_SONUC') {
+            _sifirlamaBekleyen = 0;
+            if (d.ok) {
+                console.log('%c[JBA] Bitti. ' + (d.db ? 'Kayıtlar silindi, ' : '') +
+                    'panel baştan okunuyor; birkaç saniyede yerine oturur.', 'color:#16a34a');
+            } else {
+                console.warn('[JBA] Sıfırlama tamamlanamadı: ' + (d.sebep || 'bilinmiyor') +
+                    '\nJet Barkod sitesine bir kez girip geri dön, sonra tekrar dene.');
+            }
+            return;
         }
         if (!d || d.type !== 'JB_SIPARIS_GETIR') return;
         if (!d.warehouseId) {
