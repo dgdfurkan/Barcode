@@ -308,6 +308,67 @@ function guvenliKimlik(id) {
     return typeof id === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(id);
 }
 
+/* ÇOK CİHAZ KORUMASI
+   Aynı hesapla iki yerde panel açık olabiliyor: depoda sürekli açık duran
+   bilgisayar ve evde deneme yapılan ikinci makine. İkisi de aynı
+   veritabanına yazıp siliyor.
+
+   Tehlike şu: ikinci makinede panel henüz çizilmemişken "panelde sipariş
+   yok" kararı verilirse, birinci makinenin taze kayıtları silinir.
+
+   Eşik YALNIZ "panel tamamen boş" dalında uygulanıyor. Panel doluyken
+   zaten kimlik karşılaştırması var: panelde duran sipariş silinmiyor,
+   panelden düşen anında siliniyor. Oraya da tazelik eşiği koysaydık
+   teslim edilen sipariş eşik süresi kadar ekranda kalırdı; kullanıcının
+   açıkça istemediği şey bu.
+
+   Boş panel kararı ise geri dönüşü olmayan bir silme başlattığı için
+   ek koruma hak ediyor. Nabız aralığından geniş tutuluyor ki aktif
+   cihazın kayıtları iki nabız arasında yanlışlıkla eskimiş sayılmasın. */
+const CANLI_ESIK_MS = 90 * 1000;
+
+function tazelikSuzgeci() {
+    const sinir = new Date(Date.now() - CANLI_ESIK_MS).toISOString();
+    return '&updated_at=lt.' + encodeURIComponent(sinir);
+}
+
+/* NABIZ
+   `kunyeYaz` yalnız DEĞİŞEN siparişi yazıyor. Panelde öylece duran ama
+   künyesi oynamayan bir sipariş dakikalarca `updated_at` almıyordu. Bu
+   iki yerde yanlış sonuç veriyor:
+
+   1. Tazelik süzgeci onu "eski" sayıp başka cihazın silmesine izin verir.
+   2. Site başlığındaki canlılık göstergesi verinin donduğunu sanıp
+      haksız yere "bağlantı kesik" der.
+
+   Bu yüzden panelde duran bütün siparişlerin damgası tek PATCH ile
+   tazeleniyor. Dakikada bir yeterli; künye akışının kendisi zaten 20
+   saniyede bir dönüyor. */
+let sonNabiz = 0;
+const NABIZ_ARALIK = 60 * 1000;
+
+async function nabizAt(yetki, panelIdleri) {
+    const idler = panelIdleri.filter(guvenliKimlik);
+    if (!idler.length) return;
+    if (Date.now() - sonNabiz < NABIZ_ARALIK) return;
+    sonNabiz = Date.now();
+
+    for (let i = 0; i < idler.length; i += SILME_PARCA) {
+        const parca = idler.slice(i, i + SILME_PARCA);
+        const adres = SIPARIS_API + '/rest/v1/orders' +
+            '?username=eq.' + encodeURIComponent(yetki.username) +
+            '&order_id=in.(' + parca.join(',') + ')';
+        try {
+            await fetch(adres, {
+                method: 'PATCH',
+                headers: apiBasliklari(yetki, { 'Prefer': 'return=minimal' }),
+                body: JSON.stringify({ updated_at: new Date().toISOString() })
+            });
+        } catch (e) { /* ağ yoksa bir sonraki turda */ }
+        if (i + SILME_PARCA < idler.length) await bekle(SIPARIS_ARA_MS);
+    }
+}
+
 async function paneliSenkronla(yetki, panelIdleri, panelBos, zorla) {
     /* Panel boşsa (panelBos true) idler dizisi boş olsa da temizlik
        yapılır: DB'deki tüm kayıtlar gider. Aksi hâlde en az bir id
@@ -320,18 +381,27 @@ async function paneliSenkronla(yetki, panelIdleri, panelBos, zorla) {
         '?username=eq.' + encodeURIComponent(yetki.username);
 
     try {
-        /* Panel tamamen boş: tek istekte hepsini sil, imza defterini
-           de sıfırla. Aynı sipariş bir daha panelde belirirse yeniden
-           yazılabilsin diye imza kalıntısı bırakmıyoruz. */
+        /* Panel tamamen boş: tek istekte hepsini sil. Tazelik süzgeci
+           burada da geçerli, yoksa ikinci makine birincinin işini siler.
+           İmza defteri yalnız gerçekten hiç kayıt kalmadıysa sıfırlanır. */
         if (!panelIdleri.length) {
-            const hepsi = await fetch(temel, {
+            const hepsi = await fetch(temel + tazelikSuzgeci(), {
                 method: 'DELETE',
                 headers: apiBasliklari(yetki, { 'Prefer': 'return=minimal' })
             });
-            if (hepsi.ok) await imzalariYaz({});
+            if (hepsi.ok) {
+                const kalan = await fetch(temel + '&select=order_id&limit=1',
+                    { headers: apiBasliklari(yetki) });
+                if (kalan.ok) {
+                    const k = await kalan.json();
+                    if (!k.length) await imzalariYaz({});
+                }
+            }
             return;
         }
 
+        /* Panel dolu: kimlik karşılaştırması yeterli. Panelde olmayan
+           anında gidiyor, tazelik eşiği burada devrede değil. */
         const yanit = await fetch(temel + '&select=order_id', { headers: apiBasliklari(yetki) });
         if (!yanit.ok) return;
         const dbListe = await yanit.json();
@@ -461,7 +531,10 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
         if (!liste.length && !tumIdler.length && !panelBos) { cevapla({ ok: false, sebep: 'liste boş' }); return true; }
         yetkiOku().then((y) => {
             if (!y) { cevapla({ ok: false, sebep: 'yetki yok' }); return; }
-            kunyeYaz(y, liste).then(() => paneliSenkronla(y, tumIdler, panelBos, zorla)).then(
+            kunyeYaz(y, liste)
+                .then(() => nabizAt(y, tumIdler))
+                .then(() => paneliSenkronla(y, tumIdler, panelBos, zorla))
+                .then(
                 () => cevapla({ ok: true, sayi: liste.length }),
                 (e) => cevapla({ ok: false, sebep: (e && e.message) || 'hata' })
             );

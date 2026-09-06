@@ -1769,6 +1769,40 @@
         };
 
         // === INIT ===
+        /* YETİM BAĞLAM AĞI
+           Eklenti güncellenince ya da devre dışı bırakılıp açılınca bu
+           içerik betiği yetim kalır: chrome.runtime.id tanımsız olur ve
+           bütün mesajlar sessizce düşer. Sayfa normal görünmeye devam
+           ettiği için kimse fark etmez, veri akışı saatlerce durur.
+
+           Arka plan güncelleme anında panoyu zaten yeniliyor. Bu ağ o
+           yolun tutmadığı hâller için: tarayıcı çökmesi, eklentinin elle
+           kapatılıp açılması, yenilemenin engellendiği durumlar. */
+        let yetimUyarisiVerildi = false;
+
+        const baglamGecerliMi = () => {
+            try { return !!(chrome.runtime && chrome.runtime.id); }
+            catch (e) { return false; }
+        };
+
+        const yetimKaldiysaTazele = () => {
+            if (baglamGecerliMi() || yetimUyarisiVerildi) return false;
+            yetimUyarisiVerildi = true;
+            /* Kullanıcı sayfanın neden yenilendiğini görsün diye kısa bir
+               şerit gösterilip 4 saniye sonra yenileniyor. Pano salt
+               okunur, yenileme veri kaybettirmiyor. */
+            try {
+                const s = document.createElement('div');
+                s.textContent = 'Jet Barkod Asistan güncellendi, panel tazeleniyor…';
+                s.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:2147483647;' +
+                    'background:#131720;color:#fff;font:600 13px/1.4 system-ui,sans-serif;' +
+                    'padding:10px 14px;text-align:center';
+                document.documentElement.appendChild(s);
+            } catch (e) { /* sessiz */ }
+            setTimeout(() => { try { location.reload(); } catch (e) {} }, 4000);
+            return true;
+        };
+
         const init = () => {
             nobet();
             listeyiIste();
@@ -1776,11 +1810,18 @@
             adresiIzle();
 
             document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible') geriDondu();
+                if (document.visibilityState === 'visible') {
+                    if (yetimKaldiysaTazele()) return;
+                    geriDondu();
+                }
             });
-            window.addEventListener('focus', geriDondu);
+            window.addEventListener('focus', () => {
+                if (yetimKaldiysaTazele()) return;
+                geriDondu();
+            });
 
             setInterval(() => {
+                if (yetimKaldiysaTazele()) return;
                 if (!nobet()) return;
                 checkAndSync();
                 applyUI();

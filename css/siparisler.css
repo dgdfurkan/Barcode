@@ -320,6 +320,13 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     0%, 100% { box-shadow: 0 0 0 4px rgba(18,166,106,0.12); }
     50%      { box-shadow: 0 0 0 7px rgba(18,166,106,0.04); }
 }
+
+/* Veri tazeliği uyarısı. Depo paneli susunca gösterge yeşilden çıkıyor;
+   nabız da duruyor çünkü artık canlı bir akış yok, yanıltmasın. */
+.sip-canli--eski { color: var(--sari); }
+.sip-canli--eski i { background: var(--sari); box-shadow: 0 0 0 4px rgba(217,119,6,0.14); animation: none; }
+.sip-canli--kopuk { color: #d92d20; }
+.sip-canli--kopuk i { background: #d92d20; box-shadow: 0 0 0 4px rgba(217,45,32,0.14); animation: none; }
 .sip-baslik h1 {
     margin: 0;
     font-family: var(--baslik-font);

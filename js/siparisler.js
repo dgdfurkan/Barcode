@@ -337,6 +337,11 @@
            değişmiyor, imza sabit kalıyor ve aşağıdaki return bildirimi
            hiç çalıştırmıyordu. Tam da bu durumda haber vermek gerekiyor. */
         urunEksikleriBildir(yeni);
+        /* Canlılık göstergesi de erken çıkıştan önce tazelenir. Veri
+           donduğunda imza hiç değişmez; aşağıdaki return çalışsaydı
+           gösterge tam da uyarması gereken anda donmuş kalırdı. */
+        durum.siparisler = yeni;
+        canliliksGoster();
         if (!zorla && imza === durum.sonImza) return;
         /* Kurye alıp gitmiş ve eskimiş kayıtlar siliniyor; ekrana da
            girmiyorlar. Silme başarısız olursa liste yine de çizilir,
@@ -1003,6 +1008,67 @@
         return liste;
     }
 
+    /**
+     * Başlıktaki canlılık göstergesi.
+     *
+     * Eskiden burada "Canlı · 13:15" yazıyordu ama o saat SİTENİN
+     * veritabanını okuduğu andı, verinin tazeliği değil. Depo panelinin
+     * açık olduğu bilgisayarda eklenti sustuğunda (güncelleme sonrası
+     * yetim kalan sekme, kapanan tarayıcı) veritabanı donuyor; site yine
+     * "Canlı" diyordu ve kullanıcı saatler öncesinin siparişlerine
+     * bakarken bunu bilmiyordu.
+     *
+     * Artık ölçü verinin kendisi: en son güncellenen siparişin damgası.
+     * Eklenti yazmayı bıraktığı an bu damga eskimeye başlar ve gösterge
+     * uyarıya döner.
+     */
+    var TAZE_MS = 5 * 60 * 1000;
+    var KOPUK_MS = 20 * 60 * 1000;
+
+    function verininYasi() {
+        var enYeni = 0;
+        (durum.siparisler || []).forEach(function (s) {
+            var t = s && s.updated_at ? new Date(s.updated_at).getTime() : 0;
+            if (isFinite(t) && t > enYeni) enYeni = t;
+        });
+        return enYeni ? (Date.now() - enYeni) : null;
+    }
+
+    function canliliksGoster() {
+        var kutu = el('sonGuncelleme');
+        if (!kutu) return;
+        var kap = kutu.closest('.sip-canli');
+        var yas = verininYasi();
+
+        /* Hiç sipariş yoksa yaş ölçülemez. Panel gerçekten boş olabilir,
+           bu bir hata değil; site kendi okuma saatini gösteriyor. */
+        if (yas === null) {
+            var saat = durum.sonYenileme ? saatYaz(durum.sonYenileme) : null;
+            kutu.textContent = 'Canlı · ' + (saat || 'yükleniyor');
+            if (kap) kap.classList.remove('sip-canli--eski', 'sip-canli--kopuk');
+            kutu.removeAttribute('title');
+            return;
+        }
+
+        var dk = Math.floor(yas / 60000);
+        if (yas < TAZE_MS) {
+            kutu.textContent = 'Canlı · ' + saatYaz(Date.now() - yas);
+            if (kap) kap.classList.remove('sip-canli--eski', 'sip-canli--kopuk');
+            kutu.removeAttribute('title');
+        } else if (yas < KOPUK_MS) {
+            kutu.textContent = 'Veri ' + dk + ' dk. önce';
+            if (kap) { kap.classList.add('sip-canli--eski'); kap.classList.remove('sip-canli--kopuk'); }
+            kutu.setAttribute('title', 'Depo paneli bir süredir yeni veri göndermedi.');
+        } else {
+            var metin = dk < 60 ? (dk + ' dk.') : (Math.floor(dk / 60) + ' sa.');
+            kutu.textContent = 'Bağlantı kesik · ' + metin;
+            if (kap) { kap.classList.add('sip-canli--kopuk'); kap.classList.remove('sip-canli--eski'); }
+            kutu.setAttribute('title',
+                'Depo paneli ' + metin + ' önce sustu. warehouse.getir.com sipariş ' +
+                'ekranının açık olduğu bilgisayarda sayfayı yenile.');
+        }
+    }
+
     function ciz() {
         /* Kişi fotoğraflarını çizim öncesi ön-yükle: browser cache'e
            girsinler ki innerHTML sıfırlamalarında img mount edilir
@@ -1023,8 +1089,7 @@
         var hazirParca = hazir.reduce(function (a, s) { return a + (s.toplam_adet || (s.urunler || []).length); }, 0);
         el('ozetHazirParca').textContent = adetYaz(hazirParca);
 
-        var saat = durum.sonYenileme ? saatYaz(durum.sonYenileme) : null;
-        el('sonGuncelleme').textContent = 'Canlı · ' + (saat || 'yükleniyor');
+        canliliksGoster();
         kapananSayiTazele();
 
         detayiCiz();
