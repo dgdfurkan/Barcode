@@ -59,8 +59,23 @@
           if (document.getElementById('baking-assistant-modal')) return;
 
           const CLEAR_BTN_SVG_MARK = 'M8.621 8.086';
-          /** Clipboard / detay aç düğmesi (Getir kart başlığı) */
+          /** Eski panel sürümündeki detay aç düğmesi. Yedek iz olarak duruyor. */
           const CLIPBOARD_BTN_SVG_MARK = 'M9 9H4v1h5V9z';
+
+          /*
+           * Sütun başlığındaki "hepsini aç / hepsini kapat" düğmesi.
+           *
+           * Kart başlığında iki tane `ant-btn-icon-only` var: biri sıralama
+           * (title="Artan"/"Azalan"), diğeri bu. İkisinin de sınıf listesi
+           * birebir aynı, ikisi de `ant-btn-primary`. Yani düğmeyi sınıftan
+           * ayırt etmek mümkün değil, SVG'sinden ayırt ediliyor.
+           *
+           * Düğmenin dış çerçevesi iki durumda da aynı (AC_KAPA_SVG_IZ);
+           * içindeki ikon kapalıyken artı, açıkken çarpı. Ama duruma da
+           * ikondan karar verilmiyor: panelin kendi `ant-collapse-item-active`
+           * sayısına bakılıyor, çünkü tek doğru kaynak o.
+           */
+          const AC_KAPA_SVG_IZ = 'M15 6V11C15 13.21';
 
           const SETTINGS_LS_KEY = 'getirPişirmeAssistantSettings_v2';
           const SETTINGS_DEFAULT = {
@@ -606,52 +621,68 @@
             return activeCount < items.length;
           }
 
+          /* Kart başlığındaki aç/kapa düğmesi. Dört kademeli arama:
+             güncel SVG izi, eski sürüm izi, title'sız düğme (sıralama
+             düğmesinin title'ı hep dolu), en son da sondaki düğme. */
+          function acKapaDugmesi(card) {
+            const kok = card.querySelector('[class*="cardActions"]') || card.querySelector('.ant-card-head') || card;
+            const hepsi = Array.from(kok.querySelectorAll('button.ant-btn-icon-only'));
+            if (!hepsi.length) return null;
+
+            const ile = (iz) => hepsi.filter((b) => b.innerHTML.indexOf(iz) !== -1)[0] || null;
+            return (
+              ile(AC_KAPA_SVG_IZ) ||
+              ile(CLIPBOARD_BTN_SVG_MARK) ||
+              hepsi.filter((b) => !(b.getAttribute('title') || '').trim())[0] ||
+              hepsi[hepsi.length - 1]
+            );
+          }
+
+          /* Tek kartı açar. Düğme aç/kapa olduğu için ters yönde de
+             çalışabilir; o yüzden tıklanıp SONUÇ ölçülüyor ve hedefe
+             varılana kadar tekrarlanıyor. Dört deneme fazlasıyla yeter. */
+          async function kartiAc(card) {
+            for (let deneme = 0; deneme < 4; deneme++) {
+              if (!heatingCardNeedsDetailExpand(card)) return true;
+              const btn = acKapaDugmesi(card);
+              if (!btn) return false;
+              btn.click();
+              await sleep(320);
+              if (!heatingCardNeedsDetailExpand(card)) return true;
+              await sleep(220);
+            }
+            return !heatingCardNeedsDetailExpand(card);
+          }
+
           async function expandPanelClipboardIfNeeded() {
             const cards = findHeatingCards().slice(0, 4);
-            for (let c = 0; c < cards.length; c++) {
-              const card = cards[c];
-              if (!heatingCardNeedsDetailExpand(card)) continue;
-              const actions = card.querySelector('[class*="cardActions"]');
-              if (!actions) continue;
-              const candidates = actions.querySelectorAll('button.ant-btn-icon-only');
-              let btn = null;
-              candidates.forEach((b) => {
-                if (
-                  b.innerHTML.includes(CLIPBOARD_BTN_SVG_MARK) &&
-                  !b.innerHTML.includes(CLEAR_BTN_SVG_MARK) &&
-                  b.classList.contains('ant-btn-primary')
-                )
-                  btn = b;
-              });
-              if (!btn) {
-                candidates.forEach((b) => {
-                  if (b.innerHTML.includes(CLIPBOARD_BTN_SVG_MARK) && !b.innerHTML.includes(CLEAR_BTN_SVG_MARK)) btn = b;
-                });
-              }
-              if (btn) {
-                btn.click();
-                await sleep(320);
-              }
-            }
-            await sleep(200);
+            for (let c = 0; c < cards.length; c++) await kartiAc(cards[c]);
+            await sleep(180);
+          }
+
+          /* Stok hücreleri yalnız sütun açıkken DOM'a giriyor. Hepsi sıfırsa
+             ya depo gerçekten boş ya da sütun açılmamış; ikincisini elemek
+             için bir tur daha deneniyor. */
+          function stokOkunduMu(products) {
+            return products.some((p) => p.currentStock > 0 || p.frozenStock > 0);
           }
 
           /**
            * Dört saat sütununu okumaya hazır hâle getirir.
            *
-           * Eskiden ilk denemede `clickAllClearFilters(false)` çağrılıyordu
-           * ve o da yalnız `ant-btn-primary` TAŞIMAYAN düğmelere basıyordu.
-           * Oysa panelin açma düğmesi tam olarak `ant-btn-primary` sınıfını
-           * taşıyor; yani ilk turda hiç dokunulmuyordu. Kapalı sütun varsa
-           * ürünlerin bir kısmı okunuyor, `products.length` sıfır olmadığı
-           * için de zorlamalı ikinci tur hiç çalışmıyordu. Sonuç: eksik veri
+           * Açma düğmesi eski bir SVG iziyle (`M9 9H4v1h5V9z`) aranıyordu.
+           * Getir o ikonu değiştirmiş; iz hiçbir düğmeyle eşleşmediği için
+           * yıllardır TEK BİR TIKLAMA bile yapılmıyordu. Sütun kapalıyken
+           * ürün adı ile "N Pişir" yine okunuyor, ama Raf ve Donuk hücreleri
+           * DOM'da olmadığı için sıfır kalıyordu. `products.length` sıfır
+           * olmadığından da yeniden deneme tetiklenmiyordu: eksik veri
            * sessizce doğru sanılıyordu.
            *
-           * Artık düğme durumuna bakılmıyor, sütunlar açılıyor ve AÇILDIĞI
+           * Artık düğme güncel iziyle bulunuyor, tıklanıyor ve AÇILDIĞI
            * DOĞRULANIYOR. Kapalı kalan varsa üç tura kadar tekrar deneniyor.
            */
           async function sutunlariAcVeDogrula() {
-            await clickAllClearFilters(true);
+            await clickAllClearFilters(false);
             for (let tur = 0; tur < 3; tur++) {
               await expandPanelClipboardIfNeeded();
               const kapali = findHeatingCards()
@@ -1092,16 +1123,17 @@
           }
 
           resultsContainer.innerHTML =
-            '<div style="text-align: center; padding: 2rem;">Panel filtreleri açılıyor…</div>';
+            '<div style="text-align: center; padding: 2rem;">Sütunlar açılıyor…</div>';
 
           try {
             /* Sütunlar açılmadan okuma yapılmıyor. Açılma doğrulanıyor;
                eksik sütunla okunan yarım veri "başarılı" sayılmasın. */
             await sutunlariAcVeDogrula();
             let products = parseProductsFromPage();
-            if (!products.length) {
+            if (!products.length || !stokOkunduMu(products)) {
               await sutunlariAcVeDogrula();
-              products = parseProductsFromPage();
+              const tekrar = parseProductsFromPage();
+              if (tekrar.length && (!products.length || stokOkunduMu(tekrar))) products = tekrar;
             }
             if (!products.length) {
               await sleep(600);
