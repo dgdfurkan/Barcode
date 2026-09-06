@@ -981,74 +981,162 @@
             } catch (e) {}
         };
 
-        // === KUYRUK İŞLEMCİ ===
-        const processQueue = async () => {
-            if (isFetching || fetchQueue.length === 0 || !userToken || !warehouseId) return;
-            isFetching = true;
-            const oId = fetchQueue.shift();
-            fetchQueueSet.delete(oId);
+        /* ÜRÜNSÜZ YANIT
+           Panel bazen 200 döndürüp ürün listesi vermiyor; çoğunlukla
+           sipariş henüz Toplayıcı Bekliyor'dayken oluyor.
 
+           Eski kod bu durumu hiç ele almıyordu. `products` yoksa
+           `if (order?.products && ...)` bloğu atlanıyor, sipariş ne
+           önbelleğe yazılıyor, ne yeniden deneniyor, ne log'a düşüyordu:
+           sessizce kayboluyordu. "Ürünler henüz gelmedi" ekranının
+           kaynağı buydu.
+
+           `products` boş DİZİ geldiğinde ise daha kötüsü oluyordu.
+           Önbellek boş ürünle yazılıyor, `siparisiYolla` "ürün yok" deyip
+           önbelleği silip siparişi kuyruğun başına koyuyor, kuyruk yine
+           boş ürün çekiyordu. Getir'e 700 ms'de bir vuran sonsuz döngü.
+
+           Artık ürünsüz yanıt kendi soğuma süresini alıyor. Kişi
+           fotoğrafları ise üründen bağımsız yazılıyor: ürün listesi
+           gelmese de `picker`/`courier` yanıtta duruyor. */
+        const urunsuzSoguma = new Map();
+        const URUNSUZ_SOGUMA_MS = 60 * 1000;
+
+        const sogumadaMi = (oId) => {
+            const t = urunsuzSoguma.get(oId);
+            return !!t && (Date.now() - t) < URUNSUZ_SOGUMA_MS;
+        };
+
+        /* Fotoğraf tek başına gönderilebilir. `siparisYaz` gövdeyi koşullu
+           kuruyor: yalnız dolu alanlar gidiyor, boş alan DB'deki veriyi
+           bozmuyor. Ürünsüz paket `satirlariYaz`'a hiç uğramıyor. */
+        const kisiFotosunuYolla = (oId, toplayiciFoto, kuryeFoto) => {
+            if (!toplayiciFoto && !kuryeFoto) return;
+            const paket = { siparisId: oId, urunler: [] };
+            if (toplayiciFoto) paket.toplayiciFoto = toplayiciFoto;
+            if (kuryeFoto) paket.kuryeFoto = kuryeFoto;
             try {
-                const url = `https://warehouse-panel-api-gateway.getirapi.com/warehouse/${warehouseId}/orders/${oId}?domainType=1`;
-                const res = await fetch(url, { headers: API_HEADERS() });
-                if (res.ok) {
-                    const d = await res.json();
-                    const order = d?.data?.order;
-                    semayiKaydet(order);
-                    /* Debug dökümü kapalı: Getir konsolunu kirletmesin.
-                       İhtiyaç olursa `jbaDetay()` çağrısıyla son yanıt alınır. */
-                    if (order) {
-                        window.__jbaDetaySon = order;
-                        window.jbaDetay = () => window.__jbaDetaySon;
-                    }
-                    if (order?.products && Array.isArray(order.products)) {
-                        orderCache[oId.slice(-4)] = {
-                            products: order.products.map(p => {
-                                const n = p?.name?.tr || p?.name?.en || '';
-                                return typeof n === 'string' ? n.toLowerCase() : '';
-                            }).filter(Boolean),
-                            count: order.basketProductCount ?? null,
-                            /* Toplayıcı Bekliyor ürünlerinde `index` boş
-                               olabiliyor; öyleyse dizi konumu (1'den) sıra
-                               olur. */
-                            detay: order.products.map((p, i) => ({
-                                sira: (p && p.index != null) ? p.index : (i + 1),
-                                ad: (p?.name?.tr || p?.name?.en || '').trim(),
-                                gorsel: (p?.picURL?.tr || p?.picURL?.en || '') || '',
-                                adet: typeof p?.orderCount === 'number' ? p.orderCount : null
-                            })),
-                            /* Kişi fotoğrafları detay yanıtından. Panel
-                               listesinde picURL çoğu zaman olmuyor; detay
-                               ise kesin veriyor: order.picker.picURL,
-                               order.courier.picURL. */
-                            toplayiciFoto: (order.picker && order.picker.picURL) || '',
-                            kuryeFoto: (order.courier && order.courier.picURL) || ''
-                        };
-                        saveCache();
-                        applyUI();
-                        denemeler.delete(oId);
-                        // Kullanıcı bu siparişi açtıysa artık gönderilebilir.
-                        if (gonderilecek.has(oId)) siparisiYolla(oId);
-                    }
-                } else if (res.status === 401) {
-                    fetchQueue.unshift(oId);
-                    fetchQueueSet.add(oId);
-                    isFetching = false;
-                    updateQueueStatus();
-                    return;
-                } else {
-                    yenidenDene(oId, 'HTTP ' + res.status);
-                }
+                chrome.runtime.sendMessage(
+                    { type: 'JBA_SIPARIS_YAZ', siparisler: [paket] },
+                    () => { if (chrome.runtime.lastError) { /* SW uyuyor */ } }
+                );
+            } catch (e) { /* sessiz */ }
+        };
+
+        const birSiparisiCek = async (oId) => {
+            const url = `https://warehouse-panel-api-gateway.getirapi.com/warehouse/${warehouseId}/orders/${oId}?domainType=1`;
+            let res;
+            try {
+                res = await fetch(url, { headers: API_HEADERS() });
             } catch (e) {
                 yenidenDene(oId, 'fetch err: ' + ((e && e.message) || 'x'));
+                return;
             }
 
-            isFetching = false;
+            /* Jeton eskimiş. Sipariş kuyrukta beklesin, deneme hakkı
+               yanmasın: bu bizim değil, oturumun sorunu. Pompa da
+               duraklıyor, yoksa çeyrek saniyede bir 401 yiyen bir döngü
+               kurulurdu. */
+            if (res.status === 401) {
+                yetkiBeklemesi = Date.now();
+                if (!fetchQueueSet.has(oId)) {
+                    fetchQueue.unshift(oId);
+                    fetchQueueSet.add(oId);
+                }
+                return;
+            }
+            if (!res.ok) { yenidenDene(oId, 'HTTP ' + res.status); return; }
+
+            let order = null;
+            try { order = (await res.json())?.data?.order; } catch (e) { /* bozuk gövde */ }
+            if (!order) { yenidenDene(oId, 'govde yok'); return; }
+
+            semayiKaydet(order);
+            /* Debug dökümü kapalı: Getir konsolunu kirletmesin.
+               İhtiyaç olursa `jbaDetay()` çağrısıyla son yanıt alınır. */
+            window.__jbaDetaySon = order;
+            window.jbaDetay = () => window.__jbaDetaySon;
+
+            /* Kişi fotoğrafları detay yanıtından. Panel listesinde picURL
+               çoğu zaman olmuyor; detay ise kesin veriyor. */
+            const toplayiciFoto = (order.picker && order.picker.picURL) || '';
+            const kuryeFoto = (order.courier && order.courier.picURL) || '';
+            const urunler = Array.isArray(order.products) ? order.products : [];
+
+            if (!urunler.length) {
+                urunsuzSoguma.set(oId, Date.now());
+                kisiFotosunuYolla(oId, toplayiciFoto, kuryeFoto);
+                yenidenDene(oId, 'urun_yok');
+                return;
+            }
+
+            urunsuzSoguma.delete(oId);
+            orderCache[oId.slice(-4)] = {
+                products: urunler.map(p => {
+                    const n = p?.name?.tr || p?.name?.en || '';
+                    return typeof n === 'string' ? n.toLowerCase() : '';
+                }).filter(Boolean),
+                count: order.basketProductCount ?? null,
+                /* Toplayıcı Bekliyor ürünlerinde `index` boş olabiliyor;
+                   öyleyse dizi konumu (1'den) sıra olur. */
+                detay: urunler.map((p, i) => ({
+                    sira: (p && p.index != null) ? p.index : (i + 1),
+                    ad: (p?.name?.tr || p?.name?.en || '').trim(),
+                    gorsel: (p?.picURL?.tr || p?.picURL?.en || '') || '',
+                    adet: typeof p?.orderCount === 'number' ? p.orderCount : null
+                })),
+                toplayiciFoto: toplayiciFoto,
+                kuryeFoto: kuryeFoto
+            };
+            saveCache();
+            applyUI();
+            denemeler.delete(oId);
+            // Kullanıcı bu siparişi açtıysa artık gönderilebilir.
+            if (gonderilecek.has(oId)) siparisiYolla(oId);
+        };
+
+        /* PARALEL KUYRUK
+           Eskiden tek kanal vardı: bir sipariş çekilir, 700 ms beklenir,
+           sıradakine geçilirdi. Yirmi siparişlik bir panelde sonuncunun
+           ürünü ve kişi fotoğrafları on dört saniye sonra iniyordu.
+           "Fotoğraflar geç geliyor" şikâyeti tam olarak bu kuyruktu.
+
+           Üç kanal, kanal başına 250 ms. Aynı yirmi sipariş yaklaşık iki
+           saniyede tamamlanıyor. Getir paneli kendi trafiğinde bundan
+           fazlasını zaten atıyor.
+
+           `isFetching` artık "en az bir kanal meşgul" demek. Dosyanın
+           başka yerlerindeki `if (!isFetching) processQueue()` çağrıları
+           olduğu gibi çalışıyor: kanal doluyken pompa zaten kendi
+           kendini çağırıyor, iş kaybolmuyor. */
+        const PARALEL_KANAL = 3;
+        const CEKIM_ARALIK_MS = 250;
+        const YETKI_BEKLEME_MS = 5000;
+        let aktifCekim = 0;
+        let yetkiBeklemesi = 0;
+
+        const processQueue = () => {
+            if (!userToken || !warehouseId) return;
+            if (Date.now() - yetkiBeklemesi < YETKI_BEKLEME_MS) {
+                setTimeout(processQueue, YETKI_BEKLEME_MS);
+                return;
+            }
+            while (aktifCekim < PARALEL_KANAL && fetchQueue.length) {
+                const oId = fetchQueue.shift();
+                fetchQueueSet.delete(oId);
+                /* Soğumadaki sipariş kuyruğu meşgul etmesin; panel onu
+                   sonraki tarama turunda yeniden aday gösteriyor. */
+                if (sogumadaMi(oId)) continue;
+                aktifCekim++;
+                isFetching = true;
+                birSiparisiCek(oId).catch(() => {}).then(() => {
+                    aktifCekim--;
+                    isFetching = aktifCekim > 0;
+                    updateQueueStatus();
+                    if (fetchQueue.length) setTimeout(processQueue, CEKIM_ARALIK_MS);
+                });
+            }
             updateQueueStatus();
-            /* 700 ms: eski 1500 ms, yirmi siparişlik bir panelde ilk turu
-               yarım dakikaya çıkarıyordu. Panelin kendi istek trafiğinin
-               yanında bu aralık rahatça taşınıyor. */
-            if (fetchQueue.length > 0) setTimeout(processQueue, 700);
         };
 
         // === PANEL AÇ / KAPA ===
@@ -1393,7 +1481,24 @@
                 const yeni = kunyeImzasi(s);
                 const eski = sonKunye.get(s.siparisId);
                 sonKunye.set(s.siparisId, yeni);
-                if (eski !== yeni) degisen.push(s);
+                if (eski !== yeni) {
+                    degisen.push(s);
+                    /* Künye değişti: sipariş büyük ihtimalle sütun
+                       atladı. Toplayıcı Bekliyor'da ürün vermeyen panel
+                       Hazırlanıyor'da veriyor, o yüzden ürünsüz soğuma
+                       burada kalkıyor ve sipariş yeniden aday oluyor.
+                       Soğuma olmasaydı döngü, kalkmasaydı sipariş
+                       sonsuza kadar ürünsüz kalırdı. */
+                    if (urunsuzSoguma.has(s.siparisId)) {
+                        urunsuzSoguma.delete(s.siparisId);
+                        denemeler.delete(s.siparisId);
+                        otoSorulan.delete(s.siparisId);
+                        if (!fetchQueueSet.has(s.siparisId)) {
+                            fetchQueue.push(s.siparisId);
+                            fetchQueueSet.add(s.siparisId);
+                        }
+                    }
+                }
                 /* Bu sipariş ilk kez görülüyor. Detayı beklemeden, sıraya
                    girmeden çekilecek; kullanıcı "ürünler henüz gelmedi"
                    ekranını hiç görmemeli. */
@@ -1583,10 +1688,14 @@
                 const kodY = String(siparisId).slice(-4);
                 if (orderCache[kodY]) { delete orderCache[kodY]; saveCache(); }
                 otoSorulan.delete(siparisId);
-                if (!fetchQueueSet.has(siparisId)) {
+                /* Soğuma kontrolü olmadan burası bir döngü kuruyordu:
+                   panel ürün vermeyen bir siparişi her seferinde yeniden
+                   çektiriyordu. Panel ürünü verecek duruma gelince künye
+                   imzası değişiyor ve soğuma orada kaldırılıyor. */
+                if (!sogumadaMi(siparisId) && !fetchQueueSet.has(siparisId)) {
                     fetchQueue.unshift(siparisId);
                     fetchQueueSet.add(siparisId);
-                    if (!isFetching) processQueue();
+                    processQueue();
                 }
                 try {
                     var lg = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');

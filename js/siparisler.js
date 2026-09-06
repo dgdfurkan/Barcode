@@ -267,9 +267,21 @@
            PostgREST'te hata veriyor ve bütün sipariş çekimi patlıyordu.
            `*` ile eksik kolon yalnız gelmemiş oluyor. Tabloda müşteri
            verisi yok, hepsi bizim yazdığımız alanlar. */
+        /* PENCERE
+           Eskiden son 60 kayıt körlemesine çekiliyordu. Bunların bir kısmı
+           zaten `eskimisMi` ile ekranda gizleniyordu, ama `order_items`
+           sorgusu onları da kapsıyordu: her turda boşuna yüzlerce ürün
+           satırı taşınıyordu. Şikâyet edilen yavaşlık buydu.
+
+           Pencere `ESKIME_MS` ile aynı: üç saat. Sınırı geçmiş kayıt
+           panelde kesinlikle yok, çekmenin anlamı da yok. `updated_at`
+           eklenti nabzıyla tazeleniyor, yani uzun süren sipariş
+           pencerede kalmaya devam ediyor. */
+        var pencere = new Date(Date.now() - ESKIME_MS).toISOString();
         var siparisSonuc = await d.from('orders')
             .select('*')
             .eq('username', o.username)
+            .gte('updated_at', pencere)
             .order('created_at', { ascending: false })
             .limit(60);
 
@@ -342,6 +354,10 @@
            gösterge tam da uyarması gereken anda donmuş kalırdı. */
         durum.siparisler = yeni;
         canliliksGoster();
+        /* Pencere dışında kalmış kayıtlar çekilen listede olmadığı için
+           erken çıkıştan önce temizleniyor; kendi iç aralığı var, her
+           turda istek atmıyor. */
+        copToplama();
         if (!zorla && imza === durum.sonImza) return;
         /* Kurye alıp gitmiş ve eskimiş kayıtlar siliniyor; ekrana da
            girmiyorlar. Silme başarısız olursa liste yine de çizilir,
@@ -543,18 +559,51 @@
         return false;
     }
 
+    /* Tek istekte siliniyor. Önceden her kayıt için ayrı DELETE atılıyordu;
+       yirmi kalıntı yirmi gidiş dönüş demekti ve arada biri patlarsa
+       gerisi yarım kalıyordu. */
+    var SILME_PARCA = 80;
+
     async function gidenleriSil(liste) {
         var d = db();
         if (!d) return [];
-        var silinecek = liste.filter(gitmisMi);
+        var silinecek = liste.filter(gitmisMi).map(function (s) { return s.id; });
         if (!silinecek.length) return [];
 
         var silinen = [];
-        for (var i = 0; i < silinecek.length; i++) {
-            var sonuc = await d.from('orders').delete().eq('id', silinecek[i].id);
-            if (!sonuc.error) silinen.push(silinecek[i].id);
+        for (var i = 0; i < silinecek.length; i += SILME_PARCA) {
+            var parca = silinecek.slice(i, i + SILME_PARCA);
+            var sonuc = await d.from('orders').delete().in('id', parca);
+            if (!sonuc.error) silinen = silinen.concat(parca);
         }
         return silinen;
+    }
+
+    /* ÇÖP TOPLAMA
+       Pencere dışındaki kayıtlar artık hiç çekilmiyor, dolayısıyla
+       `gidenleriSil` onları göremiyor: görmediğini silemez. Geçmişte
+       birikmiş ne varsa burada tek istekle gidiyor.
+
+       Silme ölçütü zaman, kolon değil. Panelde üç saattir dokunulmamış
+       bir sipariş yok; eklenti nabzı duran her siparişin damgasını
+       dakikada bir tazeliyor. Eklenti hiç çalışmasa bile bu temizlik
+       site tarafından yürüyor, yani çöp tek bir zincire bağlı değil. */
+    var COP_ARALIK_MS = 10 * 60 * 1000;
+    var sonCopToplama = 0;
+
+    async function copToplama() {
+        var o = oturum();
+        var d = db();
+        if (!o || !o.username || !d) return 0;
+        if (Date.now() - sonCopToplama < COP_ARALIK_MS) return 0;
+        sonCopToplama = Date.now();
+
+        var sinir = new Date(Date.now() - ESKIME_MS).toISOString();
+        var sonuc = await d.from('orders')
+            .delete()
+            .eq('username', o.username)
+            .lt('updated_at', sinir);
+        return sonuc && sonuc.error ? 0 : 1;
     }
 
     function bandaGore(s) {
