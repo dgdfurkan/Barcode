@@ -52,7 +52,29 @@ Token'ın çoğu araç çıktısında gidiyor, cevaplarda değil. Sıralama en p
 
 ## 4. Proje haritası
 
-Aramadan önce buraya bak.
+Aramadan önce **kod hafızasına** sor, sonra buraya bak, en son dosya aç.
+
+`kod-hafizasi` MCP (codebase-memory-mcp) depoyu bir bilgi grafiğine indeksledi:
+5.4k düğüm, 20k kenar, proje adı `jetbarkod`. Amacı token yakmadan yer bulmak.
+
+| Soru | Araç |
+| --- | --- |
+| Bu isim nerede tanımlı | `search_graph` |
+| Bunu kim çağırıyor, bu neyi çağırıyor | `trace_path` |
+| Şu satırları göster | `get_code_snippet` |
+| Genel yapı, katmanlar, rotalar | `get_architecture` (`aspects: ["overview"]`) |
+| Niye böyle yapılmış | `manage_adr` (`mode: "sections"`) |
+| Dosya değişti mi, indeks bayat mı | `detect_changes` |
+
+Kural: `grep -rn` ile depo taramadan önce `search_graph` denenir. 16k satırlık
+`js/counting.js` içinde fonksiyon aramak için dosya açılmaz, grafik sorulur,
+dönen satır aralığı `sed -n 'A,Bp'` ile okunur.
+
+Mimari kararlar ADR'de duruyor (`manage_adr`). Kalıcı bir karar değiştiğinde
+ADR de güncellenir, yoksa bir sonraki oturum eski kararla çalışır.
+
+İndeks otomatik tazeleniyor; büyük yeniden düzenlemeden sonra
+`index_repository` elle çalıştırılır.
 
 **Sayfalar** (`pages/`): `product_search.html` en büyüğü, ayarlar ve premium özellikler burada.
 `counting.html` (v1), `counting_v2.html` (v2), `low_stock_products.html`, `shelf_missing.html`,

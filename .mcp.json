@@ -6,6 +6,12 @@
       "headers": {
         "x-api-key": "${API_KEY_21ST}"
       }
+    },
+    "kod-hafizasi": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "codebase-memory-mcp"],
+      "env": {}
     }
   }
 }

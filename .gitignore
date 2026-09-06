@@ -59,3 +59,6 @@ pages/products.json
 # Sipariş ekranı tasarım referansı. Depoya girmiyor: örnek verisinde
 # kişi adları var, depo herkese açık.
 Jet-Barkod-Siparisler-Premium/
+
+# Kod hafızası (codebase-memory-mcp) yerel çıktıları
+.codebase-memory/
