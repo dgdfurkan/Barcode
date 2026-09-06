@@ -959,27 +959,51 @@
         return m ? parseInt(m[0], 10) : 99999;
     }
 
+    /*
+     * Şu an fiilen toplanan sipariş şeridin en üstünde durur.
+     *
+     * Hazırlanıyor şeridimiz panelin üç sütununu birden topluyor:
+     * Toplayıcı Bekliyor, Hazırlanıyor, Doğrulanıyor. Depocunun elindeki
+     * iş bunların yalnız biri: toplayıcı atanmış ve panelde Hazırlanıyor
+     * sütununda duran sipariş. Onu aramak için listeyi taramasın.
+     *
+     * Toplayıcı adı eklentiden bir tur geç gelebiliyor. O aradaki sipariş
+     * en dibe düşmesin diye ikinci kademeye alınıyor.
+     *
+     * Seçilen sıralama kriteri (süre / banko / kurye) iptal olmuyor,
+     * grupların İÇİNDE çalışmaya devam ediyor.
+     */
+    var KOLON_TOPLANIYOR = /hazirlaniyor/;
+
+    function aktifToplamaSirasi(s) {
+        if (!KOLON_TOPLANIYOR.test(kolonAdi(s))) return 2;
+        return String(s.toplayici || '').trim() ? 0 : 1;
+    }
+
     function sirala(liste, kriter) {
-        var kopy = liste.slice();
+        var karsilastir;
         if (kriter === 'banko') {
-            kopy.sort(function (a, b) { return bankoSiraDegeri(a) - bankoSiraDegeri(b); });
+            karsilastir = function (a, b) { return bankoSiraDegeri(a) - bankoSiraDegeri(b); };
         } else if (kriter === 'kurye') {
-            kopy.sort(function (a, b) {
+            karsilastir = function (a, b) {
                 var ka = (a.kurye || '').toLocaleLowerCase('tr');
                 var kb = (b.kurye || '').toLocaleLowerCase('tr');
                 if (!ka && !kb) return 0;
                 if (!ka) return 1;
                 if (!kb) return -1;
                 return ka.localeCompare(kb, 'tr');
-            });
+            };
         } else {
-            kopy.sort(function (a, b) {
+            karsilastir = function (a, b) {
                 var ta = new Date(a.sepet_zamani || a.created_at || 0).getTime();
                 var tb = new Date(b.sepet_zamani || b.created_at || 0).getTime();
                 return ta - tb;
-            });
+            };
         }
-        return kopy;
+
+        return liste.slice().sort(function (a, b) {
+            return (aktifToplamaSirasi(a) - aktifToplamaSirasi(b)) || karsilastir(a, b);
+        });
     }
 
     function seritCiz(bant, listeId, bosId, imzaAnahtari) {
