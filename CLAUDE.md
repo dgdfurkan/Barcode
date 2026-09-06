@@ -47,6 +47,10 @@ Token'ın çoğu araç çıktısında gidiyor, cevaplarda değil. Sıralama en p
   toplayıcı, kurye adı, sipariş kimliği, ürün kimliği, adres, lokasyon kodu ve depo
   kimliği dahil. Ekran çizerken canlı panele bakılır ama içine kurgusal veri yazılır.
   Depo herkese açık; bu bir kere sızarsa git geçmişinden de temizlemek gerekir.
+- Eklenti kodu değişip manifest sürümü artınca `araclar/eklenti-paketle.sh`
+  çalıştırılır ve güncellenen ZIP aynı commit'e girer. Kullanıcı ayarlardan
+  `eklentiler/` altındaki ZIP'i indiriyor; depo güncel olup ZIP eski kalırsa
+  sahaya eski sürüm gider. `--kontrol` hiçbir şey yazmadan bayatları listeler.
 - Kayma, zıplama, boyut oynaması kabul edilmez. Ölç ve kanıtla.
 - Dış CDN kullanma. Her şey yerelde: `js/vendor/`, `css/tailwind.build.css`.
 
@@ -96,7 +100,9 @@ panel boyu hiçbir genişlikte oynamaz. Bu kuralı bozma.
 `getir-stock-barcodes-extension` (Stok Barkodları), `getir-stock-sync-extension` (Sayım Hazırlığı, en büyüğü,
 `webRequest` ile token yakalar), `getir-warehouse-orders-search-extension` (Sipariş İçi Ürün Arama),
 `getir-low-stock-alert-extension`, `getir-warehouse-shelf-label-fetcher`, `getir-product-fetcher`.
-Dağıtılan ZIP'ler `eklentiler/` altında, adları Türkçe.
+Dağıtılan ZIP'ler `eklentiler/` altında, adları Türkçe; `araclar/eklenti-paketle.sh`
+üretiyor. Asistan ZIP'i düz kök, diğerleri tek üst klasör taşıyor; ikisi de sahada
+kurulu, yapı değiştirilmez.
 Fırın Pişirme şu an yer imi: `eklentiler/firin-pisirme.js`.
 
 **Sayfa başına eklenti çakışması:** franchise.getir.com'da 4, warehouse.getir.com'da 3,
