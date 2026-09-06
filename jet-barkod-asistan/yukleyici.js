@@ -40,32 +40,113 @@
         });
     }
 
+    /* ==================================================================
+       ROTA NÖBETÇİSİ
+       ------------------------------------------------------------------
+       Getir paneli tek sayfa uygulaması. Fırın ekranından sipariş
+       ekranına geçerken sayfa yenilenmiyor, yalnız arayüz değişiyor.
+       Yükleyici eskiden bir kez çalışıp bırakıyordu; sonuç şuydu:
+
+         - Fırın düğmesi sipariş ekranında asılı kalıyordu
+         - Sipariş ekranına ait modüller hiç başlamıyordu
+         - Ürün bulucu görünüp işlevsiz kalabiliyordu
+
+       Artık host'a uyan bütün modüller kayda giriyor, hangisinin
+       çalışacağına YOL'a göre her gezinmede yeniden karar veriliyor.
+       Modül sözleşmesindeki `durdur` bunun için zaten vardı, yalnız
+       kimse çağırmıyordu.
+       ================================================================== */
+
+    var sonAcikListe = null;
+    var sonYol = location.pathname;
+
+    function hostUygun(m) {
+        var host = location.hostname;
+        return (m.hostlar || []).some(function (h) {
+            return host === h || host.endsWith('.' + h);
+        });
+    }
+
+    function baglam() {
+        return {
+            izle: JBA.izle,
+            bildir: JBA.bildir,
+            panoyaYaz: JBA.panoyaYaz,
+            korumali: JBA.korumali
+        };
+    }
+
+    function modulBaslat(kayit) {
+        if (kayit.calisiyor) return;
+        try {
+            kayit.modul.baslat(baglam());
+            kayit.calisiyor = true;
+            kayit.hata = null;
+        } catch (e) {
+            kayit.hata = e;
+            JBA.hata('modül ' + kayit.modul.kimlik, e);
+        }
+    }
+
+    function modulDurdur(kayit) {
+        if (!kayit.calisiyor) return;
+        try {
+            if (typeof kayit.modul.durdur === 'function') kayit.modul.durdur();
+        } catch (e) {
+            JBA.hata('modül durdur ' + kayit.modul.kimlik, e);
+        }
+        kayit.calisiyor = false;
+    }
+
+    /* Her gezinmede çağrılıyor: yola uymayan modül durduruluyor, uyan
+       ve izinli olan başlatılıyor. Hata almış modül yeniden denenmiyor
+       ki her turda aynı hata tekrarlanmasın; sayfa yenilendiğinde
+       temiz bir şans daha alıyor. */
+    function yenidenDegerlendir() {
+        JBA.calisanlar.forEach(function (kayit) {
+            var uygun = JBA.buSayfayaUygun(kayit.modul);
+            var izinli = !sonAcikListe || sonAcikListe.indexOf(kayit.modul.kimlik) !== -1;
+            if (!uygun || !izinli) modulDurdur(kayit);
+            else if (!kayit.hata) modulBaslat(kayit);
+        });
+    }
+
+    function rotayiIzle() {
+        var bak = function () {
+            if (location.pathname === sonYol) return;
+            sonYol = location.pathname;
+            JBA.korumali('rota', yenidenDegerlendir);
+        };
+        ['pushState', 'replaceState'].forEach(function (ad) {
+            var asil = history[ad];
+            if (typeof asil !== 'function' || asil.__jbaSarildi) return;
+            var sarmal = function () {
+                var r = asil.apply(this, arguments);
+                setTimeout(bak, 0);
+                return r;
+            };
+            sarmal.__jbaSarildi = true;
+            history[ad] = sarmal;
+        });
+        global.addEventListener('popstate', function () { setTimeout(bak, 0); });
+        /* React yolu history API'sine dokunmadan da değiştirebiliyor;
+           yalnız dize karşılaştırması yapan bu nöbet ölçülebilir yük
+           getirmiyor. */
+        setInterval(bak, 800);
+    }
+
     function calistir(acikliste) {
-        var uygun = JBA.moduller.filter(JBA.buSayfayaUygun);
+        sonAcikListe = acikliste;
 
-        uygun.forEach(function (m) {
-            var kayit = { modul: m, calisiyor: false, hata: null };
-            JBA.calisanlar.push(kayit);
-
-            // Liste yoksa hepsi açık. Varsa sadece içindekiler.
-            if (acikliste && acikliste.indexOf(m.kimlik) === -1) return;
-
-            try {
-                m.baslat({
-                    izle: JBA.izle,
-                    bildir: JBA.bildir,
-                    panoyaYaz: JBA.panoyaYaz,
-                    korumali: JBA.korumali
-                });
-                kayit.calisiyor = true;
-            } catch (e) {
-                kayit.hata = e;
-                JBA.hata('modül ' + m.kimlik, e);
-            }
+        /* Host'a uyan HER modül kayda giriyor; yol uymuyorsa yalnız
+           başlatılmıyor. Böylece sonradan o yola gezinildiğinde modül
+           elimizde hazır duruyor. */
+        JBA.moduller.filter(hostUygun).forEach(function (m) {
+            JBA.calisanlar.push({ modul: m, calisiyor: false, hata: null });
         });
 
-        /* Getir konsolunu kirletmesin diye başlangıç bilgisi yazılmıyor. */
-
+        yenidenDegerlendir();
+        rotayiIzle();
     }
 
     /*

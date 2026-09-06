@@ -952,6 +952,35 @@
             } catch (e) { /* sessiz */ }
         };
 
+        /* Detay çekimi başarısız olduğunda sessizce pes etmiyoruz. Geçici
+           bir ağ hatası ya da 5xx yüzünden o siparişin ürünleri hiç
+           yazılmıyordu ve kullanıcı "ürünler henüz gelmedi" ekranında
+           kalıyordu. Üç deneme hakkı var; sonuncusu da tutmazsa panelde
+           duran sipariş bir sonraki tarama turunda yeniden kuyruğa
+           giriyor, yani kalıcı kayıp yok. */
+        const denemeler = new Map();
+        const MAX_DENEME = 3;
+
+        const yenidenDene = (oId, sebep) => {
+            const sayi = (denemeler.get(oId) || 0) + 1;
+            denemeler.set(oId, sayi);
+            const tekrar = sayi < MAX_DENEME;
+            if (tekrar && !fetchQueueSet.has(oId)) {
+                fetchQueue.push(oId);
+                fetchQueueSet.add(oId);
+            }
+            try {
+                let lg = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
+                lg.push({
+                    id: oId.slice(-4),
+                    sonuc: sebep + (tekrar ? ' · yeniden (' + sayi + '/' + MAX_DENEME + ')' : ' · vazgeçildi'),
+                    saat: new Date().toLocaleTimeString('tr-TR')
+                });
+                if (lg.length > 60) lg = lg.slice(-60);
+                localStorage.setItem('jba_yazma_log', JSON.stringify(lg));
+            } catch (e) {}
+        };
+
         // === KUYRUK İŞLEMCİ ===
         const processQueue = async () => {
             if (isFetching || fetchQueue.length === 0 || !userToken || !warehouseId) return;
@@ -997,6 +1026,7 @@
                         };
                         saveCache();
                         applyUI();
+                        denemeler.delete(oId);
                         // Kullanıcı bu siparişi açtıysa artık gönderilebilir.
                         if (gonderilecek.has(oId)) siparisiYolla(oId);
                     }
@@ -1007,25 +1037,18 @@
                     updateQueueStatus();
                     return;
                 } else {
-                    try {
-                        var lg = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
-                        lg.push({ id: oId.slice(-4), sonuc: 'HTTP ' + res.status, saat: new Date().toLocaleTimeString('tr-TR') });
-                        if (lg.length > 30) lg = lg.slice(-30);
-                        localStorage.setItem('jba_yazma_log', JSON.stringify(lg));
-                    } catch (e) {}
+                    yenidenDene(oId, 'HTTP ' + res.status);
                 }
             } catch (e) {
-                try {
-                    var lg2 = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
-                    lg2.push({ id: oId.slice(-4), sonuc: 'fetch err: ' + ((e && e.message) || 'x'), saat: new Date().toLocaleTimeString('tr-TR') });
-                    if (lg2.length > 30) lg2 = lg2.slice(-30);
-                    localStorage.setItem('jba_yazma_log', JSON.stringify(lg2));
-                } catch (e2) {}
+                yenidenDene(oId, 'fetch err: ' + ((e && e.message) || 'x'));
             }
 
             isFetching = false;
             updateQueueStatus();
-            if (fetchQueue.length > 0) setTimeout(processQueue, 1500);
+            /* 700 ms: eski 1500 ms, yirmi siparişlik bir panelde ilk turu
+               yarım dakikaya çıkarıyordu. Panelin kendi istek trafiğinin
+               yanında bu aralık rahatça taşınıyor. */
+            if (fetchQueue.length > 0) setTimeout(processQueue, 700);
         };
 
         // === PANEL AÇ / KAPA ===
@@ -1363,6 +1386,7 @@
         const kunyeleriYolla = (liste, zorla) => {
             const degisen = [];
             const tumIdler = [];
+            const yeniGelenler = [];
             liste.forEach((s) => {
                 if (!s || !s.siparisId) return;
                 tumIdler.push(s.siparisId);
@@ -1370,6 +1394,10 @@
                 const eski = sonKunye.get(s.siparisId);
                 sonKunye.set(s.siparisId, yeni);
                 if (eski !== yeni) degisen.push(s);
+                /* Bu sipariş ilk kez görülüyor. Detayı beklemeden, sıraya
+                   girmeden çekilecek; kullanıcı "ürünler henüz gelmedi"
+                   ekranını hiç görmemeli. */
+                if (eski === undefined) yeniGelenler.push(s.siparisId);
                 /* Kişi (toplayıcı/kurye) değiştiyse cache eskimiş demektir:
                    yeni kişinin fotoğrafını da almak için detayı yeniden çek. */
                 const yeniKisi = kisiImzasi(s);
@@ -1381,6 +1409,24 @@
                     otoSorulan.delete(s.siparisId);
                 }
             });
+            /* YENİ SİPARİŞ ANINDA ÇEKİLİR
+               Kuyruğun BAŞINA giriyor ve tur sınırına takılmıyor. Eskiden
+               yeni sipariş sıranın sonuna ekleniyor, turda üç sipariş
+               sınırı ve 1.5 saniyelik aralıkla birlikte yirmi siparişlik
+               bir panelde otuz saniye bekliyordu. Kullanıcının gördüğü
+               "ürünler henüz gelmedi" ekranı tam olarak o bekleme idi. */
+            if (yeniGelenler.length) {
+                yeniGelenler.forEach((id) => {
+                    otoSorulan.add(id);
+                    gonderilecek.add(id);
+                    if (!fetchQueueSet.has(id)) {
+                        fetchQueue.unshift(id);
+                        fetchQueueSet.add(id);
+                    }
+                });
+                if (!isFetching) processQueue();
+            }
+
             /* KİMİN SÖZÜ GEÇER
                DOM'da kart varsa panel çizmiş demektir; o liste TAM listedir
                ve otoritedir. Teslim edilen sipariş DOM'dan düşer düşmez
@@ -1439,7 +1485,12 @@
            beklemesin. Bir tur en fazla üç sipariş alıyor ki panel trafiği
            patlamasın; gerisi sonraki turda geliyor. */
         const otoSorulan = new Set();
-        const OTO_TUR_SINIRI = 3;
+        /* Tur başına alınacak sipariş sayısı. Yeni gelen siparişler bu
+           yoldan değil, `kunyeleriYolla` içindeki öncelikli daldan
+           gidiyor; buradaki sınır yalnız ilk açılışta panelde hâlihazırda
+           duran yığını sindirmek için. 3 çok yavaştı, yirmi siparişlik
+           panelde ilk tarama dakikaları buluyordu. */
+        const OTO_TUR_SINIRI = 8;
 
         const _turkce = (t) => (t || '').toString().toLowerCase()
             .replace(/[ıİI]/g, 'i').replace(/[ğĞ]/g, 'g').replace(/[üÜ]/g, 'u')
@@ -1525,6 +1576,18 @@
             if (!paket.urunler || !paket.urunler.length) {
                 sonGonderim.delete(siparisId);
                 gonderilecek.add(siparisId);
+                /* Yalnız `gonderilecek`'e eklemek yetmiyordu: detay hiç
+                   gelmediyse bu sipariş bir daha kuyruğa girmiyor ve
+                   sonsuza kadar ürünsüz bekliyordu. Önbelleği düşürüp
+                   kuyruğun başına alıyoruz ki taze detay çekilsin. */
+                const kodY = String(siparisId).slice(-4);
+                if (orderCache[kodY]) { delete orderCache[kodY]; saveCache(); }
+                otoSorulan.delete(siparisId);
+                if (!fetchQueueSet.has(siparisId)) {
+                    fetchQueue.unshift(siparisId);
+                    fetchQueueSet.add(siparisId);
+                    if (!isFetching) processQueue();
+                }
                 try {
                     var lg = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
                     lg.push({ id: siparisId.slice(-4), urunSay: 0, sonuc: 'ATLA: urun_yok', saat: new Date().toLocaleTimeString('tr-TR') });

@@ -636,6 +636,33 @@
             await sleep(200);
           }
 
+          /**
+           * Dört saat sütununu okumaya hazır hâle getirir.
+           *
+           * Eskiden ilk denemede `clickAllClearFilters(false)` çağrılıyordu
+           * ve o da yalnız `ant-btn-primary` TAŞIMAYAN düğmelere basıyordu.
+           * Oysa panelin açma düğmesi tam olarak `ant-btn-primary` sınıfını
+           * taşıyor; yani ilk turda hiç dokunulmuyordu. Kapalı sütun varsa
+           * ürünlerin bir kısmı okunuyor, `products.length` sıfır olmadığı
+           * için de zorlamalı ikinci tur hiç çalışmıyordu. Sonuç: eksik veri
+           * sessizce doğru sanılıyordu.
+           *
+           * Artık düğme durumuna bakılmıyor, sütunlar açılıyor ve AÇILDIĞI
+           * DOĞRULANIYOR. Kapalı kalan varsa üç tura kadar tekrar deneniyor.
+           */
+          async function sutunlariAcVeDogrula() {
+            await clickAllClearFilters(true);
+            for (let tur = 0; tur < 3; tur++) {
+              await expandPanelClipboardIfNeeded();
+              const kapali = findHeatingCards()
+                .slice(0, 4)
+                .filter(heatingCardNeedsDetailExpand);
+              if (!kapali.length) return true;
+              await sleep(400);
+            }
+            return false;
+          }
+
           function parseLegacyTable() {
             const rows = document.querySelectorAll('tbody tr');
             const products = [];
@@ -1068,12 +1095,12 @@
             '<div style="text-align: center; padding: 2rem;">Panel filtreleri açılıyor…</div>';
 
           try {
-            await clickAllClearFilters(false);
-            await expandPanelClipboardIfNeeded();
+            /* Sütunlar açılmadan okuma yapılmıyor. Açılma doğrulanıyor;
+               eksik sütunla okunan yarım veri "başarılı" sayılmasın. */
+            await sutunlariAcVeDogrula();
             let products = parseProductsFromPage();
             if (!products.length) {
-              await clickAllClearFilters(true);
-              await expandPanelClipboardIfNeeded();
+              await sutunlariAcVeDogrula();
               products = parseProductsFromPage();
             }
             if (!products.length) {
@@ -1087,7 +1114,7 @@
             cachedProducts = products;
             applyViewFromCache();
           } catch (error) {
-            console.error('Pişirme Asistanı Hatası:', error);
+            JBA.hata('fırın pişirme', error);
             resultsContainer.innerHTML =
               '<div style="text-align: center; padding: 4rem 1rem; background: #fef2f2; color: #991b1b; border-radius: 0.5rem;"><h3 style="font-size: 1.25rem; font-weight: 600;">Analiz Başarısız!</h3><p style="margin-top: 0.5rem;">Pişirme listesi okunamadı. Isıtma tahmini ekranındayken tekrar dene; yine olmazsa bookmarklet metnini dosyadan yeniden kopyala.</p></div>';
           }
