@@ -1739,7 +1739,10 @@
                             logKaydet('BG_HATA: ' + (yanit.sebep || 'x'));
                             return;
                         }
-                        logKaydet('OK');
+                        /* "OK" değil: arka plan siparişi yalnız kuyruğa
+                           aldı. Gerçek sonuç JBA_YAZMA_SONUC ile ayrı bir
+                           satır olarak geliyor. */
+                        logKaydet('kuyrukta · ' + (paket.urunler || []).length + ' ürün');
                     }
                 );
             } catch (e) {
@@ -1797,6 +1800,30 @@
            detay çekilsin ve veritabanına ürünler yazılsın. */
         try {
             chrome.runtime.onMessage.addListener((istek) => {
+                /* Arka plan gerçek yazma sonucunu bildiriyor. Eskiden log'a
+                   yalnız "kuyruğa alındı" bilgisi düşüyordu ve o da "OK"
+                   diye yazılıyordu; veritabanına hiç ürün yazılmasa bile
+                   log temiz görünüyordu. */
+                if (istek && istek.type === 'JBA_YAZMA_SONUC') {
+                    const kotu = /YAZILAMADI|EKSİK/.test(String(istek.sonuc || ''));
+                    try {
+                        let lg = JSON.parse(localStorage.getItem('jba_yazma_log') || '[]');
+                        lg.push({
+                            id: String(istek.siparisId || '').slice(-4),
+                            sonuc: istek.sonuc,
+                            saat: new Date().toLocaleTimeString('tr-TR')
+                        });
+                        if (lg.length > 60) lg = lg.slice(-60);
+                        localStorage.setItem('jba_yazma_log', JSON.stringify(lg));
+                    } catch (e) {}
+                    /* Eksik ya da başarısız yazımda sipariş yeniden
+                       gönderilebilsin: koruma süresi kalkıyor. */
+                    if (kotu && istek.siparisId) {
+                        sonGonderim.delete(istek.siparisId);
+                        gonderilecek.add(istek.siparisId);
+                    }
+                    return;
+                }
                 if (!istek || istek.type !== 'JBA_URUN_CEK') return;
                 const idler = Array.isArray(istek.siparisler) ? istek.siparisler : [];
                 let eklendi = 0;

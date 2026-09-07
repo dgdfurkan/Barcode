@@ -1215,7 +1215,8 @@
             govde.innerHTML = urunler.length
                 ? bantlaraAyir(urunler)
                 : '<div class="sip-bos"><span>' + BOS_IKON + '</span><strong>Ürünler henüz gelmedi</strong>' +
-                  '<p>Panelde siparişe bir kez girmen yeterli.</p></div>';
+                  '<p>Depo paneli açıksa birkaç saniyede iniyor. Gelmiyorsa panel sekmesinde ' +
+                  'konsolu açıp <code>jbaLog()</code> yaz, son satır sebebi söylüyor.</p></div>';
             govde.scrollTop = yeniSiparis ? 0 : kaydirma;
         }
 

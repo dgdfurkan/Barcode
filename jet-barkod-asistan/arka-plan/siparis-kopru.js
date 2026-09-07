@@ -141,14 +141,96 @@ async function siparisYaz(yetki, s) {
 
     let satir = null;
     try { satir = JSON.parse(metin)[0]; } catch (e) { /* sessiz */ }
-    if (!satir || !satir.id) throw new Error('orders: kimlik dönmedi');
-    return satir.id;
+    if (satir && satir.id) return satir.id;
+
+    /* Temsil dönmediyse (Prefer başlığı yok sayıldı, satır politika
+       yüzünden geri okunamadı, gövde beklenmedik geldi) uuid'yi ayrı bir
+       okumayla alıyoruz. Kimlik olmadan `order_items` yazılamıyor;
+       eskiden burada hata fırlatılıyor ve siparişin BÜTÜN ürünleri
+       sessizce düşüyordu. */
+    try {
+        const adres = SIPARIS_API + '/rest/v1/orders?select=id' +
+            '&username=eq.' + encodeURIComponent(yetki.username) +
+            '&order_id=eq.' + encodeURIComponent(s.siparisId) + '&limit=1';
+        const tekrar = await fetch(adres, { headers: apiBasliklari(yetki) });
+        if (tekrar.ok) {
+            const liste = await tekrar.json();
+            if (liste && liste[0] && liste[0].id) return liste[0].id;
+        }
+    } catch (e) { /* aşağıda hata fırlatılıyor */ }
+
+    throw new Error('orders: kimlik dönmedi (' + metin.slice(0, 80) + ')');
+}
+
+/* SIRA BENZERSİZ OLMAK ZORUNDA
+   `order_items` üzerinde UNIQUE (order_uuid, sira) var ve UPSERT bu
+   kısıtla çalışıyor. Aynı gövdede iki satır aynı sırayı taşırsa
+   PostgreSQL "ON CONFLICT DO UPDATE command cannot affect row a second
+   time" diyor ve İSTEĞİN TAMAMI 400 dönüyor.
+
+   Sıra panelin `product.index` alanından geliyor ve orada hiçbir
+   benzersizlik garantisi yok: alan bazı ürünlerde hiç gelmiyor, o zaman
+   dizi konumu (i+1) kullanılıyor ve gerçek bir index ile çakışabiliyor.
+   Kırk sekiz ürünlük bir siparişte tek çakışma bütün ürünleri
+   düşürüyordu. Site "Ürünler henüz gelmedi" gösteriyordu ve hiçbir
+   tazeleme bunu düzeltmiyordu, çünkü her denemede aynı bozuk gövde
+   gidiyordu.
+
+   Benzersiz olan numaralara dokunulmuyor: site `alindi` işaretini
+   `sira` üzerinden yazıyor, numara oynarsa yanlış ürün işaretli
+   görünür. Yalnız çakışan ve geçersiz olanlara boştaki en küçük numara
+   veriliyor. Aynı girdi her zaman aynı çıktıyı üretiyor. */
+function siralariBenzersizle(urunler) {
+    const alinan = new Set();
+    const sira = new Array(urunler.length);
+
+    urunler.forEach((u, i) => {
+        /* `Number(null)` sıfır veriyor; panel `index` alanını null
+           gönderebiliyor ve o satır sessizce 0. sıraya oturuyordu.
+           null ile undefined burada açıkça eleniyor. */
+        if (u.sira === null || u.sira === undefined) return;
+        const s = Number(u.sira);
+        if (Number.isInteger(s) && s >= 0 && !alinan.has(s)) {
+            alinan.add(s);
+            sira[i] = s;
+        }
+    });
+
+    let bos = 1;
+    urunler.forEach((u, i) => {
+        if (sira[i] != null) return;
+        while (alinan.has(bos)) bos++;
+        alinan.add(bos);
+        sira[i] = bos;
+    });
+
+    return urunler.map((u, i) => Object.assign({}, u, { sira: sira[i] }));
+}
+
+async function satirParcasiYaz(yetki, govde) {
+    try {
+        const yanit = await fetch(
+            SIPARIS_API + '/rest/v1/order_items?on_conflict=order_uuid,sira',
+            {
+                method: 'POST',
+                headers: apiBasliklari(yetki, {
+                    'Prefer': 'resolution=merge-duplicates,return=minimal'
+                }),
+                body: JSON.stringify(govde)
+            }
+        );
+        if (yanit.ok) return { ok: true };
+        const metin = await yanit.text();
+        return { ok: false, hata: 'order_items ' + yanit.status + ': ' + metin.slice(0, 160) };
+    } catch (e) {
+        return { ok: false, hata: 'order_items ağ: ' + ((e && e.message) || 'x') };
+    }
 }
 
 async function satirlariYaz(yetki, siparisUuid, urunler) {
-    if (!urunler.length) return;
+    if (!urunler.length) return { yazilan: 0, toplam: 0 };
 
-    const govde = urunler.map((u) => ({
+    const govde = siralariBenzersizle(urunler).map((u) => ({
         order_uuid: siparisUuid,
         sira: u.sira,
         urun_id: u.urunId || null,
@@ -161,21 +243,22 @@ async function satirlariYaz(yetki, siparisUuid, urunler) {
         alt_sinif: u.altSinif || null
     }));
 
-    const yanit = await fetch(
-        SIPARIS_API + '/rest/v1/order_items?on_conflict=order_uuid,sira',
-        {
-            method: 'POST',
-            headers: apiBasliklari(yetki, {
-                'Prefer': 'resolution=merge-duplicates,return=minimal'
-            }),
-            body: JSON.stringify(govde)
-        }
-    );
+    const toplu = await satirParcasiYaz(yetki, govde);
+    if (toplu.ok) return { yazilan: govde.length, toplam: govde.length };
 
-    if (!yanit.ok) {
-        const metin = await yanit.text();
-        throw new Error('order_items ' + yanit.status + ': ' + metin.slice(0, 160));
+    /* Toplu istek patladı. Tek bozuk satır kırk yedi sağlam satırı
+       düşürmesin: hepsi tek tek deneniyor. Bu yol yalnız hata
+       durumunda çalışıyor, normal akışta tek istek atılıyor. */
+    let yazilan = 0;
+    let ilkHata = toplu.hata;
+    for (let i = 0; i < govde.length; i++) {
+        const tek = await satirParcasiYaz(yetki, [govde[i]]);
+        if (tek.ok) yazilan++;
+        else if (!ilkHata) ilkHata = tek.hata;
     }
+
+    if (!yazilan) throw new Error(ilkHata || 'order_items: hiçbir satır yazılamadı');
+    return { yazilan: yazilan, toplam: govde.length, hata: ilkHata };
 }
 
 /**
@@ -469,6 +552,29 @@ async function kuyrugaAl(siparisler) {
     return { ok: true, eklenen: eklenen, kuyruk: siparisKuyrugu.length };
 }
 
+/* GERÇEK SONUÇ NEREYE GİDİYOR
+   `kuyrugaAl` siparişi kuyruğa ekleyip hemen `{ok:true}` dönüyor, içerik
+   betiği de log'a "OK" yazıyordu. Asıl yazma bundan sonra, burada
+   oluyor; patlarsa kimse görmüyordu. Kullanıcı `jbaLog()` çıktısında
+   "OK" okuyup ürünlerin gelmediğini görüyor, ortada hata yokmuş gibi
+   duruyordu. Artık sonuç panel sekmesine geri gidiyor ve aynı log'a
+   düşüyor. */
+function yazmaSonucunuBildir(siparisId, sonuc) {
+    try {
+        chrome.tabs.query({ url: 'https://warehouse.getir.com/*' }, (sekmeler) => {
+            (sekmeler || []).forEach((t) => {
+                try {
+                    chrome.tabs.sendMessage(
+                        t.id,
+                        { type: 'JBA_YAZMA_SONUC', siparisId: siparisId, sonuc: sonuc },
+                        () => { void chrome.runtime.lastError; }
+                    );
+                } catch (e) { /* sekme kapanmış olabilir */ }
+            });
+        });
+    } catch (e) { /* sessiz */ }
+}
+
 async function kuyrugaBak() {
     if (siparisIsliyor) return;
     siparisIsliyor = true;
@@ -481,16 +587,29 @@ async function kuyrugaBak() {
             const s = siparisKuyrugu.shift();
             try {
                 const uuid = await siparisYaz(yetki, s);
-                await satirlariYaz(yetki, uuid, s.urunler || []);
+                const yazma = await satirlariYaz(yetki, uuid, s.urunler || []);
 
-                const imzalar = await imzalariOku();
-                imzalar[s.siparisId] = siparisImzasi(s);
-                await imzalariYaz(imzalar);
+                /* İmza yalnız TAM yazımdan sonra kaydediliyor. Eksik
+                   yazılan sipariş "hallettim" sayılırsa bir daha hiç
+                   denenmez ve eksik ürünle kalır. */
+                if (!yazma.toplam || yazma.yazilan === yazma.toplam) {
+                    const imzalar = await imzalariOku();
+                    imzalar[s.siparisId] = siparisImzasi(s);
+                    await imzalariYaz(imzalar);
+                }
+
+                if (yazma.toplam) {
+                    yazmaSonucunuBildir(s.siparisId, yazma.yazilan === yazma.toplam
+                        ? 'YAZILDI ' + yazma.yazilan + '/' + yazma.toplam
+                        : 'EKSİK ' + yazma.yazilan + '/' + yazma.toplam + ' · ' + (yazma.hata || ''));
+                }
             } catch (e) {
-                console.warn('[Jet Barkod] Sipariş yazılamadı:', (e && e.message) || e);
+                const msg = (e && e.message) || String(e);
+                console.warn('[Jet Barkod] Sipariş yazılamadı:', msg);
+                yazmaSonucunuBildir(s.siparisId, 'YAZILAMADI: ' + msg.slice(0, 120));
                 /* Yetki hatasıysa kuyruğu boşuna döndürmeyelim; jeton
                    yenilenene kadar duruyoruz. */
-                if (String((e && e.message) || '').indexOf('401') !== -1) break;
+                if (msg.indexOf('401') !== -1) break;
             }
 
             if (siparisKuyrugu.length) await bekle(SIPARIS_ARA_MS);
