@@ -158,6 +158,12 @@
     --sari-50:   #fff6e8;
     --sari-cizgi:#fbdba7;
     --mor:       #7c3aed;
+    /* Aşağıdakiler dosyada zaten kullanılıyordu, artık tek yerden geliyor. */
+    --yazi-orta: #344054;
+    --kirmizi:   #d92d20;
+    --kirmizi-50:#fdecec;
+    --kirmizi-cizgi:#f1b0b0;
+    --yesil-cizgi:#a7e8cd;
 
     --golge-s: 0 1px 2px rgba(16,24,40,0.04);
     --golge-o: 0 6px 20px rgba(16,24,40,0.06);
@@ -183,7 +189,11 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     stroke-linecap: round;
     stroke-linejoin: round;
 }
-.sip-icerik button, .sip-detay button, .sip-kat button { cursor: pointer; font: inherit; }
+/* `:where()` spesifikliği sıfırlar. Bu satır Tailwind preflight'ını geri almak
+   için var ama seçici (0,1,1) olduğu için `.sip-dugme` (0,1,0) kurallarını da
+   eziyordu: düğmeler 14px/750 yerine gövdeden miras 16px/400 çiziliyordu.
+   Tasarım hiç uygulanmıyordu. */
+:where(.sip-icerik, .sip-detay, .sip-kat) button { cursor: pointer; font: inherit; }
 .sip-icerik :focus-visible, .sip-detay :focus-visible, .sip-kat :focus-visible {
     outline: 3px solid rgba(21,94,239,0.24);
     outline-offset: 3px;
@@ -225,39 +235,53 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 }
 .sip-marka__im img { width: 25px; height: 25px; object-fit: contain; }
 .sip-marka > span:last-child { display: flex; flex-direction: column; }
-.sip-marka strong { font-family: var(--baslik-font); font-size: 18.9px; font-weight: 700; line-height: 1.15; letter-spacing: -0.035em; }
-.sip-marka small { margin-top: 2px; color: var(--sonuk); font-size: 12.5px; font-weight: 700; }
+.sip-marka strong { font-family: var(--baslik-font); font-size: 18px; font-weight: 700; line-height: 1.15; letter-spacing: -0.03em; }
+.sip-marka small { margin-top: 2px; color: var(--sonuk); font-size: 11px; font-weight: 700; }
 
-.sip-ust__yol { display: flex; align-items: center; gap: 7px; }
+.sip-ust__yol { display: flex; align-items: center; gap: 8px; }
+/* Yükseklik 44: dokunma hedefinin alt sınırı. Görsel olarak küçük durabilir,
+   dokunma alanı duramaz. */
 .sip-ust__yol > a {
-    height: 40px;
-    padding: 0 13px;
+    position: relative;
+    height: 44px;
+    padding: 0 12px;
     border: 1px solid var(--cizgi);
-    border-radius: 10px;
+    border-radius: 12px;
     display: flex; align-items: center; gap: 8px;
-    background: #f8fafc;
-    color: #344054;
-    font-size: 14px; font-weight: 700;
+    background: var(--kagit);
+    color: var(--yazi-orta);
+    font-size: 13px; font-weight: 700;
     text-decoration: none;
-    transition: border-color 0.18s, background 0.18s, color 0.18s;
+    transition: background var(--motion-micro) var(--motion-ease-standard),
+                border-color var(--motion-micro) var(--motion-ease-standard),
+                color var(--motion-micro) var(--motion-ease-standard);
 }
-.sip-ust__yol > a:hover { border-color: #cbd5e1; background: #fff; color: var(--mavi); }
-.sip-ust__yol > a svg { width: 17px; }
+.sip-ust__yol > a:hover { border-color: var(--soluk); background: var(--yuzey); color: var(--mavi); }
+/* İkon yalnız hover'da hafifçe öne çıkıyor: yer değiştirmiyor, yalnız
+   ölçekleniyor, yani komşu öğeleri itmiyor. */
+.sip-ust__yol > a svg {
+    width: 16px;
+    transition: transform var(--motion-fast) var(--motion-ease-out);
+}
+.sip-ust__yol > a:hover svg { transform: scale(1.08); }
+
+/* Hesap çipi gezinti bağlantılarının devamı değil, ayrı bir grup.
+   Ayrımı çizgi değil boşluk anlatıyor. */
 .sip-hesap {
-    margin-left: 5px;
-    height: 40px;
+    margin-left: 8px;
+    height: 44px;
     display: flex; align-items: center; gap: 8px;
     padding: 0 4px;
-    background: #fff;
 }
 .sip-hesap i {
-    width: 29px; height: 29px;
+    width: 28px; height: 28px;
     border-radius: 9px;
     display: grid; place-items: center;
     background: var(--mavi-50); color: var(--mavi);
-    font-size: 11.2px; font-style: normal; font-weight: 800;
+    font-size: 11px; font-style: normal; font-weight: 800;
+    letter-spacing: 0.02em;
 }
-.sip-hesap b { color: var(--yazi); font-size: 14px; font-weight: 700; }
+.sip-hesap b { color: var(--yazi); font-size: 13px; font-weight: 700; }
 .sip-hesap:empty { display: none; }
 
 .sip-sayfa { width: min(1540px, calc(100% - 48px)); margin: 0 auto; padding: 28px 0 64px; }
@@ -303,64 +327,123 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-kapi__dugme:hover { background: var(--mavi-koyu); transform: translateY(-1px); }
 
 /* ============================== BAŞLIK ============================== */
-.sip-baslik { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
+.sip-baslik { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+
+/* DURUM ÇİPİ
+   Önceden bu satır 800 ağırlık, büyük harf ve 0.13em harf aralığıyla
+   yazılıyordu; başlıkla aynı anda bağırıyor, göz hangisine bakacağını
+   bilemiyordu. Ekranın tek büyük öğesi H1. Durum bilgisi görünür kalmalı
+   ama yarışmamalı, o yüzden kendi sınırı olan küçük bir çipe alındı. */
 .sip-canli {
-    margin: 0 0 7px;
-    display: flex; align-items: center; gap: 8px;
-    color: var(--mavi);
-    font-size: 12px; font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase;
+    margin: 0 0 12px;
+    height: 24px;
+    padding: 0 8px;
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid var(--yesil-cizgi);
+    border-radius: 999px;
+    background: var(--yesil-50);
+    color: var(--yesil);
+    font-size: 11px; font-weight: 700; letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
 }
 .sip-canli i {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--yesil);
-    box-shadow: 0 0 0 4px rgba(18,166,106,0.12);
-    animation: sip-nabiz 2.4s ease-out infinite;
+    position: relative;
+    width: 8px; height: 8px;
+    border-radius: 999px;
+    background: currentColor;
+}
+/* Halka ayrı bir katman: `box-shadow` yerine `transform` + `opacity`
+   animate ediliyor, yani her karede yeniden boyama yok. */
+.sip-canli i::after {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: inherit;
+    background: currentColor;
+    animation: sip-nabiz 2.4s var(--motion-ease-out) infinite;
 }
 @keyframes sip-nabiz {
-    0%, 100% { box-shadow: 0 0 0 4px rgba(18,166,106,0.12); }
-    50%      { box-shadow: 0 0 0 7px rgba(18,166,106,0.04); }
+    0%        { transform: scale(1); opacity: 0.5; }
+    70%, 100% { transform: scale(2.8); opacity: 0; }
 }
 
 /* Veri tazeliği uyarısı. Depo paneli susunca gösterge yeşilden çıkıyor;
-   nabız da duruyor çünkü artık canlı bir akış yok, yanıltmasın. */
-.sip-canli--eski { color: var(--sari); }
-.sip-canli--eski i { background: var(--sari); box-shadow: 0 0 0 4px rgba(217,119,6,0.14); animation: none; }
-.sip-canli--kopuk { color: #d92d20; }
-.sip-canli--kopuk i { background: #d92d20; box-shadow: 0 0 0 4px rgba(217,45,32,0.14); animation: none; }
+   nabız da duruyor çünkü artık canlı bir akış yok, yanıltmasın.
+   Durum yalnız renkle anlatılmıyor: çipin metni de değişiyor. */
+.sip-canli--eski {
+    border-color: var(--sari-cizgi);
+    background: var(--sari-50);
+    color: var(--sari);
+}
+.sip-canli--kopuk {
+    border-color: var(--kirmizi-cizgi);
+    background: var(--kirmizi-50);
+    color: var(--kirmizi);
+}
+.sip-canli--eski i::after, .sip-canli--kopuk i::after { animation: none; opacity: 0; }
+
 .sip-baslik h1 {
     margin: 0;
     font-family: var(--baslik-font);
-    font-size: clamp(29.6px, 3vw, 36px); font-weight: 700; line-height: 1.05; letter-spacing: -0.05em;
+    font-size: 26px; font-weight: 700; line-height: 1.15; letter-spacing: -0.03em;
     color: var(--lacivert);
 }
-.sip-baslik__not { display: block; margin-top: 8px; color: var(--sonuk); font-size: 14.4px; }
+.sip-baslik__not { display: block; margin-top: 4px; color: var(--sonuk); font-size: 13px; }
 .sip-baslik__eylem { display: flex; gap: 8px; }
 
+/* Yükseklik 42 idi, 44 oldu: dokunma hedefinin alt sınırı. Depocu bu
+   ekranı tek eliyle, hareket hâlinde kullanıyor. */
 .sip-dugme, .sip-yenile {
-    height: 42px;
+    position: relative;
+    height: 44px;
     border: 1px solid var(--cizgi-sert);
-    border-radius: 11px;
+    border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
     background: var(--yuzey);
-    color: #344054;
-    font-size: 14px; font-weight: 750;
+    color: var(--yazi-orta);
+    font-size: 13px; font-weight: 700;
     box-shadow: var(--golge-s);
-    transition: transform 0.18s var(--yay), border-color 0.18s, box-shadow 0.18s, color 0.18s;
+    transition: transform var(--motion-fast) var(--motion-ease-out),
+                border-color var(--motion-micro) var(--motion-ease-standard),
+                color var(--motion-micro) var(--motion-ease-standard);
 }
-.sip-dugme { padding: 0 14px; gap: 8px; }
-.sip-dugme svg { width: 17px; }
-.sip-yenile { width: 42px; }
-.sip-yenile svg { width: 19px; }
-.sip-dugme:hover, .sip-yenile:hover { transform: translateY(-1px); border-color: #aeb8c7; box-shadow: var(--golge-o); color: var(--mavi); }
-.sip-dugme:active, .sip-yenile:active { transform: scale(0.96); }
+/* Yükselen gölge kendi katmanında duruyor. `box-shadow` animate etmek her
+   karede yeniden boyama demek; burada yalnız `opacity` değişiyor. */
+.sip-dugme::after, .sip-yenile::after {
+    content: '';
+    position: absolute; inset: -1px;
+    border-radius: inherit;
+    box-shadow: var(--golge-o);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--motion-fast) var(--motion-ease-out);
+}
+.sip-dugme { padding: 0 16px; gap: 8px; }
+.sip-dugme svg { width: 16px; }
+.sip-yenile { width: 44px; }
+.sip-yenile svg { width: 18px; }
+.sip-dugme:hover, .sip-yenile:hover { transform: translateY(-1px); border-color: var(--soluk); color: var(--mavi); }
+.sip-dugme:hover::after, .sip-yenile:hover::after { opacity: 1; }
+.sip-dugme:active, .sip-yenile:active { transform: translateY(0) scale(0.97); }
+.sip-dugme:active::after, .sip-yenile:active::after { opacity: 0; }
 .sip-dugme b {
-    min-width: 18px;
-    padding: 1px 6px;
-    border-radius: 20px;
-    background: #eff2f6;
+    min-width: 20px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: var(--kagit);
     color: var(--sonuk);
     font-size: 11px; font-weight: 700;
     font-variant-numeric: tabular-nums;
+    transition: background var(--motion-micro) var(--motion-ease-standard),
+                color var(--motion-micro) var(--motion-ease-standard);
+}
+.sip-dugme:hover b { background: var(--mavi-50); color: var(--mavi); }
+/* Sayaç değişince tek seferlik vurgu. Sık tekrarlanan bir olay değil;
+   kapanan sipariş sayısı saatte birkaç kez oynuyor. */
+.sip-dugme b.sip-sayi--degisti { animation: sip-sayi-vurgu var(--motion-normal) var(--motion-ease-out); }
+@keyframes sip-sayi-vurgu {
+    0%   { transform: scale(1); }
+    45%  { transform: scale(1.18); }
+    100% { transform: scale(1); }
 }
 
 /* ---- Kapananlar penceresi ----
@@ -415,7 +498,9 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-kapanan__ac:hover { border-color: var(--mavi); color: var(--mavi); }
 .sip-kapanan__geri { border: 0; background: var(--mavi); color: #fff; }
 .sip-kapanan__geri:hover { background: var(--mavi-koyu); }
-.sip-yenile.donuyor svg { animation: sip-don 0.7s linear; }
+/* Tek turluk onay hareketi. Süre token'dan türetiliyor: 440ms, hareket
+   skill'inin 500ms üst sınırının altında. */
+.sip-yenile.donuyor svg { animation: sip-don calc(var(--motion-panel) * 2) var(--motion-ease-standard); }
 @keyframes sip-don { to { transform: rotate(360deg); } }
 
 /* ============================== AKIŞ ============================== */
@@ -1335,13 +1420,13 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-marka__im img { width: 22px; height: 22px; }
     .sip-marka strong { font-size: 16px; }
     .sip-marka small { font-size: 11px; }
-    .sip-ust__yol > a { width: 38px; padding: 0; justify-content: center; }
+    .sip-ust__yol > a { width: 44px; padding: 0; justify-content: center; }
     .sip-ust__yol > a span { display: none; }
     .sip-hesap b { display: none; }
     .sip-sayfa { padding-top: 21px; }
     .sip-baslik { align-items: center; }
     .sip-baslik__not { display: none; }
-    .sip-dugme { width: 42px; padding: 0; }
+    .sip-dugme { width: 44px; padding: 0; }
     .sip-dugme span { display: none; }
 
     /* Üç şerit dar ekranda sığmıyor: yatay kaydırma ile depocu
@@ -1388,8 +1473,6 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 }
 @media (max-width: 560px) {
     .sip-ust__yol > a:first-child { display: none; }
-    .sip-baslik h1 { font-size: 25px; }
-    .sip-canli { font-size: 10.5px; }
 
     .sip-akis { margin-top: 10px; gap: 3px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .sip-serit__ust { top: 68px; min-height: 0; margin-bottom: 5px; padding: 6px; gap: 5px; border-radius: 9px; }
@@ -1462,6 +1545,9 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-kutu { padding: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
+    /* `.sip-ust` listede yoktu: üst şeritteki geçişler ve ikon ölçeklemesi
+       azaltılmış hareket açıkken de çalışıyordu. */
+    .sip-ust, .sip-ust *,
     .sip-icerik *, .sip-detay *, .sip-kat *, .sip-bildirim,
     .sip-icerik, .sip-detay, .sip-kat {
         animation: none !important;

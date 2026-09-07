@@ -1648,7 +1648,16 @@
 
     function kapananSayiTazele() {
         var d = el('kapananSayi');
-        if (d) d.textContent = kapananlar().length;
+        if (!d) return;
+        var yeni = String(kapananlar().length);
+        if (d.textContent === yeni) return;
+        d.textContent = yeni;
+        /* Değişimi tek seferlik bir vurguyla bildiriyoruz. Sınıf önce
+           kaldırılıp reflow tetikleniyor; yoksa ikinci değişimde animasyon
+           hiç yeniden başlamazdı. */
+        d.classList.remove('sip-sayi--degisti');
+        void d.offsetWidth;
+        d.classList.add('sip-sayi--degisti');
     }
 
     function kapananlariCiz() {
