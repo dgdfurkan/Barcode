@@ -959,20 +959,66 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 
 .sip-urun__eylem { display: flex; align-items: center; gap: 10px; }
 .sip-adet {
-    min-width: 58px; height: 42px;
+    position: relative;
+    min-width: 60px; height: 44px;
     padding: 0 12px;
-    border: 1px solid var(--cizgi); border-radius: 10px;
+    border: 1px solid var(--cizgi); border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
-    background: #f7f8fa;
+    background: var(--kagit);
     color: var(--lacivert);
     font-family: var(--baslik-font);
-    font-size: 14.5px; font-weight: 700;
+    font-size: 15px; font-weight: 700;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
 .sip-adet::before { content: '×'; margin-right: 2px; color: var(--soluk); }
 .sip-adet--birim::before { content: ''; margin: 0; }
-.sip-adet u { margin-left: 3px; text-decoration: none; font-size: 10.5px; font-weight: 600; color: var(--sonuk); }
+.sip-adet u { margin-left: 4px; text-decoration: none; font-size: 11px; font-weight: 600; color: var(--sonuk); }
+
+/* ÇOKLU ADET
+   Bir adetlik ürün sessiz duruyor, birden fazlası kendini gösteriyor.
+   Aradaki fark yalnız renk değil: kenarlık, zemin ve `×` işaretinin
+   tonu birlikte değişiyor, yani renk körü bir gözde de ayırt ediliyor. */
+.sip-adet--coklu {
+    border-color: var(--mavi-100);
+    background: var(--mavi-50);
+    color: var(--mavi-koyu);
+    font-weight: 800;
+}
+.sip-adet--coklu::before { color: var(--mavi); }
+.sip-urun--alindi .sip-adet--coklu { border-color: var(--cizgi); background: var(--kagit); color: var(--sonuk); }
+
+/* TİKLEME UYARISI
+   Depocu hızlı çalışırken "×2" yazısını kaçırıp tek adet alıyordu.
+   Tikleme anında adet kutusunun üstünde kısa bir balon beliriyor.
+
+   Balon `position: absolute` ve `pointer-events: none`: liste akmıyor,
+   hiçbir satır yer değiştirmiyor, kaydırma bozulmuyor. Aynı anda birkaç
+   ürüne birden bakan göz için bu şart. Hareket yalnız ilk ve son
+   dilimde; aradaki duruş okumak için. */
+.sip-adet--uyari::after {
+    content: '×' attr(data-adet);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 6px);
+    z-index: 4;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: var(--mavi);
+    color: #fff;
+    font-size: 15px; font-weight: 800;
+    line-height: 1.4;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 6px 16px rgba(37,99,235,0.32);
+    animation: sip-adet-balon 900ms var(--motion-ease-out) forwards;
+}
+@keyframes sip-adet-balon {
+    0%   { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.92); }
+    18%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    72%  { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.96); }
+}
 .sip-al {
     min-width: 108px; height: 44px;
     padding: 0 15px;
@@ -1024,7 +1070,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-urunler--dortlu .sip-urun__not { display: none; }
 .sip-urunler--dortlu .sip-kod { font-size: 10px; padding: 3px 5px; }
 .sip-urunler--dortlu .sip-urun__eylem { margin-top: 2px; justify-content: space-between; gap: 5px; }
-.sip-urunler--dortlu .sip-adet { min-width: 40px; height: 34px; padding: 0 4px; font-size: 12px; flex: none; }
+.sip-urunler--dortlu .sip-adet { min-width: 40px; height: 36px; padding: 0 4px; font-size: 12px; flex: none; }
 .sip-urunler--dortlu .sip-al { min-width: 0; flex: 1; height: 34px; padding: 0 6px; }
 
 /* ---------------------------- ALT ÇUBUK ---------------------------- */
@@ -1510,8 +1556,8 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-urun__alt { margin-top: 6px; }
     .sip-kod { font-size: 11px; }
     .sip-urun__not { display: none; }
-    .sip-adet { min-width: 39px; height: 36px; padding: 0 7px; font-size: 12.5px; }
-    .sip-al { min-width: 44px; width: 44px; height: 40px; padding: 0; border-radius: 10px; }
+    .sip-adet { min-width: 52px; height: 40px; padding: 0 8px; font-size: 15px; }
+    .sip-al { min-width: 44px; width: 44px; height: 44px; padding: 0; border-radius: 12px; }
     .sip-al::after { display: none; }
 
     .sip-urunler--ikili .sip-urun__gorsel { height: 124px; }
@@ -1527,7 +1573,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-urunler--uclu .sip-urun__ad { min-height: 54px; font-size: 12.5px; line-height: 1.22; }
     .sip-urunler--uclu .sip-kod { font-size: 10px; }
     .sip-urunler--uclu .sip-urun__eylem { gap: 4px; }
-    .sip-urunler--uclu .sip-adet { min-width: 35px; height: 34px; padding: 0 5px; font-size: 12.5px; }
+    .sip-urunler--uclu .sip-adet { min-width: 40px; height: 36px; padding: 0 6px; font-size: 13px; }
     .sip-urunler--uclu .sip-al { min-width: 0; width: auto; height: 34px; padding: 0 6px; }
 
     .sip-urunler--dortlu { padding: 6px; gap: 5px; }

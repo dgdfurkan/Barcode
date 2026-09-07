@@ -290,9 +290,17 @@
         if (!siparisler.length) return [];
 
         var kimlikler = siparisler.map(function (s) { return s.id; });
+        /* SIRALAMA ŞART
+           PostgREST `order` verilmeyen sorguda satır sırası için hiçbir
+           garanti vermiyor; aynı sorgu iki turda farklı sırada dönebiliyor.
+           `JBSiparisSirala.sirala` küme sırasını "kümenin ilk göründüğü
+           yer"e göre kuruyor, yani girdi sırası değişince çıktı sırası da
+           değişiyordu. Depocu bir ürünü tikliyor, iki saniye sonraki
+           tazelemede liste kendiliğinden yeniden diziliyordu. */
         var satirSonuc = await d.from('order_items')
             .select('order_uuid,sira,urun_adi,gorsel_id,adet,birim,ana_kategori,sinif,alt_sinif,alindi')
-            .in('order_uuid', kimlikler);
+            .in('order_uuid', kimlikler)
+            .order('sira', { ascending: true });
 
         if (satirSonuc.error) throw new Error(satirSonuc.error.message || 'Ürünler alınamadı');
 
@@ -428,6 +436,7 @@
            atıyor ve bütün satırları yeniden belirtiyordu. */
         urun.alindi = alindi;
         satiriTazele(urun);
+        if (alindi) adetUyarisiGoster(urun);
         durum.detayImzasi = siparis.id + '|' + durum.detayGorunum + '|' +
             (siparis.urunler || []).map(function (u) { return u.sira + (u.alindi ? '1' : '0'); }).join('');
 
@@ -859,7 +868,9 @@
                 '<span class="sip-urun__not">' + urunNotYaz(u) + '</span>' +
             '</div>' +
             '<div class="sip-urun__eylem">' +
-                '<span class="sip-adet' + (u.birim ? ' sip-adet--birim' : '') + '">' + adetYaz(u.adet) +
+                '<span class="sip-adet' + (u.birim ? ' sip-adet--birim' : '') +
+                    (!u.birim && urunAdet(u) > 1 ? ' sip-adet--coklu' : '') +
+                    '" data-adet="' + kacir(adetYaz(u.adet)) + '">' + adetYaz(u.adet) +
                     (u.birim ? '<u>' + kacir(u.birim) + '</u>' : '') + '</span>' +
                 '<button type="button" class="sip-al" data-isaretle="' + u.sira + '"' +
                     ' aria-pressed="' + (u.alindi ? 'true' : 'false') +
@@ -942,6 +953,27 @@
             if (d) d.setAttribute('aria-pressed', urun.alindi ? 'true' : 'false');
         }
         ilerlemeyiTazele();
+    }
+
+    /* ÇOKLU ADET UYARISI
+       Depocu hızlı çalışırken "×2" yazısını kaçırıp tek adet alıyordu.
+       Tikleme anında adet kutusundan kısa bir balon çıkıp sönüyor.
+
+       Balon satırın İÇİNDE ve `position: absolute`: liste akmıyor, hiçbir
+       ürün kayıp gitmiyor, kaydırma bozulmuyor. Aynı anda birkaç ürüne
+       birden bakan göz için bu şart. Tek adetli üründe hiç gösterilmiyor,
+       yoksa her tikte gereksiz hareket olurdu. */
+    function adetUyarisiGoster(urun) {
+        /* Kilo bazlı üründe balon yok: `urunAdet` 1,867 kg'ı iki parçaya
+           yuvarlıyor ama o iki adet değil, tek paket. */
+        if (urun.birim || urunAdet(urun) <= 1) return;
+        if (azaltilmisHareket()) return;
+        var oge = el('detayGovde').querySelector('[data-sira="' + urun.sira + '"]');
+        var kutu = oge && oge.querySelector('.sip-adet');
+        if (!kutu) return;
+        kutu.classList.remove('sip-adet--uyari');
+        void kutu.offsetWidth;
+        kutu.classList.add('sip-adet--uyari');
     }
 
     /** Bant sayaçları, yan panel, alt çubuk ve bitir düğmesi. */
@@ -1717,16 +1749,81 @@
     // Olaylar
     // ==================================================================
 
-    function detayiKapat() {
+    /* ==================================================================
+       ANDROID GERİ TUŞU
+       ------------------------------------------------------------------
+       El terminalinin altındaki geri tuşu tarayıcı geçmişini işletiyor.
+       Sipariş detayı ayrı bir sayfa değil, aynı sayfada açılan bir panel;
+       geçmişte karşılığı yoktu ve geri tuşu depocuyu doğrudan Ürün Arama
+       sayfasına atıyordu. Yanlışlıkla basıldığında yapılan iş kayboluyor.
+
+       Detay açılırken geçmişe bir kayıt bırakılıyor; geri tuşu artık o
+       kaydı tüketip paneli kapatıyor, sayfadan çıkmıyor.
+
+       Kapatmanın tek yolu `popstate`: X düğmesi ve swipe de `history.back()`
+       çağırıyor. Böylece geçmiş her zaman panelin durumuyla aynı hizada
+       kalıyor, çift kayıt ya da sahipsiz kayıt oluşmuyor.
+       ================================================================== */
+    var _geriKaydiVar = false;
+    var _kapanisAnimasyonuAtla = false;
+
+    function geriKaydiBirak() {
+        if (_geriKaydiVar) return;
+        try { history.pushState({ jbDetay: 1 }, ''); _geriKaydiVar = true; } catch (e) { /* sessiz */ }
+    }
+
+    function azaltilmisHareket() {
+        try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+    }
+
+    /* Swipe ile aynı çıkış: panel sağa kayıp saydamlaşıyor. Swipe zaten
+       kendi animasyonunu oynattığı için oradan gelen kapanışta atlanıyor. */
+    function detayiKaydirarakKapat() {
+        var p = el('siparisDetay');
+        if (!p || azaltilmisHareket()) { detayiGercektenKapat(); return; }
+        var w = p.getBoundingClientRect().width || window.innerWidth;
+        p.style.transition = 'transform var(--motion-panel) var(--motion-ease-out), opacity var(--motion-panel) ease-out';
+        p.style.transform = 'translateX(' + w + 'px)';
+        p.style.opacity = '0';
+        setTimeout(function () {
+            p.style.transition = ''; p.style.transform = ''; p.style.opacity = '';
+            detayiGercektenKapat();
+        }, 220);
+    }
+
+    function detayiGercektenKapat() {
         durum.secili = null;
         durum.detayImzasi = '';
         ciz();
     }
 
+    /* Dışarıdan çağrılan kapatma (X düğmesi, swipe sonu). Geçmişte kaydımız
+       varsa gerçek kapatmayı `popstate` yapıyor. */
+    function detayiKapat(animasyonAtla) {
+        if (_geriKaydiVar) {
+            _kapanisAnimasyonuAtla = !!animasyonAtla;
+            _geriKaydiVar = false;
+            try { history.back(); return; } catch (e) { /* aşağıda kapatılıyor */ }
+        }
+        detayiGercektenKapat();
+    }
+
+    window.addEventListener('popstate', function () {
+        _geriKaydiVar = false;
+        if (!durum.secili) return;
+        if (_kapanisAnimasyonuAtla) {
+            _kapanisAnimasyonuAtla = false;
+            detayiGercektenKapat();
+        } else {
+            detayiKaydirarakKapat();
+        }
+    });
+
     function siparisAc(id) {
         var tumu = durum.siparisler;
         durum.secili = tumu.filter(function (s) { return s.id === id; })[0] || null;
         durum.detayImzasi = '';
+        if (durum.secili) geriKaydiBirak();
         ciz();
         /* Detay panelindeki TÜM scroll'lu elementleri sıfırla; window
            scroll'una dokunma (siparişler sayfası kaldığı yerde kalsın).
@@ -1804,7 +1901,10 @@
             tazele(true);
         });
 
-        el('detayGeri').addEventListener('click', detayiKapat);
+        /* Doğrudan `detayiKapat` bağlanamaz: dinleyici event nesnesini
+           ilk argüman olarak geçiriyor ve o da `animasyonAtla` sayılıp
+           kapanış animasyonunu iptal ediyordu. */
+        el('detayGeri').addEventListener('click', function () { detayiKapat(); });
 
         /* Soldan sağa kaydırma ile geri: sadece sol kenardan başlar,
            dikey scroll'a karışmaz, mesafe ile canlı bir takip verir,
@@ -1869,7 +1969,7 @@
                     el2.style.transform = 'translateX(' + w + 'px)';
                     el2.style.opacity = '0';
                     swipeKapamaZamani = Date.now();
-                    setTimeout(function () { resetStil(); detayiKapat(); }, 210);
+                    setTimeout(function () { resetStil(); detayiKapat(true); }, 210);
                 } else {
                     el2.style.transform = ''; el2.style.opacity = '';
                     setTimeout(function () { el2.style.transition = ''; }, 220);
