@@ -75,33 +75,48 @@
             kume: 'firin',
             etiket: 'Fırın',
             renk: '#ffff00',
-            dahil: ['ekmek', 'baget', 'simit', 'poğaça', 'pogaca', 'börek', 'borek',
-                    'kruvasan', 'la lorraine', 'firin', 'fırın', 'donut', 'berliner',
-                    'sandvic', 'sandviç', 'tost'],
-            haric: ['uno', 'untad', 'ekmek kırıntısı', 'galeta']
+            /* İki kelime bütün fırın rafını yakalıyor: "ekmek" ve marka adı.
+               Baget, simit, börek, kruvasan hepsi La Lorraine altında
+               geliyor, ayrıca yazmaya gerek yok. Hariç listesi rafta duran
+               ambalajlı ürünleri eliyor: Uno tost ekmeği fırında pişmiyor. */
+            /* "ekmeğ" de listede: Türkçede k yumuşuyor ve "Tam Buğday
+               Ekmeği" sadeleşince "ekmegi" oluyor, "ekmek" onu yakalamıyor.
+               İki biçim birlikte bütün çekimleri kapsıyor. */
+            dahil: ['ekmek', 'ekmeğ', 'ekmeg', 'la lorraine'],
+            haric: ['uno', 'untad', 'maretti', 'kızarmış', 'kizarmis']
         },
         {
             kume: 'dondurma',
             etiket: 'Dondurma',
             renk: '#bb00ff',
-            dahil: ['dondurma', 'dondurulmus', 'donuk', 'cornetto', 'magnum', 'algida',
-                    'carte d or', 'golf', 'buz kupu', 'buz küpü', 'frigo', 'feast',
-                    'mochiko', 'superfresh', 'pizza donuk', 'dondurmali'],
-            haric: ['dondurma kulahi', 'dondurma külahı', 'dondurma sosu']
+            dahil: ['cornetto', 'golf', 'buz küpü', 'buz kupu', 'algida', 'carte',
+                    'feast', 'superfresh', 'donuk', 'dondurulmuş', 'dondurulmus',
+                    'magnum', 'eti alaska frigo', 'pela', 'dondurmalı', 'dondurmali',
+                    'mochiko', 'mars snickers', 'bauvian', 'panda', 'dondurma',
+                    'porsi10'],
+            haric: []
         },
         {
             kume: 'su',
             etiket: 'Su',
             renk: '#0088ff',
-            /* Bare "su" iki harfli; aşağıdaki otomatik kural onu tam kelime
-               yapıyor, "süper"in içine girmiyor. */
-            dahil: ['su', 'sular', 'dogal kaynak suyu', 'mineralli su', 'maden suyu',
-                    'kaynak suyu', 'erikli', 'hayat su', 'kuzeyden', 'damla su',
-                    'sırma', 'sirma'],
-            haric: ['sut', 'süt', 'suyu konsantre', 'meyve suyu', 'sebze suyu',
-                    'cam sise', 'cam şişe', 'susam', 'sucuk']
+            /* Tam ürün adları kullanılıyor, çıplak "su" değil: "su" iki
+               harfli olduğu için tam kelime aransa bile "maden suyu" gibi
+               istemediğimiz şeyleri çekiyordu. Hariç listesi cam şişeleri
+               ayırıyor; onlar ayrı rafta duruyor. */
+            dahil: ['erikli doğal kaynak suyu', 'erikli dogal kaynak suyu',
+                    'hayat su', 'kuzeyden doğal mineralli su',
+                    'kuzeyden dogal mineralli su', 'damla su',
+                    'hayat doğal mineralli su', 'hayat dogal mineralli su'],
+            haric: ['kuzeyden cam', 'erikli cam']
         }
     ];
+
+    /* Yerleşik kuralların sürümü. Kullanıcı ayarları cihazda saklanıyor;
+       bu sayı değişince siparişler ekranı yerleşik üç kategorinin kelime
+       listelerini bir kez tazeliyor. Kullanıcının elle seçtiği ürünler ve
+       kendi eklediği kategoriler korunuyor. */
+    var KURALLAR_SURUM = 2;
 
     /* Bant sırası kullanıcı ayarı. 'orta' kural tutmayan her şeyin yeri.
        Ayarlar ekranı bu diziyi yeniden diziyor. */
@@ -270,6 +285,7 @@
     }
 
     global.JBSiparisSirala = {
+        KURALLAR_SURUM: KURALLAR_SURUM,
         sirala: sirala,
         kuralBul: kuralBul,
         sade: sade,

@@ -1394,6 +1394,7 @@
         var kayitli = ayar && Array.isArray(ayar.kategoriler) ? ayar.kategoriler : null;
 
         if (!kayitli || !kayitli.length) {
+            ayarYaz({ kurallarSurum: (global.JBSiparisSirala && global.JBSiparisSirala.KURALLAR_SURUM) || 0 });
             return varsayilan.map(function (k) {
                 return {
                     kume: k.kume, etiket: k.etiket, renk: k.renk || '#98a2b3',
@@ -1401,6 +1402,30 @@
                     dahil: (k.dahil || []).slice(), haric: (k.haric || []).slice(), yerlesik: true
                 };
             });
+        }
+
+        /* YERLEŞİK KURALLARIN TAZELENMESİ
+           Ayarlar cihazda saklanıyor. Fırın, dondurma ve su listeleri
+           sahadan gelen bilgiyle güncellendiğinde eski kayıt yüzünden
+           kimse yeni listeyi görmüyordu. `KURALLAR_SURUM` artınca yerleşik
+           üçünün kelime listeleri bir kez varsayılana çekiliyor.
+
+           Dokunulmayanlar: kullanıcının katalogdan tek tek seçtiği ürünler
+           (`urunler`), seçtiği renk ve kendi eklediği kategoriler. O emek
+           gitmesin. */
+        var surum = (global.JBSiparisSirala && global.JBSiparisSirala.KURALLAR_SURUM) || 0;
+        if ((ayar.kurallarSurum || 0) < surum) {
+            var varsayilanHarita = {};
+            varsayilan.forEach(function (v) { varsayilanHarita[v.kume] = v; });
+            kayitli = kayitli.map(function (k) {
+                var v = k && k.yerlesik && varsayilanHarita[k.kume];
+                if (!v) return k;
+                return Object.assign({}, k, {
+                    dahil: (v.dahil || []).slice(),
+                    haric: (v.haric || []).slice()
+                });
+            });
+            ayarYaz({ kategoriler: kayitli, kurallarSurum: surum });
         }
 
         var temiz = kayitli.filter(function (k) {

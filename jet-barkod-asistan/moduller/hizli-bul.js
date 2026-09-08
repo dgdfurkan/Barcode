@@ -581,8 +581,21 @@
 
         let userToken = localStorage.getItem('getir_manual_token') || '';
         let warehouseId = '';
-        const urlMatch = window.location.href.match(/\/r\/([a-f0-9]+)\//);
-        if (urlMatch) warehouseId = urlMatch[1];
+
+        /* DEPO KİMLİĞİ ADRESTEN, HER SEFERİNDE
+           Bu değer eskiden yalnız modül başlarken bir kez okunuyordu. Getir
+           paneli tek sayfa uygulaması: modül `/login` ya da fırın ekranında
+           başlarsa adreste `/r/<depo>/` henüz yok, kimlik BOŞ kalıyor ve bir
+           daha hiç dolmuyordu. `processQueue` kimlik olmadan sessizce
+           dönüyor, yani sağ alttaki simge görünüyor ama hiçbir sipariş
+           çekilmiyordu. Sayfayı yenileyince adres baştan doğru olduğu için
+           düzeliyordu; kullanıcının gördüğü tam olarak buydu. */
+        const depoKimligi = () => {
+            const m = location.href.match(/\/r\/([a-f0-9]+)\//);
+            if (m && m[1]) warehouseId = m[1];
+            return warehouseId;
+        };
+        depoKimligi();
 
         // === HELPERS ===
         const saveCache = () => {
@@ -704,7 +717,7 @@
         const RADAR_TAZE_MS = 90 * 1000;
 
         const forceRadarFetch = async () => {
-            if (isRadarActive || !userToken || !warehouseId) return;
+            if (isRadarActive || !userToken || !depoKimligi()) return;
             isRadarActive = true;
             try {
                 const url = `https://warehouse-panel-api-gateway.getirapi.com/warehouse/${warehouseId}/orders?domainType=1`;
@@ -1116,7 +1129,7 @@
         let yetkiBeklemesi = 0;
 
         const processQueue = () => {
-            if (!userToken || !warehouseId) return;
+            if (!userToken || !depoKimligi()) return;
             if (Date.now() - yetkiBeklemesi < YETKI_BEKLEME_MS) {
                 setTimeout(processQueue, YETKI_BEKLEME_MS);
                 return;
@@ -1489,7 +1502,15 @@
                        burada kalkıyor ve sipariş yeniden aday oluyor.
                        Soğuma olmasaydı döngü, kalkmasaydı sipariş
                        sonsuza kadar ürünsüz kalırdı. */
-                    if (urunsuzSoguma.has(s.siparisId)) {
+                    /* Künye değişti: sipariş büyük ihtimalle sütun atladı.
+                       Ürünsüz soğuma ve tükenmiş deneme hakkı burada
+                       sıfırlanıyor. `denemeler` eskiden yalnız soğumadaki
+                       siparişte temizleniyordu; üç HTTP hatası yiyen bir
+                       sipariş `otoSorulan` içinde kalıp bir daha hiç
+                       denenmiyordu. Arkadan gelen siparişin unutulması
+                       buradan geliyordu. */
+                    const takildi = urunsuzSoguma.has(s.siparisId) || denemeler.has(s.siparisId);
+                    if (takildi) {
                         urunsuzSoguma.delete(s.siparisId);
                         denemeler.delete(s.siparisId);
                         otoSorulan.delete(s.siparisId);
@@ -2079,6 +2100,13 @@
                 applyUI();
                 const el = document.getElementById('jba-hb-jeton-durum');
                 if (el) el.innerText = getTokenExpiry(userToken);
+                /* KURTARMA NABZI
+                   Kuyrukta iş var ama hiçbir kanal çalışmıyorsa pompa
+                   durmuş demektir. En sık sebebi jetonun ya da depo
+                   kimliğinin kuyruk dolduktan SONRA gelmesi: o anda
+                   `processQueue` sessizce dönüyor ve onu yeniden çağıran
+                   kimse olmuyordu. Sipariş kuyrukta öylece bekliyordu. */
+                if (fetchQueue.length && !isFetching) processQueue();
             }, 5000);
         };
 
