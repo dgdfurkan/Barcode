@@ -1,28 +1,186 @@
 /* Jet Barkod Admin — Minimalist Modern (adminpanelUI.md) */
 
+/* ============================================================================
+ * YAZI TİPLERİ YERELDE
+ * Panel eskiden Google Fonts'tan Inter + Calistoga + JetBrains Mono çekiyordu.
+ * Depoda internet düşünce panel fontsuz kalıyordu, üstelik depo kuralı dış CDN
+ * kullanmamak. Aynı dosyalar `siparisler.css` içinde de tanımlı; site geneliyle
+ * tek tipografiye inildi.
+ * ========================================================================== */
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url(../assets/fonts/dm-sans/dm-sans-latin-wght-normal.woff2) format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url(../assets/fonts/dm-sans/dm-sans-latin-ext-wght-normal.woff2) format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url(../assets/fonts/dm-sans/dm-sans-latin-wght-normal.woff2) format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url(../assets/fonts/dm-sans/dm-sans-latin-ext-wght-normal.woff2) format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url(../assets/fonts/dm-sans/dm-sans-latin-wght-normal.woff2) format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url(../assets/fonts/dm-sans/dm-sans-latin-ext-wght-normal.woff2) format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url(../assets/fonts/dm-sans/dm-sans-latin-wght-normal.woff2) format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url(../assets/fonts/dm-sans/dm-sans-latin-ext-wght-normal.woff2) format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url(../assets/fonts/manrope/manrope-latin-wght-normal.woff2) format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url(../assets/fonts/manrope/manrope-latin-ext-wght-normal.woff2) format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url(../assets/fonts/manrope/manrope-latin-wght-normal.woff2) format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url(../assets/fonts/manrope/manrope-latin-ext-wght-normal.woff2) format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 800;
+    font-display: swap;
+    src: url(../assets/fonts/manrope/manrope-latin-wght-normal.woff2) format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'Manrope';
+    font-style: normal;
+    font-weight: 800;
+    font-display: swap;
+    src: url(../assets/fonts/manrope/manrope-latin-ext-wght-normal.woff2) format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ============================================================================
+ * TOKEN'LAR
+ * Ölçekler `css/siparisler.css` ile aynı. Eskiden dokuz farklı yazı boyutu ve
+ * altı farklı yarıçap vardı; yarıçapların HEPSİ ondalıklı piksele düşüyordu
+ * (0.45rem = 7,2px gibi). Kimse o sayıları seçmemişti, her bileşen yanındakini
+ * biraz değiştirerek eklenmişti.
+ * ========================================================================== */
 :root {
-    --adm-bg: #FAFAFA;
-    --adm-fg: #0F172A;
-    --adm-muted: #F1F5F9;
-    --adm-muted-fg: #64748B;
-    --adm-accent: #0052FF;
-    --adm-accent-2: #4D7CFF;
-    --adm-border: #E2E8F0;
-    --adm-card: #FFFFFF;
-    --adm-sidebar: #0F172A;
-    --adm-sidebar-muted: #1E293B;
-    --adm-gradient: linear-gradient(135deg, #0052FF, #4D7CFF);
-    --adm-shadow-sm: 0 1px 3px rgb(15 23 42 / 0.06);
-    --adm-shadow-md: 0 4px 14px rgb(15 23 42 / 0.07);
-    --adm-shadow-lg: 0 14px 32px rgb(15 23 42 / 0.09);
-    --adm-shadow-accent: 0 6px 20px rgb(0 82 255 / 0.22);
-    --adm-radius: 0.75rem;
-    --adm-radius-lg: 1rem;
-    --adm-font-display: "Calistoga", Georgia, serif;
-    --adm-font-ui: "Inter", system-ui, sans-serif;
-    --adm-font-mono: "JetBrains Mono", ui-monospace, monospace;
-    --adm-ease: cubic-bezier(0.16, 1, 0.3, 1);
-    --adm-sidebar-w: 15.5rem;
+    /* Renkler: siparisler.css paletiyle aynı değerler, admin adlarıyla. */
+    --adm-bg: #f4f6f9;
+    --adm-fg: #111827;
+    --adm-muted: #f4f6f9;
+    --adm-muted-fg: #667085;
+    --adm-faint: #98a2b3;
+    --adm-accent: #2563eb;
+    --adm-accent-2: #1d4ed8;
+    --adm-accent-50: #eff6ff;
+    --adm-accent-100: #dbe7ff;
+    --adm-border: #e4e7ec;
+    --adm-border-strong: #d0d5dd;
+    --adm-card: #ffffff;
+    --adm-fg-mid: #344054;
+    --adm-ok: #0e9f6e;
+    --adm-ok-50: #eafaf4;
+    --adm-warn: #d97706;
+    --adm-warn-50: #fff6e8;
+    --adm-danger: #d92d20;
+    --adm-danger-50: #fdecec;
+    --adm-sidebar: #111827;
+    --adm-sidebar-muted: #1f2937;
+    --adm-gradient: linear-gradient(135deg, #2563eb, #1d4ed8);
+
+    --adm-shadow-sm: 0 1px 2px rgba(16,24,40,0.04);
+    --adm-shadow-md: 0 6px 20px rgba(16,24,40,0.06);
+    --adm-shadow-lg: 0 24px 70px rgba(7,21,45,0.18);
+    --adm-shadow-accent: 0 6px 20px rgba(37,99,235,0.22);
+
+    /* Yarıçap: 6 rozet · 9 düğme · 12 kart · 16 panel · 999 hap */
+    --adm-radius-xs: 6px;
+    --adm-radius-sm: 9px;
+    --adm-radius: 12px;
+    --adm-radius-lg: 16px;
+    --adm-radius-hap: 999px;
+
+    /* Yazı: 10 rozet · 11 yardımcı · 12 liste · 13 gövde · 15 kart başlığı
+       · 18 panel başlığı · 26 ekranın tek büyük sayısı */
+    --adm-yazi-10: 10px;
+    --adm-yazi-11: 11px;
+    --adm-yazi-12: 12px;
+    --adm-yazi-13: 13px;
+    --adm-yazi-15: 15px;
+    --adm-yazi-18: 18px;
+    --adm-yazi-26: 26px;
+
+    --adm-font-display: 'Manrope', 'Inter', sans-serif;
+    --adm-font-ui: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --adm-font-mono: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+    /* Hareket motion.css'ten geliyor; bu takma ad eski çağrıları bozmuyor. */
+    --adm-ease: var(--motion-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+    --adm-sidebar-w: 248px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -56,7 +214,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     display: flex;
     flex-direction: column;
     transform: translateX(-105%);
-    transition: transform 0.32s var(--adm-ease);
+    transition: transform var(--motion-panel) var(--motion-ease-out);
     box-shadow: 8px 0 40px rgb(0 0 0 / 0.18);
 }
 
@@ -76,7 +234,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-brand-logo {
     width: 2.5rem;
     height: 2.5rem;
-    border-radius: 0.7rem;
+    border-radius: var(--adm-radius);
     object-fit: contain;
     background: rgb(255 255 255 / 0.06);
     padding: 0.2rem;
@@ -89,7 +247,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-sidebar-brand h1 {
     margin: 0;
     font-family: var(--adm-font-display);
-    font-size: 1.35rem;
+    font-size: var(--adm-yazi-18);
     font-weight: 400;
     letter-spacing: -0.02em;
     line-height: 1.15;
@@ -104,7 +262,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-sidebar-brand p {
     margin: 0.35rem 0 0;
-    font-size: 0.6875rem;
+    font-size: var(--adm-yazi-11);
     font-family: var(--adm-font-mono);
     letter-spacing: 0.12em;
     text-transform: uppercase;
@@ -135,7 +293,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-admin-badge {
     width: 2.35rem;
     height: 2.35rem;
-    border-radius: 0.7rem;
+    border-radius: var(--adm-radius);
     background: rgb(0 82 255 / 0.14);
     border: 1px solid rgb(0 82 255 / 0.28);
     display: grid;
@@ -153,7 +311,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-topbar-logo {
     width: 1.75rem;
     height: 1.75rem;
-    border-radius: 0.45rem;
+    border-radius: var(--adm-radius-xs);
     object-fit: contain;
     flex-shrink: 0;
 }
@@ -165,11 +323,11 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-user-avatar {
     width: 2.25rem;
     height: 2.25rem;
-    border-radius: 0.65rem;
+    border-radius: var(--adm-radius-sm);
     background: var(--adm-gradient);
     display: grid;
     place-items: center;
-    font-size: 0.75rem;
+    font-size: var(--adm-yazi-12);
     font-weight: 700;
     color: #fff;
     box-shadow: var(--adm-shadow-accent);
@@ -178,14 +336,14 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-user-chip strong {
     display: block;
-    font-size: 0.8125rem;
+    font-size: var(--adm-yazi-13);
     font-weight: 600;
     color: #F8FAFC;
 }
 
 .adm-user-chip small {
     display: block;
-    font-size: 0.6875rem;
+    font-size: var(--adm-yazi-11);
     color: #94A3B8;
 }
 
@@ -197,14 +355,14 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     width: 100%;
     padding: 0.72rem 0.85rem;
     border: none;
-    border-radius: 0.65rem;
+    border-radius: var(--adm-radius-sm);
     background: transparent;
     color: #94A3B8;
-    font-size: 0.8125rem;
+    font-size: var(--adm-yazi-13);
     font-weight: 500;
     text-align: left;
     cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+    transition: background var(--motion-fast) var(--motion-ease-standard), color var(--motion-fast) var(--motion-ease-standard), transform var(--motion-fast) var(--motion-ease-standard);
 }
 
 .adm-shell .tab-button:hover {
@@ -224,7 +382,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     border-radius: 50%;
     background: rgb(148 163 184 / 0.5);
     flex-shrink: 0;
-    transition: background 0.2s ease, box-shadow 0.2s ease;
+    transition: background var(--motion-fast) var(--motion-ease-standard);
 }
 
 .adm-shell .tab-button.active .adm-nav-dot {
@@ -263,7 +421,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-topbar-title {
     flex: 1;
     font-family: var(--adm-font-display);
-    font-size: 1.125rem;
+    font-size: var(--adm-yazi-18);
     font-weight: 400;
     letter-spacing: -0.02em;
     margin: 0;
@@ -283,11 +441,11 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     min-width: 2.75rem;
     min-height: 2.75rem;
     border: 1px solid var(--adm-border);
-    border-radius: 0.65rem;
+    border-radius: var(--adm-radius-sm);
     background: var(--adm-card);
     color: var(--adm-fg);
     cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+    transition: border-color var(--motion-fast), transform var(--motion-fast);
 }
 
 .adm-menu-btn:hover,
@@ -325,8 +483,8 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     display: flex;
     align-items: flex-start;
     gap: 0.75rem;
-    transition: transform 0.28s var(--adm-ease), box-shadow 0.28s var(--adm-ease);
-    animation: admFadeUp 0.55s var(--adm-ease) both;
+    transition: transform var(--motion-panel) var(--motion-ease-out);
+    animation: admFadeUp var(--motion-normal) var(--motion-ease-out) both;
 }
 
 .adm-stat-card:nth-child(2) { animation-delay: 0.05s; }
@@ -341,7 +499,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-stat-icon {
     width: 2.5rem;
     height: 2.5rem;
-    border-radius: 0.7rem;
+    border-radius: var(--adm-radius);
     background: var(--adm-gradient);
     display: grid;
     place-items: center;
@@ -354,7 +512,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-stat-label {
     margin: 0;
-    font-size: 0.6875rem;
+    font-size: var(--adm-yazi-11);
     font-family: var(--adm-font-mono);
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -363,7 +521,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-stat-value {
     margin: 0.2rem 0 0;
-    font-size: 1.5rem;
+    font-size: var(--adm-yazi-26);
     font-weight: 700;
     letter-spacing: -0.03em;
     line-height: 1.1;
@@ -377,7 +535,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     border-radius: var(--adm-radius-lg);
     box-shadow: var(--adm-shadow-md);
     overflow: hidden;
-    animation: admFadeUp 0.6s var(--adm-ease) 0.12s both;
+    animation: admFadeUp var(--motion-normal) var(--motion-ease-out) 60ms both;
 }
 
 .adm-workspace-inner { padding: 1rem; }
@@ -398,7 +556,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-section-head h3 {
     margin: 0;
-    font-size: 1.125rem;
+    font-size: var(--adm-yazi-18);
     font-weight: 600;
     letter-spacing: -0.02em;
 }
@@ -408,11 +566,11 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     align-items: center;
     gap: 0.5rem;
     padding: 0.35rem 0.75rem;
-    border-radius: 999px;
+    border-radius: var(--adm-radius-hap);
     border: 1px solid rgb(0 82 255 / 0.22);
     background: rgb(0 82 255 / 0.05);
     font-family: var(--adm-font-mono);
-    font-size: 0.625rem;
+    font-size: var(--adm-yazi-10);
     letter-spacing: 0.14em;
     text-transform: uppercase;
     color: var(--adm-accent);
@@ -436,11 +594,12 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     min-height: 2.75rem;
     padding: 0 1rem;
     border-radius: var(--adm-radius);
-    font-size: 0.8125rem;
+    font-size: var(--adm-yazi-13);
     font-weight: 600;
     cursor: pointer;
     border: none;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    transition: transform var(--motion-fast) var(--motion-ease-out),
+                background var(--motion-micro) var(--motion-ease-standard);
 }
 
 .adm-btn:active { transform: scale(0.98); }
@@ -452,7 +611,9 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 }
 
 .adm-btn-primary:hover {
-    filter: brightness(1.06);
+    /* `filter` yerine düz renk: parlaklık süzgeci her karede yeniden boyama
+       istiyor, gradyanın koyu ucuna geçmek bedava. */
+    background: var(--adm-accent-2);
     box-shadow: var(--adm-shadow-accent);
     transform: translateY(-1px);
 }
@@ -489,7 +650,8 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-workspace button[class*="bg-blue"] {
     border-radius: var(--adm-radius) !important;
     font-weight: 600 !important;
-    transition: transform 0.2s, box-shadow 0.2s, filter 0.2s !important;
+    transition: transform var(--motion-fast) var(--motion-ease-out),
+                background var(--motion-micro) var(--motion-ease-standard) !important;
 }
 
 .adm-workspace button.bg-blue-600,
@@ -502,7 +664,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-workspace button.bg-blue-600:hover,
 .adm-workspace button.bg-blue-500:hover {
-    filter: brightness(1.06);
+    background: var(--adm-accent-2);
     box-shadow: var(--adm-shadow-accent);
 }
 
@@ -511,14 +673,17 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-shell .ip-filter-btn {
     min-height: 2.25rem;
     padding: 0 0.85rem;
-    border-radius: 999px;
+    border-radius: var(--adm-radius-hap);
     border: 1px solid var(--adm-border);
     background: var(--adm-muted);
     color: var(--adm-muted-fg);
-    font-size: 0.75rem;
+    font-size: var(--adm-yazi-12);
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background var(--motion-fast) var(--motion-ease-standard),
+                color var(--motion-fast) var(--motion-ease-standard),
+                border-color var(--motion-fast) var(--motion-ease-standard),
+                transform var(--motion-fast) var(--motion-ease-out);
 }
 
 .adm-shell .filter-btn.is-active,
@@ -540,7 +705,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-workspace table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.8125rem;
+    font-size: var(--adm-yazi-13);
 }
 
 .adm-workspace thead {
@@ -551,7 +716,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     padding: 0.75rem 1rem;
     text-align: left;
     font-family: var(--adm-font-mono);
-    font-size: 0.625rem;
+    font-size: var(--adm-yazi-10);
     letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--adm-muted-fg);
@@ -566,7 +731,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 }
 
 .adm-workspace tbody tr {
-    transition: background 0.15s ease;
+    transition: background var(--motion-micro) var(--motion-ease-standard);
 }
 
 .adm-workspace tbody tr:hover { background: rgb(0 82 255 / 0.03); }
@@ -594,7 +759,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     .adm-users-table table tbody td[data-label="Kullanıcı"]::before { display: none; }
 
     .adm-users-table table tbody td[data-label="Kullanıcı"] .adm-user-cell-name {
-        font-size: 1rem;
+        font-size: var(--adm-yazi-15);
         font-weight: 700;
         color: var(--adm-fg);
         letter-spacing: -0.02em;
@@ -619,7 +784,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     .adm-users-table table tbody td::before {
         content: attr(data-label);
         font-family: var(--adm-font-mono);
-        font-size: 0.625rem;
+        font-size: var(--adm-yazi-10);
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--adm-muted-fg);
@@ -648,7 +813,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     .adm-table-wrap:not(.adm-users-table) table tbody td::before {
         content: attr(data-label);
         font-family: var(--adm-font-mono);
-        font-size: 0.625rem;
+        font-size: var(--adm-yazi-10);
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--adm-muted-fg);
@@ -667,14 +832,14 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-action-btn {
     width: 2.35rem;
     height: 2.35rem;
-    border-radius: 0.6rem;
+    border-radius: var(--adm-radius-sm);
     border: 1px solid var(--adm-border);
     background: var(--adm-card);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: transform var(--motion-micro) var(--motion-ease-standard), background var(--motion-micro) var(--motion-ease-standard), border-color var(--motion-micro) var(--motion-ease-standard);
 }
 
 .adm-action-btn svg {
@@ -719,8 +884,8 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     border-radius: var(--adm-radius);
     background: var(--adm-card);
     color: var(--adm-fg);
-    font-size: 0.875rem;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    font-size: var(--adm-yazi-13);
+    transition: border-color var(--motion-fast);
 }
 
 .adm-workspace textarea,
@@ -739,7 +904,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-workspace label,
 .adm-modal-panel label {
-    font-size: 0.8125rem;
+    font-size: var(--adm-yazi-13);
     font-weight: 500;
     color: var(--adm-fg);
 }
@@ -774,7 +939,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-chat-users-head h4 {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--adm-yazi-13);
     font-weight: 600;
     color: var(--adm-fg);
 }
@@ -801,7 +966,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     border-bottom: 1px solid var(--adm-border);
     background: var(--adm-card);
     cursor: pointer;
-    transition: background 0.15s ease;
+    transition: background var(--motion-micro) var(--motion-ease-standard);
 }
 
 .adm-chat-user-item:hover,
@@ -812,10 +977,10 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-chat-user-avatar {
     width: 2.25rem;
     height: 2.25rem;
-    border-radius: 0.65rem;
+    border-radius: var(--adm-radius-sm);
     background: var(--adm-gradient);
     color: #fff;
-    font-size: 0.8125rem;
+    font-size: var(--adm-yazi-13);
     font-weight: 700;
     display: grid;
     place-items: center;
@@ -829,7 +994,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-chat-user-body h4 {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--adm-yazi-13);
     font-weight: 600;
     color: var(--adm-fg);
     white-space: nowrap;
@@ -839,7 +1004,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-chat-user-body p {
     margin: 0.15rem 0 0;
-    font-size: 0.75rem;
+    font-size: var(--adm-yazi-12);
     color: var(--adm-muted-fg);
     white-space: nowrap;
     overflow: hidden;
@@ -879,7 +1044,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     width: 2.25rem;
     height: 2.25rem;
     border: 1px solid var(--adm-border);
-    border-radius: 0.55rem;
+    border-radius: var(--adm-radius-sm);
     background: var(--adm-card);
     color: var(--adm-fg);
     cursor: pointer;
@@ -889,10 +1054,10 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-chat-thread-avatar {
     width: 2.25rem;
     height: 2.25rem;
-    border-radius: 0.65rem;
+    border-radius: var(--adm-radius-sm);
     background: var(--adm-gradient);
     color: #fff;
-    font-size: 0.8125rem;
+    font-size: var(--adm-yazi-13);
     font-weight: 700;
     display: grid;
     place-items: center;
@@ -903,7 +1068,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-chat-thread-meta h4 {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--adm-yazi-13);
     font-weight: 600;
     color: var(--adm-fg);
     white-space: nowrap;
@@ -913,7 +1078,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-chat-thread-meta p {
     margin: 0.1rem 0 0;
-    font-size: 0.6875rem;
+    font-size: var(--adm-yazi-11);
     color: var(--adm-muted-fg);
 }
 
@@ -965,6 +1130,39 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 /* legacy duplicate removed */
 
+
+/* ============================================================================
+ * TAILWIND KÖPRÜSÜ
+ * Panelde 340 yerde satır içi Tailwind boyut sınıfı var (text-sm 139, text-xs 85,
+ * rounded-md 75, rounded-lg 75 ...). Bunlar kendi ölçeklerini dayatıyordu ve
+ * ekranda 14/16/20/24px ile bizim 10/11/12/13/15/18/26 ölçeğimiz yan yana
+ * duruyordu. Yüzlerce sınıfı elle sökmek yerine ölçeğe eşleniyorlar; HTML
+ * okunur kalıyor, ekranda tek ölçek görünüyor.
+ *
+ * Kapsam `.adm-shell` ile sınırlı: sitenin geri kalanındaki Tailwind kullanımı
+ * etkilenmiyor.
+ * ========================================================================== */
+.adm-shell .text-xs   { font-size: var(--adm-yazi-11); }
+.adm-shell .text-sm   { font-size: var(--adm-yazi-13); }
+.adm-shell .text-base { font-size: var(--adm-yazi-15); }
+.adm-shell .text-lg   { font-size: var(--adm-yazi-15); }
+.adm-shell .text-xl   { font-size: var(--adm-yazi-18); }
+.adm-shell .text-2xl  { font-size: var(--adm-yazi-26); }
+.adm-shell .text-3xl  { font-size: var(--adm-yazi-26); }
+
+.adm-shell .rounded      { border-radius: var(--adm-radius-xs); }
+.adm-shell .rounded-md   { border-radius: var(--adm-radius-sm); }
+.adm-shell .rounded-lg   { border-radius: var(--adm-radius); }
+.adm-shell .rounded-xl   { border-radius: var(--adm-radius-lg); }
+.adm-shell .rounded-2xl  { border-radius: var(--adm-radius-lg); }
+.adm-shell .rounded-full { border-radius: var(--adm-radius-hap); }
+
+/* Başlıklar tek ailede: Tailwind'in font sınıfı yok, miras geliyor. */
+.adm-shell h1, .adm-shell h2, .adm-shell h3, .adm-shell h4 {
+    font-family: var(--adm-font-display);
+    letter-spacing: -0.02em;
+}
+
 /* ── Modals ── */
 body.adm-shell > [id*="Modal"],
 body.adm-shell > [id*="modal"] {
@@ -1008,7 +1206,7 @@ body.adm-shell > [id*="modal"] > div:first-child {
     background: rgb(15 23 42 / 0.45);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.28s ease;
+    transition: opacity var(--motion-panel) var(--motion-ease-standard);
 }
 
 .adm-sidebar-overlay.is-visible {
@@ -1023,7 +1221,7 @@ body.adm-shell > [id*="modal"] > div:first-child {
 
 /* ── Animations ── */
 @keyframes admFadeUp {
-    from { opacity: 0; transform: translateY(14px); }
+    from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
