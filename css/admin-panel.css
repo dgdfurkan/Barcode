@@ -148,8 +148,11 @@
     --adm-warn-50: #fff6e8;
     --adm-danger: #d92d20;
     --adm-danger-50: #fdecec;
-    --adm-sidebar: #111827;
-    --adm-sidebar-muted: #1f2937;
+    /* Yan panel eskiden koyu lacivertti (#111827). O kontrast paneli ikiye
+       bölüyor, göz sürekli açıktan koyuya gidip geliyordu. Artık aynı
+       aydınlıkta duruyor; ayrımı ince bir çizgi ve zemin farkı anlatıyor. */
+    --adm-sidebar: #ffffff;
+    --adm-sidebar-muted: #f4f6f9;
     --adm-gradient: linear-gradient(135deg, #2563eb, #1d4ed8);
 
     --adm-shadow-sm: 0 1px 2px rgba(16,24,40,0.04);
@@ -210,19 +213,20 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     z-index: 50;
     width: min(88vw, var(--adm-sidebar-w));
     background: var(--adm-sidebar);
-    color: #F8FAFC;
+    color: var(--adm-fg);
+    border-right: 1px solid var(--adm-border);
     display: flex;
     flex-direction: column;
     transform: translateX(-105%);
     transition: transform var(--motion-panel) var(--motion-ease-out);
-    box-shadow: 8px 0 40px rgb(0 0 0 / 0.18);
+    box-shadow: 8px 0 40px rgba(16, 24, 40, 0.1);
 }
 
 .adm-sidebar.is-open { transform: translateX(0); }
 
 .adm-sidebar-brand {
     padding: 20px 20px 16px;
-    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+    border-bottom: 1px solid var(--adm-border);
 }
 
 .adm-brand-lockup {
@@ -236,9 +240,9 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     height: 2.5rem;
     border-radius: var(--adm-radius);
     object-fit: contain;
-    background: rgb(255 255 255 / 0.06);
+    background: var(--adm-sidebar-muted);
+    border: 1px solid var(--adm-border);
     padding: 4px;
-    box-shadow: 0 4px 14px rgb(0 0 0 / 0.2);
     flex-shrink: 0;
 }
 
@@ -266,7 +270,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     font-family: var(--adm-font-mono);
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: rgb(148 163 184);
+    color: var(--adm-faint);
 }
 
 .adm-sidebar-nav {
@@ -280,7 +284,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-sidebar-foot {
     padding: 16px 16px 20px;
-    border-top: 1px solid rgb(255 255 255 / 0.06);
+    border-top: 1px solid var(--adm-border);
 }
 
 .adm-user-chip {
@@ -294,13 +298,12 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     width: 2.35rem;
     height: 2.35rem;
     border-radius: var(--adm-radius);
-    background: rgb(0 82 255 / 0.14);
-    border: 1px solid rgb(0 82 255 / 0.28);
+    background: var(--adm-accent-50);
+    border: 1px solid var(--adm-accent-100);
     display: grid;
     place-items: center;
-    color: #93C5FD;
+    color: var(--adm-accent);
     flex-shrink: 0;
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.04);
 }
 
 .adm-admin-badge svg {
@@ -337,14 +340,14 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-user-chip strong {
     display: block;
     font-size: var(--adm-yazi-13);
-    font-weight: 600;
-    color: #F8FAFC;
+    font-weight: 700;
+    color: var(--adm-fg);
 }
 
 .adm-user-chip small {
     display: block;
     font-size: var(--adm-yazi-11);
-    color: #94A3B8;
+    color: var(--adm-muted-fg);
 }
 
 /* Tab buttons → sidebar nav */
@@ -352,43 +355,47 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     display: flex;
     align-items: center;
     gap: 12px;
+    position: relative;
     width: 100%;
     min-height: 44px;
     padding: 12px;
     border: none;
-    border-radius: var(--adm-radius-sm);
+    border-radius: var(--adm-radius);
     background: transparent;
-    color: #94A3B8;
+    color: var(--adm-muted-fg);
     font-size: var(--adm-yazi-13);
-    font-weight: 500;
+    font-weight: 600;
     text-align: left;
     cursor: pointer;
     transition: background var(--motion-fast) var(--motion-ease-standard), color var(--motion-fast) var(--motion-ease-standard), transform var(--motion-fast) var(--motion-ease-standard);
 }
 
 .adm-shell .tab-button:hover {
-    background: rgb(255 255 255 / 0.05);
-    color: #E2E8F0;
+    background: var(--adm-sidebar-muted);
+    color: var(--adm-fg);
 }
 
+/* Aktif sekme dolu bir hap. Eskiden koyu zeminde soluk bir vurgu ve sol
+   kenarda ince bir çubuktu; hangi sekmede olduğun uzaktan seçilmiyordu. */
 .adm-shell .tab-button.active {
-    background: rgb(37 99 235 / 0.16);
-    color: #f8fafc;
-    box-shadow: inset 3px 0 0 var(--adm-accent);
+    background: var(--adm-accent);
+    color: #ffffff;
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.28);
 }
 
 .adm-shell .tab-button .adm-nav-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: rgb(148 163 184 / 0.5);
+    width: 6px;
+    height: 6px;
+    border-radius: var(--adm-radius-hap);
+    background: var(--adm-border-strong);
     flex-shrink: 0;
-    transition: background var(--motion-fast) var(--motion-ease-standard);
+    transition: background var(--motion-fast) var(--motion-ease-standard),
+                transform var(--motion-fast) var(--motion-ease-out);
 }
-
+.adm-shell .tab-button:hover .adm-nav-dot { background: var(--adm-accent); }
 .adm-shell .tab-button.active .adm-nav-dot {
-    background: var(--adm-accent);
-    box-shadow: 0 0 0 4px rgb(37 99 235 / 0.2);
+    background: #ffffff;
+    transform: scale(1.35);
 }
 
 .adm-app {
@@ -445,7 +452,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-menu-btn:hover,
 .adm-icon-btn:hover {
-    border-color: rgb(0 82 255 / 0.25);
+    border-color: rgb(37 99 235 / 0.25);
     box-shadow: var(--adm-shadow-sm);
 }
 
@@ -466,7 +473,12 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 }
 
 @media (min-width: 768px) {
-    .adm-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+    .adm-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+}
+/* Tek başına kalan son kart yarım genişlikte durmasın. */
+.adm-stats > .adm-stat-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+@media (min-width: 768px) {
+    .adm-stats > .adm-stat-card:last-child:nth-child(odd) { grid-column: auto; }
 }
 
 .adm-stat-card {
@@ -476,8 +488,9 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     padding: 16px 16px;
     box-shadow: var(--adm-shadow-sm);
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
+    min-width: 0;
     transition: transform var(--motion-panel) var(--motion-ease-out);
     animation: admFadeUp var(--motion-normal) var(--motion-ease-out) both;
 }
@@ -508,9 +521,8 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-stat-label {
     margin: 0;
     font-size: var(--adm-yazi-11);
-    font-family: var(--adm-font-mono);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    font-weight: 600;
+    line-height: 1.3;
     color: var(--adm-muted-fg);
 }
 
@@ -556,18 +568,20 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     letter-spacing: -0.02em;
 }
 
+/* Bölüm etiketi eskiden büyük harf, tek aralıklı font ve 0.14em harf
+   aralığıyla yazılıyordu; kısa bir başlık bile ekranda bağırıyordu. Küçük
+   ve okunur bir çip yeterli. */
 .adm-section-label {
     display: inline-flex;
     align-items: center;
     gap: 8px;
     padding: 4px 12px;
     border-radius: var(--adm-radius-hap);
-    border: 1px solid rgb(0 82 255 / 0.22);
-    background: rgb(0 82 255 / 0.05);
-    font-family: var(--adm-font-mono);
-    font-size: var(--adm-yazi-10);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
+    border: 1px solid var(--adm-accent-100);
+    background: var(--adm-accent-50);
+    font-size: var(--adm-yazi-11);
+    font-weight: 700;
+    letter-spacing: 0.01em;
     color: var(--adm-accent);
     margin-bottom: 12px;
 }
@@ -620,7 +634,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-btn-ghost:hover {
     color: var(--adm-fg);
-    border-color: rgb(0 82 255 / 0.25);
+    border-color: rgb(37 99 235 / 0.25);
     background: var(--adm-muted);
 }
 
@@ -728,7 +742,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     transition: background var(--motion-micro) var(--motion-ease-standard);
 }
 
-.adm-workspace tbody tr:hover { background: rgb(0 82 255 / 0.03); }
+.adm-workspace tbody tr:hover { background: rgb(37 99 235 / 0.03); }
 
 
 /* ============================================================================
@@ -908,7 +922,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-action-edit:hover { background: #ECFDF5; border-color: #A7F3D0; }
 
 .adm-action-extend { color: var(--adm-accent); }
-.adm-action-extend:hover { background: rgb(0 82 255 / 0.08); border-color: rgb(0 82 255 / 0.25); }
+.adm-action-extend:hover { background: rgb(37 99 235 / 0.08); border-color: rgb(37 99 235 / 0.25); }
 
 .adm-action-premium { color: #D97706; }
 .adm-action-premium:hover { background: #FFFBEB; border-color: #FDE68A; }
@@ -953,8 +967,8 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 .adm-modal-panel select:focus,
 .adm-modal-panel textarea:focus {
     outline: none;
-    border-color: rgb(0 82 255 / 0.45);
-    box-shadow: 0 0 0 3px rgb(0 82 255 / 0.12);
+    border-color: rgb(37 99 235 / 0.45);
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.12);
 }
 
 .adm-workspace label,
@@ -965,15 +979,34 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 }
 
 /* ── Chat layout ── */
+/* SOHBET YÜKSEKLİĞİ
+   Kapsayıcının yalnız `min-height`i vardı, `height`i yoktu. Mesaj alanı
+   `overflow-y: auto` taşısa da sınırı olmadığı için içeriği kadar
+   büyüyordu: bin mesajlık bir sohbet sayfayı bin mesaj boyu uzatıyordu.
+   Artık görünen alana oturuyor, kaydırma mesaj listesinin kendi içinde. */
 .adm-chat-layout {
     display: flex;
     flex-direction: column;
-    min-height: 22rem;
+    height: calc(100dvh - 260px);
+    min-height: 360px;
+    max-height: 820px;
     border: 1px solid var(--adm-border);
     border-radius: var(--adm-radius-lg);
     overflow: hidden;
     background: var(--adm-card);
 }
+
+/* Flex çocuğunun varsayılan `min-height: auto` değeri taşmayı engelliyor;
+   sıfırlanmadan `overflow` hiç devreye girmiyor. */
+.adm-shell #chatMessagesArea {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.adm-shell .adm-chat-users-list { flex: 1 1 0; min-height: 0; overflow-y: auto; }
+.adm-shell .adm-chat-thread-head,
+.adm-shell #chatInputArea { flex: none; }
 
 .adm-chat-users {
     background: var(--adm-muted);
@@ -1026,7 +1059,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-chat-user-item:hover,
 .adm-chat-user-item.is-active {
-    background: rgb(0 82 255 / 0.05);
+    background: rgb(37 99 235 / 0.05);
 }
 
 .adm-chat-user-avatar {
@@ -1160,9 +1193,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 }
 
 @media (max-width: 767px) {
-    .adm-chat-layout {
-        min-height: calc(100dvh - 11rem);
-    }
+
 
     .adm-chat-main {
         display: none;
@@ -1178,9 +1209,7 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
         min-height: 100%;
     }
 
-    #chatMessagesArea {
-        min-height: 12rem;
-    }
+    .adm-chat-layout { height: calc(100dvh - 190px); max-height: none; }
 }
 
 /* legacy duplicate removed */
@@ -1284,7 +1313,7 @@ body.adm-shell :focus-visible {
     outline-offset: 2px;
     border-radius: var(--adm-radius-xs);
 }
-.adm-sidebar :focus-visible { outline-color: rgba(255, 255, 255, 0.55); }
+
 
 /* ============================================================================
  * BOŞ DURUM
@@ -1341,6 +1370,89 @@ body.adm-shell ::selection { background: var(--adm-accent-100); color: var(--adm
     transform: scaleX(0);
     transform-origin: left center;
     transition: transform var(--motion-panel) var(--motion-ease-out);
+}
+
+
+/* ============================================================================
+ * MOBİL ALT GEZİNME
+ * Yedi sekme dar ekranda yan panele sıkışıyordu ve her geçiş için paneli
+ * açıp kapamak gerekiyordu. Sık kullanılan dördü başparmağın altına indi;
+ * "Daha" kalanları yan panelden açıyor.
+ *
+ * Masaüstünde gizli: orada yan panel zaten sürekli duruyor.
+ * ========================================================================== */
+.adm-alt-nav {
+    position: fixed;
+    z-index: 45;
+    inset: auto 0 0 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, 0.92);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border-top: 1px solid var(--adm-border);
+}
+
+.adm-alt-nav__oge {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 52px;
+    padding: 6px 4px;
+    border: 0;
+    border-radius: var(--adm-radius);
+    background: transparent;
+    color: var(--adm-muted-fg);
+    font-family: inherit;
+    font-size: var(--adm-yazi-10);
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: color var(--motion-micro) var(--motion-ease-standard),
+                background var(--motion-micro) var(--motion-ease-standard);
+}
+.adm-alt-nav__oge svg { width: 22px; height: 22px; flex: none; }
+.adm-alt-nav__oge span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Aktif öğe: ikonun arkasında dolu bir hap. Renk tek başına taşımıyor,
+   ikon da yukarı kalkıyor. */
+.adm-alt-nav__oge::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    width: 44px;
+    height: 26px;
+    border-radius: var(--adm-radius-hap);
+    background: var(--adm-accent);
+    opacity: 0;
+    transform: scale(0.7);
+    transition: opacity var(--motion-fast) var(--motion-ease-out),
+                transform var(--motion-fast) var(--motion-ease-out);
+}
+.adm-alt-nav__oge svg,
+.adm-alt-nav__oge span { position: relative; z-index: 1; }
+
+.adm-alt-nav__oge.active { color: var(--adm-accent); }
+.adm-alt-nav__oge.active svg { color: #ffffff; }
+.adm-alt-nav__oge.active::before { opacity: 1; transform: scale(1); }
+.adm-alt-nav__oge:active { transform: scale(0.94); }
+
+/* Alt çubuk içeriğin son satırını örtmesin. */
+.adm-shell .adm-main { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+
+@media (min-width: 1024px) {
+    .adm-alt-nav { display: none; }
+    .adm-shell .adm-main { padding-bottom: 32px; }
 }
 
 /* ── Inverted stats band (IP tab inner) ── */
@@ -1415,7 +1527,7 @@ body.adm-shell ::selection { background: var(--adm-accent-100); color: var(--adm
         height: 100vh;
         transform: none;
         box-shadow: none;
-        border-right: 1px solid rgb(255 255 255 / 0.06);
+        border-right: 1px solid var(--adm-border);
     }
 
     .adm-sidebar-overlay,
@@ -1451,6 +1563,6 @@ body.adm-shell ::selection { background: var(--adm-accent-100); color: var(--adm
 .adm-workspace .to-purple-600,
 .adm-workspace .to-pink-600 {
     background: var(--adm-gradient) !important;
-    --tw-gradient-from: #0052FF !important;
-    --tw-gradient-to: #4D7CFF !important;
+    --tw-gradient-from: #2563eb !important;
+    --tw-gradient-to: #1d4ed8 !important;
 }

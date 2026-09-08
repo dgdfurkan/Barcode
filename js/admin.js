@@ -329,6 +329,12 @@ class AdminPanel {
             else openNav();
         });
 
+        /* Alt gezinmedeki "Daha": yan paneldeki kalan sekmelere açılıyor. */
+        document.getElementById('admAltDaha')?.addEventListener('click', () => {
+            if (sidebar?.classList.contains('is-open')) closeNav();
+            else openNav();
+        });
+
         overlay?.addEventListener('click', closeNav);
 
         document.querySelectorAll('.tab-button').forEach((btn) => {
@@ -356,7 +362,6 @@ class AdminPanel {
 
         const titles = {
             users: 'Kullanıcılar',
-            messages: 'Mesajlar',
             chat: 'Sohbet',
             ipAnalysis: 'IP Analizi',
             updates: 'Güncellemeler',
