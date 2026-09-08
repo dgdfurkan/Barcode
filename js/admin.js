@@ -387,7 +387,17 @@ class AdminPanel {
         }
     }
 
+    /* Veri gelene kadar iskelet: dönen çark gelecek yerleşimi bilmiyor,
+       iskelet satırın yerini tutuyor ve liste inince ekran zıplamıyor. */
+    _iskeletGoster(tbodyId, satir, sutun) {
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody || tbody.rows.length) return;
+        tbody.innerHTML = Array.from({ length: satir }, () =>
+            '<tr><td colspan="' + sutun + '"><div class="adm-iskelet"></div></td></tr>').join('');
+    }
+
     async loadUsers() {
+        this._iskeletGoster('usersTable', 5, 6);
         try {
             // Try Supabase first
             if (window.jbDb) {

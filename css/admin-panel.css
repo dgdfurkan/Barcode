@@ -1218,11 +1218,22 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     letter-spacing: -0.02em;
 }
 
-/* ── Modals ── */
+/* ============================================================================
+ * MODALLER
+ * Panelde on modal var ve hepsi `hidden` sınıfıyla açılıp kapanıyordu:
+ * geçiş yok, ekrana çat diye biniyordu. Artık zemin soluyor, panel altından
+ * gelip yerine oturuyor.
+ *
+ * Seçici kimlik desenine bakıyor (`[id*="Modal"]`) çünkü on modalın hiçbirinde
+ * ortak sınıf yok ve HTML'e tek tek sınıf eklemek yerine tek kural yeterli.
+ * `!important` gerekli: modal panelleri satır içi Tailwind sınıflarıyla
+ * geliyor ve onlar aynı özellikleri yazıyor.
+ * ========================================================================== */
 body.adm-shell > [id*="Modal"],
 body.adm-shell > [id*="modal"] {
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
+    animation: admModalZemin var(--motion-fast) var(--motion-ease-standard);
 }
 
 .adm-modal-panel,
@@ -1231,6 +1242,105 @@ body.adm-shell > [id*="modal"] > div:first-child {
     border-radius: var(--adm-radius-lg) !important;
     border: 1px solid var(--adm-border) !important;
     box-shadow: var(--adm-shadow-lg) !important;
+    animation: admModalPanel var(--motion-panel) var(--motion-ease-out);
+}
+
+/* `hidden` gizliyken animasyon çalışmasın: sınıf kalkınca yeniden başlıyor. */
+body.adm-shell > [id*="Modal"].hidden,
+body.adm-shell > [id*="modal"].hidden { animation: none; }
+
+@keyframes admModalZemin {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+@keyframes admModalPanel {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ============================================================================
+ * SEKME GEÇİŞİ
+ * Sekmeler `hidden` ile değişiyordu, içerik anında yer değiştiriyordu.
+ * Kısa bir giriş gözün yeni içeriği takip etmesini kolaylaştırıyor. Yalnız
+ * `opacity` ve `transform`; yerleşim oynamıyor, kayma olmuyor.
+ * ========================================================================== */
+.adm-workspace .tab-content:not(.hidden) {
+    animation: admSekme var(--motion-normal) var(--motion-ease-out);
+}
+@keyframes admSekme {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+
+/* ============================================================================
+ * ODAK GÖRÜNÜRLÜĞÜ
+ * Panelde hiç `:focus-visible` kuralı yoktu; klavyeyle gezen biri nerede
+ * olduğunu göremiyordu. Halka yalnız klavye odağında çıkıyor, fareyle
+ * tıklandığında görünmüyor.
+ * ========================================================================== */
+body.adm-shell :focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.4);
+    outline-offset: 2px;
+    border-radius: var(--adm-radius-xs);
+}
+.adm-sidebar :focus-visible { outline-color: rgba(255, 255, 255, 0.55); }
+
+/* ============================================================================
+ * BOŞ DURUM
+ * Listeler boşken `admin.js` gri, ortalanmış bir paragraf basıyor. Kuru bir
+ * cümle yerine kendi kabı olan, nefes alan bir alan.
+ * ========================================================================== */
+.adm-workspace .text-center.text-gray-500,
+.adm-workspace .text-gray-500.text-center,
+.adm-workspace td[data-bos] {
+    padding: 32px 16px;
+    color: var(--adm-muted-fg);
+    font-size: var(--adm-yazi-13);
+}
+
+/* ============================================================================
+ * YÜKLEME İSKELETİ
+ * Dönen çark yerleşimi bilmiyor; iskelet gelecek satırın yerini tutuyor,
+ * veri inince ekran zıplamıyor. `admin.js` bir kaba `adm-iskelet` sınıfı
+ * verdiğinde çalışıyor.
+ * ========================================================================== */
+.adm-iskelet {
+    height: 44px;
+    margin-bottom: 8px;
+    border-radius: var(--adm-radius);
+    background: linear-gradient(90deg,
+        var(--adm-muted) 25%, #e9edf3 37%, var(--adm-muted) 63%);
+    background-size: 400% 100%;
+    animation: admIskelet 1.4s var(--motion-ease-standard) infinite;
+}
+@keyframes admIskelet {
+    from { background-position: 100% 50%; }
+    to   { background-position: 0 50%; }
+}
+
+/* Kaydırma çubuğu panelin geri kalanıyla aynı dili konuşsun. */
+body.adm-shell * { scrollbar-width: thin; scrollbar-color: var(--adm-border-strong) transparent; }
+body.adm-shell *::-webkit-scrollbar { width: 10px; height: 10px; }
+body.adm-shell *::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: var(--adm-radius-hap);
+    background-clip: content-box;
+    background-color: var(--adm-border-strong);
+}
+body.adm-shell *::-webkit-scrollbar-track { background: transparent; }
+
+body.adm-shell ::selection { background: var(--adm-accent-100); color: var(--adm-fg); }
+
+
+/* İlerleme çubuğu: `width` yerine `scaleX`. Genişlik animasyonu her karede
+   yerleşim hesabı istiyor; ölçekleme yalnız derleyici katmanında çalışıyor.
+   Sol kenardan büyüsün diye `transform-origin` sola sabit. */
+.adm-ilerleme-dolgu {
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform var(--motion-panel) var(--motion-ease-out);
 }
 
 /* ── Inverted stats band (IP tab inner) ── */
@@ -1281,9 +1391,18 @@ body.adm-shell > [id*="modal"] > div:first-child {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .adm-stat-card,
-    .adm-workspace,
-    .adm-shell .tab-button.active .adm-nav-dot { animation: none; }
+    /* Eskiden yalnız üç seçici kapsanıyordu; sonradan eklenen modal ve
+       sekme girişleri azaltılmış hareket açıkken de oynuyordu. Kural artık
+       panelin tamamını kapsıyor. Öğeler son hâllerinde duruyor, yani
+       animasyonun bitiş karesi neyse o. */
+    body.adm-shell *,
+    body.adm-shell *::before,
+    body.adm-shell *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+        scroll-behavior: auto !important;
+    }
     .adm-stat-card,
     .adm-workspace { opacity: 1; transform: none; }
 }

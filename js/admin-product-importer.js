@@ -613,7 +613,7 @@
                 
                 if (progressDiv) {
                     progressDiv.classList.remove('hidden');
-                    progressBar.style.width = '10%';
+                    progressBar.style.transform = 'scaleX(0.1)';
                     progressText.textContent = 'Extension\'a bağlanılıyor...';
                 }
                 
@@ -658,12 +658,12 @@
                 }
                 
                 if (progressBar) {
-                    progressBar.style.width = '30%';
+                    progressBar.style.transform = 'scaleX(0.3)';
                     progressText.textContent = 'Extension\'a bağlanılıyor...';
                 }
                 
                 if (progressBar) {
-                    progressBar.style.width = '40%';
+                    progressBar.style.transform = 'scaleX(0.4)';
                     progressText.textContent = 'Extension\'a bağlanılıyor...';
                 }
                 
@@ -706,7 +706,7 @@
                             }
                             
                             if (progressBar) {
-                                progressBar.style.width = '100%';
+                                progressBar.style.transform = 'scaleX(1.0)';
                             }
                             
                             const products = response.products || [];
@@ -736,7 +736,7 @@
                     
                     // İlk ilerleme mesajları
                     if (progressBar) {
-                        progressBar.style.width = '10%';
+                        progressBar.style.transform = 'scaleX(0.1)';
                     }
                     if (progressText) {
                         progressText.textContent = '🔄 Extension\'a bağlanılıyor...';
@@ -745,7 +745,7 @@
                     // Content script'e mesaj gönder
                     setTimeout(() => {
                         if (progressBar) {
-                            progressBar.style.width = '20%';
+                            progressBar.style.transform = 'scaleX(0.2)';
                         }
                         if (progressText) {
                             progressText.textContent = '🔍 Getir sitesi kontrol ediliyor...';
@@ -1132,7 +1132,7 @@
                 
                 if (progressDiv) {
                     progressDiv.classList.remove('hidden');
-                    progressBar.style.width = '10%';
+                    progressBar.style.transform = 'scaleX(0.1)';
                     progressText.textContent = 'Extension\'a bağlanılıyor...';
                 }
                 
@@ -1159,7 +1159,7 @@
                 }
                 
                 if (progressBar) {
-                    progressBar.style.width = '20%';
+                    progressBar.style.transform = 'scaleX(0.2)';
                     progressText.textContent = 'Extension\'a bağlanılıyor...';
                 }
                 
@@ -1203,7 +1203,7 @@
                             if (progressBar && event.data.message.includes('%')) {
                                 const match = event.data.message.match(/(\d+)%/);
                                 if (match) {
-                                    progressBar.style.width = match[1] + '%';
+                                    progressBar.style.transform = 'scaleX(' + (Number(match[1]) / 100) + ')';
                                 }
                             }
                         }
@@ -1228,7 +1228,7 @@
                             }
                             
                             if (progressBar) {
-                                progressBar.style.width = '100%';
+                                progressBar.style.transform = 'scaleX(1.0)';
                             }
                             
                             const data = response.data || [];
@@ -1281,7 +1281,7 @@
                     
                     // İlk ilerleme mesajları
                     if (progressBar) {
-                        progressBar.style.width = '10%';
+                        progressBar.style.transform = 'scaleX(0.1)';
                     }
                     if (progressText) {
                         progressText.textContent = '🔄 Extension\'a bağlanılıyor...';
@@ -1290,7 +1290,7 @@
                     // Content script'e mesaj gönder
                     setTimeout(() => {
                         if (progressBar) {
-                            progressBar.style.width = '20%';
+                            progressBar.style.transform = 'scaleX(0.2)';
                         }
                         if (progressText) {
                             progressText.textContent = '🔍 Warehouse sitesi kontrol ediliyor...';
