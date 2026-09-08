@@ -547,24 +547,34 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     background: #f0f2f5; color: #344054;
     font-family: inherit; font-size: 12px; font-weight: 600;
     font-variant-numeric: tabular-nums;
-    flex-basis: 100%;
-    width: fit-content;
 }
 .sip-serit__ust { cursor: pointer; }
+.sip-serit__ust > div { min-width: 0; flex: 1 1 auto; }
 .sip-serit__ust p { margin: 3px 0 0; color: var(--sonuk); font-size: 12px; }
 .sip-serit__ust p b { color: #344054; }
 
+/* SIRALAMA ROZETİ
+   Eskiden içinde emoji vardı (saat, kare, kişi) ve hangi sıralamanın
+   seçili olduğu yalnız `title` ile anlaşılıyordu; dokunmatikte hover
+   olmadığı için depocu bunu hiç göremiyordu. Artık ikon satır içi SVG
+   ve etiket rozetin üstünde yazılı. Dar ekranda etiket gizleniyor,
+   ikon kalıyor. */
 .sip-sira-rozet {
     margin-left: auto; flex: none;
-    width: 28px; height: 28px;
-    border-radius: 8px;
-    display: grid; place-items: center;
-    background: rgba(99,144,248,0.1); color: var(--mavi);
-    font-size: 13px; line-height: 1;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--mavi-100);
+    border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--mavi-50); color: var(--mavi);
+    font-size: 11px; font-weight: 700; line-height: 1;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background var(--motion-micro) var(--motion-ease-standard),
+                border-color var(--motion-micro) var(--motion-ease-standard);
 }
-.sip-sira-rozet:hover { background: rgba(99,144,248,0.2); }
+.sip-sira-rozet svg { width: 14px; height: 14px; flex: none; }
+.sip-sira-rozet b { font-weight: 700; white-space: nowrap; }
+.sip-sira-rozet:hover { background: var(--mavi-100); border-color: var(--mavi); }
 
 .sip-serit__liste { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 11px; }
 .sip-serit__bos {
@@ -1525,7 +1535,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-serit__ikon { width: 24px; height: 24px; border-radius: 6px; }
     .sip-serit__ikon svg { width: 13px; }
     .sip-serit__ust h2 { font-size: 11px; line-height: 1.2; }
-    .sip-serit__ust h2 span { min-width: 17px; height: 17px; margin-left: 2px; padding: 0 4px; font-size: 9.5px; }
+    .sip-serit__ust h2 span { min-width: 18px; height: 18px; margin-left: 2px; padding: 0 4px; font-size: 10px; }
     .sip-serit__ust p { display: none; }
     .sip-ayrac { min-height: 520px; }
     .sip-serit__liste { gap: 5px; }
@@ -1540,7 +1550,10 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-kart__kisiad { font-size: 9.5px; }
     .sip-kart__ilerleme { margin-top: 6px; gap: 5px; }
     .sip-kart__ilerleme strong { font-size: 10px; }
-    .sip-sira-rozet { width: 22px; height: 22px; font-size: 10px; border-radius: 6px; }
+    /* Üç şerit yan yana duruyor, başlık alanı zaten dar. Rozet ikonuna
+       inip yer açıyor; hangi sıralamanın seçili olduğu ikondan okunuyor. */
+    .sip-sira-rozet { height: 28px; padding: 0 6px; gap: 0; }
+    .sip-sira-rozet b { display: none; }
 
     .sip-tepe__durum .sip-rozet { padding: 4px 7px; }
     .sip-yan-etiket { font-size: 10.5px; }

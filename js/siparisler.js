@@ -44,6 +44,7 @@
         secili: null,
         detayGorunum: 'liste',
         bantSirasi: null,
+        yukSirasi: null,
         kategoriler: null,
         kodUrun: null,
         yukleniyor: true,
@@ -1027,11 +1028,54 @@
      *
      * @returns {Array} o şeritteki siparişler (sayaç ve toplam için)
      */
+    /* Şerit başlığındaki rozet bunları sırayla geziyor. Etiket rozette
+       yazılı duruyor: eskiden yalnız `title` vardı, dokunmatikte hover
+       olmadığı için depocu hangi sıralamada olduğunu göremiyordu. */
+    var SIRA_IKON = {
+        sure:     '<svg viewBox="0 0 20 20"><path d="M10 4v12M6 12l4 4 4-4"/></svg>',
+        sureTers: '<svg viewBox="0 0 20 20"><path d="M10 16V4M6 8l4-4 4 4"/></svg>',
+        temiz:    '<svg viewBox="0 0 20 20"><path d="M3 5h14M3 10h9M3 15h5"/></svg>',
+        banko:    '<svg viewBox="0 0 20 20"><path d="M7 3v14M13 3v14M3 7h14M3 13h14"/></svg>',
+        kurye:    '<svg viewBox="0 0 20 20"><path d="M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM4 17c0-3 2.7-5 6-5s6 2 6 5"/></svg>'
+    };
+
     var SIRA_SECENEKLERI = [
-        { anahtar: 'sure', etiket: 'Süreye göre' },
-        { anahtar: 'banko', etiket: 'Banko numarasına göre' },
-        { anahtar: 'kurye', etiket: 'Kurye adına göre' }
+        { anahtar: 'sure',     kisa: 'Eski önce',  etiket: 'En eski sipariş başta' },
+        { anahtar: 'sureTers', kisa: 'Yeni önce',  etiket: 'En yeni sipariş başta' },
+        { anahtar: 'temiz',    kisa: 'Kolay önce', etiket: 'Kategorisiz siparişler başta, ağır olanlar sonda' },
+        { anahtar: 'banko',    kisa: 'Banko',      etiket: 'Banko numarasına göre' },
+        { anahtar: 'kurye',    kisa: 'Kurye',      etiket: 'Kurye adına göre' }
     ];
+
+    /* KATEGORİ YÜKÜ
+       Depocu önce kolay siparişi alıp bankoya bırakmak istiyor: içinde
+       fırın ya da dondurma olmayan sipariş tek turda toplanıyor, dondurmalı
+       olan dolabı açmayı gerektiriyor.
+
+       Yük iki sayıdan oluşuyor. Birincisi siparişin içindeki EN AĞIR
+       kategori; ağırlık sırasını kullanıcı ayarlardan diziyor. İkincisi
+       kaç ayrı kategori olduğu, çünkü "fırın" tek turdur ama "fırın + su"
+       iki ayrı rafa gitmek demektir. Hiç kategorisi olmayan sipariş, yani
+       kartı beyaz görünen sipariş, en hafif olanıdır.
+
+       Ürünleri henüz gelmemiş sipariş de beyaz sayılıyor; kartı da beyaz
+       çiziliyor, yani ekranla tutarlı. */
+    function kategoriYuku(s) {
+        var sira = durum.yukSirasi || [];
+        var gorulen = {};
+        (s.urunler || []).forEach(function (u) {
+            var b = u.toplamaBandi || 'orta';
+            if (b && b !== 'orta') gorulen[b] = true;
+        });
+        var bantlar = Object.keys(gorulen);
+        if (!bantlar.length) return [0, 0];
+        var enAgir = 0;
+        bantlar.forEach(function (b) {
+            var i = sira.indexOf(b);
+            enAgir = Math.max(enAgir, i < 0 ? sira.length + 1 : i + 1);
+        });
+        return [enAgir, bantlar.length];
+    }
 
     function bankoSiraDegeri(s) {
         var k = siparisKimligi(s);
@@ -1061,10 +1105,25 @@
         return String(s.toplayici || '').trim() ? 0 : 1;
     }
 
+    function zamanDegeri(s) {
+        var t = new Date(s.sepet_zamani || s.created_at || 0).getTime();
+        return isFinite(t) ? t : 0;
+    }
+
     function sirala(liste, kriter) {
         var karsilastir;
         if (kriter === 'banko') {
             karsilastir = function (a, b) { return bankoSiraDegeri(a) - bankoSiraDegeri(b); };
+        } else if (kriter === 'sureTers') {
+            karsilastir = function (a, b) { return zamanDegeri(b) - zamanDegeri(a); };
+        } else if (kriter === 'temiz') {
+            karsilastir = function (a, b) {
+                var ya = kategoriYuku(a);
+                var yb = kategoriYuku(b);
+                /* Eşit yükte en eski sipariş öne geçiyor; iki kolay sipariş
+                   arasında bekleyeni seçmek doğru olan. */
+                return (ya[0] - yb[0]) || (ya[1] - yb[1]) || (zamanDegeri(a) - zamanDegeri(b));
+            };
         } else if (kriter === 'kurye') {
             karsilastir = function (a, b) {
                 var ka = (a.kurye || '').toLocaleLowerCase('tr');
@@ -1075,11 +1134,7 @@
                 return ka.localeCompare(kb, 'tr');
             };
         } else {
-            karsilastir = function (a, b) {
-                var ta = new Date(a.sepet_zamani || a.created_at || 0).getTime();
-                var tb = new Date(b.sepet_zamani || b.created_at || 0).getTime();
-                return ta - tb;
-            };
+            karsilastir = function (a, b) { return zamanDegeri(a) - zamanDegeri(b); };
         }
 
         return liste.slice().sort(function (a, b) {
@@ -1447,6 +1502,46 @@
     /* Bant sırası ile kategori listesi birbirinden kopmasın: silinen
        kategorinin kalıntısı sırada kalmasın, yeni eklenen kategori sıraya
        düşmemiş olmasın. Her açılışta ve her değişiklikte çalışıyor. */
+    /* SİPARİŞ ÖNCELİK SIRASI
+       "Kolay önce" sıralamasının ağırlık listesi. Toplama sırasından ayrı
+       tutuluyor: toplama sırası depoda hangi rafa önce gidileceğini
+       söylüyor, bu liste ise hangi SİPARİŞİN önce alınacağını. İkisi aynı
+       şey değil; fırına önce gidiyor olman fırınlı siparişin kolay olduğu
+       anlamına gelmiyor. 'orta' burada yok, kategorisiz sipariş zaten en
+       hafif sayılıyor. */
+    function yukSirasiOnar() {
+        var gecerli = {};
+        (durum.kategoriler || []).forEach(function (k) { gecerli[k.kume] = true; });
+        durum.yukSirasi = (durum.yukSirasi || []).filter(function (k) {
+            return gecerli[k] && k !== 'orta';
+        });
+        (durum.kategoriler || []).forEach(function (k) {
+            if (k.kume === 'orta') return;
+            if (durum.yukSirasi.indexOf(k.kume) === -1) durum.yukSirasi.push(k.kume);
+        });
+    }
+
+    function yukSirasiCiz() {
+        var kap = el('ayarYukSira');
+        if (!kap) return;
+        if (!durum.yukSirasi.length) {
+            kap.innerHTML = '<p class="sip-ayar__not">Kategori yok.</p>';
+            return;
+        }
+        kap.innerHTML = durum.yukSirasi.map(function (k, i) {
+            return '<div class="sip-sira__oge">' +
+                '<span class="sip-sira__no">' + (i + 1) + '</span>' +
+                '<span class="sip-sira__ad">' + kacir(bantEtiket(k)) + '</span>' +
+                '<button type="button" data-yuk="' + kacir(k) + '" data-tasi="-1" aria-label="Yukarı"' +
+                    (i === 0 ? ' disabled' : '') + '>' +
+                    '<svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></button>' +
+                '<button type="button" data-yuk="' + kacir(k) + '" data-tasi="1" aria-label="Aşağı"' +
+                    (i === durum.yukSirasi.length - 1 ? ' disabled' : '') + '>' +
+                    '<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>' +
+            '</div>';
+        }).join('');
+    }
+
     function bantSirasiOnar() {
         var gecerli = { orta: true };
         (durum.kategoriler || []).forEach(function (k) { gecerli[k.kume] = true; });
@@ -1491,8 +1586,10 @@
     function kategorileriDegisti() {
         ayarYaz({ kategoriler: durum.kategoriler });
         bantSirasiOnar();
-        ayarYaz({ bantSirasi: durum.bantSirasi });
+        yukSirasiOnar();
+        ayarYaz({ bantSirasi: durum.bantSirasi, yukSirasi: durum.yukSirasi });
         siraCiz();
+        yukSirasiCiz();
         durum.kartImzasi = { hazirlaniyor: '', hazir: '', yolda: '' };
         durum.detayImzasi = '';
         tazele(true);
@@ -1674,6 +1771,7 @@
 
     function ayarAc() {
         siraCiz();
+        yukSirasiCiz();
         kategorileriCiz();
         katAc('siparisAyar');
     }
@@ -1881,18 +1979,21 @@
         return null;
     }
 
-    var SIRA_ETIKETLERI = { sure: '⏱', banko: '#', kurye: '👤' };
-    var SIRA_IPUCU = { sure: 'Süreye göre', banko: 'Bankoya göre', kurye: 'Kuryeye göre' };
+    function siraSecenegi(anahtar) {
+        return SIRA_SECENEKLERI.filter(function (x) { return x.anahtar === anahtar; })[0] ||
+               SIRA_SECENEKLERI[0];
+    }
 
     function siraBaslikGuncelle(bant) {
         var serit = el('siparisAkis').querySelector('.sip-serit--' + bant);
         if (!serit) return;
         var rozet = serit.querySelector('.sip-sira-rozet');
-        var kriter = durum.seritSira[bant] || 'sure';
-        if (rozet) {
-            rozet.textContent = SIRA_ETIKETLERI[kriter] || '⏱';
-            rozet.title = SIRA_IPUCU[kriter] || '';
-        }
+        if (!rozet) return;
+        var sec = siraSecenegi(durum.seritSira[bant] || 'sure');
+        rozet.innerHTML = (SIRA_IKON[sec.anahtar] || SIRA_IKON.sure) +
+                          '<b>' + kacir(sec.kisa) + '</b>';
+        rozet.title = sec.etiket;
+        rozet.setAttribute('aria-label', 'Sıralama: ' + sec.etiket + '. Değiştirmek için tıkla.');
     }
 
     function siraDegistir(baslik) {
@@ -2149,6 +2250,26 @@
         });
         el('kategoriEkle').addEventListener('click', kategoriEkle);
 
+        el('ayarYukSira').addEventListener('click', function (e) {
+            var d = e.target.closest('[data-tasi]');
+            if (!d) return;
+            var yon = Number(d.getAttribute('data-tasi'));
+            var k = d.getAttribute('data-yuk');
+            var dizi = durum.yukSirasi.slice();
+            var i = dizi.indexOf(k);
+            var j = i + yon;
+            if (i < 0 || j < 0 || j >= dizi.length) return;
+            dizi[i] = dizi[j];
+            dizi[j] = k;
+            durum.yukSirasi = dizi;
+            ayarYaz({ yukSirasi: dizi });
+            yukSirasiCiz();
+            /* Yalnız "Kolay önce" seçili şeritler etkileniyor ama kart
+               imzasını sıfırlamak en ucuzu; liste zaten elde. */
+            durum.kartImzasi = { hazirlaniyor: '', hazir: '', yolda: '' };
+            ciz();
+        });
+
         el('ayarSira').addEventListener('click', function (e) {
             var d = e.target.closest('[data-tasi]');
             if (!d) return;
@@ -2229,6 +2350,16 @@
             : vars.slice();
         durum.kategoriler = kategorileriYukle(ayar);
         bantSirasiOnar();
+        /* Varsayılan yük sırası: su en hafif, dondurma en ağır. Depocunun
+           anlattığı akış bu. */
+        durum.yukSirasi = Array.isArray(ayar.yukSirasi) && ayar.yukSirasi.length
+            ? ayar.yukSirasi.slice()
+            : ['su', 'firin', 'dondurma'];
+        yukSirasiOnar();
+        /* Rozetlerin içeriği JS'ten geliyor; açılışta bir kez doldurulmazsa
+           kullanıcı boş bir hap görüyor. Eskiden HTML'de emoji yazılıydı,
+           bu adım gerekmiyordu. */
+        ['hazirlaniyor', 'hazir', 'yolda'].forEach(siraBaslikGuncelle);
 
         bolumGoster('siparisIcerik');
         baglan();
