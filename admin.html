@@ -58,10 +58,6 @@
                     <span class="adm-nav-dot" aria-hidden="true"></span>
                     Kullanıcılar
                 </button>
-                <button type="button" class="tab-button" data-tab="messages">
-                    <span class="adm-nav-dot" aria-hidden="true"></span>
-                    Mesajlar
-                </button>
                 <button type="button" class="tab-button" data-tab="chat">
                     <span class="adm-nav-dot" aria-hidden="true"></span>
                     Sohbet
@@ -147,15 +143,6 @@
                             <p class="adm-stat-value" id="expiringUsers">-</p>
                         </div>
                     </article>
-                    <article class="adm-stat-card">
-                        <div class="adm-stat-icon">
-                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                        </div>
-                        <div>
-                            <p class="adm-stat-label">Bekleyen Mesaj</p>
-                            <p class="adm-stat-value" id="pendingMessages">-</p>
-                        </div>
-                    </article>
                 </div>
 
                 <section class="adm-workspace">
@@ -186,35 +173,6 @@
                 </div>
 
                 <!-- Messages Tab -->
-                <div id="messages-tab" class="tab-content hidden">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-medium text-gray-900">Kullanıcı Mesajları</h3>
-                        <button id="refreshMessagesBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
-                            Yenile
-                        </button>
-                    </div>
-                    
-                    <!-- Message Filter -->
-                    <div class="mb-4 flex space-x-2">
-                        <button id="filterAllMessages" class="filter-btn is-active px-3 py-1 rounded-md text-sm">
-                            Tümü
-                        </button>
-                        <button id="filterPendingMessages" class="filter-btn px-3 py-1 rounded-md text-sm">
-                            Bekleyen
-                        </button>
-                        <button id="filterApprovedMessages" class="filter-btn px-3 py-1 rounded-md text-sm">
-                            Onaylanan
-                        </button>
-                        <button id="filterRejectedMessages" class="filter-btn px-3 py-1 rounded-md text-sm">
-                            Reddedilen
-                        </button>
-                    </div>
-                    
-                    <div id="messagesList" class="space-y-4">
-                        <!-- Messages will be loaded here -->
-                    </div>
-                </div>
-
                 <!-- Chat Tab -->
                 <div id="chat-tab" class="tab-content hidden">
                     <div class="adm-section-label"><i aria-hidden="true"></i> Canlı Destek</div>
@@ -247,7 +205,6 @@
                                         </div>
                                         <div class="adm-chat-thread-meta">
                                             <h4 id="selectedUserName">Kullanıcı</h4>
-                                            <p id="selectedUserStatus">Çevrimiçi</p>
                                         </div>
                                     </div>
                                     <button type="button" id="clearChatBtn" class="adm-btn adm-btn-ghost adm-icon-btn adm-action-danger" aria-label="Sohbeti temizle" title="Sohbeti temizle">

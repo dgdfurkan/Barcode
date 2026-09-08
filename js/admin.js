@@ -3,9 +3,7 @@ class AdminPanel {
     constructor() {
         this.currentTab = 'users';
         this.users = [];
-        this.messages = [];
         this.logs = [];
-        this.currentMessageFilter = 'all';
         this.ipTrackingData = [];
         this.blockedIPsData = [];
         this.ipAnalysis = null;
@@ -58,7 +56,6 @@ class AdminPanel {
 
         // Load initial data
         await this.loadUsers();
-        await this.loadMessages();
         await this.loadIPTracking();
 
         // Update stats
@@ -141,22 +138,7 @@ class AdminPanel {
             this.togglePasswordVisibility('editPassword', 'toggleEditPassword');
         });
 
-        // Message filter buttons
-        document.getElementById('filterAllMessages').addEventListener('click', () => {
-            this.filterMessages('all');
-        });
 
-        document.getElementById('filterPendingMessages').addEventListener('click', () => {
-            this.filterMessages('pending');
-        });
-
-        document.getElementById('filterApprovedMessages').addEventListener('click', () => {
-            this.filterMessages('approved');
-        });
-
-        document.getElementById('filterRejectedMessages').addEventListener('click', () => {
-            this.filterMessages('rejected');
-        });
 
         // IP Analysis filter buttons
         document.getElementById('filterAllIPs').addEventListener('click', () => {
@@ -993,127 +975,7 @@ class AdminPanel {
         }
     }
 
-    async loadMessages() {
-        try {
-            // Always load from global messages (since Supabase is not configured)
-            const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
-            console.log('Loading global messages from local storage:', globalMessages);
-            this.messages = globalMessages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            console.log('Sorted messages:', this.messages);
 
-            this.renderMessages();
-            this.updateStats();
-        } catch (error) {
-            console.error('Error loading messages:', error);
-        }
-    }
-
-    renderMessages() {
-        const container = document.getElementById('messagesList');
-        container.innerHTML = '';
-
-        console.log('Rendering messages:', this.messages);
-
-        if (this.messages.length === 0) {
-            container.innerHTML = '<p class="text-gray-500 text-center py-8">Henüz mesaj bulunmuyor.</p>';
-            return;
-        }
-
-        // Filter messages based on current filter
-        let filteredMessages = this.messages;
-        if (this.currentMessageFilter && this.currentMessageFilter !== 'all') {
-            filteredMessages = this.messages.filter(message => message.status === this.currentMessageFilter);
-        }
-
-        if (filteredMessages.length === 0) {
-            container.innerHTML = '<p class="text-gray-500 text-center py-8">Bu kategoride mesaj bulunmuyor.</p>';
-            return;
-        }
-
-        filteredMessages.forEach(message => {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'bg-white border border-gray-200 rounded-lg p-4';
-            
-            messageDiv.innerHTML = `
-                <div class="flex justify-between items-start mb-2">
-                    <div>
-                        <h4 class="font-medium text-gray-900">${message.message_type || 'Genel'}</h4>
-                        <p class="text-sm text-gray-500">${message.user_id}</p>
-                    </div>
-                    <span class="text-xs text-gray-400">${new Date(message.created_at).toLocaleString('tr-TR')}</span>
-                </div>
-                <p class="text-gray-700 mb-3">${message.content}</p>
-                <div class="flex justify-between items-center">
-                    <span class="px-2 py-1 rounded-full text-xs ${
-                        message.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        message.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        'bg-red-100 text-red-800'
-                    }">
-                        ${message.status === 'pending' ? 'Bekliyor' :
-                          message.status === 'approved' ? 'Onaylandı' : 'Reddedildi'}
-                    </span>
-                    <div class="flex space-x-2">
-                        ${message.status === 'pending' ? `
-                            <button onclick="adminPanel.updateMessageStatus('${message.id}', 'approved')" class="text-green-600 hover:text-green-800 text-sm">Onayla</button>
-                            <button onclick="adminPanel.updateMessageStatus('${message.id}', 'rejected')" class="text-red-600 hover:text-red-800 text-sm">Reddet</button>
-                        ` : `
-                            <button onclick="adminPanel.updateMessageStatus('${message.id}', 'pending')" class="text-blue-600 hover:text-blue-800 text-sm">Bekletmeye Al</button>
-                        `}
-                    </div>
-                </div>
-            `;
-            
-            container.appendChild(messageDiv);
-        });
-    }
-
-    async updateMessageStatus(messageId, status) {
-        try {
-            // Update in Supabase
-            if (window.jbDb) {
-                await window.jbDb
-                    .from('messages')
-                    .update({ status: status })
-                    .eq('id', messageId);
-            }
-
-            // Update in global messages
-            const globalMessages = JSON.parse(localStorage.getItem('globalMessages') || '[]');
-            const messageIndex = globalMessages.findIndex(m => m.id == messageId);
-            if (messageIndex !== -1) {
-                globalMessages[messageIndex].status = status;
-                localStorage.setItem('globalMessages', JSON.stringify(globalMessages));
-            }
-
-            // Update in memory
-            const message = this.messages.find(m => m.id == messageId);
-            if (message) {
-                message.status = status;
-            }
-
-            this.renderMessages();
-            this.updateStats();
-
-            alert(`Mesaj ${status === 'approved' ? 'onaylandı' : 'reddedildi'}!`);
-        } catch (error) {
-            console.error('Error updating message status:', error);
-            alert('Mesaj durumu güncellenirken hata oluştu: ' + error.message);
-        }
-    }
-
-    filterMessages(filter) {
-        this.currentMessageFilter = filter;
-        
-        // Update filter button states
-        document.querySelectorAll('.filter-btn').forEach((btn) => {
-            btn.classList.remove('is-active');
-        });
-
-        const activeButton = document.getElementById(`filter${filter.charAt(0).toUpperCase() + filter.slice(1)}Messages`);
-        if (activeButton) activeButton.classList.add('is-active');
-        
-        this.renderMessages();
-    }
 
 
 
@@ -1672,12 +1534,10 @@ class AdminPanel {
             const daysLeft = this.getTrialDaysLeft(u.trial_end);
             return daysLeft !== null && daysLeft <= 3 && daysLeft > 0;
         }).length;
-        const pendingMessages = this.messages.filter(m => m.status === 'pending').length;
 
         document.getElementById('totalUsers').textContent = totalUsers;
         document.getElementById('activeUsers').textContent = activeUsers;
         document.getElementById('expiringUsers').textContent = expiringUsers;
-        document.getElementById('pendingMessages').textContent = pendingMessages;
     }
 
     getTrialStatusText(trialEnd) {
@@ -1964,10 +1824,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     defaultTrialEnd.setDate(defaultTrialEnd.getDate() + 3);
     document.getElementById('newTrialEnd').value = defaultTrialEnd.toISOString().slice(0, 16);
     
-    // Add event listeners for refresh buttons
-    document.getElementById('refreshMessagesBtn').addEventListener('click', async () => {
-        await adminPanel.loadMessages();
-    });
+
 
     // Config Tab Event Listeners
     const refreshConfigBtn = document.getElementById('refreshConfigBtn');
@@ -2760,11 +2617,9 @@ AdminPanel.prototype.updateSelectedUserInfo = function(username) {
     const selectedUserInfo = document.getElementById('selectedUserInfo');
     const selectedUserInitial = document.getElementById('selectedUserInitial');
     const selectedUserName = document.getElementById('selectedUserName');
-    const selectedUserStatus = document.getElementById('selectedUserStatus');
 
     selectedUserInitial.textContent = username.charAt(0).toUpperCase();
     selectedUserName.textContent = username;
-    selectedUserStatus.textContent = 'Çevrimiçi';
     selectedUserInfo.classList.remove('hidden');
 };
 
