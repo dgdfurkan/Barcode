@@ -736,6 +736,67 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 .adm-workspace tbody tr:hover { background: rgb(0 82 255 / 0.03); }
 
+
+/* ============================================================================
+ * TABLOLAR DAR EKRANDA KART
+ * Panelde sekiz tablo var; kart deseni eskiden yalnız kullanıcı tablosuna
+ * yazılmıştı. Kalanlar 322 piksellik kapta 600-1014 piksel genişliğinde kalıp
+ * yatay kaydırılarak okunuyordu. Sütun başlıkları da gizlendiği için hangi
+ * sayının ne olduğu belli olmuyordu.
+ *
+ * Etiketler `js/admin-tablo.js` tarafından `thead`den okunup yazılıyor;
+ * tablolar JS ile doldurulduğu için her çizimden sonra yenileniyor.
+ * ========================================================================== */
+@media (max-width: 767px) {
+    .adm-workspace table,
+    .adm-workspace table tbody { display: block; width: 100%; }
+    .adm-workspace table thead { display: none; }
+
+    .adm-workspace table tbody tr {
+        display: block;
+        margin-bottom: 12px;
+        border: 1px solid var(--adm-border);
+        border-radius: var(--adm-radius);
+        background: var(--adm-card);
+        box-shadow: var(--adm-shadow-sm);
+        overflow: hidden;
+    }
+    .adm-workspace table tbody tr:last-child { margin-bottom: 0; }
+
+    .adm-workspace table tbody td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: auto;
+        padding: 8px 12px;
+        border: 0;
+        border-bottom: 1px solid var(--adm-border);
+        font-size: var(--adm-yazi-13);
+        text-align: right;
+        white-space: normal;
+    }
+    .adm-workspace table tbody td:last-child { border-bottom: 0; }
+
+    .adm-workspace table tbody td::before {
+        content: attr(data-label);
+        flex: none;
+        max-width: 45%;
+        color: var(--adm-muted-fg);
+        font-size: var(--adm-yazi-11);
+        font-weight: 700;
+        text-align: left;
+    }
+    /* Başlıksız sütun (eylem düğmeleri) ve boş durum satırı etiket taşımıyor. */
+    .adm-workspace table tbody td[data-label=""]::before,
+    .adm-workspace table tbody td:not([data-label])::before { content: none; }
+    .adm-workspace table tbody td[data-label=""],
+    .adm-workspace table tbody td[data-bos] { justify-content: center; text-align: center; }
+
+    /* Kaplar artık kaydırma taşımıyor; kalıntı gölge çizgisi kalmasın. */
+    .adm-workspace .adm-table-wrap { overflow-x: visible; }
+}
+
 @media (max-width: 767px) {
     .adm-table-wrap table thead { display: none; }
 
