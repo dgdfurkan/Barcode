@@ -2870,12 +2870,12 @@ AdminPanel.prototype.renderChatMessages = function(messages) {
             if (isImageMessage && imageData) {
                 html += `
                     <div class="flex justify-end mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
-                        <div class="max-w-xs">
-                            <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onclick="if(window.imageLightbox) window.imageLightbox.open('${imageData.imageUrl.replace(/'/g, "\\'")}', '${imageData.alt.replace(/'/g, "\\'")}')">
+                        <div class="adm-balon-kap">
+                            <div class="adm-balon adm-balon--admin adm-balon--gorsel" onclick="if(window.imageLightbox) window.imageLightbox.open('${imageData.imageUrl.replace(/'/g, "\\'")}', '${imageData.alt.replace(/'/g, "\\'")}')">
                                 <img src="${imageData.imageUrl}" alt="${imageData.alt || 'Görsel'}" class="w-full h-auto max-h-48 object-contain" style="max-width: 280px;" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'p-3 text-white text-sm\\'>Görsel yüklenemedi</div>'">
                             </div>
-                            ${imageData.alt ? `<div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 text-xs">${imageData.alt}</div>` : ''}
-                            <div class="text-xs text-gray-500 mt-1 text-right">Admin • ${time}</div>
+                            ${imageData.alt ? `<div class="adm-balon__altyazi adm-balon__altyazi--admin">${imageData.alt}</div>` : ''}
+                            <div class="adm-balon__bilgi adm-balon__bilgi--sag">Admin • ${time}</div>
                         </div>
                     </div>
                 `;
@@ -2883,13 +2883,13 @@ AdminPanel.prototype.renderChatMessages = function(messages) {
                 // Regular text message
                 html += `
                     <div class="flex justify-end mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
-                        <div class="max-w-xs">
-                            <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
+                        <div class="adm-balon-kap">
+                            <div class="adm-balon adm-balon--admin">
                                 ${messageContent}
                             </div>
-                            <div class="text-xs text-gray-500 mt-1 text-right flex items-center justify-end space-x-2">
+                            <div class="adm-balon__bilgi adm-balon__bilgi--sag">
                                 <span>Admin • ${time}</span>
-                                <button onclick="adminPanel.deleteMessage(${index})" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity">
+                                <button onclick="adminPanel.deleteMessage(${index})" class="adm-balon__sil" aria-label="Mesajı sil">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                     </svg>
@@ -2908,12 +2908,12 @@ AdminPanel.prototype.renderChatMessages = function(messages) {
                 // Render user image message
                 html += `
                     <div class="flex justify-start mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
-                        <div class="max-w-xs">
-                            <div class="bg-white border border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity shadow-sm" onclick="if(window.imageLightbox) window.imageLightbox.open('${userImageData.imageUrl.replace(/'/g, "\\'")}', '${userImageData.alt.replace(/'/g, "\\'")}')">
+                        <div class="adm-balon-kap">
+                            <div class="adm-balon adm-balon--kullanici adm-balon--gorsel" onclick="if(window.imageLightbox) window.imageLightbox.open('${userImageData.imageUrl.replace(/'/g, "\\'")}', '${userImageData.alt.replace(/'/g, "\\'")}')">
                                 <img src="${userImageData.imageUrl}" alt="${userImageData.alt || 'Görsel'}" class="w-full h-auto max-h-48 object-contain" style="max-width: 280px;" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'p-3 text-gray-700 text-sm\\'>Görsel yüklenemedi</div>'">
                             </div>
-                            ${userImageData.alt ? `<div class="bg-white border border-gray-200 px-3 py-1 text-xs">${userImageData.alt}</div>` : ''}
-                            <div class="text-xs text-gray-500 mt-1">${msg.username || 'Kullanıcı'} • ${time}</div>
+                            ${userImageData.alt ? `<div class="adm-balon__altyazi">${userImageData.alt}</div>` : ''}
+                            <div class="adm-balon__bilgi">${msg.username || 'Kullanıcı'} • ${time}</div>
                         </div>
                     </div>
                 `;
@@ -2921,13 +2921,13 @@ AdminPanel.prototype.renderChatMessages = function(messages) {
                 // Regular user text message
                 html += `
                     <div class="flex justify-start mb-3 group" data-message-date="${currentDate || ''}" data-message-timestamp="${msgDate || ''}">
-                        <div class="max-w-xs">
-                            <div class="bg-white border border-gray-200 px-3 py-2 rounded-lg text-sm shadow-sm">
+                        <div class="adm-balon-kap">
+                            <div class="adm-balon adm-balon--kullanici">
                                 ${messageContent}
                             </div>
-                            <div class="text-xs text-gray-500 mt-1 flex items-center space-x-2">
+                            <div class="adm-balon__bilgi">
                                 <span>${msg.username || 'Kullanıcı'} • ${time}</span>
-                                <button onclick="adminPanel.deleteMessage(${index})" class="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity">
+                                <button onclick="adminPanel.deleteMessage(${index})" class="adm-balon__sil" aria-label="Mesajı sil">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                     </svg>
@@ -3234,12 +3234,12 @@ AdminPanel.prototype.addAdminMessageToUI = function(message) {
         // Render image message
         messageDiv.innerHTML = `
             <div class="flex justify-end mb-3">
-                <div class="max-w-xs">
-                    <div class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity" onclick="if(window.imageLightbox) window.imageLightbox.open('${imageData.imageUrl.replace(/'/g, "\\'")}', '${imageData.alt.replace(/'/g, "\\'")}')">
+                <div class="adm-balon-kap">
+                    <div class="adm-balon adm-balon--admin adm-balon--gorsel" onclick="if(window.imageLightbox) window.imageLightbox.open('${imageData.imageUrl.replace(/'/g, "\\'")}', '${imageData.alt.replace(/'/g, "\\'")}')">
                         <img src="${imageData.imageUrl}" alt="${imageData.alt || 'Görsel'}" class="w-full h-auto max-h-48 object-contain" style="max-width: 280px;" loading="lazy" onerror="this.parentElement.innerHTML='<div class=\\'p-3 text-white text-sm\\'>Görsel yüklenemedi</div>'">
                     </div>
-                    ${imageData.alt ? `<div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 text-xs">${imageData.alt}</div>` : ''}
-                    <div class="text-xs text-gray-500 mt-1 text-right">Admin • ${time}</div>
+                    ${imageData.alt ? `<div class="adm-balon__altyazi adm-balon__altyazi--admin">${imageData.alt}</div>` : ''}
+                    <div class="adm-balon__bilgi adm-balon__bilgi--sag">Admin • ${time}</div>
                 </div>
             </div>
         `;
@@ -3247,11 +3247,11 @@ AdminPanel.prototype.addAdminMessageToUI = function(message) {
         // Regular text message
         messageDiv.innerHTML = `
             <div class="flex justify-end mb-3">
-                <div class="max-w-xs">
-                    <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-2 rounded-lg text-sm">
+                <div class="adm-balon-kap">
+                    <div class="adm-balon adm-balon--admin">
                         ${message}
                     </div>
-                    <div class="text-xs text-gray-500 mt-1 text-right">Admin • ${time}</div>
+                    <div class="adm-balon__bilgi adm-balon__bilgi--sag">Admin • ${time}</div>
                 </div>
             </div>
         `;
@@ -3727,7 +3727,7 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
                 mainRow.innerHTML = `
                     <div class="flex-1">
                         <h4 class="text-sm font-medium text-gray-900">${featureName}</h4>
-                        <p class="text-xs text-gray-500 mt-1">${this.getFeatureDescription(featureKey)}</p>
+                        <p class="adm-balon__bilgi">${this.getFeatureDescription(featureKey)}</p>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer ml-4">
                         <input type="checkbox" 
@@ -4269,7 +4269,7 @@ AdminPanel.prototype.createValueInput = function(inputId, valueType, currentValu
                 <textarea id="${inputId}" 
                           rows="6" 
                           class="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:ring-blue-500 focus:border-blue-500">${JSON.stringify(currentValue, null, 2)}</textarea>
-                <p class="text-xs text-gray-500 mt-1">JSON formatında girin</p>
+                <p class="adm-balon__bilgi">JSON formatında girin</p>
             `;
         default:
             return `<input type="text" id="${inputId}" value="${String(currentValue)}" class="w-full px-3 py-2 border border-gray-300 rounded-md">`;

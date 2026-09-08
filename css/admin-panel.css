@@ -1038,12 +1038,15 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     gap: 8px;
 }
 
+/* `max-height: 14rem` listeyi 224 pikselde kesiyordu: kapsayıcının artık
+   kendi sabit yüksekliği var, liste onun kalanını doldursun. Sınır dar
+   ekranda kullanıcı listesini neredeyse görünmez yapıyordu. */
 .adm-chat-users-list {
     overflow-y: auto;
-    flex: 1;
-    min-height: 10rem;
-    max-height: 14rem;
+    flex: 1 1 0;
+    min-height: 0;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 .adm-chat-user-item {
@@ -1182,13 +1185,6 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
         border-right: 1px solid var(--adm-border);
     }
 
-    .adm-chat-users-list {
-        max-height: none;
-        min-height: 0;
-        height: auto;
-        flex: 1;
-    }
-
     .adm-chat-back { display: none; }
 }
 
@@ -1210,6 +1206,15 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
     }
 
     .adm-chat-layout { height: calc(100dvh - 190px); max-height: none; }
+
+    /* Dar ekranda düzen dikey. `.adm-chat-users` flex payı almadığı için
+       içeriği kadar yer kaplıyor; içindeki listeye verilen `flex: 1 1 0`
+       da bu yüzden sıfıra düşüp listeyi görünmez yapıyordu. Kullanıcı
+       listesi boş görünüyor, hiçbir sohbete girilemiyordu. */
+    .adm-chat-layout:not(.has-thread) .adm-chat-users {
+        flex: 1 1 auto;
+        min-height: 0;
+    }
 }
 
 /* legacy duplicate removed */
@@ -1453,6 +1458,100 @@ body.adm-shell ::selection { background: var(--adm-accent-100); color: var(--adm
 @media (min-width: 1024px) {
     .adm-alt-nav { display: none; }
     .adm-shell .adm-main { padding-bottom: 32px; }
+}
+
+
+/* ============================================================================
+ * SOHBET BALONLARI
+ * Admin balonları mavi-mor gradyandı; gradyan üstünde beyaz metnin kontrastı
+ * balonun bir ucundan öbürüne değişiyor ve okunmuyordu. Gradyanın anlamı da
+ * yoktu: balon bir vurgu yüzeyi, veri değil.
+ *
+ * Silme düğmesi `opacity-0 group-hover:opacity-100` ile gizliydi. Dokunmatik
+ * ekranda hover yok, yani telefondan mesaj silmek imkânsızdı; artık her
+ * zaman görünüyor, soluk duruyor, dokununca belirginleşiyor.
+ * ========================================================================== */
+.adm-balon-kap { max-width: min(78%, 460px); min-width: 0; }
+
+.adm-balon {
+    padding: 10px 14px;
+    border-radius: var(--adm-radius-lg);
+    font-size: var(--adm-yazi-13);
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+}
+/* Konuşma yönünü köşe anlatıyor: kendi tarafındaki alt köşe sivri. */
+.adm-balon--admin {
+    background: var(--adm-accent);
+    color: #ffffff;
+    border-bottom-right-radius: var(--adm-radius-xs);
+}
+.adm-balon--kullanici {
+    background: var(--adm-card);
+    border: 1px solid var(--adm-border);
+    color: var(--adm-fg);
+    border-bottom-left-radius: var(--adm-radius-xs);
+    box-shadow: var(--adm-shadow-sm);
+}
+.adm-balon--gorsel { padding: 0; overflow: hidden; cursor: pointer; }
+.adm-balon--gorsel img { display: block; width: 100%; height: auto; }
+
+.adm-balon__altyazi {
+    padding: 6px 14px;
+    background: var(--adm-muted);
+    color: var(--adm-muted-fg);
+    font-size: var(--adm-yazi-11);
+}
+.adm-balon__altyazi--admin { background: var(--adm-accent-2); color: #ffffff; }
+
+.adm-balon__bilgi {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    color: var(--adm-muted-fg);
+    font-size: var(--adm-yazi-11);
+}
+.adm-balon__bilgi--sag { justify-content: flex-end; }
+
+.adm-balon__sil {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin: -6px 0;
+    border: 0;
+    border-radius: var(--adm-radius-hap);
+    background: transparent;
+    color: var(--adm-faint);
+    cursor: pointer;
+    transition: color var(--motion-micro) var(--motion-ease-standard),
+                background var(--motion-micro) var(--motion-ease-standard);
+}
+.adm-balon__sil:hover { color: var(--adm-danger); background: var(--adm-danger-50); }
+.adm-balon__sil svg { width: 14px; height: 14px; }
+/* Görsel olarak 28 piksel, dokunma alanı 44. Küçük ikon parmakla
+   ıskalanmasın diye alan görünmez bir katmanla büyütülüyor. */
+.adm-balon__sil::after {
+    content: "";
+    position: absolute;
+    width: 44px;
+    height: 44px;
+}
+.adm-balon__sil { position: relative; }
+
+/* Mesaj listesi: satırlar arası nefes ve zemin. */
+.adm-shell #chatMessagesArea { background: var(--adm-bg); padding: 16px; }
+.adm-shell #chatMessagesArea > div { margin-bottom: 12px; }
+
+/* Tarih başlığı mesajların üstünde yüzüyor. */
+.adm-shell #chatDateHeader {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 8px 0;
+    background: linear-gradient(var(--adm-bg) 70%, transparent);
+    border: 0;
 }
 
 /* ── Inverted stats band (IP tab inner) ── */
