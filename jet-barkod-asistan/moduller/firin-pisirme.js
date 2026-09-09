@@ -286,9 +286,110 @@
             );
           }
 
+
+          /* ============================================================
+             CODE 128-B
+             Fırın ürünlerinin bir kısmının barkodu EAN-13 değil: "F001200",
+             "agri200", "lalorrainekruvasan_pkt" gibi harf taşıyan iç kodlar.
+             Çizim katmanı yalnız 13 haneli sayı kabul ediyordu, bu yüzden
+             havuzda kaydı OLAN ürünler için bile "barkod kaydı yok"
+             yazıyordu. Kayıt vardı, çizilemiyordu.
+
+             Code 128-B bu kodları olduğu gibi taşıyor: ASCII 32-126 arası
+             her karakter, 11 modül genişliğinde altı elemanla kodlanıyor.
+             ============================================================ */
+          const C128_DESEN = [
+            '212222','222122','222221','121223','121322','131222','122213','122312','132212','221213',
+            '221312','231212','112232','122132','122231','113222','123122','123221','223211','221132',
+            '221231','213212','223112','312131','311222','321122','321221','312212','322112','322211',
+            '212123','212321','232121','111323','131123','131321','112313','132113','132311','211313',
+            '231113','231311','112133','112331','132131','113123','113321','133121','313121','211331',
+            '231131','213113','213311','213131','311123','311321','331121','312113','312311','332111',
+            '314111','221411','431111','111224','111422','121124','121421','141122','141221','112214',
+            '112412','122114','122411','142112','142211','241211','221114','413111','241112','134111',
+            '111242','121142','121241','114212','124112','124211','411212','421112','421211','212141',
+            '214121','412121','111143','111341','131141','114113','114311','411113','411311','113141',
+            '114131','311141','411131','211412','211214','211232','2331112'
+          ];
+
+          function code128BBitleri(metin) {
+            const kodlar = [104];               // Start B
+            for (let i = 0; i < metin.length; i++) {
+              const c = metin.charCodeAt(i);
+              if (c < 32 || c > 126) return null;   // Code B dışı
+              kodlar.push(c - 32);
+            }
+            let toplam = 104;
+            for (let i = 1; i < kodlar.length; i++) toplam += kodlar[i] * i;
+            kodlar.push(toplam % 103);          // kontrol
+            kodlar.push(106);                   // Stop
+
+            let bit = '';
+            kodlar.forEach((k) => {
+              const d = C128_DESEN[k];
+              if (!d) return;
+              for (let i = 0; i < d.length; i++) {
+                const genislik = parseInt(d[i], 10);
+                bit += (i % 2 === 0 ? '1' : '0').repeat(genislik);
+              }
+            });
+            return bit;
+          }
+
+          function svgCode128BarCode(metin, shelfLargerDisplay) {
+            const bits = code128BBitleri(metin);
+            if (!bits) return '';
+            const modul = 1.4;
+            const pad = 4;
+            const yaziPx = 12;
+            const cizgiY = 46;
+            const genislik = bits.length * modul + pad * 2;
+            const yukseklik = cizgiY + yaziPx + 8;
+
+            const rects = [];
+            let i = 0;
+            while (i < bits.length) {
+              if (bits[i] !== '1') { i++; continue; }
+              let j = i;
+              while (j < bits.length && bits[j] === '1') j++;
+              rects.push('<rect x="' + (pad + i * modul).toFixed(2) + '" y="0" width="' +
+                         ((j - i) * modul).toFixed(2) + '" height="' + cizgiY + '" />');
+              i = j;
+            }
+            const olcek = (shelfLargerDisplay ? 124 : 92) / genislik;
+            const dw = +(genislik * olcek).toFixed(2);
+            const dh = +(yukseklik * olcek).toFixed(2);
+            const kacir = metin.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+            return (
+              '<svg xmlns="http://www.w3.org/2000/svg" width="' + dw + '" height="' + dh +
+              '" viewBox="0 0 ' + genislik.toFixed(2) + ' ' + yukseklik +
+              '" preserveAspectRatio="xMinYMin meet" role="img" aria-label="Barkod ' + kacir + '">' +
+              '<rect x="0" y="0" width="' + genislik.toFixed(2) + '" height="' + yukseklik + '" fill="transparent" />' +
+              '<g fill="#000">' + rects.join('') + '</g>' +
+              '<text x="' + (genislik / 2).toFixed(2) + '" y="' + (cizgiY + yaziPx + 1) +
+              '" fill="#000" font-weight="700" font-size="' + yaziPx +
+              '" font-family="ui-monospace,Consolas,\'Courier New\',monospace" text-anchor="middle">' + kacir + '</text>' +
+              '</svg>'
+            );
+          }
+
           function shelfBarcodeCornerInner(productName) {
             const listed = lookupEan13ForDisplayName(productName);
-            if (!listed || !/^\d{13}$/.test(listed)) return { barcode: '', mismatch: false };
+            if (!listed) return { barcode: '', mismatch: false };
+
+            /* EAN-13 olmayan iç kodlar (F001200, agri200 ...) Code 128 ile
+               çiziliyor. Eskiden bunlar sessizce eleniyor ve ürün barkodsuz
+               görünüyordu. */
+            if (!/^\d{13}$/.test(listed)) {
+              const svg128 = svgCode128BarCode(listed, true);
+              if (!svg128) return { barcode: '', mismatch: false };
+              return {
+                barcode: '<span style="display:block;line-height:0;" title="' +
+                         listed.replace(/"/g, '&quot;') + '">' + svg128 + '</span>',
+                mismatch: false
+              };
+            }
+
             const canon = ean13CanonicalForDrawing(listed);
             if (!canon) return { barcode: '', mismatch: false };
             const mismatch = listed !== canon;
