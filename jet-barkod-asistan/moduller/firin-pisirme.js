@@ -76,6 +76,9 @@
            * sayısına bakılıyor, çünkü tek doğru kaynak o.
            */
           const AC_KAPA_SVG_IZ = 'M15 6V11C15 13.21';
+          /* Aynı düğmenin iki ikonu: kapalıyken artı, açıkken çarpı. */
+          const ARTI_SVG_IZ = 'M9.5 7H8V5.5';
+          const CARPI_SVG_IZ = 'M9.854 5.146';
 
           const SETTINGS_LS_KEY = 'getirPişirmeAssistantSettings_v2';
           const SETTINGS_DEFAULT = {
@@ -89,8 +92,18 @@
           /** 📋 ile manuel açılınca sabah/akşam ayırmadan stok tablosuna geçilir */
           let manualShelfToggle = false;
 
+          /* BARKOD HAVUZU
+             Uc kaynak birlesti: firin urunlerinin disa aktarimi (CSV), site
+             katalogundaki "Ekmek (N g)" ve "Ramazan Pidesi (N g)" gramaj
+             varyantlari, ve panelde gorulen adlar.
+
+             Gramaj ADIN PARCASI: "Ekmek (200 g)" ile "Ekmek (250 g)" ayri
+             urun, ayri barkod. Eslestirme bu yuzden parantez icini atmiyor.
+
+             Ayni gramajin birkac bolgesel barkodu olabiliyor (agri200,
+             batman200 gibi); genel desen olan F001/F003 tercih ediliyor. */
           const FIRIN_CATALOG = JSON.parse(
-            '[{"Urun_Adi":"La Lorraine Sokak Simiti (90 g)","Barkod":"8681573033125"},{"Urun_Adi":"La Lorraine Patatesli Rulo Börek (85 g)","Barkod":"8681573031749"},{"Urun_Adi":"La Lorraine Ispanaklı Börek (85 g)","Barkod":"8681573031756"},{"Urun_Adi":"La Lorraine Balkan Çöreği (85 g)","Barkod":"8681573031961"},{"Urun_Adi":"La Lorraine Tereyağlı Kruvasan (55 g)","Barkod":"8681573031923"},{"Urun_Adi":"La Lorraine Rustik Esmer Baget Ekmek (95 g)","Barkod":"8681573030063"},{"Urun_Adi":"La Lorraine Zeytinli Kekikli Rustik Baget (110 g)","Barkod":"8681573033316"},{"Urun_Adi":"La Lorraine Üç Peynirli Mini Çörek (24 g)","Barkod":"8681573033392"},{"Urun_Adi":"La Lorraine Yenilenen Tombul Ekmek (300 g)","Barkod":"5941878404550"},{"Urun_Adi":"La Lorraine Patlıcanlı Rulo Börek (80 g)","Barkod":"8681573032180"},{"Urun_Adi":"La Lorraine Taze Baget (110 g)","Barkod":"5941878404789"},{"Urun_Adi":"La Lorraine Peynirli Rulo Börek (85 g)","Barkod":"8681573031732"},{"Urun_Adi":"La Lorraine Ciabatta (145 g)","Barkod":"8681573033712"},{"Urun_Adi":"La Lorraine Ekşi Mayalı Tam Buğday Ekmeği (380 g)","Barkod":"8681573033804"},{"Urun_Adi":"La Lorraine Ekşi Mayalı Kare Rustik Ekmek (385 g)","Barkod":"8681573033927"},{"Urun_Adi":"La Lorraine Kuru Domatesli Fesleğenli Baget (135 g)","Barkod":"8681573033842"}]'
+            '[{"Urun_Adi": "Ekmek (200 g)", "Barkod": "F001200"}, {"Urun_Adi": "Ekmek (210 g)", "Barkod": "F001210"}, {"Urun_Adi": "Ekmek (250 g)", "Barkod": "F001250"}, {"Urun_Adi": "Ekmek (260 g)", "Barkod": "F001260"}, {"Urun_Adi": "Ekmek (280 g)", "Barkod": "F001280"}, {"Urun_Adi": "Ekmek (290 g)", "Barkod": "F001290"}, {"Urun_Adi": "La Lorraine - Uğur/UDD 560 BK - Donuk Dolap (Sandık Tipi 150 cm)", "Barkod": "108181500700900"}, {"Urun_Adi": "La Lorraine Antep Fıstıklı Kruvasan (75 g)", "Barkod": "8681573033743"}, {"Urun_Adi": "La Lorraine Baget Kraftı", "Barkod": "10300010"}, {"Urun_Adi": "La Lorraine Balkan Çöreği (85 g)", "Barkod": "8681573031961"}, {"Urun_Adi": "La Lorraine Börek Paketi (2 Ürün)", "Barkod": "lalorraineborek_bundle"}, {"Urun_Adi": "La Lorraine Ciabatta (105 g)", "Barkod": "8681573030537"}, {"Urun_Adi": "La Lorraine Ciabatta (145 g)", "Barkod": "8681573033712"}, {"Urun_Adi": "La Lorraine Dondurulmuş Mini Ciabatta (10\'lu)", "Barkod": "4400147"}, {"Urun_Adi": "La Lorraine Dondurulmuş Mini Esmer Baget (10\'lu)", "Barkod": "8699975525391"}, {"Urun_Adi": "La Lorraine Dondurulmuş Mini Rustik Baget (10\'lu)", "Barkod": "4400152"}, {"Urun_Adi": "La Lorraine Dondurulmuş Mini Sade Baget (10\'lu)", "Barkod": "8699975525353"}, {"Urun_Adi": "La Lorraine Ekmek Kraftı", "Barkod": "10300008"}, {"Urun_Adi": "La Lorraine Ekşi Mayalı Kare Rustik Ekmek (385 g)", "Barkod": "8681573033927"}, {"Urun_Adi": "La Lorraine Ekşi Mayalı Tam Buğday Ekmeği (380 g)", "Barkod": "8681573033804"}, {"Urun_Adi": "La Lorraine Fındıklı ve Çikolata Kremalı Çörek (80 g)", "Barkod": "8681573031978"}, {"Urun_Adi": "La Lorraine Ispanaklı Börek (85 g)", "Barkod": "8681573031756"}, {"Urun_Adi": "La Lorraine Ispanaklı Börek İkilisi (2 x 85 g)", "Barkod": "lalorraineıspanaklıbörek2lig10"}, {"Urun_Adi": "La Lorraine Ispanaklı Börek İkilisi (2 x 95 g)", "Barkod": "ıspanaklıbörekikilisi"}, {"Urun_Adi": "La Lorraine Jalapeno Biberli Peynirli Çörek (1 Adet)", "Barkod": "8681573033767"}, {"Urun_Adi": "La Lorraine Kare Rustik Ekmek (385 g)", "Barkod": "8681573030278"}, {"Urun_Adi": "La Lorraine Kruvasan Paketi (2 Ürün)", "Barkod": "lalorrainekruvasan_pkt"}, {"Urun_Adi": "La Lorraine Kuru Domatesli Fesleğenli Baget (135 g)", "Barkod": "8681573033842"}, {"Urun_Adi": "La Lorraine Kıymalı Patatesli Börek (2 x 95 g)", "Barkod": "lalorrainekıymalıpatateslibörek2li"}, {"Urun_Adi": "La Lorraine Kıymalı Patatesli Börek (80 g)", "Barkod": "8681573031824"}, {"Urun_Adi": "La Lorraine Patatesli Rulo Börek (85 g)", "Barkod": "8681573031749"}, {"Urun_Adi": "La Lorraine Patlıcanlı Rulo Börek (80 g)", "Barkod": "8681573032180"}, {"Urun_Adi": "La Lorraine Peynirli Danish Çörek (65 g)", "Barkod": "8681573032319"}, {"Urun_Adi": "La Lorraine Peynirli Kruvasan (65 g)", "Barkod": "8681573032302"}, {"Urun_Adi": "La Lorraine Peynirli Milföy Böreği (105 g)", "Barkod": "8681573033705"}, {"Urun_Adi": "La Lorraine Peynirli Poğaça (2 x 75 g)", "Barkod": "lalorraine2lipogaca_cmn"}, {"Urun_Adi": "La Lorraine Peynirli Poğaça (73 g)", "Barkod": "8681573033194"}, {"Urun_Adi": "La Lorraine Peynirli Rulo Börek (85 g)", "Barkod": "8681573031732"}, {"Urun_Adi": "La Lorraine Pizza Çörek (110 g)", "Barkod": "8681573033415"}, {"Urun_Adi": "La Lorraine Rustik Esmer Baget Ekmek (95 g)", "Barkod": "8681573030063"}, {"Urun_Adi": "La Lorraine Sade Baget (255 g)", "Barkod": "8681573030896"}, {"Urun_Adi": "La Lorraine Sokak Simiti (2 x 90 g)", "Barkod": "lalorreınesımıt2lı_g10"}, {"Urun_Adi": "La Lorraine Sokak Simiti (90 g)", "Barkod": "8681573033125"}, {"Urun_Adi": "La Lorraine Tam Buğday Ekmeği (360 g)", "Barkod": "8681573033446"}, {"Urun_Adi": "La Lorraine Tam Buğday Unlu Ekmek (350 g)", "Barkod": "4400154"}, {"Urun_Adi": "La Lorraine Taze Baget (110 g)", "Barkod": "5941878404789"}, {"Urun_Adi": "La Lorraine Taze Baget (2 x 110 g)", "Barkod": "66990addc0f970edb6d176af_g10_gb_x2"}, {"Urun_Adi": "La Lorraine Taze Ekmek Paketi (2 Ürün)", "Barkod": "g10_lalrraine_tze_ekmk"}, {"Urun_Adi": "La Lorraine Tereyağlı Kruvasan (55 g)", "Barkod": "8681573031923"}, {"Urun_Adi": "La Lorraine Tereyağlı Kruvasan İkilisi (2 x 55 g)", "Barkod": "lalorrainekruvasan2li_cmn"}, {"Urun_Adi": "La Lorraine Tombul Ekmek (320 g)", "Barkod": "8681573030612"}, {"Urun_Adi": "La Lorraine Vanilya Kremalı Kruvasan (80 g)", "Barkod": "8681573033637"}, {"Urun_Adi": "La Lorraine Yenilenen Tombul Ekmek (300 g)", "Barkod": "5941878404550"}, {"Urun_Adi": "La Lorraine Zeytinli Kekikli Rustik Baget (110 g)", "Barkod": "8681573033316"}, {"Urun_Adi": "La Lorraine Çavdar Ekmeği (300 g)", "Barkod": "4400155"}, {"Urun_Adi": "La Lorraine Çavdar Ekmeği (380 g) (380 g)", "Barkod": "8681573033439"}, {"Urun_Adi": "La Lorraine Çikolata Dolgulu Kruvasan  (65 g)", "Barkod": "8681573032241"}, {"Urun_Adi": "La Lorraine Çikolata Kremalı Kruvasan (65 g)", "Barkod": "8681573031954"}, {"Urun_Adi": "La Lorraine Çilekli Danish Çörek (2 x 80 g)", "Barkod": "çileklidanishg10"}, {"Urun_Adi": "La Lorraine Çilekli Danish Çörek (65 g)", "Barkod": "8681573032258"}, {"Urun_Adi": "La Lorraine Çörek Kraftı", "Barkod": "10300006"}, {"Urun_Adi": "La Lorraine Üzümlü Çörek (80 g)", "Barkod": "8681573031992"}, {"Urun_Adi": "La Lorraine Üç Peynirli Mini Çörek (2 x 24 g)", "Barkod": "minicörekg10bundle2li"}, {"Urun_Adi": "La Lorraine Üç Peynirli Mini Çörek (24 g)", "Barkod": "8681573033392"}, {"Urun_Adi": "La Lorraine İki Peynirli Çörek (80 g)", "Barkod": "8681573033408"}, {"Urun_Adi": "Ramazan Pidesi (200 g)", "Barkod": "F003200"}, {"Urun_Adi": "Ramazan Pidesi (210 g)", "Barkod": "F003210"}, {"Urun_Adi": "Ramazan Pidesi (220 g)", "Barkod": "F003220"}, {"Urun_Adi": "Ramazan Pidesi (240 g)", "Barkod": "F003240"}, {"Urun_Adi": "Ramazan Pidesi (250 g)", "Barkod": "F003250"}, {"Urun_Adi": "Ramazan Pidesi (260 g)", "Barkod": "F003260"}, {"Urun_Adi": "Ramazan Pidesi (270 g)", "Barkod": "F003270"}, {"Urun_Adi": "Ramazan Pidesi (275 g)", "Barkod": "F003275"}, {"Urun_Adi": "Ramazan Pidesi (280 g)", "Barkod": "F003280"}, {"Urun_Adi": "Ramazan Pidesi (300 g)", "Barkod": "F003300"}, {"Urun_Adi": "Ramazan Pidesi (310 g)", "Barkod": "F003310"}, {"Urun_Adi": "Ramazan Pidesi (320 g)", "Barkod": "F003320"}, {"Urun_Adi": "Ramazan Pidesi (325 g)", "Barkod": "F003325"}, {"Urun_Adi": "Ramazan Pidesi (330 g)", "Barkod": "F003330"}, {"Urun_Adi": "Ramazan Pidesi (335 g)", "Barkod": "F003335"}, {"Urun_Adi": "Ramazan Pidesi (340 g)", "Barkod": "F003340"}, {"Urun_Adi": "Ramazan Pidesi (350 g)", "Barkod": "F003350"}, {"Urun_Adi": "Ramazan Pidesi (360 g)", "Barkod": "F003360"}, {"Urun_Adi": "Ramazan Pidesi (370 g)", "Barkod": "F003370"}, {"Urun_Adi": "Ramazan Pidesi (380 g)", "Barkod": "F003380"}, {"Urun_Adi": "Ramazan Pidesi (400 g)", "Barkod": "F003400"}, {"Urun_Adi": "Ramazan Pidesi (420 g)", "Barkod": "F003420"}, {"Urun_Adi": "Ramazan Pidesi (440 g)", "Barkod": "F003440"}, {"Urun_Adi": "Ramazan Pidesi (450 g)", "Barkod": "F003450"}, {"Urun_Adi": "Ramazan Pidesi (500 g)", "Barkod": "F003500"}]'
           );
 
           /** Yeni barkod ekleyince firin.json ile bu JSON'ı eşleştirip yeniden bookmarklet oluştur. */
@@ -100,8 +113,26 @@
           const EAN_R = ['1110010', '1100110', '1101100', '1000010', '1011100', '1001110', '1010000', '1000100', '1001000', '1110100'];
           const EAN_FIRST_PARITY = ['LLLLLL', 'LLGLGG', 'LLGGLG', 'LLGGGL', 'LGLLGG', 'LGGLLG', 'LGGGLL', 'LGLGLG', 'LGLGGL', 'LGGLGL'];
 
-          function normalizeNameForBarcodeMatch(s) {
-            return String(s || '')
+          /* GRAMAJ ADIN PARÇASI
+             Eskiden parantez içi silinip atılıyordu; "Ekmek (200 g)" ile
+             "Ekmek (250 g)" aynı isme indirgeniyor ve ikisi de aynı barkodu
+             alıyordu. Oysa bunlar ayrı ürün, ayrı barkod. Gramaj artık adın
+             sonuna sayı olarak ekleniyor: "ekmek 200". */
+          function gramajCikar(s) {
+            const m = String(s || '').match(/\(\s*(?:(\d+)\s*x\s*)?(\d+(?:[.,]\d+)?)\s*(g|gr|kg|ml|l)\s*\)/i);
+            if (!m) return '';
+            /* Çarpan da imzaya giriyor: "2 x 110 g" ile "110 g" ayrı ürün,
+               ayrı barkod. Atlanırsa depocu ikili paketin barkodunu tek
+               ürün için okutuyor. */
+            const adet = m[1] ? m[1] + 'x' : '';
+            const sayi = m[2].replace(',', '.');
+            const birim = m[3].toLowerCase();
+            return adet + sayi + (birim === 'gr' ? 'g' : birim);
+          }
+
+          function normalizeNameForBarcodeMatch(s, gramajsiz) {
+            const gramaj = gramajsiz ? '' : gramajCikar(s);
+            const govde = String(s || '')
               .toLowerCase()
               .normalize('NFKD')
               .replace(/\p{M}+/gu, '')
@@ -110,23 +141,41 @@
               .replace(/[^\p{L}\p{N}\s]/gu, ' ')
               .replace(/\s+/g, ' ')
               .trim();
+            return gramaj ? govde + ' ' + gramaj : govde;
           }
 
+          /* Eşleştirme üç kademe, sırayla:
+               1. Gramajıyla birebir  -> "ekmek 200" = "ekmek 200"
+               2. Gramajsız birebir   -> ada tam uyan tek kayıt varsa
+               3. Parça eşleşmesi     -> en uzun ortak gövde
+
+             İkinci kademede birden çok aday varsa hiçbiri seçilmiyor:
+             gramajı bilinmeyen "Ekmek" için rastgele bir gramajın barkodunu
+             vermek, depocunun yanlış ürün okutması demek. */
           function lookupEan13ForDisplayName(displayName) {
             const pn = normalizeNameForBarcodeMatch(displayName);
             if (!pn || pn.length < 4) return '';
+
             let exact = '';
             FIRIN_CATALOG.forEach((row) => {
-              const kn = normalizeNameForBarcodeMatch(row.Urun_Adi);
-              if (kn && kn === pn) exact = row.Barkod;
+              if (normalizeNameForBarcodeMatch(row.Urun_Adi) === pn) exact = row.Barkod;
             });
             if (exact) return exact;
+
+            const pnSade = normalizeNameForBarcodeMatch(displayName, true);
+            const adaylar = [];
+            FIRIN_CATALOG.forEach((row) => {
+              if (normalizeNameForBarcodeMatch(row.Urun_Adi, true) === pnSade) adaylar.push(row.Barkod);
+            });
+            if (adaylar.length === 1) return adaylar[0];
+            if (adaylar.length > 1) return '';
+
             let best = '';
             let bestKn = '';
             FIRIN_CATALOG.forEach((row) => {
-              const kn = normalizeNameForBarcodeMatch(row.Urun_Adi);
+              const kn = normalizeNameForBarcodeMatch(row.Urun_Adi, true);
               if (!kn || kn.length < 8) return;
-              if (pn.includes(kn) || kn.includes(pn)) {
+              if (pnSade.includes(kn) || kn.includes(pnSade)) {
                 if (kn.length > bestKn.length) {
                   bestKn = kn;
                   best = row.Barkod;
@@ -514,8 +563,23 @@
             return settingsState;
           }
 
+          /* "ekmeğ" de listede: Türkçede k yumuşuyor ve "Tam Buğday Ekmeği"
+             içinde "ekmek" geçmiyor. O ürün ekmek sayılmayınca ekmek
+             kurallarının hiçbiri ona uygulanmıyordu. */
           function isBreadProduct(name) {
-            return /ekmek/i.test(name || '');
+            return /ekmek|ekmeğ|ekmeg|pide/i.test(name || '');
+          }
+
+          /* TAZE ÜRETİM
+             "Ekmek (200 g)" ve "Ramazan Pidesi (300 g)" gibi markasız,
+             gramajlı ürünler fırında hamurdan üretiliyor; donuk stokları
+             hiçbir zaman olmuyor. Onlara "donukta stok görünmüyor" uyarısı
+             vermek yanlış alarm.
+
+             La Lorraine gibi markalı ürünler donuk hamurdan pişiyor, onlarda
+             uyarı anlamlı; bu yüzden ayrım marka adının olup olmamasında. */
+          function tazeUretimMi(name) {
+            return /^\s*(ekmek|ramazan\s+pidesi)\s*\(\s*\d+\s*(g|gr)\s*\)\s*$/i.test(name || '');
           }
 
           function findHeatingCards() {
@@ -607,18 +671,51 @@
             await sleep(550);
           }
 
-          function heatingCardNeedsDetailExpand(card) {
+          /* KART AÇIK MI
+             İki bağımsız kanıt kullanılıyor:
+
+             1. Panelin kendi işareti: kaç satır `ant-collapse-item-active`.
+                Asıl ölçüt bu, çünkü stok hücreleri satır açıkken DOM'a giriyor.
+             2. Düğmenin ikonu: kapalıyken artı, açıkken çarpı. Sınıf listesi
+                iki durumda da birebir aynı olduğu için durum ancak buradan
+                okunuyor.
+
+             İkincisi tek başına yetmiyor (kullanıcı elle bir satırı kapatmış
+             olabilir), ama birincinin doğrulaması olarak duruyor: satırların
+             hepsi açık görünüp düğme hâlâ artıysa panel henüz çizmemiş
+             demektir ve bir tur daha beklemek gerekiyor. */
+          function kartSatirDurumu(card) {
             const collapse = card.querySelector('.ant-card-body .ant-collapse, .ant-collapse');
-            if (!collapse) return false;
+            if (!collapse) return { toplam: 0, acik: 0 };
             let items = [];
             try {
               items = Array.from(collapse.querySelectorAll(':scope > .ant-collapse-item'));
             } catch (_) {
               items = [];
             }
-            if (!items.length) return false;
-            const activeCount = collapse.querySelectorAll(':scope > .ant-collapse-item-active').length;
-            return activeCount < items.length;
+            return {
+              toplam: items.length,
+              acik: items.filter((x) => x.classList.contains('ant-collapse-item-active')).length
+            };
+          }
+
+          /* Düğme ikonundan durum: '' bilinmiyor, 'acik' çarpı, 'kapali' artı. */
+          function dugmeDurumu(card) {
+            const btn = acKapaDugmesi(card);
+            if (!btn) return '';
+            const ic = btn.innerHTML;
+            if (ic.indexOf(CARPI_SVG_IZ) !== -1) return 'acik';
+            if (ic.indexOf(ARTI_SVG_IZ) !== -1) return 'kapali';
+            return '';
+          }
+
+          function heatingCardNeedsDetailExpand(card) {
+            const d = kartSatirDurumu(card);
+            if (!d.toplam) return false;
+            if (d.acik < d.toplam) return true;
+            /* Satırlar açık görünüyor ama düğme hâlâ "aç" diyorsa panel
+               henüz oturmamış; kapalı sayıp bir tur daha bekliyoruz. */
+            return dugmeDurumu(card) === 'kapali';
           }
 
           /* Kart başlığındaki aç/kapa düğmesi. Dört kademeli arama:
@@ -663,8 +760,16 @@
           /* Stok hücreleri yalnız sütun açıkken DOM'a giriyor. Hepsi sıfırsa
              ya depo gerçekten boş ya da sütun açılmamış; ikincisini elemek
              için bir tur daha deneniyor. */
+          /* Eskiden "en az bir üründe stok var mı" diye bakılıyordu. Tek bir
+             ürünün stok hücresi hiç açılmamışsa o kontrol geçiyor ve o ürün
+             sıfır stokla listeye giriyordu; Tombul Ekmek ve Kare Rustik
+             Ekmek böyle kayboluyordu. Artık HER ürün tek tek soruluyor. */
+          function stokOkunmayanlar(products) {
+            return (products || []).filter((p) => !p.stokOkundu);
+          }
+
           function stokOkunduMu(products) {
-            return products.some((p) => p.currentStock > 0 || p.frozenStock > 0);
+            return !!(products || []).length && stokOkunmayanlar(products).length === 0;
           }
 
           /**
@@ -757,15 +862,21 @@
             return m ? parseInt(m[1], 10) : 0;
           }
 
+          /* Stok hücreleri yalnız satır AÇIKKEN DOM'da. Okundu mu bilgisi
+             geri dönüyor: hiç okunmayan ürün sessizce sıfır stokla
+             geçmesin. */
           function applyStocksFromItem(product, item) {
+            let okundu = false;
             item.querySelectorAll('[class*="stockCell"]').forEach((cell) => {
               const lab = cell.querySelector('[class*="stockLabel"]')?.textContent?.trim() || '';
               const raw = cell.querySelector('[class*="stockValue"]')?.textContent;
               const val = parseInt(raw, 10);
               if (Number.isNaN(val)) return;
-              if (lab === 'Raf' || (lab.length && lab.indexOf('Raf') !== -1)) product.currentStock = val;
-              if (lab === 'Donuk' || (lab.length && lab.indexOf('Donuk') !== -1)) product.frozenStock = val;
+              if (lab === 'Raf' || (lab.length && lab.indexOf('Raf') !== -1)) { product.currentStock = val; okundu = true; }
+              if (lab === 'Donuk' || (lab.length && lab.indexOf('Donuk') !== -1)) { product.frozenStock = val; okundu = true; }
             });
+            if (okundu) product.stokOkundu = true;
+            return okundu;
           }
 
           function parseHeatingPanels() {
@@ -782,6 +893,7 @@
                     imgSrc,
                     currentStock: 0,
                     frozenStock: 0,
+                    stokOkundu: false,
                     recommendations: [0, 0, 0, 0]
                   });
                 }
@@ -937,8 +1049,12 @@
                 }
               }
 
+              /* Taze üretim ürünleri bu uyarının dışında: donuk stokları
+                 zaten olmuyor, "donukta yok" demek yanlış alarm. Eksik
+                 varsa aşağıdaki genel ekmek uyarısı zaten yakalıyor. */
               if (
                 bread &&
+                !tazeUretimMi(product.name) &&
                 settings.includeBread &&
                 settings.breadAlertDeficit &&
                 !rowAdded &&
@@ -954,6 +1070,28 @@
                   reason: `Eldeki miktar dilim hedefinin altında (${product.currentStock} / ${currentTarget}). Donuktan pişirilecek stok görünmüyor.`,
                   sortPriority: 3,
                   displayKind: 'bread-no-frozen'
+                });
+                rowAdded = true;
+              }
+
+              /* Taze üretimde eksik varsa gerekçe donuk değil, üretim. */
+              if (
+                bread &&
+                tazeUretimMi(product.name) &&
+                settings.includeBread &&
+                settings.breadAlertDeficit &&
+                !rowAdded &&
+                currentTarget > 0 &&
+                product.currentStock < currentTarget
+              ) {
+                finalRecommendations.push({
+                  ...product,
+                  currentTarget,
+                  amountToCook: currentTarget - product.currentStock,
+                  alertLevel: 'warning',
+                  reason: `Rafta ${product.currentStock}, dilim hedefi ${currentTarget}. ${currentTarget - product.currentStock} adet üretilmeli.`,
+                  sortPriority: 3,
+                  displayKind: 'bread-taze'
                 });
                 rowAdded = true;
               }
@@ -1126,18 +1264,25 @@
             '<div style="text-align: center; padding: 2rem;">Sütunlar açılıyor…</div>';
 
           try {
-            /* Sütunlar açılmadan okuma yapılmıyor. Açılma doğrulanıyor;
-               eksik sütunla okunan yarım veri "başarılı" sayılmasın. */
-            await sutunlariAcVeDogrula();
-            let products = parseProductsFromPage();
-            if (!products.length || !stokOkunduMu(products)) {
+            /* Sütunlar açılmadan okuma yapılmıyor ve HER ürünün stok hücresi
+               okunana kadar tur tekrarlanıyor. Eskiden "en az bir üründe stok
+               var" yeterli sayılıyordu; tek bir ürünün satırı açılmamışsa o
+               ürün sıfır stokla listeye giriyor ve fark edilmiyordu. */
+            let products = [];
+            let eksikler = [];
+            for (let tur = 0; tur < 3; tur++) {
               await sutunlariAcVeDogrula();
-              const tekrar = parseProductsFromPage();
-              if (tekrar.length && (!products.length || stokOkunduMu(tekrar))) products = tekrar;
+              const okunan = parseProductsFromPage();
+              if (okunan.length) products = okunan;
+              eksikler = stokOkunmayanlar(products);
+              if (products.length && !eksikler.length) break;
+              await sleep(500);
             }
+
             if (!products.length) {
               await sleep(600);
               products = parseProductsFromPage();
+              eksikler = stokOkunmayanlar(products);
             }
             if (!products.length) {
               throw new Error('NO_PRODUCTS');
@@ -1145,6 +1290,17 @@
 
             cachedProducts = products;
             applyViewFromCache();
+
+            /* Üç turda da okunamayan ürün varsa sessiz geçilmiyor: yanlış
+               sayıya bakıp yanlış pişirmektense eksik olduğunu bilmek yeğ. */
+            if (eksikler.length) {
+              const uyari = document.createElement('div');
+              uyari.style.cssText = 'margin:0 0 12px;padding:12px 14px;border:1px solid #fbdba7;border-radius:12px;background:#fff6e8;color:#92400e;font-size:13px;line-height:1.5;';
+              uyari.innerHTML = '<strong>' + eksikler.length + ' ürünün stoğu okunamadı.</strong><br>' +
+                eksikler.map((p) => p.name).join(', ') +
+                '<br>Sütunları elle açıp panel düğmesine tekrar bas.';
+              resultsContainer.insertBefore(uyari, resultsContainer.firstChild);
+            }
           } catch (error) {
             JBA.hata('fırın pişirme', error);
             resultsContainer.innerHTML =
