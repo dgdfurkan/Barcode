@@ -8,7 +8,7 @@
  *
  * Yetki jetonunu ve depo kimliğini `chrome.webRequest` ile yakalıyor.
  * Engelleyici webRequest MV3'te kaldırıldı ama buradaki kullanım
- * dinleyici (onBeforeSendHeaders, onCompleted); o hâlâ geçerli.
+ * dinleyici (onBeforeSendHeaders); o hâlâ geçerli.
  * ============================================================================
  */
 
@@ -19,14 +19,41 @@ import { handleFetchExpiryProducts } from './skt-getir.js';
 
 console.log('✅ Background script yüklendi');
 
-// Token ve warehouse ID yakalama için webRequest listener
-// Bu browser seviyesinde çalışır, sayfa script'lerinden bağımsız
-// OPTİMİZE EDİLDİ: Sadece token yoksa veya geçersizse aktif çalışır
+/* JETON YAKALAMA
+   ----------------------------------------------------------------------
+   Jeton `franchise.getir.com` sayfasının kendi isteklerinden okunuyor.
+   Sayfa hangi jetonu kullanıyorsa biz de onu kullanmalıyız.
+
+   ESKİ HATA
+   Bir kez jeton yakalanınca `passiveMode` açılıyor ve jetonun `exp`
+   alanı geçmediği sürece dinleyici hiçbir şey yapmıyordu. Getir'in
+   gerçek ağ geçidi jetonu 24 SAAT ömürlü ve her gün yenileniyor; ama
+   depoda ömrü 14 GÜN olan başka bir jeton da dolaşıyor ve ikisi birebir
+   aynı yapıda (publicKey, userId, iat, exp). Eklenti bir kez uzun ömürlü
+   olana yapıştığında `exp` günlerce geçmediği için onu "geçerli" sayıp
+   asla değiştirmiyordu. Sayım istekleri o jetonla gidiyor ve reddediliyordu.
+
+   YENİ DAVRANIŞ
+   Jeton her istekte tazeleniyor. Yakalamak bedava: başlık zaten elimizde,
+   yalnızca değişip değişmediğine bakıyoruz. Kısa ömürlü jeton uzun ömürlü
+   olanı eziyor, çünkü sayfanın o an KULLANDIĞI jeton doğru olandır. */
 let backgroundTokenState = {
     token: null,
     tokenExpiry: null,
-    passiveMode: false
+    warehouseId: null
 };
+
+/* Yalnız franchise ağ geçidi. `*.getirapi.com` çok geniş: aynı desene
+   `rudderstack-external.data.getirapi.com` (analitik) ve
+   `vsrm-cdn.erp.getirapi.com` (görsel CDN) de giriyor; onların başlıkları
+   bizim işimize yaramıyor. */
+const FRANCHISE_AG_GECIDI = 'https://franchise-api-gateway.getirapi.com';
+
+/* Depo kimliği istek adresinde geçiyor: /warehouses/<24 hane hex>/... */
+function adrestenDepoKimligi(url) {
+    const m = String(url || '').match(/\/warehouses\/([a-f0-9]{24})\b/i);
+    return m ? m[1] : null;
+}
 
 // Token geçerliliğini kontrol et
 function isTokenValidInBackground(tokenExpiry) {
@@ -44,13 +71,16 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
             return; // franchise.getir.com dışındaki sayfalardan gelen istekleri yoksay
         }
         
-        // Pasif modda ve token geçerliyse, sessizce çalış (log yazma)
-        if (backgroundTokenState.passiveMode && backgroundTokenState.token && isTokenValidInBackground(backgroundTokenState.tokenExpiry)) {
-            return; // Pasif modda, sadece sessizce dinle
+        /* Depo kimliği hangi istekte geçiyorsa oradan alınıyor; jeton
+           isteğiyle aynı olmak zorunda değil. */
+        const depo = adrestenDepoKimligi(details.url);
+        if (depo && depo !== backgroundTokenState.warehouseId) {
+            backgroundTokenState.warehouseId = depo;
+            depoKimligiDuyur(depo);
         }
-        
-        // Sadece Getir franchise API çağrılarını dinle
-        if (details.url.includes('getirapi.com') || details.url.includes('franchise-api-gateway.getirapi.com')) {
+
+        // Yalnız franchise ağ geçidi; analitik ve CDN alt alanları değil.
+        if (details.url.startsWith(FRANCHISE_AG_GECIDI)) {
             const headers = details.requestHeaders || [];
             
             // Authorization header'ını bul
@@ -81,24 +111,10 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                             // Silent fail
                         }
                         
-                        // Token'ı kaydet ve pasif moda geç
                         backgroundTokenState.token = authHeader.value;
                         backgroundTokenState.tokenExpiry = tokenExpiry;
-                        backgroundTokenState.passiveMode = true;
-                    
-                        // Warehouse ID'yi request body'den çıkarmaya çalış (POST ise)
-                        let warehouseId = null;
-                        if (details.method === 'POST' && details.requestBody) {
-                            try {
-                                const body = details.requestBody.formData || details.requestBody.raw;
-                                if (body) {
-                                    // Request body'yi parse etmek için content script'e göndermemiz gerekebilir
-                                    // Şimdilik sadece token'ı gönderelim
-                                }
-                            } catch (e) {
-                                // Request body parse edilemedi
-                            }
-                        }
+
+                        const warehouseId = backgroundTokenState.warehouseId;
                         
                         // Franchise sayfasına token'ı gönder (sadece token değiştiyse)
                         chrome.tabs.query({ url: 'https://franchise.getir.com/*' }, (tabs) => {
@@ -139,102 +155,38 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                                 stockEndpoint: 'https://franchise-api-gateway.getirapi.com/stocks'
                             }
                         });
-                    } else {
-                        // Token zaten mevcut, pasif moda geç
-                        if (!backgroundTokenState.passiveMode) {
-                            backgroundTokenState.passiveMode = true;
-                        }
                     }
                 }
             }
         }
     },
     {
-        urls: [
-            'https://franchise-api-gateway.getirapi.com/*',
-            'https://*.getirapi.com/*'
-        ]
+        /* Yalnız franchise ağ geçidi ve depo kimliğinin geçtiği adresler.
+           Analitik ve CDN alt alanları kapsam dışı. */
+        urls: ['https://franchise-api-gateway.getirapi.com/*']
     },
     ['requestHeaders']
 );
 
-// Response'dan warehouse ID yakalama için onCompleted listener
-// OPTİMİZE EDİLDİ: Pasif modda sadece sessizce çalışır
-// SADECE franchise.getir.com'dan gelen istekler işlenir
-chrome.webRequest.onCompleted.addListener(
-    (details) => {
-        // SADECE franchise.getir.com'dan gelen istekleri işle
-        const initiator = details.initiator || '';
-        if (!initiator.startsWith('https://franchise.getir.com')) {
-            return;
-        }
-        
-        // Pasif modda ve token geçerliyse, sessizce çalış (log yazma)
-        if (backgroundTokenState.passiveMode && backgroundTokenState.token && isTokenValidInBackground(backgroundTokenState.tokenExpiry)) {
-            return; // Pasif modda, sadece sessizce dinle
-        }
-        
-        // Sadece Getir franchise API çağrılarını dinle ve başarılı response'ları yakala
-        if ((details.url.includes('getirapi.com') || details.url.includes('franchise-api-gateway.getirapi.com')) 
-            && details.statusCode === 200) {
-            
-            // Response body'yi almak için fetch yap (CORS sorunu olmayacak çünkü extension'dan)
-            fetch(details.url, {
-                method: 'GET',
-                headers: {
-                    'Cache-Control': 'no-cache'
-                }
-            }).then(response => {
-                if (response.ok) {
-                    return response.json();
-                }
-                return null;
-            }).then(data => {
-                if (data) {
-                    let warehouseId = null;
-                    
-                    // Warehouse ID'yi response'dan çıkar
-                    if (Array.isArray(data) && data.length > 0 && data[0].warehouse) {
-                        warehouseId = data[0].warehouse;
-                    } else if (data.data && Array.isArray(data.data) && data.data.length > 0 && data.data[0].warehouse) {
-                        warehouseId = data.data[0].warehouse;
-                    } else if (data.warehouse) {
-                        warehouseId = data.warehouse;
-                    }
-                    
-                    if (warehouseId) {
-                        // Pasif modda log yazma
-                        if (!backgroundTokenState.passiveMode) {
-                            console.log('🏭 ✅ Warehouse ID yakalandı (webRequest response):', warehouseId);
-                        }
-                        
-                        // Franchise sayfasına warehouse ID'yi gönder
-                        chrome.tabs.query({ url: 'https://franchise.getir.com/*' }, (tabs) => {
-                            if (tabs && tabs.length > 0) {
-                                tabs.forEach(tab => {
-                                    chrome.tabs.sendMessage(tab.id, {
-                                        type: 'WAREHOUSE_ID_CAPTURED',
-                                        warehouseId: warehouseId
-                                    }).catch(err => {
-                                        // Content script henüz yüklenmemiş olabilir
-                                    });
-                                });
-                            }
-                        });
-                    }
-                }
-            }).catch(err => {
-                // Response okunamadı, sorun değil
+/* Depo kimliği artık istek ADRESİNDEN okunuyor (/warehouses/<id>/...),
+   yanıt gövdesinden değil.
+
+   Buradaki eski dinleyici her 200 yanıtı için aynı adrese İKİNCİ bir istek
+   atıyordu; üstelik jetonsuz, yani çoğu 401 dönüyordu. Amaç yalnızca depo
+   kimliğini bulmaktı ve o bilgi zaten adreste duruyor. */
+function depoKimligiDuyur(warehouseId) {
+    if (!warehouseId) return;
+    try {
+        chrome.tabs.query({ url: 'https://franchise.getir.com/*' }, (tabs) => {
+            (tabs || []).forEach((tab) => {
+                chrome.tabs.sendMessage(tab.id, {
+                    type: 'WAREHOUSE_ID_CAPTURED',
+                    warehouseId: warehouseId
+                }).catch(() => { /* içerik betiği henüz yüklenmemiş olabilir */ });
             });
-        }
-    },
-    {
-        urls: [
-            'https://franchise-api-gateway.getirapi.com/*',
-            'https://*.getirapi.com/*'
-        ]
-    }
-);
+        });
+    } catch (e) { /* sessiz */ }
+}
 
 console.log('✅ webRequest listener eklendi (token ve warehouse ID yakalama için)');
 

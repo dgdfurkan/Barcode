@@ -222,6 +222,21 @@
             // Önceki API bilgilerini sakla (değişiklik tespiti için)
             let previousAPIInfo = null;
 
+            /* Jetonun ÜRETİLDİĞİ an. Seçim ölçütü bu: sayfanın en son
+               kullandığı jeton doğru olandır. */
+            function parseJwtIssuedMsFromToken(tokenString) {
+                if (!tokenString || typeof tokenString !== 'string') return null;
+                try {
+                    const bare = tokenString.replace(/^Bearer\s+/i, '').trim();
+                    const parts = bare.split('.');
+                    if (parts.length !== 3) return null;
+                    const padded = parts[1] + '='.repeat((4 - parts[1].length % 4) % 4);
+                    const decoded = JSON.parse(atob(padded));
+                    if (decoded.iat) return decoded.iat * 1000;
+                } catch (e) { /* ignore */ }
+                return null;
+            }
+
             function parseJwtExpiryMsFromToken(tokenString) {
                 if (!tokenString || typeof tokenString !== 'string') return null;
                 try {
@@ -256,17 +271,36 @@
                 return mx > 0 ? mx : null;
             }
 
+            /* HANGİ JETON KAZANIR
+               Eskiden ömrü EN UZUN olan seçiliyordu. Getir'in gerçek ağ
+               geçidi jetonu 24 saatlik; depoda ömrü 14 gün olan başka bir
+               jeton da dolaşıyor ve ikisi birebir aynı yapıda. Uzun ömürlü
+               olan her seferinde kazanıyor, sayım istekleri onunla gidiyor
+               ve reddediliyordu.
+
+               Ölçüt artık TAZELİK: en son üretilmiş jeton (`iat`), eşitlikte
+               en son yakalanan (`timestamp`). Süresi geçmiş adaylar baştan
+               eleniyor; hiçbiri geçerli değilse en tazesi yine de dönüyor,
+               yoksa elde hiçbir şey kalmıyor. */
             function pickBestApiInfo(candidates) {
                 const valid = (candidates || []).filter((c) => c && c.token && String(c.token).trim());
                 if (!valid.length) return null;
-                return valid.reduce((best, cur) => {
-                    const expB = getEffectiveExpiryMs(best) || 0;
-                    const expC = getEffectiveExpiryMs(cur) || 0;
-                    if (expC > expB) return cur;
-                    if (expC < expB) return best;
-                    const tsB = best.timestamp || 0;
-                    const tsC = cur.timestamp || 0;
-                    return tsC >= tsB ? cur : best;
+
+                const tazelik = (c) => parseJwtIssuedMsFromToken(c.token) || c.timestamp || 0;
+                const suresiVar = (c) => {
+                    const exp = getEffectiveExpiryMs(c);
+                    return !exp || Date.now() < exp;
+                };
+
+                const havuz = valid.filter(suresiVar);
+                const aday = havuz.length ? havuz : valid;
+
+                return aday.reduce((best, cur) => {
+                    const tB = tazelik(best);
+                    const tC = tazelik(cur);
+                    if (tC > tB) return cur;
+                    if (tC < tB) return best;
+                    return (cur.timestamp || 0) >= (best.timestamp || 0) ? cur : best;
                 });
             }
 
