@@ -164,6 +164,10 @@
     --kirmizi-50:#fdecec;
     --kirmizi-cizgi:#f1b0b0;
     --yesil-cizgi:#a7e8cd;
+    /* Açık yeşil zemin üstünde okunacak metin ve beyaz ikon taşıyan
+       dolu yüzey için koyu ton. --yesil bu iki yerde 4.5 eşiğini
+       geçmiyordu. */
+    --yesil-koyu:#047857;
 
     --golge-s: 0 1px 2px rgba(16,24,40,0.04);
     --golge-o: 0 6px 20px rgba(16,24,40,0.06);
@@ -872,9 +876,9 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-gorunum button svg { width: 16px; }
 .sip-gorunum button:hover { color: var(--sonuk); }
 .sip-gorunum button[aria-selected="true"] {
-    background: #fff;
-    color: var(--yazi);
-    box-shadow: 0 1px 5px rgba(16,24,40,0.12);
+    background: var(--lacivert);
+    color: #fff;
+    box-shadow: 0 1px 5px rgba(16,24,40,0.18);
 }
 
 .sip-urunler { flex: 1; min-height: 0; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 9px; scroll-behavior: smooth; }
@@ -915,7 +919,11 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-urunler--gir .sip-urun { animation: sip-urun-gir 0.36s var(--yay) both; animation-delay: calc(var(--i, 0) * 24ms); }
 @keyframes sip-urun-gir { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
 .sip-urun:hover { border-color: #c2d3f7; }
-.sip-urun--alindi { border-color: #afe0cc; background: #f7fcfa; }
+.sip-urun--alindi {
+    border-color: var(--yesil);
+    background: var(--yesil-50);
+    box-shadow: 0 0 0 3px rgba(14, 159, 110, 0.12);
+}
 .sip-urun--alindi .sip-urun__gorsel { opacity: 0.62; }
 
 .sip-urun__gorsel {
@@ -996,7 +1004,15 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     font-weight: 800;
 }
 .sip-adet--coklu::before { color: var(--mavi); }
-.sip-urun--alindi .sip-adet--coklu { border-color: var(--cizgi); background: var(--kagit); color: var(--sonuk); }
+/* Alındı durumunda adet de yeşile dönüyor: kartın rengiyle aynı dili
+   konuşsun, tek başına sönük kalmasın. */
+.sip-urun--alindi .sip-adet {
+    border-color: var(--yesil-cizgi);
+    background: var(--yesil-50);
+    color: var(--yesil-koyu);
+}
+.sip-urun--alindi .sip-adet::before { color: var(--yesil-koyu); }
+.sip-urun--alindi .sip-adet u { color: var(--yesil-koyu); }
 
 /* TİKLEME UYARISI
    Depocu hızlı çalışırken "×2" yazısını kaçırıp tek adet alıyordu.
@@ -1040,10 +1056,10 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     transition: transform 0.18s var(--yay), background 0.18s, color 0.18s, border-color 0.18s;
 }
 .sip-al::after { content: 'Aldım'; }
-.sip-al svg { width: 17px; opacity: 0.55; }
+.sip-al svg { width: 17px; opacity: 0.55; stroke-width: 2.6; }
 .sip-al:hover { transform: translateY(-1px); border-color: var(--mavi); background: #e4edff; }
 .sip-al:active { transform: translateY(0) scale(0.97); }
-.sip-urun--alindi .sip-al { border-color: var(--yesil); background: var(--yesil); color: #fff; }
+.sip-urun--alindi .sip-al { border-color: var(--yesil-koyu); background: var(--yesil-koyu); color: #fff; }
 .sip-urun--alindi .sip-al::after { content: 'Alındı'; }
 .sip-urun--alindi .sip-al svg { opacity: 1; }
 
