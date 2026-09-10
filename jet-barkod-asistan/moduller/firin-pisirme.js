@@ -82,7 +82,12 @@
 
           const SETTINGS_LS_KEY = 'getirPişirmeAssistantSettings_v2';
           const SETTINGS_DEFAULT = {
-            includeBread: false,
+            /* Eskiden `false`'tı. Fırın panelinde ekmeği varsayılan olarak
+               gizlemek yanlış: "Yenilenen Tombul Ekmek" ve "Ekşi Mayalı Kare
+               Rustik Ekmek" hem pişirme listesinde hem gece çıkış listesinde
+               hiç görünmüyordu, üstelik gizlendiklerine dair tek satır uyarı
+               yoktu. Ayar kapalıyken artık kaç ürünün gizlendiği yazılıyor. */
+            includeBread: true,
             breadAlertDeficit: true,
             breadAlertSurplus: false,
             eveningShelfExit: false
@@ -985,6 +990,9 @@
             if (cards.length === 0) return [];
             const byName = new Map();
             cards.forEach((card, slotIndex) => {
+              /* Panel dörtten fazla kart çizerse fazlası dizinin dışına
+                 yazılır ve `recommendations` bozulurdu. */
+              if (slotIndex > 3) return;
               getProductItemsFromCard(card).forEach((item) => {
                 const { name, imgSrc } = parseNameImgFromItem(item);
                 if (!name) return;
@@ -1020,16 +1028,21 @@
             return { index: 3, name: '20:00-00:00', start: 20, end: 24 };
           }
 
+          /* Elenen ürün sayılıyor. Liste "eldeki stok" listesi olduğu için
+             rafı boş ürün gerçekten girmiyor, ama kaç tanesinin neden
+             girmediği ekranda yazıyor: sessizce kaybolan ürün kalmasın. */
           function collectShelfStockRows(products, settings) {
             const rows = [];
+            let gizliEkmek = 0;
+            let rafBos = 0;
             products.forEach((p) => {
-              if (!settings.includeBread && isBreadProduct(p.name)) return;
+              if (!settings.includeBread && isBreadProduct(p.name)) { gizliEkmek++; return; }
               const elde = Number(p.currentStock) || 0;
-              if (elde <= 0) return;
+              if (elde <= 0) { rafBos++; return; }
               rows.push({ ...p });
             });
             rows.sort((a, b) => b.currentStock - a.currentStock || String(a.name).localeCompare(String(b.name), 'tr'));
-            return rows;
+            return { rows, gizliEkmek, rafBos, toplam: products.length };
           }
 
           function buildViewModel(products, settings) {
@@ -1043,12 +1056,24 @@
             else if (manualShelfToggle) shelfBannerKind = 'manual';
 
             if (useShelfMode) {
-              const rows = collectShelfStockRows(products, settings);
-              return { mode: 'shelf-exit', rows, currentSlotIndex, shelfBannerKind };
+              const raf = collectShelfStockRows(products, settings);
+              return {
+                mode: 'shelf-exit',
+                rows: raf.rows,
+                gizliEkmek: raf.gizliEkmek,
+                rafBos: raf.rafBos,
+                toplam: raf.toplam,
+                currentSlotIndex,
+                shelfBannerKind
+              };
             }
+            const pisirme = generateCookingRecommendations(products, settings);
             return {
               mode: 'cook',
-              rows: generateCookingRecommendations(products, settings),
+              rows: pisirme.aksiyon,
+              izleme: pisirme.izleme,
+              gizliEkmek: pisirme.gizliEkmek,
+              toplam: products.length,
               currentSlotIndex
             };
           }
@@ -1077,17 +1102,43 @@
             const nextSlotIndex = (currentSlotIndex + 1) % 4;
             const lookaheadMinutes = 30;
             const finalRecommendations = [];
+            /* HİÇBİR ÜRÜN SESSİZCE DÜŞMÜYOR.
+               Eskiden üç ayrı `return` vardı: ekmek ayarı kapalıysa, panelde
+               hiç "N Pişir" yoksa, ve donuk sıfırsa ürün listeden tamamen
+               siliniyordu. On beş üründen beşi ekrana geliyor, kalan onu
+               kullanıcı için yok hükmündeydi. "Ekşi Mayalı Kare Rustik
+               Ekmek" (Pişir 0, Donuk 14) hiçbir ayarla görünmüyordu.
+
+               Artık pişirilmesi gerekmeyen ürün de listeye giriyor, yalnız
+               ayrı ve sessiz bir bölümde ve NEDEN pişirilmediği yazılı. */
+            const izleme = [];
+            let gizliEkmek = 0;
+
+            const izlemeyeAl = (product, durum, not) => {
+              izleme.push({ ...product, durum, not });
+            };
 
             products.forEach((product) => {
               const bread = isBreadProduct(product.name);
-              if (!settings.includeBread && bread) return;
+              if (!settings.includeBread && bread) { gizliEkmek++; return; }
+
+              /* Panel bazen dörtten az dilim kartı çiziyor; okunmayan dilim
+                 `undefined` kalmasın diye sıfıra düşürülüyor. */
+              const currentTarget = product.recommendations[currentSlotIndex] || 0;
+              const nextTarget = product.recommendations[nextSlotIndex] || 0;
+              const dilimAdi = getCurrentTimeSlot(currentHour).name;
 
               const hasTargets = product.recommendations.some((r) => r > 0);
-              if (!hasTargets) return;
-              if (!bread && product.frozenStock === 0) return;
-
-              const currentTarget = product.recommendations[currentSlotIndex];
-              const nextTarget = product.recommendations[nextSlotIndex];
+              if (!hasTargets) {
+                izlemeyeAl(product, 'oneri-yok',
+                  'Panel bu ürün için pişirme önermiyor (dört dilimin dördü de 0).');
+                return;
+              }
+              if (!bread && product.frozenStock === 0) {
+                izlemeyeAl(product, 'donuk-yok',
+                  'Donukta stok görünmüyor, pişirilecek malzeme yok.');
+                return;
+              }
               let amountToCook = 0,
                 reason = '',
                 alertLevel = 'info',
@@ -1215,18 +1266,113 @@
                   sortPriority: 5,
                   displayKind: 'bread-surplus'
                 });
+                rowAdded = true;
+              }
+
+              /* Karar ağacından satır çıkmadıysa ürün yeterli demektir;
+                 yine de gerekçesiyle birlikte izleme bölümüne giriyor. */
+              if (!rowAdded) {
+                const not = currentTarget > 0
+                  ? `Rafta ${product.currentStock}, ${dilimAdi} hedefi ${currentTarget}. Yeterli.`
+                  : `${dilimAdi} diliminde hedef yok. Rafta ${product.currentStock}, donukta ${product.frozenStock}.`;
+                izlemeyeAl(product, 'yeterli', not);
               }
             });
 
             finalRecommendations.sort((a, b) => a.sortPriority - b.sortPriority);
-            return finalRecommendations;
+            /* İzlemede önce rafı boş olanlar: gözle taranırken en çok onlar
+               önemli, biri gerçekten unutulmuş olabilir. */
+            izleme.sort((a, b) =>
+              (Number(a.currentStock) || 0) - (Number(b.currentStock) || 0) ||
+              String(a.name).localeCompare(String(b.name), 'tr'));
+            return { aksiyon: finalRecommendations, izleme, gizliEkmek };
           }
 
-          function displayShelfExitList(rows, currentSlotIndex, shelfBannerKind) {
+          /* ÖZET ŞERİDİ
+             Panelde kaç ürün okundu, kaçı ekrana geldi, kaçı nerede kaldı.
+             Bir ürün görünmüyorsa sebebi burada yazıyor; "acaba okuyamadı
+             mı yoksa gerek mi yok muydu" sorusu kalmıyor. */
+          function ozetSeridi(parcalar) {
+            const el = document.createElement('div');
+            el.style.cssText =
+              'margin:0 0 12px;padding:9px 12px;border:1px solid #e2e8f0;border-radius:10px;' +
+              'background:#f8fafc;color:#475569;font-size:12px;line-height:1.5;' +
+              'display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;';
+            el.innerHTML = parcalar.filter(Boolean).join('<span style="color:#cbd5e1">·</span>');
+            return el;
+          }
+
+          function ekmekGizliUyarisi(sayi) {
+            if (!sayi) return '';
+            return '<span style="color:#b45309;font-weight:600">' + sayi +
+              ' ekmek ürünü ayarlarla gizli</span>';
+          }
+
+          /* İZLEME SATIRI
+             Pişirilmesi gerekmeyen ürün de ekranda; sessiz, tek satır,
+             gerekçesiyle. Aksiyon kartlarıyla karışmasın diye gri ve küçük. */
+          /* Ürün adı panelden geliyor; içinde `<` geçen bir ad satırın
+             HTML'ini bozar. Metin olarak basılıyor. */
+          function kacir(m) {
+            const k = document.createElement('span');
+            k.textContent = String(m == null ? '' : m);
+            return k.innerHTML;
+          }
+
+          function izlemeSatiri(p) {
+            const satir = document.createElement('div');
+            satir.style.cssText =
+              'display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #e5e7eb;' +
+              'border-radius:9px;background:#fff;margin-bottom:6px;';
+            const rafRengi = (Number(p.currentStock) || 0) === 0 ? '#b45309' : '#111827';
+            satir.innerHTML = `
+        <img src="${kacir(p.imgSrc || '')}" alt="" width="34" height="34" style="width:34px;height:34px;object-fit:cover;border-radius:5px;flex-shrink:0;background:#f1f5f9;">
+        <div style="flex:1 1 auto;min-width:0;">
+          <div style="font-size:13px;font-weight:600;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${kacir(p.name)}">${kacir(p.name)}</div>
+          <div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${kacir(p.not)}</div>
+        </div>
+        <div style="flex:none;text-align:right;font-size:11px;color:#64748b;line-height:1.35;">
+          <div>Raf <strong style="color:${rafRengi};font-size:12px;">${p.currentStock}</strong></div>
+          <div>Donuk <strong style="color:#111827;font-size:12px;">${p.frozenStock}</strong></div>
+        </div>
+        <div style="flex:none;font-size:11px;color:#94a3b8;letter-spacing:0.5px;">${kacir((p.recommendations || []).join('·'))}</div>`;
+            return satir;
+          }
+
+          /* Tek bir ürünün çizimi patlarsa (bozuk ad, çizilemeyen barkod)
+             listenin geri kalanı da ölüyordu. Her satır kendi başına
+             korunuyor; hatalı olan yerine tek satırlık uyarı geliyor. */
+          function guvenliEkle(kap, uret, ad) {
+            try {
+              const el = uret();
+              if (el) kap.appendChild(el);
+            } catch (e) {
+              JBA && JBA.hata && JBA.hata('firin satır çizimi', e);
+              const uyari = document.createElement('div');
+              uyari.style.cssText =
+                'padding:8px 10px;border:1px solid #fecaca;border-radius:9px;background:#fef2f2;' +
+                'color:#991b1b;font-size:12px;margin-bottom:6px;';
+              uyari.textContent = (ad || 'Bir ürün') + ' çizilemedi, atlandı.';
+              kap.appendChild(uyari);
+            }
+          }
+
+          function displayShelfExitList(rows, currentSlotIndex, shelfBannerKind, sayimlar) {
             resultsContainer.innerHTML = '';
+            const say = sayimlar || {};
+            resultsContainer.appendChild(ozetSeridi([
+              '<strong style="color:#0f172a">' + (say.toplam || rows.length) + ' ürün okundu</strong>',
+              rows.length + ' rafta var',
+              say.rafBos ? say.rafBos + ' ürünün rafı boş' : '',
+              ekmekGizliUyarisi(say.gizliEkmek)
+            ]));
+
             if (rows.length === 0) {
-              resultsContainer.innerHTML =
-                '<div style="text-align: center; padding: 3rem 1rem; background: #f8fafc; color: #475569; border-radius: 0.5rem;"><h3 style="font-size: 1.125rem;">Liste boş</h3><p style="margin-top: 0.5rem;">Stokta görünür ürün yok ya da okunamadı. Filtreleri temizleyip tekrar dene ya da ayarlardan ekmek seçeneğine bak.</p></div>';
+              const bos = document.createElement('div');
+              bos.style.cssText = 'text-align:center;padding:3rem 1rem;background:#f8fafc;color:#475569;border-radius:0.5rem;';
+              bos.innerHTML = '<h3 style="font-size:1.125rem;">Rafta ürün yok</h3><p style="margin-top:0.5rem;">Okunan ürünlerin hiçbirinin rafında stok görünmüyor. Filtreleri temizleyip tekrar dene' +
+                (say.gizliEkmek ? ', ya da ayarlardan ekmek ürünlerini aç' : '') + '.</p>';
+              resultsContainer.appendChild(bos);
               return;
             }
             const banner = document.createElement('div');
@@ -1251,6 +1397,7 @@
             const inactiveStyle = 'color: #6b7280;';
 
             rows.forEach((p, i) => {
+              guvenliEkle(resultsContainer, () => {
               const bcParts = shelfBarcodeCornerInner(p.name);
               const bcHtml = `<div class="ba-shelf-bc">${bcParts.barcode ? `<div class="ba-corner-barcode">${bcParts.barcode}</div>` : ''}</div>`;
               const stockHint =
@@ -1275,26 +1422,49 @@
             <div style="${currentSlotIndex === 2 ? activeStyle : ''}"><div style="font-size: 0.76rem; font-weight: inherit;">${p.recommendations[2]}</div><div style="font-size: 0.55rem; ${currentSlotIndex === 2 ? '' : inactiveStyle}">16–20</div></div>
             <div style="${currentSlotIndex === 3 ? activeStyle : ''}"><div style="font-size: 0.76rem; font-weight: inherit;">${p.recommendations[3]}</div><div style="font-size: 0.55rem; ${currentSlotIndex === 3 ? '' : inactiveStyle}">20–00</div></div>
         </div>`;
-              resultsContainer.appendChild(card);
+              return card;
+              }, p.name);
             });
           }
 
           function displayView(view) {
             if (view.mode === 'shelf-exit') {
-              displayShelfExitList(view.rows, view.currentSlotIndex, view.shelfBannerKind || 'evening');
+              displayShelfExitList(view.rows, view.currentSlotIndex, view.shelfBannerKind || 'evening', {
+                gizliEkmek: view.gizliEkmek,
+                rafBos: view.rafBos,
+                toplam: view.toplam
+              });
               return;
             }
-            displayCookingResults(view.rows, view.currentSlotIndex);
+            displayCookingResults(view.rows, view.currentSlotIndex, {
+              izleme: view.izleme || [],
+              gizliEkmek: view.gizliEkmek,
+              toplam: view.toplam
+            });
           }
 
-          function displayCookingResults(recommendations, currentSlotIndex) {
+          function displayCookingResults(recommendations, currentSlotIndex, ek) {
             resultsContainer.innerHTML = '';
+            const veri = ek || {};
+            const izleme = veri.izleme || [];
+
+            resultsContainer.appendChild(ozetSeridi([
+              '<strong style="color:#0f172a">' + (veri.toplam != null ? veri.toplam : recommendations.length) + ' ürün okundu</strong>',
+              recommendations.length + ' pişirilecek',
+              izleme.length ? izleme.length + ' izlemede' : '',
+              ekmekGizliUyarisi(veri.gizliEkmek)
+            ]));
+
             if (recommendations.length === 0) {
-              resultsContainer.innerHTML =
-                '<div style="text-align: center; padding: 4rem 1rem; background: #f0fdf4; color: #166534; border-radius: 0.5rem;"><h3 style="font-size: 1.25rem; font-weight: 600;">Her şey yolunda!</h3><p style="margin-top: 0.5rem;">Mevcut stoklar yeterli, pişirilmesi gereken ürün yok.</p></div>';
-              return;
+              const bos = document.createElement('div');
+              bos.style.cssText = 'text-align:center;padding:2.5rem 1rem;background:#f0fdf4;color:#166534;border-radius:0.5rem;';
+              bos.innerHTML = '<h3 style="font-size:1.25rem;font-weight:600;">Her şey yolunda!</h3><p style="margin-top:0.5rem;">Bu dilimde pişirilmesi gereken ürün yok.' +
+                (izleme.length ? ' Okunan diğer ürünler aşağıda listeli.' : '') + '</p>';
+              resultsContainer.appendChild(bos);
             }
+
             recommendations.forEach((p, i) => {
+              guvenliEkle(resultsContainer, () => {
               const colorMap = {
                 danger: { border: '#ef4444', bg: '#fef2f2', labelBg: '#fee2e2' },
                 warning: { border: '#f59e0b', bg: '#fffbeb', labelBg: '#fef3c7' },
@@ -1357,8 +1527,28 @@
           <div style="font-size: 0.75rem; font-weight: 600; color: #4b5563; margin-top: 0.5rem;">DONUK</div>
           <div style="font-size: 1.25rem; font-weight: 700;">${p.frozenStock}</div>
         </div>`;
-              resultsContainer.appendChild(card);
+              return card;
+              }, p.name);
             });
+
+            /* İZLEME BÖLÜMÜ
+               Pişirilmesi gerekmeyen ürünler. Katlanır: aksiyon listesini
+               kalabalıklaştırmıyor ama tek tıkla hepsi görünüyor. Panelde
+               okunan her ürün ya yukarıda ya burada; üçüncü bir yer yok. */
+            if (izleme.length) {
+              const kutu = document.createElement('details');
+              kutu.style.cssText = 'margin-top:14px;border:1px solid #e5e7eb;border-radius:11px;background:#f8fafc;';
+              const bas = document.createElement('summary');
+              bas.style.cssText =
+                'cursor:pointer;padding:11px 13px;font-size:13px;font-weight:600;color:#334155;list-style:none;';
+              bas.textContent = 'Pişirme gerektirmeyen ' + izleme.length + ' ürün';
+              kutu.appendChild(bas);
+              const ic = document.createElement('div');
+              ic.style.cssText = 'padding:0 10px 10px;';
+              izleme.forEach((p) => guvenliEkle(ic, () => izlemeSatiri(p), p.name));
+              kutu.appendChild(ic);
+              resultsContainer.appendChild(kutu);
+            }
           }
 
           resultsContainer.innerHTML =
