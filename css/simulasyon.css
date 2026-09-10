@@ -1,0 +1,631 @@
+/**
+ * Jet Barkod. Simülasyon sayfası: sinematik kabuk.
+ * ============================================================================
+ *
+ * NE YAPIYOR
+ * Sayfa perdelere bölünmüş. Her perde uzun bir kaydırma alanı ve içinde
+ * ekrana yapışan bir sahne taşıyor. Kaydırdıkça sahne ilerliyor, sayfa
+ * ilerlemiyor: anlatının temposunu parmak belirliyor.
+ *
+ * NEDEN KAYDIRMA ÇALINMIYOR
+ * `scroll` olayını yakalayıp sayfayı kendi hesabına kaydıran sayfalar
+ * telefonda kırılıyor: atalet bozuluyor, geri jesti takılıyor, ekran
+ * okuyucu kayboluyor. Burada tarayıcının kendi kaydırması olduğu gibi
+ * duruyor; yalnız `position: sticky` ile sahne yerinde tutuluyor.
+ *
+ * İLERLEME TEK SAYI
+ * `js/simulasyon.js` her perdeye `--p` yazıyor: 0 perdenin başı, 1 sonu.
+ * Bütün hareket bu tek sayıdan türüyor. JS hiçbir stil hesaplamıyor,
+ * yalnız sayıyı tazeliyor; ne animate edileceğine CSS karar veriyor.
+ *
+ * PERDE İÇİ DURAKLAR
+ * Bir perdede birkaç durak olabiliyor. Her durak `--p` üzerinde bir
+ * aralık: `araligi()` deseni o aralığı kendi 0..1'ine çeviriyor.
+ * Örnek: ikinci durak 0.25 ile 0.50 arasındaysa
+ * `clamp(0, calc((var(--p) - 0.25) / 0.25), 1)`.
+ *
+ * JS YOKSA
+ * `sim-hazir` sınıfı gelmezse yapışma ve `--p` hiç devreye girmiyor;
+ * perdeler alt alta duran normal bölümlere dönüyor ve her sahne SON
+ * hâliyle görünüyor. Anlatı hareketsiz kalır ama eksiksiz okunur.
+ *
+ * RENK VE YAZI
+ * Palet ve tipografi `css/hakkimizda.css` içinden geliyor (`--hk-*`).
+ * Burada yeni renk üretilmiyor. Tek yeni ölçek basamağı `--sim-dev`:
+ * açılış başlığı sayfanın tek en büyük öğesi, mevcut ölçeğin üstünde
+ * duruyor ve başka hiçbir yerde kullanılmıyor.
+ *
+ * HAREKET
+ * Süre ve eğri `css/motion.css` token'larından. Yalnız `transform` ve
+ * `opacity` animate ediliyor; `--p` ile sürülen her şey de bu ikisine
+ * bağlanıyor. Genişlik, yükseklik, gölge animate edilmiyor.
+ * ============================================================================
+ */
+
+:root {
+    /* Sayfanın tek en büyük yazısı. Açılış başlığından başka yerde yok.
+       Yükseklik de hesaba katılıyor: yalnız `vw` ile ölçeklenen başlık
+       geniş ama alçak ekranda (yatay telefon, kısa pencere) dört satıra
+       çıkıp sahnenin tamamını yiyordu. */
+    --sim-dev: clamp(2rem, min(6.4vw, 8.6vh), 4.8rem);
+
+    /* Derinlik. Telefonda düzleşiyor: eğik yüzeyler küçük ekranda
+       okunaklılığı bozuyor ve boyama maliyeti artıyor. */
+    --sim-derinlik: 1400px;
+    --sim-egim: 1;
+
+    /* Sahne yüksekliği. `dvh` adres çubuğu gizlenince sahnenin
+       zıplamasını önlüyor. */
+    --sim-sahne-y: 100dvh;
+}
+
+@media (max-width: 767px) {
+    :root {
+        --sim-derinlik: 2200px;
+        --sim-egim: 0.45;
+    }
+}
+
+/* ============================================================================
+ * PERDE
+ * ========================================================================== */
+
+.sim-perde {
+    position: relative;
+    /* Kaydırma payı: sahnenin baştan sona oynaması için gereken yol.
+       JS yokken bu yükseklik anlamsız, o yüzden `sim-hazir` altında. */
+    background: var(--hk-murekkep);
+    color: var(--hk-ak);
+}
+
+.sim-hazir .sim-perde {
+    height: var(--sim-yol, 300vh);
+}
+
+.sim-sahne {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    min-height: var(--sim-sahne-y);
+    padding: 48px 16px;
+    overflow: hidden;
+    perspective: var(--sim-derinlik);
+    perspective-origin: 50% 46%;
+}
+
+.sim-hazir .sim-sahne {
+    position: sticky;
+    top: 0;
+    height: var(--sim-sahne-y);
+    min-height: 0;
+    padding: 0 16px;
+}
+
+/* Sahnedeki her şey tek bir 3B uzayda: katmanlar birbirinin önünde ve
+   arkasında gerçekten duruyor, sıralamayı z-index değil derinlik
+   belirliyor. */
+.sim-kat {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    transform-style: preserve-3d;
+    pointer-events: none;
+}
+
+/* Oynayan katman derleyiciye önceden haber veriyor. Sınıf JS tarafından
+   yalnız perde görünürken takılıyor: sürekli açık bırakmak bellekte
+   gereksiz katman tutuyor. */
+.sim-perde.gorunur .sim-kat--oynak { will-change: transform, opacity; }
+
+/* Katmanlar aynı yere yığılmasın: her biri sahnenin bir bölgesinde durur.
+   Üstte söz, altta cihaz; ortada ikisinin arasında kalan derinlik. */
+.sim-kat--ust {
+    place-items: start center;
+    padding-top: clamp(76px, 13vh, 148px);
+}
+
+.sim-kat--alt { place-items: end center; }
+
+.sim-ic {
+    position: relative;
+    width: min(100%, var(--hk-en));
+    margin: 0 auto;
+}
+
+/* ============================================================================
+ * ZEMİN: derinlik ızgarası
+ * Düz siyah zeminde 3B hareket okunmuyor, gözün tutunacağı bir şey yok.
+ * Perspektifle uzaklaşan ince bir ızgara mesafeyi görünür kılıyor.
+ * ========================================================================== */
+
+.sim-izgara {
+    position: absolute;
+    left: 50%;
+    bottom: -10%;
+    width: 260%;
+    height: 130%;
+    margin-left: -130%;
+    background-image:
+        linear-gradient(to right, rgb(255 255 255 / 0.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgb(255 255 255 / 0.07) 1px, transparent 1px);
+    background-size: 68px 68px;
+    transform: rotateX(calc(74deg * var(--sim-egim)))
+               translate3d(0, calc(var(--p, 0) * -180px), 0);
+    transform-origin: 50% 100%;
+    opacity: 0.5;
+    mask-image: linear-gradient(to top, #000 0%, transparent 72%);
+    -webkit-mask-image: linear-gradient(to top, #000 0%, transparent 72%);
+}
+
+/* Ufuktaki ışık. Sahnenin bir yönü olduğunu söylüyor. */
+.sim-ufuk {
+    position: absolute;
+    left: 50%;
+    top: 42%;
+    width: min(760px, 92vw);
+    height: 320px;
+    margin-left: min(-380px, -46vw);
+    border-radius: 999px;
+    background: radial-gradient(closest-side, rgb(19 91 236 / 0.34), transparent 72%);
+    filter: blur(18px);
+    opacity: calc(0.35 + var(--p, 0) * 0.4);
+}
+
+/* ============================================================================
+ * BAŞLIK KATMANI
+ * ========================================================================== */
+
+.sim-soz {
+    position: relative;
+    z-index: 2;
+    /* `ch` KULLANILMIYOR: bu kapta yazı gövde boyunda, başlık ise
+       `--sim-dev`. `26ch` başlığın değil kabın harfini ölçüyor ve
+       278 piksel çıkıyordu; başlık beş satıra bölünüp sahneyi yiyordu. */
+    width: min(92vw, 940px);
+    margin: 0 auto;
+    text-align: center;
+}
+
+.sim-soz__ad {
+    margin: 0;
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: var(--sim-dev);
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    color: var(--hk-ak);
+}
+
+.sim-soz__ad em {
+    display: block;
+    font-style: normal;
+    color: var(--hk-mavi-ak);
+}
+
+.sim-soz__alt {
+    max-width: 46ch;
+    margin: 24px auto 0;
+    font-size: 1.06rem;
+    line-height: 1.55;
+    color: var(--hk-ak-soluk);
+}
+
+.sim-etiket {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 6px 12px;
+    border: 1px solid rgb(255 255 255 / 0.16);
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--hk-ak-soluk);
+}
+
+.sim-etiket i {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--hk-mavi-ak);
+}
+
+/* ============================================================================
+ * CİHAZ KASALARI
+ * El terminali ve telefon. İkisi de DOM; ekranlarının içine gerçek arayüz
+ * çiziliyor, resim konmuyor. Böylece ürün neyse sahnede o görünüyor.
+ * ========================================================================== */
+
+.sim-cihaz {
+    position: relative;
+    transform-style: preserve-3d;
+    border-radius: 16px;
+    background: linear-gradient(160deg, #262d3a, #12161f);
+    box-shadow:
+        0 40px 90px rgb(0 0 0 / 0.55),
+        inset 0 1px 0 rgb(255 255 255 / 0.09);
+}
+
+.sim-cihaz__ekran {
+    position: relative;
+    overflow: hidden;
+    border-radius: 9px;
+    background: var(--hk-kagit);
+    color: var(--hk-yazi);
+}
+
+/* El terminali: kalın çerçeve, küçük ekran, altında tuş takımı.
+   Genişlik yüksekliğe de bağlı: cihaz ekran boyu kadar uzadığında
+   sahnede sözle çakışıyordu. */
+.sim-terminal {
+    width: min(290px, 76vw, 30vh);
+    padding: 14px 14px 0;
+}
+
+.sim-terminal .sim-cihaz__ekran {
+    aspect-ratio: 3 / 4;
+}
+
+.sim-terminal__tuslar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    padding: 12px 0 14px;
+}
+
+.sim-terminal__tuslar span {
+    height: 14px;
+    border-radius: 6px;
+    background: rgb(255 255 255 / 0.09);
+}
+
+/* Telefon: ince çerçeve, uzun ekran. */
+.sim-telefon {
+    width: min(290px, 74vw, 26vh);
+    padding: 10px;
+    border-radius: 16px;
+}
+
+.sim-telefon .sim-cihaz__ekran {
+    aspect-ratio: 9 / 19;
+    border-radius: 12px;
+}
+
+/* ============================================================================
+ * İKİ ŞERİT: eskiden / şimdi
+ * ========================================================================== */
+
+.sim-yol-cift {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 24px;
+    padding: 0 24px;
+    transform-style: preserve-3d;
+}
+
+.sim-yaka {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.sim-yaka--eski {
+    border: 1px solid rgb(154 116 52 / 0.5);
+    background: rgb(154 116 52 / 0.16);
+    color: #e8c88a;
+}
+
+.sim-yaka--yeni {
+    border: 1px solid rgb(19 91 236 / 0.5);
+    background: rgb(19 91 236 / 0.18);
+    color: var(--hk-mavi-ak);
+}
+
+.sim-yaka svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* ============================================================================
+ * KAYDIRMA İPUCU
+ * Yapışan ilk sahnede sayfa durmuş gibi görünüyor. Küçük bir işaret
+ * devamı olduğunu söylüyor; ilerleme başlayınca sönüyor.
+ * ========================================================================== */
+
+.sim-ipucu {
+    position: absolute;
+    left: 50%;
+    bottom: 28px;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--hk-ak-soluk);
+    transform: translateX(-50%);
+    opacity: clamp(0, calc(1 - var(--p, 0) * 8), 1);
+}
+
+.sim-ipucu i {
+    display: block;
+    width: 1px;
+    height: 26px;
+    background: linear-gradient(to bottom, transparent, var(--hk-ak-soluk));
+    animation: sim-ipucu-in 1.8s var(--motion-ease-standard) infinite;
+}
+
+@keyframes sim-ipucu-in {
+    0%   { transform: translateY(-6px) scaleY(0.6); opacity: 0; }
+    45%  { opacity: 1; }
+    100% { transform: translateY(6px) scaleY(1); opacity: 0; }
+}
+
+/* ============================================================================
+ * PERDE 0: AÇILIŞ
+ *
+ * İKİ AYRI HAREKET, KARIŞTIRMA
+ * Giriş (sayfa açılınca bir kez oynayan) ile ilerleme (kaydırmaya bağlı)
+ * ayrı öğelerde duruyor. Aynı öğeye ikisini birden yazarsan `animation`
+ * ile `transform` çakışıyor ve biri diğerini eziyor. Dıştaki `.sim-gir`
+ * girişi, içteki öğe kaydırmayı taşıyor.
+ *
+ * İLK KARE DOLU
+ * Bütün hareket `--p` ile sürülseydi `--p: 0` anında ekranda hiçbir şey
+ * olmazdı: ziyaretçi karşısında siyah bir ekran bulur ve kaydırması
+ * gerektiğini bilmezdi. Başlık ve terminal ilk kareden itibaren duruyor;
+ * kaydırma onları yalnız İLERLETİYOR.
+ *
+ * Duraklar:
+ *   0.10 - 0.34  sipariş fişi terminale düşer
+ *   0.44 - 0.74  kamera geri çekilir, sahne iki şeride ayrılır
+ *   0.70 - 1.00  şeritler yerine oturur, açıklamaları gelir
+ * ========================================================================== */
+
+.sim-acilis {
+    --d2: clamp(0, calc((var(--p, 0) - 0.10) / 0.24), 1);
+    --d3: clamp(0, calc((var(--p, 0) - 0.44) / 0.30), 1);
+    --d4: clamp(0, calc((var(--p, 0) - 0.70) / 0.30), 1);
+}
+
+/* Giriş: sayfa açılınca bir kez. Kaydırmayla ilgisi yok.
+
+   Animasyon SARMALIN üstünde, çocuğun değil. `animation-fill-mode: both`
+   bitiş değerini kalıcı olarak uyguluyor; aynı öğede hem giriş opaklığı
+   hem `--p` ile sürülen opaklık olsaydı animasyon ikincisini kalıcı
+   olarak ezerdi ve başlık bir daha hiç sönmezdi. */
+.sim-gir {
+    display: block;
+    transform-style: preserve-3d;
+}
+
+.js-hazir .sim-gir {
+    animation: sim-gir var(--motion-panel) var(--motion-ease-out) both;
+    animation-delay: calc(var(--s, 0) * 90ms);
+}
+
+@keyframes sim-gir {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Başlık ilk kareden beri ekranda; sahne ikiye ayrılırken yukarı çıkıp
+   söner. */
+.sim-acilis .sim-soz {
+    transform: translate3d(0, calc(var(--d3) * -90px), 0);
+    opacity: calc(1 - var(--d3));
+}
+
+/* Terminal ve fiş TEK yuvada duruyor: fiş terminalin ekranına inecek,
+   ikisi ayrı katmanda olsaydı hizaları ekran boyuna göre kayardı. */
+.sim-yuva {
+    position: relative;
+    transform-style: preserve-3d;
+    /* Cihaz alt kenardan taşıyor: sahnenin devamı olduğu hissi veriyor
+       ve söze yer açıyor. */
+    transform: translate3d(0, calc(24% + var(--d3, 0) * 14%),
+                           calc(-160px - var(--d3, 0) * 320px))
+               rotateX(calc((11deg - var(--d2, 0) * 7deg) * var(--sim-egim)))
+               rotateY(calc(var(--d3, 0) * -14deg * var(--sim-egim)));
+    opacity: calc(1 - var(--d3, 0) * 0.75);
+}
+
+/* Sipariş fişi terminalin ekranına düşüyor. */
+.sim-fis {
+    position: absolute;
+    left: 50%;
+    top: 16%;
+    width: 76%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--hk-kagit);
+    color: var(--hk-yazi);
+    box-shadow: 0 24px 50px rgb(0 0 0 / 0.5);
+    transform:
+        translate3d(-50%, calc(-300px + var(--d2) * 300px), 40px)
+        rotate(calc(-9deg + var(--d2) * 9deg));
+    opacity: calc(var(--d2) * (1 - var(--d3)));
+}
+
+.sim-fis__ust {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.sim-fis__banko {
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.sim-fis__not {
+    font-size: 11px;
+    color: var(--hk-cok-soluk);
+}
+
+.sim-fis__satir {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    border-top: 1px solid var(--hk-cizgi);
+    font-size: 12px;
+}
+
+.sim-fis__satir b {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--hk-soluk);
+}
+
+/* İki şerit sahnenin sonunda açılıyor. */
+.sim-acilis .sim-yol-cift {
+    opacity: var(--d3);
+    transform: translate3d(0, calc(40px - var(--d3) * 40px), 0);
+}
+
+.sim-acilis .sim-yol-cift > div {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    text-align: center;
+}
+
+.sim-acilis .sim-yol-cift > div:first-child {
+    transform: translate3d(calc(var(--d3) * -4%), 0, calc(var(--d4) * -60px))
+               rotateY(calc(var(--d3) * 13deg * var(--sim-egim)));
+}
+
+.sim-acilis .sim-yol-cift > div:last-child {
+    transform: translate3d(calc(var(--d3) * 4%), 0, calc(var(--d4) * -60px))
+               rotateY(calc(var(--d3) * -13deg * var(--sim-egim)));
+}
+
+.sim-yol-cift p {
+    max-width: 24ch;
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--hk-ak-soluk);
+    opacity: var(--d4);
+}
+
+/* ============================================================================
+ * ANLATI ARASI: açık zeminli okuma bölümü
+ * Sinematik perdeler arasında göz dinlensin ve iddia yazıyla da kurulsun.
+ * ========================================================================== */
+
+.sim-ara {
+    padding: clamp(4rem, 9vw, 7.5rem) clamp(1.1rem, 4vw, 2rem);
+    background: var(--hk-kagit);
+    color: var(--hk-yazi);
+}
+
+.sim-ara__ic {
+    width: min(100%, var(--hk-en));
+    margin: 0 auto;
+}
+
+.sim-ara--koyu {
+    background: var(--hk-murekkep);
+    color: var(--hk-ak);
+}
+
+/* Senaryo dosyası gelmediğinde kap boş kalmıyor. */
+.sim-eksik {
+    padding: 24px;
+    border: 1px solid var(--hk-cizgi);
+    border-radius: 12px;
+    background: var(--hk-kagit-2);
+    color: var(--hk-soluk);
+    font-size: 13px;
+    text-align: center;
+}
+
+.sim-ara--koyu .sim-eksik {
+    border-color: var(--hk-murekkep-cizgi);
+    background: var(--hk-murekkep-2);
+    color: var(--hk-ak-soluk);
+}
+
+/* ============================================================================
+ * AZALTILMIŞ HAREKET
+ *
+ * `--p` bire sabitlenmiyor: son kare bazı katmanların sönmüş hâli, o hâlde
+ * anlatının yarısı ekrandan kalkardı. Onun yerine yapışma ve derinlik
+ * tamamen kalkıyor, katmanlar akışta alt alta diziliyor ve HEPSİ görünür
+ * oluyor. Hareket yok, eksik de yok.
+ * ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .sim-hazir .sim-perde { height: auto; }
+
+    .sim-hazir .sim-sahne,
+    .sim-sahne {
+        position: static;
+        height: auto;
+        min-height: 0;
+        padding: clamp(3rem, 7vw, 5rem) 16px;
+        perspective: none;
+        overflow: visible;
+    }
+
+    .sim-kat {
+        position: static;
+        display: grid;
+        justify-items: center;
+        gap: 32px;
+        margin-top: 32px;
+    }
+
+    .sim-kat--zemin { display: none; }
+
+    .sim-perde [style*="--p"],
+    .sim-soz,
+    .sim-cihaz,
+    .sim-fis,
+    .sim-yol-cift,
+    .sim-yol-cift > div,
+    .sim-yol-cift p {
+        transform: none !important;
+        opacity: 1 !important;
+    }
+
+    .sim-fis {
+        position: static;
+        width: min(320px, 88vw);
+        margin: 0 auto;
+    }
+
+    .sim-yol-cift {
+        position: static;
+        gap: 32px;
+        padding: 0;
+    }
+
+    .sim-ipucu { display: none; }
+    .sim-ipucu i { animation: none; }
+}

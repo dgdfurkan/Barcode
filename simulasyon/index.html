@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Simülasyon — Aynı depo, iki yöntem | Jet Barkod</title>
+<meta name="description" content="Aynı sipariş, aynı raf, aynı saat. Solda eski yöntem, sağda Jet Barkod. Sipariş toplama, fırın, sayım, barkod ve ürün arama sahneleri yan yana oynuyor.">
+<link rel="canonical" href="https://jetbarkod.com.tr/simulasyon/">
+<link rel="icon" href="../assets/logo.png?v=2">
+<link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
+<meta name="theme-color" content="#0a0d13">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Aynı depo, iki yöntem">
+<meta property="og:description" content="Eski yöntemle Jet Barkod yan yana, aynı saatte. Farkı kronometre yazıyor.">
+<meta property="og:url" content="https://jetbarkod.com.tr/simulasyon/">
+
+<link rel="stylesheet" href="../css/motion.css?v=20260907a">
+<link rel="stylesheet" href="../css/hakkimizda.css?v=20260831c">
+<link rel="stylesheet" href="../css/karsilastirma.css?v=20260831b">
+<link rel="stylesheet" href="../css/simulasyon.css?v=20260911a">
+
+<script>
+/*
+ * Gövde çizilmeden çalışır. Tek işi: animasyon gerçekten yapılacaksa
+ * `gir` öğelerini gizlemek. Varsayılan hâl görünür; sınıf eklenmezse
+ * sayfa animasyonsuz ama eksiksiz okunur. Ana betik üç saniyede
+ * çalışmazsa gizleme geri alınır.
+ */
+(function (d) {
+    var azHareket = window.matchMedia &&
+                    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!('IntersectionObserver' in window) || azHareket) return;
+
+    d.documentElement.className += ' js-hazir';
+    setTimeout(function () {
+        if (!window.__hkHazir) {
+            d.documentElement.className =
+                d.documentElement.className.replace(/\bjs-hazir\b/, '');
+        }
+    }, 3000);
+})(document);
+</script>
+</head>
+<body>
+
+<div class="ilerleme" aria-hidden="true"></div>
+
+<header class="ust">
+    <a class="ust__marka" href="/">
+        <img class="ust__logo" src="../assets/logo.png" alt="" width="26" height="26">
+        Jet Barkod
+    </a>
+    <span class="ust__bosluk"></span>
+    <a class="ust__bag" href="#toplama">Sipariş toplama</a>
+    <a class="ust__bag" href="#firin">Fırın</a>
+    <a class="ust__bag" href="#sayim">Sayım</a>
+    <a class="ust__bag" href="#sonuc">Sonuç</a>
+    <a class="ust__giris" href="/">Giriş yap</a>
+</header>
+
+<!-- ==================================================================
+     Perde 0. Açılış
+     ================================================================== -->
+<section class="sim-perde sim-acilis" style="--sim-yol: 340vh" aria-label="Açılış">
+    <div class="sim-sahne">
+
+        <div class="sim-kat sim-kat--zemin" aria-hidden="true">
+            <div class="sim-ufuk"></div>
+            <div class="sim-izgara"></div>
+        </div>
+
+        <div class="sim-kat sim-kat--ust sim-kat--oynak">
+          <div class="sim-gir" style="--s:0">
+            <div class="sim-soz">
+                <span class="sim-etiket"><i aria-hidden="true"></i> Simülasyon</span>
+                <h1 class="sim-soz__ad">Aynı depo, aynı sipariş<em>iki ayrı yöntem</em></h1>
+                <p class="sim-soz__alt">
+                    Beş iş, iki yöntemle yan yana oynuyor. İkisi de aynı anda başlıyor,
+                    aynı saati paylaşıyor. Farkı biz söylemiyoruz, kronometre yazıyor.
+                </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="sim-kat sim-kat--alt sim-kat--oynak">
+          <div class="sim-gir" style="--s:1">
+            <div class="sim-yuva">
+                <div class="sim-cihaz sim-terminal">
+                    <div class="sim-cihaz__ekran"></div>
+                    <div class="sim-terminal__tuslar" aria-hidden="true">
+                        <span></span><span></span><span></span><span></span>
+                        <span></span><span></span><span></span><span></span>
+                    </div>
+                </div>
+
+                <article class="sim-fis">
+                    <div class="sim-fis__ust">
+                        <span class="sim-fis__banko">BNK.004</span>
+                        <span class="sim-fis__not">yeni sipariş</span>
+                    </div>
+                    <div class="sim-fis__satir"><span>Ekmek (200 g)</span><b>×2</b></div>
+                    <div class="sim-fis__satir"><span>Süt (1 L)</span><b>×1</b></div>
+                    <div class="sim-fis__satir"><span>Erikli Su (5 L)</span><b>×3</b></div>
+                    <div class="sim-fis__satir"><span>Maydanoz</span><b>×1</b></div>
+                </article>
+            </div>
+          </div>
+        </div>
+
+        <div class="sim-kat sim-kat--oynak">
+            <div class="sim-yol-cift">
+                <div>
+                    <span class="sim-yaka sim-yaka--eski">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                        Eskiden
+                    </span>
+                    <p>El terminali, koşturmaca, süreyi yetiştirme telaşı.</p>
+                </div>
+                <div>
+                    <span class="sim-yaka sim-yaka--yeni">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        Jet Barkod ile
+                    </span>
+                    <p>Tek okutma, telefonda liste, sırası gelince sakin toplama.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="sim-ipucu" aria-hidden="true">
+            <span>Kaydır</span>
+            <i></i>
+        </div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Ara. İddia yazıyla
+     ================================================================== -->
+<section class="sim-ara">
+    <div class="sim-ara__ic">
+        <div class="gir">
+            <span class="etiket">Neyi karşılaştırıyoruz</span>
+            <h2 class="baslik">Kazanılan süre <em>yalnız süre değil</em></h2>
+            <p class="giris">
+                Depoda süre baskısı yalnız işi geciktirmiyor; acele ettiren her dakika
+                yanlış ürün, yanlış adet ve eksik poşet riskini büyütüyor. Aşağıdaki
+                sahnelerde ölçtüğümüz şey saniye. Ama o saniyelerin karşılığı, işi
+                telaşsız yapabilmek.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Perde 1. Sipariş toplama  (2. aşamada doldurulacak)
+     ================================================================== -->
+<section class="sim-ara sim-ara--koyu" id="toplama">
+    <div class="sim-ara__ic">
+        <div class="gir">
+            <span class="etiket">Ana perde</span>
+            <h2 class="baslik">Sipariş toplama</h2>
+            <p class="giris">
+                Terminale sipariş düşüyor. Eskiden liste ekranda, ürün rafta; göz iki
+                yerde ve saat işliyor. Jet Barkod'da barkodlar tek seferde okutuluyor,
+                liste telefona geçiyor, toplama sıradaki siparişi beklerken sakin
+                sakin yapılıyor.
+            </p>
+        </div>
+        <div class="gir" data-senaryo="JBSenaryoToplama"></div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Perde 2. Fırın
+     ================================================================== -->
+<section class="sim-ara" id="firin">
+    <div class="sim-ara__ic">
+        <div class="gir">
+            <span class="etiket">Fırın</span>
+            <h2 class="baslik">Ne pişecek, <em>kaç tane pişecek</em></h2>
+            <p class="giris">
+                Panelde dört zaman dilimi ve on beş ürün var; satırlar kapalı geliyor.
+                Raf ve donuk değerlerini görmek için altmış satırı tek tek açmak
+                gerekiyor. Pişirme paneli hepsini bir düğmede açıyor ve kaç adet
+                pişirileceğini sebebiyle yazıyor.
+            </p>
+        </div>
+        <div class="gir" data-senaryo="JBSenaryoFirin"></div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Perde 3. Sayım
+     ================================================================== -->
+<section class="sim-ara sim-ara--koyu" id="sayim">
+    <div class="sim-ara__ic">
+        <div class="gir">
+            <span class="etiket">Sayım</span>
+            <h2 class="baslik">Masa başında mı, <em>rafın önünde mi</em></h2>
+            <p class="giris">
+                Elle sayımda her kalem tek tek aratılır, çıkan değer deftere yazılır,
+                sonra rafa gidilip gerçek adet sayılır: iki iş iki ayrı yerde. Jet
+                Barkod'da telefon elde, rafın önünde. Barkod okutulur, sistem stoğu
+                kendiliğinden gelir, fark aynı satırda hesaplanır.
+            </p>
+        </div>
+        <div class="gir" data-senaryo="JBSenaryoSayim"></div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Perde 4. Barkod ve Hızlı Bul
+     ================================================================== -->
+<section class="sim-ara" id="barkod">
+    <div class="sim-ara__ic">
+        <div class="gir">
+            <span class="etiket">Barkod</span>
+            <h2 class="baslik">Okunmayan barkod <em>işi durdurmasın</em></h2>
+            <p class="giris">
+                Etiketi yırtılmış ya da silinmiş bir ürünün barkodunu bulmak eskiden
+                arama turuydu. Jet Barkod'da ürün adı yazılır, barkod ekranda çıkar.
+            </p>
+        </div>
+        <div class="gir" data-senaryo="JBSenaryoBarkod"></div>
+
+        <div class="gir" style="margin-top:3.4rem">
+            <h3 class="baslik baslik--kucuk">Bankoda kalan ürün hangi siparişin</h3>
+            <p class="giris">
+                Eskiden tek yol siparişleri tek tek açmaktı. Hızlı Bul'da ürünün adı
+                bir kez yazılıyor, eşleşen sipariş kartı öne çıkıyor.
+            </p>
+        </div>
+        <div class="gir" data-senaryo="JBSenaryoHizliBul"></div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Sonuç  (4. aşamada toplam kronometre eklenecek)
+     ================================================================== -->
+<section class="sim-ara sim-ara--koyu" id="sonuc">
+    <div class="sim-ara__ic">
+        <div class="gir">
+            <span class="etiket">Sonuç</span>
+            <h2 class="baslik">Kazanılan zaman <em>telaşı alıyor</em></h2>
+            <p class="giris">
+                Sahnelerde ölçtüğünüz fark tek bir siparişin farkı. Bir vardiyada
+                aynı iş defalarca tekrarlanıyor. Kazanılan zaman doğrudan şuna
+                dönüşüyor: acele etmeden toplanan sipariş, doğru okunan adet, eksiksiz
+                giden poşet.
+            </p>
+            <div class="dugmeler" style="margin-top:1.6rem">
+                <a class="dugme dugme--ana" href="/">Denemeye başlayın</a>
+                <a class="dugme dugme--sade" href="/hakkinda/">Nasıl çalışıyor</a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<footer class="dip">
+    <div class="dip__ic">
+        <span>&copy; <span id="yil">2026</span> Jet Barkod</span>
+        <span class="dip__bosluk"></span>
+        <a href="https://jetbarkod.com.tr">jetbarkod.com.tr</a>
+        <a href="https://flowcobalt.com" target="_blank" rel="noopener">flowcobalt.com</a>
+    </div>
+</footer>
+
+<script src="../js/vendor/JsBarcode.all.min.js"></script>
+<script src="../js/karsilastirma.js?v=20260831a"></script>
+<script src="../js/karsilastirma-barkod.js?v=20260831d"></script>
+<script src="../js/karsilastirma-firin.js?v=20260831a"></script>
+<script src="../js/karsilastirma-hizlibul.js?v=20260831b"></script>
+<script src="../js/karsilastirma-sayim.js?v=20260831a"></script>
+<script src="../js/hakkimizda.js?v=20260831a"></script>
+<script src="../js/simulasyon.js?v=20260911a"></script>
+</body>
+</html>
