@@ -23,7 +23,7 @@
     <script src="js/db-config.js?v=20260828i"></script>
     <script src="js/jb-db.js?v=20260828i"></script>
     <link rel="stylesheet" href="css/motion.css?v=20260909a">
-    <link rel="stylesheet" href="css/admin-panel.css?v=20260909a">
+    <link rel="stylesheet" href="css/admin-panel.css?v=20260910a">
     <style>
         .glass-effect {
             background: rgba(255, 255, 255, 0.1);
@@ -1168,254 +1168,251 @@
         </div>
     </div>
 
-    <!-- Add User Modal -->
-    <div id="addUserModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Yeni Kullanıcı</h3>
-                <button id="closeAddUserModal" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
+    <!-- Yeni Kullanıcı -->
+    <div id="addUserModal" class="adm-modal hidden" role="dialog" aria-modal="true" aria-labelledby="addUserModalTitle" data-odak="newUsername">
+        <div class="adm-modal-zemin" data-adm-kapat></div>
+        <div class="adm-modal-panel">
+            <div class="adm-modal-bas">
+                <div>
+                    <h3 id="addUserModalTitle">Yeni Kullanıcı</h3>
+                    <p>Kullanıcı adı ve parola yeterli, gerisi varsayılanla açılır.</p>
+                </div>
+                <button type="button" id="closeAddUserModal" class="adm-modal-kapat" aria-label="Kapat"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
-            <form id="addUserForm" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Kullanıcı Adı</label>
-                    <input type="text" id="newUsername" required class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+
+            <form id="addUserForm" class="adm-modal-form">
+                <div class="adm-modal-govde">
+                    <div class="adm-modal-bolum">
+                        <div class="adm-alan">
+                            <label for="newUsername">Kullanıcı adı</label>
+                            <input type="text" id="newUsername" required autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ornek.kullanici">
+                        </div>
+                        <div class="adm-alan">
+                            <label for="newPassword">Parola</label>
+                            <div class="adm-alan-parola">
+                                <input type="password" id="newPassword" required autocomplete="new-password">
+                                <button type="button" id="toggleNewPassword" aria-label="Parolayı göster"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="adm-modal-bolum">
+                        <h4>Test süresi</h4>
+                        <div class="adm-cip-izgara" id="newTrialChips">
+                            <button type="button" class="adm-cip" data-gun="1">1 gün</button>
+                            <button type="button" class="adm-cip secili" data-gun="3">3 gün</button>
+                            <button type="button" class="adm-cip" data-gun="7">1 hafta</button>
+                            <button type="button" class="adm-cip" data-gun="15">15 gün</button>
+                            <button type="button" class="adm-cip" data-gun="30">1 ay</button>
+                            <button type="button" class="adm-cip" data-ozel="1">Tarih seç</button>
+                        </div>
+                        <input type="number" id="newTrialDays" value="3" min="1" max="30" hidden>
+                        <div class="adm-alan" id="newTrialEndAlan" hidden>
+                            <label for="newTrialEnd">Bitiş tarihi ve saati</label>
+                            <input type="datetime-local" id="newTrialEnd">
+                        </div>
+                    </div>
+
+                    <details class="adm-katla">
+                        <summary>Gelişmiş</summary>
+                        <div class="adm-katla-ic">
+                            <div class="adm-alan">
+                                <label for="newCompany">Şirket</label>
+                                <input type="text" id="newCompany" autocomplete="off">
+                            </div>
+                            <div class="adm-alan">
+                                <label for="newEmail">İletişim e-postası</label>
+                                <input type="email" id="newEmail" autocomplete="off" autocapitalize="none" inputmode="email">
+                            </div>
+                            <label class="adm-anahtar" for="newIPTrackingEnabled">
+                                <span class="adm-anahtar-metin">
+                                    <strong>IP takibi</strong>
+                                    <span>Kullanıcının bağlandığı adresler kaydedilsin</span>
+                                </span>
+                                <input type="checkbox" id="newIPTrackingEnabled" checked>
+                                <i aria-hidden="true"></i>
+                            </label>
+                            <div class="adm-alan">
+                                <label for="newMaxIPCount">En fazla IP sayısı</label>
+                                <input type="number" id="newMaxIPCount" min="1" max="50" value="5" inputmode="numeric">
+                                <span class="adm-ipucu">Kullanıcının kaç farklı adresten girebileceği.</span>
+                            </div>
+                            <div class="adm-alan">
+                                <label for="newIPs">İzin verilen IP'ler</label>
+                                <input type="text" id="newIPs" placeholder="192.168.1.100, 203.0.113.1" autocapitalize="none" autocorrect="off" spellcheck="false">
+                                <span class="adm-ipucu">Virgülle ayırın. Boş bırakılırsa hepsine izin verilir.</span>
+                            </div>
+                        </div>
+                    </details>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Şifre</label>
-                    <input type="password" id="newPassword" required class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Şirket</label>
-                    <input type="text" id="newCompany" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">İletişim Email</label>
-                    <input type="email" id="newEmail" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Test Bitiş Tarihi</label>
-                    <input type="datetime-local" id="newTrialEnd" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Maksimum IP Sayısı</label>
-                    <input type="number" id="newMaxIPCount" min="1" max="50" value="5" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                    <p class="text-xs text-gray-500 mt-1">Kullanıcının kullanabileceği maksimum farklı IP sayısı</p>
-                </div>
-                <div>
-                    <label class="flex items-center">
-                        <input type="checkbox" id="newIPTrackingEnabled" checked class="mr-2">
-                        <span class="text-sm font-medium text-gray-700">IP Takibi Aktif</span>
-                    </label>
-                    <p class="text-xs text-gray-500 mt-1">Bu kullanıcı için IP takibi yapılsın mı?</p>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Test Süresi (gün) - Alternatif</label>
-                    <input type="number" id="newTrialDays" value="3" min="1" max="30" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">İzin Verilen IP'ler (virgülle ayırın)</label>
-                    <input type="text" id="newIPs" placeholder="192.168.1.100, 203.0.113.1" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <div class="flex space-x-3 pt-4">
-                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg">
-                        Oluştur
-                    </button>
-                    <button type="button" id="cancelAddUser" class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 px-4 rounded-lg">
-                        İptal
-                    </button>
+
+                <div class="adm-modal-ayak">
+                    <button type="button" id="cancelAddUser" class="adm-btn adm-btn-ghost">İptal</button>
+                    <button type="submit" class="adm-btn adm-btn-primary">Oluştur</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Edit User Modal -->
-    <div id="editUserModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-medium text-gray-900">Kullanıcı Düzenle</h3>
-                    <button id="closeEditUserModal" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
+    <!-- Kullanıcı Düzenle -->
+    <div id="editUserModal" class="adm-modal hidden" role="dialog" aria-modal="true" aria-labelledby="editUserModalTitle">
+        <div class="adm-modal-zemin" data-adm-kapat></div>
+        <div class="adm-modal-panel">
+            <div class="adm-modal-bas">
+                <div>
+                    <h3 id="editUserModalTitle">Kullanıcı Düzenle</h3>
+                    <p id="editUserModalAlt">Hesap bilgileri ve erişim ayarları</p>
+                </div>
+                <button type="button" id="closeEditUserModal" class="adm-modal-kapat" aria-label="Kapat"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+
+            <form id="editUserForm" class="adm-modal-form">
+                <div class="adm-modal-govde">
+                    <div class="adm-modal-bolum">
+                        <div class="adm-alan">
+                            <label for="editUsername">Kullanıcı adı</label>
+                            <input type="text" id="editUsername" readonly>
+                        </div>
+                        <div class="adm-alan">
+                            <label for="editPassword">Yeni parola</label>
+                            <div class="adm-alan-parola">
+                                <input type="password" id="editPassword" autocomplete="new-password" placeholder="Değiştirmeyecekseniz boş bırakın">
+                                <button type="button" id="toggleEditPassword" aria-label="Parolayı göster"><svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="adm-modal-bolum">
+                        <h4>Bilgiler</h4>
+                        <div class="adm-alan">
+                            <label for="editCompany">Şirket</label>
+                            <input type="text" id="editCompany" autocomplete="off">
+                        </div>
+                        <div class="adm-alan">
+                            <label for="editEmail">E-posta</label>
+                            <input type="email" id="editEmail" autocomplete="off" autocapitalize="none" inputmode="email">
+                        </div>
+                        <div class="adm-alan">
+                            <label for="editTrialEnd">Test bitiş tarihi</label>
+                            <input type="datetime-local" id="editTrialEnd">
+                        </div>
+                    </div>
+
+                    <div class="adm-modal-bolum">
+                        <h4>Erişim</h4>
+                        <label class="adm-anahtar" for="editIsActive">
+                            <span class="adm-anahtar-metin">
+                                <strong>Hesap aktif</strong>
+                                <span>Kapalıyken kullanıcı giriş yapamaz</span>
+                            </span>
+                            <input type="checkbox" id="editIsActive">
+                            <i aria-hidden="true"></i>
+                        </label>
+                        <label class="adm-anahtar" for="editIPTrackingEnabled">
+                            <span class="adm-anahtar-metin">
+                                <strong>IP takibi</strong>
+                                <span>Bağlanılan adresler kaydedilsin</span>
+                            </span>
+                            <input type="checkbox" id="editIPTrackingEnabled">
+                            <i aria-hidden="true"></i>
+                        </label>
+                        <div class="adm-alan">
+                            <label for="editMaxIPCount">En fazla IP sayısı</label>
+                            <input type="number" id="editMaxIPCount" min="1" max="50" placeholder="5" inputmode="numeric">
+                        </div>
+                        <div class="adm-alan">
+                            <label for="editIPs">İzin verilen IP'ler</label>
+                            <input type="text" id="editIPs" placeholder="Boş bırakılırsa tüm IP'ler" autocapitalize="none" autocorrect="off" spellcheck="false">
+                        </div>
+                    </div>
+
+                    <button type="button" id="refreshUserPage" class="adm-btn adm-btn-ghost" style="width:100%">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        <span>Kullanıcının sayfasını yenile</span>
                     </button>
                 </div>
-                
-                <form id="editUserForm">
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Kullanıcı Adı</label>
-                        <input type="text" id="editUsername" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" readonly>
+
+                <div class="adm-modal-ayak">
+                    <button type="button" id="cancelEditUser" class="adm-btn adm-btn-ghost">İptal</button>
+                    <button type="submit" class="adm-btn adm-btn-primary">Güncelle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Test Süresi Uzat -->
+    <div id="extendTrialModal" class="adm-modal hidden" role="dialog" aria-modal="true" aria-labelledby="extendTrialTitle">
+        <div class="adm-modal-zemin" data-adm-kapat></div>
+        <div class="adm-modal-panel">
+            <div class="adm-modal-bas">
+                <div>
+                    <h3 id="extendTrialTitle">Test Süresi Uzat</h3>
+                    <p>Seçilen süre mevcut bitiş tarihine eklenir.</p>
+                </div>
+                <button type="button" id="closeExtendTrialModal" class="adm-modal-kapat" aria-label="Kapat"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+
+            <div class="adm-modal-govde">
+                <dl class="adm-bilgi-kutu">
+                    <dt>Kullanıcı</dt>
+                    <dd id="extendTrialUsername">-</dd>
+                    <dt style="margin-top:8px">Mevcut bitiş</dt>
+                    <dd class="adm-bilgi-kucuk" id="extendTrialCurrentEnd">-</dd>
+                </dl>
+
+                <div class="adm-modal-bolum">
+                    <h4>Hızlı ekle</h4>
+                    <div class="adm-cip-izgara">
+                        <button type="button" class="quick-duration-btn adm-cip" data-hours="1">1 saat</button>
+                        <button type="button" class="quick-duration-btn adm-cip" data-hours="3">3 saat</button>
+                        <button type="button" class="quick-duration-btn adm-cip" data-hours="8">8 saat</button>
+                        <button type="button" class="quick-duration-btn adm-cip" data-hours="12">12 saat</button>
+                        <button type="button" class="quick-duration-btn adm-cip" data-days="1">1 gün</button>
+                        <button type="button" class="quick-duration-btn adm-cip" data-days="2">2 gün</button>
+                        <button type="button" class="quick-duration-btn adm-cip" data-days="3">3 gün</button>
+                        <button type="button" class="quick-duration-btn adm-cip" data-days="7">1 hafta</button>
+                        <button type="button" class="quick-duration-btn adm-cip" data-days="30">1 ay</button>
                     </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Şifre</label>
-                        <div class="flex">
-                            <input type="password" id="editPassword" class="flex-1 border-gray-300 rounded-l-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                            <button type="button" id="toggleEditPassword" class="px-3 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 hover:bg-gray-100">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Şirket</label>
-                        <input type="text" id="editCompany" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">E-posta</label>
-                        <input type="email" id="editEmail" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Test Bitiş Tarihi</label>
-                        <input type="datetime-local" id="editTrialEnd" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">İzin Verilen IP'ler</label>
-                        <input type="text" id="editIPs" placeholder="IP1, IP2, IP3 (boş bırakırsanız tüm IP'ler)" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Maksimum IP Sayısı</label>
-                        <input type="number" id="editMaxIPCount" min="1" max="50" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="5">
-                        <p class="text-xs text-gray-500 mt-1">Kullanıcının kullanabileceği maksimum farklı IP sayısı</p>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="flex items-center">
-                            <input type="checkbox" id="editIPTrackingEnabled" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                            <span class="ml-2 text-sm text-gray-700">IP Takibi Aktif</span>
-                        </label>
-                        <p class="text-xs text-gray-500 mt-1">Bu kullanıcı için IP takibi yapılsın mı?</p>
-                    </div>
-                    
-                    <div class="mb-4">
-                        <label class="flex items-center">
-                            <input type="checkbox" id="editIsActive" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
-                            <span class="ml-2 text-sm text-gray-700">Aktif Kullanıcı</span>
-                        </label>
-                    </div>
-                    
-                    <div class="flex flex-col space-y-3">
-                        <button type="button" id="refreshUserPage" class="w-full px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors flex items-center justify-center space-x-2">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                            </svg>
-                            <span>Kullanıcı Sayfasını Yenile</span>
-                        </button>
-                    <div class="flex justify-end space-x-3">
-                        <button type="button" id="cancelEditUser" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors">
-                            İptal
-                        </button>
-                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                            Güncelle
-                        </button>
-                        </div>
-                    </div>
-                </form>
+                </div>
+
+                <div class="adm-alan">
+                    <label for="extendTrialNewEnd">Yeni bitiş tarihi ve saati</label>
+                    <input type="datetime-local" id="extendTrialNewEnd">
+                </div>
+            </div>
+
+            <div class="adm-modal-ayak">
+                <button type="button" id="cancelExtendTrial" class="adm-btn adm-btn-ghost">İptal</button>
+                <button type="button" id="confirmExtendTrial" class="adm-btn adm-btn-primary">Güncelle</button>
             </div>
         </div>
     </div>
 
-    <!-- Extend Trial Modal -->
-    <div id="extendTrialModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-medium text-gray-900" id="extendTrialTitle">Test Süresi Uzat</h3>
-                    <button id="closeExtendTrialModal" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
+    <!-- Premium Haklar -->
+    <div id="premiumFeaturesModal" class="adm-modal hidden" role="dialog" aria-modal="true" aria-labelledby="premiumFeaturesTitle">
+        <div class="adm-modal-zemin" data-adm-kapat></div>
+        <div class="adm-modal-panel adm-modal-panel--genis">
+            <div class="adm-modal-bas">
+                <div>
+                    <h3 id="premiumFeaturesTitle">Premium Haklar</h3>
+                    <p>Değişiklik anında kullanıcıya iletilir, sayfası yenilenir.</p>
                 </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Kullanıcı</label>
-                    <div class="text-lg font-semibold text-gray-900" id="extendTrialUsername">-</div>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Mevcut Bitiş Tarihi</label>
-                    <div class="text-sm text-gray-600" id="extendTrialCurrentEnd">-</div>
-                </div>
-                
-                <div class="mb-6">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Yeni Bitiş Tarihi ve Saati</label>
-                    <input type="datetime-local" id="extendTrialNewEnd" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 mb-3">
-                    
-                    <!-- Quick Duration Buttons -->
-                    <div class="mb-3">
-                        <label class="block text-sm font-medium text-gray-600 mb-2">Hızlı Seçim:</label>
-                        <div class="grid grid-cols-3 gap-2">
-                            <button type="button" class="quick-duration-btn px-3 py-2 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors" data-hours="1">1 Saat</button>
-                            <button type="button" class="quick-duration-btn px-3 py-2 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors" data-hours="3">3 Saat</button>
-                            <button type="button" class="quick-duration-btn px-3 py-2 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors" data-hours="8">8 Saat</button>
-                            <button type="button" class="quick-duration-btn px-3 py-2 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors" data-hours="12">12 Saat</button>
-                            <button type="button" class="quick-duration-btn px-3 py-2 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors" data-days="1">1 Gün</button>
-                            <button type="button" class="quick-duration-btn px-3 py-2 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors" data-days="2">2 Gün</button>
-                            <button type="button" class="quick-duration-btn px-3 py-2 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors" data-days="3">3 Gün</button>
-                            <button type="button" class="quick-duration-btn px-3 py-2 text-xs bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors" data-days="7">1 Hafta</button>
-                            <button type="button" class="quick-duration-btn px-3 py-2 text-xs bg-purple-100 text-purple-700 rounded-md hover:bg-purple-200 transition-colors" data-days="30">1 Ay</button>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="flex justify-end space-x-3">
-                    <button id="cancelExtendTrial" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors">
-                        İptal
-                    </button>
-                    <button id="confirmExtendTrial" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                        Güncelle
-                    </button>
+                <button type="button" id="closePremiumFeaturesModal" class="adm-modal-kapat" aria-label="Kapat"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+
+            <div class="adm-modal-govde">
+                <dl class="adm-bilgi-kutu">
+                    <dt>Kullanıcı</dt>
+                    <dd id="premiumFeaturesUsername">-</dd>
+                </dl>
+                <div id="premiumFeaturesList" class="adm-hak-liste">
+                    <!-- Haklar buraya yükleniyor -->
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Premium Features Modal -->
-    <div id="premiumFeaturesModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-lg font-medium text-gray-900">⭐ Premium Özellikler Yönetimi</h3>
-                    <button id="closePremiumFeaturesModal" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-                
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Kullanıcı</label>
-                    <div class="text-lg font-semibold text-gray-900" id="premiumFeaturesUsername">-</div>
-                </div>
-
-                <div class="mb-6">
-                    <p class="text-sm text-gray-600 mb-4">Aşağıdaki premium özellikleri açıp kapatabilirsiniz. Değişiklikler anında kullanıcıya bildirilir ve sayfa otomatik yenilenir.</p>
-                    
-                    <div id="premiumFeaturesList" class="space-y-3">
-                        <!-- Premium features will be loaded here -->
-                    </div>
-                </div>
-                
-                <div class="flex justify-end space-x-3">
-                    <button id="cancelPremiumFeatures" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors">
-                        İptal
-                    </button>
-                    <button id="savePremiumFeatures" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors">
-                        Kaydet
-                    </button>
-                </div>
+            <div class="adm-modal-ayak">
+                <button type="button" id="cancelPremiumFeatures" class="adm-btn adm-btn-ghost">İptal</button>
+                <button type="button" id="savePremiumFeatures" class="adm-btn adm-btn-primary">Kaydet</button>
             </div>
         </div>
     </div>
@@ -1687,11 +1684,34 @@
         </div>
     </div>
 
+    <!-- Onay Tabakası -->
+    <div id="admOnayModal" class="adm-modal hidden" role="dialog" aria-modal="true" aria-labelledby="admOnayBaslik" data-odak="admOnayVazgec">
+        <div class="adm-modal-zemin" data-adm-kapat></div>
+        <div class="adm-modal-panel">
+            <div class="adm-modal-bas">
+                <div>
+                    <h3 id="admOnayBaslik">Emin misiniz?</h3>
+                </div>
+                <button type="button" class="adm-modal-kapat" data-adm-kapat aria-label="Kapat"><svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+            <div class="adm-modal-govde">
+                <p class="adm-onay-metin" id="admOnayMetin"></p>
+            </div>
+            <div class="adm-modal-ayak">
+                <button type="button" id="admOnayVazgec" class="adm-btn adm-btn-ghost" data-adm-kapat>Vazgeç</button>
+                <button type="button" class="adm-btn adm-btn-primary" id="admOnayEvet">Devam</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="adm-bildirim-yuva" id="admBildirimYuva" aria-live="polite"></div>
+
     <script src="js/auth.js?v=20260831a"></script>
     <script src="js/oturum-yeri.js?v=20260902a"></script>
     <script src="js/image-lightbox.js?v=20260828i"></script>
-    <script src="js/admin.js?v=20260828i"></script>
+    <script src="js/admin.js?v=20260910a"></script>
     <script src="js/admin-tablo.js?v=20260909a"></script>
+    <script src="js/admin-modal.js?v=20260910a"></script>
     <script src="js/feature-definitions.js?v=20260828i"></script>
     <script src="js/feature-manager.js?v=20260828i"></script>
     <script src="js/admin-updates.js?v=20260828i"></script>

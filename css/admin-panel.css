@@ -1254,42 +1254,593 @@ body.adm-shell.adm-nav-open { overflow: hidden; }
 
 /* ============================================================================
  * MODALLER
- * Panelde on modal var ve hepsi `hidden` sınıfıyla açılıp kapanıyordu:
- * geçiş yok, ekrana çat diye biniyordu. Artık zemin soluyor, panel altından
- * gelip yerine oturuyor.
+ * ----------------------------------------------------------------------------
+ * ESKİDEN NE VARDI
+ * On modal, on ayrı yerleşim. Kimi `flex items-center` ile ortalanıyor, kimi
+ * `top-20 mx-auto w-96` ile yukarıdan itiliyordu. Ortak yanları yoktu, bu
+ * yüzden ortak kural da yazılamıyordu ve stil `[id*="Modal"]` desenine
+ * bakan kırılgan bir seçiciyle veriliyordu.
  *
- * Seçici kimlik desenine bakıyor (`[id*="Modal"]`) çünkü on modalın hiçbirinde
- * ortak sınıf yok ve HTML'e tek tek sınıf eklemek yerine tek kural yeterli.
- * `!important` gerekli: modal panelleri satır içi Tailwind sınıflarıyla
- * geliyor ve onlar aynı özellikleri yazıyor.
+ * Telefonda üç ayrı şekilde bozuktu:
+ * 1. Yeni Kullanıcı panelinde dokuz alan var. Dış kap `fixed inset-0`,
+ *    iç panelde yükseklik sınırı yok: panel ekrandan taşıyor ve HİÇBİR
+ *    kaydırma kabı olmadığı için alt alanlara ulaşılamıyordu. "Oluştur"
+ *    düğmesi ekranın altında kalıyordu.
+ * 2. `w-96` yani 384px. 375px'lik telefonda panel ekrandan geniş.
+ * 3. Klavye açılınca `100vh` küçülmüyor; odaklanılan alan klavyenin
+ *    altında kalıyordu.
+ *
+ * ŞİMDİ NE VAR
+ * Tek desen: zemin + panel, panel üç parçalı (baş / gövde / ayak).
+ * Yalnız GÖVDE kayıyor; başlık ve eylem satırı sabit duruyor.
+ *
+ * Yükseklik `--adm-gorunur-y` değişkeninden geliyor. Bu değeri
+ * `js/admin-modal.js` `visualViewport.height` ile yazıyor, yani klavye
+ * açılınca panel klavyenin üstüne oturuyor ve ayak satırı görünür kalıyor.
+ * Değişken yoksa `100dvh` devreye giriyor.
+ *
+ * Telefonda panel alta yapışık bir tabaka (üst köşeleri yuvarlak), 768px
+ * üstünde ortalanmış bir kart. Aynı HTML, iki yerleşim.
  * ========================================================================== */
-body.adm-shell > [id*="Modal"],
-body.adm-shell > [id*="modal"] {
+.adm-modal {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: var(--adm-gorunur-y, 100dvh);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.adm-modal.hidden { display: none; }
+
+.adm-modal-zemin {
+    position: absolute;
+    inset: 0;
+    background: rgb(16 24 40 / 0.45);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
     animation: admModalZemin var(--motion-fast) var(--motion-ease-standard);
 }
 
-.adm-modal-panel,
-body.adm-shell > [id*="Modal"] > div:first-child,
-body.adm-shell > [id*="modal"] > div:first-child {
+.adm-modal-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    /* Üstte zeminden bir şerit görünsün: panel sayfa değil, tabaka. */
+    max-height: calc(100% - 28px);
+    background: var(--adm-card);
+    border-radius: var(--adm-radius-lg) var(--adm-radius-lg) 0 0;
+    box-shadow: var(--adm-shadow-lg);
+    overflow: hidden;
+    animation: admModalPanel var(--motion-panel) var(--motion-ease-out);
+}
+
+/* Form panelin kendisi kadar esneyecek: gövde kayarken ayak sabit kalsın
+   diye üç parça aynı flex zincirinde durmak zorunda. */
+.adm-modal-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* ── Baş ── */
+.adm-modal-bas {
+    position: relative;
+    flex: none;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--adm-border);
+    background: var(--adm-card);
+}
+
+/* Telefonda tabakanın tutamağı: parmakla çekilecek yeri gösteriyor. */
+.adm-modal-bas::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+    border-radius: var(--adm-radius-hap);
+    background: var(--adm-border-strong);
+}
+
+.adm-modal-bas h3 {
+    margin: 0;
+    font-family: var(--adm-font-display);
+    font-size: var(--adm-yazi-18);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--adm-fg);
+}
+
+.adm-modal-bas p {
+    margin: 2px 0 0;
+    font-size: var(--adm-yazi-12);
+    color: var(--adm-muted-fg);
+}
+
+.adm-modal-kapat {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    margin: -10px -8px -10px 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--adm-radius);
+    background: transparent;
+    color: var(--adm-faint);
+    cursor: pointer;
+    transition: background var(--motion-micro) var(--motion-ease-standard),
+                color var(--motion-micro) var(--motion-ease-standard);
+}
+
+.adm-modal-kapat:hover { background: var(--adm-muted); color: var(--adm-fg); }
+.adm-modal-kapat:active { transform: scale(0.94); }
+
+/* ── Gövde: kayan tek yer ── */
+.adm-modal-govde {
+    flex: 1 1 auto;
+    /* Flex çocuğunun varsayılan `min-height: auto` değeri taşmayı
+       engelliyor; sıfırlanmadan `overflow` hiç devreye girmiyor. */
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ── Ayak: klavyenin üstünde kalan eylem satırı ── */
+.adm-modal-ayak {
+    flex: none;
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--adm-border);
+    background: var(--adm-card);
+}
+
+.adm-modal-ayak .adm-btn { flex: 1 1 0; }
+
+/* Telefonda birincil eylem sağda değil, başparmağın altında ve geniş:
+   sıra ters çevriliyor ki "Oluştur" sağ tarafta, "İptal" solda kalsın. */
+@media (max-width: 767px) {
+    .adm-modal-ayak .adm-btn-ghost { flex: 0 0 38%; }
+}
+
+@media (min-width: 768px) {
+    .adm-modal { justify-content: center; align-items: center; padding: 24px; }
+
+    .adm-modal-panel {
+        width: 100%;
+        max-width: 30rem;
+        max-height: min(100%, 46rem);
+        border-radius: var(--adm-radius-lg);
+        border: 1px solid var(--adm-border);
+    }
+
+    .adm-modal-bas::before { display: none; }
+    .adm-modal-bas { padding: 20px 20px 16px; }
+    .adm-modal-govde { padding: 20px; }
+    .adm-modal-ayak { padding: 16px 20px; justify-content: flex-end; }
+    .adm-modal-ayak .adm-btn { flex: 0 0 auto; min-width: 7rem; }
+
+    .adm-modal-panel--genis { max-width: 42rem; }
+}
+
+/* ── Modal içi form parçaları ── */
+/* `.adm-alan { display: flex }` tarayıcının `[hidden]` kuralını yeniyor:
+   yazar stili UA stilinden güçlü. Gizli alan gizli kalsın. */
+.adm-modal [hidden] { display: none !important; }
+
+.adm-alan { display: flex; flex-direction: column; gap: 6px; }
+
+.adm-alan > label {
+    font-size: var(--adm-yazi-12);
+    font-weight: 600;
+    color: var(--adm-fg-mid);
+}
+
+/* Salt okunur alan düzenlenebilir gibi durmasın. */
+.adm-modal-panel input[readonly],
+.adm-modal-panel textarea[readonly] {
+    background: var(--adm-muted);
+    color: var(--adm-muted-fg);
+    cursor: default;
+}
+
+.adm-alan .adm-ipucu {
+    font-size: var(--adm-yazi-11);
+    color: var(--adm-muted-fg);
+}
+
+/* iOS 16px altındaki alanlara odaklanınca sayfayı yakınlaştırıyor;
+   yakınlaşma modalın yerleşimini bozuyor. Telefonda taban 16px. */
+@media (max-width: 767px) {
+    .adm-modal-panel input:not([type="checkbox"]):not([type="radio"]),
+    .adm-modal-panel select,
+    .adm-modal-panel textarea { font-size: 16px; }
+}
+
+.adm-alan-ikili { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Bölüm başlığı: gövde uzun olduğunda göz nerede olduğunu bilsin. */
+.adm-modal-bolum {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.adm-modal-bolum > h4 {
+    margin: 0;
+    font-family: var(--adm-font-ui);
+    font-size: var(--adm-yazi-11);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--adm-faint);
+}
+
+/* Parola alanı + göster düğmesi tek kutu gibi dursun. */
+.adm-alan-parola { position: relative; display: flex; }
+.adm-alan-parola input { padding-right: 46px !important; }
+
+/* Düğme alanın tam yüksekliğini kaplıyor: 38 pikselik bir hedef parmakla
+   ıskalanıyordu, şimdi 44x44. */
+.adm-alan-parola button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--adm-radius-sm);
+    background: transparent;
+    color: var(--adm-faint);
+    cursor: pointer;
+}
+
+.adm-alan-parola button:hover { color: var(--adm-fg); }
+
+/* ── Anahtar (switch) ──
+   Onay kutusu 13px'lik bir dokunma hedefiydi. Satırın tamamı tıklanabilir,
+   yüksekliği 44px. */
+.adm-anahtar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid var(--adm-border);
+    border-radius: var(--adm-radius);
+    background: var(--adm-card);
+    cursor: pointer;
+    transition: border-color var(--motion-micro) var(--motion-ease-standard),
+                background var(--motion-micro) var(--motion-ease-standard);
+}
+
+.adm-anahtar:hover { background: var(--adm-muted); }
+
+.adm-anahtar-metin { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.adm-anahtar-metin strong {
+    font-size: var(--adm-yazi-13);
+    font-weight: 600;
+    color: var(--adm-fg);
+}
+
+.adm-anahtar-metin span {
+    font-size: var(--adm-yazi-11);
+    color: var(--adm-muted-fg);
+}
+
+.adm-anahtar input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.adm-anahtar i {
+    flex: none;
+    position: relative;
+    width: 44px;
+    height: 26px;
+    border-radius: var(--adm-radius-hap);
+    background: var(--adm-border-strong);
+    transition: background var(--motion-fast) var(--motion-ease-standard);
+}
+
+.adm-anahtar i::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: var(--adm-shadow-sm);
+    transition: transform var(--motion-fast) var(--motion-ease-out);
+}
+
+.adm-anahtar input:checked + i { background: var(--adm-accent); }
+.adm-anahtar input:checked + i::after { transform: translateX(18px); }
+.adm-anahtar input:focus-visible + i { box-shadow: 0 0 0 3px rgb(37 99 235 / 0.2); }
+.adm-anahtar:has(input:checked) { border-color: rgb(37 99 235 / 0.3); background: var(--adm-accent-50); }
+
+/* ── Süre çipleri ── */
+.adm-cip-izgara {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.adm-cip {
+    min-height: 44px;
+    padding: 0 8px;
+    border: 1px solid var(--adm-border);
+    border-radius: var(--adm-radius);
+    background: var(--adm-card);
+    color: var(--adm-fg-mid);
+    font-family: inherit;
+    font-size: var(--adm-yazi-13);
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform var(--motion-micro) var(--motion-ease-standard),
+                border-color var(--motion-micro) var(--motion-ease-standard),
+                background var(--motion-micro) var(--motion-ease-standard);
+}
+
+.adm-cip:hover { border-color: var(--adm-border-strong); background: var(--adm-muted); }
+.adm-cip:active { transform: scale(0.97); }
+
+.adm-cip.secili {
+    border-color: var(--adm-accent);
+    background: var(--adm-accent-50);
+    color: var(--adm-accent-2);
+}
+
+/* ── Katlanır bölüm ──
+   Telefonda hesap açmak iki alan sürsün: kullanıcı adı ve parola. Şirket,
+   e-posta ve IP ayarlarının hepsinin makul varsayılanı var, gerekmedikçe
+   ekranı uzatmasınlar. */
+.adm-katla { border: 1px solid var(--adm-border); border-radius: var(--adm-radius); }
+
+.adm-katla > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: var(--adm-yazi-13);
+    font-weight: 600;
+    color: var(--adm-fg-mid);
+    cursor: pointer;
+    list-style: none;
+}
+
+.adm-katla > summary::-webkit-details-marker { display: none; }
+
+.adm-katla > summary::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--adm-faint);
+    border-bottom: 2px solid var(--adm-faint);
+    transform: rotate(45deg) translate(-2px, -2px);
+    transition: transform var(--motion-fast) var(--motion-ease-standard);
+}
+
+.adm-katla[open] > summary::after { transform: rotate(-135deg) translate(-2px, -2px); }
+.adm-katla[open] > summary { border-bottom: 1px solid var(--adm-border); }
+
+.adm-katla-ic {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 12px;
+}
+
+/* ── Bilgi satırı (salt okunur) ── */
+.adm-bilgi-kutu {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px;
+    border-radius: var(--adm-radius);
+    background: var(--adm-muted);
+}
+
+.adm-bilgi-kutu dt {
+    font-size: var(--adm-yazi-11);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--adm-faint);
+}
+
+.adm-bilgi-kutu dd {
+    margin: 0;
+    font-size: var(--adm-yazi-15);
+    font-weight: 600;
+    color: var(--adm-fg);
+}
+
+.adm-bilgi-kutu dd.adm-bilgi-kucuk {
+    font-size: var(--adm-yazi-13);
+    font-weight: 400;
+    color: var(--adm-fg-mid);
+}
+
+/* ── Premium hak satırı ── */
+.adm-hak-liste { display: flex; flex-direction: column; gap: 8px; }
+
+/* Sınır alanı olan hak (kısayol sayısı) iki satır: anahtar ve sayı kutusu
+   tek çerçevede duruyor, anahtarın kendi çerçevesi kalkıyor. */
+.adm-hak-kutu {
+    border: 1px solid var(--adm-border);
+    border-radius: var(--adm-radius);
+    padding: 0 12px 12px;
+}
+
+/* Açık hak vurgusu satırda değil kutuda: yalnız anahtar satırı renklenince
+   altındaki sayı alanı kutunun dışında kalmış gibi duruyordu. */
+.adm-hak-kutu .adm-anahtar,
+.adm-hak-kutu .adm-anahtar:has(input:checked) {
+    border: 0;
+    padding-left: 0;
+    padding-right: 0;
+    background: transparent;
+}
+
+.adm-hak-kutu:has(input:checked) {
+    border-color: rgb(37 99 235 / 0.3);
+    background: var(--adm-accent-50);
+}
+
+.adm-hak-sinir {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--adm-border);
+}
+
+.adm-hak-sinir label { flex: none; font-size: var(--adm-yazi-11); color: var(--adm-muted-fg); }
+.adm-hak-sinir input { max-width: 8rem; }
+
+/* ── Onay tabakası ──
+   Silme ve durum değiştirme eskiden tarayıcının `confirm()` kutusuyla
+   soruluyordu: telefonda sayfanın tepesinde beliren, panelin diliyle
+   alakası olmayan bir kutu. Aynı modal desenini kullanıyor. */
+.adm-onay-metin {
+    margin: 0;
+    font-size: var(--adm-yazi-13);
+    line-height: 1.5;
+    color: var(--adm-fg-mid);
+}
+
+.adm-onay-metin strong { color: var(--adm-fg); }
+
+/* ── Bildirim ── */
+.adm-bildirim-yuva {
+    position: fixed;
+    left: 50%;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 80;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: min(100% - 32px, 26rem);
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.adm-bildirim {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: var(--adm-radius);
+    background: var(--adm-fg);
+    color: #fff;
+    font-size: var(--adm-yazi-13);
+    font-weight: 500;
+    box-shadow: var(--adm-shadow-lg);
+    animation: admBildirimGir var(--motion-normal) var(--motion-ease-out);
+}
+
+.adm-bildirim--ok { background: #06603f; }
+.adm-bildirim--hata { background: #a41c14; }
+.adm-bildirim.cikiyor { animation: admBildirimCik var(--motion-fast) var(--motion-ease-standard) forwards; }
+
+@keyframes admBildirimGir {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes admBildirimCik {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(8px); }
+}
+
+/* ── Eski modallar ──
+   Kalan altı modal hâlâ satır içi Tailwind ile geliyor. Yeniden yazılana
+   kadar en azından telefonda taşmasınlar: kap kayar, panel ekrana sığar. */
+body.adm-shell > [id*="Modal"]:not(.adm-modal),
+body.adm-shell > [id*="modal"]:not(.adm-modal) {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    animation: admModalZemin var(--motion-fast) var(--motion-ease-standard);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px;
+}
+
+body.adm-shell > [id*="Modal"]:not(.adm-modal) > div:first-child,
+body.adm-shell > [id*="modal"]:not(.adm-modal) > div:first-child {
     border-radius: var(--adm-radius-lg) !important;
     border: 1px solid var(--adm-border) !important;
     box-shadow: var(--adm-shadow-lg) !important;
+    max-height: calc(var(--adm-gorunur-y, 100dvh) - 32px);
+    overflow-y: auto;
     animation: admModalPanel var(--motion-panel) var(--motion-ease-out);
 }
+
+/* `top-20 mx-auto w-96` gibi eski konumlandırmalar dar ekranda paneli
+   ekrandan taşırıyordu; genişlik sınırı ekranın kendisi oluyor. */
+body.adm-shell > [id*="Modal"]:not(.adm-modal) > div.w-96,
+body.adm-shell > [id*="modal"]:not(.adm-modal) > div.w-96 {
+    width: 100% !important;
+    max-width: 24rem;
+}
+
+body.adm-shell > [id*="Modal"]:not(.adm-modal) > div.top-20,
+body.adm-shell > [id*="modal"]:not(.adm-modal) > div.top-20 { top: 0 !important; }
 
 /* `hidden` gizliyken animasyon çalışmasın: sınıf kalkınca yeniden başlıyor. */
 body.adm-shell > [id*="Modal"].hidden,
 body.adm-shell > [id*="modal"].hidden { animation: none; }
+
+/* Modal açıkken arkadaki sayfa kaymasın (iOS'ta gövde kaydırması
+   modalın kendi kaydırmasını çalıyor). */
+body.adm-modal-acik { overflow: hidden; }
 
 @keyframes admModalZemin {
     from { opacity: 0; }
     to   { opacity: 1; }
 }
 @keyframes admModalPanel {
-    from { opacity: 0; transform: translateY(12px) scale(0.98); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (min-width: 768px) {
+    @keyframes admModalPanel {
+        from { opacity: 0; transform: translateY(12px) scale(0.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
 }
 
 /* ============================================================================

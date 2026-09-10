@@ -75,7 +75,40 @@ class AdminPanel {
 
         // Add user modal
         document.getElementById('addUserBtn').addEventListener('click', () => {
+            this.yeniKullaniciSuresiSifirla();
             document.getElementById('addUserModal').classList.remove('hidden');
+        });
+
+        /* Test süresi çipleri.
+           Panelde iki alan var ve ikisi de `addUser()` tarafından okunuyor:
+           `newTrialEnd` doluysa o kazanıyor, boşsa `newTrialDays` gün
+           olarak ekleniyor. Eskiden ikisi de yan yana duruyor ve alttaki
+           "Alternatif" diye etiketleniyordu; hangisinin geçerli olduğu
+           belli değildi. Artık çipler gün alanını yazıyor, tarih alanı
+           yalnız "Tarih seç" denince ortaya çıkıyor. */
+        document.querySelectorAll('#newTrialChips .adm-cip').forEach(cip => {
+            cip.addEventListener('click', () => {
+                document.querySelectorAll('#newTrialChips .adm-cip').forEach(d => d.classList.remove('secili'));
+                cip.classList.add('secili');
+
+                const tarihAlan = document.getElementById('newTrialEndAlan');
+                const tarihGiris = document.getElementById('newTrialEnd');
+                const gunGiris = document.getElementById('newTrialDays');
+
+                if (cip.dataset.ozel) {
+                    const gun = parseInt(gunGiris.value) || 3;
+                    const bitis = new Date(Date.now() + gun * 24 * 60 * 60 * 1000);
+                    const yerel = new Date(bitis.getTime() - bitis.getTimezoneOffset() * 60000);
+                    tarihGiris.value = yerel.toISOString().slice(0, 16);
+                    tarihAlan.hidden = false;
+                    tarihGiris.focus();
+                    return;
+                }
+
+                gunGiris.value = cip.dataset.gun;
+                tarihGiris.value = '';
+                tarihAlan.hidden = true;
+            });
         });
 
         document.getElementById('closeAddUserModal').addEventListener('click', () => {
@@ -133,10 +166,6 @@ class AdminPanel {
             this.refreshUserPage();
         });
 
-        // Toggle password visibility
-        document.getElementById('toggleEditPassword').addEventListener('click', () => {
-            this.togglePasswordVisibility('editPassword', 'toggleEditPassword');
-        });
 
 
 
@@ -508,6 +537,20 @@ class AdminPanel {
         return Math.max(0, diffDays);
     }
 
+    /* Panel her açılışta aynı yerden başlasın: bir önceki kullanıcının
+       seçimi ekranda kalırsa yanlış süreyle hesap açılıyor. */
+    yeniKullaniciSuresiSifirla() {
+        document.querySelectorAll('#newTrialChips .adm-cip').forEach(cip => {
+            cip.classList.toggle('secili', cip.dataset.gun === '3');
+        });
+        const tarihAlan = document.getElementById('newTrialEndAlan');
+        if (tarihAlan) tarihAlan.hidden = true;
+        const tarihGiris = document.getElementById('newTrialEnd');
+        if (tarihGiris) tarihGiris.value = '';
+        const gunGiris = document.getElementById('newTrialDays');
+        if (gunGiris) gunGiris.value = '3';
+    }
+
     async addUser() {
         const username = document.getElementById('newUsername').value;
         const password = document.getElementById('newPassword').value;
@@ -600,10 +643,10 @@ class AdminPanel {
             document.getElementById('addUserModal').classList.add('hidden');
             document.getElementById('addUserForm').reset();
 
-            alert('Kullanıcı başarıyla oluşturuldu!');
+            admBildir('Kullanıcı oluşturuldu: ' + username, 'ok');
         } catch (error) {
             console.error('Error adding user:', error);
-            alert('Kullanıcı oluşturulurken hata oluştu: ' + error.message);
+            admBildir('Kullanıcı oluşturulamadı: ' + error.message, 'hata');
         }
     }
 
@@ -624,6 +667,9 @@ class AdminPanel {
         document.getElementById('extendTrialUsername').textContent = username;
         document.getElementById('extendTrialCurrentEnd').textContent = currentEnd.toLocaleString('tr-TR');
         document.getElementById('extendTrialNewEnd').value = currentEndString;
+
+        // Önceki seçim kalmasın: modal her açılışta temiz başlıyor.
+        document.querySelectorAll('.quick-duration-btn').forEach(btn => btn.classList.remove('secili'));
 
         // Show modal
         document.getElementById('extendTrialModal').classList.remove('hidden');
@@ -657,11 +703,11 @@ class AdminPanel {
         const newEndString = localTime.toISOString().slice(0, 16);
         document.getElementById('extendTrialNewEnd').value = newEndString;
 
-        // Visual feedback - highlight the clicked button
+        // Seçili çip tek sınıfla işaretleniyor
         document.querySelectorAll('.quick-duration-btn').forEach(btn => {
-            btn.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-200');
+            btn.classList.remove('secili');
         });
-        button.classList.add('ring-2', 'ring-blue-500', 'bg-blue-200');
+        button.classList.add('secili');
     }
 
     async confirmExtendTrial() {
@@ -670,7 +716,7 @@ class AdminPanel {
 
         const newEndString = document.getElementById('extendTrialNewEnd').value;
         if (!newEndString) {
-            alert('Lütfen yeni bitiş tarihi seçin!');
+            admBildir('Yeni bitiş tarihi seçin.', 'hata');
             return;
         }
 
@@ -678,7 +724,7 @@ class AdminPanel {
             // datetime-local input yerel saat formatında gelir, UTC'ye çevir
             const newEnd = new Date(newEndString);
             if (isNaN(newEnd.getTime())) {
-                alert('Geçersiz tarih formatı!');
+                admBildir('Geçersiz tarih formatı.', 'hata');
                 return;
             }
 
@@ -708,10 +754,10 @@ class AdminPanel {
             // Close modal
             document.getElementById('extendTrialModal').classList.add('hidden');
 
-            alert(`Test süresi ${newEnd.toLocaleString('tr-TR')} olarak güncellendi!`);
+            admBildir(`Test süresi ${newEnd.toLocaleString('tr-TR')} oldu.`, 'ok');
         } catch (error) {
             console.error('Error extending trial:', error);
-            alert('Süre uzatılırken hata oluştu: ' + error.message);
+            admBildir('Süre uzatılamadı: ' + error.message, 'hata');
         }
     }
 
@@ -756,9 +802,12 @@ class AdminPanel {
             return;
         }
 
-        if (!confirm(`⚠️ ${username} kullanıcısının sayfasını yenilemek istediğinizden emin misiniz?`)) {
-            return;
-        }
+        const onay = await admOnay({
+            baslik: 'Sayfayı yenile',
+            metin: `<strong>${admKacis(username)}</strong> kullanıcısının açık sayfası yeniden yüklenecek. Kaydedilmemiş işi varsa kaybolur.`,
+            onayla: 'Yenile'
+        });
+        if (!onay) return;
 
         try {
             if (!window.jbDb) {
@@ -900,41 +949,29 @@ class AdminPanel {
             // Close modal
             document.getElementById('editUserModal').classList.add('hidden');
 
-            alert('Kullanıcı başarıyla güncellendi!');
+            admBildir('Kullanıcı güncellendi.', 'ok');
         } catch (error) {
             console.error('Error updating user:', error);
-            alert('Kullanıcı güncellenirken hata oluştu: ' + error.message);
-        }
-    }
-
-    togglePasswordVisibility(inputId, buttonId) {
-        const input = document.getElementById(inputId);
-        const button = document.getElementById(buttonId);
-        
-        if (input.type === 'password') {
-            input.type = 'text';
-            button.innerHTML = `
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
-                </svg>
-            `;
-        } else {
-            input.type = 'password';
-            button.innerHTML = `
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                </svg>
-            `;
+            admBildir('Kullanıcı güncellenemedi: ' + error.message, 'hata');
         }
     }
 
     async toggleUser(username) {
-        try {
-            const user = this.users.find(u => u.username === username);
-            if (!user) return;
+        const user = this.users.find(u => u.username === username);
+        if (!user) return;
 
-            const newStatus = !user.is_active;
+        const newStatus = !user.is_active;
+        const onay = await admOnay({
+            baslik: newStatus ? 'Hesabı aç' : 'Hesabı kapat',
+            metin: newStatus
+                ? `<strong>${admKacis(username)}</strong> tekrar giriş yapabilecek.`
+                : `<strong>${admKacis(username)}</strong> giriş yapamayacak. Açık oturumu varsa bir sonraki denemede kapanır.`,
+            onayla: newStatus ? 'Aç' : 'Kapat',
+            tehlike: !newStatus
+        });
+        if (!onay) return;
+
+        try {
 
             // Update in Supabase
             if (window.jbDb) {
@@ -954,15 +991,21 @@ class AdminPanel {
             this.renderUsers();
             this.updateStats();
 
-            alert(`Kullanıcı ${newStatus ? 'aktif' : 'deaktif'} edildi!`);
+            admBildir(`${username} ${newStatus ? 'aktif edildi' : 'deaktif edildi'}.`, 'ok');
         } catch (error) {
             console.error('Error toggling user:', error);
-            alert('Kullanıcı durumu değiştirilirken hata oluştu: ' + error.message);
+            admBildir('Durum değiştirilemedi: ' + error.message, 'hata');
         }
     }
 
     async deleteUser(username) {
-        if (!confirm(`${username} kullanıcısını silmek istediğinizden emin misiniz?`)) return;
+        const onay = await admOnay({
+            baslik: 'Kullanıcıyı sil',
+            metin: `<strong>${admKacis(username)}</strong> kalıcı olarak silinecek. Bu işlem geri alınamaz.`,
+            onayla: 'Sil',
+            tehlike: true
+        });
+        if (!onay) return;
 
         try {
             // Delete from Supabase
@@ -983,10 +1026,10 @@ class AdminPanel {
             this.renderUsers();
             this.updateStats();
 
-            alert('Kullanıcı silindi!');
+            admBildir('Kullanıcı silindi.', 'ok');
         } catch (error) {
             console.error('Error deleting user:', error);
-            alert('Kullanıcı silinirken hata oluştu: ' + error.message);
+            admBildir('Kullanıcı silinemedi: ' + error.message, 'hata');
         }
     }
 
@@ -3718,49 +3761,50 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
                 
                 console.log(`🖼️ Rendering feature: ${featureKey} - ${featureName} (enabled: ${featureEnabled}, limit: ${featureLimit})`);
                 
-                const featureItem = document.createElement('div');
-                featureItem.className = 'flex flex-col p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3';
-                
-                // Main row: feature name and toggle
-                const mainRow = document.createElement('div');
-                mainRow.className = 'flex items-center justify-between';
+                /* Satırın tamamı anahtarın etiketi: dokunma hedefi onay
+                   kutusunun 20 pikseli değil, satırın kendisi. */
+                const featureItem = document.createElement('label');
+                featureItem.className = 'adm-anahtar';
+                featureItem.setAttribute('for', `hak-${featureKey}`);
+
+                const mainRow = featureItem;
                 mainRow.innerHTML = `
-                    <div class="flex-1">
-                        <h4 class="text-sm font-medium text-gray-900">${featureName}</h4>
-                        <p class="adm-balon__bilgi">${this.getFeatureDescription(featureKey)}</p>
-                    </div>
-                    <label class="relative inline-flex items-center cursor-pointer ml-4">
-                        <input type="checkbox" 
-                               data-feature="${featureKey}" 
-                               class="sr-only peer feature-toggle" 
-                               ${featureEnabled ? 'checked' : ''}>
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-                    </label>
+                    <span class="adm-anahtar-metin">
+                        <strong>${featureName}</strong>
+                        <span>${this.getFeatureDescription(featureKey)}</span>
+                    </span>
+                    <input type="checkbox"
+                           id="hak-${featureKey}"
+                           data-feature="${featureKey}"
+                           class="feature-toggle"
+                           ${featureEnabled ? 'checked' : ''}>
+                    <i aria-hidden="true"></i>
                 `;
-                featureItem.appendChild(mainRow);
                 
                 // Limit input row (only for keyboardShortcuts)
                 if (featureKey === 'keyboardShortcuts') {
+                    /* Sayı alanı anahtar etiketinin İÇİNDE duramaz: etikete
+                       yapılan her tık onay kutusunu çeviriyor, alana
+                       dokunmak hakkı kapatıyordu. Kardeş olarak duruyor. */
                     const limitRow = document.createElement('div');
-                    limitRow.className = 'flex items-center space-x-3 mt-2 pt-2 border-t border-gray-200';
+                    limitRow.className = 'adm-hak-sinir';
                     limitRow.innerHTML = `
-                        <label class="text-xs font-medium text-gray-700 whitespace-nowrap">
-                            İzin Verilen Kısayol Sayısı:
-                        </label>
-                        <input type="number" 
-                               data-feature-limit="${featureKey}" 
-                               min="0" 
-                               placeholder="Sınırsız için boş bırakın"
-                               class="w-32 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        <label for="hak-sinir-${featureKey}">Kısayol sayısı</label>
+                        <input type="number"
+                               id="hak-sinir-${featureKey}"
+                               data-feature-limit="${featureKey}"
+                               min="0"
+                               inputmode="numeric"
+                               placeholder="Sınırsız"
                                value="${featureLimit !== null ? featureLimit : ''}"
                                ${!featureEnabled ? 'disabled' : ''}>
-                        <span class="text-xs text-gray-500">
-                            (Boş bırakılırsa sınırsız olur)
-                        </span>
                     `;
-                    featureItem.appendChild(limitRow);
-                    
-                    // Enable/disable limit input based on toggle
+
+                    const sarmal = document.createElement('div');
+                    sarmal.className = 'adm-hak-kutu';
+                    sarmal.appendChild(featureItem);
+                    sarmal.appendChild(limitRow);
+
                     const toggle = mainRow.querySelector('.feature-toggle');
                     const limitInput = limitRow.querySelector(`[data-feature-limit="${featureKey}"]`);
                     toggle.addEventListener('change', (e) => {
@@ -3769,8 +3813,11 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
                             limitInput.value = '';
                         }
                     });
+
+                    featuresList.appendChild(sarmal);
+                    return;
                 }
-                
+
                 featuresList.appendChild(featureItem);
             });
             
@@ -3858,7 +3905,7 @@ AdminPanel.prototype.savePremiumFeatures = async function() {
             console.log('✅ Premium features updated for:', this.currentPremiumUser);
             
             // Show success message
-            alert(`Premium özellikler başarıyla güncellendi. Kullanıcıya bildirim gönderildi ve sayfa otomatik yenilenecek.`);
+            admBildir('Premium haklar güncellendi, kullanıcıya iletildi.', 'ok');
             
             // Close modal
             document.getElementById('premiumFeaturesModal').classList.add('hidden');
@@ -3873,7 +3920,7 @@ AdminPanel.prototype.savePremiumFeatures = async function() {
         }
     } catch (error) {
         console.error('Error saving premium features:', error);
-        alert('Premium özellikler kaydedilirken hata oluştu: ' + error.message);
+        admBildir('Premium haklar kaydedilemedi: ' + error.message, 'hata');
     }
 };
 
