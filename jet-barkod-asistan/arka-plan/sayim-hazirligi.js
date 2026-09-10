@@ -49,6 +49,32 @@ let backgroundTokenState = {
    bizim işimize yaramıyor. */
 const FRANCHISE_AG_GECIDI = 'https://franchise-api-gateway.getirapi.com';
 
+/* YENİLEME JETONU AYIKLAMA
+   Franchise sayfasında üç jeton dolaşıyor ve üçü de aynı alanları taşıyor
+   (publicKey, userId, iat, exp). Tarayıcıda ölçüldü:
+
+     preToken      ~10 dakika  giriş akışı
+     accessToken    24 saat    API'nin kabul ettiği jeton
+     refreshToken   14 gün     yalnız accessToken yenilemeye yarar
+
+   Yenileme isteği `Authorization: Bearer <refreshToken>` ile gidiyorsa o
+   jeton da buraya düşüyor ve saklanan jetonu bozuyor. Ömrü üst sınırı
+   aşan aday saklanmıyor. Sınır 48 saat: gerçek jetonun iki katı pay,
+   14 günlük olan dışarıda. */
+const JETON_UST_OMUR_MS = 48 * 60 * 60 * 1000;
+
+function jetonOmruMsBg(token) {
+    try {
+        const bare = String(token).replace(/^Bearer\s+/i, '');
+        const parts = bare.split('.');
+        if (parts.length !== 3) return null;
+        const padded = parts[1] + '='.repeat((4 - parts[1].length % 4) % 4);
+        const g = JSON.parse(atob(padded));
+        if (!g.exp || !g.iat) return null;
+        return (g.exp - g.iat) * 1000;
+    } catch (e) { return null; }
+}
+
 /* Depo kimliği istek adresinde geçiyor: /warehouses/<24 hane hex>/... */
 function adrestenDepoKimligi(url) {
     const m = String(url || '').match(/\/warehouses\/([a-f0-9]{24})\b/i);
@@ -71,22 +97,35 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
             return; // franchise.getir.com dışındaki sayfalardan gelen istekleri yoksay
         }
         
-        /* Depo kimliği hangi istekte geçiyorsa oradan alınıyor; jeton
-           isteğiyle aynı olmak zorunda değil. */
-        const depo = adrestenDepoKimligi(details.url);
-        if (depo && depo !== backgroundTokenState.warehouseId) {
-            backgroundTokenState.warehouseId = depo;
-            depoKimligiDuyur(depo);
+        /* Bu dinleyici sayfanın HER isteğinde çalışıyor; buradaki her satır
+           gezinmenin üstüne biniyor. Sıra en ucuzdan pahalıya diziliyor ve
+           ilk elenen yerde çıkılıyor. */
+        if (!details.url.startsWith(FRANCHISE_AG_GECIDI)) return;
+
+        /* Depo kimliği yalnız adresinde geçen isteklerde aranıyor:
+           `indexOf` bedava, düzenli ifade her istekte çalıştırılmıyor. */
+        if (details.url.indexOf('/warehouses/') !== -1) {
+            const depo = adrestenDepoKimligi(details.url);
+            if (depo && depo !== backgroundTokenState.warehouseId) {
+                backgroundTokenState.warehouseId = depo;
+                depoKimligiDuyur(depo);
+            }
         }
 
-        // Yalnız franchise ağ geçidi; analitik ve CDN alt alanları değil.
-        if (details.url.startsWith(FRANCHISE_AG_GECIDI)) {
+        {
             const headers = details.requestHeaders || [];
             
             // Authorization header'ını bul
             const authHeader = headers.find(h => 
                 h.name && h.name.toLowerCase() === 'authorization'
             );
+
+            /* En sık durum: aynı jeton yine geldi. JWT çözme, depoya yazma
+               ve sekmeye haber verme buradan sonra; hiçbiri çalışmıyor.
+               Eski `passiveMode` bu işi jetonun `exp` alanına bakarak
+               yapıyordu ve o yüzden uzun ömürlü yanlış jetona günlerce
+               yapışıyordu. Karşılaştırma artık değerin kendisiyle. */
+            if (authHeader && authHeader.value === backgroundTokenState.token) return;
             
             if (authHeader && authHeader.value && authHeader.value.startsWith('Bearer ')) {
                 const token = authHeader.value.substring(7).trim();
@@ -111,6 +150,11 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                             // Silent fail
                         }
                         
+                        /* Ömrü sınırı aşan jeton yenileme jetonudur;
+                           saklanmıyor ve sekmeye duyurulmuyor. */
+                        const omur = jetonOmruMsBg(authHeader.value);
+                        if (omur !== null && omur > JETON_UST_OMUR_MS) return;
+
                         backgroundTokenState.token = authHeader.value;
                         backgroundTokenState.tokenExpiry = tokenExpiry;
 

@@ -272,16 +272,37 @@
             }
 
             /* HANGİ JETON KAZANIR
-               Eskiden ömrü EN UZUN olan seçiliyordu. Getir'in gerçek ağ
-               geçidi jetonu 24 saatlik; depoda ömrü 14 gün olan başka bir
-               jeton da dolaşıyor ve ikisi birebir aynı yapıda. Uzun ömürlü
-               olan her seferinde kazanıyor, sayım istekleri onunla gidiyor
-               ve reddediliyordu.
+               ------------------------------------------------------------
+               Franchise sayfasında üç jeton dolaşıyor ve ÜÇÜ DE birebir aynı
+               alanları taşıyor (publicKey, userId, iat, exp). Tarayıcıda
+               ölçüldü:
 
-               Ölçüt artık TAZELİK: en son üretilmiş jeton (`iat`), eşitlikte
-               en son yakalanan (`timestamp`). Süresi geçmiş adaylar baştan
-               eleniyor; hiçbiri geçerli değilse en tazesi yine de dönüyor,
-               yoksa elde hiçbir şey kalmıyor. */
+                 preToken      ~10 dakika  giriş akışı
+                 accessToken    24 saat    API'nin kabul ettiği jeton
+                 refreshToken   14 gün     yalnız accessToken yenilemeye yarar
+
+               Eskiden ömrü EN UZUN olan seçiliyordu, yani her seferinde
+               refreshToken kazanıyordu. Sayım istekleri onunla gidiyor ve
+               reddediliyordu.
+
+               Ölçüt artık iki kademeli:
+                 1. Ömrü ÜST SINIRI aşan aday yenileme jetonudur, elenir.
+                 2. Kalanlar arasında en TAZE olan (`iat`) seçilir; iki jeton
+                    aynı anda üretilmişse en son yakalanan.
+
+               Üst sınır 48 saat: gerçek jeton 24 saatlik, iki katı pay
+               bırakıyor ama 14 günlük olanı dışarıda tutuyor. Sınırı geçen
+               tek aday varsa yine de kullanılıyor; hiç jeton olmamasından
+               iyidir. */
+            const JETON_UST_OMUR_MS = 48 * 60 * 60 * 1000;
+
+            function jetonOmruMs(apiInfo) {
+                const iat = parseJwtIssuedMsFromToken(apiInfo && apiInfo.token);
+                const exp = getEffectiveExpiryMs(apiInfo);
+                if (!iat || !exp) return null;
+                return exp - iat;
+            }
+
             function pickBestApiInfo(candidates) {
                 const valid = (candidates || []).filter((c) => c && c.token && String(c.token).trim());
                 if (!valid.length) return null;
@@ -291,9 +312,17 @@
                     const exp = getEffectiveExpiryMs(c);
                     return !exp || Date.now() < exp;
                 };
+                /* Ömrü bilinmeyen jeton elenmiyor: eski kayıtlarda `iat`
+                   olmayabilir ve onları kaybetmek istemiyoruz. */
+                const makulOmur = (c) => {
+                    const omur = jetonOmruMs(c);
+                    return omur === null || omur <= JETON_UST_OMUR_MS;
+                };
 
-                const havuz = valid.filter(suresiVar);
-                const aday = havuz.length ? havuz : valid;
+                const gecerli = valid.filter(suresiVar);
+                const temel = gecerli.length ? gecerli : valid;
+                const kisaOmurlu = temel.filter(makulOmur);
+                const aday = kisaOmurlu.length ? kisaOmurlu : temel;
 
                 return aday.reduce((best, cur) => {
                     const tB = tazelik(best);
