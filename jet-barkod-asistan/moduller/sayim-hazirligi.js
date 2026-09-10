@@ -296,9 +296,16 @@
                iyidir. */
             const JETON_UST_OMUR_MS = 48 * 60 * 60 * 1000;
 
+            /* Ömür YALNIZ jetonun kendi içinden hesaplanıyor.
+               `getEffectiveExpiryMs` dışarıdan gelen `tokenExpiry` alanıyla
+               JWT'nin `exp`i arasından büyüğü seçiyor; o alan eski bir
+               kayıttan miras kalmış olabiliyor ve 24 saatlik jetonu
+               günlerce ömürlü gösteriyordu. Sonuç: gerçek jeton "yenileme
+               jetonu" sanılıp eleniyordu. */
             function jetonOmruMs(apiInfo) {
-                const iat = parseJwtIssuedMsFromToken(apiInfo && apiInfo.token);
-                const exp = getEffectiveExpiryMs(apiInfo);
+                const token = apiInfo && apiInfo.token;
+                const iat = parseJwtIssuedMsFromToken(token);
+                const exp = parseJwtExpiryMsFromToken(token);
                 if (!iat || !exp) return null;
                 return exp - iat;
             }
@@ -337,14 +344,13 @@
                 if (!winner) return prev;
                 const bare = String(winner.token).replace(/^Bearer\s+/i, '').trim();
                 const token = bare ? `Bearer ${bare}` : winner.token;
+                /* Son kullanma tarihi kazanan jetonun KENDİ içinden geliyor.
+                   Eskiden `winner.tokenExpiry || jwtExp || prev.tokenExpiry`
+                   sırasıyla bakılıyordu; kazananın alanı boşsa ÖNCEKİ
+                   kaydın tarihi yeni jetona yapışıyor ve taze jeton
+                   günler sonra bitecekmiş gibi görünüyordu. */
                 const jwtExp = parseJwtExpiryMsFromToken(winner.token);
-                let tokenExpiry = winner.tokenExpiry || jwtExp || prev?.tokenExpiry;
-                if (tokenExpiry) {
-                    const n = normalizeExpiry(tokenExpiry);
-                    if (n) tokenExpiry = n;
-                } else if (jwtExp) {
-                    tokenExpiry = jwtExp;
-                }
+                let tokenExpiry = jwtExp || normalizeExpiry(winner.tokenExpiry) || null;
                 return {
                     token,
                     warehouseId: winner.warehouseId || prev?.warehouseId,
@@ -922,7 +928,7 @@
                                 apiEndpoints.passiveMode = true; // Token yakalandı, pasif moda geç
                         
                                 if (!isPassiveMode) {
-                                jbLog('🔑 ✅ Franchise token yakalandı (XHR):', token.substring(0, 30) + '... (uzunluk: ' + token.length + ')');
+                                jbLog('🔑 ✅ Franchise token yakalandı (XHR), uzunluk:', token.length);
                                     jbLog('🔇 Pasif moda geçildi - artık sessizce çalışacak');
                                     if (apiEndpoints.tokenExpiry) {
                                         jbLog('⏰ Token expiry:', new Date(apiEndpoints.tokenExpiry).toLocaleString('tr-TR'));
@@ -940,7 +946,7 @@
                                     }
                                 } else {
                                     if (!isPassiveMode) {
-                                        console.warn('⚠️ Token JWT formatında değil veya çok kısa (XHR):', token.substring(0, 20) + '...');
+                                        console.warn('⚠️ Token JWT formatında değil veya çok kısa (XHR), uzunluk:', token.length);
                                     }
                                 }
                             } else {
@@ -1179,7 +1185,7 @@
                                     apiEndpoints.initialAttempts = apiEndpoints.maxInitialAttempts; // Deneme sayısını maksimuma çıkar
                             
                                     if (apiEndpoints.initialAttempts < apiEndpoints.maxInitialAttempts) {
-                                        jbLog('🔑 ✅ localStorage\'dan getir_api_info token bulundu:', tokenValue.substring(0, 30) + '... (uzunluk: ' + tokenValue.length + ')');
+                                        jbLog('🔑 ✅ localStorage\'dan getir_api_info token bulundu, uzunluk:', tokenValue.length);
                                         if (tokenExpiry) {
                                             jbLog('⏰ Token expiry:', new Date(tokenExpiry).toLocaleString('tr-TR'));
                                         }

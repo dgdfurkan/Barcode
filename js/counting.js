@@ -595,21 +595,76 @@ class CountingSystem {
         return mx > 0 ? mx : null;
     }
 
+    /** Jetonun üretildiği an (JWT `iat`). */
+    parseJwtIssuedMsFromToken(tokenString) {
+        if (!tokenString || typeof tokenString !== 'string') return null;
+        try {
+            const bare = tokenString.replace(/^Bearer\s+/i, '').trim();
+            const parts = bare.split('.');
+            if (parts.length !== 3) return null;
+            const padded = parts[1] + '='.repeat((4 - parts[1].length % 4) % 4);
+            const decoded = JSON.parse(atob(padded));
+            if (decoded.iat) return decoded.iat * 1000;
+        } catch (e) { /* geçersiz JWT */ }
+        return null;
+    }
+
+    /* Ömür YALNIZ jetonun kendi içinden. `getEffectiveExpiryMs` dışarıdan
+       gelen `tokenExpiry` alanını da hesaba katıyor ve o alan eski bir
+       kayıttan miras kalmış olabiliyor; 24 saatlik jetonu günlerce ömürlü
+       gösterip yenileme jetonu sanılmasına yol açıyordu. */
+    jetonOmruMs(apiInfo) {
+        const token = apiInfo && apiInfo.token;
+        const iat = this.parseJwtIssuedMsFromToken(token);
+        const exp = this.parseJwtExpiryMsFromToken(token);
+        if (!iat || !exp) return null;
+        return exp - iat;
+    }
+
     /**
-     * Birden fazla kaynak arasında en geç bitecek token'ı seçer (manuel / Supabase / eklenti).
-     * Aynı bitişte: daha yeni timestamp öncelikli.
+     * HANGİ JETON KAZANIR
+     * Franchise sayfasında üç jeton dolaşıyor ve üçü de birebir aynı
+     * alanları taşıyor (publicKey, userId, iat, exp):
+     *
+     *   preToken      ~10 dakika  giriş akışı
+     *   accessToken    24 saat    API'nin kabul ettiği jeton
+     *   refreshToken   14 gün     yalnız accessToken yenilemeye yarar
+     *
+     * Eskiden EN GEÇ bitecek olan kazanıyordu, yani her seferinde
+     * refreshToken. Sayım istekleri onunla gidiyor ve reddediliyordu.
+     *
+     * Ölçüt iki kademeli: ömrü üst sınırı aşan aday yenileme jetonudur ve
+     * elenir; kalanlar arasında en TAZE olan seçilir. Sınır 48 saat,
+     * gerçek jetonun iki katı pay. Sınırı geçen tek aday varsa yine de
+     * kullanılıyor.
      */
     pickBestApiInfo(candidates) {
         const valid = (candidates || []).filter((c) => c && c.token && String(c.token).trim());
         if (valid.length === 0) return null;
-        return valid.reduce((best, cur) => {
-            const expB = this.getEffectiveExpiryMs(best) || 0;
-            const expC = this.getEffectiveExpiryMs(cur) || 0;
-            if (expC > expB) return cur;
-            if (expC < expB) return best;
-            const tsB = best.timestamp || 0;
-            const tsC = cur.timestamp || 0;
-            return tsC >= tsB ? cur : best;
+
+        const USTOMUR = 48 * 60 * 60 * 1000;
+        const tazelik = (c) => this.parseJwtIssuedMsFromToken(c.token) || c.timestamp || 0;
+        const suresiVar = (c) => {
+            const exp = this.getEffectiveExpiryMs(c);
+            return !exp || Date.now() < exp;
+        };
+        /* Ömrü okunamayan aday elenmiyor: eski kayıtlarda `iat` olmayabilir. */
+        const makulOmur = (c) => {
+            const omur = this.jetonOmruMs(c);
+            return omur === null || omur <= USTOMUR;
+        };
+
+        const gecerli = valid.filter(suresiVar);
+        const temel = gecerli.length ? gecerli : valid;
+        const kisaOmurlu = temel.filter(makulOmur);
+        const aday = kisaOmurlu.length ? kisaOmurlu : temel;
+
+        return aday.reduce((best, cur) => {
+            const tB = tazelik(best);
+            const tC = tazelik(cur);
+            if (tC > tB) return cur;
+            if (tC < tB) return best;
+            return (cur.timestamp || 0) >= (best.timestamp || 0) ? cur : best;
         });
     }
 
@@ -617,14 +672,12 @@ class CountingSystem {
         if (!winner) return prev;
         const bare = String(winner.token).replace(/^Bearer\s+/i, '').trim();
         const token = bare ? `Bearer ${bare}` : winner.token;
+        /* Son kullanma tarihi kazanan jetonun KENDİ içinden. Eskiden
+           kazananın alanı boşsa ÖNCEKİ kaydın tarihi yeni jetona
+           yapışıyordu; taze jeton günler sonra bitecekmiş gibi görünüyor
+           ve yenileme jetonu sanılıyordu. */
         const jwtExp = this.parseJwtExpiryMsFromToken(winner.token);
-        let tokenExpiry = winner.tokenExpiry || jwtExp || prev?.tokenExpiry;
-        if (tokenExpiry) {
-            const n = this.normalizeExpiry(tokenExpiry);
-            if (n) tokenExpiry = n;
-        } else if (jwtExp) {
-            tokenExpiry = jwtExp;
-        }
+        const tokenExpiry = jwtExp || this.normalizeExpiry(winner.tokenExpiry) || null;
         return {
             token,
             warehouseId: winner.warehouseId || prev?.warehouseId,
@@ -784,7 +837,7 @@ class CountingSystem {
         const pv = document.getElementById('manualTokenPreview');
         if (pv) pv.textContent = '';
         await this.updateAPIStatusCard();
-        this.showToast('Token kaydedildi (en uzun süreli seçildi)', 'success', 3500);
+        this.showToast('Token kaydedildi (en güncel olan seçildi)', 'success', 3500);
     }
 
     async loadProducts() {
@@ -11573,7 +11626,7 @@ class CountingSystem {
                                 warehouseName: apiInfo.warehouseName,
                                 stockEndpoint: apiInfo.stockEndpoint,
                                 tokenLength: token.length,
-                                tokenPrefix: token.substring(0, 7)
+                                tokenUzunluk: token.length
                             });
                         } else {
                             console.warn('⚠️ Supabase\'de _api_info veya token bulunamadı');
