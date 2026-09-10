@@ -493,6 +493,76 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.18) !important;
 }`;
 
+    /* ------------------------------------------------------------------
+       PARÇA SAYISI
+       Panel `basketProductCount` alanını bir sayı olarak veriyordu; artık
+       bazı siparişlerde nesne dönüyor ve rozet `×[object Object]` yazıyor,
+       siparişler sayfasında da adet hiç yazılmıyor (yazma koşulu
+       `typeof === 'number'`).
+
+       Alanın yeni şekli kesin bilinmediği için üç kademe var:
+       1. Sayı ya da sayıya çevrilebilen dize doğrudan kullanılıyor.
+       2. Nesneyse bilinen adlar taranıyor; hiçbiri tutmazsa nesnede tek bir
+          sayısal değer varsa o alınıyor.
+       3. Hiçbiri olmazsa ürün listesindeki `orderCount` toplamı hesaplanıyor.
+          Zaten "parça" dediğimiz şey bu.
+
+       Tanınmayan nesne şekli `jba_hata_log`'a bir kez düşüyor: bir sonraki
+       turda alan adını tahmin etmeden yazabilelim diye. */
+    var ADET_ADLARI = ['count', 'total', 'value', 'amount', 'quantity',
+                       'totalCount', 'productCount', 'basketProductCount'];
+    var bilinmeyenSekilYazildi = false;
+
+    function sayiyaCevir(d) {
+        if (typeof d === 'number') return Number.isFinite(d) ? Math.round(d) : null;
+        if (typeof d === 'string' && d.trim() !== '') {
+            var n = Number(d);
+            return Number.isFinite(n) ? Math.round(n) : null;
+        }
+        return null;
+    }
+
+    function urunlerdenParca(urunler) {
+        if (!Array.isArray(urunler) || !urunler.length) return null;
+        var toplam = 0;
+        var bulundu = false;
+        for (var i = 0; i < urunler.length; i++) {
+            var p = urunler[i] || {};
+            /* `orderCount` müşterinin istediği adet, `count` toplanan adet.
+               Parça sayısı istenen adettir. */
+            var a = sayiyaCevir(p.orderCount);
+            if (a === null) a = sayiyaCevir(p.count);
+            if (a === null) continue;
+            toplam += a;
+            bulundu = true;
+        }
+        return bulundu ? toplam : null;
+    }
+
+    function parcaSayisiCoz(deger, urunler) {
+        var dogrudan = sayiyaCevir(deger);
+        if (dogrudan !== null) return dogrudan;
+
+        if (deger && typeof deger === 'object') {
+            for (var i = 0; i < ADET_ADLARI.length; i++) {
+                var a = sayiyaCevir(deger[ADET_ADLARI[i]]);
+                if (a !== null) return a;
+            }
+            var sayisallar = Object.keys(deger).filter(function (k) {
+                return sayiyaCevir(deger[k]) !== null;
+            });
+            if (sayisallar.length === 1) return sayiyaCevir(deger[sayisallar[0]]);
+
+            if (!bilinmeyenSekilYazildi) {
+                bilinmeyenSekilYazildi = true;
+                global.JBA && global.JBA.hata('hizli-bul parça sayısı',
+                    new Error('basketProductCount nesne geldi, alanlar: ' + Object.keys(deger).join(',')));
+            }
+        }
+
+        return urunlerdenParca(urunler);
+    }
+
     function stilKur() {
         if (document.getElementById('jba-hizli-bul-stil')) return;
         var s = document.createElement('style');
@@ -654,7 +724,9 @@
 
         // Cache backward compatibility (eski format: array, yeni: {products, count})
         const getProducts = (entry) => Array.isArray(entry) ? entry : (entry?.products || []);
-        const getCount = (entry) => Array.isArray(entry) ? null : (entry?.count ?? null);
+        /* Eski önbellekte nesne yazılı kalmış olabilir; okurken de
+           çözülüyor ki kullanıcı önbelleği temizlemek zorunda kalmasın. */
+        const getCount = (entry) => Array.isArray(entry) ? null : parcaSayisiCoz(entry?.count, null);
 
         // Kelime bazlı eşleşme: İ/i, I/ı ve diğer Türkçe karakterler dahil tam harf duyarsız arama
         const normalizeStr = (str) => {
@@ -1089,7 +1161,7 @@
                     const n = p?.name?.tr || p?.name?.en || '';
                     return typeof n === 'string' ? n.toLowerCase() : '';
                 }).filter(Boolean),
-                count: order.basketProductCount ?? null,
+                count: parcaSayisiCoz(order.basketProductCount, urunler),
                 /* Toplayıcı Bekliyor ürünlerinde `index` boş olabiliyor;
                    öyleyse dizi konumu (1'den) sıra olur. */
                 detay: urunler.map((p, i) => ({

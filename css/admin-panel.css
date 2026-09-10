@@ -1823,9 +1823,12 @@ body.adm-shell > [id*="modal"]:not(.adm-modal) > div.top-20 { top: 0 !important;
 body.adm-shell > [id*="Modal"].hidden,
 body.adm-shell > [id*="modal"].hidden { animation: none; }
 
-/* Modal açıkken arkadaki sayfa kaymasın (iOS'ta gövde kaydırması
-   modalın kendi kaydırmasını çalıyor). */
-body.adm-modal-acik { overflow: hidden; }
+/* Modal açıkken arkadaki sayfa kaymasın. Asıl kilit `js/admin-modal.js`
+   içinde `html` üstüne yazılıyor (sayfayı kaydıran öğe o; `body`ye yazılan
+   `overflow` masaüstünde hiçbir şey yapmıyordu). Buradaki kural yalnız
+   dokunmatikte zincirlemeyi kesiyor. */
+body.adm-modal-acik { overscroll-behavior: none; touch-action: none; }
+body.adm-modal-acik .adm-modal { touch-action: auto; }
 
 @keyframes admModalZemin {
     from { opacity: 0; }

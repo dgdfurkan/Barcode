@@ -481,12 +481,35 @@ class AdminPanel {
         }
     }
 
+    /* Yönetici hesabı müşteri değil: listede, sayaçlarda ve eylem
+       düğmelerinde işi yok. Kendi hesabını yanlışlıkla silmek ya da test
+       süresi vermek paneli tamamen kilitler. `this.users` içinde duruyor
+       çünkü oturum ve sohbet tarafı onu arıyor; yalnız gösterim süzülüyor. */
+    yoneticiMi(user) {
+        if (!user) return false;
+        return user.is_admin === true || user.isAdmin === true;
+    }
+
+    musteriler() {
+        return this.users.filter(u => !this.yoneticiMi(u));
+    }
+
+    /* Konsoldan ya da eski bir çağrıdan gelen yıkıcı işlemler de geçmesin. */
+    yoneticiKorumasi(username) {
+        const user = this.users.find(u => u.username === username);
+        if (user && this.yoneticiMi(user)) {
+            admBildir('Yönetici hesabı bu panelden değiştirilemez.', 'hata');
+            return true;
+        }
+        return false;
+    }
+
     renderUsers() {
         const tbody = document.getElementById('usersTable');
         tbody.innerHTML = '';
         const icons = this._userActionIcons();
 
-        this.users.forEach(user => {
+        this.musteriler().forEach(user => {
             const row = document.createElement('tr');
             const safeUser = String(user.username).replace(/'/g, "\\'");
             const toggleIcon = user.is_active ? icons.toggleOn : icons.toggleOff;
@@ -651,6 +674,7 @@ class AdminPanel {
     }
 
     extendTrial(username) {
+        if (this.yoneticiKorumasi(username)) return;
         const user = this.users.find(u => u.username === username);
         if (!user) return;
 
@@ -762,6 +786,7 @@ class AdminPanel {
     }
 
     editUser(username) {
+        if (this.yoneticiKorumasi(username)) return;
         const user = this.users.find(u => u.username === username);
         if (!user) return;
 
@@ -957,6 +982,7 @@ class AdminPanel {
     }
 
     async toggleUser(username) {
+        if (this.yoneticiKorumasi(username)) return;
         const user = this.users.find(u => u.username === username);
         if (!user) return;
 
@@ -999,6 +1025,7 @@ class AdminPanel {
     }
 
     async deleteUser(username) {
+        if (this.yoneticiKorumasi(username)) return;
         const onay = await admOnay({
             baslik: 'Kullanıcıyı sil',
             metin: `<strong>${admKacis(username)}</strong> kalıcı olarak silinecek. Bu işlem geri alınamaz.`,
@@ -1586,9 +1613,10 @@ class AdminPanel {
     }
 
     updateStats() {
-        const totalUsers = this.users.length;
-        const activeUsers = this.users.filter(u => u.is_active).length;
-        const expiringUsers = this.users.filter(u => {
+        const musteriler = this.musteriler();
+        const totalUsers = musteriler.length;
+        const activeUsers = musteriler.filter(u => u.is_active).length;
+        const expiringUsers = musteriler.filter(u => {
             const daysLeft = this.getTrialDaysLeft(u.trial_end);
             return daysLeft !== null && daysLeft <= 3 && daysLeft > 0;
         }).length;
@@ -3679,6 +3707,7 @@ AdminPanel.prototype.playAdminNotificationSound = function() {
 
 // Premium Features Management Functions
 AdminPanel.prototype.managePremiumFeatures = async function(username) {
+    if (this.yoneticiKorumasi(username)) return;
     console.log('⭐ Managing premium features for user:', username);
     
     // Set current user for premium features modal

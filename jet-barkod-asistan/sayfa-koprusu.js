@@ -240,6 +240,52 @@
      * tahmin edip yanlış alan okumaktansa gerçek yanıttan öğreniyoruz.
      * Kayıt bir kez yazılıyor, sonraki çekimlerde dokunulmuyor.
      */
+    /* Panel `basketProductCount` alanını bazı siparişlerde nesne olarak
+       veriyor. `siparis-kopru.js` yalnız `typeof === 'number'` olduğunda
+       yazdığı için adet sessizce boş kalıyordu. Sayı çıkaramazsak ürün
+       listesindeki `orderCount` toplamına düşüyoruz; parça dediğimiz zaten o.
+       Aynı çözüm `moduller/hizli-bul.js` içinde de var (ayrı dünya, ortak
+       dosya paylaşamıyorlar). */
+    var ADET_ADLARI = ['count', 'total', 'value', 'amount', 'quantity',
+                       'totalCount', 'productCount', 'basketProductCount'];
+
+    function sayiyaCevir(d) {
+        if (typeof d === 'number') return isFinite(d) ? Math.round(d) : null;
+        if (typeof d === 'string' && d.trim() !== '') {
+            var n = Number(d);
+            return isFinite(n) ? Math.round(n) : null;
+        }
+        return null;
+    }
+
+    function parcaSayisiCoz(deger, urunler) {
+        var dogrudan = sayiyaCevir(deger);
+        if (dogrudan !== null) return dogrudan;
+
+        if (deger && typeof deger === 'object') {
+            for (var i = 0; i < ADET_ADLARI.length; i++) {
+                var a = sayiyaCevir(deger[ADET_ADLARI[i]]);
+                if (a !== null) return a;
+            }
+            var sayisallar = Object.keys(deger).filter(function (k) {
+                return sayiyaCevir(deger[k]) !== null;
+            });
+            if (sayisallar.length === 1) return sayiyaCevir(deger[sayisallar[0]]);
+        }
+
+        if (!Array.isArray(urunler) || !urunler.length) return null;
+        var toplam = 0, bulundu = false;
+        for (var j = 0; j < urunler.length; j++) {
+            var p = urunler[j] || {};
+            var b = sayiyaCevir(p.orderCount);
+            if (b === null) b = sayiyaCevir(p.count);
+            if (b === null) continue;
+            toplam += b;
+            bulundu = true;
+        }
+        return bulundu ? toplam : null;
+    }
+
     function semayiKaydet(siparis) {
         try {
             if (!siparis || localStorage.getItem('jba_detay_sema')) return;
@@ -426,8 +472,8 @@
             banko: (kon[0] && kon[0].locationBarcode) || '',
             kolon: metin(kolon),
             durum: o.status,
-            toplamAdet: o.basketProductCount,
-            posetSayisi: o.totalBagUsageCount,
+            toplamAdet: parcaSayisiCoz(o.basketProductCount, o.products),
+            posetSayisi: parcaSayisiCoz(o.totalBagUsageCount, null),
             eksikUrunVar: !!o.hasMissingProduct,
             toplayici: (o.picker && o.picker.name) || '',
             kurye: (o.courier && o.courier.name) || '',

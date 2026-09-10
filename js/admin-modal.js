@@ -63,10 +63,23 @@
     }
 
     /* ── Gövde kilidi ─────────────────────────────────────────────────── */
+    /* Sayfayı kaydıran öğe `html`, `body` değil. Kilit `body`ye yazıldığında
+       masaüstünde hiçbir işe yaramıyordu: modal açıkken arka plan tekerlekle
+       kayıyordu. */
     function govdeyiKilitle() {
         if (document.body.classList.contains('adm-modal-acik')) return;
         kilitliKaydirma = global.scrollY || global.pageYOffset || 0;
         document.body.classList.add('adm-modal-acik');
+
+        /* Kaydırma çubuğu kaybolunca sayfa genişliyor ve içerik yana
+           zıplıyor. Kaybolan genişlik kadar boşluk bırakılıyor. Örtüşen
+           çubuk kullanan sistemlerde fark sıfır, hiçbir şey eklenmiyor. */
+        var fark = global.innerWidth - document.documentElement.clientWidth;
+        if (fark > 0) document.body.style.paddingRight = fark + 'px';
+        document.documentElement.style.overflow = 'hidden';
+
+        /* iOS `html` üstündeki `overflow`u dokunmatik kaydırmada
+           dinlemiyor; orada gövdeyi konumdan dondurmak gerekiyor. */
         if (darMi()) {
             document.body.style.position = 'fixed';
             document.body.style.top = (-kilitliKaydirma) + 'px';
@@ -79,15 +92,30 @@
     function govdeyiCoz() {
         if (yigin.length) return;
         if (!document.body.classList.contains('adm-modal-acik')) return;
+        var donduruldu = document.body.style.position === 'fixed';
         document.body.classList.remove('adm-modal-acik');
+        document.documentElement.style.overflow = '';
+        document.body.style.paddingRight = '';
         document.body.style.position = '';
         document.body.style.top = '';
         document.body.style.left = '';
         document.body.style.right = '';
         document.body.style.width = '';
+
+        if (!donduruldu) return;
         /* `position: fixed` kalkınca tarayıcı en üste atlıyor; kullanıcı
-           listede neredeyse oraya geri konuyor. */
-        global.scrollTo(0, kilitliKaydirma);
+           listede neredeyse oraya geri konuyor.
+
+           `behavior: 'instant'` şart: `admin-panel.css` içinde
+           `html { scroll-behavior: smooth }` var ve düz `scrollTo` bu yüzden
+           animasyonlu çalışıyordu. Panel kapanınca sayfa görünür biçimde en
+           üste çıkıp aşağı kayıyordu. Geri koyma bir düzeltme, bir yolculuk
+           değil; anında olacak. */
+        try {
+            global.scrollTo({ top: kilitliKaydirma, left: 0, behavior: 'instant' });
+        } catch (e) {
+            global.scrollTo(0, kilitliKaydirma);
+        }
     }
 
     /* ── Açılış / kapanış ─────────────────────────────────────────────── */
@@ -190,17 +218,37 @@
     });
 
     /* Klavye açıldığında odaklanılan alan görünür alanın ortasına gelsin:
-       tarayıcının kendi kaydırması modalın içindeki kaba her zaman
-       uymuyor, alan başlığın altında kalabiliyor. */
+       tarayıcının kendi kaydırması modalın içindeki kaba her zaman uymuyor,
+       alan başlığın altında kalabiliyor.
+
+       `scrollIntoView` KULLANILMIYOR: öğe bulunamazsa tarayıcı üst kapları
+       da kaydırıyor ve sayfanın kendisi oynayabiliyor. Yalnız modalın kendi
+       gövdesi kaydırılıyor.
+
+       Ayrıca yalnız klavye gerçekten açıkken çalışıyor: masaüstünde Tab ile
+       gezerken form gözün altından kaymasın. */
+    function klavyeAcikMi() {
+        var vv = global.visualViewport;
+        return !!vv && (global.innerHeight - vv.height) > 120;
+    }
+
     document.addEventListener('focusin', function (e) {
         if (!yigin.length) return;
-        var modal = e.target.closest ? e.target.closest('.adm-modal') : null;
-        if (!modal) return;
         var alan = e.target;
+        if (!alan.closest || !alan.closest('.adm-modal')) return;
         if (!alan.matches || !alan.matches('input, textarea, select')) return;
+        var kap = alan.closest('.adm-modal-govde');
+        if (!kap) return;
+
         setTimeout(function () {
             if (document.activeElement !== alan) return;
-            try { alan.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (err) { /* eski tarayıcı */ }
+            if (!klavyeAcikMi()) return;
+            if (kap.scrollHeight <= kap.clientHeight) return;
+            var kapK = kap.getBoundingClientRect();
+            var alanK = alan.getBoundingClientRect();
+            var hedef = kap.scrollTop + (alanK.top - kapK.top) - (kap.clientHeight - alanK.height) / 2;
+            try { kap.scrollTo({ top: hedef, behavior: 'smooth' }); }
+            catch (err) { kap.scrollTop = hedef; }
         }, 260);
     });
 
