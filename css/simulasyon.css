@@ -632,12 +632,30 @@
     inset: 0;
 }
 
-/* Geçiş değeri her perdenin kendi durağından geliyor (`--gecis`). Eskiden
+/* GEÇİŞ SIRAYLA, AYNI ANDA DEĞİL.
+
+   Geçiş değeri her perdenin kendi durağından geliyor (`--gecis`). Eskiden
    doğrudan toplama perdesinin `--k2`si okunuyordu; fırın ve sayım
    perdelerinde o değişken tanımsız olduğu için `calc` geçersiz oluyor ve
-   iki replik de tam opak kalıyordu, yani üst üste biniyorlardı. */
-.sim-repl__a { opacity: calc(1 - var(--gecis, 0)); }
-.sim-repl__b { opacity: var(--gecis, 0); }
+   iki replik de tam opak kalıyordu.
+
+   Sonra düz çapraz geçişe alındı: `A = 1 - gecis`, `B = gecis`. Bu da
+   ortada iki metnin de yarı saydam olduğu bir an bırakıyor. Tek satırlık
+   yazıda göze batmıyor ama bu perdelerde iki metin de üç satır ve üst
+   üste binince ikisi de okunmaz oluyor, ekran kirli görünüyor.
+
+   Artık A geçişin ilk %45'inde tamamen sönüyor, B %55'ten sonra
+   beliriyor. Arada ikisinin de görünmediği kısa bir boşluk var: temiz
+   kesme. Hafif dikey kayma da yönü anlatıyor. */
+.sim-repl__a {
+    opacity: clamp(0, calc(1 - var(--gecis, 0) * 2.22), 1);
+    transform: translate3d(0, calc(var(--gecis, 0) * -14px), 0);
+}
+
+.sim-repl__b {
+    opacity: clamp(0, calc((var(--gecis, 0) - 0.55) * 2.22), 1);
+    transform: translate3d(0, calc((1 - var(--gecis, 0)) * 14px), 0);
+}
 
 /* ── Elde terminal ──
    Koşarken hafifçe sallanıyor; akış durunca geri plana çekilip söner. */
@@ -870,54 +888,55 @@
 }
 
 /* ── Deste ──
-   On dört satır derinlemesine diziliyor. Uzaktaki küçük ve soluk; sıra
-   ona gelene kadar bekliyor.
+   YEDİ OKUNUR SATIR, ON DÖRT SLİVER DEĞİL.
 
-   DERİNLİK YUKARI DEĞİL GERİYE.
-   Önce her satır bir öncekinden 26 piksel YUKARIDA duruyordu: on dört
-   satır 364 piksellik bir merdiven yapıyor, sahnenin ortasından çıkıp
-   üstteki replik yazısının içine giriyor ve sayacı örtüyordu. Artık
-   yukarı kayma 7 piksel, asıl ayrımı 74 piksellik derinlik yapıyor.
-   Perspektif uzaktakini zaten küçültüyor; deste gerçekten deste gibi
-   duruyor ve dikey yer kaplamıyor. */
+   Önce on dört satır derinlemesine diziliyordu. Perspektif uzaktakini
+   küçültüyor; on dördü birden ekrana sığdırınca hepsi birkaç piksellik
+   dilime iniyor ve hiçbiri okunmuyordu. Oysa anlatılmak istenen şey
+   satırların GÖRÜNTÜSÜ değil: raf ve donuk değerinin ancak satır açılınca
+   ortaya çıkması. Görünmeyen bir değeri göstermeye çalışmanın anlamı yok.
+   Sayıyı (altmış) sayaç ve alttaki "53 satır daha" satırı söylüyor.
+
+   Derinlik duruyor ama süs olarak: liste hafifçe geriye yatık. */
+/* Liste ve "53 satır daha" yazısı TEK KAPTA.
+   Kardeş olduklarında ızgara ikisini ayrı satıra koyuyor ve katman
+   yüksekliği boyunca dağıtıyordu: liste 250-516'da, yazı 779-801'de,
+   arada 263 piksel boşluk. Yazı listeden kopuk duruyordu. */
+.sim-dek-yuva {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform-style: preserve-3d;
+}
+
 .sim-dek {
-    position: relative;
-    width: min(86vw, 460px);
-    /* Yüksekliği belli bir blok: katman onu alt bölgeye hizalayabilsin. */
-    height: 190px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: min(88vw, 470px);
     margin: 0;
     padding: 0;
     list-style: none;
     transform-style: preserve-3d;
-    /* Karar kartları gelirken deste geri çekilip söner. */
-    transform: translate3d(0, calc(var(--f3) * 40px), calc(var(--f3) * -360px));
-    opacity: calc(1 - var(--f3) * 0.88);
+    transform: rotateX(calc(7deg * var(--sim-egim)))
+               translate3d(0, calc(var(--f3) * 30px), calc(var(--f3) * -340px));
+    opacity: calc(1 - var(--f3) * 0.9);
 }
 
-/* Açılan satır: değerler beliriyor ve satır bir tık öne çıkıyor.
+/* Açılan satır: raf ve donuk değerleri beliriyor, satır belirginleşiyor.
    `--esik` her satırda farklı; sıra bu yüzden teker teker geliyor ve
    sahnenin temposunu belirleyen şey bu oluyor. */
 .sim-dek__satir {
-    --ac: clamp(0, calc((var(--p, 0) - var(--esik)) / 0.022), 1);
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 50%;
+    --ac: clamp(0, calc((var(--p, 0) - var(--esik)) / 0.03), 1);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
     height: 34px;
-    margin-top: -17px;
-    padding: 0 10px;
-    border: 1px solid rgb(148 163 184 / calc(0.18 + var(--ac) * 0.34));
+    padding: 0 11px;
+    border: 1px solid rgb(148 163 184 / calc(0.16 + var(--ac) * 0.36));
     border-radius: 9px;
-    background: rgb(17 24 39 / 0.92);
-    /* Açılan satır 34 piksel öne geliyor, böylece sıranın nerede olduğu
-       gözle takip edilebiliyor. Öne gelse bile bir öncekinin önüne
-       geçmiyor: 74 piksellik aralık 34'ten büyük. */
-    transform: translate3d(0, calc(var(--i) * -7px),
-                           calc(var(--i) * -74px + var(--ac) * 34px));
-    opacity: calc(0.3 + var(--i) * 0.03 + var(--ac) * 0.45);
+    background: rgb(17 24 39 / calc(0.6 + var(--ac) * 0.34));
+    opacity: calc(0.42 + var(--ac) * 0.58);
 }
 
 .sim-dek__gorsel {
@@ -932,12 +951,9 @@
 .sim-dek__gorsel[data-f="f-baget"]    { background-image: url(../assets/tanitim/f-baget.jpg); }
 .sim-dek__gorsel[data-f="f-simit"]    { background-image: url(../assets/tanitim/f-simit.jpg); }
 .sim-dek__gorsel[data-f="f-kruvasan"] { background-image: url(../assets/tanitim/f-kruvasan.jpg); }
-.sim-dek__gorsel[data-f="f-cikolata"] { background-image: url(../assets/tanitim/f-cikolata.jpg); }
 .sim-dek__gorsel[data-f="f-ispanak"]  { background-image: url(../assets/tanitim/f-ispanak.jpg); }
-.sim-dek__gorsel[data-f="f-patates"]  { background-image: url(../assets/tanitim/f-patates.jpg); }
 .sim-dek__gorsel[data-f="f-peynirli"] { background-image: url(../assets/tanitim/f-peynirli.jpg); }
 .sim-dek__gorsel[data-f="f-rustik"]   { background-image: url(../assets/tanitim/f-rustik.jpg); }
-.sim-dek__gorsel[data-f="f-vanilya"]  { background-image: url(../assets/tanitim/f-vanilya.jpg); }
 
 .sim-dek__ad {
     flex: 1 1 auto;
@@ -978,6 +994,17 @@
     color: var(--hk-ak-soluk);
     white-space: nowrap;
 }
+
+.sim-dek__devam {
+    width: min(88vw, 470px);
+    margin: 12px 0 0;
+    font-size: 0.86rem;
+    color: var(--hk-ak-soluk);
+    text-align: center;
+    opacity: calc(1 - var(--f3) * 0.9);
+}
+
+.sim-dek__devam strong { color: var(--hk-ak); font-weight: 700; }
 
 /* ── Sayaç ──
    Rakamlar üst üste duruyor, her biri kendi aralığında görünüyor.
@@ -1639,8 +1666,9 @@
         transform: translate3d(0, calc(112% - var(--b3) * 88%), 0);
     }
 
-    .sim-dek { width: min(92vw, 400px); }
-    .sim-dek__satir { gap: 6px; }
+    .sim-dek { width: min(94vw, 400px); }
+    .sim-dek__devam { width: min(94vw, 400px); font-size: 0.8rem; }
+    .sim-dek__satir { gap: 6px; padding: 0 8px; }
     .sim-dek__ad { font-size: 10px; }
     .sim-dek__stok i { padding: 2px 4px; font-size: 9px; }
 }
@@ -1670,8 +1698,36 @@
     .sim-yukselen    { transform: translate3d(0, calc(118% - var(--k3) * 88%), 0); }
     .sim-raf-telefon { transform: translate3d(0, calc(118% - var(--s3) * 88%), 0); }
 
-    .sim-kat--dek { padding-bottom: 40px; }
-    .sim-dek { height: 150px; }
+    .sim-kat--dek { padding-bottom: 32px; }
+
+    /* Kartların giriş kayması alçak pencerede 32 piksellik payı aşıp
+       sahnenin altından 9 piksel taşıyordu. */
+    .sim-karar__kart {
+        transform: translate3d(0, calc((1 - var(--f3)) * (12px + var(--s) * 5px)), 0);
+    }
+    .sim-dek { gap: 3px; }
+    .sim-dek__satir { height: 28px; }
+    .sim-dek__devam { margin-top: 8px; font-size: 0.78rem; }
+}
+
+/* Yatay telefon (844x390 gibi). Üstte üç satır yazı, altta yedi satırlık
+   liste; 390 piksele ikisi birden sığmıyor. Satır sayısını azaltmak
+   yerine satırlar inceltiliyor: "53 satır daha" cümlesi ekrandaki
+   sayıya dayandığı için satır atmak o cümleyi yanlış yapardı. */
+@media (max-height: 460px) {
+    .sim-kat--ust { padding-top: 24px; }
+    .sim-repl p { font-size: 0.86rem; line-height: 1.4; }
+    .sim-repl .sim-yaka { margin-bottom: 5px; padding: 5px 10px; }
+    .sim-sayac { margin-top: 5px; }
+
+    .sim-dek { gap: 2px; }
+    .sim-dek__satir { height: 24px; gap: 6px; padding: 0 7px; }
+    .sim-dek__gorsel { width: 16px; height: 16px; }
+    .sim-dek__ad { font-size: 9.5px; }
+    .sim-dek__pisir { padding: 1px 5px; font-size: 9px; }
+    .sim-dek__stok i { padding: 1px 4px; font-size: 9px; }
+    .sim-dek__devam { margin-top: 6px; font-size: 0.72rem; }
+    .sim-kat--dek { padding-bottom: 20px; }
 }
 
 /* ============================================================================
@@ -1740,6 +1796,7 @@
     .sim-repl__a,
     .sim-repl__b {
         position: static;
+        transform: none !important;
         opacity: 1 !important;
     }
 
@@ -1775,7 +1832,10 @@
         opacity: 1 !important;
     }
 
-    .sim-dek__stok { opacity: 1; }
+    .sim-dek__stok,
+    .sim-dek__devam { opacity: 1; }
+
+    .sim-dek-yuva { transform: none !important; }
 
     .sim-karar { opacity: 1 !important; }
     .sim-karar__kart { transform: none !important; }
