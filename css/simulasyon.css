@@ -550,6 +550,7 @@
     --k1: clamp(0, calc(var(--p, 0) / 0.46), 1);
     --k2: clamp(0, calc((var(--p, 0) - 0.42) / 0.18), 1);
     --k3: clamp(0, calc((var(--p, 0) - 0.52) / 0.22), 1);
+    --gecis: var(--k2);
 }
 
 /* ── Koridor ──
@@ -623,8 +624,12 @@
     inset: 0;
 }
 
-.sim-repl__a { opacity: calc(1 - var(--k2)); }
-.sim-repl__b { opacity: var(--k2); }
+/* Geçiş değeri her perdenin kendi durağından geliyor (`--gecis`). Eskiden
+   doğrudan toplama perdesinin `--k2`si okunuyordu; fırın ve sayım
+   perdelerinde o değişken tanımsız olduğu için `calc` geçersiz oluyor ve
+   iki replik de tam opak kalıyordu, yani üst üste biniyorlardı. */
+.sim-repl__a { opacity: calc(1 - var(--gecis, 0)); }
+.sim-repl__b { opacity: var(--gecis, 0); }
 
 /* ── Elde terminal ──
    Koşarken hafifçe sallanıyor; akış durunca geri plana çekilip söner. */
@@ -832,6 +837,425 @@
 }
 
 /* ============================================================================
+ * PERDE 2: FIRIN
+ *
+ * Anlatılan şey bir sayı: altmış. Dört dilim çarpı on beş ürün. Panelde
+ * satırlar kapalı geliyor, raf ve donuk değerini görmek için her birini
+ * tek tek açmak gerekiyor.
+ *
+ * O yüzden bu sahnede tempo BİLİNÇLİ OLARAK YAVAŞ: satırlar teker teker
+ * açılıyor ve sayaç ağır ağır tırmanıyor. Kaydıran kişi altmışı saymıyor,
+ * hissediyor. Sonra tek düğme ve deste bir anda açılıp karar kartlarına
+ * dönüşüyor.
+ *
+ * Duraklar:
+ *   0.00 - 0.44  satırlar tek tek açılıyor, sayaç tırmanıyor
+ *   0.44 - 0.58  replik değişiyor, deste geri çekiliyor
+ *   0.54 - 1.00  karar kartları öne geliyor
+ * ========================================================================== */
+
+.sim-firin {
+    --f1: clamp(0, calc(var(--p, 0) / 0.44), 1);
+    --f2: clamp(0, calc((var(--p, 0) - 0.44) / 0.14), 1);
+    --f3: clamp(0, calc((var(--p, 0) - 0.54) / 0.24), 1);
+    --gecis: var(--f2);
+}
+
+/* ── Deste ──
+   On dört satır derinlemesine diziliyor. Uzaktaki küçük ve soluk; sıra
+   ona gelene kadar bekliyor. */
+.sim-dek {
+    position: relative;
+    width: min(86vw, 460px);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    transform-style: preserve-3d;
+    /* Karar kartları gelirken deste geri çekilip söner. */
+    transform: translate3d(0, calc(var(--f3) * 40px), calc(var(--f3) * -360px));
+    opacity: calc(1 - var(--f3) * 0.88);
+}
+
+/* Açılan satır: değerler beliriyor ve satır bir tık öne çıkıyor.
+   `--esik` her satırda farklı; sıra bu yüzden teker teker geliyor ve
+   sahnenin temposunu belirleyen şey bu oluyor. */
+.sim-dek__satir {
+    --ac: clamp(0, calc((var(--p, 0) - var(--esik)) / 0.022), 1);
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    margin-top: -17px;
+    padding: 0 10px;
+    border: 1px solid rgb(148 163 184 / calc(0.18 + var(--ac) * 0.34));
+    border-radius: 9px;
+    background: rgb(17 24 39 / 0.92);
+    /* Deste: her satır bir öncekinden biraz yukarıda ve biraz uzakta.
+       Açılan satır 26 piksel öne geliyor, böylece sıranın nerede olduğu
+       gözle takip edilebiliyor. */
+    transform: translate3d(0, calc(var(--i) * -26px),
+                           calc(var(--i) * -46px + var(--ac) * 26px));
+    opacity: calc(0.34 + var(--i) * 0.035 + var(--ac) * 0.4);
+}
+
+.sim-dek__gorsel {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    background: #1f2937 center / cover no-repeat;
+}
+
+.sim-dek__gorsel[data-f="f-ekmek"]    { background-image: url(../assets/tanitim/f-ekmek.jpg); }
+.sim-dek__gorsel[data-f="f-baget"]    { background-image: url(../assets/tanitim/f-baget.jpg); }
+.sim-dek__gorsel[data-f="f-simit"]    { background-image: url(../assets/tanitim/f-simit.jpg); }
+.sim-dek__gorsel[data-f="f-kruvasan"] { background-image: url(../assets/tanitim/f-kruvasan.jpg); }
+.sim-dek__gorsel[data-f="f-cikolata"] { background-image: url(../assets/tanitim/f-cikolata.jpg); }
+.sim-dek__gorsel[data-f="f-ispanak"]  { background-image: url(../assets/tanitim/f-ispanak.jpg); }
+.sim-dek__gorsel[data-f="f-patates"]  { background-image: url(../assets/tanitim/f-patates.jpg); }
+.sim-dek__gorsel[data-f="f-peynirli"] { background-image: url(../assets/tanitim/f-peynirli.jpg); }
+.sim-dek__gorsel[data-f="f-rustik"]   { background-image: url(../assets/tanitim/f-rustik.jpg); }
+.sim-dek__gorsel[data-f="f-vanilya"]  { background-image: url(../assets/tanitim/f-vanilya.jpg); }
+
+.sim-dek__ad {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--hk-ak);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sim-dek__pisir {
+    flex: none;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: rgb(180 83 9 / 0.25);
+    font-size: 10px;
+    font-weight: 700;
+    color: #f0b360;
+}
+
+/* Raf ve donuk yalnız satır AÇILINCA görünüyor. Kapalıyken yok olmaları
+   anlatının kendisi: o değerler için tıklamak gerekiyor. */
+.sim-dek__stok {
+    flex: none;
+    display: flex;
+    gap: 6px;
+    opacity: var(--ac);
+}
+
+.sim-dek__stok i {
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: rgb(148 163 184 / 0.16);
+    font-size: 10px;
+    font-style: normal;
+    color: var(--hk-ak-soluk);
+    white-space: nowrap;
+}
+
+/* ── Sayaç ──
+   Rakamlar üst üste duruyor, her biri kendi aralığında görünüyor.
+   Kaydırma hızını rakam değil ARALIK belirliyor; sayı akmıyor, sayıyor. */
+.sim-sayac {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 10px;
+}
+
+.sim-sayac s {
+    position: relative;
+    display: inline-block;
+    min-width: 2ch;
+    text-align: right;
+    text-decoration: none;
+    font-variant-numeric: tabular-nums;
+}
+
+.sim-sayac s span {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    opacity: calc(
+        clamp(0, calc((var(--p, 0) - var(--a)) / 0.008), 1) *
+        (1 - clamp(0, calc((var(--p, 0) - var(--b)) / 0.008), 1))
+    );
+}
+
+.sim-sayac s span:first-child { position: static; }
+
+/* ── Karar kartları ── */
+.sim-karar {
+    display: flex;
+    gap: 12px;
+    width: min(92vw, 760px);
+    transform-style: preserve-3d;
+    opacity: var(--f3);
+}
+
+.sim-karar__kart {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px;
+    border: 1px solid;
+    border-radius: 12px;
+    background: rgb(17 24 39 / 0.94);
+    /* Kartlar sırayla geliyor: `--s` her kartta bir artıyor. */
+    transform: translate3d(0, calc((1 - var(--f3)) * 60px * (1 + var(--s))), 0);
+}
+
+.sim-karar__kart em {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: #1f2937 center / cover no-repeat;
+}
+
+.sim-karar__kart em[data-f="f-ekmek"]    { background-image: url(../assets/tanitim/f-ekmek.jpg); }
+.sim-karar__kart em[data-f="f-kruvasan"] { background-image: url(../assets/tanitim/f-kruvasan.jpg); }
+.sim-karar__kart em[data-f="f-simit"]    { background-image: url(../assets/tanitim/f-simit.jpg); }
+
+.sim-karar__etiket {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+.sim-karar__kart strong {
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--hk-ak);
+}
+
+.sim-karar__kart small { font-size: 11px; color: var(--hk-ak-soluk); }
+
+.sim-karar__kart--acil  { border-color: rgb(179 35 31 / 0.55); }
+.sim-karar__kart--acil  .sim-karar__etiket { color: #f87171; }
+.sim-karar__kart--uyari { border-color: rgb(180 83 9 / 0.55); }
+.sim-karar__kart--uyari .sim-karar__etiket { color: #f0b360; }
+.sim-karar__kart--tamam { border-color: rgb(14 124 88 / 0.55); }
+.sim-karar__kart--tamam .sim-karar__etiket { color: #4ade80; }
+
+/* ============================================================================
+ * PERDE 3: SAYIM
+ *
+ * Anlatılan şey mesafe: sayım masada mı yapılıyor, rafın önünde mi. O
+ * yüzden bu sahnede kamera GERÇEKTEN yer değiştiriyor; masa geri çekilip
+ * koridor öne geliyor.
+ *
+ * Duraklar:
+ *   0.00 - 0.44  masa başı: ara, oku, deftere yaz
+ *   0.44 - 0.58  replik değişiyor, masa geri çekiliyor
+ *   0.54 - 1.00  rafın önü: telefon, barkod, fark
+ * ========================================================================== */
+
+.sim-sayim {
+    --s1: clamp(0, calc(var(--p, 0) / 0.44), 1);
+    --s2: clamp(0, calc((var(--p, 0) - 0.44) / 0.14), 1);
+    --s3: clamp(0, calc((var(--p, 0) - 0.54) / 0.24), 1);
+    --gecis: var(--s2);
+}
+
+/* Koridor sayım perdesinde durağan başlıyor, sahnenin ikinci yarısında
+   kameraya yaklaşıyor: masadan rafa geçiş bu. */
+.sim-koridor--yavas {
+    transform: translate3d(0, 0, calc(var(--s3, 0) * 900px));
+    opacity: calc(0.25 + var(--s3, 0) * 0.75);
+}
+
+.sim-masa {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(86vw, 420px);
+    transform: translate3d(calc(-18% - var(--s3) * 22%), calc(10% + var(--s3) * 24%),
+                           calc(-40px - var(--s3) * 420px))
+               rotateY(calc(12deg * var(--sim-egim)));
+    opacity: calc(1 - var(--s3) * 0.92);
+}
+
+.sim-masa__ekran {
+    padding: 12px;
+    border: 1px solid rgb(148 163 184 / 0.22);
+    border-radius: 12px;
+    background: rgb(17 24 39 / 0.95);
+}
+
+.sim-masa__arama {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 10px;
+    border: 1px solid rgb(148 163 184 / 0.28);
+    border-radius: 9px;
+    font-size: 11px;
+    color: var(--hk-ak-soluk);
+}
+
+.sim-masa__arama i {
+    width: 9px;
+    height: 9px;
+    border: 1.4px solid currentColor;
+    border-radius: 999px;
+}
+
+.sim-masa__sonuc {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sim-masa__sonuc li {
+    display: flex;
+    align-items: center;
+    padding: 5px 4px;
+    border-bottom: 1px solid rgb(148 163 184 / 0.14);
+    font-size: 11px;
+    color: var(--hk-ak);
+}
+
+.sim-masa__sonuc li.sonuk { opacity: 0.4; }
+.sim-masa__sonuc b { margin-left: auto; font-weight: 700; }
+
+/* Defter: her kalem için bir çentik. Altı çentik ağır ağır doluyor. */
+.sim-masa__defter {
+    display: flex;
+    gap: 6px;
+    padding: 10px 12px;
+    border: 1px solid rgb(148 163 184 / 0.18);
+    border-radius: 10px;
+    background: rgb(148 163 184 / 0.07);
+}
+
+.sim-masa__defter i {
+    width: 14px;
+    height: 3px;
+    border-radius: 999px;
+    background: var(--hk-ak-soluk);
+    opacity: clamp(0, calc((var(--p, 0) - var(--esik)) / 0.02), 1);
+}
+
+/* ── Rafın önündeki telefon ── */
+.sim-raf-telefon {
+    transform: translate3d(calc(20% - var(--s3) * 6%), calc(120% - var(--s3) * 104%),
+                           calc(-30px + var(--s3) * 110px))
+               rotateY(calc((-14deg + var(--s3) * 10deg) * var(--sim-egim)));
+    opacity: var(--s3);
+}
+
+.sim-sayim-ekran {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    background: var(--hk-kagit-2);
+}
+
+/* Tarayıcı penceresi: kamera görüntüsü ve okuma çizgisi. */
+.sim-sayim__tarayici {
+    position: relative;
+    height: 58px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    background: #0b1220;
+    overflow: hidden;
+}
+
+.sim-sayim__cizgi {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    top: 50%;
+    height: 1.5px;
+    background: #22c55e;
+    box-shadow: 0 0 8px #22c55e;
+}
+
+.sim-perde.gorunur .sim-sayim__cizgi {
+    animation: sim-tara 1.6s var(--motion-ease-standard) infinite;
+}
+
+@keyframes sim-tara {
+    0%, 100% { transform: translateY(-18px); opacity: 0.4; }
+    50%      { transform: translateY(18px); opacity: 1; }
+}
+
+.sim-sayim__liste {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/* Satırlar okundukça listeye düşüyor: aşağıdan gelip yerine oturuyor. */
+.sim-sayim__liste li {
+    --gel: clamp(0, calc((var(--p, 0) - var(--esik)) / 0.05), 1);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 6px;
+    border: 1px solid var(--hk-cizgi);
+    border-radius: 7px;
+    background: #fff;
+    font-size: 9px;
+    color: #111827;
+    transform: translate3d(0, calc((1 - var(--gel)) * 12px), 0);
+    opacity: var(--gel);
+}
+
+.sim-sayim__liste em {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: #eef2f6 center / cover no-repeat;
+}
+
+.sim-sayim__liste em[data-urun="sogan"]    { background-image: url(../assets/tanitim/sogan.jpg); }
+.sim-sayim__liste em[data-urun="maydanoz"] { background-image: url(../assets/tanitim/maydanoz.jpg); }
+.sim-sayim__liste em[data-urun="sos"]      { background-image: url(../assets/tanitim/sos.jpg); }
+.sim-sayim__liste em[data-urun="su"]       { background-image: url(../assets/tanitim/su.jpg); }
+.sim-sayim__liste em[data-urun="un"]       { background-image: url(../assets/tanitim/un.jpg); }
+
+.sim-sayim__liste span {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sim-sayim__liste b { flex: none; font-weight: 700; }
+
+/* Fark: eksikse kırmızı, eşitse gri. Anlam yalnız renkte değil, sayının
+   önündeki işarette de duruyor. */
+.sim-sayim__liste s {
+    flex: none;
+    min-width: 22px;
+    padding: 1px 4px;
+    border-radius: 5px;
+    background: #fdecec;
+    color: #b3231f;
+    font-weight: 700;
+    text-align: center;
+    text-decoration: none;
+}
+
+.sim-sayim__liste s.esit { background: var(--hk-kagit-3); color: var(--hk-soluk); }
+
+/* ============================================================================
  * ANLATI ARASI: açık zeminli okuma bölümü
  * Sinematik perdeler arasında göz dinlensin ve iddia yazıyla da kurulsun.
  * ========================================================================== */
@@ -867,6 +1291,68 @@
     border-color: var(--hk-murekkep-cizgi);
     background: var(--hk-murekkep-2);
     color: var(--hk-ak-soluk);
+}
+
+/* ============================================================================
+ * DAR EKRAN
+ *
+ * Masaüstünde cihazlar yan yana duruyor: biri solda eski yöntem, biri
+ * sağda yeni. Telefonda o yan yana yer yok; 375 pikselde masa kadrajın
+ * 29 piksel dışına taşıyor ve karar kartları üçe bölününce her biri 115
+ * piksele düşüyordu.
+ *
+ * Çözüm yatay kaymayı büyütmek değil KALDIRMAK: dar ekranda iki cihaz da
+ * ortada duruyor ve biri sönerken diğeri beliriyor. Aynı yerde geçiş,
+ * anlatıyı bozmuyor; zaten ikisi aynı anda gerekli değil.
+ * ========================================================================== */
+
+@media (max-width: 767px) {
+    .sim-kosan {
+        transform: translate3d(0, calc(14% + var(--k3) * 26%),
+                               calc(-40px - var(--k3) * 300px))
+                   rotateZ(calc((1deg - var(--k1) * 2deg) * var(--sim-egim)));
+    }
+
+    .sim-yukselen {
+        transform: translate3d(0, calc(110% - var(--k3) * 96%), 0);
+    }
+
+    .sim-masa {
+        width: min(92vw, 360px);
+        transform: translate3d(0, calc(6% + var(--s3) * 20%),
+                               calc(-30px - var(--s3) * 300px));
+    }
+
+    .sim-raf-telefon {
+        transform: translate3d(0, calc(110% - var(--s3) * 96%), 0);
+    }
+
+    /* Üç karar kartı alt alta. Yan yana durduklarında her biri 115
+       piksele düşüyor ve içindeki üç satır okunmuyor. */
+    .sim-karar {
+        flex-direction: column;
+        width: min(92vw, 400px);
+    }
+
+    .sim-karar__kart {
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+    }
+
+    .sim-karar__kart em { flex: none; }
+
+    .sim-karar__kart strong { margin-left: auto; font-size: 15px; }
+
+    /* Etiket ve gerekçe dar ekranda tek satıra sığmıyor; gerekçe
+       kartın altına değil etiketin altına giriyor. */
+    .sim-karar__kart small { display: none; }
+
+    .sim-dek { width: min(92vw, 400px); }
+    .sim-dek__satir { gap: 6px; }
+    .sim-dek__ad { font-size: 10px; }
+    .sim-dek__stok i { padding: 2px 4px; font-size: 9px; }
 }
 
 /* ============================================================================
@@ -951,4 +1437,48 @@
     .sim-sip__satir::after,
     .sim-sip__tik::before,
     .sim-sip__tik::after { opacity: 1; }
+
+    /* Fırın perdesi: deste akışta alt alta, hepsi açık; karar kartları
+       görünür. Sayaç yalnız varılan sayıyı gösteriyor, çünkü anlatılan
+       şey tırmanış değil altmışın kendisi. */
+    .sim-dek {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        transform: none !important;
+        opacity: 1 !important;
+    }
+
+    .sim-dek__satir {
+        position: static;
+        margin-top: 0;
+        transform: none !important;
+        opacity: 1 !important;
+    }
+
+    .sim-dek__stok { opacity: 1; }
+
+    .sim-karar { opacity: 1 !important; }
+    .sim-karar__kart { transform: none !important; }
+
+    .sim-sayac s span { opacity: 0; }
+    .sim-sayac s span:last-child { position: static; opacity: 1; }
+    .sim-sayac s span:first-child:not(:last-child) { display: none; }
+
+    /* Sayım perdesi: masa da raf da görünür, defter dolu, liste dolu. */
+    .sim-masa,
+    .sim-raf-telefon {
+        transform: none !important;
+        opacity: 1 !important;
+    }
+
+    .sim-masa__defter i { opacity: 1; }
+
+    .sim-sayim__liste li {
+        transform: none !important;
+        opacity: 1 !important;
+    }
+
+    .sim-sayim__cizgi,
+    .sim-perde.gorunur .sim-sayim__cizgi { animation: none; }
 }
