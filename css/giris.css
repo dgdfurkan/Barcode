@@ -254,6 +254,81 @@ body.giris {
     line-height: 1.35;
 }
 
+/* --- Simülasyon bağlantısı ---
+   Tanıtım panelindeki tek çağrı. Özellik satırlarının üstünde duruyor:
+   listeyi okumadan önce görülüyor, okuyanı da listeden ayrı bir şey
+   olduğu için rahatsız etmiyor. */
+
+.giris-sim {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin: 0 0 1.1rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid rgb(238 242 248 / 0.16);
+    border-radius: 12px;
+    background: rgb(238 242 248 / 0.05);
+    color: #fff;
+    text-decoration: none;
+    transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.giris-sim:hover {
+    border-color: rgb(238 242 248 / 0.3);
+    background: rgb(238 242 248 / 0.09);
+    transform: translateY(-1px);
+}
+
+.giris-sim:active { transform: none; }
+
+.giris-sim__im {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: rgb(238 242 248 / 0.1);
+}
+
+.giris-sim__im svg { width: 19px; height: 19px; }
+
+.giris-sim__yazi { flex: 1 1 auto; min-width: 0; }
+
+.giris-sim__ad {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+}
+
+.giris-sim__not {
+    display: block;
+    margin-top: 0.08rem;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: rgb(238 242 248 / 0.45);
+}
+
+.giris-sim__ok {
+    flex: none;
+    display: inline-flex;
+    color: rgb(238 242 248 / 0.45);
+    transition: transform 140ms ease, color 140ms ease;
+}
+
+.giris-sim__ok svg { width: 17px; height: 17px; }
+
+.giris-sim:hover .giris-sim__ok { transform: translateX(2px); color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+    .giris-sim,
+    .giris-sim__ok { transition: none; }
+    .giris-sim:hover { transform: none; }
+    .giris-sim:hover .giris-sim__ok { transform: none; }
+}
+
 /* --- Özellik satırları --- */
 
 .giris-ozellikler {

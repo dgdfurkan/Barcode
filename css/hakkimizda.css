@@ -365,6 +365,12 @@ img { max-width: 100%; display: block; }
 .kunye a { color: var(--hk-yazi); text-decoration: none; border-bottom: 1px solid var(--hk-cizgi-koyu); }
 .kunye a:hover { border-bottom-color: var(--hk-mavi); color: var(--hk-mavi-koyu); }
 
+/* Metin içi bağlantı. `.kunye a` ile aynı desen, künyeye bağlı olmadan. */
+.bag { color: var(--hk-mavi-koyu); text-decoration: none; border-bottom: 1px solid var(--hk-mavi); }
+.bag:hover { color: var(--hk-yazi); border-bottom-color: var(--hk-yazi); }
+.kesit--koyu .bag { color: var(--hk-mavi-ak); border-bottom-color: var(--hk-mavi-ak); }
+.kesit--koyu .bag:hover { color: var(--hk-ak); border-bottom-color: var(--hk-ak); }
+
 /* --- Düğmeler --- */
 
 .dugmeler { display: flex; flex-wrap: wrap; gap: 0.7rem; }
