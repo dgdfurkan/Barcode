@@ -523,7 +523,60 @@
 </section>
 
 <!-- ==================================================================
-     Perde 4. Barkod ve Hızlı Bul
+     Perde 4. Barkod. Sinematik sahne
+     ================================================================== -->
+<section class="sim-perde sim-barkod" style="--sim-yol: 360vh" aria-label="Barkod sahnesi">
+    <div class="sim-sahne">
+
+        <div class="sim-kat sim-kat--zemin" aria-hidden="true">
+            <div class="sim-ufuk"></div>
+            <div class="sim-izgara"></div>
+        </div>
+
+        <div class="sim-kat sim-kat--ust sim-kat--oynak">
+            <div class="sim-repl">
+                <p class="sim-repl__a">
+                    <span class="sim-yaka sim-yaka--eski">Eskiden</span>
+                    Etiket yırtılmış, barkod okunmuyor. Ürünü bulmanın tek yolu
+                    aramak: raf raf, liste liste.
+                    <b>İş, okunmayan bir etiket yüzünden duruyor.</b>
+                </p>
+                <p class="sim-repl__b">
+                    <span class="sim-yaka sim-yaka--yeni">Jet Barkod ile</span>
+                    Ürünün adı yazılıyor, barkod ekranda çıkıyor.
+                    <b>Dokuz binden fazla ürün, barkodu ve fotoğrafıyla.</b>
+                </p>
+            </div>
+        </div>
+
+        <div class="sim-kat sim-kat--oynak">
+            <div class="sim-etiket-kart">
+                <em class="sim-etiket-kart__gorsel" data-urun="kaymak"></em>
+                <div class="sim-etiket-kart__barkod"></div>
+                <span class="sim-etiket-kart__uyari">Okunamadı</span>
+            </div>
+        </div>
+
+        <div class="sim-kat sim-kat--oynak">
+            <div class="sim-cihaz sim-telefon sim-barkod-tel">
+                <div class="sim-cihaz__ekran sim-bul">
+                    <div class="sim-bul__arama">
+                        <i></i><span class="sim-bul__yazi">kaymak</span>
+                    </div>
+                    <div class="sim-bul__sonuc">
+                        <em data-urun="kaymak"></em>
+                        <strong>Süzme Kaymak (170 g)</strong>
+                        <div class="sim-bul__barkod"></div>
+                        <span class="sim-bul__no">8690000000117</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Perde 4. Barkod ve Hızlı Bul yarışları
      ================================================================== -->
 <section class="sim-ara" id="barkod">
     <div class="sim-ara__ic">
@@ -549,18 +602,51 @@
 </section>
 
 <!-- ==================================================================
-     Sonuç  (4. aşamada toplam kronometre eklenecek)
+     Sonuç. Oynatılan sahnelerin toplamı
      ================================================================== -->
 <section class="sim-ara sim-ara--koyu" id="sonuc">
     <div class="sim-ara__ic">
         <div class="gir">
             <span class="etiket">Sonuç</span>
-            <h2 class="baslik">Kazanılan zaman <em>telaşı alıyor</em></h2>
+            <h2 class="baslik">Bu sayfada <em>kendi gözünüzle ölçtünüz</em></h2>
             <p class="giris">
-                Sahnelerde ölçtüğünüz fark tek bir siparişin farkı. Bir vardiyada
-                aynı iş defalarca tekrarlanıyor. Kazanılan zaman doğrudan şuna
-                dönüşüyor: acele etmeden toplanan sipariş, doğru okunan adet, eksiksiz
-                giden poşet.
+                Aşağıdaki tek sayı, yukarıda oynattığınız sahnelerin kronometre
+                farklarının toplamı. Oynatmadığınız sahne toplama girmiyor.
+                Sayfada bundan başka rakam yok.
+            </p>
+        </div>
+
+        <div class="sim-toplam gir" id="simToplam" data-durum="bos">
+            <div class="sim-toplam__bos">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+                </svg>
+                <p>
+                    Henüz sahne oynatmadınız. Yukarıdaki sahnelerden birinde
+                    <strong>Karşılaştırmayı oynat</strong> düğmesine basın, kazanılan
+                    süre burada toplansın.
+                </p>
+            </div>
+
+            <div class="sim-toplam__dolu">
+                <ul class="sim-toplam__liste" id="simToplamListe"></ul>
+                <div class="sim-toplam__sonuc">
+                    <span class="sim-toplam__etiket">Oynattığınız sahnelerde kazanılan süre</span>
+                    <strong class="sim-toplam__sayi" id="simToplamSure">00:00.00</strong>
+                    <span class="sim-toplam__not" id="simToplamNot"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="gir" style="margin-top:2.4rem">
+            <h3 class="baslik baslik--kucuk">Kazanılan süre nereye gidiyor</h3>
+            <p class="giris">
+                Depoda süre baskısı yalnız işi geciktirmiyor. Acele ettiren her dakika
+                yanlış ürün, yanlış adet ve eksik poşet riskini büyütüyor. Kazanılan
+                zamanın karşılığı şu: sipariş acele edilmeden toplanıyor, adet doğru
+                okunuyor, gramajdan emin olunmayan üründe durup bakılabiliyor. Telaş
+                azalınca hata azalıyor, hata azalınca da depo daha iyi bir yerde
+                duruyor.
             </p>
             <div class="dugmeler" style="margin-top:1.6rem">
                 <a class="dugme dugme--ana" href="/">Denemeye başlayın</a>

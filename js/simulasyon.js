@@ -159,11 +159,100 @@
     }
 
     // ==================================================================
+    // Toplam kronometre
+    // ==================================================================
+
+    /**
+     * Oynatılan sahnelerin kronometre farklarını toplar.
+     *
+     * NEDEN SAYFADAKİ TEK RAKAM BU
+     * Sayfada puan, gelir ya da yüzde yazmıyor. Yazsaydık savunulması
+     * gereken bir iddia olurdu. Buradaki sayı ise ziyaretçinin gözünün
+     * önünde, iki kronometreyle ölçüldü; kimsenin bize inanması gerekmiyor.
+     *
+     * OYNATILMAYAN SAHNE TOPLAMA GİRMEZ
+     * Beş sahnenin hepsini peşin toplayıp yazmak kolay olurdu ama o zaman
+     * sayı "bizim iddiamız" olurdu, izleyicinin ölçümü değil. Yalnız
+     * gerçekten oynatılan sahne sayılıyor.
+     *
+     * AYNI SAHNE TEKRAR OYNATILIRSA
+     * Üzerine eklenmiyor, son değeriyle güncelleniyor. Süreler her
+     * oynatmada rastgele aralıklardan seçildiği için tekrar tekrar
+     * oynatarak toplamı şişirmek mümkün olmamalı.
+     */
+    function ToplamPanosu(kok) {
+        this.kok = kok;
+        this.liste = belge.getElementById('simToplamListe');
+        this.sure = belge.getElementById('simToplamSure');
+        this.not = belge.getElementById('simToplamNot');
+        this.kayitlar = {};
+        this.sira = [];
+    }
+
+    ToplamPanosu.prototype.ekle = function (bilgi) {
+        var ad = bilgi.baslik || 'Sahne';
+        if (!this.kayitlar[ad]) this.sira.push(ad);
+        this.kayitlar[ad] = bilgi;
+        this.ciz();
+    };
+
+    ToplamPanosu.prototype.ciz = function () {
+        if (!this.liste || !this.sure) return;
+
+        var toplamFark = 0;
+        var toplamEski = 0;
+        var toplamYeni = 0;
+        var satirlar = '';
+
+        for (var i = 0; i < this.sira.length; i++) {
+            var k = this.kayitlar[this.sira[i]];
+            toplamFark += k.fark;
+            toplamEski += k.solSure;
+            toplamYeni += k.sagSure;
+            satirlar +=
+                '<li><span>' + kacir(this.sira[i]) + '</span>' +
+                '<b>' + global.JBKarsilastirma.saatYaz(k.fark) + '</b></li>';
+        }
+
+        this.liste.innerHTML = satirlar;
+        this.sure.textContent = global.JBKarsilastirma.saatYaz(toplamFark);
+
+        if (this.not) {
+            var kat = toplamYeni > 0 ? (toplamEski / toplamYeni) : 0;
+            this.not.textContent =
+                this.sira.length + ' sahne · eski yöntem ' +
+                global.JBKarsilastirma.saatYaz(toplamEski) + ', Jet Barkod ' +
+                global.JBKarsilastirma.saatYaz(toplamYeni) + ' · ' +
+                kat.toFixed(1).replace('.', ',') + ' kat';
+        }
+
+        this.kok.dataset.durum = 'dolu';
+    };
+
+    function kacir(m) {
+        var k = belge.createElement('span');
+        k.textContent = String(m == null ? '' : m);
+        return k.innerHTML;
+    }
+
+    function toplamiKur() {
+        var kok = belge.getElementById('simToplam');
+        if (!kok || !global.JBKarsilastirma) return;
+
+        var pano = new ToplamPanosu(kok);
+        /* Olay sahne kabından kabarıyor; tek dinleyici hepsini karşılıyor. */
+        belge.addEventListener('krs:bitti', function (e) {
+            if (e.detail) pano.ekle(e.detail);
+        });
+    }
+
+    // ==================================================================
     // Başlat
     // ==================================================================
 
     function baslat() {
         sahneleriKur();
+        toplamiKur();
 
         /* Azaltılmış hareket açıksa yapışma da ilerleme de gereksiz:
            CSS zaten perdeleri düz bölüme çeviriyor. */

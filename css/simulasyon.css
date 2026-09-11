@@ -1256,6 +1256,261 @@
 .sim-sayim__liste s.esit { background: var(--hk-kagit-3); color: var(--hk-soluk); }
 
 /* ============================================================================
+ * PERDE 4: BARKOD
+ *
+ * Kısa perde. Yırtık etiket geri çekiliyor, telefonda ürün adı yazılıp
+ * barkod beliriyor.
+ *
+ * Duraklar:
+ *   0.00 - 0.44  yırtık etiket, okunamadı uyarısı
+ *   0.44 - 0.58  replik değişiyor
+ *   0.54 - 1.00  telefon geliyor, ad yazılıyor, barkod çıkıyor
+ * ========================================================================== */
+
+.sim-barkod {
+    --b1: clamp(0, calc(var(--p, 0) / 0.44), 1);
+    --b2: clamp(0, calc((var(--p, 0) - 0.44) / 0.14), 1);
+    --b3: clamp(0, calc((var(--p, 0) - 0.54) / 0.24), 1);
+    --gecis: var(--b2);
+}
+
+/* Barkod deseni. Düzenli aralıklı çizgi barkod gibi durmuyor; kalınlıklar
+   değişince gerçeğe benziyor. */
+.sim-etiket-kart__barkod,
+.sim-bul__barkod {
+    background:
+        repeating-linear-gradient(90deg,
+            #111827 0 2px, transparent 2px 3px,
+            #111827 3px 4px, transparent 4px 7px,
+            #111827 7px 10px, transparent 10px 11px,
+            #111827 11px 12px, transparent 12px 15px);
+}
+
+.sim-etiket-kart {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(78vw, 300px);
+    padding: 16px;
+    border-radius: 12px;
+    background: var(--hk-kagit);
+    box-shadow: 0 30px 70px rgb(0 0 0 / 0.5);
+    /* Etiketin sağ alt köşesi yırtık: barkodun bir kısmı yok. */
+    clip-path: polygon(0 0, 100% 0, 100% 62%, 74% 76%, 88% 88%, 46% 100%, 0 100%);
+    transform: translate3d(calc(-16% - var(--b3) * 20%), calc(4% + var(--b3) * 18%),
+                           calc(-40px - var(--b3) * 380px))
+               rotate(calc(-3deg * var(--sim-egim)));
+    opacity: calc(1 - var(--b3) * 0.9);
+}
+
+.sim-etiket-kart__gorsel {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    background: var(--hk-kagit-3) center / cover no-repeat;
+}
+
+.sim-etiket-kart__gorsel[data-urun="kaymak"] { background-image: url(../assets/tanitim/kaymak.jpg); }
+
+.sim-etiket-kart__barkod {
+    height: 42px;
+    border-radius: 3px;
+}
+
+.sim-etiket-kart__uyari {
+    position: absolute;
+    left: 16px;
+    top: 16px;
+    padding: 4px 9px;
+    border-radius: 6px;
+    background: var(--hk-kirmizi);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+}
+
+/* ── Telefonda arama ── */
+.sim-barkod-tel {
+    transform: translate3d(calc(20% - var(--b3) * 4%), calc(110% - var(--b3) * 96%),
+                           calc(-30px + var(--b3) * 100px))
+               rotateY(calc((-14deg + var(--b3) * 10deg) * var(--sim-egim)));
+    opacity: var(--b3);
+}
+
+.sim-bul {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+    background: var(--hk-kagit-2);
+}
+
+.sim-bul__arama {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 10px;
+    border: 1px solid var(--hk-cizgi);
+    border-radius: 9px;
+    background: #fff;
+    font-size: 10px;
+    color: #111827;
+}
+
+.sim-bul__arama i {
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border: 1.4px solid var(--hk-soluk);
+    border-radius: 999px;
+}
+
+/* Yazılan ad harf harf değil, soldan sağa açılarak geliyor: `width`
+   animasyonu yerleşim hesaplatır, `clip-path` hesaplatmaz. */
+.sim-bul__yazi {
+    clip-path: inset(0 calc((1 - var(--b3)) * 100%) 0 0);
+    white-space: nowrap;
+}
+
+.sim-bul__sonuc {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 12px;
+    border: 1px solid var(--hk-cizgi);
+    border-radius: 10px;
+    background: #fff;
+    /* Sonuç kartı, ad yazıldıktan SONRA beliriyor. */
+    opacity: clamp(0, calc((var(--p, 0) - 0.72) / 0.12), 1);
+}
+
+.sim-bul__sonuc em {
+    width: 54px;
+    height: 54px;
+    border-radius: 8px;
+    background: var(--hk-kagit-3) center / cover no-repeat;
+}
+
+.sim-bul__sonuc em[data-urun="kaymak"] { background-image: url(../assets/tanitim/kaymak.jpg); }
+
+.sim-bul__sonuc strong { font-size: 10px; font-weight: 700; color: #111827; }
+
+.sim-bul__barkod {
+    height: 36px;
+    border-radius: 2px;
+}
+
+.sim-bul__no {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    color: var(--hk-soluk);
+    text-align: center;
+}
+
+/* ============================================================================
+ * TOPLAM PANOSU
+ *
+ * Sayfadaki tek rakamın durduğu yer. İki durumu var: sahne oynatılmadan
+ * önce boş durum, sonra dolu. Boş durum "burada bir şey yok" demiyor, ne
+ * yapılması gerektiğini söylüyor.
+ * ========================================================================== */
+
+.sim-toplam {
+    margin-top: 2rem;
+    border: 1px solid var(--hk-murekkep-cizgi);
+    border-radius: 16px;
+    background: var(--hk-murekkep-2);
+    overflow: hidden;
+}
+
+.sim-toplam[data-durum="bos"] .sim-toplam__dolu,
+.sim-toplam[data-durum="dolu"] .sim-toplam__bos { display: none; }
+
+.sim-toplam__bos {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 24px;
+}
+
+.sim-toplam__bos svg {
+    flex: none;
+    width: 26px;
+    height: 26px;
+    fill: none;
+    stroke: var(--hk-ak-soluk);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+}
+
+.sim-toplam__bos p {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--hk-ak-soluk);
+}
+
+.sim-toplam__bos strong { color: var(--hk-ak); }
+
+.sim-toplam__liste {
+    margin: 0;
+    padding: 8px 0 0;
+    list-style: none;
+}
+
+.sim-toplam__liste li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--hk-murekkep-cizgi);
+    font-size: 0.95rem;
+    color: var(--hk-ak-soluk);
+}
+
+.sim-toplam__liste span {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.sim-toplam__liste b {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    color: var(--hk-ak);
+}
+
+.sim-toplam__sonuc {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 24px;
+    text-align: center;
+}
+
+.sim-toplam__etiket {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--hk-ak-soluk);
+}
+
+.sim-toplam__sayi {
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: clamp(2.2rem, 6vw, 3.6rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    color: #4ade80;
+}
+
+.sim-toplam__not { font-size: 0.86rem; color: var(--hk-ak-soluk); }
+
+/* ============================================================================
  * ANLATI ARASI: açık zeminli okuma bölümü
  * Sinematik perdeler arasında göz dinlensin ve iddia yazıyla da kurulsun.
  * ========================================================================== */
@@ -1348,6 +1603,16 @@
     /* Etiket ve gerekçe dar ekranda tek satıra sığmıyor; gerekçe
        kartın altına değil etiketin altına giriyor. */
     .sim-karar__kart small { display: none; }
+
+    .sim-etiket-kart {
+        width: min(80vw, 300px);
+        transform: translate3d(0, calc(2% + var(--b3) * 16%),
+                               calc(-30px - var(--b3) * 300px));
+    }
+
+    .sim-barkod-tel {
+        transform: translate3d(0, calc(110% - var(--b3) * 96%), 0);
+    }
 
     .sim-dek { width: min(92vw, 400px); }
     .sim-dek__satir { gap: 6px; }
@@ -1481,4 +1746,15 @@
 
     .sim-sayim__cizgi,
     .sim-perde.gorunur .sim-sayim__cizgi { animation: none; }
+
+    /* Barkod perdesi: yırtık etiket de telefon da görünür, ad tam yazılı,
+       sonuç kartı açık. */
+    .sim-etiket-kart,
+    .sim-barkod-tel {
+        transform: none !important;
+        opacity: 1 !important;
+    }
+
+    .sim-bul__yazi { clip-path: none; }
+    .sim-bul__sonuc { opacity: 1; }
 }

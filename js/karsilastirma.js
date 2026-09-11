@@ -363,6 +363,27 @@
              * görünür oluyor.
              */
             if (vurguEl) vurguEl.classList.add('acik');
+
+            /*
+             * Sonucu dışarıya duyur. Sahne bunu kimin dinlediğini bilmiyor;
+             * hakkımızda sayfasında dinleyen yok, simülasyon sayfasında
+             * `js/simulasyon.js` dinleyip oynatılan sahnelerin farklarını
+             * topluyor. Motoru sayfaya bağlamamak için olay kullanıldı:
+             * geri çağrı parametresi eklemek her çağrı yerini
+             * değiştirmeyi gerektirirdi.
+             */
+            try {
+                kap.dispatchEvent(new CustomEvent('krs:bitti', {
+                    bubbles: true,
+                    detail: {
+                        baslik: tanim.baslik || '',
+                        solSure: sol.toplam,
+                        sagSure: sag.toplam,
+                        fark: fark,
+                        kat: kat
+                    }
+                }));
+            } catch (e) { /* olay kurulamadıysa sahne yine de çalışır */ }
         }
 
         var perde = kap.querySelector('.krs__perde');
