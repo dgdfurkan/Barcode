@@ -153,7 +153,101 @@
 </section>
 
 <!-- ==================================================================
-     Perde 1. Sipariş toplama  (2. aşamada doldurulacak)
+     Perde 1. Sipariş toplama. Sinematik sahne
+     ================================================================== -->
+<section class="sim-perde sim-toplama" style="--sim-yol: 460vh" aria-label="Sipariş toplama sahnesi">
+    <div class="sim-sahne">
+
+        <div class="sim-kat sim-kat--zemin" aria-hidden="true">
+            <div class="sim-koridor">
+                <i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i>
+                <i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i>
+            </div>
+            <div class="sim-izgara"></div>
+        </div>
+
+        <div class="sim-kat sim-kat--ust sim-kat--oynak">
+            <div class="sim-repl">
+                <p class="sim-repl__a">
+                    <span class="sim-yaka sim-yaka--eski">Eskiden</span>
+                    Liste terminalin küçük ekranında, ürün rafta.
+                    <b>Göz iki yerde, saat işliyor.</b>
+                </p>
+                <p class="sim-repl__b">
+                    <span class="sim-yaka sim-yaka--yeni">Jet Barkod ile</span>
+                    Barkodlar tek geçişte okunuyor, liste telefona düşüyor.
+                    <b>Toplama sıradaki sipariş beklenirken.</b>
+                </p>
+            </div>
+        </div>
+
+        <div class="sim-kat sim-kat--alt sim-kat--oynak">
+            <div class="sim-cihaz sim-terminal sim-kosan">
+                <div class="sim-cihaz__ekran sim-term-ekran">
+                    <div class="sim-term-bas">BNK.004</div>
+                    <ul class="sim-term-liste">
+                        <li><span>Ekmek (200 g)</span><b>2</b></li>
+                        <li><span>Süt (1 L)</span><b>1</b></li>
+                        <li><span>Erikli Su (5 L)</span><b>3</b></li>
+                        <li><span>Maydanoz</span><b>1</b></li>
+                        <li><span>Süzme Yoğurt</span><b>1</b></li>
+                    </ul>
+                </div>
+                <div class="sim-terminal__tuslar" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sim-kat sim-kat--alt sim-kat--oynak">
+            <div class="sim-cihaz sim-telefon sim-yukselen">
+                <div class="sim-cihaz__ekran sim-sip">
+                    <div class="sim-sip__bas">
+                        <strong>BNK.004</strong>
+                        <span>5 kalem · 8 parça</span>
+                    </div>
+                    <div class="sim-sip__cubuk"><i></i></div>
+                    <ul class="sim-sip__liste">
+                        <li class="sim-sip__satir" style="--esik:0.62">
+                            <em class="sim-sip__gorsel" data-urun="ekmek"></em>
+                            <span class="sim-sip__ad">Ekmek (200 g)</span>
+                            <b class="sim-sip__adet sim-sip__adet--coklu">×2</b>
+                            <s class="sim-sip__tik"></s>
+                        </li>
+                        <li class="sim-sip__satir" style="--esik:0.70">
+                            <em class="sim-sip__gorsel" data-urun="sut"></em>
+                            <span class="sim-sip__ad">Süt (1 L)</span>
+                            <b class="sim-sip__adet">×1</b>
+                            <s class="sim-sip__tik"></s>
+                        </li>
+                        <li class="sim-sip__satir" style="--esik:0.78">
+                            <em class="sim-sip__gorsel" data-urun="su"></em>
+                            <span class="sim-sip__ad">Erikli Su (5 L)</span>
+                            <b class="sim-sip__adet sim-sip__adet--coklu">×3</b>
+                            <s class="sim-sip__tik"></s>
+                        </li>
+                        <li class="sim-sip__satir" style="--esik:0.86">
+                            <em class="sim-sip__gorsel" data-urun="maydanoz"></em>
+                            <span class="sim-sip__ad">Maydanoz</span>
+                            <b class="sim-sip__adet">×1</b>
+                            <s class="sim-sip__tik"></s>
+                        </li>
+                        <li class="sim-sip__satir" style="--esik:0.92">
+                            <em class="sim-sip__gorsel" data-urun="yogurt"></em>
+                            <span class="sim-sip__ad">Süzme Yoğurt</span>
+                            <b class="sim-sip__adet">×1</b>
+                            <s class="sim-sip__tik"></s>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ==================================================================
+     Perde 1. Yarış
      ================================================================== -->
 <section class="sim-ara sim-ara--koyu" id="toplama">
     <div class="sim-ara__ic">
@@ -268,6 +362,7 @@
 
 <script src="../js/vendor/JsBarcode.all.min.js"></script>
 <script src="../js/karsilastirma.js?v=20260831a"></script>
+<script src="../js/karsilastirma-toplama.js?v=20260911a"></script>
 <script src="../js/karsilastirma-barkod.js?v=20260831d"></script>
 <script src="../js/karsilastirma-firin.js?v=20260831a"></script>
 <script src="../js/karsilastirma-hizlibul.js?v=20260831b"></script>

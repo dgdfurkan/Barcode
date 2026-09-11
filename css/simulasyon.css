@@ -534,6 +534,304 @@
 }
 
 /* ============================================================================
+ * PERDE 1: SİPARİŞ TOPLAMA
+ *
+ * İki durak tek sahnede. Önce koridor kameraya doğru akıyor: koşu bu.
+ * Sonra akış duruyor, terminal geri çekiliyor, telefon kadraja yükseliyor
+ * ve satırlar sırayla yeşile dönüyor.
+ *
+ * Duraklar:
+ *   0.00 - 0.46  koridor akıyor, terminal elde, birinci replik
+ *   0.42 - 0.60  akış yavaşlıyor, replik değişiyor
+ *   0.52 - 1.00  telefon yükseliyor, satırlar sırayla işaretleniyor
+ * ========================================================================== */
+
+.sim-toplama {
+    --k1: clamp(0, calc(var(--p, 0) / 0.46), 1);
+    --k2: clamp(0, calc((var(--p, 0) - 0.42) / 0.18), 1);
+    --k3: clamp(0, calc((var(--p, 0) - 0.52) / 0.22), 1);
+}
+
+/* ── Koridor ──
+   Altı raf çerçevesi derinlemesine diziliyor ve `--k1` ile kameraya doğru
+   geliyor. Akış hissini veren şey çerçevelerin yanından geçmesi. */
+.sim-koridor {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    /* Akış `--k1` ile hızlanıp `--k2` ile duruyor: koşu bitiyor. */
+    transform: translate3d(0, 0, calc(var(--k1) * 1500px * (1 - var(--k2) * 0.35)));
+}
+
+.sim-koridor i {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: min(78vw, 900px);
+    height: min(64vh, 560px);
+    margin: calc(min(64vh, 560px) / -2) 0 0 calc(min(78vw, 900px) / -2);
+    border: 2px solid rgb(148 163 184 / 0.16);
+    border-radius: 4px;
+    /* Her çerçeve bir öncekinden 340 piksel daha uzakta. */
+    transform: translate3d(0, 0, calc(var(--i) * -340px));
+    /* Uzaktaki soluk, yakındaki belirgin. */
+    opacity: calc(0.15 + var(--i) * 0.13);
+}
+
+/* Raf katları: çerçevenin içinde yatay çizgiler. Boş dikdörtgen raf
+   gibi durmuyor, üç kat çizgi duruyor. */
+.sim-koridor i::before,
+.sim-koridor i::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgb(148 163 184 / 0.2);
+}
+
+.sim-koridor i::before { top: 33%; }
+.sim-koridor i::after  { top: 66%; }
+
+/* ── Replikler ── */
+.sim-repl {
+    position: relative;
+    width: min(92vw, 720px);
+    text-align: center;
+}
+
+.sim-repl p {
+    margin: 0;
+    font-size: clamp(1rem, 2.1vw, 1.32rem);
+    line-height: 1.5;
+    color: var(--hk-ak-soluk);
+}
+
+.sim-repl b {
+    display: block;
+    margin-top: 6px;
+    font-weight: 700;
+    color: var(--hk-ak);
+}
+
+.sim-repl .sim-yaka { margin-bottom: 12px; }
+
+/* İki replik üst üste duruyor, yalnız görünürlükleri değişiyor: biri
+   diğerinin yerini alsaydı sahne o anda bir satır boyu zıplardı. */
+.sim-repl__b {
+    position: absolute;
+    inset: 0;
+}
+
+.sim-repl__a { opacity: calc(1 - var(--k2)); }
+.sim-repl__b { opacity: var(--k2); }
+
+/* ── Elde terminal ──
+   Koşarken hafifçe sallanıyor; akış durunca geri plana çekilip söner. */
+.sim-kosan {
+    transform: translate3d(calc(-24% + var(--k2) * -14%), calc(18% + var(--k3) * 30%),
+                           calc(-60px - var(--k3) * 420px))
+               rotateY(calc(14deg * var(--sim-egim)))
+               rotateZ(calc((2deg - var(--k1) * 4deg) * var(--sim-egim)));
+    opacity: calc(1 - var(--k3) * 0.85);
+}
+
+/* Terminal ekranındaki liste: küçük, sıkışık, okunması için durmak
+   gereken tipografi. Anlatılan şey bu. */
+.sim-term-ekran { padding: 6px; }
+
+.sim-term-bas {
+    padding: 3px 4px;
+    border-radius: 3px;
+    background: #e5e7eb;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #374151;
+}
+
+.sim-term-liste {
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sim-term-liste li {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 4px;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 7px;
+    color: #4b5563;
+}
+
+.sim-term-liste b { margin-left: auto; font-size: 8px; color: #111827; }
+
+/* ── Telefon ──
+   Akış durduktan sonra kadraja yükseliyor. */
+.sim-yukselen {
+    transform: translate3d(calc(22% + var(--k3) * -4%),
+                           calc(120% - var(--k3) * 104%),
+                           calc(-40px + var(--k3) * 120px))
+               rotateY(calc((-16deg + var(--k3) * 12deg) * var(--sim-egim)));
+    opacity: var(--k3);
+}
+
+/* ── Telefondaki siparişler ekranı ── */
+.sim-sip {
+    display: flex;
+    flex-direction: column;
+    padding: 8px;
+    background: var(--hk-kagit-2);
+    font-size: 9px;
+}
+
+.sim-sip__bas {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 4px 5px 7px;
+}
+
+.sim-sip__bas strong {
+    font-family: 'Manrope', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.sim-sip__bas span { font-size: 8px; color: #667085; }
+
+.sim-sip__cubuk {
+    height: 3px;
+    margin: 0 5px 8px;
+    border-radius: 999px;
+    background: #e4e7ec;
+    overflow: hidden;
+}
+
+/* Çubuk genişlik DEĞİL ölçek ile doluyor: genişlik animasyonu her karede
+   yerleşim hesaplatıyor, ölçek hesaplatmıyor. */
+.sim-sip__cubuk i {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: var(--hk-mavi);
+    transform: scaleX(var(--k3));
+    transform-origin: left center;
+}
+
+.sim-sip__liste {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.sim-sip__satir {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px;
+    border: 1px solid var(--hk-cizgi);
+    border-radius: 9px;
+    background: #fff;
+    overflow: hidden;
+}
+
+/* Alındı hâli: satırın üstüne yeşil bir kaplama beliriyor. Arka plan
+   rengini `--p` ile değiştirmek mümkün değil; opaklık değiştirmek
+   mümkün ve ucuz. */
+.sim-sip__satir::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1px solid #a7e8c8;
+    border-radius: 9px;
+    background: #f0fdf6;
+    opacity: clamp(0, calc((var(--p, 0) - var(--esik)) / 0.05), 1);
+}
+
+/* Satırın kendi içeriği kaplamanın üstünde kalıyor. */
+.sim-sip__satir > * { position: relative; z-index: 1; }
+
+.sim-sip__gorsel {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    background: #eef2f6 center / cover no-repeat;
+}
+
+.sim-sip__gorsel[data-urun="ekmek"]    { background-image: url(../assets/tanitim/ekmek.jpg); }
+.sim-sip__gorsel[data-urun="sut"]      { background-image: url(../assets/tanitim/sut.jpg); }
+.sim-sip__gorsel[data-urun="su"]       { background-image: url(../assets/tanitim/su.jpg); }
+.sim-sip__gorsel[data-urun="maydanoz"] { background-image: url(../assets/tanitim/maydanoz.jpg); }
+.sim-sip__gorsel[data-urun="yogurt"]   { background-image: url(../assets/tanitim/yogurt.jpg); }
+
+.sim-sip__ad {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 9px;
+    font-weight: 600;
+    color: #111827;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Adet rozeti: çoklu olan mavi ve kalın. Kaçırılması en pahalı bilgi. */
+.sim-sip__adet {
+    flex: none;
+    padding: 2px 5px;
+    border-radius: 6px;
+    background: var(--hk-kagit-3);
+    font-size: 9px;
+    font-weight: 800;
+    color: #667085;
+}
+
+.sim-sip__adet--coklu { background: #dbe7ff; color: var(--hk-mavi); }
+
+.sim-sip__tik {
+    flex: none;
+    position: relative;
+    width: 15px;
+    height: 15px;
+    border: 1px solid #d0d5dd;
+    border-radius: 999px;
+    background: #fff;
+    text-decoration: none;
+}
+
+.sim-sip__tik::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 999px;
+    background: var(--hk-yesil);
+    opacity: clamp(0, calc((var(--p, 0) - var(--esik)) / 0.05), 1);
+}
+
+.sim-sip__tik::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 5px;
+    width: 6px;
+    height: 3px;
+    border: 0 solid #fff;
+    border-left-width: 1.6px;
+    border-bottom-width: 1.6px;
+    transform: rotate(-45deg);
+    opacity: clamp(0, calc((var(--p, 0) - var(--esik)) / 0.05), 1);
+}
+
+/* ============================================================================
  * ANLATI ARASI: açık zeminli okuma bölümü
  * Sinematik perdeler arasında göz dinlensin ve iddia yazıyla da kurulsun.
  * ========================================================================== */
@@ -628,4 +926,29 @@
 
     .sim-ipucu { display: none; }
     .sim-ipucu i { animation: none; }
+
+    /* Toplama perdesi: koridor akışı kalkıyor, iki replik de alt alta
+       duruyor, iki cihaz da görünür, liste toplanmış hâlde. Hareket
+       gitti, anlatı yerinde. */
+    .sim-koridor { display: none; }
+
+    .sim-repl__a,
+    .sim-repl__b {
+        position: static;
+        opacity: 1 !important;
+    }
+
+    .sim-repl__b { margin-top: 28px; }
+
+    .sim-kosan,
+    .sim-yukselen {
+        transform: none !important;
+        opacity: 1 !important;
+    }
+
+    .sim-sip__cubuk i { transform: scaleX(1); }
+
+    .sim-sip__satir::after,
+    .sim-sip__tik::before,
+    .sim-sip__tik::after { opacity: 1; }
 }
