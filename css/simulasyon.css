@@ -128,6 +128,10 @@
 
 .sim-kat--alt { place-items: end center; }
 
+/* Deste alt bölgede ama tabana yapışmıyor: karar kartları onun yerine
+   gelirken ortada bir soluklanma payı kalsın. */
+.sim-kat--dek { padding-bottom: clamp(48px, 11vh, 130px); }
+
 .sim-ic {
     position: relative;
     width: min(100%, var(--hk-en));
@@ -502,10 +506,12 @@
 }
 
 /* İki şerit sahnenin sonunda açılıyor. */
-.sim-acilis .sim-yol-cift {
-    opacity: var(--d3);
-    transform: translate3d(0, calc(40px - var(--d3) * 40px), 0);
-}
+/* Giriş kayması KAPTA DEĞİL, sütunlarda.
+   Kap `inset: 0` ile sahnenin tamamı kadar; ona verilen her dikey kayma
+   doğrudan alttan taşma demek oluyordu. İçerik zaten ortalanmış olduğu
+   için görünen bir kırpılma olmuyordu ama kutu sahnenin dışına çıkıyordu.
+   Kayma sütunlara taşındı; kap yerinde duruyor. */
+.sim-acilis .sim-yol-cift { opacity: var(--d3); }
 
 .sim-acilis .sim-yol-cift > div {
     display: grid;
@@ -515,12 +521,14 @@
 }
 
 .sim-acilis .sim-yol-cift > div:first-child {
-    transform: translate3d(calc(var(--d3) * -4%), 0, calc(var(--d4) * -60px))
+    transform: translate3d(calc(var(--d3) * -4%), calc(28px - var(--d3) * 28px),
+                           calc(var(--d4) * -60px))
                rotateY(calc(var(--d3) * 13deg * var(--sim-egim)));
 }
 
 .sim-acilis .sim-yol-cift > div:last-child {
-    transform: translate3d(calc(var(--d3) * 4%), 0, calc(var(--d4) * -60px))
+    transform: translate3d(calc(var(--d3) * 4%), calc(28px - var(--d3) * 28px),
+                           calc(var(--d4) * -60px))
                rotateY(calc(var(--d3) * -13deg * var(--sim-egim)));
 }
 
@@ -863,10 +871,20 @@
 
 /* ── Deste ──
    On dört satır derinlemesine diziliyor. Uzaktaki küçük ve soluk; sıra
-   ona gelene kadar bekliyor. */
+   ona gelene kadar bekliyor.
+
+   DERİNLİK YUKARI DEĞİL GERİYE.
+   Önce her satır bir öncekinden 26 piksel YUKARIDA duruyordu: on dört
+   satır 364 piksellik bir merdiven yapıyor, sahnenin ortasından çıkıp
+   üstteki replik yazısının içine giriyor ve sayacı örtüyordu. Artık
+   yukarı kayma 7 piksel, asıl ayrımı 74 piksellik derinlik yapıyor.
+   Perspektif uzaktakini zaten küçültüyor; deste gerçekten deste gibi
+   duruyor ve dikey yer kaplamıyor. */
 .sim-dek {
     position: relative;
     width: min(86vw, 460px);
+    /* Yüksekliği belli bir blok: katman onu alt bölgeye hizalayabilsin. */
+    height: 190px;
     margin: 0;
     padding: 0;
     list-style: none;
@@ -894,12 +912,12 @@
     border: 1px solid rgb(148 163 184 / calc(0.18 + var(--ac) * 0.34));
     border-radius: 9px;
     background: rgb(17 24 39 / 0.92);
-    /* Deste: her satır bir öncekinden biraz yukarıda ve biraz uzakta.
-       Açılan satır 26 piksel öne geliyor, böylece sıranın nerede olduğu
-       gözle takip edilebiliyor. */
-    transform: translate3d(0, calc(var(--i) * -26px),
-                           calc(var(--i) * -46px + var(--ac) * 26px));
-    opacity: calc(0.34 + var(--i) * 0.035 + var(--ac) * 0.4);
+    /* Açılan satır 34 piksel öne geliyor, böylece sıranın nerede olduğu
+       gözle takip edilebiliyor. Öne gelse bile bir öncekinin önüne
+       geçmiyor: 74 piksellik aralık 34'ten büyük. */
+    transform: translate3d(0, calc(var(--i) * -7px),
+                           calc(var(--i) * -74px + var(--ac) * 34px));
+    opacity: calc(0.3 + var(--i) * 0.03 + var(--ac) * 0.45);
 }
 
 .sim-dek__gorsel {
@@ -1010,8 +1028,12 @@
     border: 1px solid;
     border-radius: 12px;
     background: rgb(17 24 39 / 0.94);
-    /* Kartlar sırayla geliyor: `--s` her kartta bir artıyor. */
-    transform: translate3d(0, calc((1 - var(--f3)) * 60px * (1 + var(--s))), 0);
+    /* Kartlar sırayla geliyor: `--s` her kartta bir artıyor.
+
+       Kayma eskiden 60/120/180 pikseldi: üçüncü kart giriş sırasında
+       sahnenin altından 36 ila 67 piksel taşıyordu. Sıra hissi 26/40/54
+       ile de kuruluyor, taşma kalmıyor. */
+    transform: translate3d(0, calc((1 - var(--f3)) * (26px + var(--s) * 14px)), 0);
 }
 
 .sim-karar__kart em {
@@ -1332,8 +1354,11 @@
 }
 
 /* ── Telefonda arama ── */
+/* Telefon alçak pencerede replik yazısının 9 pikselini örtüyordu. Son
+   konumu bir tık aşağı alındı; alttan kırpılması sorun değil, üstteki
+   yazıyla çakışması sorun. */
 .sim-barkod-tel {
-    transform: translate3d(calc(20% - var(--b3) * 4%), calc(110% - var(--b3) * 96%),
+    transform: translate3d(calc(20% - var(--b3) * 4%), calc(112% - var(--b3) * 88%),
                            calc(-30px + var(--b3) * 100px))
                rotateY(calc((-14deg + var(--b3) * 10deg) * var(--sim-egim)));
     opacity: var(--b3);
@@ -1611,13 +1636,42 @@
     }
 
     .sim-barkod-tel {
-        transform: translate3d(0, calc(110% - var(--b3) * 96%), 0);
+        transform: translate3d(0, calc(112% - var(--b3) * 88%), 0);
     }
 
     .sim-dek { width: min(92vw, 400px); }
     .sim-dek__satir { gap: 6px; }
     .sim-dek__ad { font-size: 10px; }
     .sim-dek__stok i { padding: 2px 4px; font-size: 9px; }
+}
+
+/* ============================================================================
+ * ALÇAK PENCERE
+ *
+ * 320x568 gibi kısa ekranlarda replik yazısı üç satıra çıkıyor ve üst
+ * boşlukla birlikte sahnenin yarısını yiyor; altta duran öğeler yazının
+ * içine giriyordu (barkod perdesinde etiket 7, telefon 17 piksel).
+ *
+ * Yükseklik bir kırılma noktası olarak ayrıca ele alınıyor: genişlik
+ * kuralları burada işe yaramıyor, çünkü sorun dar olmak değil alçak
+ * olmak.
+ * ========================================================================== */
+
+@media (max-height: 640px) {
+    .sim-kat--ust { padding-top: 40px; }
+
+    .sim-repl p { font-size: 0.95rem; }
+    .sim-repl .sim-yaka { margin-bottom: 8px; }
+
+    /* Cihazlar ve etiket bir tık aşağı: alttan kırpılmaları sorun değil,
+       üstteki yazıyla çakışmaları sorun. */
+    .sim-etiket-kart { transform: translate3d(0, calc(10% + var(--b3) * 16%), calc(-30px - var(--b3) * 300px)); }
+    .sim-barkod-tel  { transform: translate3d(0, calc(118% - var(--b3) * 80%), 0); }
+    .sim-yukselen    { transform: translate3d(0, calc(118% - var(--k3) * 88%), 0); }
+    .sim-raf-telefon { transform: translate3d(0, calc(118% - var(--s3) * 88%), 0); }
+
+    .sim-kat--dek { padding-bottom: 40px; }
+    .sim-dek { height: 150px; }
 }
 
 /* ============================================================================
