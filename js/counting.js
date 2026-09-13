@@ -4998,11 +4998,20 @@ class CountingSystem {
         if (!this.currentTableName) return;
         if (this._importInProgress) return;
 
+        /* HEDEF TABLO BAŞTA SABİTLENİYOR.
+           Eskiden sorgu `this.currentTableName` ile açılıyor, sonuçlar
+           döndüğünde tablo adı BİR DAHA okunuyordu. Arada tablo değişirse
+           (gün ekleme tam olarak bunu yapıyor) eski tablonun satırları yeni
+           tablonun içine yazılıyordu. Kullanıcı bunu "aktif tablonun üzerine
+           yazıyor" diye görüyor, sayfayı yenileyince düzeliyordu; çünkü
+           sunucudaki veri doğru, bozulan yalnız bellekteki hâldi. */
+        const hedefTablo = this.currentTableName;
+
         try {
-            // 1. Aktif tablonun tüm ürünlerini çek
+            // 1. Hedef tablonun tüm ürünlerini çek
             const { data: rows, error } = await this._queryCountingItems(
                 this._getCountingItemsSelectColumns(false),
-                (q) => q.eq('username', this.currentUser.username).eq('table_name', this.currentTableName)
+                (q) => q.eq('username', this.currentUser.username).eq('table_name', hedefTablo)
             );
             if (error) return;
 
@@ -5012,19 +5021,26 @@ class CountingSystem {
             }
 
             let changed = false;
-            const localTable = this.cachedFullData?._tables?.[this.currentTableName];
+            const localTable = this.cachedFullData?._tables?.[hedefTablo];
             if (!localTable) return;
+
+            /* Sorgu sürerken tablo değiştiyse satırlar hedef tablonun kendi
+               slotuna yazılır, ekrandaki tabloya DOKUNULMAZ. */
+            const halaAktif = this.currentTableName === hedefTablo;
+            const canli = halaAktif ? this.countingData : null;
 
             // Yeni gelen veya güncellenen ürünleri merge et (last-write-wins)
             for (const [pId, incoming] of Object.entries(incomingMap)) {
                 const local = localTable[pId];
                 if (!local) {
                     localTable[pId] = incoming;
-                    this.countingData[pId] = incoming;
                     if (!Array.isArray(localTable._productOrder)) localTable._productOrder = [];
                     if (!localTable._productOrder.includes(pId)) localTable._productOrder.push(pId);
-                    if (!Array.isArray(this.countingData._productOrder)) this.countingData._productOrder = [];
-                    if (!this.countingData._productOrder.includes(pId)) this.countingData._productOrder.push(pId);
+                    if (canli) {
+                        canli[pId] = incoming;
+                        if (!Array.isArray(canli._productOrder)) canli._productOrder = [];
+                        if (!canli._productOrder.includes(pId)) canli._productOrder.push(pId);
+                    }
                     changed = true;
                 } else {
                     const incomingTs = new Date(incoming.lastUpdated).getTime();
@@ -5032,16 +5048,18 @@ class CountingSystem {
                     if (incomingTs > localTs) {
                         const merged = this._mergeCountingEntryFromRemote(local, incoming);
                         localTable[pId] = merged;
-                        this.countingData[pId] = merged;
+                        if (canli) canli[pId] = merged;
                         changed = true;
                     }
                 }
             }
 
             if (changed) {
-                this.scheduleRenderTable();
-                this.updateStatistics();
-                this.updateCountingProgress();
+                if (halaAktif) {
+                    this.scheduleRenderTable();
+                    this.updateStatistics();
+                    this.updateCountingProgress();
+                }
                 this._scheduleTableSelectorUpdate();
                 this._saveFullBlobToLocalStorage();
             }
@@ -5341,6 +5359,10 @@ class CountingSystem {
         }
         void this._flushPendingProductSaves(fromTable);
         this._persistTableSlotLocally(fromTable);
+        /* Tablo değişimi sırasında sunucudan gelen yakalama sorgusu araya
+           girmesin. Toplu içe aktarma kilidi ancak applyImportedRows'ta
+           başlıyor; arada kalan bu pencere korumasızdı. */
+        this._suppressCatchUpUntil = Date.now() + 3000;
 
         const fullData = this.cachedFullData || { _api_info: {}, _tables: {} };
         if (!fullData._tables) fullData._tables = {};
@@ -6354,6 +6376,10 @@ class CountingSystem {
         }
         void this._flushPendingProductSaves(fromTable);
         this._persistTableSlotLocally(fromTable);
+        /* Tablo değişimi sırasında sunucudan gelen yakalama sorgusu araya
+           girmesin. Toplu içe aktarma kilidi ancak applyImportedRows'ta
+           başlıyor; arada kalan bu pencere korumasızdı. */
+        this._suppressCatchUpUntil = Date.now() + 3000;
 
         if (!options.allowDaily && trimmed.startsWith(this.DAILY_TABLE_PREFIX)) {
             throw new Error('Bu isim günlük sayım için ayrılmıştır; genel tabloda kullanılamaz');
