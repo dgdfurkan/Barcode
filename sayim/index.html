@@ -2407,6 +2407,18 @@
                 padding: 1rem;
             }
         }
+
+        /* ÇENTİK
+           Üst çubuk `sticky top-0`. Sayfa `viewport-fit=cover` ile açılıyor
+           ve durum çubuğu saydam, yani gövde ekranın en tepesinden, çentiğin
+           altından başlıyor. Dolgu koymazsak "Barkod Aramaya Dön" düğmesi
+           çentiğin altında kalıyor ve iPhone'da basılamıyor.
+
+           Seçici yapıya bakıyor çünkü üst çubuk saf Tailwind sınıflarıyla
+           yazılmış, tutunacak bir sınıf adı yok. */
+        body > header.sticky {
+            padding-top: env(safe-area-inset-top);
+        }
     </style>
     <link rel="stylesheet" href="../css/motion.css?v=20260828i" />
     <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />

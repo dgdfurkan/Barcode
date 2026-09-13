@@ -212,7 +212,17 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     position: sticky;
     top: 0;
     z-index: 30;
-    height: 70px;
+    /* ÇENTİK
+       Sayfa `viewport-fit=cover` ile açılıyor ve durum çubuğu saydam.
+       Yani gövde ekranın en tepesinden başlıyor, çentiğin altından.
+       Dolgu koymazsak marka ve gezinme bağlantıları çentiğin altında
+       kalıyor, iPhone'da tıklanamıyorlar.
+
+       Yükseklik `height` değil `min-height`: `box-sizing: border-box`
+       global, sabit yükseklikte dolgu içeriği ezerdi. İç satır kendi
+       yüksekliğini taşıyor. */
+    min-height: 70px;
+    padding-top: env(safe-area-inset-top);
     border-bottom: 1px solid var(--cizgi);
     background: rgba(255,255,255,0.97);
     color: var(--yazi);
@@ -222,7 +232,9 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 }
 .sip-ust__ic {
     width: min(1540px, calc(100% - 48px));
-    height: 100%;
+    /* 70 değil 69: alt kenarlık sınır kutusuna dahil, eskiden `height:100%`
+       de 69px veriyordu. Çubuğun toplam yüksekliği 70'te kalsın. */
+    height: 69px;
     margin: 0 auto;
     display: flex; align-items: center; justify-content: space-between;
     gap: 24px;
@@ -524,7 +536,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-serit { min-width: 0; }
 .sip-serit__ust {
     position: sticky;
-    top: 82px;
+    top: calc(82px + env(safe-area-inset-top));
     z-index: 6;
     min-height: 68px;
     margin-bottom: 12px;
@@ -1465,7 +1477,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 
 /* Bildirim */
 .sip-bildirim {
-    position: fixed; left: 50%; bottom: 25px; z-index: 120;
+    position: fixed; left: 50%; bottom: calc(25px + env(safe-area-inset-bottom)); z-index: 120;
     padding: 11px 15px;
     display: flex; align-items: center; gap: 8px;
     border-radius: 11px;
@@ -1486,7 +1498,11 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-urunler--ikili .sip-bolum { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 900px) {
-    .sip-ust { height: 62px; }
+    /* `height` değil `min-height`: sabit yükseklikte çentik dolgusu
+       içeriği ezerdi (`box-sizing: border-box` global). İç satır kendi
+       yüksekliğini taşıyor. */
+    .sip-ust { min-height: 62px; }
+    .sip-ust__ic { height: 61px; }
     .sip-ust__ic, .sip-sayfa { width: calc(100% - 30px); }
     .sip-marka__im { width: 36px; height: 36px; border-radius: 11px; }
     .sip-marka__im img { width: 22px; height: 22px; }
@@ -1505,7 +1521,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
        istediği şeridi görebiliyor. Snap ile şeritler hizalı duruyor. */
     .sip-akis { gap: 4px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .sip-ayrac { display: none; }
-    .sip-serit__ust { top: 72px; padding: 10px; }
+    .sip-serit__ust { top: calc(72px + env(safe-area-inset-top)); padding: 10px; }
     .sip-serit__ikon { width: 36px; height: 36px; }
     .sip-serit__liste { gap: 9px; }
     .sip-ayrac { min-height: 460px; }
@@ -1547,7 +1563,7 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-ust__yol > a:first-child { display: none; }
 
     .sip-akis { margin-top: 10px; gap: 3px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .sip-serit__ust { top: 68px; min-height: 0; margin-bottom: 5px; padding: 6px; gap: 5px; border-radius: 9px; }
+    .sip-serit__ust { top: calc(68px + env(safe-area-inset-top)); min-height: 0; margin-bottom: 5px; padding: 6px; gap: 5px; border-radius: 9px; }
     .sip-serit__ikon { width: 24px; height: 24px; border-radius: 6px; }
     .sip-serit__ikon svg { width: 13px; }
     .sip-serit__ust h2 { font-size: 11px; line-height: 1.2; }

@@ -96,7 +96,10 @@ body.giris {
     display: flex;
     align-items: center;
     gap: 1rem;
-    padding: 1.15rem clamp(1rem, 4vw, 2.5rem);
+    /* Çentik: sayfa `viewport-fit=cover` ve durum çubuğu saydam, gövde
+       ekranın en tepesinden başlıyor. Dolgu olmadan marka ve "Destek"
+       düğmesi çentiğin altında kalıyor. */
+    padding: calc(1.15rem + env(safe-area-inset-top)) clamp(1rem, 4vw, 2.5rem) 1.15rem;
 }
 
 .giris-marka {
@@ -750,7 +753,10 @@ body.giris #openChat::after {
 }
 
 @media (max-width: 560px) {
-    .giris-ust { padding: 0.9rem 1rem; }
+    /* Çentik dolgusu burada da korunuyor. `padding` kısayolu yazılırsa
+       üstteki `padding-top: env(...)` siliniyor ve tam da telefonda,
+       yani çentiğin olduğu yerde, marka çubuğu çentiğin altına giriyordu. */
+    .giris-ust { padding: calc(0.9rem + env(safe-area-inset-top)) 1rem 0.9rem; }
     .giris-rakamlar { gap: 0 1.2rem; }
     .giris-cagri { flex-direction: column; align-items: stretch; text-align: center; }
     .giris-cagri__dugme { justify-content: center; }
