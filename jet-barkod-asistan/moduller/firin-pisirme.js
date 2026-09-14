@@ -1033,6 +1033,18 @@
           }
 
           function getCurrentTimeSlot(hours) {
+            /* GECE YARISI İLE 08:00 ARASI 08:00-12:00 DİLİMİ SAYILIR.
+               Fırın paneli asıl bu saatlerde, sabahki pişirmeye hazırlanmak
+               için açılıyor. Eskiden 00:00-07:59 hiçbir aralığa uymayıp son
+               satıra düşüyordu: dün akşamın 20:00-00:00 hedefi "şimdi"
+               sanılıyor, kartta o sütun yeşil yanıyor, hesap o sayıya göre
+               yapılıyordu. Üstelik ileriye bakış `currentSlotIndex !== 3`
+               dediği için sabah dilimine hazırlık uyarısı hiç açılmıyordu.
+
+               Gündüz davranışı değişmiyor. `getCurrentTimeSlot(24)` de bu
+               dala girmiyor (24 < 8 değil), yani "sonraki dilim" adlandırması
+               olduğu gibi kalıyor. */
+            if (hours < 8) return { index: 0, name: '08:00-12:00', start: 8, end: 12 };
             if (hours >= 8 && hours < 12) return { index: 0, name: '08:00-12:00', start: 8, end: 12 };
             if (hours >= 12 && hours < 16) return { index: 1, name: '12:00-16:00', start: 12, end: 16 };
             if (hours >= 16 && hours < 20) return { index: 2, name: '16:00-20:00', start: 16, end: 20 };
@@ -1055,6 +1067,10 @@
             const now = new Date();
             const h = now.getHours();
             const { index: currentSlotIndex } = getCurrentTimeSlot(h);
+            /* Duvar saati 08:00'den once ise panel ileriye calisiyor. Bayrak
+               burada uretiliyor ki afis ile hesap ayni `now`'u gorsun; render
+               saati yeniden okusaydi 08:00 sinirinda ikisi ayrisabilirdi. */
+            const hazirlikModu = h < 8;
             const eveningShelf = settings.eveningShelfExit && h === 23;
             const useShelfMode = manualShelfToggle || eveningShelf;
             let shelfBannerKind = 'evening';
@@ -1063,12 +1079,13 @@
 
             if (useShelfMode) {
               const rows = collectShelfStockRows(products, settings);
-              return { mode: 'shelf-exit', rows, currentSlotIndex, shelfBannerKind };
+              return { mode: 'shelf-exit', rows, currentSlotIndex, shelfBannerKind, hazirlikModu };
             }
             return {
               mode: 'cook',
               rows: generateCookingRecommendations(products, settings),
-              currentSlotIndex
+              currentSlotIndex,
+              hazirlikModu
             };
           }
 
@@ -1368,14 +1385,27 @@
               displayShelfExitList(view.rows, view.currentSlotIndex, view.shelfBannerKind || 'evening');
               return;
             }
-            displayCookingResults(view.rows, view.currentSlotIndex);
+            displayCookingResults(view.rows, view.currentSlotIndex, view.hazirlikModu);
           }
 
-          function displayCookingResults(recommendations, currentSlotIndex) {
+          function displayCookingResults(recommendations, currentSlotIndex, hazirlikModu) {
             resultsContainer.innerHTML = '';
+
+            /* Saat 03:00 iken kartta 08-12 sutununun yesil yanmasi
+               aciklamasiz kalmasin. Afis once ekleniyor, bos durum dali da
+               `innerHTML` yerine append kullaniyor, yoksa afisi siliyordu. */
+            if (hazirlikModu) {
+              const hazirlikAfis = document.createElement('div');
+              hazirlikAfis.style.cssText =
+                'margin-bottom: 1rem; padding: 0.75rem 1rem; background: #1e293b; color: #f8fafc; border-radius: 0.5rem; font-size: 0.875rem; line-height: 1.4;';
+              hazirlikAfis.innerHTML =
+                '<strong>08:00-12:00 dilimi için hazırlık</strong><br/>Saat henüz 08:00 olmadı. Panel bu dilimi «şimdi» sayıyor ve sayıları ona göre veriyor.';
+              resultsContainer.appendChild(hazirlikAfis);
+            }
+
             if (recommendations.length === 0) {
-              resultsContainer.innerHTML =
-                '<div style="text-align: center; padding: 4rem 1rem; background: #f0fdf4; color: #166534; border-radius: 0.5rem;"><h3 style="font-size: 1.25rem; font-weight: 600;">Her şey yolunda!</h3><p style="margin-top: 0.5rem;">Mevcut stoklar yeterli, pişirilmesi gereken ürün yok.</p></div>';
+              resultsContainer.insertAdjacentHTML('beforeend',
+                '<div style="text-align: center; padding: 4rem 1rem; background: #f0fdf4; color: #166534; border-radius: 0.5rem;"><h3 style="font-size: 1.25rem; font-weight: 600;">Her şey yolunda!</h3><p style="margin-top: 0.5rem;">Mevcut stoklar yeterli, pişirilmesi gereken ürün yok.</p></div>');
               return;
             }
             recommendations.forEach((p, i) => {
