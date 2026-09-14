@@ -1,0 +1,1318 @@
+/**
+ * Jet Barkod - Sayim v3
+ * ============================================================================
+ *
+ * v3 motoru (`js/counting.js`) hic degistirmeden yeniden giydirir. Motorun
+ * bekledigi butun kimlikler yeni isaretlemede duruyor, o yuzden butun
+ * islemler calisiyor. Degisen yalniz sunum.
+ *
+ * ---------------------------------------------------------------------------
+ * KAPSAM
+ * ---------------------------------------------------------------------------
+ * Butun kurallar `.s3` altinda. v1 (`/sayim/`) ve v2 (`/sayim-yeni/`) ayni
+ * motoru paylasiyor ama bu dosyayi yuklemiyor, yani onlara hicbir sey sizmaz.
+ *
+ * ---------------------------------------------------------------------------
+ * MOTORUN URETTIGI ISARETLEMEYI NASIL EZIYORUZ
+ * ---------------------------------------------------------------------------
+ * Motor kart ve satir HTML'ini sablon dizgesiyle basiyor ve Tailwind sinif
+ * adlarini oraya gomulu tutuyor. O dizgelere dokunmak v1 ile v2'yi de
+ * degistirirdi. Bunun yerine ozgullukle eziyoruz: Tailwind yardimcisi tek
+ * sinif (0,1,0), bizim `.s3 .rapid-product-card` gibi seciciler (0,2,0) ya da
+ * uzeri. `!important` gerekmiyor, sadece iki basamak.
+ *
+ * Motorun biraktigi tutamaklar:
+ *   .rapid-product-card.counted / .not-counted   izgara karti
+ *   button[data-table-name][data-table-status]   tablo cipi
+ *   tr.product-row-modern                        masaustu satiri
+ *   .product-card-modern                         mobil kart
+ *   .stock-indicator                             kart durum seridi
+ *
+ * ---------------------------------------------------------------------------
+ * OLCEK (arayuz-sistemi skill'i)
+ * ---------------------------------------------------------------------------
+ * Yazi     10 11 12 13 15 18 26          Bosluk  4 8 12 16 24 32 48
+ * Yaricap  6 9 12 16 999                 Ara deger yok, ondalik piksel yok.
+ *
+ * Hareket  yalniz css/motion.css token'lari. Yalniz transform ve opacity
+ *          animate edilir. Sayim tiki gunde yuzlerce kez tekrarlaniyor,
+ *          orada hareket yok, sadece renk.
+ * ============================================================================
+ */
+
+/* ==========================================================================
+   0) BELIRTECLER
+   Renk ana siteden (`css/main.css` --color-*) geliyor. v3 kendi paletini
+   uydurmuyor, var olana anlam yukluyor.
+   ========================================================================== */
+
+.s3 {
+    --s3-mavi:        var(--color-primary, #2563eb);
+    --s3-mavi-koyu:   var(--color-primary-700, #1d4ed8);
+    --s3-mavi-50:     var(--color-primary-50, #eff6ff);
+    --s3-mavi-100:    var(--color-primary-100, #dbeafe);
+
+    --s3-yazi:        var(--color-text-primary, #0f172a);
+    --s3-yazi-orta:   var(--color-secondary-700, #334155);
+    --s3-sonuk:       var(--color-text-secondary, #475569);
+    --s3-soluk:       var(--color-secondary-400, #94a3b8);
+
+    --s3-cizgi:       var(--color-border, #e2e8f0);
+    --s3-cizgi-ince:  rgba(15, 23, 42, 0.08);
+    --s3-kagit:       var(--color-background, #f8fafc);
+    --s3-yuzey:       var(--color-surface, #ffffff);
+    --s3-tepsi:       #f1f5f9;
+
+    /* Anlam renkleri. Sayimda istenen sonuc FARK OLMAMASI, o yuzden notr
+       gri "tamam" demek; yesil fazlayi, kirmizi eksigi anlatiyor. Renk tek
+       basina anlam tasimaz, her durumun ayrica ikonu var. */
+    --s3-fazla:       #047857;
+    --s3-fazla-zemin: #ecfdf5;
+    --s3-fazla-cizgi: #a7f3d0;
+    --s3-eksik:       #be123c;
+    --s3-eksik-zemin: #fff1f2;
+    --s3-eksik-cizgi: #fecdd3;
+    --s3-bekleyen:    #b45309;
+    --s3-bekleyen-zemin: #fffbeb;
+    --s3-bekleyen-cizgi: #fde68a;
+    --s3-tamam:       #0f766e;
+    --s3-tamam-zemin: #f0fdfa;
+
+    /* Golge yalniz yukseklik anlatir. Sert koyu golge yok, iki katmanli
+       yumusak yayilim var. */
+    --s3-golge-s: 0 1px 2px rgba(15, 23, 42, 0.04);
+    --s3-golge-o: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.14);
+    --s3-golge-b: 0 2px 4px rgba(15, 23, 42, 0.04), 0 24px 48px -20px rgba(15, 23, 42, 0.22);
+
+    --s3-ust-boy: 56px;
+    --s3-komut-boy: 60px;
+
+    --s3-baslik-font: 'Manrope', 'Inter', system-ui, sans-serif;
+    --s3-govde-font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* ==========================================================================
+   1) TABAN
+   ========================================================================== */
+
+.s3 {
+    background: var(--s3-kagit);
+    color: var(--s3-yazi);
+    font-family: var(--s3-govde-font);
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    /* Yatay kaydirma hicbir kirilma noktasinda olmayacak. */
+    overflow-x: hidden;
+}
+
+/* Sayi gosteren her yer sabit genislik. Sayac degisirken yerlesim oynamasin. */
+.s3 .s3-sayi,
+.s3 [data-sayi],
+.s3 input[type='number'] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+}
+
+.s3 :focus-visible {
+    outline: 2px solid var(--s3-mavi);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+/* Dokunma hedefi en az 44px. Gorsel kucuklugu dokunma alanina yansimaz. */
+.s3 .s3-dokun {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+/* ==========================================================================
+   2) UST BAR
+   Centikli iPhone: yukseklik sabit degil, guvenli alan dolguya ekleniyor.
+   ========================================================================== */
+
+.s3-ust {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: rgba(255, 255, 255, 0.86);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    border-bottom: 1px solid var(--s3-cizgi-ince);
+    padding-top: env(safe-area-inset-top);
+}
+
+.s3-ust__ic {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--s3-ust-boy);
+    padding: 0 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+}
+
+.s3-ust__marka {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.s3-ust__logo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.s3-ust__ad {
+    font-family: var(--s3-baslik-font);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1;
+    color: var(--s3-yazi);
+    white-space: nowrap;
+}
+
+.s3-ust__bosluk { flex: 1 1 auto; min-width: 0; }
+
+/* Geri, cikis gibi ikon dugmeleri */
+.s3-ikon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 10px;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--s3-sonuk);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                transform var(--motion-fast, 140ms) var(--motion-ease-out);
+}
+
+.s3-ikon-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* Dokunmali cihazda hover yanlis tetikleniyor, kapiya aliyoruz. */
+@media (hover: hover) and (pointer: fine) {
+    .s3-ikon-btn:hover { background: var(--s3-tepsi); color: var(--s3-yazi); }
+}
+
+/* Basildigi an geri bildirim. Emil'in kurali: dugme dinledigini gostersin. */
+.s3-ikon-btn:active { transform: scale(0.97); }
+
+.s3-ikon-btn--birincil {
+    background: var(--s3-mavi);
+    color: #fff;
+    box-shadow: var(--s3-golge-s);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .s3-ikon-btn--birincil:hover { background: var(--s3-mavi-koyu); color: #fff; }
+}
+
+/* Aktif tablo cipi: ustteki tek kimlik noktasi, cekmeceyi acar. */
+.s3-tablo-cip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: min(46vw, 320px);
+    min-height: 44px;
+    padding: 0 10px 0 12px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 999px;
+    background: var(--s3-yuzey);
+    box-shadow: var(--s3-golge-s);
+    color: var(--s3-yazi);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                box-shadow var(--motion-micro, 100ms) var(--motion-ease-standard),
+                transform var(--motion-fast, 140ms) var(--motion-ease-out);
+}
+
+.s3-tablo-cip:active { transform: scale(0.98); }
+
+@media (hover: hover) and (pointer: fine) {
+    .s3-tablo-cip:hover { border-color: var(--s3-soluk); box-shadow: var(--s3-golge-o); }
+}
+
+.s3-tablo-cip__ad {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.s3-tablo-cip__sayi {
+    flex-shrink: 0;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--s3-mavi-50);
+    color: var(--s3-mavi-koyu);
+    font-size: 10px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+.s3-tablo-cip__ok { flex-shrink: 0; width: 14px; height: 14px; color: var(--s3-soluk); }
+
+/* Jeton durumu: renk tek basina anlam tasimasin diye baslikta yazi da var. */
+.s3-jeton-nokta {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--s3-soluk);
+    flex-shrink: 0;
+}
+
+.s3-jeton-nokta[data-durum='canli'] { background: var(--s3-fazla); }
+.s3-jeton-nokta[data-durum='bitiyor'] { background: var(--s3-bekleyen); }
+.s3-jeton-nokta[data-durum='yok'] { background: var(--s3-eksik); }
+
+.s3-kullanici {
+    display: none;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.2;
+    min-width: 0;
+}
+
+.s3-kullanici__ad {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--s3-yazi);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.s3-kullanici__depo {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--s3-sonuk);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+    .s3-kullanici { display: flex; }
+}
+
+/* ==========================================================================
+   3) KOMUT CUBUGU
+   Ekranin birincil isi: urun bulmak ve saymak. Arama en buyuk hedef.
+   ========================================================================== */
+
+.s3-komut {
+    position: sticky;
+    top: calc(var(--s3-ust-boy) + env(safe-area-inset-top));
+    z-index: 30;
+    background: rgba(248, 250, 252, 0.9);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    border-bottom: 1px solid var(--s3-cizgi-ince);
+}
+
+.s3-komut__ic {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--s3-komut-boy);
+    padding: 8px 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+}
+
+.s3-ara {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.s3-ara__ikon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    color: var(--s3-soluk);
+    pointer-events: none;
+}
+
+.s3-ara input {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 40px 0 36px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 9px;
+    background: var(--s3-yuzey);
+    color: var(--s3-yazi);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: var(--s3-golge-s);
+    transition: border-color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                box-shadow var(--motion-micro, 100ms) var(--motion-ease-standard);
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.s3-ara input::placeholder { color: var(--s3-soluk); font-weight: 500; }
+
+.s3-ara input:focus {
+    outline: none;
+    border-color: var(--s3-mavi);
+    box-shadow: 0 0 0 3px var(--s3-mavi-100);
+}
+
+.s3-ara__temizle {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--s3-soluk);
+    cursor: pointer;
+    transition: background-color var(--motion-micro, 100ms) var(--motion-ease-standard);
+}
+
+.s3-ara__temizle svg { width: 14px; height: 14px; }
+
+@media (hover: hover) and (pointer: fine) {
+    .s3-ara__temizle:hover { background: var(--s3-tepsi); color: var(--s3-yazi); }
+}
+
+/* Arac dugmeleri: kamera, terminal, pano, tasma */
+.s3-araclar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.s3-arac {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 9px;
+    background: var(--s3-yuzey);
+    color: var(--s3-yazi-orta);
+    cursor: pointer;
+    box-shadow: var(--s3-golge-s);
+    transition: background-color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                border-color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                transform var(--motion-fast, 140ms) var(--motion-ease-out);
+}
+
+.s3-arac svg { width: 19px; height: 19px; }
+.s3-arac:active { transform: scale(0.97); }
+
+@media (hover: hover) and (pointer: fine) {
+    .s3-arac:hover { border-color: var(--s3-soluk); color: var(--s3-yazi); }
+}
+
+/* Dar ekranda dokunma hedefi kucultulmez: 44px kritik esik. Yer,
+   dugmeler arasi bosluktan ve ust bardaki ikincil baglantidan kazaniliyor. */
+@media (max-width: 380px) {
+    .s3-araclar { gap: 2px; }
+    .s3-komut__ic { gap: 6px; padding-left: 8px; padding-right: 8px; }
+}
+
+/* Tasma menusu */
+.s3-tasma { position: relative; }
+
+.s3-tasma__liste {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 60;
+    min-width: 232px;
+    padding: 6px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 12px;
+    background: var(--s3-yuzey);
+    box-shadow: var(--s3-golge-b);
+    /* Acilir menu tetikleyicisinden buyur, ortadan degil. */
+    transform-origin: top right;
+}
+
+.s3-tasma__oge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 40px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--s3-yazi);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--motion-micro, 100ms) var(--motion-ease-standard);
+}
+
+.s3-tasma__oge svg { width: 16px; height: 16px; color: var(--s3-sonuk); flex-shrink: 0; }
+
+@media (hover: hover) and (pointer: fine) {
+    .s3-tasma__oge:hover { background: var(--s3-tepsi); }
+}
+
+.s3-tasma__oge--tehlike { color: var(--s3-eksik); }
+.s3-tasma__oge--tehlike svg { color: var(--s3-eksik); }
+
+@media (hover: hover) and (pointer: fine) {
+    .s3-tasma__oge--tehlike:hover { background: var(--s3-eksik-zemin); }
+}
+
+.s3-tasma__ayirac {
+    height: 1px;
+    margin: 6px 4px;
+    background: var(--s3-cizgi);
+}
+
+/* ==========================================================================
+   4) ILERLEME SERIDI
+   Ekranin tek buyuk sayisi burada. Yukseklik sabit, sayilar tabular.
+   ========================================================================== */
+
+.s3-serit {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+}
+
+.s3-serit__sol { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+
+.s3-serit__sayi {
+    font-family: var(--s3-baslik-font);
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--s3-yazi);
+    font-variant-numeric: tabular-nums;
+}
+
+.s3-serit__toplam {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--s3-sonuk);
+    font-variant-numeric: tabular-nums;
+}
+
+.s3-serit__etiket {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--s3-soluk);
+}
+
+.s3-serit__olcumler { display: flex; gap: 6px; margin-left: auto; flex-shrink: 0; }
+
+.s3-olcum {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 999px;
+    background: var(--s3-yuzey);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--s3-yazi-orta);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.s3-olcum svg { width: 13px; height: 13px; flex-shrink: 0; }
+.s3-olcum--fazla { color: var(--s3-fazla); border-color: var(--s3-fazla-cizgi); background: var(--s3-fazla-zemin); }
+.s3-olcum--eksik { color: var(--s3-eksik); border-color: var(--s3-eksik-cizgi); background: var(--s3-eksik-zemin); }
+
+.s3-olcum__etiket { font-weight: 600; color: inherit; opacity: 0.75; }
+
+@media (max-width: 560px) {
+    .s3-olcum__etiket { display: none; }
+}
+
+/* Ilerleme cubugu: genislik degil scaleX animate ediliyor. */
+.s3-cubuk {
+    height: 3px;
+    background: var(--s3-cizgi);
+    overflow: hidden;
+}
+
+.s3-cubuk__dolu {
+    height: 100%;
+    background: var(--s3-mavi);
+    transform-origin: left center;
+    transform: scaleX(0);
+    transition: transform var(--motion-normal, 180ms) var(--motion-ease-out);
+}
+
+/* ==========================================================================
+   5) ANA ALAN
+   ========================================================================== */
+
+.s3-govde {
+    padding: 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+    padding-bottom: calc(32px + env(safe-area-inset-bottom));
+}
+
+/* Dis tepsi + ic yuzey. Icerik dogrudan zemine oturmuyor, bir kaba oturuyor. */
+.s3-tepsi {
+    border: 1px solid var(--s3-cizgi-ince);
+    border-radius: 16px;
+    background: var(--s3-yuzey);
+    box-shadow: var(--s3-golge-o);
+    overflow: hidden;
+}
+
+.s3-tepsi__baslik {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--s3-cizgi-ince);
+}
+
+.s3-tepsi__ad {
+    font-family: var(--s3-baslik-font);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--s3-yazi);
+}
+
+.s3-tepsi__sag { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* Gorunum anahtari: izgara / tablo */
+.s3-gorunum {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    /* 44px kritik esik: bu dugme telefonda da basiliyor. */
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 9px;
+    background: var(--s3-yuzey);
+    color: var(--s3-yazi-orta);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                transform var(--motion-fast, 140ms) var(--motion-ease-out);
+}
+
+.s3-gorunum svg { width: 15px; height: 15px; }
+.s3-gorunum:active { transform: scale(0.97); }
+
+/* Tablo ici arama */
+.s3-tablo-ara { padding: 0 16px 12px; }
+
+/* ==========================================================================
+   6) URUN IZGARASI
+   Varsayilan gorunum bu. Motor `.rapid-product-card` uretip durumu
+   `data-rapid-state` ile yaziyor. Bes deger var, hepsi burada:
+     blue      iki stok da girilmemis, sira bu urunde
+     orange    biri girilmis, yarim kalmis
+     positive  depo fazla
+     negative  depo eksik
+     zero      fark yok, istenen sonuc
+   Motorun v1'deki 3px cerceveli hali disarida birakildi; kart tamamen
+   v3 tasarimi. Secicilere kimlik de konuyor, cunku v1 kurallari kimlik
+   uzerinden yazilmisti ve ozgullukte kimlik once geliyor.
+   ========================================================================== */
+
+.s3 #rapidCountingGrid { padding: 12px; }
+
+.s3 #rapidCountingGridContainer {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 8px;
+}
+
+@media (min-width: 640px) {
+    .s3 #rapidCountingGridContainer {
+        grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+        gap: 10px;
+    }
+}
+
+@media (min-width: 1280px) {
+    .s3 #rapidCountingGridContainer {
+        grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+        gap: 12px;
+    }
+}
+
+.s3 #rapidCountingGridContainer .rapid-product-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    aspect-ratio: 1;
+    /* Kenarlik her durumda 1px. Kalinlik degismiyor, yalniz renk
+       degisiyor; boylece durum degisince kart yeniden olculmuyor. */
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 12px;
+    background: var(--s3-yuzey);
+    box-shadow: var(--s3-golge-s);
+    cursor: pointer;
+    overflow: hidden;
+    /* Sayim tiki gunde yuzlerce kez tekrarlaniyor. Hareket yok, renk var. */
+    transition: border-color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                background-color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                box-shadow var(--motion-micro, 100ms) var(--motion-ease-standard);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.s3 #rapidCountingGridContainer .rapid-product-card:active { transform: scale(0.98); }
+
+@media (hover: hover) and (pointer: fine) {
+    .s3 #rapidCountingGridContainer .rapid-product-card:hover {
+        border-color: var(--s3-soluk);
+        box-shadow: var(--s3-golge-o);
+    }
+}
+
+/* Durumlar. Renk tek basina anlam tasimiyor: her kartta ayrica sag ust
+   ikon ve alt serit var. */
+.s3 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="blue"] {
+    border-color: var(--s3-mavi);
+    background: var(--s3-mavi-50);
+}
+
+.s3 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="orange"] {
+    border-color: var(--s3-bekleyen-cizgi);
+    background: var(--s3-bekleyen-zemin);
+}
+
+.s3 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="positive"] {
+    border-color: var(--s3-fazla-cizgi);
+    background: var(--s3-fazla-zemin);
+}
+
+.s3 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="negative"] {
+    border-color: var(--s3-eksik-cizgi);
+    background: var(--s3-eksik-zemin);
+}
+
+/* Fark yok: sayimda istenen sonuc bu, o yuzden sakin duruyor. */
+.s3 #rapidCountingGridContainer .rapid-product-card[data-rapid-state="zero"] {
+    border-color: var(--s3-cizgi);
+    background: var(--s3-yuzey);
+}
+
+/* Sag ust durum rozeti */
+.s3 #rapidCountingGridContainer .rapid-product-card .product-status-icon {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: transparent;
+}
+
+.s3 #rapidCountingGridContainer .rapid-product-card .product-status-icon svg,
+.s3 #rapidCountingGridContainer .rapid-product-card .product-status-icon div {
+    width: 13px;
+    height: 13px;
+}
+
+.s3 #rapidCountingGridContainer .rapid-product-card .product-status-icon--positive { background: var(--s3-fazla-zemin); }
+.s3 #rapidCountingGridContainer .rapid-product-card .product-status-icon--negative { background: var(--s3-eksik-zemin); }
+.s3 #rapidCountingGridContainer .rapid-product-card .product-status-icon--zero { background: var(--s3-tepsi); }
+
+/* Alt serit. v1 kurali kimlik tasidigi icin seciciye kimlik konuyor. */
+.s3 #rapidCountingGridContainer .rapid-product-card .stock-indicator {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: auto;
+    height: 3px;
+    border-radius: 0;
+    opacity: 1;
+    z-index: 2;
+}
+
+.s3 #rapidCountingGridContainer .rapid-product-card .stock-indicator.bg-emerald-400 { background: var(--s3-fazla); }
+.s3 #rapidCountingGridContainer .rapid-product-card .stock-indicator.bg-rose-400 { background: var(--s3-eksik); }
+.s3 #rapidCountingGridContainer .rapid-product-card .stock-indicator.bg-orange-400 { background: var(--s3-bekleyen); }
+.s3 #rapidCountingGridContainer .rapid-product-card .stock-indicator.bg-gray-300 { background: var(--s3-soluk); }
+
+.s3 #rapidCountingGridContainer .rapid-product-card img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+}
+
+.s3 #rapidCountingGridContainer .rapid-product-card p {
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--s3-yazi-orta);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   7) MASAUSTU TABLOSU
+   ========================================================================== */
+
+.s3 #desktopTableView table { width: 100%; border-collapse: collapse; }
+
+.s3 #desktopTableView thead { background: var(--s3-tepsi); }
+
+.s3 #desktopTableView th {
+    padding: 10px 16px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--s3-sonuk);
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--s3-cizgi);
+}
+
+.s3 #desktopTableView th.sortable-header { cursor: pointer; }
+
+@media (hover: hover) and (pointer: fine) {
+    .s3 #desktopTableView th.sortable-header:hover { color: var(--s3-yazi); background: var(--s3-cizgi); }
+}
+
+.s3 .product-row-modern { border-bottom: 1px solid var(--s3-cizgi-ince); }
+
+.s3 .product-row-modern td { padding: 10px 16px; vertical-align: middle; }
+
+@media (hover: hover) and (pointer: fine) {
+    .s3 .product-row-modern:hover { background: var(--s3-mavi-50); }
+}
+
+.s3 .product-row-modern img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 9px;
+    background: var(--s3-yuzey);
+    box-shadow: none;
+    mix-blend-mode: multiply;
+}
+
+/* ==========================================================================
+   8) TABLO CEKMECESI
+   Tablo yonetimi ekranda surekli durmuyor, isi bitince kapaniyor.
+   ========================================================================== */
+
+.s3-cekmece-perde {
+    position: fixed;
+    inset: 0;
+    z-index: 110;
+    background: rgba(15, 23, 42, 0.45);
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--motion-normal, 180ms) var(--motion-ease-out),
+                visibility var(--motion-normal, 180ms);
+}
+
+.s3-cekmece-perde.acik { opacity: 1; visibility: visible; }
+
+.s3-cekmece {
+    position: fixed;
+    z-index: 111;
+    display: flex;
+    flex-direction: column;
+    background: var(--s3-yuzey);
+    box-shadow: var(--s3-golge-b);
+    visibility: hidden;
+    /* Yuzde ile tasiniyor, kendi boyu kadar. Piksel uydurmuyoruz. */
+    transition: transform var(--motion-panel, 220ms) var(--motion-ease-out),
+                visibility var(--motion-panel, 220ms);
+}
+
+/* Telefon: alttan gelen sayfa. Basparmak bolgesinde. */
+.s3-cekmece {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: min(86vh, 720px);
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.s3-cekmece.acik { transform: translateY(0); visibility: visible; }
+
+/* Masaustu: sagdan gelen panel. */
+@media (min-width: 768px) {
+    .s3-cekmece {
+        left: auto;
+        top: 0;
+        bottom: 0;
+        width: min(420px, 92vw);
+        max-height: none;
+        border-radius: 0;
+        transform: translateX(100%);
+        padding-bottom: 0;
+    }
+    .s3-cekmece.acik { transform: translateX(0); }
+}
+
+.s3-cekmece__tutamak {
+    width: 36px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: 999px;
+    background: var(--s3-cizgi-sert, #cbd5e1);
+    flex-shrink: 0;
+}
+
+@media (min-width: 768px) {
+    .s3-cekmece__tutamak { display: none; }
+}
+
+.s3-cekmece__baslik {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--s3-cizgi-ince);
+    flex-shrink: 0;
+}
+
+.s3-cekmece__ad {
+    font-family: var(--s3-baslik-font);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--s3-yazi);
+}
+
+.s3-cekmece__govde {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 16px 16px;
+}
+
+/* Genel / Gunluk segment kontrolu.
+   Motor sinif degil `aria-selected` oynatiyor, o yuzden oradan boyuyoruz. */
+.s3-segment {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--s3-tepsi);
+    margin-bottom: 12px;
+}
+
+.s3-segment__btn {
+    flex: 1 1 0;
+    min-height: 44px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--s3-sonuk);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background-color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                color var(--motion-micro, 100ms) var(--motion-ease-standard);
+}
+
+.s3-segment__btn[aria-selected='true'] {
+    background: var(--s3-yuzey);
+    color: var(--s3-yazi);
+    box-shadow: var(--s3-golge-s);
+}
+
+/* Tablo cipleri.
+   Genel cipler `data-table-status` tasiyor, gunluk cipler tasimiyor.
+   Motorun yazdigi bes deger: not-started, incomplete, complete-positive,
+   complete-negative, complete-balanced. Baskasi yok. */
+.s3 #generalTableList,
+.s3 #dailyTableList {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    overflow: visible;
+}
+
+.s3 #generalTableList { flex-direction: row; flex-wrap: wrap; }
+
+.s3 #generalTableList button[data-table-name],
+.s3 #dailyTableList button[data-table-name] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 999px;
+    background: var(--s3-yuzey);
+    color: var(--s3-yazi-orta);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: none;
+    transition: border-color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                background-color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                color var(--motion-micro, 100ms) var(--motion-ease-standard),
+                transform var(--motion-fast, 140ms) var(--motion-ease-out);
+}
+
+.s3 #generalTableList button[data-table-name]:active,
+.s3 #dailyTableList button[data-table-name]:active { transform: scale(0.98); }
+
+/* Henuz baslamamis */
+.s3 #generalTableList button[data-table-status="not-started"] {
+    border-color: var(--s3-cizgi);
+    background: var(--s3-yuzey);
+    color: var(--s3-sonuk);
+}
+
+/* Yarim kalmis */
+.s3 #generalTableList button[data-table-status="incomplete"] {
+    border-color: var(--s3-bekleyen-cizgi);
+    background: var(--s3-bekleyen-zemin);
+    color: var(--s3-bekleyen);
+}
+
+/* Bitmis: farkli ya da denk */
+.s3 #generalTableList button[data-table-status="complete-positive"],
+.s3 #generalTableList button[data-table-status="complete-balanced"] {
+    border-color: var(--s3-fazla-cizgi);
+    background: var(--s3-fazla-zemin);
+    color: var(--s3-fazla);
+}
+
+.s3 #generalTableList button[data-table-status="complete-negative"] {
+    border-color: var(--s3-eksik-cizgi);
+    background: var(--s3-eksik-zemin);
+    color: var(--s3-eksik);
+}
+
+/* Acik tablo: kenarlik kalinligi degismiyor, golge ve renk degisiyor,
+   boylece secim degisince cip yeniden olculmuyor. */
+.s3 #generalTableList button[data-table-name].ring-2,
+.s3 #dailyTableList button[data-table-name].ring-2 {
+    border-color: var(--s3-mavi);
+    box-shadow: 0 0 0 3px var(--s3-mavi-100);
+    color: var(--s3-mavi-koyu);
+    font-weight: 700;
+}
+
+.s3 #generalTableList button[data-table-name] span,
+.s3 #dailyTableList button[data-table-name] span {
+    max-width: none;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Gunluk satir: cip + silme dugmesi yan yana */
+.s3 #dailyTableList > div[role="listitem"] {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    min-width: 0;
+}
+
+.s3 #dailyTableList button[data-table-name] { flex: 1 1 auto; min-width: 0; }
+
+.s3 #dailyTableList .sayim-daily-row-del {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 1px solid var(--s3-eksik-cizgi);
+    border-radius: 9px;
+    background: var(--s3-yuzey);
+    color: var(--s3-eksik);
+    cursor: pointer;
+    transition: background-color var(--motion-micro, 100ms) var(--motion-ease-standard);
+}
+
+.s3 #dailyTableList .sayim-daily-row-del:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.s3 #dailyTableList .sayim-daily-row-del svg { width: 15px; height: 15px; }
+
+/* Bos liste durumu. Motor bu sinifi kendisi aciyor. */
+.s3 #generalTableList.sayim-general-table-list--empty,
+.s3 #dailyTableList.sayim-chip-scroll--empty {
+    display: block;
+    padding: 16px 12px;
+    border: 1px dashed var(--s3-cizgi);
+    border-radius: 12px;
+    text-align: center;
+}
+
+/* ==========================================================================
+   9) DORT DURUM
+   Yukleniyor iskelette, bos burada, hata bildirimde, dolu yukarida.
+   ========================================================================== */
+
+.s3 #emptyState { padding: 48px 24px; text-align: center; }
+
+.s3 #emptyState svg { width: 40px; height: 40px; color: var(--s3-soluk); margin: 0 auto; }
+
+.s3 #emptyState h3 {
+    margin-top: 12px;
+    font-family: var(--s3-baslik-font);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--s3-yazi);
+}
+
+.s3 #emptyState p { margin-top: 4px; font-size: 12px; color: var(--s3-sonuk); }
+
+/* ==========================================================================
+   10) AZALTILMIS HAREKET
+   Hareket kalkiyor, bilgi kalmaya devam ediyor.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    .s3 *,
+    .s3 *::before,
+    .s3 *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+    }
+    .s3-cekmece { transition: visibility 0.01ms !important; }
+}
+
+/* ==========================================================================
+   11) MOTORUN SINIFINI EZDIGI YERLER
+   `updateAPIStatusCard` kart ikonunun `className`'ini komple yeniden yaziyor,
+   yani oraya kendi sinifimizi koyamayiz; kimlik secicisiyle giydiriyoruz.
+   ========================================================================== */
+
+.s3 #apiStatusCard {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 12px;
+    background: var(--s3-yuzey);
+    box-shadow: var(--s3-golge-s);
+}
+
+.s3 #apiStatusCard.hidden { display: none; }
+
+.s3 #apiStatusIcon {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.s3 #apiStatusIcon svg { width: 17px; height: 17px; }
+
+.s3 #apiStatusText { font-size: 12px; font-weight: 700; color: var(--s3-yazi); }
+.s3 #apiWarehouseName,
+.s3 #apiExpiryTime { font-size: 11px; font-weight: 600; color: var(--s3-sonuk); font-variant-numeric: tabular-nums; }
+
+.s3 #manualTokenInput {
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 10px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 9px;
+    background: var(--s3-yuzey);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    color: var(--s3-yazi);
+    resize: vertical;
+}
+
+.s3 #manualTokenInput:focus {
+    outline: none;
+    border-color: var(--s3-mavi);
+    box-shadow: 0 0 0 3px var(--s3-mavi-100);
+}
+
+.s3 #manualTokenPreview { font-size: 11px; color: var(--s3-sonuk); min-height: 16px; }
+
+/* Sonuc listesi (elle urun arama) */
+.s3 #manualInputResults {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 60;
+    max-height: min(52vh, 360px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 12px;
+    background: var(--s3-yuzey);
+    box-shadow: var(--s3-golge-b);
+}
+
+.s3 #manualInputResults.hidden { display: none; }
+
+/* Genel tablo acilir listesi */
+.s3 #sayimGeneralTableDropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 60;
+    width: min(360px, 88vw);
+    padding: 8px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 12px;
+    background: var(--s3-yuzey);
+    box-shadow: var(--s3-golge-b);
+    transform-origin: top right;
+}
+
+.s3 #sayimGeneralTableDropdown.hidden { display: none; }
+
+.s3 #sayimGeneralTableDropdownSearch,
+.s3 #generalTableSearch {
+    width: 100%;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 9px;
+    background: var(--s3-yuzey);
+    font-family: inherit;
+    font-size: 12px;
+    color: var(--s3-yazi);
+}
+
+.s3 #sayimGeneralTableDropdownSearch:focus,
+.s3 #generalTableSearch:focus {
+    outline: none;
+    border-color: var(--s3-mavi);
+    box-shadow: 0 0 0 3px var(--s3-mavi-100);
+}
+
+.s3 #sayimGeneralTableDropdownList { max-height: min(48vh, 320px); overflow-y: auto; margin-top: 8px; }
+
+/* Aktif tablo uc nokta menusu */
+.s3 #sayimTableMenuDropdown {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 60;
+    min-width: 200px;
+    padding: 6px;
+    border: 1px solid var(--s3-cizgi);
+    border-radius: 12px;
+    background: var(--s3-yuzey);
+    box-shadow: var(--s3-golge-b);
+    transform-origin: top right;
+}
+
+.s3 #sayimTableMenuDropdown.hidden { display: none; }
+
+.s3 #sayimTableMenuDropdown button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 40px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .s3 #sayimTableMenuDropdown button:hover { background: var(--s3-tepsi); }
+}
+
+/* Motorun gizledigi paneller: `hidden` her zaman kazanmali. */
+.s3 .hidden { display: none !important; }
+
+/* ==========================================================================
+   12) COK DAR EKRAN (<=360px)
+   320px'de ust bar tasiyordu: tablo cipi 46vw ile 147px'e cikiyor, cocuklar
+   ve bosluklar toplaminda 351px ediyor. Cip daraltiliyor, ikincil surum
+   baglantisi gizleniyor. Dokunma hedefleri 44px kaliyor.
+   ========================================================================== */
+
+@media (max-width: 360px) {
+    .s3-ust__ic { gap: 4px; padding-left: 8px; padding-right: 8px; }
+    .s3-ust__marka { display: none; }
+    .s3-tablo-cip { max-width: min(40vw, 150px); padding: 0 6px 0 10px; }
+    .s3-tablo-cip__sayi { display: none; }
+    #countingVersionSwitch { display: none; }
+}
