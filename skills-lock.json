@@ -85,6 +85,36 @@
       "skillPath": "skills/soft-skill/SKILL.md",
       "computedHash": "7db385e4c5370e5a7fca9704a1361b056e4504ea6a03924bb86f33a4f00b5c73"
     },
+    "hyperframes-animation": {
+      "source": "heygen-com/hyperframes",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-animation/SKILL.md",
+      "computedHash": "4dd03f4780065fc90dd73760cc686c264ef6bf2b82b1e7ebe6d49e55d92fcac1"
+    },
+    "hyperframes-cli": {
+      "source": "heygen-com/hyperframes",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-cli/SKILL.md",
+      "computedHash": "c9d8c72badf913863e493741e174f2db3921c251a142364316100ed9f93e0085"
+    },
+    "hyperframes-core": {
+      "source": "heygen-com/hyperframes",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-core/SKILL.md",
+      "computedHash": "261780c24317f4861165d0c23e1ac293ac9c85024c267cb5fb037627a23c1f8b"
+    },
+    "hyperframes-creative": {
+      "source": "heygen-com/hyperframes",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-creative/SKILL.md",
+      "computedHash": "e548215097e6a682870b46fb5f719fc88752f51ceea0bedef8c2e5a33ada43df"
+    },
+    "hyperframes-keyframes": {
+      "source": "heygen-com/hyperframes",
+      "sourceType": "github",
+      "skillPath": "skills/hyperframes-keyframes/SKILL.md",
+      "computedHash": "fc5657f4f5cbbeeab23f951ed739e0fe9e29a9865cdabb80d9e87840628a2a46"
+    },
     "image-to-code": {
       "source": "Leonxlnx/taste-skill",
       "sourceType": "github",
