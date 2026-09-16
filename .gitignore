@@ -63,6 +63,9 @@ Jet-Barkod-Siparisler-Premium/
 # Kod hafızası (codebase-memory-mcp) yerel çıktıları
 .codebase-memory/
 
-# brag skill: lisansı doğrulanmamış müzikler ve video çıktıları depoya girmez
-.agents/skills/brag/assets/music/*.mp3
+# Sonradan kurulan brag ve Hyperframes skill'leri yerelde kalır, video çıktıları depoya girmez
+.agents/skills/brag/
+.agents/skills/hyperframes-*/
+.claude/skills/brag
+.claude/skills/hyperframes-*
 brag-output*/
