@@ -42,7 +42,12 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
     process.exit(1);
 }
 
-const SESSION_TTL_SECONDS = Number(process.env.SESSION_TTL_SECONDS || 24 * 60 * 60);
+/* Oturum üç gün sürüyor ve site açık kaldıkça /api/auth/refresh ile
+   tazeleniyor, yani açık duran bir sayfa login'e atılmıyor. Tazeleme ne
+   kadar uzarsa uzasın ilk girişten SESSION_MAX_SECONDS sonra parola yeniden
+   isteniyor; çalınan bir token sonsuza dek uzatılamasın. */
+const SESSION_TTL_SECONDS = Number(process.env.SESSION_TTL_SECONDS || 3 * 24 * 60 * 60);
+const SESSION_MAX_SECONDS = Number(process.env.SESSION_MAX_SECONDS || 30 * 24 * 60 * 60);
 const GUEST_TTL_SECONDS = Number(process.env.GUEST_TTL_SECONDS || 30 * 24 * 60 * 60);
 
 const pool = new Pool({
@@ -98,13 +103,15 @@ function clientIpOf(req) {
     return String(req.ip || '').replace('::ffff:', '') || 'unknown';
 }
 
-function signSessionToken(user) {
+function signSessionToken(user, authTime) {
     const isAdmin = !!user.is_admin;
     return jwt.sign(
         {
             role: isAdmin ? 'web_admin' : 'web_user',
             username: user.username,
             is_admin: isAdmin,
+            // İlk girişin anı. Tazelemede korunuyor; mutlak üst sınır buna göre.
+            auth_time: authTime || Math.floor(Date.now() / 1000),
         },
         JWT_SECRET,
         { expiresIn: SESSION_TTL_SECONDS, algorithm: 'HS256' }
@@ -414,6 +421,69 @@ app.get('/api/auth/session', async (req, res) => {
         });
     } catch (e) {
         console.error('session check error:', e);
+        return res.status(500).json({ ok: false, error: 'server_error' });
+    }
+});
+
+/**
+ * Oturumu tazeler. Site açık kaldıkça istemci bunu çağırıyor; girişli hesap
+ * gün içinde login ekranına atılmıyor.
+ *
+ * Yalnız HÂLÂ GEÇERLİ bir token tazeleniyor, süresi dolmuşsa yeniden giriş
+ * gerekiyor. Kullanıcı her seferinde veritabanından yeniden okunuyor: hesap
+ * kapatılmış, deneme bitmiş, IP engellenmiş ya da izinli IP listesi dışına
+ * çıkılmışsa yeni token verilmiyor. Yönetici yetkisi de oradan okunuyor, yani
+ * yetkisi alınan birinin yeni token'ı yetkisiz geliyor. Misafir token'ı bu
+ * uçtan geçmiyor.
+ */
+app.post('/api/auth/refresh', async (req, res) => {
+    const claims = verifyToken(bearerOf(req));
+    if (!claims || !claims.username) {
+        return res.status(401).json({ ok: false, error: 'invalid_token', code: 'invalid_token' });
+    }
+    if (claims.role !== 'web_user' && claims.role !== 'web_admin') {
+        return res.status(400).json({ ok: false, error: 'not_refreshable', code: 'not_refreshable' });
+    }
+
+    const simdi = Math.floor(Date.now() / 1000);
+    // Bu uç gelmeden önce verilmiş token'larda auth_time yok; iat yerine geçiyor.
+    const authTime = Number(claims.auth_time || claims.iat || simdi);
+    if (simdi - authTime > SESSION_MAX_SECONDS) {
+        return res.status(401).json({ ok: false, error: 'session_too_old', code: 'session_too_old' });
+    }
+
+    const clientIP = clientIpOf(req);
+    try {
+        if (await isIPBlocked(clientIP)) {
+            return res.status(403).json({ ok: false, error: 'ip_blocked', code: 'ip_blocked' });
+        }
+
+        const r = await pool.query(
+            `SELECT username, trial_end, is_active, is_admin, allowed_ips
+             FROM users WHERE username = $1 LIMIT 1`,
+            [claims.username]
+        );
+        if (r.rowCount === 0) return res.status(401).json({ ok: false, error: 'user_gone', code: 'user_gone' });
+
+        const u = r.rows[0];
+        if (!u.is_active) return res.status(403).json({ ok: false, error: 'inactive', code: 'inactive' });
+        if (!checkTrialExpiry(u.trial_end)) {
+            return res.status(403).json({ ok: false, error: 'trial_expired', code: 'trial_expired' });
+        }
+        if (!validateIP(clientIP, u.allowed_ips)) {
+            return res.status(403).json({ ok: false, error: 'ip_not_allowed', code: 'ip_not_allowed' });
+        }
+
+        const token = signSessionToken(u, authTime);
+        const decoded = jwt.decode(token);
+        return res.json({
+            ok: true,
+            token,
+            exp: decoded.exp,
+            expiresAt: new Date(decoded.exp * 1000).toISOString(),
+        });
+    } catch (e) {
+        console.error('refresh error:', e);
         return res.status(500).json({ ok: false, error: 'server_error' });
     }
 });

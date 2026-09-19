@@ -121,6 +121,125 @@
         }
     }
 
+    // ==================================================================
+    // Oturumu açık tut
+    //
+    // Site açık kaldıkça token kendiliğinden tazeleniyor. Ömrünün çeyreği
+    // geçince sunucudan yenisi alınıyor; üç günlük token için bu, açık duran
+    // sayfada yaklaşık 18 saatte bir demek. Kullanıcı gün içinde login
+    // ekranına atılmıyor.
+    //
+    // HİÇBİR KOŞULDA ÇIKIŞ YAPTIRMIYOR. Tazeleme başarısız olursa eski token
+    // olduğu gibi kalıyor, süresi dolunca bugünkü akış işliyor. Sunucuda uç
+    // henüz yoksa (404) bu sekmede bir daha denenmiyor; davranış eskisiyle
+    // birebir aynı kalıyor.
+    // ==================================================================
+
+    const YENILEME_UCU = '/api/auth/refresh';
+    const UC_YOK_ANAHTARI = 'jb_token_yenileme_yok';
+    const KONTROL_ARALIGI_MS = 10 * 60 * 1000;
+
+    /** Misafir token'ı tazelenmiyor, o kendi akışıyla yönetiliyor. */
+    function tazelenebilirMi(claims) {
+        return !!claims && (claims.role === 'web_user' || claims.role === 'web_admin');
+    }
+
+    /** Süresi dolmamış ve ömrünün çeyreğini geçmiş mi? */
+    function tazelemeVakti(claims) {
+        if (!claims || !claims.exp) return false;
+        const simdi = Date.now() / 1000;
+        if (simdi >= claims.exp) return false;
+        const verilis = Number(claims.iat) || claims.exp - 24 * 60 * 60;
+        const omur = Math.max(1, claims.exp - verilis);
+        return simdi - verilis > omur / 4;
+    }
+
+    function ucYokMu() {
+        try {
+            return sessionStorage.getItem(UC_YOK_ANAHTARI) === '1';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function ucYokIsaretle() {
+        try {
+            sessionStorage.setItem(UC_YOK_ANAHTARI, '1');
+        } catch (e) { /* ignore */ }
+    }
+
+    let suruyor = null;
+
+    /**
+     * Token'ı sunucudan tazeler. Aynı anda ikinci çağrı gelirse ilkini bekler.
+     * @returns {Promise<{ok:boolean, code?:string, status?:number}>}
+     */
+    function refresh() {
+        if (suruyor) return suruyor;
+        const is = (async () => {
+            const eski = get();
+            const claims = decode(eski);
+            if (!eski || !tazelenebilirMi(claims) || isExpired() || !apiBase()) {
+                return { ok: false, code: 'skip' };
+            }
+            try {
+                const res = await fetch(apiBase() + YENILEME_UCU, {
+                    method: 'POST',
+                    headers: { Authorization: 'Bearer ' + eski },
+                });
+                if (res.status === 404) {
+                    ucYokIsaretle();
+                    return { ok: false, code: 'no_endpoint', status: 404 };
+                }
+                let veri = null;
+                try {
+                    veri = await res.json();
+                } catch (e) { /* ignore */ }
+                if (!res.ok || !veri || !veri.token) {
+                    return { ok: false, code: (veri && veri.code) || 'invalid', status: res.status };
+                }
+                /* İstek sürerken çıkış yapıldıysa ya da başka sekme token'ı
+                   zaten değiştirdiyse yazmıyoruz. Çıkış yapmış birini geri
+                   sokmak da, başka hesabın token'ını ezmek de olmaz. */
+                if (get() !== eski) return { ok: false, code: 'changed' };
+                set(veri.token);
+                return { ok: true };
+            } catch (e) {
+                return { ok: false, code: 'network' };
+            }
+        })();
+        suruyor = is;
+        is.then(() => {
+            if (suruyor === is) suruyor = null;
+        });
+        return is;
+    }
+
+    /** Vakti geldiyse tazeler, gelmediyse hiçbir şey yapmaz. */
+    function refreshIfDue() {
+        if (ucYokMu()) return Promise.resolve({ ok: false, code: 'no_endpoint' });
+        const claims = decode();
+        if (!tazelenebilirMi(claims) || !tazelemeVakti(claims)) {
+            return Promise.resolve({ ok: false, code: 'not_due' });
+        }
+        return refresh();
+    }
+
+    function zamanlayiciyiKur() {
+        const kontrol = () => {
+            void refreshIfDue();
+        };
+        setTimeout(kontrol, 5000);
+        setInterval(kontrol, KONTROL_ARALIGI_MS);
+        /* Bilgisayar uykudan uyanınca ya da sekmeye dönülünce zamanlayıcı
+           gecikmiş olabilir; bu olaylar kontrolü hemen yaptırıyor. */
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') kontrol();
+        });
+        window.addEventListener('focus', kontrol);
+        window.addEventListener('online', kontrol);
+    }
+
     window.jetbarkodAuth = {
         get,
         set,
@@ -131,5 +250,11 @@
         apiBase,
         apiFetch,
         validateWithServer,
+        refresh,
+        refreshIfDue,
     };
+
+    try {
+        zamanlayiciyiKur();
+    } catch (e) { /* ignore */ }
 })();

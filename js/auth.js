@@ -495,12 +495,16 @@ function checkAuth() {
             }
         }
 
-        const loginTime = new Date(sessionData.loginTime);
-        
-        // Check if session is older than 24 hours
-        if (now - loginTime > 24 * 60 * 60 * 1000) {
-            logout();
-            return false;
+        /* Süre kararını yukarıdaki imzalı token veriyor. Giriş anından
+           sayılan ikinci bir 24 saat sınırı vardı; token site açıkken
+           tazelense bile hesabı günde bir login'e atıyordu. Token yardımcısı
+           yüklenmemiş bir sayfa kalırsa diye yedek olarak duruyor, üç gün. */
+        if (!window.jetbarkodAuth) {
+            const loginTime = new Date(sessionData.loginTime);
+            if (now - loginTime > 3 * 24 * 60 * 60 * 1000) {
+                logout();
+                return false;
+            }
         }
         
         // Check trial expiry (sync check)
@@ -542,12 +546,18 @@ async function checkAuthAsync() {
             return sessionData;
         }
 
-        const loginTime = new Date(sessionData.loginTime);
-        
-        // Check if session is older than 24 hours
-        if (now - loginTime > 24 * 60 * 60 * 1000) {
-            logout();
-            return false;
+        /* Süre kararı imzalı token'da, checkAuth ile aynı kural. */
+        if (window.jetbarkodAuth) {
+            if (!window.jetbarkodAuth.get() || window.jetbarkodAuth.isExpired()) {
+                logout();
+                return false;
+            }
+        } else {
+            const loginTime = new Date(sessionData.loginTime);
+            if (now - loginTime > 3 * 24 * 60 * 60 * 1000) {
+                logout();
+                return false;
+            }
         }
         
         // Check IP ban status (async check)
