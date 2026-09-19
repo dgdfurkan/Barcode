@@ -47,7 +47,7 @@
     <script src="../js/guest-access.js?v=20260831a"></script>
     <script src="../js/image-lightbox.js?v=20260828i"></script>
     <script src="../js/trial-notifications.js?v=20260828i"></script>
-    <script src="../js/user-manager.js?v=20260828i"></script>
+    <script src="../js/user-manager.js?v=20260919b"></script>
     <script src="../js/premium-features.js?v=20260828i"></script>
     <script src="../js/notifications.js?v=20260828i"></script>
     <script src="../js/feature-definitions.js?v=20260828i"></script>
@@ -3076,6 +3076,19 @@
             bosta(dilim);
         }
 
+        /* Kullanıcı verisi önbellekten açıldı. Sunucudaki farklı çıkarsa
+           (başka cihazda ürün eklenmiş, ayar değişmiş) liste burada sessizce
+           tazeleniyor; açık bir arama varsa sonuçlar da yenileniyor. */
+        window.addEventListener('jb:kullanici-verisi', () => {
+            try {
+                if (!window.userDataManager) return;
+                products = window.userDataManager.getAllProducts();
+                buildCatalogSearchIndexes(products);
+                const kutu = document.getElementById('searchInput');
+                if (kutu && kutu.value.trim()) performSearch(kutu.value);
+            } catch (e) { /* sessiz */ }
+        });
+
         function lookupProductByBarcodeTerm(term) {
             if (!term) return null;
             const trimmed = String(term).replace(/\s+/g, '');
@@ -3100,7 +3113,14 @@
         });
         function markProductsHydratedForClipboard() {
             if (products.length > 0) {
-                buildCatalogSearchIndexes(products);
+                /* Açılışta iki kez çağrılıyor (init ve finally). Aynı katalog için
+                   indeks ikinci kez kurulmasın: dokuz bin ürün yeniden geziliyor,
+                   arkadaki ısıtma baştan başlıyordu. Kural
+                   ensureCatalogSearchIndexesReady ile aynı. */
+                if (catalogSearchIndexes.productsRef !== products ||
+                    catalogSearchIndexes.barcodeToProduct.size === 0) {
+                    buildCatalogSearchIndexes(products);
+                }
                 window.AppBoot?.step('catalog');
             }
             if (typeof _resolveProductsHydratedForClipboard === 'function') {
@@ -4184,13 +4204,126 @@
             el.style.maxHeight = 3 * PRODUCT_TITLE_MIN_PX * PRODUCT_TITLE_LH + 'px';
         }
 
+        /*
+         * Başlıkları topluca sığdırır. Sonuç fitProductSearchTitle ile birebir
+         * aynı; farkı ölçüm sayısında.
+         *
+         * Eskiden her başlık yaz-ölç-yaz-ölç yapıyordu. Her ölçüm (scrollHeight)
+         * tarayıcıya sayfayı yeniden yerleştirtiyor; 100 başlıkta 100 kez, uzun
+         * başlıkta onlarca kez daha. Arama sonucu gelince ekran bu yüzden
+         * takılıyordu (bu makinede 31-60 ms, zayıf bilgisayarda katları).
+         *
+         * Şimdi önce hepsine taban punto yazılıyor, sonra hepsi TEK yerleşimle
+         * ölçülüyor. Taban puntoda iki satıra sığan (ölçümde 100 başlıktan
+         * 97-98'i) orada bitiyor; yalnız sığmayanlar eski yoldan küçültülüyor.
+         */
+        function basliklariTopluSigdir(liste) {
+            const canli = liste.filter((el) => el && el.isConnected);
+            if (!canli.length) return;
+            canli.forEach((el) => {
+                el.style.fontSize = '';
+                el.style.maxHeight = '';
+                el.style.overflow = 'hidden';
+                el.style.wordBreak = 'break-word';
+                el.style.overflowWrap = 'anywhere';
+                el.style.lineHeight = String(PRODUCT_TITLE_LH);
+            });
+            const tabanlar = canli.map((el) => parseFloat(window.getComputedStyle(el).fontSize) || 16);
+            canli.forEach((el, i) => {
+                el.style.fontSize = tabanlar[i] + 'px';
+                el.style.maxHeight = 2 * tabanlar[i] * PRODUCT_TITLE_LH + 'px';
+            });
+            const sigmayan = canli.filter((el, i) => !(el.scrollHeight <= 2 * tabanlar[i] * PRODUCT_TITLE_LH + 1));
+            sigmayan.forEach((el) => fitProductSearchTitle(el));
+        }
+
+        function baslikListesi(kutu) {
+            return kutu.matches('[data-product-search-title]')
+                ? [kutu]
+                : [...kutu.querySelectorAll('[data-product-search-title]')];
+        }
+
+        /* Ekrandan uzaktaki başlıklar kaydırılıp yaklaşınca sığdırılıyor. Pay
+           600px: başlık görünür olmadan çok önce sığmış oluyor, kullanıcı
+           küçülmeyi görmüyor. Sayfadan çıkmış eski kutular bırakılıyor. */
+        let baslikGozlemcisi = null;
+        const gozlenenKutular = new Set();
+
+        function uzaktakileriSonraSigdir(kutular) {
+            if (!('IntersectionObserver' in window)) {
+                const hepsi = [];
+                kutular.forEach((k) => hepsi.push(...baslikListesi(k)));
+                basliklariTopluSigdir(hepsi);
+                return;
+            }
+            if (!baslikGozlemcisi) {
+                baslikGozlemcisi = new IntersectionObserver((kayitlar) => {
+                    const yaklasan = [];
+                    kayitlar.forEach((k) => {
+                        if (!k.isIntersecting) return;
+                        baslikGozlemcisi.unobserve(k.target);
+                        gozlenenKutular.delete(k.target);
+                        yaklasan.push(...baslikListesi(k.target));
+                    });
+                    if (yaklasan.length) basliklariTopluSigdir(yaklasan);
+                }, { rootMargin: '600px 0px' });
+            }
+            gozlenenKutular.forEach((k) => {
+                if (!k.isConnected) {
+                    baslikGozlemcisi.unobserve(k);
+                    gozlenenKutular.delete(k);
+                }
+            });
+            kutular.forEach((k) => {
+                if (gozlenenKutular.has(k)) return;
+                gozlenenKutular.add(k);
+                baslikGozlemcisi.observe(k);
+            });
+        }
+
         function scheduleProductSearchTitleFit(root) {
             const scope = root && root.nodeType === 1 ? root : document;
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
-                    scope.querySelectorAll('[data-product-search-title]').forEach((node) => {
-                        fitProductSearchTitle(node);
+                    const basliklar = [...scope.querySelectorAll('[data-product-search-title]')];
+                    if (!basliklar.length) return;
+
+                    /* YALNIZ IZGARA KARTLARI yeni yoldan. Kartın genişliği
+                       ızgara sütunundan geliyor, yani bir başlığın sığması
+                       diğerlerine bağlı değil; sonuç eskisiyle birebir aynı
+                       (ölçüldü: üç aramada sıfır fark).
+
+                       Liste ve tablo görünümü ESKİ yoldan devam ediyor. Tabloda
+                       sütun genişliği bütün satırların içeriğine bağlı; orada
+                       sırayı ya da zamanı değiştirmek başka satırları da
+                       kaydırıyordu (ölçüldü: 10-11 başlıkta fark). */
+                    const izgara = [];
+                    const izgaraKutulari = [];
+                    basliklar.forEach((el) => {
+                        const kart = el.closest('#gridResults > [data-product-id]');
+                        if (kart) {
+                            izgara.push(el);
+                            izgaraKutulari.push(kart);
+                        } else {
+                            fitProductSearchTitle(el);
+                        }
                     });
+                    if (!izgara.length) return;
+
+                    /* Ekrandaki ve yakınındaki kartlar hemen, gerisi kaydırılıp
+                       yaklaşınca. Eskiden 100 başlığın hepsi her aramada
+                       sığdırılıyordu; ekranda ise 3-10 kart görünüyor. */
+                    const ust = -400;
+                    const alt = window.innerHeight + 400;
+                    const hemen = [];
+                    const sonra = [];
+                    izgaraKutulari.forEach((kart, i) => {
+                        const r = kart.getBoundingClientRect();
+                        if (r.height > 0 && r.bottom >= ust && r.top <= alt) hemen.push(izgara[i]);
+                        else sonra.push(kart);
+                    });
+                    basliklariTopluSigdir(hemen);
+                    if (sonra.length) uzaktakileriSonraSigdir(sonra);
                 });
             });
         }
@@ -4838,7 +4971,7 @@
                     return `
                     <div class="group bg-white rounded-xl border border-amber-200 shadow-sm flex flex-col overflow-hidden" data-product-id="${product.id}">
                         <div class="h-48 p-2 bg-amber-50/40 flex items-center justify-center relative cursor-pointer" onclick="showImageModal('${productImage}', '${productName}')">
-                            <img src="${product.image || ''}" 
+                            <img src="${product.image || ''}" loading="lazy" decoding="async"
                                  alt="${product.name}" 
                                  class="w-auto h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-300"
                                  onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
@@ -4896,7 +5029,7 @@
                     <div class="group bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden ${isOutOfStock ? 'opacity-60' : ''}" data-product-id="${product.id}">
                         <!-- Image Area -->
                         <div class="h-48 p-2 bg-slate-50 flex items-center justify-center relative cursor-pointer" onclick="showImageModal('${productImage.replace(/'/g, "\\'")}', '${productName}')">
-                            <img src="${productImage}" 
+                            <img src="${productImage}" loading="lazy" decoding="async"
                                  alt="${product.name}" 
                                  class="w-auto h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-300"
                                  onerror="this.src='https://images.unsplash.com/photo-1584824486509-112e4181ff6b?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;">
@@ -4976,9 +5109,9 @@
         // Default products are NEVER stored in user_data, always loaded from PRODUCTS_DATA
         async function loadProducts() {
             try {
-                // Initialize user data manager if not already done
-                if (!window.userDataManager.currentUser) {
-                    await window.userDataManager.init();
+                // Kullanıcı verisi hazır değilse önbellekten kur (ağı beklemez).
+                if (!window.userDataManager.userData) {
+                    await window.userDataManager.hizliBaslat();
                 }
                 
                 // Get ALL products (custom + default) using getAllProducts()
@@ -5179,7 +5312,7 @@
                 // Load products from JSON
                 products = await loadProducts();
                 console.log(`Loaded ${products.length} products`);
-                buildCatalogSearchIndexes(products);
+                // İndeksi markProductsHydratedForClipboard kuruyor; burada ikinci kez kurulmuyor.
                 markProductsHydratedForClipboard();
 
                 // Trial countdown function - FIXED VERSION
@@ -7835,7 +7968,7 @@
                 <tr class="hover:bg-secondary-50 transition-colors">
                     <td class="px-6 py-4">
                         <div class="flex items-center space-x-3">
-                            <img src="${product.image}" 
+                            <img src="${product.image}" loading="lazy" decoding="async"
                                  alt="${product.name}" 
                                  class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200"
                                  onclick="showImageModal('${product.image}', '${product.name}')"
@@ -7886,7 +8019,7 @@
                     <tr class="bg-gray-50 hover:bg-gray-100 transition-colors">
                         <td class="px-6 py-4">
                             <div class="flex items-center space-x-3">
-                                <img src="${product.image}" 
+                                <img src="${product.image}" loading="lazy" decoding="async"
                                      alt="${product.name}" 
                                      class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200 opacity-60"
                                      onclick="showImageModal('${product.image}', '${product.name}')"
@@ -7922,7 +8055,7 @@
             mobileResults.innerHTML = activeResults.map(product => `
                 <div class="p-4">
                     <div class="flex items-start space-x-3 mb-4">
-                        <img src="${product.image}" 
+                        <img src="${product.image}" loading="lazy" decoding="async"
                              alt="${product.name}" 
                              class="w-16 h-16 rounded-lg object-cover flex-shrink-0 product-image cursor-pointer hover:scale-105 transition-transform duration-200"
                              onclick="showImageModal('${product.image}', '${product.name}')"
@@ -7964,7 +8097,7 @@
                 mobileResults.innerHTML += outOfStockResults.map(product => `
                     <div class="p-4 bg-gray-50">
                         <div class="flex items-start space-x-3 mb-4">
-                            <img src="${product.image}" 
+                            <img src="${product.image}" loading="lazy" decoding="async"
                                  alt="${product.name}" 
                                  class="w-16 h-16 rounded-lg object-cover flex-shrink-0 product-image cursor-pointer hover:scale-105 transition-transform duration-200 opacity-60"
                                  onclick="showImageModal('${product.image}', '${product.name}')"
@@ -8098,7 +8231,7 @@
                     row.innerHTML = `
                         <td class="px-6 py-4">
                             <div class="flex items-center space-x-3">
-                                <img src="${product.image}" 
+                                <img src="${product.image}" loading="lazy" decoding="async"
                                      alt="${product.name}" 
                                      class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200"
                                      onclick="showImageModal('${product.image}', '${product.name}')"
@@ -8143,7 +8276,7 @@
                     row.innerHTML = `
                         <td class="px-6 py-4">
                             <div class="flex items-center space-x-3">
-                                <img src="${product.image}" 
+                                <img src="${product.image}" loading="lazy" decoding="async"
                                      alt="${product.name}" 
                                      class="w-12 h-12 rounded-lg object-cover product-image cursor-pointer hover:scale-105 transition-transform duration-200"
                                      onclick="showImageModal('${product.image}', '${product.name}')"
@@ -11554,47 +11687,46 @@
                 return;
             }
             
-            // ÖNCE Supabase'den güncel trial_end değerini çek (misafir modunda atla)
             let trialEndDate = session.trialEnd;
-            
-            if (!session.isGuest) {
-            // Supabase hazır olana kadar bekle
-            for (let i = 0; i < 50; i++) {
-                if (window.jbDb) break;
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            
-            if (window.jbDb && session.username) {
+
+            /* Deneme süresi sunucudan ARKADA tazeleniyor. Eskiden burada
+               bekleniyordu; ağ takılınca (sekme uykudan dönünce, bilgisayar
+               uyanınca) açılış saniyelerce duruyordu. Oturumdaki değer son
+               bilinen değer, sayfa onunla açılıyor. Sunucudan farklısı gelirse
+               aşağıda sayaç ve şeritler güncelleniyor. */
+            const trialTazelemesi = session.isGuest ? Promise.resolve(null) : (async () => {
+                for (let i = 0; i < 50; i++) {
+                    if (window.jbDb) break;
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                }
+                if (!window.jbDb || !session.username) return null;
                 try {
                     const { data, error } = await window.jbDb
                         .from('users')
                         .select('trial_end')
                         .eq('username', session.username)
                         .single();
-                    
-                    if (!error && data) {
-                        trialEndDate = data.trial_end;
-                        
-                        const sessionData = {
-                            username: session.username,
-                            company: session.company || '',
-                            trialEnd: trialEndDate,
-                            isAdmin: session.isAdmin || false,
-                            loginTime: session.loginTime || new Date().toISOString(),
-                            clientIP: session.clientIP || ''
-                        };
-                        
-                        Object.assign(session, sessionData);
-                        localStorage.setItem('userSession', JSON.stringify(sessionData));
-                        
-                        const authToken = btoa(unescape(encodeURIComponent(JSON.stringify(sessionData))));
-                        localStorage.setItem('authToken', authToken);
-                    }
+                    if (error || !data) return null;
+
+                    const sessionData = {
+                        username: session.username,
+                        company: session.company || '',
+                        trialEnd: data.trial_end,
+                        isAdmin: session.isAdmin || false,
+                        loginTime: session.loginTime || new Date().toISOString(),
+                        clientIP: session.clientIP || ''
+                    };
+
+                    Object.assign(session, sessionData);
+                    localStorage.setItem('userSession', JSON.stringify(sessionData));
+
+                    const authToken = btoa(unescape(encodeURIComponent(JSON.stringify(sessionData))));
+                    localStorage.setItem('authToken', authToken);
+                    return data.trial_end;
                 } catch (error) {
-                    // Sessizce devam et, session değerini kullan
+                    return null;
                 }
-            }
-            }
+            })();
             
             // Update user info in header
             document.getElementById('userName').textContent = session.username;
@@ -11625,6 +11757,15 @@
                 }
             };
             tryUpdateCountdown();
+
+            // Arkadaki deneme süresi farklı döndüyse göstergeleri güncelle.
+            trialTazelemesi.then((yeniTrial) => {
+                if (!yeniTrial || yeniTrial === trialEndDate) return;
+                trialEndDate = yeniTrial;
+                if (window.updateTrialCountdown) window.updateTrialCountdown(yeniTrial);
+                if (window.updateTrialBanner) window.updateTrialBanner(yeniTrial);
+                if (window.updateTrialCountdownHeader) window.updateTrialCountdownHeader(yeniTrial);
+            });
             
             // Supabase realtime subscription - trial_end değişikliklerini dinle
             if (window.jbDb && session.username) {
@@ -11867,10 +12008,9 @@
                 console.error('❌ Error updating banner:', error);
             }
             
-            // Initialize user data manager
+            // Kullanıcı verisi önbellekten anında; sunucu arkada soruluyor.
             try {
-                await window.userDataManager.init();
-                console.log('User data manager initialized');
+                await window.userDataManager.hizliBaslat();
             } catch (error) {
                 console.error('Error initializing user data manager:', error);
             }
@@ -11891,10 +12031,9 @@
             
             // Contact form handler removed - chat system kullanılıyor
             
-            // Initialize user data manager
+            // Kullanıcı verisi önbellekten anında; sunucu arkada soruluyor.
             try {
-                await window.userDataManager.init();
-                console.log('User data manager initialized');
+                await window.userDataManager.hizliBaslat();
             } catch (error) {
                 console.error('Error initializing user data manager:', error);
             }

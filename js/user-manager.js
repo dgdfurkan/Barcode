@@ -22,6 +22,146 @@ class UserDataManager {
         await this.loadUserData();
     }
 
+    /**
+     * Açılışı ağa bağlamadan kurar. Yalnız arama sayfası kullanıyor; diğer
+     * sayfalar `init()` ile devam ediyor, onlar için hiçbir şey değişmedi.
+     *
+     * NEDEN
+     * `init()` kullanıcının kendi ürünlerini ve ayarlarını sunucudan bekliyor.
+     * Chrome sekmeyi bellek için kapatıp geri açınca ya da bilgisayar
+     * uykudan uyanınca ağ saniyelerce takılabiliyor; sayfa o sürede "Ürün
+     * kataloğu hazırlanıyor"da kalıyordu. Oysa katalog zaten sayfada.
+     *
+     * NASIL
+     * Son bilinen veri tarayıcıda duruyor; sunucudan her okuyuşta ve her
+     * kayıtta yazılıyor. Varsa sayfa onunla anında açılıyor, sunucu arkada
+     * soruluyor. Sunucudaki farklıysa `jb:kullanici-verisi` olayı yayılıyor
+     * ve sayfa listeyi sessizce tazeliyor. Önbellek yoksa (bu tarayıcıda
+     * ilk açılış) sunucu en fazla 4 saniye bekleniyor.
+     *
+     * NEYİ BOZMUYOR
+     * Ağ hatası elimizdeki veriyi silmiyor. Sunucu cevabı gelene kadar
+     * kullanıcı bir ayarı ya da ürünü değiştirdiyse sunucu verisi onun
+     * üstüne yazılmıyor; yerel değişiklik kazanıyor ve kayıtla sunucuya
+     * gidiyor.
+     */
+    hizliBaslat() {
+        if (this._hizliSoz) return this._hizliSoz;
+
+        const session = window.authUtils.checkAuth();
+        if (!session) return Promise.reject(new Error('User not authenticated'));
+        this.currentUser = session;
+
+        const yerel = this._yereldenOku();
+        if (yerel) {
+            this.userData = yerel;
+            this._invalidateAllProductsCache();
+            this._arkaPlanTazelemesi = this._sunucudanTazele();
+            this._hizliSoz = Promise.resolve();
+            return this._hizliSoz;
+        }
+
+        this.userData = this.createDefaultUserData();
+        this._invalidateAllProductsCache();
+        const tazeleme = this._sunucudanTazele();
+        this._arkaPlanTazelemesi = tazeleme;
+        this._hizliSoz = Promise.race([
+            tazeleme,
+            new Promise((bitti) => setTimeout(bitti, 4000)),
+        ]).then(() => {});
+        return this._hizliSoz;
+    }
+
+    /** Tarayıcıdaki son bilinen veri. Yoksa ya da bozuksa null. */
+    _yereldenOku() {
+        try {
+            const ham = localStorage.getItem(`userData_${this.currentUser.username}`);
+            if (!ham) return null;
+            const veri = JSON.parse(ham);
+            if (!veri || typeof veri !== 'object') return null;
+            const ayarlar = veri.settings && typeof veri.settings === 'object'
+                ? { ...veri.settings }
+                : this.createDefaultUserData().settings;
+            delete ayarlar.searchHistory;
+            return {
+                products: Array.isArray(veri.products) ? veri.products.filter((p) => p && !p.isDefault) : [],
+                settings: ayarlar,
+            };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    _yereleYaz() {
+        try {
+            localStorage.setItem(
+                `userData_${this.currentUser.username}`,
+                JSON.stringify({
+                    products: (this.userData.products || []).filter((p) => !p.isDefault),
+                    settings: this.userData.settings || {},
+                })
+            );
+        } catch (e) { /* kota dolu olabilir; önbellek şart değil */ }
+    }
+
+    /** Karşılaştırma için verinin izi. */
+    _veriIzi(veri) {
+        try {
+            return JSON.stringify([(veri && veri.products) || [], (veri && veri.settings) || {}]);
+        } catch (e) {
+            return String(Date.now()) + Math.random();
+        }
+    }
+
+    /**
+     * Sunucudaki veriyi okuyup uygular. Hiçbir koşulda hata fırlatmıyor ve
+     * elindeki veriyi silmiyor. Uygulandıysa true döner.
+     */
+    async _sunucudanTazele() {
+        if (!window.jbDb || !this.currentUser?.username) return false;
+        const baslangicIzi = this._veriIzi(this.userData);
+
+        let sonuc;
+        try {
+            sonuc = await window.jbDb
+                .from('user_data')
+                .select('custom_products, settings')
+                .eq('username', this.currentUser.username)
+                .order('updated_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+        } catch (e) {
+            return false;
+        }
+
+        // Ağ hatası, yetki hatası ya da satır yok: elimizdeki veri kalsın.
+        const data = sonuc && !sonuc.error ? sonuc.data : null;
+        if (!data || (data.custom_products == null && data.settings == null)) return false;
+
+        // Bu arada kullanıcı bir şey değiştirdiyse onun değişikliği kazanır.
+        if (this._veriIzi(this.userData) !== baslangicIzi) return false;
+
+        const hepsi = Array.isArray(data.custom_products) ? data.custom_products : [];
+        const temiz = hepsi.filter((p) => p && !p.isDefault);
+        const yeni = { products: temiz, settings: data.settings || {} };
+        const degisti = this._veriIzi(yeni) !== baslangicIzi;
+
+        this.userData = yeni;
+        this._invalidateAllProductsCache();
+        this._yereleYaz();
+
+        // Eski kayıtta varsayılan ürün kalmışsa `loadUserData` gibi temizleyip yaz.
+        if (temiz.length !== hepsi.length) {
+            this.saveUserData().catch(() => {});
+        }
+        if (degisti) {
+            try {
+                window.dispatchEvent(new CustomEvent('jb:kullanici-verisi'));
+            } catch (e) { /* sessiz */ }
+        }
+        return true;
+    }
+
     // Load user-specific data (ONLY from custom_products and settings columns)
     // Note: 'data' column has been removed - only new columns are used
     async loadUserData() {
@@ -57,7 +197,9 @@ class UserDataManager {
                             this.saveUserData().catch(err => console.warn('Failed to save cleaned data:', err));
                         }
                     }
-                    
+
+                    // Arama sayfası bir sonraki açılışta bununla anında açılıyor.
+                    this._yereleYaz();
                     return;
                 } else if (error && error.code === 'PGRST116') {
                     // No row found - create default data
