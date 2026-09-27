@@ -38,7 +38,7 @@
          indirmiyordu, yalnızca boşuna el sıkışma yapıyordu. Yazı tipi
          sistemden geliyor. -->
     <script src="../veri/temp_products.js?v=20260914a"></script>
-    <script src="../js/getir-cdn-paste.js?v=20260831a"></script>
+    <script src="../js/getir-cdn-paste.js?v=20260928a"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
     <script src="../js/asistan-koprusu.js?v=20260903a"></script>
     <script src="../js/eklenti-rehberi.js?v=20260829a"></script>
@@ -48,6 +48,7 @@
     <script src="../js/app-boot.js?v=20260828i"></script>
     <script src="../js/guest-access.js?v=20260831a"></script>
     <script src="../js/image-lightbox.js?v=20260828i"></script>
+    <script src="../js/urun-foto.js?v=20260928a" defer></script>
     <script src="../js/trial-notifications.js?v=20260828i"></script>
     <script src="../js/user-manager.js?v=20260919b"></script>
     <script src="../js/premium-features.js?v=20260828i"></script>
@@ -2002,6 +2003,7 @@
     <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
     <link rel="stylesheet" href="../css/sohbet.css?v=20260901g" />
+    <link rel="stylesheet" href="../css/urun-foto.css?v=20260928a" />
 </head>
 <body class="bg-background min-h-screen v2">
     <!-- Açılış perdesi. İlk karede boyanır; JS hiç çalışmasa bile
@@ -2084,6 +2086,12 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                             </svg>
                             <span>Raftaki Eksikler</span>
+                        </button>
+                        <button id="headerOrdersPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Siparişler">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 4h4"/>
+                            </svg>
+                            <span>Siparişler</span>
                         </button>
                         </nav>
                     </div>
@@ -2221,6 +2229,13 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                 </svg>
                 <span>Raftaki Eksikler</span>
+            </button>
+            <!-- Siparişler (sadece premium siparisTakibi aktifse görünür) -->
+            <button id="mobileOrdersPageBtn" class="mobile-menu-item hidden" type="button" aria-label="Siparişler">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 4h4"/>
+                </svg>
+                <span>Siparişler</span>
             </button>
 
             <button id="mobileSettingsBtn" class="mobile-menu-item">
@@ -3167,6 +3182,12 @@
                 mobileMenuOverlay.classList.add('active');
                 mobileMenuPanel.classList.add('active');
                 document.body.style.overflow = 'hidden';
+                /* Menü her açıldığında premium buton görünürlüğü
+                   yeniden hesaplansın; admin haklarını değiştirdiyse ya da
+                   kullanıcı ayarlarda toggle çevirdiyse anında yansır. */
+                if (typeof updatePremiumNavVisibility === 'function') {
+                    updatePremiumNavVisibility();
+                }
             }
         }
 
@@ -3262,6 +3283,19 @@
             mobileShelfMissingPageBtn.addEventListener('click', () => {
                 closeMobileMenu();
                 window.location.replace('../eksikler/');
+            });
+        }
+        const headerOrdersPageBtn = document.getElementById('headerOrdersPageBtn');
+        if (headerOrdersPageBtn) {
+            headerOrdersPageBtn.addEventListener('click', () => {
+                window.location.replace('../siparisler/');
+            });
+        }
+        const mobileOrdersPageBtn = document.getElementById('mobileOrdersPageBtn');
+        if (mobileOrdersPageBtn) {
+            mobileOrdersPageBtn.addEventListener('click', () => {
+                closeMobileMenu();
+                window.location.replace('../siparisler/');
             });
         }
 
@@ -3707,6 +3741,19 @@
         }
         
         // Premium nav chip görünürlüğü (header + mobil menü)
+        /* Siparişler kısayolu: admin hakkı verdiyse, kullanıcı ayarlardan
+           kapatmadıkça görünür. Tercih bu cihazda yerelde tutulur; sunucudaki
+           kopya yalnız yerelde hiç kayıt yoksa okunur. */
+        function siparislerTercihi() {
+            try {
+                const v = localStorage.getItem('jb_siparisler_nav');
+                if (v === '1') return true;
+                if (v === '0') return false;
+            } catch (e) {}
+            const t = window.premiumFeatures?.featurePreferencesCache;
+            return !t || t.siparisTakibi !== false;
+        }
+
         async function updatePremiumNavVisibility() {
             const navWrap = document.getElementById('headerPremiumNav');
             const headerBtn = document.getElementById('headerCountingPageBtn');
@@ -3717,15 +3764,17 @@
             const mobileAgendaBtn = document.getElementById('mobileAgendaPageBtn');
             const headerShelfBtn = document.getElementById('headerShelfMissingPageBtn');
             const mobileShelfBtn = document.getElementById('mobileShelfMissingPageBtn');
+            const headerOrdersBtn = document.getElementById('headerOrdersPageBtn');
+            const mobileOrdersBtn = document.getElementById('mobileOrdersPageBtn');
 
             const hideAll = () => {
                 if (navWrap) navWrap.classList.add('hidden');
-                [headerBtn, mobileBtn, headerLowStockBtn, mobileLowStockBtn, headerAgendaBtn, mobileAgendaBtn, headerShelfBtn, mobileShelfBtn].forEach((el) => {
+                [headerBtn, mobileBtn, headerLowStockBtn, mobileLowStockBtn, headerAgendaBtn, mobileAgendaBtn, headerShelfBtn, mobileShelfBtn, headerOrdersBtn, mobileOrdersBtn].forEach((el) => {
                     if (el) el.classList.add('hidden');
                 });
             };
 
-            if (!headerBtn && !mobileBtn && !headerLowStockBtn && !mobileLowStockBtn && !headerAgendaBtn && !mobileAgendaBtn && !headerShelfBtn && !mobileShelfBtn) return;
+            if (!headerBtn && !mobileBtn && !headerLowStockBtn && !mobileLowStockBtn && !headerAgendaBtn && !mobileAgendaBtn && !headerShelfBtn && !mobileShelfBtn && !headerOrdersBtn && !mobileOrdersBtn) return;
 
             try {
                 if (!window.authUtils || !window.authUtils.checkAuth()) {
@@ -3768,6 +3817,15 @@
                 } else {
                     if (headerShelfBtn) headerShelfBtn.classList.add('hidden');
                     if (mobileShelfBtn) mobileShelfBtn.classList.add('hidden');
+                }
+
+                /* Siparişler için hem admin hakkı hem kullanıcı tercihi:
+                   admin açsa da ayarlardan kapatan kullanıcı nav'da görmesin. */
+                if (window.premiumFeatures?.checkPremiumFeature('siparisTakibi') && siparislerTercihi()) {
+                    show(headerOrdersBtn, mobileOrdersBtn);
+                } else {
+                    if (headerOrdersBtn) headerOrdersBtn.classList.add('hidden');
+                    if (mobileOrdersBtn) mobileOrdersBtn.classList.add('hidden');
                 }
 
                 if (navWrap) {
@@ -8283,56 +8341,13 @@
             loadingState.setAttribute('aria-busy', 'true');
         }
 
-        // Show image modal
+        // Ürün fotoğrafı penceresi: js/urun-foto.js
         function showImageModal(imageUrl, productName) {
-            // Create modal overlay
-            const modal = document.createElement('div');
-            modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
-            modal.innerHTML = `
-                <div class="relative max-w-4xl max-h-full p-4">
-                    <button class="absolute top-2 right-2 text-white hover:text-gray-300 z-10" onclick="closeImageModal()">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
-                    <img src="${imageUrl}" 
-                         alt="${productName}" 
-                         class="max-w-full max-h-full object-contain rounded-lg"
-                         onerror="this.src='../assets/urun-gorseli-yok.svg'; this.onerror=null;">
-                    <div class="text-center mt-4">
-                        <h3 class="text-white text-lg font-medium">${productName}</h3>
-                    </div>
-                </div>
-            `;
-            
-            // Close modal on overlay click
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    closeImageModal();
-                }
-            });
-            
-            // Close modal on ESC key
-            const handleEsc = (e) => {
-                if (e.key === 'Escape') {
-                    closeImageModal();
-                }
-            };
-            document.addEventListener('keydown', handleEsc);
-            
-            // Store references for cleanup
-            modal._handleEsc = handleEsc;
-            
-            document.body.appendChild(modal);
+            if (window.JBUrunFoto) window.JBUrunFoto.ac(imageUrl, productName);
         }
 
-        // Close image modal
         function closeImageModal() {
-            const modal = document.querySelector('.fixed.inset-0.bg-black.bg-opacity-75');
-            if (modal) {
-                document.removeEventListener('keydown', modal._handleEsc);
-                modal.remove();
-            }
+            if (window.JBUrunFoto) window.JBUrunFoto.kapat();
         }
 
         // Show notification when table data is parsed
@@ -8930,6 +8945,7 @@
         const PREMIUM_FEATURES_WITH_PREFERENCE = new Set([
             'lowStockAlert',
             'stokSayimi',
+            'siparisTakibi',
             'getirStockBarcodesExtension'
         ]);
 
@@ -8995,6 +9011,10 @@
                     }
                 }
 
+                if (featureKey === 'siparisTakibi') {
+                    isEnabled = siparislerTercihi();
+                }
+
                 const action = hasPremium ? PREMIUM_FEATURE_ACTIONS[featureKey] : null;
 
                 const featureItem = document.createElement('div');
@@ -9035,6 +9055,9 @@
                     if (checkbox) {
                         checkbox.addEventListener('change', async (e) => {
                             const enabled = e.target.checked;
+                            if (featureKey === 'siparisTakibi') {
+                                try { localStorage.setItem('jb_siparisler_nav', enabled ? '1' : '0'); } catch (err) {}
+                            }
                             try {
                                 if (config.storageKey) {
                                     localStorage.setItem(config.storageKey, enabled ? '1' : '0');
@@ -9047,6 +9070,9 @@
                                     if (autoPasteCheckbox) {
                                         autoPasteCheckbox.checked = enabled;
                                     }
+                                }
+                                if (typeof updatePremiumNavVisibility === 'function') {
+                                    updatePremiumNavVisibility();
                                 }
                             } catch (err) {
                                 console.error('Error saving preference:', err);

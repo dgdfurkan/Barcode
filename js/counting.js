@@ -10362,9 +10362,16 @@ class CountingSystem {
             G.isGetirStyleProductHtml(value) &&
             typeof G.resolveProductsFromGetirHtml === 'function'
         ) {
-            const resolved = G.resolveProductsFromGetirHtml(value, this.allProducts);
+            const detay = typeof G.resolveProductsFromGetirHtmlDetailed === 'function'
+                ? G.resolveProductsFromGetirHtmlDetailed(value, this.allProducts)
+                : { products: G.resolveProductsFromGetirHtml(value, this.allProducts), unmatched: [] };
+            const resolved = detay.products;
             if (resolved.length > 0) {
                 await this.bulkAddResolvedProductsFromGetirPaste(resolved);
+                this._eslesmeyenleriBildir(
+                    (detay.unmatched || []).map((r) => ({ ad: r.name, gorsel: r.imageUrl })),
+                    'Getir tablosu'
+                );
                 if (clearInput) {
                     const input = document.getElementById('manualProductInput');
                     if (input) input.value = '';
@@ -10401,7 +10408,9 @@ class CountingSystem {
             }
             if (cozulen.length > 0) {
                 await this.bulkAddResolvedProductsFromGetirPaste(cozulen, 'Ad listesi');
-                if (bulunamayan.length > 0) {
+                if (bulunamayan.length > 0 && this._eslesmeyenleriBildir(bulunamayan.map((ad) => ({ ad })), 'Ad listesi')) {
+                    this.showToast(`${bulunamayan.length} ürün katalogda bulunamadı. Liste üstte duruyor.`, 'info', 4000);
+                } else if (bulunamayan.length > 0) {
                     this.showToast(
                         `${bulunamayan.length} ürün katalogda bulunamadı: ${bulunamayan.slice(0, 3).join(', ')}${
                             bulunamayan.length > 3 ? '…' : ''
@@ -10469,9 +10478,16 @@ class CountingSystem {
                 G.isGetirStyleProductHtml(raw) &&
                 typeof G.resolveProductsFromGetirHtml === 'function'
             ) {
-                const resolved = G.resolveProductsFromGetirHtml(raw, this.allProducts);
+                const detay = typeof G.resolveProductsFromGetirHtmlDetailed === 'function'
+                    ? G.resolveProductsFromGetirHtmlDetailed(raw, this.allProducts)
+                    : { products: G.resolveProductsFromGetirHtml(raw, this.allProducts), unmatched: [] };
+                const resolved = detay.products;
                 if (resolved.length > 0) {
                     await this.bulkAddResolvedProductsFromGetirPaste(resolved);
+                    this._eslesmeyenleriBildir(
+                        (detay.unmatched || []).map((r) => ({ ad: r.name, gorsel: r.imageUrl })),
+                        'Getir tablosu'
+                    );
                     return;
                 }
             }
@@ -10647,19 +10663,20 @@ class CountingSystem {
         }
 
         this._lastUnmatchedGetirUrls = unmatchedUrls;
+        this._eslesmeyenleriBildir(unmatchedUrls.map((u) => ({ gorsel: u })), 'Görsel linki');
 
         if (idsInPasteOrder.length === 0) {
             if (noMatch > 0 && skippedInTable === 0) {
                 this.showToast('Bu görsel adresleriyle eşleşen ürün bulunamadı', 'warning', 5000, {
-                    actionHint: 'Eşleşmeyen görselleri görmek için tıklayın',
-                    onClick: () => this._openUnmatchedGetirImagesModal(unmatchedUrls),
+                    actionHint: 'Eşleşmeyenleri görmek için tıklayın',
+                    onClick: () => this._eslesmeyenPaneliAc(unmatchedUrls),
                 });
             } else if (skippedInTable > 0) {
                 const allDup = skippedInTable === urls.length && noMatch === 0;
                 const toastOpts = noMatch
                     ? {
-                          actionHint: 'Eşleşmeyen görselleri görmek için tıklayın',
-                          onClick: () => this._openUnmatchedGetirImagesModal(unmatchedUrls),
+                          actionHint: 'Eşleşmeyenleri görmek için tıklayın',
+                          onClick: () => this._eslesmeyenPaneliAc(unmatchedUrls),
                       }
                     : null;
                 this.showToast(
@@ -10708,8 +10725,8 @@ class CountingSystem {
 
         const toastOpts = noMatch
             ? {
-                  actionHint: 'Eşleşmeyen görselleri görmek için tıklayın',
-                  onClick: () => this._openUnmatchedGetirImagesModal(unmatchedUrls),
+                  actionHint: 'Eşleşmeyenleri görmek için tıklayın',
+                  onClick: () => this._eslesmeyenPaneliAc(unmatchedUrls),
               }
             : null;
         this.showToast(msg, 'success', 5500, toastOpts);
@@ -11303,6 +11320,33 @@ class CountingSystem {
         });
 
         this._renderUnmatchedGetirSlide = renderSlide;
+    }
+
+    /**
+     * Toplu eklemede katalogda bulunamayanları kalıcı panele yazar
+     * (js/sayim-eslesmeyen.js). Panel yüklü değilse false döner, çağıran
+     * eski bildirime düşer.
+     */
+    _eslesmeyenleriBildir(ogeler, kaynak) {
+        if (!Array.isArray(ogeler) || ogeler.length === 0) return false;
+        const P = typeof window !== 'undefined' ? window.JBEslesmeyen : null;
+        if (!P || typeof P.ekle !== 'function') return false;
+        try {
+            P.ekle(ogeler, { tablo: this.formatTableDisplayName(this.currentTableName), kaynak });
+            return true;
+        } catch (e) {
+            console.warn('Eşleşmeyen ürün paneli yazılamadı:', e);
+            return false;
+        }
+    }
+
+    _eslesmeyenPaneliAc(urls) {
+        const P = typeof window !== 'undefined' ? window.JBEslesmeyen : null;
+        if (P && typeof P.ac === 'function' && P.sayi() > 0) {
+            P.ac();
+            return;
+        }
+        this._openUnmatchedGetirImagesModal(urls);
     }
 
     _openUnmatchedGetirImagesModal(urls) {

@@ -275,12 +275,13 @@
     function resolveProductsFromGetirHtmlDetailed(html, products) {
         var rows = extractGetirRowsFromHtml(html);
         if (!rows.length || !products || !products.length) {
-            return { products: [], rows: rows || [] };
+            return { products: [], rows: rows || [], unmatched: [] };
         }
 
         var imageIndex = getOrBuildGetirImageProductIndex(products);
         var nameIndex = getOrBuildProductNameLookupIndex(products);
         var resolved = [];
+        var unmatched = [];
         var seenIds = new Set();
 
         rows.forEach(function (row) {
@@ -291,12 +292,17 @@
             if (!product && row.name) {
                 product = findProductByNameFromLookupIndex(nameIndex, row.name);
             }
-            if (!product || !product.id || seenIds.has(product.id)) return;
+            // Katalogda karşılığı olmayan satır: sayım sayfası bunu kullanıcıya gösteriyor
+            if (!product || !product.id) {
+                unmatched.push(row);
+                return;
+            }
+            if (seenIds.has(product.id)) return;
             seenIds.add(product.id);
             resolved.push(product);
         });
 
-        return { products: resolved, rows: rows };
+        return { products: resolved, rows: rows, unmatched: unmatched };
     }
 
     /**
