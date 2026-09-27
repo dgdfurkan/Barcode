@@ -37,7 +37,19 @@ BEGIN
     END IF;
 END $$;
 
-GRANT USAGE ON SCHEMA public TO anon;
-GRANT USAGE ON SCHEMA public TO authenticated;
-GRANT ALL ON dispatch_agenda_items TO anon;
-GRANT ALL ON dispatch_agenda_items TO authenticated;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT USAGE ON SCHEMA public TO anon;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT USAGE ON SCHEMA public TO authenticated;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT ALL ON dispatch_agenda_items TO anon;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT ALL ON dispatch_agenda_items TO authenticated;

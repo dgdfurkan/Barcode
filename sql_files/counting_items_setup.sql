@@ -51,10 +51,22 @@ END $$;
 
 -- 4. Role izinleri — anon/authenticated ile erişim için ZORUNLU
 -- Supabase'de RLS politikası yetmez; rolün tabloya erişim izni de olmalı.
-GRANT USAGE ON SCHEMA public TO anon;
-GRANT USAGE ON SCHEMA public TO authenticated;
-GRANT ALL ON counting_items TO anon;
-GRANT ALL ON counting_items TO authenticated;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT USAGE ON SCHEMA public TO anon;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT USAGE ON SCHEMA public TO authenticated;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT ALL ON counting_items TO anon;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT ALL ON counting_items TO authenticated;
 
 -- 5. Supabase Realtime için yayın (publication)
 -- "supabase_realtime" publication'ına ekle

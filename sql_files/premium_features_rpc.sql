@@ -29,8 +29,14 @@ END;
 $$;
 
 -- Grant execute permission to authenticated users
-GRANT EXECUTE ON FUNCTION check_premium_feature(VARCHAR, TEXT) TO authenticated;
-GRANT EXECUTE ON FUNCTION check_premium_feature(VARCHAR, TEXT) TO anon;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT EXECUTE ON FUNCTION check_premium_feature(VARCHAR, TEXT) TO authenticated;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT EXECUTE ON FUNCTION check_premium_feature(VARCHAR, TEXT) TO anon;
 
 -- Add comment
 COMMENT ON FUNCTION check_premium_feature IS 'Validates if a user has a specific premium feature enabled. Returns true if feature is enabled, false otherwise.';

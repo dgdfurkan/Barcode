@@ -159,5 +159,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Eski ve yeni imza için izin (UUID, INET) ve (UUID, INET, TEXT)
-GRANT EXECUTE ON FUNCTION track_user_ip(UUID, INET) TO authenticated;
-GRANT EXECUTE ON FUNCTION track_user_ip(UUID, INET, TEXT) TO authenticated;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT EXECUTE ON FUNCTION track_user_ip(UUID, INET) TO authenticated;
+-- [güvenlik] Supabase dönemine ait yetki. Bugün tarayıcı isteği web_anon olarak
+-- geliyor, bu yetkiye ulaşılamıyor ama duruyor olması gereksiz risk. Kapatıldı;
+-- geri alma: sql_files/security_03_supabase_kalintilari.sql
+-- GRANT EXECUTE ON FUNCTION track_user_ip(UUID, INET, TEXT) TO authenticated;

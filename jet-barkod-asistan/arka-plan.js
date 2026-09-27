@@ -10,6 +10,7 @@ import './arka-plan/sayim-hazirligi.js';
 import './arka-plan/raf-etiketi.js';
 import './arka-plan/urun-cekici.js';
 import './arka-plan/siparis-kopru.js';
+import './arka-plan/siteye-git.js';
 
 /**
  * Güncelleme sonrası açık panel sekmelerini tazele.

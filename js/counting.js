@@ -2117,6 +2117,15 @@ class CountingSystem {
 
     _beginBulkImportLock(message = 'Ürünler işleniyor') {
         this._importInProgress = true;
+        /* Yakalama sorgusu içe aktarmanın TAMAMI boyunca bastırılıyor. Eskiden
+           yalnız tablo değişiminde 3 saniyelik bir pencere vardı; altmış
+           satırlık bir yapıştırma bundan uzun sürdüğünde araya giren sorgu
+           taze veriyi sunucunun eski hâliyle karıştırabiliyordu. Bitişte
+           `_endBulkImportLock` kısa bir paya çekiyor. */
+        this._suppressCatchUpUntil = Math.max(
+            Number(this._suppressCatchUpUntil) || 0,
+            Date.now() + 60000
+        );
         this.showCountingStatus(message, 'Tablo değiştirmeyin', { lock: true });
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
@@ -6420,7 +6429,17 @@ class CountingSystem {
 
         this._scheduleMetaSave(250);
 
-        if (options.skipRender === true) return;
+        /* Ürün listesi içe aktarmadan sonra çizilecek, ama BAŞLIK, ÇİPLER ve
+           alt sekme hemen güncellenmeli. Eskiden burada dönülüyordu: motor yeni
+           tabloya geçiyor, üstteki "aktif tablo" adıyla Genel/Günlük sekmesi
+           eski tabloyu göstermeye devam ediyordu. Kullanıcı satırların eski
+           tabloya eklendiğini sanıyor, ancak sayfayı yenileyince düzeliyordu. */
+        if (options.skipRender === true) {
+            this.updateTableSelector();
+            this.updateActiveTableActivityLine();
+            this.syncSayimSubTabToTable();
+            return;
+        }
 
         // Re-render UI
         this.renderTable();
@@ -8227,6 +8246,8 @@ class CountingSystem {
             this._ensureActiveTable(targetTable, 'kayıt sonrası');
             // targetTable AÇIKÇA geçiliyor — this.currentTableName değil.
             await this._bulkSaveProductEntries(idsInPasteOrder, targetTable);
+            // Son kontrol: ürün kayıtları sırasında da aktif tablo kaymasın.
+            this._ensureActiveTable(targetTable, 'ürün kayıtları sonrası');
             this.showToast(
                 `${added} ürün işlendi${skipped ? `, ${skipped} satır eşleşmedi` : ''}`,
                 added ? 'success' : 'warning',
@@ -8235,6 +8256,11 @@ class CountingSystem {
             return { added, skipped };
         } finally {
             this._endBulkImportLock();
+            /* İçe aktarma yarıda hata verse bile başlık, çipler ve alt sekme
+               gerçek aktif tabloyu göstersin. */
+            this.updateTableSelector();
+            this.updateActiveTableActivityLine();
+            this.syncSayimSubTabToTable();
         }
     }
 

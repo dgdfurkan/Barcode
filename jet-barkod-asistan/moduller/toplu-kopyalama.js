@@ -67,11 +67,19 @@
     }
 
     /**
-     * Jet Barkod zaten açık bir sekmedeyse yeni sekme açma. Açık sekme
-     * BroadcastChannel'dan cevap veriyor; yarım saniye sessizlik gelirse
-     * açık değildir, yeni sekme açılır.
+     * Jet Barkod'a geçer. Açık sekme varsa onu öne alır.
+     *
+     * ÖNCE ARKA PLAN. Arka plan `tabs` yetkisiyle sekmeyi doğrudan görüyor,
+     * beklemeye gerek kalmıyor. Eski yol (BroadcastChannel ile "ping" atıp
+     * yarım saniye "pong" beklemek) yedek olarak duruyor: arka plan cevap
+     * vermezse (eklenti güncellenirken içerik betiği yetim kalabiliyor)
+     * eskisi gibi çalışıyor.
+     *
+     * Eski yolun sorunu şuydu: Chrome sekmeyi bellek için kapattıysa ya da
+     * sekme o an meşgulse cevap gelmiyor ve İKİNCİ bir sekme açılıyordu;
+     * kullanıcı sayfanın yeniden yüklenmesini bekliyordu.
      */
-    function siteyeGit() {
+    function eskiYoldanGit() {
         try {
             if (typeof BroadcastChannel !== 'undefined') {
                 var kanal = new BroadcastChannel('barcode_site_nav');
@@ -85,16 +93,32 @@
                     kanal.removeEventListener('message', dinle);
                     kanal.close();
                     if (!cevap) window.open(SITE, '_blank');
-                }, 500);
+                }, 700);
                 return;
             }
         } catch (e) { /* kanal yoksa aşağıdaki yol */ }
         window.open(SITE, '_blank');
     }
 
+    function siteyeGit() {
+        try {
+            chrome.runtime.sendMessage({ type: 'JBA_SITEYE_GIT', url: SITE }, function (cevap) {
+                if (chrome.runtime.lastError || !cevap || !cevap.ok) {
+                    eskiYoldanGit();
+                }
+            });
+        } catch (e) {
+            eskiYoldanGit();
+        }
+    }
+
+    /* Kopyalama bitti, beklemeye gerek yok. Eskiden yarım saniye bekleniyor,
+       ardından yarım saniye de "pong" bekleniyordu; sekme diri olsa bile bir
+       saniye kaybediliyordu. Panoya yazma zaten tamamlandı; kısa gecikme
+       yalnız "kopyalandı" bildiriminin görünmesi için. */
     function kopyalandiktanSonra() {
         yonlendirmeAcikMi().then(function (acik) {
-            if (acik) setTimeout(siteyeGit, 500);
+            if (acik) setTimeout(siteyeGit, 120);
         });
     }
 
