@@ -50,6 +50,8 @@
     <script src="../js/trial-notifications.js?v=20260828i"></script>
     <script src="../js/user-manager.js?v=20260919b"></script>
     <script src="../js/premium-features.js?v=20260828i"></script>
+    <script src="../js/ajanda-hatirlatici.js?v=20261002a"></script>
+    <script src="../js/ajanda-zil.js?v=20261002a"></script>
     <script src="../js/notifications.js?v=20260828i"></script>
     <script src="../js/feature-definitions.js?v=20260828i"></script>
     <script src="../js/feature-manager.js?v=20260828i"></script>
@@ -2003,6 +2005,7 @@
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
     <link rel="stylesheet" href="../css/sohbet.css?v=20260901g" />
     <link rel="stylesheet" href="../css/urun-foto.css?v=20260928a" />
+    <link rel="stylesheet" href="../css/ajanda-zil.css?v=20261002a" />
 </head>
 <body class="bg-background min-h-screen">
     <!-- Açılış perdesi. İlk karede boyanır; JS hiç çalışmasa bile
@@ -3797,6 +3800,8 @@
 
             const hideAll = () => {
                 if (navWrap) navWrap.classList.add('hidden');
+                window.__jbAjandaHak = false;
+                window.JBAjandaZil?.hakGuncelle(false);
                 [headerBtn, mobileBtn, headerLowStockBtn, mobileLowStockBtn, headerAgendaBtn, mobileAgendaBtn, headerShelfBtn, mobileShelfBtn, headerOrdersBtn, mobileOrdersBtn].forEach((el) => {
                     if (el) el.classList.add('hidden');
                 });
@@ -3855,6 +3860,11 @@
                     if (headerOrdersBtn) headerOrdersBtn.classList.add('hidden');
                     if (mobileOrdersBtn) mobileOrdersBtn.classList.add('hidden');
                 }
+
+                /* Ajanda hatırlatıcı zili (js/ajanda-zil.js): perde kalkmadan
+                   karar verilsin ki zil sonradan belirip üst çubuğu itmesin */
+                window.__jbAjandaHak = !!window.premiumFeatures?.checkPremiumFeature('urunAjandasi');
+                window.JBAjandaZil?.hakGuncelle(window.__jbAjandaHak);
 
                 if (navWrap) {
                     navWrap.classList.toggle('hidden', !anyVisible);

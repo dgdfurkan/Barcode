@@ -340,8 +340,11 @@ class DispatchAgendaApp {
 
             if (error) throw error;
             this.items = Array.isArray(data) ? data : [];
+            this._yuklemeHatali = false;
+            await this._hatirlaticiyiEsitle();
         } catch (e) {
             console.error('Ajanda yüklenemedi:', e);
+            this._yuklemeHatali = true;
             this.items = [];
             this._toast('Kayıtlar yüklenemedi', 'error');
         }
@@ -351,10 +354,11 @@ class DispatchAgendaApp {
         if (!this.items.length) {
             if (listEl) listEl.innerHTML = '';
             emptyEl?.classList.remove('hidden');
-            return;
+        } else {
+            emptyEl?.classList.add('hidden');
+            if (listEl) this._renderAgendaList(listEl);
         }
-        emptyEl?.classList.add('hidden');
-        if (listEl) this._renderAgendaList(listEl);
+        this._derinBaglantiyiAc();
     }
 
     _dateKey(item) {
@@ -416,11 +420,15 @@ class DispatchAgendaApp {
         const meta = pickup
             ? `<div class="flex flex-wrap items-center gap-1 mt-1.5">${pickup}</div>`
             : '';
+        const zil = this._hatirlaticiAcikMi(item)
+            ? `<span class="agenda-zil-isaret" title="Hatırlatıcı açık" aria-label="Hatırlatıcı açık">${this._zilSvg()}</span>`
+            : '';
         return `
             <button type="button" class="agenda-card" data-item-id="${this._esc(item.id)}" aria-label="${name}">
                 <div class="relative">
                     <img src="${img}" alt="" class="agenda-card-img" loading="lazy" />
                     <span class="agenda-qty-badge">−${qty}</span>
+                    ${zil}
                 </div>
                 <p class="agenda-card-title">${name}</p>
                 ${meta}
@@ -448,6 +456,7 @@ class DispatchAgendaApp {
         document.getElementById('addSearchClearBtn')?.addEventListener('click', () => this._clearSearchInput());
         document.getElementById('detailCloseBtn')?.addEventListener('click', () => this.closeDetailSheet());
         document.getElementById('detailDeleteBtn')?.addEventListener('click', () => this.openDeleteConfirmModal());
+        document.getElementById('detailReminderBtn')?.addEventListener('click', () => void this._hatirlaticiyiCevir());
         document.getElementById('detailSheetBackdrop')?.addEventListener('click', () => this.closeDetailSheet());
 
         document.getElementById('agendaDeleteConfirmClose')?.addEventListener('click', () => this.closeDeleteConfirmModal());
@@ -577,6 +586,8 @@ class DispatchAgendaApp {
         if (noteEl) noteEl.value = '';
         if (addrEl) addrEl.value = '';
         if (pickupEl) pickupEl.checked = false;
+        const reminderEl = document.getElementById('addReminder');
+        if (reminderEl) reminderEl.checked = false;
         this._setReasonPreset(this.REASON_PRESETS[0]);
         this._setDefaultDate('addEventDate');
 
@@ -756,6 +767,9 @@ class DispatchAgendaApp {
         const pickupRequired = !!document.getElementById('addPickupRequired')?.checked;
         const address = (document.getElementById('addAddress')?.value || '').trim();
         const eventDate = document.getElementById('addEventDate')?.value || null;
+        const reminder = !!document.getElementById('addReminder')?.checked;
+        const H = window.JBAjandaHatirlatici;
+        if (reminder && H) await H.kolonVarMi();
 
         const barcodes = Array.isArray(this.selectedProduct.barcodes) ? this.selectedProduct.barcodes : [];
         const row = {
@@ -771,15 +785,18 @@ class DispatchAgendaApp {
             address: address || null,
             event_date: eventDate,
             updated_at: new Date().toISOString(),
+            ...(H ? H.eklemeAlani(reminder) : {}),
         };
 
         const saveBtn = document.getElementById('addModalSave');
         if (saveBtn) saveBtn.disabled = true;
 
         try {
-            const { error } = await window.jbDb.from('dispatch_agenda_items').insert(row);
+            const { data, error } = await window.jbDb.from('dispatch_agenda_items').insert(row).select('id');
             if (error) throw error;
-            this._toast('Kayıt eklendi', 'success');
+            const yeniId = Array.isArray(data) ? data[0]?.id : data?.id;
+            if (H && yeniId) H.eklendi(yeniId, reminder);
+            this._toast(reminder ? 'Kayıt eklendi, hatırlatıcı kuruldu' : 'Kayıt eklendi', 'success');
             this.closeAddModal();
             await this.loadItems();
         } catch (e) {
@@ -821,6 +838,10 @@ class DispatchAgendaApp {
                     <dd class="text-right text-slate-900">${this._esc(this._formatDate(item.event_date || item.created_at))}</dd>
                 </div>
                 <div class="flex justify-between gap-3 border-b border-slate-100 py-2.5">
+                    <dt class="text-slate-500 shrink-0">Hatırlatıcı</dt>
+                    <dd class="text-right font-semibold ${this._hatirlaticiAcikMi(item) ? 'text-rose-700' : 'text-slate-400'}">${this._hatirlaticiAcikMi(item) ? 'Açık · arama sayfasında görünüyor' : 'Kapalı'}</dd>
+                </div>
+                <div class="flex justify-between gap-3 border-b border-slate-100 py-2.5">
                     <dt class="text-slate-500 shrink-0">Müşteriden Alınacak</dt>
                     <dd class="text-right font-semibold ${item.pickup_required ? 'text-blue-700' : 'text-slate-400'}">${item.pickup_required ? 'Evet' : 'Hayır'}</dd>
                 </div>
@@ -828,6 +849,7 @@ class DispatchAgendaApp {
                 ${barcodeText ? `<div class="flex justify-between gap-3 py-2.5"><dt class="text-slate-500 shrink-0">Barkod</dt><dd class="text-right text-xs font-mono text-slate-600 [overflow-wrap:anywhere]">${this._esc(barcodeText)}</dd></div>` : ''}
             </dl>`;
 
+        this._hatirlaticiDugmesiniYaz(item);
         sheet.classList.remove('hidden');
         sheet.setAttribute('aria-hidden', 'false');
         requestAnimationFrame(() => sheet.classList.add('agenda-sheet-open'));
@@ -874,6 +896,7 @@ class DispatchAgendaApp {
                 .eq('id', this.detailItem.id)
                 .eq('username', this._username);
             if (error) throw error;
+            window.JBAjandaHatirlatici?.kaldirildi(this.detailItem.id);
             this.closeDeleteConfirmModal();
             this._toast('Kayıt silindi', 'success');
             this.closeDetailSheet();
@@ -884,6 +907,94 @@ class DispatchAgendaApp {
         } finally {
             if (confirmBtn) confirmBtn.disabled = false;
         }
+    }
+
+    // ==================================================================
+    // Hatırlatıcı
+    // ==================================================================
+
+    _hatirlaticiAcikMi(item) {
+        const H = window.JBAjandaHatirlatici;
+        return !!(H && H.aciklarMi(item, this._username));
+    }
+
+    _zilSvg() {
+        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>';
+    }
+
+    /** Sütun durumunu öğren, arama sayfasının okuduğu önbelleği tazele. */
+    async _hatirlaticiyiEsitle() {
+        const H = window.JBAjandaHatirlatici;
+        if (!H) return;
+        try { await H.esitle(this.items); } catch (e) { /* ağ: yerel iz geçerli kalır */ }
+        H.onbellekYaz(this.items.filter((it) => H.aciklarMi(it, this._username)), this._username);
+    }
+
+    _hatirlaticiDugmesiniYaz(item) {
+        const btn = document.getElementById('detailReminderBtn');
+        if (!btn) return;
+        if (!window.JBAjandaHatirlatici) {
+            btn.classList.add('hidden');
+            return;
+        }
+        const acik = this._hatirlaticiAcikMi(item);
+        btn.classList.remove('hidden');
+        btn.classList.toggle('is-acik', acik);
+        btn.disabled = false;
+        btn.innerHTML = `${this._zilSvg()}<span>${acik ? 'Hatırlatıcıyı kapat' : 'Hatırlatıcı kur'}</span>`;
+    }
+
+    async _hatirlaticiyiCevir() {
+        const H = window.JBAjandaHatirlatici;
+        const item = this.detailItem;
+        if (!H || !item?.id) return;
+        const btn = document.getElementById('detailReminderBtn');
+        const yeni = !this._hatirlaticiAcikMi(item);
+        if (btn) btn.disabled = true;
+        try {
+            await H.ayarla(item.id, yeni);
+            if (H.kolonDurumu() === true) item.reminder = yeni;
+            H.onbellekYaz(this.items.filter((it) => H.aciklarMi(it, this._username)), this._username);
+            const listEl = document.getElementById('agendaCardStrip');
+            if (listEl && this.items.length) this._renderAgendaList(listEl);
+            this.openDetailSheet(item);
+            this._toast(yeni ? 'Hatırlatıcı kuruldu' : 'Hatırlatıcı kapatıldı', 'success');
+        } catch (e) {
+            console.error(e);
+            this._toast('Hatırlatıcı değiştirilemedi', 'error');
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    /**
+     * Arama sayfasındaki zilden gelindiyse (?kayit=<id>) o kaydı aç.
+     * Bir kez çalışır; adres çubuğundaki parametre temizlenir ki
+     * yenileyince yeniden açılmasın.
+     */
+    _derinBaglantiyiAc() {
+        // Liste yüklenemediyse bekle; bir sonraki başarılı yüklemede açılır
+        if (this._derinBaglantiBitti || this._yuklemeHatali) return;
+        let id = null;
+        try { id = new URLSearchParams(window.location.search).get('kayit'); } catch (e) { id = null; }
+        if (!id) { this._derinBaglantiBitti = true; return; }
+        this._derinBaglantiBitti = true;
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('kayit');
+            window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+        } catch (e) { /* ignore */ }
+        const item = this.items.find((x) => String(x.id) === String(id));
+        if (!item) {
+            this._toast('Bu kayıt artık yok', 'info');
+            return;
+        }
+        const kart = document.querySelector(`[data-item-id="${CSS.escape(String(id))}"]`);
+        if (kart) {
+            kart.scrollIntoView({ block: 'center' });
+            kart.classList.add('is-vurgu');
+            setTimeout(() => kart.classList.remove('is-vurgu'), 1600);
+        }
+        this.openDetailSheet(item);
     }
 
     _setDefaultDate(inputId = 'addEventDate') {
