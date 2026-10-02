@@ -138,6 +138,4 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
   Tek sebebi `admin_panel_inject.js`. jetbarkod.com.tr ile sınırlandırılabilir.
 - Site ile eklenti arasındaki `postMessage` çağrıları hedef kaynağı `'*'` veriyor. Kısıtlanmalı.
 - `sql_files/security_02_drop_plaintext_password.sql` çalıştırılacak.
-- `sql_files/ajanda_hatirlatici.sql` çalıştırılacak. Çalışana kadar ajanda hatırlatıcıları
-  yalnız ekleyen tarayıcıda tutulur (`js/ajanda-hatirlatici.js`), sütun gelince kendiliğinden taşınır.
 - VPS'te apt upgrade + reboot bekliyor.
