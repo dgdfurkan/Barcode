@@ -34,7 +34,7 @@
     <script src="../js/vendor/qrcode.min.js?v=20260828i"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <script src="../veri/temp_products.js?v=20260914a"></script>
+    <script src="../veri/temp_products.js?v=20261003a"></script>
     <script src="../js/getir-cdn-paste.js?v=20260928a"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
     <script src="../js/asistan-koprusu.js?v=20260903a"></script>
@@ -11007,7 +11007,7 @@
                 
                 // Update temp_products.js
                 const jsContent = `const PRODUCTS_DATA = ${JSON.stringify(data)};`;
-                await fetch('../veri/temp_products.js?v=20260914a', {
+                await fetch('../veri/temp_products.js?v=20261003a', {
                     method: 'PUT',
                     body: jsContent,
                     headers: { 'Content-Type': 'application/javascript' }
