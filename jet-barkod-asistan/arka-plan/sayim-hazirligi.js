@@ -17,6 +17,19 @@
 
 import { handleFetchExpiryProducts } from './skt-getir.js';
 
+/* Franchise sitesi franchise-v2.getir.com'a taşındı; eskisi de açık olabilir.
+   Stok sayfası iki sitede farklı yolda: /stock/current ve
+   /inventory-management/current. Herhangi bir franchise sekmesi iş görür,
+   stok sayfası açıksa o öne alınır. */
+const FRANCHISE_SEKMELERI = ['https://franchise.getir.com/*', 'https://franchise-v2.getir.com/*'];
+function stokSayfasiMi(url) {
+    return /^https:\/\/franchise(-v\d+)?\.getir\.com\/(stock|inventory-management)\/current/.test(url || '') ? 1 : 0;
+}
+async function franchiseStokSekmeleri() {
+    const tabs = await chrome.tabs.query({ url: FRANCHISE_SEKMELERI });
+    return tabs.sort((a, b) => stokSayfasiMi(b.url) - stokSayfasiMi(a.url));
+}
+
 console.log('✅ Background script yüklendi');
 
 /* JETON YAKALAMA
@@ -93,7 +106,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
     (details) => {
         // SADECE franchise.getir.com'dan gelen istekleri işle (warehouse.getir.com vb. hariç)
         const initiator = details.initiator || '';
-        if (!initiator.startsWith('https://franchise.getir.com')) {
+        if (!/^https:\/\/franchise(-v\d+)?\.getir\.com(\/|$)/.test(initiator)) {
             return; // franchise.getir.com dışındaki sayfalardan gelen istekleri yoksay
         }
         
@@ -161,7 +174,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                         const warehouseId = backgroundTokenState.warehouseId;
                         
                         // Franchise sayfasına token'ı gönder (sadece token değiştiyse)
-                        chrome.tabs.query({ url: 'https://franchise.getir.com/*' }, (tabs) => {
+                        chrome.tabs.query({ url: FRANCHISE_SEKMELERI }, (tabs) => {
                             if (tabs && tabs.length > 0) {
                                 tabs.forEach(tab => {
                                     chrome.tabs.sendMessage(tab.id, {
@@ -221,7 +234,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 function depoKimligiDuyur(warehouseId) {
     if (!warehouseId) return;
     try {
-        chrome.tabs.query({ url: 'https://franchise.getir.com/*' }, (tabs) => {
+        chrome.tabs.query({ url: FRANCHISE_SEKMELERI }, (tabs) => {
             (tabs || []).forEach((tab) => {
                 chrome.tabs.sendMessage(tab.id, {
                     type: 'WAREHOUSE_ID_CAPTURED',
@@ -798,10 +811,10 @@ async function handleStockRequestFromSupabase(request) {
 async function handleStockRequest(barcode, productName, requestId) {
     try {
         // Franchise sayfasını bul (API bilgilerini almak için)
-        const tabs = await chrome.tabs.query({ url: 'https://franchise.getir.com/stock/current' });
+        const tabs = await franchiseStokSekmeleri();
         
         if (tabs.length === 0) {
-            throw new Error('Getir franchise sayfası açık değil. Lütfen https://franchise.getir.com/stock/current sayfasını açın ve sayfayı yenileyin.');
+            throw new Error('Getir franchise sayfası açık değil. Lütfen https://franchise-v2.getir.com/inventory-management/current sayfasını açın ve sayfayı yenileyin.');
         }
         
         // Content script'ten API bilgilerini al
@@ -877,10 +890,10 @@ async function handleStockRequest(barcode, productName, requestId) {
 async function handleAPIRequest(apiInfo, barcode, productName, requestId) {
     try {
         // Franchise sayfasını bul
-        const tabs = await chrome.tabs.query({ url: 'https://franchise.getir.com/stock/current' });
+        const tabs = await franchiseStokSekmeleri();
         
         if (tabs.length === 0) {
-            throw new Error('Getir franchise sayfası açık değil. Lütfen https://franchise.getir.com/stock/current sayfasını açın.');
+            throw new Error('Getir franchise sayfası açık değil. Lütfen https://franchise-v2.getir.com/inventory-management/current sayfasını açın.');
         }
         
         // Content script'e mesaj gönder

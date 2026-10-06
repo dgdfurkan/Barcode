@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Getir Stok Barkodları",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "ant-table-tbody içindeki tüm ürün görsel URL’lerini satır sırasıyla virgülle kopyalar.",
   "icons": {
     "16": "icon128.png",
@@ -11,12 +11,22 @@
   "action": {
     "default_title": "Sayfadaki “Görsel URL'leri kopyala” butonunu kullan"
   },
-  "permissions": ["clipboardWrite"],
-  "host_permissions": ["https://franchise.getir.com/*"],
+  "permissions": [
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://franchise.getir.com/*",
+    "https://franchise-v2.getir.com/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://franchise.getir.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://franchise.getir.com/*",
+        "https://franchise-v2.getir.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ]

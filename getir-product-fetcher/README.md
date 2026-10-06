@@ -23,7 +23,7 @@ Manifest v3'te service worker'lar sadece gerektiğinde çalışır:
 
 ## Kullanım
 
-1. Getir franchise sitesine giriş yapın: https://franchise.getir.com
+1. Getir franchise sitesine giriş yapın: https://franchise-v2.getir.com
 2. Admin paneli açın: http://localhost:8080/admin.html (veya kendi portunuz)
 3. "Ürün İçe Aktarma" sekmesine gidin
 4. "Getir API'den Tüm Ürünleri Çek" butonuna tıklayın

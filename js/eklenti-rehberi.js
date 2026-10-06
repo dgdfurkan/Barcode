@@ -53,7 +53,7 @@
         stokBarkodlari: {
             tur: 'eklenti',
             ad: 'Stok Barkodları',
-            site: 'franchise.getir.com',
+            site: 'franchise-v2.getir.com',
             dosya: 'Jet Barkod - Stok Barkodları',
             ikon: '../assets/eklenti/stok-barkodlari.png',
             ozet: 'Franchise stok sayfasındaki görsel adreslerini, satır sırasını bozmadan kopyalar.',
@@ -67,7 +67,7 @@
         stokSenkron: {
             tur: 'eklenti',
             ad: 'Sayım Hazırlığı',
-            site: 'franchise.getir.com',
+            site: 'franchise-v2.getir.com',
             dosya: 'Jet Barkod - Sayım Hazırlığı',
             ikon: '../assets/eklenti/sayim-hazirligi.png',
             ozet: 'Sayım tablosunu ürünle doldurmanın hızlı yolu. Stok sayfasından toplu seçim yapar.',

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Getir Stok Senkronizasyonu",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Getir franchise stok sayfasından stok verilerini senkronize eder",
   "author": "FlowCobalt",
   "icons": {
@@ -9,9 +9,15 @@
     "48": "icon128.png",
     "128": "icon128.png"
   },
-  "permissions": ["storage", "webRequest", "tabs", "scripting"],
+  "permissions": [
+    "storage",
+    "webRequest",
+    "tabs",
+    "scripting"
+  ],
   "host_permissions": [
     "https://franchise.getir.com/*",
+    "https://franchise-v2.getir.com/*",
     "https://franchise-api-gateway.getirapi.com/*",
     "https://*.getirapi.com/*",
     "https://warehouse.getir.com/*",
@@ -21,8 +27,13 @@
   ],
   "content_scripts": [
     {
-      "matches": ["https://franchise.getir.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://franchise.getir.com/*",
+        "https://franchise-v2.getir.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_start"
     },
     {
@@ -33,7 +44,9 @@
         "https://www.jetbarkod.com.tr/*",
         "file:///*"
       ],
-      "js": ["page-bridge.js"],
+      "js": [
+        "page-bridge.js"
+      ],
       "run_at": "document_start",
       "all_frames": false
     }
@@ -43,6 +56,7 @@
       "http://localhost/*",
       "http://127.0.0.1/*",
       "https://franchise.getir.com/*",
+      "https://franchise-v2.getir.com/*",
       "https://jetbarkod.com.tr/*",
       "https://www.jetbarkod.com.tr/*"
     ]
@@ -53,8 +67,13 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["background.js", "expiry-fetch.js"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "background.js",
+        "expiry-fetch.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }

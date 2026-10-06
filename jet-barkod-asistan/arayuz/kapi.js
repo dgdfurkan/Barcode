@@ -26,7 +26,7 @@
     var yerEl = document.getElementById('yer');
     var surumEl = document.getElementById('surum');
 
-    var DESTEKLENEN = ['warehouse.getir.com', 'franchise.getir.com'];
+    var DESTEKLENEN = ['warehouse.getir.com', 'franchise.getir.com', 'franchise-v2.getir.com'];
 
     try {
         surumEl.textContent = 'sürüm ' + chrome.runtime.getManifest().version;

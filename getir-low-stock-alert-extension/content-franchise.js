@@ -2,7 +2,7 @@
 // Bearer token: Sayfanın yaptığı fetch ve XMLHttpRequest isteklerini izleyerek
 // Authorization header'ından alınır (birçok SPA XHR kullanır).
 (function () {
-  if (window.location.hostname !== 'franchise.getir.com') return;
+  if (!/^franchise(-v\d+)?\.getir\.com$/.test(window.location.hostname)) return;
 
   let token = null;
   let lastMovementsBody = null;

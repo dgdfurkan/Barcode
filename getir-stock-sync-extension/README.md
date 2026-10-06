@@ -30,7 +30,7 @@ Bu Chrome extension, Getir franchise stok sayfasından stok verilerini senkroniz
 
 ### İlk Kurulum
 
-1. **Getir franchise sayfasını açın**: `https://franchise.getir.com/stock/current`
+1. **Getir franchise sayfasını açın**: `https://franchise-v2.getir.com/inventory-management/current`
 2. Extension otomatik olarak API bilgilerini yakalayacaktır
 3. Console'u açın (F12) ve şu log'ları göreceksiniz:
    - `🌐 API çağrısı yakalandı:` - Gerçek API endpoint'i

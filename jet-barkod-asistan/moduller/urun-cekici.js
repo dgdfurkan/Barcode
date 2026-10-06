@@ -131,7 +131,7 @@
         kimlik: 'urunCekici',
         ad: 'Ürün Çekici',
         ozet: 'Franchise ürün kataloğunu yönetici paneline aktarır. Yönetici aracı.',
-        hostlar: ['franchise.getir.com'],
+        hostlar: ['franchise.getir.com', 'franchise-v2.getir.com'],
 
         baslat: function () { calistir(); },
 

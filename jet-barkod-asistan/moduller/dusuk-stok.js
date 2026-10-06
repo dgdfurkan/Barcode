@@ -128,7 +128,7 @@
         kimlik: 'dusukStok',
         ad: 'Düşük Stok Uyarısı',
         ozet: 'Stok hareketlerini izler, eşiğin altına düşen ürünleri Jet Barkod listesine gönderir.',
-        hostlar: ['franchise.getir.com'],
+        hostlar: ['franchise.getir.com', 'franchise-v2.getir.com'],
 
         baslat: function () {
             chrome.runtime.onMessage.addListener(dinleyici);

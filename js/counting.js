@@ -11649,7 +11649,7 @@ class CountingSystem {
 
             // If no stocks were retrieved, show instruction
             if (Object.keys(systemStocks).length === 0) {
-                this.showNotification('Getir franchise sayfası açık değil veya token süresi dolmuş. Lütfen https://franchise.getir.com/stock/current sayfasını açın ve sayfayı yenileyin.', 'error');
+                this.showNotification('Getir franchise sayfası açık değil veya token süresi dolmuş. Lütfen https://franchise-v2.getir.com/inventory-management/current sayfasını açın ve sayfayı yenileyin.', 'error');
             }
         } catch (error) {
             console.error('Error fetching stocks from extension:', error);
@@ -11829,7 +11829,7 @@ class CountingSystem {
             
             if (!apiInfo) {
                 console.log('ℹ️ API bilgileri bulunamadı. Supabase, extension ve localStorage kontrol edildi.');
-                reject(new Error('API bilgileri bulunamadı. Lütfen Getir franchise sayfasını açın (https://franchise.getir.com/stock/current) ve sayfayı yenileyin. Extension token\'ı yakalayacak ve Supabase\'e kaydedecektir.'));
+                reject(new Error('API bilgileri bulunamadı. Lütfen Getir franchise sayfasını açın (https://franchise-v2.getir.com/inventory-management/current) ve sayfayı yenileyin. Extension token\'ı yakalayacak ve Supabase\'e kaydedecektir.'));
                 return;
             }
             
@@ -11845,7 +11845,7 @@ class CountingSystem {
                 // Token geçerliliğini kontrol et (JWT exp dahil)
                 const effectiveExpiry = this.getEffectiveExpiryMs(apiInfo);
                 if (effectiveExpiry && Date.now() >= effectiveExpiry - 5 * 60 * 1000) {
-                    reject(new Error('Token süresi dolmuş. Lütfen Getir franchise sayfasını yenileyin (https://franchise.getir.com/stock/current).'));
+                    reject(new Error('Token süresi dolmuş. Lütfen Getir franchise sayfasını yenileyin (https://franchise-v2.getir.com/inventory-management/current).'));
                     return;
                 }
                 

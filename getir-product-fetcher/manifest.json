@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Getir Product Fetcher",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Getir API'den ürün çekme extension'ı (Admin panel için)",
   "permissions": [
     "storage",
@@ -11,6 +11,7 @@
   ],
   "host_permissions": [
     "https://franchise.getir.com/*",
+    "https://franchise-v2.getir.com/*",
     "https://franchise-api-gateway.getirapi.com/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
@@ -18,13 +19,24 @@
   ],
   "content_scripts": [
     {
-      "matches": ["https://franchise.getir.com/*"],
-      "js": ["content.js"],
+      "matches": [
+        "https://franchise.getir.com/*",
+        "https://franchise-v2.getir.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"],
-      "js": ["admin_panel_inject.js"],
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://*/*"
+      ],
+      "js": [
+        "admin_panel_inject.js"
+      ],
       "run_at": "document_idle",
       "all_frames": false
     }
@@ -40,4 +52,3 @@
     ]
   }
 }
-

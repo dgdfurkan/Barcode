@@ -249,10 +249,10 @@
         kimlik: 'stokBarkodlari',
         ad: 'Stok Barkodları',
         ozet: 'Stok tablosundaki ürün görsel adreslerini sırayla kopyalar. Jet Barkod arama kutusuna yapıştır.',
-        hostlar: ['franchise.getir.com'],
+        hostlar: ['franchise.getir.com', 'franchise-v2.getir.com'],
         // Yalnız güncel stok listesi. Franchise'ın başka sayfalarında
         // tablo yapısı farklı, düğme oralarda anlamsız duruyordu.
-        yol: function (yol) { return /^\/stock\/current\/?$/.test(yol); },
+        yol: function (yol) { return /^\/(stock|inventory-management)\/current\/?$/.test(yol); },
 
         baslat: function (ctx) {
             stilKur();

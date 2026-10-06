@@ -279,8 +279,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           featureEnabled: msg.payload.featureEnabled === true
         };
       }
-      const tabs = await chrome.tabs.query({ url: 'https://franchise.getir.com/*' });
-      if (!tabs.length) return { error: 'Franchise sekmesi açık değil. franchise.getir.com açıp giriş yapın.' };
+      const tabs = await chrome.tabs.query({ url: ['https://franchise.getir.com/*', 'https://franchise-v2.getir.com/*'] });
+      if (!tabs.length) return { error: 'Franchise sekmesi açık değil. franchise-v2.getir.com açıp giriş yapın.' };
       const manualToken = await getManualToken(msg.username);
       const tabId = tabs[0].id;
       try {
@@ -370,7 +370,7 @@ chrome.alarms.create('pollLowStock', { periodInMinutes: POLL_INTERVAL_MINUTES })
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name !== 'pollLowStock') return;
   if (!isWithinWorkHours()) return;
-  chrome.tabs.query({ url: 'https://franchise.getir.com/*' }, async (tabs) => {
+  chrome.tabs.query({ url: ['https://franchise.getir.com/*', 'https://franchise-v2.getir.com/*'] }, async (tabs) => {
     if (!tabs.length) return;
     if (movementsFetchInFlight) return;
     const usernames = Object.keys(userConfigByUsername);

@@ -173,11 +173,11 @@ async function handleExportAllProducts(sendResponse) {
     sendProgressToAdmin('🔍 Getir sitesi kontrol ediliyor...');
     
     // Getir franchise sitesinde açık tab'ı bul
-    const franchiseTabs = await chrome.tabs.query({ url: 'https://franchise.getir.com/*' });
+    const franchiseTabs = await chrome.tabs.query({ url: ['https://franchise.getir.com/*', 'https://franchise-v2.getir.com/*'] });
     
     if (!franchiseTabs || franchiseTabs.length === 0) {
       console.error('❌ Getir franchise sitesi açık değil!');
-      sendProgressToAdmin('❌ Getir franchise sitesi açık değil. Lütfen https://franchise.getir.com adresini açın.');
+      sendProgressToAdmin('❌ Getir franchise sitesi açık değil. Lütfen https://franchise-v2.getir.com adresini açın.');
       
       // Hata mesajını admin panele gönder
       for (const adminTab of adminTabs) {
@@ -185,7 +185,7 @@ async function handleExportAllProducts(sendResponse) {
           type: 'GETIR_EXPORT_PRODUCTS_RESPONSE',
           success: false,
           products: null,
-          error: 'Getir franchise sitesi açık değil. Lütfen https://franchise.getir.com adresini açın.',
+          error: 'Getir franchise sitesi açık değil. Lütfen https://franchise-v2.getir.com adresini açın.',
           total: 0
         }).catch(() => {});
       }

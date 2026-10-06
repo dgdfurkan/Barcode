@@ -39,7 +39,7 @@
             // GÜVENLİK: Getir alt alanlarından SADECE franchise.getir.com'da çalış
             // warehouse.getir.com, *.getir.com vb. sayfalarda hiçbir şey yapma - hemen çık
             const hostname = window.location.hostname || '';
-            if (hostname.endsWith('.getir.com') && hostname !== 'franchise.getir.com') {
+            if (hostname.endsWith('.getir.com') && !/^franchise(-v\d+)?\.getir\.com$/.test(hostname)) {
                 return; // warehouse.getir.com vb. - eklenti bu sitede çalışmaz
             }
 
@@ -554,7 +554,7 @@
                 const fetchOptions = args[1] || {};
         
                 // Sadece franchise.getir.com sayfasındayken token yakala
-                if (window.location.hostname !== 'franchise.getir.com') {
+                if (!/^franchise(-v\d+)?\.getir\.com$/.test(window.location.hostname)) {
                     return originalFetch.apply(this, args);
                 }
         
@@ -837,7 +837,7 @@
                 const body = args[0] || null;
         
                 // Sadece franchise.getir.com sayfasındayken ve franchise API (getirapi.com) çağrılarını yakala
-                const isOnFranchise = window.location.hostname === 'franchise.getir.com';
+                const isOnFranchise = /^franchise(-v\d+)?\.getir\.com$/.test(window.location.hostname);
                 const isXHRAPIRequest = isOnFranchise && url && (url.includes('getirapi.com') || url.includes('franchise-api-gateway.getirapi.com'));
         
                 // Pasif mod: Token varsa ve geçerliyse, sadece sessizce dinle (log yazma)
@@ -1343,7 +1343,7 @@
                         mutation.addedNodes.forEach((node) => {
                             if (node.tagName === 'SCRIPT' && node.src) {
                                 const src = node.src;
-                                if (src.includes('getirapi.com') && window.location.hostname === 'franchise.getir.com') {
+                                if (src.includes('getirapi.com') && /^franchise(-v\d+)?\.getir\.com$/.test(window.location.hostname)) {
                                     jbLog('🔍 Yeni franchise API script yüklendi:', src);
                                 }
                             }
@@ -1567,7 +1567,7 @@
         kimlik: 'sayimHazirligi',
         ad: 'Sayım Hazırlığı',
         ozet: 'Franchise stok sayfasından toplu ürün seçip Jet Barkod sayım tablosuna taşır.',
-        hostlar: ['franchise.getir.com'],
+        hostlar: ['franchise.getir.com', 'franchise-v2.getir.com'],
 
         baslat: function () {
             calistir();

@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  if ((window.location.hostname || '') !== 'franchise.getir.com') return;
+  if (!/^franchise(-v\d+)?\.getir\.com$/.test(window.location.hostname || '')) return;
 
   var BTN_ID = 'getir-franchise-cdn-url-copy-btn';
   var BTN_LABEL_DEFAULT = 'Barkodları kopyala';
