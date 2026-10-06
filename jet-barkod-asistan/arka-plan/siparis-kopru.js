@@ -58,6 +58,139 @@ async function yetkiYaz(token, username) {
 }
 
 // ==================================================================
+// Oturum sağlığı: jeton kendi kendini yeniliyor
+// ==================================================================
+//
+// KESİNTİNİN SEBEBİ
+// Jeton yalnız Jet Barkod sayfası açılırken eklentiye veriliyordu. Site
+// jetonu kendi tarafında yenilese de buradaki kopya eskiyor, süresi
+// dolunca bütün yazmalar 401 alıp SESSİZCE duruyordu. Eklenti yeniden
+// kurulunca da depo sıfırlanıyor, yine aynı sessizlik. Birisi Jet Barkod
+// sayfasını açana kadar hiçbir sipariş gelmiyordu.
+//
+// ŞİMDİ
+//  - Ömrünün yarısı geçen jeton sunucudan kendiliğinden yenileniyor
+//    (/api/auth/refresh). Site kapalı olsa da oturum sürüyor; sınır
+//    sunucunun ilk girişten sonraki azami süresi.
+//  - 401 gelirse bir kez yenilenip yeniden deneniyor.
+//  - Kurtarılamazsa uzantı simgesinde kırmızı "!" çıkıyor ve depo
+//    panelinde görünür bir şerit beliriyor (moduller/hizli-bul.js).
+
+const YENILEME_UCU = SIPARIS_API + '/api/auth/refresh';
+const OTURUM_ANAHTARI = 'jbaSiparisOturum';
+const YETKI_ALARMI = 'jbaYetkiTazele';
+
+let tazelemeSozu = null;
+let oturumSaglam = null;
+let oturumSebep = '';
+
+function jetonGovdesi(token) {
+    try {
+        const p = String(token || '').split('.')[1];
+        if (!p) return null;
+        const b = p.replace(/-/g, '+').replace(/_/g, '/');
+        const ham = atob(b + '==='.slice((b.length + 3) % 4));
+        const bayt = Uint8Array.from(ham, (c) => c.charCodeAt(0));
+        return JSON.parse(new TextDecoder().decode(bayt));
+    } catch (e) {
+        return null;
+    }
+}
+
+/** Kalan ve toplam ömür, saniye. Çözülemezse null. */
+function jetonOmru(token) {
+    const c = jetonGovdesi(token);
+    if (!c || !c.exp) return null;
+    const simdi = Date.now() / 1000;
+    const omur = c.iat ? (c.exp - c.iat) : 3 * 24 * 60 * 60;
+    return { kalan: c.exp - simdi, omur: Math.max(omur, 60) };
+}
+
+function oturumDurumuYay(saglam, sebep) {
+    sebep = saglam ? '' : (sebep || 'bilinmiyor');
+    if (oturumSaglam === saglam && oturumSebep === sebep) return;
+    oturumSaglam = saglam;
+    oturumSebep = sebep;
+    try {
+        chrome.storage.local.set({ [OTURUM_ANAHTARI]: { saglam: saglam, sebep: sebep, zaman: Date.now() } });
+    } catch (e) { /* sessiz */ }
+    try {
+        chrome.action.setBadgeText({ text: saglam ? '' : '!' });
+        if (!saglam) chrome.action.setBadgeBackgroundColor({ color: '#d92d20' });
+        chrome.action.setTitle({
+            title: saglam ? 'Jet Barkod Asistan'
+                : 'Jet Barkod Asistan: oturum yok, siparişler Jet Barkod\'a gitmiyor'
+        });
+    } catch (e) { /* sessiz */ }
+    try {
+        chrome.tabs.query({ url: 'https://warehouse.getir.com/*' }, (sekmeler) => {
+            (sekmeler || []).forEach((t) => {
+                try {
+                    chrome.tabs.sendMessage(t.id, { type: 'JBA_SIPARIS_OTURUM', saglam: saglam, sebep: sebep },
+                        () => { void chrome.runtime.lastError; });
+                } catch (e) { /* sekme kapanmış */ }
+            });
+        });
+    } catch (e) { /* sessiz */ }
+}
+
+/**
+ * Geçerli yetkiyi döner; vakti geldiyse önce yeniler. Aynı anda gelen
+ * çağrılar tek isteği paylaşıyor. Kullanılabilir jeton yoksa null.
+ * @param {boolean} zorla  401 sonrası: vaktine bakmadan yenile.
+ * @param {boolean} isVar  Sipariş akışı gerçekten çalışıyor. Yalnız o
+ *   zaman "oturum yok" uyarısı veriliyor; siparişleri kullanmayan birinin
+ *   simgesinde boşuna kırmızı ünlem durmasın.
+ */
+function yetkiTazele(zorla, isVar) {
+    if (tazelemeSozu) {
+        return tazelemeSozu.then((y) => {
+            if (!y && isVar) oturumDurumuYay(false, oturumSebep || 'jeton-yok');
+            return y;
+        });
+    }
+    tazelemeSozu = (async () => {
+        const y = await yetkiOku();
+        if (!y) { if (isVar) oturumDurumuYay(false, 'jeton-yok'); return null; }
+        const o = jetonOmru(y.token);
+        if (o && o.kalan <= 0) { if (isVar) oturumDurumuYay(false, 'suresi-doldu'); return null; }
+        const vakti = zorla || !o || o.kalan < o.omur * 0.5;
+        if (!vakti) { oturumDurumuYay(true); return y; }
+        try {
+            const r = await fetch(YENILEME_UCU, {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + y.token }
+            });
+            let v = null;
+            try { v = await r.json(); } catch (e) { /* gövde yok */ }
+            if (r.ok && v && v.token) {
+                await yetkiYaz(v.token, y.username);
+                oturumDurumuYay(true);
+                return await yetkiOku();
+            }
+            if (r.status === 401) {
+                oturumDurumuYay(false, (v && v.code) || 'gecersiz');
+                return null;
+            }
+        } catch (e) { /* ağ yok: elimizdeki jetonla devam */ }
+        // Yenilenemedi ama jeton hâlâ geçerli: onunla sürdür
+        if (o && o.kalan > 0 && !zorla) { oturumDurumuYay(true); return y; }
+        return zorla ? null : y;
+    })().finally(() => { tazelemeSozu = null; });
+    return tazelemeSozu;
+}
+
+try {
+    chrome.alarms.create(YETKI_ALARMI, { periodInMinutes: 30 });
+    chrome.alarms.onAlarm.addListener((alarm) => {
+        if (alarm && alarm.name === YETKI_ALARMI) void yetkiTazele(false);
+    });
+} catch (e) { /* sessiz */ }
+try { chrome.runtime.onStartup.addListener(() => { void yetkiTazele(false); }); } catch (e) { /* sessiz */ }
+// Hizmet işçisi her uyandığında ucuz bir kontrol (ağ yalnız vakti gelince)
+void yetkiTazele(false);
+
+// ==================================================================
 // İmza: aynı siparişi boşuna tekrar yazma
 // ==================================================================
 
@@ -304,6 +437,8 @@ async function siparisSil(yetki, siparisId) {
     }
 }
 
+let kunye401 = false;
+
 async function kunyeYaz(yetki, liste) {
     for (let i = 0; i < liste.length; i++) {
         const s = liste[i];
@@ -355,7 +490,7 @@ async function kunyeYaz(yetki, liste) {
                     body: JSON.stringify([govde])
                 }
             );
-            if (yanit.status === 401) break;
+            if (yanit.status === 401) { kunye401 = true; break; }
         } catch (e) { /* ağ yoksa sonraki listede yine denenir */ }
 
         if (i < liste.length - 1) await bekle(SIPARIS_ARA_MS);
@@ -580,8 +715,9 @@ async function kuyrugaBak() {
     siparisIsliyor = true;
 
     try {
+        let kurtarmaDenendi = false;
         while (siparisKuyrugu.length) {
-            const yetki = await yetkiOku();
+            const yetki = await yetkiTazele(false, true);
             if (!yetki) break;
 
             const s = siparisKuyrugu.shift();
@@ -607,9 +743,18 @@ async function kuyrugaBak() {
                 const msg = (e && e.message) || String(e);
                 console.warn('[Jet Barkod] Sipariş yazılamadı:', msg);
                 yazmaSonucunuBildir(s.siparisId, 'YAZILAMADI: ' + msg.slice(0, 120));
-                /* Yetki hatasıysa kuyruğu boşuna döndürmeyelim; jeton
-                   yenilenene kadar duruyoruz. */
-                if (msg.indexOf('401') !== -1) break;
+                /* Yetki hatası: jetonu bir kez yenileyip aynı siparişi
+                   yeniden dene. Kurtarılamazsa sipariş kuyruğun başına
+                   geri konuyor ve duruluyor; jeton gelince kaldığı yerden
+                   devam ediyor. Eskiden sipariş burada kayboluyordu. */
+                if (msg.indexOf('401') !== -1) {
+                    siparisKuyrugu.unshift(s);
+                    if (kurtarmaDenendi) break;
+                    kurtarmaDenendi = true;
+                    const yeni = await yetkiTazele(true, true);
+                    if (!yeni) break;
+                    continue;
+                }
             }
 
             if (siparisKuyrugu.length) await bekle(SIPARIS_ARA_MS);
@@ -627,7 +772,14 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
     if (!istek || typeof istek.type !== 'string') return;
 
     if (istek.type === 'JBA_SIPARIS_YETKI') {
-        yetkiYaz(istek.token, istek.username).then((ok) => cevapla({ ok: ok }));
+        yetkiYaz(istek.token, istek.username).then((ok) => {
+            if (ok) {
+                oturumDurumuYay(true);
+                // Jeton yokken birikmiş iş varsa hemen devam
+                if (siparisKuyrugu.length && !siparisIsliyor) kuyrugaBak();
+            }
+            cevapla({ ok: ok });
+        });
         return true;
     }
 
@@ -648,9 +800,18 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
            ekranda kalmasın. */
         const zorla = !!istek.zorla;
         if (!liste.length && !tumIdler.length && !panelBos) { cevapla({ ok: false, sebep: 'liste boş' }); return true; }
-        yetkiOku().then((y) => {
+        yetkiTazele(false, true).then(async (y) => {
             if (!y) { cevapla({ ok: false, sebep: 'yetki yok' }); return; }
-            kunyeYaz(y, liste)
+            kunye401 = false;
+            await kunyeYaz(y, liste);
+            if (kunye401) {
+                // Jeton reddedildi: yenile ve aynı listeyi bir kez daha yaz
+                const yeni = await yetkiTazele(true, true);
+                if (!yeni) { cevapla({ ok: false, sebep: 'oturum düştü' }); return; }
+                y = yeni;
+                await kunyeYaz(y, liste);
+            }
+            Promise.resolve()
                 .then(() => nabizAt(y, tumIdler))
                 .then(() => paneliSenkronla(y, tumIdler, panelBos, zorla))
                 .then(
@@ -736,8 +897,14 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
     }
 
     if (istek.type === 'JBA_SIPARIS_DURUM') {
-        yetkiOku().then((y) =>
-            cevapla({ yetkiVar: !!y, kuyruk: siparisKuyrugu.length, isliyor: siparisIsliyor })
+        yetkiTazele(false, true).then((y) =>
+            cevapla({
+                yetkiVar: !!y,
+                saglam: !!y && oturumSaglam !== false,
+                sebep: oturumSebep,
+                kuyruk: siparisKuyrugu.length,
+                isliyor: siparisIsliyor
+            })
         );
         return true;
     }

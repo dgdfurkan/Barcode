@@ -138,4 +138,6 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
   Tek sebebi `admin_panel_inject.js`. jetbarkod.com.tr ile sınırlandırılabilir.
 - Site ile eklenti arasındaki `postMessage` çağrıları hedef kaynağı `'*'` veriyor. Kısıtlanmalı.
 - `sql_files/security_02_drop_plaintext_password.sql` çalıştırılacak.
+- `sql_files/siparis_canli.sql` çalıştırılacak (siparişlerde tik 1-2 sn'de diğer cihaza). Çalışana kadar
+  sayfa 3 sn'de bir tam çekimle idare ediyor.
 - VPS'te apt upgrade + reboot bekliyor.

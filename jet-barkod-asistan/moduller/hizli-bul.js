@@ -1893,6 +1893,10 @@
            detay çekilsin ve veritabanına ürünler yazılsın. */
         try {
             chrome.runtime.onMessage.addListener((istek) => {
+                if (istek && istek.type === 'JBA_SIPARIS_OTURUM') {
+                    oturumSeridi(istek.saglam !== false);
+                    return;
+                }
                 /* Arka plan gerçek yazma sonucunu bildiriyor. Eskiden log'a
                    yalnız "kuyruğa alındı" bilgisi düşüyordu ve o da "OK"
                    diye yazılıyordu; veritabanına hiç ürün yazılmasa bile
@@ -2113,6 +2117,60 @@
             setInterval(bak, 1000);   // yalnız dize karşılaştırması, ölçülebilir yük yok
         };
 
+        /* OTURUM ŞERİDİ
+           Jet Barkod jetonu yoksa ya da süresi dolduysa siparişler
+           veritabanına yazılamıyor. Eskiden bu tamamen sessizdi; depoda
+           kimse fark etmiyor, telefondaki siparişler sayfası boş kalıyordu.
+           Artık panelin altında kırmızı bir şerit çıkıyor ve tek düğmeyle
+           jeton yeniden toplanıyor. */
+        let oturumSeritEl = null;
+        const oturumSeridi = (saglam) => {
+            /* Yalnız sipariş ekranında: siparişler buradan akıyor. Fırın
+               gibi başka sayfalarda şerit iş görmez, gözü yorar. */
+            if (location.pathname.indexOf('/dashboard/orders') === -1) saglam = true;
+            if (saglam) {
+                if (oturumSeritEl) { oturumSeritEl.remove(); oturumSeritEl = null; }
+                return;
+            }
+            if (oturumSeritEl && document.documentElement.contains(oturumSeritEl)) return;
+            const k = document.createElement('div');
+            k.setAttribute('role', 'alert');
+            k.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483646;max-width:min(440px,calc(100vw - 32px));' +
+                'display:flex;align-items:center;gap:12px;padding:12px 12px 12px 16px;border-radius:12px;' +
+                'background:#b42318;color:#fff;font:600 13px/1.4 system-ui,-apple-system,sans-serif;' +
+                'box-shadow:0 12px 32px rgba(16,24,40,.28)';
+            const yazi = document.createElement('span');
+            yazi.style.cssText = 'flex:1;min-width:0';
+            yazi.textContent = 'Jet Barkod oturumu yok. Siparişler Jet Barkod\'a gitmiyor.';
+            const d = document.createElement('button');
+            d.type = 'button';
+            d.textContent = 'Oturumu bağla';
+            d.style.cssText = 'flex:none;height:36px;padding:0 12px;border:0;border-radius:9px;background:#fff;' +
+                'color:#b42318;font:700 12px/1 system-ui,-apple-system,sans-serif;cursor:pointer';
+            d.addEventListener('click', () => {
+                d.disabled = true;
+                d.textContent = 'Açılıyor…';
+                try {
+                    chrome.runtime.sendMessage({ type: 'JBA_JETON_TOPLA' }, () => {
+                        void chrome.runtime.lastError;
+                        setTimeout(() => { d.disabled = false; d.textContent = 'Oturumu bağla'; }, 3000);
+                    });
+                } catch (e) { d.disabled = false; d.textContent = 'Oturumu bağla'; }
+            });
+            k.appendChild(yazi);
+            k.appendChild(d);
+            document.documentElement.appendChild(k);
+            oturumSeritEl = k;
+        };
+        const oturumuSor = () => {
+            try {
+                chrome.runtime.sendMessage({ type: 'JBA_SIPARIS_DURUM' }, (r) => {
+                    if (chrome.runtime.lastError || !r) return;
+                    oturumSeridi(!!r.saglam);
+                });
+            } catch (e) { /* yetim bağlam: ayrı ağ ilgileniyor */ }
+        };
+
         // === INIT ===
         /* YETİM BAĞLAM AĞI
            Eklenti güncellenince ya da devre dışı bırakılıp açılınca bu
@@ -2151,6 +2209,8 @@
         const init = () => {
             nobet();
             listeyiIste();
+            oturumuSor();
+            setInterval(oturumuSor, 60 * 1000);
             observer.observe(document.body, { childList: true, subtree: true });
             adresiIzle();
 

@@ -40,3 +40,58 @@ chrome.runtime.onInstalled.addListener(function (ayrinti) {
         });
     } catch (e) { /* sessiz */ }
 });
+
+/* JETON TOPLAMA
+   Eklenti kurulunca ya da güncellenince manifestteki içerik betikleri
+   açık sekmelere kendiliğinden girmiyor. Jet Barkod sekmesi günlerdir
+   açıksa site köprüsü orada yok, jeton da eklentiye hiç ulaşmıyordu:
+   depo panelinden gelen siparişler, biri Jet Barkod'u yenileyene kadar
+   yazılmıyordu. Köprü açık sekmelere elle sokuluyor; selam verir vermez
+   site jetonu yeniden veriyor (js/asistan-koprusu.js). */
+const SITE_ADRESLERI = ['https://jetbarkod.com.tr/*', 'https://www.jetbarkod.com.tr/*'];
+
+function siteKoprusunuSok() {
+    try {
+        chrome.tabs.query({ url: SITE_ADRESLERI }, function (sekmeler) {
+            if (chrome.runtime.lastError) return;
+            (sekmeler || []).forEach(function (t) {
+                chrome.scripting.executeScript({ target: { tabId: t.id }, files: ['site-koprusu.js'] })
+                    .catch(function () { /* sekme yükleniyor ya da kapanmış */ });
+            });
+        });
+    } catch (e) { /* sessiz */ }
+}
+
+chrome.runtime.onInstalled.addListener(function (ayrinti) {
+    if (ayrinti.reason === 'update' || ayrinti.reason === 'install') siteKoprusunuSok();
+});
+
+/* Depo panelindeki "Oturumu bağla" düğmesi. Açık Jet Barkod sekmelerine
+   köprü sokuluyor; hiç sekme yoksa siparişler sayfası açılıyor. Kullanıcı
+   girişliyse jeton saniyeler içinde geliyor, değilse giriş ekranı çıkıyor. */
+chrome.runtime.onMessage.addListener(function (istek, gonderen, cevapla) {
+    if (!istek || istek.type !== 'JBA_JETON_TOPLA') return;
+    chrome.tabs.query({ url: SITE_ADRESLERI }, function (sekmeler) {
+        if (chrome.runtime.lastError) { cevapla({ ok: false }); return; }
+        /* Sayım sayfaları yenilenmiyor: orada yarım kalmış bir giriş
+           olabilir. Köprü yine de onlara da sokuluyor. */
+        var yenilenebilir = (sekmeler || []).filter(function (t) {
+            return !/\/sayim/i.test(t.url || '');
+        });
+        if (sekmeler && sekmeler.length) siteKoprusunuSok();
+        if (yenilenebilir.length) {
+            /* Köprü sokulsa da sayfadaki eski betik jetonu yeniden vermeyebilir;
+               en garantisi sekmeyi yenilemek. Bu sayfalar yenilenince veri
+               kaybetmiyor. */
+            yenilenebilir.forEach(function (t) {
+                try { chrome.tabs.reload(t.id); } catch (e) { /* sekme gitmiş */ }
+            });
+            cevapla({ ok: true, sekme: yenilenebilir.length });
+        } else {
+            chrome.tabs.create({ url: 'https://jetbarkod.com.tr/siparisler/', active: true }, function () {
+                cevapla({ ok: !chrome.runtime.lastError, sekme: 0 });
+            });
+        }
+    });
+    return true;
+});

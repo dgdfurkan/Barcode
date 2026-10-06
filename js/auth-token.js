@@ -27,10 +27,18 @@
     }
 
     function set(token) {
+        const onceki = get();
         try {
             if (token) localStorage.setItem(TOKEN_KEY, token);
             else localStorage.removeItem(TOKEN_KEY);
         } catch (e) { /* ignore */ }
+        /* Jeton değişti: Asistan eklentisi kendi kopyasını tutuyor ve depo
+           panelinden gelen siparişleri onunla yazıyor. Haber verilmezse
+           eklentideki kopya eskiyip süresi dolunca siparişler sessizce
+           durur (js/asistan-koprusu.js bu olayı dinliyor). */
+        if (onceki !== (token || '')) {
+            try { window.dispatchEvent(new CustomEvent('jb:jeton-degisti')); } catch (e) { /* ignore */ }
+        }
     }
 
     function clear() {

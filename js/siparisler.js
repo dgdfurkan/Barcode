@@ -38,7 +38,18 @@
 (function (global) {
     'use strict';
 
-    var YOKLAMA_MS = 8000;
+    /* YOKLAMA
+       İki katmanlı. 1,5 saniyede bir yalnız sipariş başlıkları soruluyor
+       (birkaç yüz bayt); bir şey değiştiyse ürünlerle birlikte tam çekim
+       yapılıyor. Bir depocunun tiki diğer cihazlara böylece 1-2 saniyede
+       ulaşıyor. Tik ürün satırında değişiyor; başlığa iz bırakması için
+       veritabanı `orders.son_isaret` damgasını kendisi basıyor
+       (sql_files/siparis_canli.sql). O sütun yoksa sayfa 3 saniyede bir
+       tam çekime düşüyor, yine çalışıyor. Hiçbir koşulda 20 saniyeden uzun
+       süre tam çekimsiz kalınmıyor. */
+    var HAFIF_MS = 1500;
+    var GUVENLIK_MS = 20000;
+    var YEDEK_TAM_MS = 3000;
     var durum = {
         siparisler: [],
         secili: null,
@@ -291,6 +302,9 @@
         if (!siparisler.length) return [];
 
         var kimlikler = siparisler.map(function (s) { return s.id; });
+        /* Ürün sorgusu bu anda yola çıkıyor. Bu andan SONRA onaylanan bir
+           tik, bu yanıtta görünmeyebilir; aşağıda yerel değer korunuyor. */
+        var cekimBasi = Date.now();
         /* SIRALAMA ŞART
            PostgREST `order` verilmeyen sorguda satır sırası için hiçbir
            garanti vermiyor; aynı sorgu iki turda farklı sırada dönebiliyor.
@@ -322,7 +336,7 @@
                     anaKategori: r.ana_kategori || '',
                     sinif: r.sinif || '',
                     altSinif: r.alt_sinif || '',
-                    alindi: !!r.alindi
+                    alindi: bekleyenUygula(s.id, r.sira, !!r.alindi, cekimBasi)
                 };
             });
             s.urunler = (global.JBSiparisSirala && global.JBSiparisSirala.sirala)
@@ -341,7 +355,38 @@
         }).join('|');
     }
 
-    async function tazele(zorla) {
+    /* TEK UÇUŞ
+       Aynı anda iki tam çekim olmuyor. İkisi yarışınca geç başlayan erken
+       bitebiliyor, sonra erken başlayanın ESKİ verisi ekrana basılıyordu:
+       tik bir an görünüp geri kalkıyordu. Çekim sürerken gelen istek
+       bekletiliyor, bitince tek bir tane daha yapılıyor. */
+    var _tazeleSoz = null;
+    var _tazeleBekleyen = false;
+    var _tazeleZorla = false;
+    var sonTamCekim = 0;
+
+    function tazele(zorla) {
+        if (_tazeleSoz) {
+            _tazeleBekleyen = true;
+            _tazeleZorla = _tazeleZorla || !!zorla;
+            return _tazeleSoz;
+        }
+        sonTamCekim = Date.now();
+        _tazeleSoz = tazeleIc(!!zorla).catch(function (e) {
+            console.warn('Sipariş tazeleme:', e && e.message);
+        }).then(function () {
+            _tazeleSoz = null;
+            if (_tazeleBekleyen) {
+                var z = _tazeleZorla;
+                _tazeleBekleyen = false;
+                _tazeleZorla = false;
+                return tazele(z);
+            }
+        });
+        return _tazeleSoz;
+    }
+
+    async function tazeleIc(zorla) {
         var yeni;
         try {
             yeni = await siparisleriCek();
@@ -385,8 +430,74 @@
         if (durum.secili) {
             var guncel = yeni.filter(function (s) { return s.id === durum.secili.id; })[0];
             durum.secili = guncel || null;
+            // Sipariş listeden düştü: geçmiş yığınından da düşsün
+            if (!guncel) katmanDustu('detay');
         }
         ciz();
+    }
+
+    // ==================================================================
+    // Hafif yoklama
+    // ==================================================================
+
+    var isaretKolonu = null;     // null: bilinmiyor · true · false (göç yok)
+    var sonHafifImza = '';
+    var hafifSuruyor = false;
+    var donguSaati = null;
+
+    function kolonYokHatasi(h) {
+        if (!h) return false;
+        var kod = String(h.code || '');
+        return kod === '42703' || kod === 'PGRST204' || /son_isaret/.test(String(h.message || ''));
+    }
+
+    async function hafifYokla() {
+        if (hafifSuruyor) return;
+        var o = oturum();
+        var d = db();
+        if (!o || !o.username || !d) return;
+        hafifSuruyor = true;
+        try {
+            var pencere = new Date(Date.now() - ESKIME_MS).toISOString();
+            var kolonlar = 'id,updated_at,toplama_durumu' + (isaretKolonu === false ? '' : ',son_isaret');
+            var r = await d.from('orders')
+                .select(kolonlar)
+                .eq('username', o.username)
+                .gte('updated_at', pencere)
+                .order('created_at', { ascending: false })
+                .limit(60);
+            if (r.error) {
+                if (isaretKolonu !== false && kolonYokHatasi(r.error)) isaretKolonu = false;
+                return;
+            }
+            if (isaretKolonu === null) isaretKolonu = true;
+            var imza = (r.data || []).map(function (x) {
+                return x.id + ':' + x.updated_at + ':' + x.toplama_durumu + ':' + (x.son_isaret || '');
+            }).join('|');
+            if (imza !== sonHafifImza) {
+                var ilk = !sonHafifImza;
+                sonHafifImza = imza;
+                // İlk turda imza yalnız öğreniliyor; tam çekim zaten yeni yapıldı
+                if (!ilk || Date.now() - sonTamCekim > HAFIF_MS) await tazele(false);
+            }
+        } catch (e) {
+            /* Ağ yok: bir sonraki turda yine denenir */
+        } finally {
+            hafifSuruyor = false;
+        }
+    }
+
+    function dongu() {
+        clearTimeout(donguSaati);
+        donguSaati = null;
+        if (document.visibilityState !== 'visible') return;
+        var aralik = isaretKolonu === false ? YEDEK_TAM_MS : GUVENLIK_MS;
+        var is = (Date.now() - sonTamCekim >= aralik) ? tazele(false) : hafifYokla();
+        var sonra = function () {
+            clearTimeout(donguSaati);
+            if (document.visibilityState === 'visible') donguSaati = setTimeout(dongu, HAFIF_MS);
+        };
+        Promise.resolve(is).then(sonra, sonra);
     }
 
     /* Ürünü gelmemiş siparişleri eklentiye bildirir.
@@ -423,43 +534,162 @@
     // Yazma
     // ==================================================================
 
-    async function urunIsaretle(siparis, urun, alindi) {
-        var d = db();
-        if (!d) {
+    /* TİK YAZMA
+       Eskiden her dokunuş ayrı bir istekti. Hızlı iki dokunuşta (tikle,
+       vazgeç) istekler sunucuya ters sırada varabiliyor, ekranla
+       veritabanı ayrı düşüyordu. Yoklama da tik kaydedilmeden başlamışsa
+       eski veriyi getirip tiki geri kaldırıyordu.
+
+       Şimdi her ürün için tek bir yazıcı var. Ekran anında dönüyor; yazıcı
+       uçuştayken yeni dokunuş gelirse yalnız istenen son durum hatırlanıyor
+       ve uçuş bitince o yazılıyor. Onaylanmamış ya da yoklamadan sonra
+       onaylanmış tik, yoklama yanıtında ezilmiyor (`bekleyenUygula`).
+       Ağ hatasında üç kez yeniden deneniyor; gene olmazsa ekran
+       sunucunun bildiği son hâle dönüyor ve uyarı çıkıyor. */
+    var bekleyen = new Map();
+
+    function bekleyenAnahtar(siparisId, sira) { return siparisId + '|' + sira; }
+
+    function bekleyenUygula(siparisId, sira, sunucu, cekimBasi) {
+        var k = bekleyenAnahtar(siparisId, sira);
+        var b = bekleyen.get(k);
+        if (!b) return sunucu;
+        if (b.ucusta || b.istenen !== b.yazilan) return b.istenen;
+        if (cekimBasi < b.onay) return b.istenen;
+        // Onaydan sonra başlamış bir okuma: sunucu artık yetkili (başka cihaz değiştirmiş olabilir)
+        bekleyen.delete(k);
+        return sunucu;
+    }
+
+    function urunuBul(siparisId, sira) {
+        var kaynak = (durum.secili && durum.secili.id === siparisId) ? durum.secili
+            : (durum.siparisler || []).filter(function (x) { return x.id === siparisId; })[0];
+        if (!kaynak) return null;
+        return (kaynak.urunler || []).filter(function (u) { return u.sira === sira; })[0] || null;
+    }
+
+    function detayImzasiTazele(siparis) {
+        if (!durum.secili || durum.secili.id !== siparis.id) return;
+        durum.detayImzasi = siparis.id + '|' + durum.detayGorunum + '|' +
+            (siparis.urunler || []).map(function (u) { return u.sira + (u.alindi ? '1' : '0'); }).join('');
+    }
+
+    function urunIsaretle(siparis, urun, alindi) {
+        if (!db()) {
             /* Sessizce hiçbir şey yapmak en kötüsü: depocu işaretlediğini
                sanıp geçiyor. */
             if (global.JBDiyalog) global.JBDiyalog.hata('Veri bağlantısı yok, işaretleme kaydedilemez.');
             return;
         }
+        var k = bekleyenAnahtar(siparis.id, urun.sira);
+        var b = bekleyen.get(k);
+        if (!b) {
+            b = { siparisId: siparis.id, sira: urun.sira, ilk: !!urun.alindi, istenen: alindi,
+                  yazilan: null, ucusta: false, onay: 0, deneme: 0 };
+            bekleyen.set(k, b);
+        } else {
+            b.istenen = alindi;
+        }
 
-        /* Ekranı hemen çevir; ağ beklemesi elde hissedilmesin. Yalnız o
+        /* Ekran anında dönüyor; ağ beklemesi elde hissedilmesin. Yalnız o
            satır güncelleniyor: gövdeyi yeniden yazmak kaydırmayı başa
            atıyor ve bütün satırları yeniden belirtiyordu. */
         urun.alindi = alindi;
         satiriTazele(urun);
-        if (alindi) adetUyarisiGoster(urun);
-        durum.detayImzasi = siparis.id + '|' + durum.detayGorunum + '|' +
-            (siparis.urunler || []).map(function (u) { return u.sira + (u.alindi ? '1' : '0'); }).join('');
+        isaretEfekti(urun, alindi);
+        detayImzasiTazele(siparis);
+        durumuPlanla(siparis.id);
 
-        var sonuc = await d.from('order_items')
-            .update({ alindi: alindi })
-            .eq('order_uuid', siparis.id)
-            .eq('sira', urun.sira);
+        if (!b.ucusta) isaretPompala(b);
+    }
 
-        if (sonuc.error) {
-            urun.alindi = !alindi;
-            satiriTazele(urun);
+    var YENIDEN_DENE_MS = [600, 1500, 3500];
+
+    async function isaretPompala(b) {
+        var d = db();
+        if (!d) return;
+        b.ucusta = true;
+        var hedef = b.istenen;
+        var sonuc;
+        try {
+            sonuc = await d.from('order_items')
+                .update({ alindi: hedef })
+                .eq('order_uuid', b.siparisId)
+                .eq('sira', b.sira)
+                .select('sira');
+        } catch (e) {
+            sonuc = { error: e };
+        }
+        b.ucusta = false;
+
+        var tamam = sonuc && !sonuc.error && Array.isArray(sonuc.data) && sonuc.data.length > 0;
+        if (!tamam) {
+            /* Hata yoksa ama hiç satır güncellenmediyse sipariş silinmiş
+               demektir; yeniden denemenin anlamı yok. */
+            if (sonuc && sonuc.error && b.deneme < YENIDEN_DENE_MS.length) {
+                var bekle = YENIDEN_DENE_MS[b.deneme];
+                b.deneme++;
+                setTimeout(function () { if (!b.ucusta && bekleyen.get(bekleyenAnahtar(b.siparisId, b.sira)) === b) isaretPompala(b); }, bekle);
+                return;
+            }
+            bekleyen.delete(bekleyenAnahtar(b.siparisId, b.sira));
+            var u = urunuBul(b.siparisId, b.sira);
+            if (u) {
+                u.alindi = b.ilk;
+                if (durum.secili && durum.secili.id === b.siparisId) {
+                    satiriTazele(u);
+                    detayImzasiTazele(durum.secili);
+                }
+                cizIste();
+            }
             if (global.JBDiyalog) global.JBDiyalog.hata('Ürün işaretlenemedi. Bağlantını kontrol et.');
             return;
         }
 
-        var tamami = (siparis.urunler || []).every(function (u) { return u.alindi; });
-        var hedef = tamami ? 'toplandi' : (siparis.urunler.some(function (u) { return u.alindi; }) ? 'toplaniyor' : 'bekliyor');
-        /* Kart listesindeki sayaç da güncellensin diye tam çizim. Detay
-           gövdesi imzası değişmediği için yeniden yazılmıyor; kaydırma
-           yerinde kalıyor. */
-        if (hedef !== siparis.toplama_durumu) await siparisDurumu(siparis, hedef);
-        else ciz();
+        b.deneme = 0;
+        b.yazilan = hedef;
+        b.ilk = hedef;
+        b.onay = Date.now();
+        // Uçuş sürerken fikir değiştiyse son istenen durumu yaz
+        if (b.istenen !== hedef) isaretPompala(b);
+    }
+
+    /* Bekleyen kayıtlar sonsuza dek birikmesin: bir dakikadır onaylı ve
+       sakin olanlar düşüyor. */
+    setInterval(function () {
+        var sinir = Date.now() - 60 * 1000;
+        bekleyen.forEach(function (b, k) {
+            if (!b.ucusta && b.istenen === b.yazilan && b.onay && b.onay < sinir) bekleyen.delete(k);
+        });
+    }, 30 * 1000);
+
+    /* Toplama durumu (bekliyor/toplaniyor/toplandi) ve kart sayaçları her
+       dokunuşta değil, dokunuşlar durulunca bir kez yazılıyor. Hızlı
+       tiklemede hem ağ hem çizim yükü düşüyor. */
+    var _durumSaatleri = new Map();
+
+    function durumuPlanla(siparisId) {
+        clearTimeout(_durumSaatleri.get(siparisId));
+        _durumSaatleri.set(siparisId, setTimeout(function () {
+            _durumSaatleri.delete(siparisId);
+            var s = (durum.secili && durum.secili.id === siparisId) ? durum.secili
+                : (durum.siparisler || []).filter(function (x) { return x.id === siparisId; })[0];
+            if (!s) return;
+            var urunler = s.urunler || [];
+            var hepsi = urunler.length > 0 && urunler.every(function (u) { return u.alindi; });
+            var hedef = hepsi ? 'toplandi' : (urunler.some(function (u) { return u.alindi; }) ? 'toplaniyor' : 'bekliyor');
+            if (hedef !== s.toplama_durumu) siparisDurumu(s, hedef, true);
+            cizIste();
+        }, 450));
+    }
+
+    var _cizimKaresi = 0;
+    function cizIste() {
+        if (_cizimKaresi) return;
+        _cizimKaresi = requestAnimationFrame(function () {
+            _cizimKaresi = 0;
+            ciz();
+        });
     }
 
     async function siparisDurumu(siparis, yeni, sessiz) {
@@ -472,8 +702,12 @@
         siparis.toplama_durumu = yeni;
         if (!sessiz) ciz(); else ilerlemeyiTazele();
 
+        /* `updated_at` yazılmıyor: o damga depo panelinin nabzı. Sitedeki
+           tikler onu tazeleseydi panel sustuğu hâlde gösterge "Canlı"
+           derdi. Değişikliği diğer cihazlar `toplama_durumu` üzerinden
+           görüyor. */
         var sonuc = await d.from('orders')
-            .update({ toplama_durumu: yeni, updated_at: new Date().toISOString() })
+            .update({ toplama_durumu: yeni })
             .eq('id', siparis.id);
 
         if (sonuc.error) {
@@ -755,8 +989,11 @@
         var icerik = varMi
             ? (foto ? '' : '<b>' + kacir(bas) + '</b>')
             : (kurye ? BOS_ICON_KURYE : BOS_ICON_TOPLAYICI);
+        var fotoli = varMi && foto;
         return '<span class="sip-kart__kisi' + (kurye ? ' sip-kart__kisi--kurye' : '') +
-                    (varMi ? '' : ' sip-kart__kisi--bos') + '">' +
+                    (varMi ? '' : ' sip-kart__kisi--bos') + (fotoli ? ' sip-kart__kisi--foto' : '') + '"' +
+                    (fotoli ? ' data-kisi-foto="' + kacir(foto) + '" data-kisi-ad="' + kacir(ad) +
+                        '" data-kisi-rol="' + (kurye ? 'Kurye' : 'Toplayıcı') + '" title="Fotoğrafı büyüt"' : '') + '>' +
             '<span class="sip-kart__bas" style="background:' + renk + '">' +
                 fotoHtml + icerik +
             '</span>' +
@@ -928,10 +1165,14 @@
                 ? '<img src="' + kacir(foto) + '" alt="" referrerpolicy="no-referrer"' +
                   ' onerror="this.remove()"><b>' + bas + '</b>'
                 : bas;
-            return '<div class="sip-kisi-satir">' +
-                '<span class="sip-avatar' + (kurye ? ' sip-avatar--kurye' : '') +
-                    (ad ? '' : ' sip-avatar--bos') + (ad && foto ? ' sip-avatar--foto' : '') + '">' +
-                    ic + '</span>' +
+            var sinif = 'sip-avatar' + (kurye ? ' sip-avatar--kurye' : '') +
+                    (ad ? '' : ' sip-avatar--bos') + (ad && foto ? ' sip-avatar--foto' : '');
+            var avatar = (ad && foto)
+                ? '<button type="button" class="' + sinif + '" data-kisi-foto="' + kacir(foto) +
+                  '" data-kisi-ad="' + kacir(ad) + '" data-kisi-rol="' + rol + '" aria-label="' +
+                  kacir(ad) + ' fotoğrafını büyüt">' + ic + '</button>'
+                : '<span class="' + sinif + '">' + ic + '</span>';
+            return '<div class="sip-kisi-satir">' + avatar +
                 '<div><small>' + rol + '</small><strong>' + kacir(ad || 'Atanmadı') + '</strong></div>' +
                 (ad && aktif ? '<span class="sip-kisi-durum"><i></i>Aktif</span>' : '') +
             '</div>';
@@ -956,25 +1197,95 @@
         ilerlemeyiTazele();
     }
 
-    /* ÇOKLU ADET UYARISI
-       Depocu hızlı çalışırken "×2" yazısını kaçırıp tek adet alıyordu.
-       Tikleme anında adet kutusundan kısa bir balon çıkıp sönüyor.
+    /* TİK HİSSİ
+       Tek adetli üründe kısa ve net bir onay: düğme hafifçe büzülüp
+       açılıyor, tik çiziliyor, satır yeşile dolarak dönüyor.
 
-       Balon satırın İÇİNDE ve `position: absolute`: liste akmıyor, hiçbir
-       ürün kayıp gitmiyor, kaydırma bozulmuyor. Aynı anda birkaç ürüne
-       birden bakan göz için bu şart. Tek adetli üründe hiç gösterilmiyor,
-       yoksa her tikte gereksiz hareket olurdu. */
-    function adetUyarisiGoster(urun) {
-        /* Kilo bazlı üründe balon yok: `urunAdet` 1,867 kg'ı iki parçaya
-           yuvarlıyor ama o iki adet değil, tek paket. */
-        if (urun.birim || urunAdet(urun) <= 1) return;
-        if (azaltilmisHareket()) return;
+       Çoklu adette ekranın kenarları adet kadar nabız atıyor (oyunlarda
+       hasar alınca kenarda beliren ışık gibi) ve satırın ortasında
+       "×3 ADET" damgası beliriyor. Renk adetle değişiyor: 2 mavi, 3 mor,
+       4 turuncu, 5 ve üstü kırmızı; yani göz rengi tanıdıkça sayıyı
+       okumadan anlıyor. Destekleyen telefonda aynı sayıda titreşim de var.
+
+       Hepsi `pointer-events: none` ve yalnız transform/opacity: liste
+       akmıyor, sonraki dokunuşu engellemiyor. Azaltılmış harekette nabız
+       ve büyüme yok, damga sakin görünüp kayboluyor. */
+    var COKLU_RENK = { 2: '#2563eb', 3: '#7c3aed', 4: '#d97706', 5: '#d92d20' };
+
+    function titret(alindi, n) {
+        try {
+            if (!navigator.vibrate) return;
+            if (!alindi) { navigator.vibrate(8); return; }
+            if (n <= 1) { navigator.vibrate(14); return; }
+            var desen = [];
+            for (var i = 0; i < Math.min(n, 5); i++) desen.push(26, 60);
+            navigator.vibrate(desen);
+        } catch (e) { /* desteklenmiyor */ }
+    }
+
+    var _duyuruSaati = null;
+    function canliDuyur(metin) {
+        var b = el('sipDuyuru');
+        if (!b) return;
+        b.textContent = '';
+        clearTimeout(_duyuruSaati);
+        _duyuruSaati = setTimeout(function () { b.textContent = metin; }, 30);
+    }
+
+    function cokluEfektKatmani() {
+        var e = el('sipCokluEfekt');
+        if (e) return e;
+        e = document.createElement('div');
+        e.id = 'sipCokluEfekt';
+        e.className = 'sip-coklu-efekt';
+        e.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(e);
+        return e;
+    }
+
+    function isaretEfekti(urun, alindi) {
+        var n = urun.birim ? 1 : urunAdet(urun);
+        titret(alindi, n);
         var oge = el('detayGovde').querySelector('[data-sira="' + urun.sira + '"]');
-        var kutu = oge && oge.querySelector('.sip-adet');
-        if (!kutu) return;
-        kutu.classList.remove('sip-adet--uyari');
-        void kutu.offsetWidth;
-        kutu.classList.add('sip-adet--uyari');
+        if (!oge) return;
+
+        oge.classList.remove('sip-urun--tik', 'sip-urun--geri');
+        void oge.offsetWidth;
+        if (!alindi) { oge.classList.add('sip-urun--geri'); return; }
+        oge.classList.add('sip-urun--tik');
+        if (n <= 1) return;
+
+        var m = Math.min(n, 5);
+        var renk = COKLU_RENK[m];
+
+        var ef = cokluEfektKatmani();
+        ef.style.setProperty('--efekt-renk', renk);
+        ef.style.setProperty('--n', m);
+        ef.classList.remove('oyna');
+        void ef.offsetWidth;
+        ef.classList.add('oyna');
+        clearTimeout(ef._saat);
+        ef._saat = setTimeout(function () { ef.classList.remove('oyna'); }, 1300);
+
+        var eski = oge.querySelector('.sip-damga');
+        if (eski) eski.remove();
+        var damga = document.createElement('span');
+        damga.className = 'sip-damga';
+        damga.setAttribute('aria-hidden', 'true');
+        damga.style.setProperty('--efekt-renk', renk);
+        damga.innerHTML = '<b>×' + n + '</b><small>ADET</small>';
+        oge.appendChild(damga);
+        setTimeout(function () { if (damga.parentNode) damga.remove(); }, 1200);
+
+        var kutu = oge.querySelector('.sip-adet');
+        if (kutu) {
+            kutu.style.setProperty('--n', m);
+            kutu.style.setProperty('--efekt-renk', renk);
+            kutu.classList.remove('sip-adet--nabiz');
+            void kutu.offsetWidth;
+            kutu.classList.add('sip-adet--nabiz');
+        }
+        canliDuyur(n + ' adet alındı');
     }
 
     /** Bant sayaçları, yan panel, alt çubuk ve bitir düğmesi. */
@@ -1182,8 +1493,11 @@
      * Eklenti yazmayı bıraktığı an bu damga eskimeye başlar ve gösterge
      * uyarıya döner.
      */
-    var TAZE_MS = 5 * 60 * 1000;
-    var KOPUK_MS = 20 * 60 * 1000;
+    /* Depo paneli dakikada bir nabız atıyor. İki buçuk dakika susarsa
+       gecikme, on dakika susarsa kopukluk sayılıyor; eskiden yirmi
+       dakika bekleniyordu ve kesinti saatlerce fark edilmiyordu. */
+    var TAZE_MS = 150 * 1000;
+    var KOPUK_MS = 10 * 60 * 1000;
 
     function verininYasi() {
         var enYeni = 0;
@@ -1194,9 +1508,20 @@
         return enYeni ? (Date.now() - enYeni) : null;
     }
 
+    /* Kopukluk yalnız küçük bir yazıyla anlatılınca depoda kimse fark
+       etmiyordu. Listenin üstünde ne yapılacağını söyleyen bir şerit var. */
+    function kopukSeridi(metin) {
+        var b = el('sipKopuk');
+        if (!b) return;
+        if (!metin) { b.hidden = true; return; }
+        b.hidden = false;
+        b.querySelector('[data-kopuk-sure]').textContent = metin;
+    }
+
     function canliliksGoster() {
         var kutu = el('sonGuncelleme');
         if (!kutu) return;
+        kopukSeridi(null);
         var kap = kutu.closest('.sip-canli');
         var yas = verininYasi();
 
@@ -1221,6 +1546,7 @@
             kutu.setAttribute('title', 'Depo paneli bir süredir yeni veri göndermedi.');
         } else {
             var metin = dk < 60 ? (dk + ' dk.') : (Math.floor(dk / 60) + ' sa.');
+            kopukSeridi(metin);
             kutu.textContent = 'Bağlantı kesik · ' + metin;
             if (kap) { kap.classList.add('sip-canli--kopuk'); kap.classList.remove('sip-canli--eski'); }
             kutu.setAttribute('title',
@@ -1321,16 +1647,113 @@
     // Katmanlar: barkod, görsel, ayarlar, bildirim
     // ==================================================================
 
-    function katAc(id) {
-        el(id).hidden = false;
-        document.body.classList.add('sip-kat-acik');
+    /* GERİ TUŞU VE KATMANLAR
+       Açık olan her şey (sipariş detayı, barkod penceresi, fotoğraf,
+       ayarlar, kapananlar) bir yığında ve her biri tarayıcı geçmişinde bir
+       kayıt. Geri tuşu ya da geri hareketi her zaman EN ÜSTTEKİNİ kapatıyor.
+
+       Eskiden yalnız detay geçmişe yazılıyordu. Fotoğraf ya da barkod
+       açıkken geri basılınca alttaki detay kapanıyor, üstteki pencere
+       ortada kalıyordu; geçmiş ile ekran birbirinden kopuyor, bazen sayfa
+       dokunuşa cevap vermez hâle geliyordu. */
+    var katmanlar = [];
+    var gecmisAtla = 0;
+    var KATMAN_KAPAT = {};
+
+    /* Sayfa bir katman açıkken yenilendiyse o anki geçmiş kaydı bizden
+       kalma; yığın boş başladığı için sahipsiz. Kaydı nötrle ki ilk geri
+       basışı boşa gitmesin. */
+    try {
+        if (history.state && history.state.jbKatman) history.replaceState(null, '');
+    } catch (e) { /* sessiz */ }
+
+    function katmanAc(ad) {
+        katmanlar.push(ad);
+        try { history.pushState({ jbKatman: ad, derinlik: katmanlar.length }, ''); } catch (e) { /* sessiz */ }
     }
 
-    function katKapat(id) {
-        el(id).hidden = true;
+    /** Katman ekrandaki düğmeyle kapandı: geçmiş kaydı da tüketilsin. */
+    function katmanKapandi(ad) {
+        var i = katmanlar.lastIndexOf(ad);
+        if (i === -1) return;
+        var enUst = i === katmanlar.length - 1;
+        katmanlar.splice(i, 1);
+        if (enUst) {
+            gecmisAtla++;
+            try { history.back(); } catch (e) { gecmisAtla--; }
+        }
+    }
+
+    /** Katman veri yüzünden kendiliğinden gitti: yalnız yığından düşsün. */
+    function katmanDustu(ad) {
+        var i = katmanlar.lastIndexOf(ad);
+        if (i !== -1) katmanlar.splice(i, 1);
+    }
+
+    window.addEventListener('popstate', function () {
+        if (gecmisAtla > 0) { gecmisAtla--; durumuOnar(); return; }
+        var ad = katmanlar.pop();
+        if (ad && KATMAN_KAPAT[ad]) {
+            try { KATMAN_KAPAT[ad](); } catch (e) { console.warn('Katman kapatılamadı:', e); }
+        }
+        durumuOnar();
+    });
+
+    function katGizle(id) {
+        var k = el(id);
+        if (k) k.hidden = true;
         if (!document.querySelector('.sip-kat:not([hidden])')) {
             document.body.classList.remove('sip-kat-acik');
         }
+    }
+
+    function katAc(id) {
+        var k = el(id);
+        if (!k) return;
+        if (!k.hidden) return;
+        k.hidden = false;
+        document.body.classList.add('sip-kat-acik');
+        KATMAN_KAPAT[id] = function () { katGizle(id); };
+        katmanAc(id);
+    }
+
+    function katKapat(id) {
+        var k = el(id);
+        if (!k || k.hidden) { katmanDustu(id); return; }
+        katGizle(id);
+        katmanKapandi(id);
+    }
+
+    KATMAN_KAPAT.foto = function () {
+        if (global.JBUrunFoto && global.JBUrunFoto.acikMi()) global.JBUrunFoto.kapat();
+    };
+
+    /* GÜVENLİK AĞI
+       Ekran ile durum birbirinden koparsa (yarım kalmış bir kaydırma,
+       uygulamadan çıkıp dönme, beklenmedik bir hata) sayfa dokunuşa
+       cevap vermez hâle gelebiliyordu: görünmez bir katman ekranı
+       kaplıyor ya da gövde kilitli kalıyordu. Sekmeye her dönüşte ve her
+       geri hareketinden sonra ekran duruma göre onarılıyor. */
+    function durumuOnar() {
+        var detay = el('siparisDetay');
+        if (detay && !durum.secili) {
+            detay.classList.remove('acik');
+            detay.setAttribute('aria-hidden', 'true');
+            detay.style.transition = '';
+            detay.style.transform = '';
+            detay.style.opacity = '';
+            document.body.classList.remove('sip-detay-acik');
+            katmanDustu('detay');
+        }
+        if (global.JBSiparisKaydir) global.JBSiparisKaydir.sifirla();
+        ['siparisKodlar', 'siparisAyar', 'siparisKapananlar'].forEach(function (id) {
+            var k = el(id);
+            if (k && k.hidden) katmanDustu(id);
+        });
+        if (!document.querySelector('.sip-kat:not([hidden])')) {
+            document.body.classList.remove('sip-kat-acik');
+        }
+        if (!(global.JBUrunFoto && global.JBUrunFoto.acikMi())) katmanDustu('foto');
     }
 
     var bildirimSaati = null;
@@ -1350,8 +1773,46 @@
         } catch (e) { /* pano izni yoksa kod zaten ekranda */ }
     }
 
-    /** Barkod penceresi. Ana kod büyük, diğerleri altında rozet olarak.
-        Üstteki görsele dokunmak da büyük fotoğrafı açıyor. */
+    /* BARKOD PENCERESİ
+       Eskiden üstte süs çizgiler vardı: koddan türetiliyordu ama gerçek
+       bir barkod değildi, okuyucu okumuyordu; iriydi ve hangi koda ait
+       olduğu belli değildi. Diğer kodlar da sarmalanan rozetlerdi, çok
+       barkodlu üründe pencere taşıyordu.
+
+       Şimdi seçili kodun gerçek, okutulabilir barkodu çiziliyor (EAN-13,
+       EAN-8, UPC-A, olmadı Code 128; js/barkod-svg.js). Altında haneler
+       okunaklı gruplarla ve kopyala düğmesi. Bütün kodlar altta liste:
+       birine dokununca üstteki barkod ona geçiyor. Liste kendi içinde
+       kayıyor, pencere hiçbir zaman ekrandan taşmıyor. */
+    function kodBicim(kod) {
+        var k = String(kod || '');
+        if (/^\d{13}$/.test(k)) return k.slice(0, 1) + ' ' + k.slice(1, 7) + ' ' + k.slice(7);
+        if (/^\d{8}$/.test(k)) return k.slice(0, 4) + ' ' + k.slice(4);
+        if (/^\d{12}$/.test(k)) return k.slice(0, 1) + ' ' + k.slice(1, 6) + ' ' + k.slice(6, 11) + ' ' + k.slice(11);
+        return k;
+    }
+
+    function kodSec(i) {
+        var u = durum.kodUrun;
+        if (!u) return;
+        var liste = barkodBul(u).barkodlar;
+        if (!liste.length) return;
+        i = Math.max(0, Math.min(liste.length - 1, i));
+        durum.kodSecili = i;
+        var kod = liste[i];
+        var cizim = global.JBBarkodSvg ? global.JBBarkodSvg.ciz(kod, { yukseklik: 56, etiket: kod + ' barkodu' }) : null;
+        el('kodCizim').innerHTML = cizim ? cizim.svg : '';
+        el('kodCizim').hidden = !cizim;
+        el('kodNo').textContent = kodBicim(kod);
+        el('kodTur').textContent = cizim ? cizim.tur : '';
+        el('kodKopya').setAttribute('data-kopyala', kod);
+        el('kodListe').querySelectorAll('[data-kod-sec]').forEach(function (b) {
+            var secili = Number(b.getAttribute('data-kod-sec')) === i;
+            b.classList.toggle('is-secili', secili);
+            b.setAttribute('aria-selected', secili ? 'true' : 'false');
+        });
+    }
+
     function kodlariAc(u) {
         var bilgi = barkodBul(u);
         durum.kodUrun = u;
@@ -1362,34 +1823,53 @@
         else { g.removeAttribute('src'); gd.hidden = true; }
 
         el('kodAd').textContent = urunBasligi(u, bilgi);
-        el('kodNot').textContent = adetYaz(u.adet) + (u.birim ? ' ' + u.birim : '') + ' adet' +
-            (bilgi.barkodlar.length > 1 ? '  ·  ' + bilgi.barkodlar.length + ' barkod' : '');
+        var n = bilgi.barkodlar.length;
+        el('kodNot').textContent = adetYaz(u.adet) + (u.birim ? ' ' + u.birim : ' adet') +
+            (n ? '  ·  ' + n + ' barkod' : '');
 
-        var varMi = bilgi.barkodlar.length > 0;
-        el('kodCizgiler').hidden = !varMi;
-        el('kodNo').hidden = !varMi;
-        el('kodDiger').hidden = !varMi;
+        var varMi = n > 0;
+        el('kodSecili').hidden = !varMi;
         el('kodBos').hidden = varMi;
+        el('kodListeKap').hidden = n < 2;
 
         if (varMi) {
-            /* Çizgiler süs değil, koda göre çiziliyor: aynı barkod hep aynı
-               desende çıkıyor, farklı ürün farklı desende. */
-            var kod = bilgi.barkodlar[0];
-            var cizgi = '';
-            for (var i = 0; i < 34; i++) {
-                var n = kod.charCodeAt(i % kod.length) % 4;
-                cizgi += '<i style="width:' + [2, 4, 7, 11][n] + 'px"></i>';
-            }
-            el('kodCizgiler').innerHTML = cizgi;
-            el('kodNo').textContent = kod;
-            el('kodNo').setAttribute('data-kopyala', kod);
-            el('kodDiger').innerHTML = bilgi.barkodlar.slice(1).map(function (b) {
-                return '<button type="button" data-kopyala="' + kacir(b) + '">' + kacir(b) + '</button>';
+            el('kodSayi').textContent = n;
+            el('kodListe').innerHTML = bilgi.barkodlar.map(function (b, i) {
+                var tur = global.JBBarkodSvg && global.JBBarkodSvg.desen(b);
+                return '<button type="button" class="sip-bk__satir" role="option" data-kod-sec="' + i + '" aria-selected="false">' +
+                    '<span class="sip-bk__sira">' + (i + 1) + '</span>' +
+                    '<span class="sip-bk__satir-kod">' + kacir(kodBicim(b)) + '</span>' +
+                    '<span class="sip-bk__satir-tur">' + kacir(tur ? tur.tur : '') + '</span>' +
+                    '<svg class="sip-bk__tik" viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg>' +
+                '</button>';
             }).join('');
+            kodSec(0);
         } else {
             el('kodBos').textContent = 'Bu ürün katalogda eşleşmedi. Barkodu panelden okutman gerekiyor.';
+            el('kodListe').innerHTML = '';
         }
         katAc('siparisKodlar');
+    }
+
+    /* Ürün ve kişi fotoğrafı arama sayfasındaki pencereyle açılıyor
+       (js/urun-foto.js): her fotoğraf aynı çerçevede, yakınlaştırılabilir.
+       Ürünün adının altında barkodları kaydırılabilir şerit olarak. */
+    var _fotoYeniden = false;
+
+    function fotoAc(adres, baslik, secenek) {
+        if (!adres || !global.JBUrunFoto) return;
+        /* Kapanmakta olan pencere hemen yeniden açılırsa, eski açılışın
+           kapanış haberi bu sırada geliyor. O haber geçmiş kaydını silmesin:
+           aynı kayıt yeni açılışa devrediliyor. */
+        _fotoYeniden = true;
+        try {
+            global.JBUrunFoto.ac(adres, baslik, Object.assign({}, secenek || {}, {
+                kapaninca: function () { if (!_fotoYeniden) katmanKapandi('foto'); }
+            }));
+        } finally {
+            _fotoYeniden = false;
+        }
+        if (katmanlar.indexOf('foto') === -1) katmanAc('foto');
     }
 
     function gorseliBuyut(u) {
@@ -1397,9 +1877,15 @@
         var bilgi = barkodBul(u);
         var adres = urunGorseli(u, bilgi);
         if (!adres) return;
-        el('buyukGorsel').src = adres;
-        el('buyukAd').textContent = urunBasligi(u, bilgi);
-        katAc('siparisBuyuk');
+        fotoAc(adres, urunBasligi(u, bilgi), { barkodlar: bilgi.barkodlar });
+    }
+
+    function kisiFotoAc(dugum) {
+        var foto = dugum && dugum.getAttribute('data-kisi-foto');
+        if (!foto) return;
+        var ad = dugum.getAttribute('data-kisi-ad') || '';
+        var rol = dugum.getAttribute('data-kisi-rol') || '';
+        fotoAc(foto, ad + (rol ? ' · ' + rol : ''), { arac: false });
     }
 
     // ---- Ayarlar ----
@@ -1880,38 +2366,34 @@
        geçmişte karşılığı yoktu ve geri tuşu depocuyu doğrudan Ürün Arama
        sayfasına atıyordu. Yanlışlıkla basıldığında yapılan iş kayboluyor.
 
-       Detay açılırken geçmişe bir kayıt bırakılıyor; geri tuşu artık o
-       kaydı tüketip paneli kapatıyor, sayfadan çıkmıyor.
-
-       Kapatmanın tek yolu `popstate`: X düğmesi ve swipe de `history.back()`
-       çağırıyor. Böylece geçmiş her zaman panelin durumuyla aynı hizada
-       kalıyor, çift kayıt ya da sahipsiz kayıt oluşmuyor.
+       Detay ve üstündeki her pencere geçmişe bir kayıt bırakıyor
+       (`katmanAc`); geri tuşu her seferinde en üsttekini kapatıyor, sayfadan
+       çıkmıyor. Ekrandaki düğmeyle kapanan katman kendi kaydını
+       `katmanKapandi` ile tüketiyor. Ayrıntı: "GERİ TUŞU VE KATMANLAR".
        ================================================================== */
-    var _geriKaydiVar = false;
-    var _kapanisAnimasyonuAtla = false;
-
-    function geriKaydiBirak() {
-        if (_geriKaydiVar) return;
-        try { history.pushState({ jbDetay: 1 }, ''); _geriKaydiVar = true; } catch (e) { /* sessiz */ }
-    }
-
     function azaltilmisHareket() {
         try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
     }
 
-    /* Swipe ile aynı çıkış: panel sağa kayıp saydamlaşıyor. Swipe zaten
-       kendi animasyonunu oynattığı için oradan gelen kapanışta atlanıyor. */
+    /* Geri düğmesi ve geri tuşu: panel sağa kayıp kapanıyor. */
+    var _kapanisSaati = null;
     function detayiKaydirarakKapat() {
         var p = el('siparisDetay');
         if (!p || azaltilmisHareket()) { detayiGercektenKapat(); return; }
         var w = p.getBoundingClientRect().width || window.innerWidth;
-        p.style.transition = 'transform var(--motion-panel) var(--motion-ease-out), opacity var(--motion-panel) ease-out';
-        p.style.transform = 'translateX(' + w + 'px)';
-        p.style.opacity = '0';
-        setTimeout(function () {
-            p.style.transition = ''; p.style.transform = ''; p.style.opacity = '';
+        p.style.transition = 'transform var(--motion-panel) var(--motion-ease-out)';
+        p.style.transform = 'translate3d(' + w + 'px,0,0)';
+        clearTimeout(_kapanisSaati);
+        _kapanisSaati = setTimeout(function () {
+            /* Aynı karede sınıf düşüyor ve satır içi stil siliniyor: panel
+               zaten ekran dışında, CSS'in kendi kapanış konumu da orası.
+               Ayrı karelerde yapılınca panel bir an geri gelip yeniden
+               kayıyordu. */
             detayiGercektenKapat();
-        }, 220);
+            p.style.transition = 'none';
+            p.style.transform = '';
+            requestAnimationFrame(function () { p.style.transition = ''; });
+        }, 230);
     }
 
     function detayiGercektenKapat() {
@@ -1920,33 +2402,24 @@
         ciz();
     }
 
-    /* Dışarıdan çağrılan kapatma (X düğmesi, swipe sonu). Geçmişte kaydımız
-       varsa gerçek kapatmayı `popstate` yapıyor. */
+    /** Ekrandaki geri düğmesi, kaydırma sonu, Esc. */
     function detayiKapat(animasyonAtla) {
-        if (_geriKaydiVar) {
-            _kapanisAnimasyonuAtla = !!animasyonAtla;
-            _geriKaydiVar = false;
-            try { history.back(); return; } catch (e) { /* aşağıda kapatılıyor */ }
+        if (durum.secili) {
+            if (animasyonAtla === true) detayiGercektenKapat();
+            else detayiKaydirarakKapat();
         }
-        detayiGercektenKapat();
+        katmanKapandi('detay');
     }
 
-    window.addEventListener('popstate', function () {
-        _geriKaydiVar = false;
-        if (!durum.secili) return;
-        if (_kapanisAnimasyonuAtla) {
-            _kapanisAnimasyonuAtla = false;
-            detayiGercektenKapat();
-        } else {
-            detayiKaydirarakKapat();
-        }
-    });
+    KATMAN_KAPAT.detay = function () {
+        if (durum.secili) detayiKaydirarakKapat();
+    };
 
     function siparisAc(id) {
         var tumu = durum.siparisler;
         durum.secili = tumu.filter(function (s) { return s.id === id; })[0] || null;
         durum.detayImzasi = '';
-        if (durum.secili) geriKaydiBirak();
+        if (durum.secili && katmanlar.indexOf('detay') === -1) katmanAc('detay');
         ciz();
         /* Detay panelindeki TÜM scroll'lu elementleri sıfırla; window
            scroll'una dokunma (siparişler sayfası kaldığı yerde kalsın).
@@ -2008,6 +2481,159 @@
         siraBaslikGuncelle(bant);
     }
 
+    /* KAYDIRARAK GERİ
+       iOS'taki gibi: panel parmağı birebir takip ediyor, arkadaki liste
+       soldan hafifçe kayarak geliyor, aradaki gölge açılıyor. Bırakınca
+       karar mesafeye VE hıza göre: ekranın üçte birini geçtiyse ya da hızlı
+       bir fiske attıysa kapanıyor, yoksa yaya gibi yerine dönüyor. Kalan
+       yol hızla orantılı sürede tamamlanıyor, yani hareket elden kopmuyor.
+
+       Eskiden yalnız sol kenardan 30 piksellik şeritten başlıyordu ve
+       eşik sabit 70 pikseldi; parmak kenarı ıskalayınca hiç çalışmıyordu.
+       Artık detayın her yerinden başlıyor; yön kilidi katı (yatay hareket
+       dikeyin 1,4 katı), dikey kaydırma bozulmuyor.
+
+       DONMA
+       Eski hareket bir dokunuşta "aktif" kalabiliyordu (uygulamadan çıkıp
+       dönünce dokunuşun bitişi hiç gelmiyor). O hâlde sonraki her dokunuş
+       kaydırmayı engelliyordu: sayfa donmuş gibiydi. Şimdi her yeni
+       dokunuş, iptal, sekme değişimi ve geri tuşu durumu sıfırlıyor. */
+    function kaydirarakGeriKur() {
+        var panel = el('siparisDetay');
+        if (!panel) return;
+        var arkalar = [document.querySelector('.sip-ust'), document.querySelector('.sip-sayfa')].filter(Boolean);
+        var golge = document.createElement('div');
+        golge.className = 'sip-geri-golge';
+        golge.hidden = true;
+        golge.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(golge);
+
+        var EGRI = 'cubic-bezier(0.2, 0.8, 0.2, 1)';
+        var PARALAKS = 0.28;
+        var d = null;
+        var kare = 0;
+        var bitisSaati = null;
+        var hayaletBitis = 0;
+
+        function stilYaz(gecis, x, w) {
+            var p = Math.min(1, Math.max(0, x / w));
+            panel.style.transition = gecis ? 'transform ' + gecis : 'none';
+            panel.style.transform = 'translate3d(' + x + 'px,0,0)';
+            arkalar.forEach(function (a) {
+                a.style.transition = gecis ? 'transform ' + gecis : 'none';
+                a.style.transform = 'translate3d(' + (-PARALAKS * w * (1 - p)) + 'px,0,0)';
+            });
+            golge.style.transition = gecis ? 'opacity ' + gecis : 'none';
+            golge.style.opacity = String(1 - p);
+        }
+
+        function sifirla() {
+            clearTimeout(bitisSaati);
+            bitisSaati = null;
+            if (kare) { cancelAnimationFrame(kare); kare = 0; }
+            d = null;
+            panel.classList.remove('sip-detay--suruk');
+            panel.style.transition = '';
+            panel.style.transform = '';
+            arkalar.forEach(function (a) { a.style.transition = ''; a.style.transform = ''; });
+            golge.hidden = true;
+            golge.style.transition = '';
+            golge.style.opacity = '';
+        }
+
+        global.JBSiparisKaydir = { sifirla: function () { if (!d || !d.bitiyor) sifirla(); } };
+
+        function cerceve() {
+            kare = 0;
+            if (d && d.yon === 'x' && !d.bitiyor) stilYaz(null, Math.max(0, d.dx), d.w);
+        }
+
+        panel.addEventListener('touchstart', function (e) {
+            if (d && d.bitiyor) return;
+            d = null;
+            if (!durum.secili || e.touches.length !== 1 || azaltilmisHareket()) return;
+            if (e.target.closest('input, textarea, select, [data-yatay]')) return;
+            var t = e.touches[0];
+            d = { x0: t.clientX, y0: t.clientY, dx: 0, yon: null, bitiyor: false,
+                  w: panel.getBoundingClientRect().width || window.innerWidth,
+                  iz: [{ t: e.timeStamp, x: t.clientX }] };
+        }, { passive: true });
+
+        panel.addEventListener('touchmove', function (e) {
+            if (!d || d.bitiyor) return;
+            if (e.touches.length !== 1) { if (d.yon === 'x') geriBirak(false); else d = null; return; }
+            var t = e.touches[0];
+            var dx = t.clientX - d.x0;
+            var dy = t.clientY - d.y0;
+            if (d.yon === null) {
+                if (Math.abs(dx) + Math.abs(dy) < 10) return;
+                if (dx > 0 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+                    d.yon = 'x';
+                    d.x0 = t.clientX;          // eşik payı panele yansımasın
+                    golge.hidden = false;
+                    panel.classList.add('sip-detay--suruk');
+                } else {
+                    d = null;                   // dikey: sayfa normal kayar
+                    return;
+                }
+            }
+            if (e.cancelable) e.preventDefault();
+            d.dx = t.clientX - d.x0;
+            d.iz.push({ t: e.timeStamp, x: t.clientX });
+            if (d.iz.length > 8) d.iz.shift();
+            if (!kare) kare = requestAnimationFrame(cerceve);
+        }, { passive: false });
+
+        function hiz() {
+            if (!d || d.iz.length < 2) return 0;
+            var son = d.iz[d.iz.length - 1];
+            var ilk = d.iz[0];
+            for (var i = d.iz.length - 2; i >= 0; i--) {
+                if (son.t - d.iz[i].t > 100) break;
+                ilk = d.iz[i];
+            }
+            var sure = son.t - ilk.t;
+            return sure > 0 ? (son.x - ilk.x) / sure : 0;
+        }
+
+        function geriBirak(iptal) {
+            if (!d) return;
+            if (d.yon !== 'x') { d = null; return; }
+            if (kare) { cancelAnimationFrame(kare); kare = 0; }
+            var v = iptal ? 0 : hiz();
+            var x = Math.max(0, d.dx);
+            var kapat = !iptal && (x > d.w * 0.33 || (v > 0.45 && x > 24));
+            var kalan = kapat ? (d.w - x) : x;
+            var sure = Math.round(Math.min(300, Math.max(150, kalan / Math.max(Math.abs(v), 1.3))));
+            d.bitiyor = true;
+            stilYaz(sure + 'ms ' + EGRI, kapat ? d.w : 0, d.w);
+            if (kapat) hayaletBitis = Date.now() + sure + 350;
+            bitisSaati = setTimeout(function () {
+                if (kapat) {
+                    /* Panel ekran dışındayken aynı karede kapanıyor ve stiller
+                       siliniyor; CSS'in kapanış konumu da ekran dışı, bir an
+                       geri görünme olmuyor. */
+                    detayiKapat(true);
+                }
+                sifirla();
+            }, sure + 16);
+        }
+
+        panel.addEventListener('touchend', function () { geriBirak(false); }, { passive: true });
+        panel.addEventListener('touchcancel', function () { geriBirak(true); }, { passive: true });
+        window.addEventListener('blur', function () { if (d && !d.bitiyor) geriBirak(true); });
+
+        /* Hayalet tık: parmak kalkınca tarayıcı bir tık daha üretebiliyor
+           ve alttaki kartı açabiliyordu. Kapanıştan hemen sonraki tık yutuluyor. */
+        document.addEventListener('click', function (e) {
+            if (hayaletBitis && Date.now() < hayaletBitis) {
+                e.stopPropagation();
+                e.preventDefault();
+                hayaletBitis = 0;
+            }
+        }, true);
+    }
+
     function baglan() {
         /* İki şerit de aynı kapsayıcının altında; tek dinleyici kartı
            bulup açıyor. */
@@ -2032,89 +2658,21 @@
            kapanış animasyonunu iptal ediyordu. */
         el('detayGeri').addEventListener('click', function () { detayiKapat(); });
 
-        /* Soldan sağa kaydırma ile geri: sadece sol kenardan başlar,
-           dikey scroll'a karışmaz, mesafe ile canlı bir takip verir,
-           yeterli mesafede kapatır, değilse yumuşak geri döner. Yalnız
-           dokunmatik cihazda. */
-        (function swipeGeri() {
-            var el2 = el('siparisDetay');
-            if (!el2) return;
-            /* Yön kilidi katı: dx en az 1.7x dy olacak ki çapraz swipe
-               tetiklemesin. Kilitten önce ölçüm eşiği 14px, küçük parmak
-               titreklerini ele almaz. Sol kenar 30px. Dikey yön saptanırsa
-               tüm swipe iptal, sayfa normal scroll eder. */
-            var basX = 0, basY = 0, aktif = false, yon = null;
-            var esik = 70, kenar = 30;
-            var swipeKapamaZamani = 0;
+        kaydirarakGeriKur();
 
-            function resetStil() {
-                el2.style.transition = '';
-                el2.style.transform = '';
-                el2.style.opacity = '';
-            }
-
-            el2.addEventListener('touchstart', function (e) {
-                if (!durum.secili || e.touches.length !== 1) return;
-                var t = e.touches[0];
-                if (t.clientX > kenar) return;
-                basX = t.clientX; basY = t.clientY;
-                aktif = true; yon = null;
-                el2.style.transition = 'none';
-            }, { passive: true });
-
-            el2.addEventListener('touchmove', function (e) {
-                if (!aktif) return;
-                var t = e.touches[0];
-                var dx = t.clientX - basX;
-                var dy = t.clientY - basY;
-                if (yon === null) {
-                    var m = Math.abs(dx), n = Math.abs(dy);
-                    if (m + n < 14) return;
-                    if (dx > 0 && m > n * 1.7) {
-                        yon = 'x';
-                    } else {
-                        yon = 'y'; aktif = false; resetStil(); return;
-                    }
-                }
-                if (yon !== 'x') return;
-                if (e.cancelable) e.preventDefault();
-                dx = Math.max(0, dx);
-                el2.style.transform = 'translateX(' + dx + 'px)';
-                el2.style.opacity = String(1 - Math.min(dx / 400, 0.28));
-            }, { passive: false });
-
-            var bitir = function (e) {
-                if (!aktif) return;
-                aktif = false;
-                var son = (e.changedTouches && e.changedTouches[0]) || null;
-                var dx = son ? son.clientX - basX : 0;
-                if (yon !== 'x') { resetStil(); return; }
-                el2.style.transition = 'transform 0.2s cubic-bezier(.2,.8,.2,1), opacity 0.2s ease-out';
-                if (dx > esik) {
-                    var w = el2.getBoundingClientRect().width || window.innerWidth;
-                    el2.style.transform = 'translateX(' + w + 'px)';
-                    el2.style.opacity = '0';
-                    swipeKapamaZamani = Date.now();
-                    setTimeout(function () { resetStil(); detayiKapat(true); }, 210);
-                } else {
-                    el2.style.transform = ''; el2.style.opacity = '';
-                    setTimeout(function () { el2.style.transition = ''; }, 220);
-                }
-            };
-            el2.addEventListener('touchend', bitir, { passive: true });
-            el2.addEventListener('touchcancel', bitir, { passive: true });
-
-            /* Ghost-click yut: touchend'ten sonra 350ms içinde gelen ilk
-               click swipe kalıntısı olabilir; birinci tıklama boşa
-               gitmesin diye o click'i emen bir hindi katman. */
-            document.addEventListener('click', function (e) {
-                if (swipeKapamaZamani && Date.now() - swipeKapamaZamani < 350) {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    swipeKapamaZamani = 0;
-                }
-            }, true);
-        })();
+        /* Kişi fotoğrafı: kartta ve detayda. Kartın kendisi siparişi
+           açıyor; fotoğraflı kişiye dokunmak onun yerine fotoğrafı açıyor. */
+        el('siparisAkis').addEventListener('click', function (e) {
+            var kf = e.target.closest('[data-kisi-foto]');
+            if (!kf) return;
+            e.stopPropagation();
+            e.preventDefault();
+            kisiFotoAc(kf);
+        }, true);
+        el('detayKisiler').addEventListener('click', function (e) {
+            var kf = e.target.closest('[data-kisi-foto]');
+            if (kf) kisiFotoAc(kf);
+        });
 
         el('detayGovde').addEventListener('click', function (e) {
             if (!durum.secili) return;
@@ -2158,15 +2716,29 @@
         el('kodGorselDugme').addEventListener('click', function () { gorseliBuyut(durum.kodUrun); });
         el('siparisKodlar').addEventListener('click', function (e) {
             if (e.target === el('siparisKodlar')) { katKapat('siparisKodlar'); return; }
+            var sec = e.target.closest('[data-kod-sec]');
+            if (sec) { kodSec(Number(sec.getAttribute('data-kod-sec'))); return; }
             var k = e.target.closest('[data-kopyala]');
-            if (k && k.getAttribute('data-kopyala')) kopyala(k.getAttribute('data-kopyala'));
-        });
-
-        el('buyukKapat').addEventListener('click', function () { katKapat('siparisBuyuk'); });
-        el('siparisBuyuk').addEventListener('click', function (e) {
-            if (e.target === el('siparisBuyuk') || e.target.classList.contains('sip-buyuk__ic')) {
-                katKapat('siparisBuyuk');
+            if (k && k.getAttribute('data-kopyala')) {
+                kopyala(k.getAttribute('data-kopyala'));
+                if (k.id === 'kodKopya') {
+                    k.classList.add('is-tamam');
+                    k.querySelector('span').textContent = 'Kopyalandı';
+                    clearTimeout(k._saat);
+                    k._saat = setTimeout(function () {
+                        k.classList.remove('is-tamam');
+                        k.querySelector('span').textContent = 'Kopyala';
+                    }, 1400);
+                }
             }
+        });
+        el('kodListe').addEventListener('keydown', function (e) {
+            if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+            e.preventDefault();
+            var yeni = (durum.kodSecili || 0) + (e.key === 'ArrowDown' ? 1 : -1);
+            kodSec(yeni);
+            var b = el('kodListe').querySelector('[data-kod-sec="' + durum.kodSecili + '"]');
+            if (b) b.focus();
         });
 
         el('kapananlarAc').addEventListener('click', kapananlariAc);
@@ -2175,7 +2747,18 @@
             if (e.target === el('siparisKapananlar')) { katKapat('siparisKapananlar'); return; }
             var ac = e.target.closest('[data-kapanan-ac]');
             if (ac) {
-                katKapat('siparisKapananlar');
+                /* Pencere kapanıp detay açılıyor. Geri gidip yeni kayıt
+                   yazmak yerine pencerenin geçmiş kaydı detaya devrediliyor:
+                   ikisi aynı anda yapılınca tarayıcı yanlış kaydı geri
+                   alabiliyordu. */
+                var i = katmanlar.lastIndexOf('siparisKapananlar');
+                katGizle('siparisKapananlar');
+                if (i !== -1 && i === katmanlar.length - 1 && katmanlar.indexOf('detay') === -1) {
+                    katmanlar[i] = 'detay';
+                    try { history.replaceState({ jbKatman: 'detay', derinlik: katmanlar.length }, ''); } catch (err) { /* sessiz */ }
+                } else {
+                    katmanKapandi('siparisKapananlar');
+                }
                 siparisAc(ac.getAttribute('data-kapanan-ac'));
                 return;
             }
@@ -2291,7 +2874,6 @@
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             // Üstteki katman önce kapanmalı; Esc bir seferde ikisini kapatmasın.
-            if (!el('siparisBuyuk').hidden) { katKapat('siparisBuyuk'); return; }
             if (!el('siparisKodlar').hidden) { katKapat('siparisKodlar'); return; }
             if (!el('siparisAyar').hidden) { katKapat('siparisAyar'); return; }
             if (!el('siparisKapananlar').hidden) { katKapat('siparisKapananlar'); return; }
@@ -2299,17 +2881,24 @@
         });
 
         /* Sekme öne gelince hemen bir kez tazele; depocu telefonu cebinden
-           çıkardığında eski listeye bakmasın. */
+           çıkardığında eski listeye bakmasın. Arka planda yoklama durur,
+           pil ve veri harcamaz. */
         document.addEventListener('visibilitychange', function () {
-            if (document.visibilityState === 'visible') tazele(false);
+            if (document.visibilityState === 'visible') {
+                durumuOnar();
+                sonTamCekim = 0;
+                dongu();
+            } else {
+                clearTimeout(donguSaati);
+                if (global.JBSiparisKaydir) global.JBSiparisKaydir.sifirla();
+            }
         });
+        window.addEventListener('pageshow', function () { durumuOnar(); dongu(); });
+        window.addEventListener('online', function () { sonTamCekim = 0; dongu(); });
     }
 
     function yoklamayiBaslat() {
-        if (zamanlayici) clearInterval(zamanlayici);
-        zamanlayici = setInterval(function () {
-            if (document.visibilityState === 'visible') tazele(false);
-        }, YOKLAMA_MS);
+        dongu();
     }
 
     // ==================================================================
@@ -2364,8 +2953,7 @@
         bolumGoster('siparisIcerik');
         baglan();
         ciz();
-        tazele(true);
-        yoklamayiBaslat();
+        tazele(true).then(yoklamayiBaslat);
     }
 
     if (document.readyState === 'loading') {

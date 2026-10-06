@@ -74,6 +74,17 @@
                         ikon('<path d="M6 6l12 12M18 6L6 18"/>') +
                     '</button>' +
                 '</div>' +
+                '<div class="uf-barkod" hidden>' +
+                    '<div class="uf-barkod__serit" role="group" aria-roledescription="kaydırılabilir liste" aria-label="Barkodlar"></div>' +
+                    '<div class="uf-barkod__alt">' +
+                        '<span class="uf-barkod__noktalar" aria-hidden="true"></span>' +
+                        '<span class="uf-barkod__sayac" aria-live="polite"></span>' +
+                        '<button type="button" class="uf-barkod__kopya" data-uf="kopya">' +
+                            ikon('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/>') +
+                            '<span>Kopyala</span>' +
+                        '</button>' +
+                    '</div>' +
+                '</div>' +
                 '<div class="uf-sahne">' +
                     '<img class="uf-resim" alt="" decoding="async" draggable="false">' +
                     '<div class="uf-durum" data-uf="yukleniyor"><span class="uf-cark" aria-hidden="true"></span></div>' +
@@ -104,6 +115,15 @@
             sigdir: perde.querySelector('[data-uf="sigdir"]'),
             kapat: perde.querySelector('[data-uf="kapat"]'),
             ipucu: perde.querySelector('.uf-ipucu'),
+            arac: perde.querySelector('.uf-arac'),
+            barkod: perde.querySelector('.uf-barkod'),
+            serit: perde.querySelector('.uf-barkod__serit'),
+            noktalar: perde.querySelector('.uf-barkod__noktalar'),
+            sayac: perde.querySelector('.uf-barkod__sayac'),
+            kopya: perde.querySelector('[data-uf="kopya"]'),
+            barkodlar: [],
+            barkodSira: 0,
+            kapaninca: null,
             s: 1, x: 0, y: 0,
             isaretler: new Map(),
             sikistirma: null,
@@ -203,6 +223,8 @@
 
         /* Arka sayfa dokunmayla da kaymasın (iOS) */
         d.perde.addEventListener('touchmove', function (e) {
+            // Barkod şeridi yatay kayıyor; orada tarayıcının kaydırması lazım
+            if (d.serit.contains(e.target)) return;
             if (e.cancelable) e.preventDefault();
         }, { passive: false });
         d.perde.addEventListener('wheel', function (e) {
@@ -309,6 +331,8 @@
         sahne.addEventListener('pointerup', birak);
         sahne.addEventListener('pointercancel', birak);
 
+        barkodBagla(d);
+
         d.resim.addEventListener('load', function () {
             d.yukleniyor.hidden = true;
             d.hata.hidden = true;
@@ -349,10 +373,120 @@
         }
     }
 
-    function ac(url, ad) {
+    // ---- Barkod şeridi ----
+    // Adın hemen altında. Kaydırınca serbest kaymıyor, bir sonrakine
+    // oturuyor (karakter seçer gibi). Koda dokununca sıradaki geliyor.
+
+    function barkodBicim(kod) {
+        var k = String(kod || '');
+        if (/^\d{13}$/.test(k)) return k.slice(0, 1) + ' ' + k.slice(1, 7) + ' ' + k.slice(7);
+        if (/^\d{8}$/.test(k)) return k.slice(0, 4) + ' ' + k.slice(4);
+        return k;
+    }
+
+    function barkodSayaci(d) {
+        var n = d.barkodlar.length;
+        d.sayac.textContent = n > 1 ? (d.barkodSira + 1) + ' / ' + n : 'Barkod';
+        var noktalar = d.noktalar.children;
+        for (var i = 0; i < noktalar.length; i++) {
+            noktalar[i].classList.toggle('is-secili', i === d.barkodSira);
+        }
+    }
+
+    function barkodaGit(d, i, yumusak) {
+        var n = d.barkodlar.length;
+        if (!n) return;
+        i = ((i % n) + n) % n;
+        d.barkodSira = i;
+        var w = d.serit.clientWidth;
+        try {
+            d.serit.scrollTo({ left: i * w, behavior: yumusak && !hareketAzMi() ? 'smooth' : 'auto' });
+        } catch (e) { d.serit.scrollLeft = i * w; }
+        barkodSayaci(d);
+    }
+
+    function barkodBagla(d) {
+        var kare = 0;
+        d.serit.addEventListener('scroll', function () {
+            if (kare) return;
+            kare = requestAnimationFrame(function () {
+                kare = 0;
+                var w = d.serit.clientWidth || 1;
+                var i = Math.round(d.serit.scrollLeft / w);
+                if (i !== d.barkodSira && i >= 0 && i < d.barkodlar.length) {
+                    d.barkodSira = i;
+                    barkodSayaci(d);
+                }
+            });
+        }, { passive: true });
+        d.serit.addEventListener('click', function (e) {
+            if (!e.target.closest('.uf-barkod__kod')) return;
+            if (d.barkodlar.length > 1) barkodaGit(d, d.barkodSira + 1, true);
+        });
+        d.serit.addEventListener('keydown', function (e) {
+            if (e.key === 'ArrowRight') { e.preventDefault(); barkodaGit(d, d.barkodSira + 1, true); }
+            else if (e.key === 'ArrowLeft') { e.preventDefault(); barkodaGit(d, d.barkodSira - 1, true); }
+        });
+        d.kopya.addEventListener('click', function () {
+            var kod = d.barkodlar[d.barkodSira];
+            if (!kod) return;
+            var yaz = function () {
+                var s = d.kopya.querySelector('span');
+                s.textContent = 'Kopyalandı';
+                d.kopya.classList.add('is-tamam');
+                clearTimeout(d._kopyaSaat);
+                d._kopyaSaat = setTimeout(function () {
+                    s.textContent = 'Kopyala';
+                    d.kopya.classList.remove('is-tamam');
+                }, 1400);
+            };
+            try {
+                navigator.clipboard.writeText(kod).then(yaz, function () {});
+            } catch (e) { /* pano izni yok: kod zaten ekranda */ }
+        });
+    }
+
+    function barkodlariYaz(d, liste) {
+        var temiz = (Array.isArray(liste) ? liste : [])
+            .map(function (b) { return String(b == null ? '' : b).trim(); })
+            .filter(Boolean);
+        d.barkodlar = temiz;
+        d.barkodSira = 0;
+        d.barkod.hidden = !temiz.length;
+        d.perde.classList.toggle('uf-perde--barkodlu', temiz.length > 0);
+        if (!temiz.length) { d.serit.textContent = ''; d.noktalar.textContent = ''; return; }
+        var h = '';
+        for (var i = 0; i < temiz.length; i++) {
+            h += '<button type="button" class="uf-barkod__kod" aria-label="Barkod ' + (i + 1) + ': ' + temiz[i] +
+                (temiz.length > 1 ? '. Sıradakine geçmek için dokun' : '') + '">' +
+                '<span>' + barkodBicim(temiz[i]).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span></button>';
+        }
+        d.serit.innerHTML = h;
+        d.serit.classList.toggle('is-tek', temiz.length === 1);
+        var n = '';
+        if (temiz.length > 1) for (var j = 0; j < temiz.length; j++) n += '<i></i>';
+        d.noktalar.innerHTML = n;
+        d.serit.scrollLeft = 0;
+        barkodSayaci(d);
+    }
+
+    /**
+     * @param {string} url
+     * @param {string} ad
+     * @param {{barkodlar?: string[], arac?: boolean, kapaninca?: function}} [secenek]
+     *   barkodlar  Adın altında kaydırılabilir şerit.
+     *   arac       false: alttaki yakınlaştırma çubuğu gizli (kişi fotoğrafı).
+     *   kapaninca  Pencere kapanınca bir kez çağrılır.
+     */
+    function ac(url, ad, secenek) {
+        secenek = secenek || {};
         if (acik && acik.kapaniyor) {
             // Kapanırken yeniden açıldı: kapanışı iptal et, aynı pencereyi kullan
             acik.kapaniyor = false;
+            // Önceki açılışın kapanış haberi kaybolmasın (çağıranın geçmiş kaydı)
+            var oncekiGeri = acik.kapaninca;
+            acik.kapaninca = null;
+            if (oncekiGeri) { try { oncekiGeri(); } catch (err) { /* sessiz */ } }
             document.addEventListener('keydown', tus, true);
             acik.perde.classList.add('is-acik');
         }
@@ -361,6 +495,10 @@
         acik = d;
 
         d.baslik.textContent = ad ? String(ad) : 'Ürün görseli';
+        barkodlariYaz(d, secenek.barkodlar);
+        d.arac.hidden = secenek.arac === false;
+        d.perde.classList.toggle('uf-perde--aracsiz', secenek.arac === false);
+        d.kapaninca = typeof secenek.kapaninca === 'function' ? secenek.kapaninca : null;
         d.resim.alt = ad ? String(ad) : '';
         d.resim.classList.remove('is-yuklendi');
         d.yukleniyor.hidden = false;
@@ -418,6 +556,9 @@
             if (odak && typeof odak.focus === 'function' && document.contains(odak)) {
                 try { odak.focus({ preventScroll: true }); } catch (err) {}
             }
+            var geri = d.kapaninca;
+            d.kapaninca = null;
+            if (geri) { try { geri(); } catch (err) { /* çağıranın hatası pencereyi kilitlemesin */ } }
         };
 
         if (hareketAzMi()) { bitir(); return; }

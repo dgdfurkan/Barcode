@@ -210,3 +210,115 @@
     .uf-kart { transform: none; }
     .uf-cark { animation-duration: 1400ms; }
 }
+
+/* ---- Barkod şeridi (adın altında) ----
+   Kaydırınca serbest kaymıyor, her seferinde tam bir koda oturuyor.
+   Koda dokununca sıradaki geliyor. */
+.uf-barkod {
+    padding: 0 8px 8px;
+    border-bottom: 1px solid var(--uf-cizgi);
+}
+
+.uf-barkod[hidden] { display: none; }
+
+.uf-barkod__serit {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x;
+    border-radius: 12px;
+    background: var(--uf-kagit);
+}
+
+.uf-barkod__serit::-webkit-scrollbar { display: none; }
+
+.uf-barkod__kod {
+    flex: 0 0 100%;
+    min-height: 48px;
+    display: grid;
+    place-items: center;
+    padding: 8px 16px;
+    border: 0;
+    background: transparent;
+    color: var(--uf-yazi);
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+    cursor: pointer;
+    font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, 'Roboto Mono', Consolas, monospace;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums slashed-zero;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.uf-barkod__serit.is-tek .uf-barkod__kod { cursor: default; }
+.uf-barkod__kod:focus-visible { outline: 2px solid var(--uf-mavi); outline-offset: -2px; border-radius: 12px; }
+
+.uf-barkod__alt {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 4px 0 0 8px;
+}
+
+.uf-barkod__noktalar { display: flex; gap: 4px; }
+.uf-barkod__noktalar:empty { display: none; }
+
+.uf-barkod__noktalar i {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--uf-cizgi);
+    transition: background-color var(--motion-fast, 140ms) var(--motion-ease-standard, ease),
+                transform var(--motion-fast, 140ms) var(--motion-ease-out, ease-out);
+}
+
+.uf-barkod__noktalar i.is-secili { background: var(--uf-mavi); transform: scale(1.25); }
+
+.uf-barkod__sayac {
+    flex: 1;
+    min-width: 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--uf-sonuk);
+    font-variant-numeric: tabular-nums;
+}
+
+.uf-barkod__kopya {
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--uf-yazi-orta);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.uf-barkod__kopya svg { width: 16px; height: 16px; }
+.uf-barkod__kopya:hover { background: var(--uf-kagit); }
+.uf-barkod__kopya.is-tamam { color: #047857; }
+
+/* Kişi fotoğrafı: alt araç çubuğu yok, çerçeve aynı */
+.uf-arac[hidden] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .uf-barkod__noktalar i { transition: none; }
+}
+
+/* Şerit ve araç çubuğu yer kaplıyor: çerçeve ekrana sığsın diye kısalır.
+   Genişlik aynı kaldığı için fotoğraflar yine standart boyda. */
+.uf-perde--barkodlu .uf-sahne { height: min(528px, calc(100vw - 32px), calc(100dvh - 252px)); }
+.uf-perde--aracsiz .uf-sahne { height: min(528px, calc(100vw - 32px), calc(100dvh - 112px)); }
+.uf-perde--barkodlu.uf-perde--aracsiz .uf-sahne { height: min(528px, calc(100vw - 32px), calc(100dvh - 204px)); }

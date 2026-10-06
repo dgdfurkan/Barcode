@@ -18,15 +18,16 @@
     <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
     <link rel="stylesheet" href="../css/motion.css?v=20260907a" />
-    <link rel="stylesheet" href="../css/siparisler.css?v=20260913a" />
-    <script src="../js/auth-token.js?v=20260919a"></script>
+    <link rel="stylesheet" href="../css/siparisler.css?v=20261007a" />
+    <link rel="stylesheet" href="../css/urun-foto.css?v=20261007a" />
+    <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20260828i"></script>
     <script src="../js/auth.js?v=20260919a"></script>
     <script src="../js/oturum-yeri.js?v=20260902a"></script>
     <script src="../js/user-manager.js?v=20260919b"></script>
     <script src="../js/premium-features.js?v=20260828i"></script>
-    <script src="../js/asistan-koprusu.js?v=20260903a"></script>
+    <script src="../js/asistan-koprusu.js?v=20261007a"></script>
     <!-- Barkodlar katalogdan çözülüyor: sipariş detayında ürün kimliği gelmiyor,
          ad ve görsel geliyor. GetirCdnPaste görsel adresinden ürünü buluyor. -->
     <script src="../js/getir-cdn-paste.js?v=20260928a"></script>
@@ -82,6 +83,13 @@
                     <button type="button" class="sip-yenile" id="siparisYenile" aria-label="Siparişleri yenile"><svg viewBox="0 0 20 20"><path d="M15.7 6.7V3m0 0H12m3.7 0-2.8 2.8a6.7 6.7 0 1 0 1.8 7.2"/></svg></button>
                 </div>
             </section>
+            <div class="sip-kopuk" id="sipKopuk" role="alert" hidden>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 6.5v4.5M10 14h.01"/><path d="M8.6 3.4 2.3 14.5A1.6 1.6 0 0 0 3.7 17h12.6a1.6 1.6 0 0 0 1.4-2.5L11.4 3.4a1.6 1.6 0 0 0-2.8 0Z"/></svg>
+                <div>
+                    <strong>Depo panelinden veri gelmiyor · <span data-kopuk-sure></span></strong>
+                    <p>Depodaki bilgisayarda Getir sipariş ekranı açık mı bak. Asistan simgesinde kırmızı ünlem varsa paneldeki “Oturumu bağla” düğmesine bas.</p>
+                </div>
+            </div>
 
             <!--
               İki şerit yan yana: solda arkada toplanan, sağda bankoda bekleyen.
@@ -194,18 +202,26 @@
     <!-- Barkod penceresi: ürün adına dokununca açılıyor. -->
     <div class="sip-kat" id="siparisKodlar" hidden>
         <div class="sip-kutu sip-kutu--barkod" role="dialog" aria-modal="true" aria-labelledby="kodAd">
-            <button type="button" class="sip-kapat" id="kodKapat" aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
-            <div class="sip-barkod__urun">
-                <button type="button" class="sip-barkod__gorsel" id="kodGorselDugme" aria-label="Görseli büyüt"><img id="kodGorsel" alt=""></button>
-                <div>
-                    <small>ÜRÜN BARKODU</small>
+            <div class="sip-bk__ust">
+                <button type="button" class="sip-bk__gorsel" id="kodGorselDugme" aria-label="Görseli büyüt"><img id="kodGorsel" alt=""></button>
+                <div class="sip-bk__metin">
                     <h3 id="kodAd"></h3>
                     <p id="kodNot"></p>
                 </div>
+                <button type="button" class="sip-kapat" id="kodKapat" aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
             </div>
-            <div class="sip-barkod__cizgiler" id="kodCizgiler" aria-hidden="true"></div>
-            <button type="button" class="sip-barkod__no" id="kodNo" data-kopyala=""></button>
-            <div class="sip-barkod__diger" id="kodDiger"></div>
+            <div class="sip-bk__secili" id="kodSecili">
+                <div class="sip-bk__cizim" id="kodCizim"></div>
+                <div class="sip-bk__no-satir">
+                    <span class="sip-bk__no" id="kodNo"></span>
+                    <button type="button" class="sip-bk__kopya" id="kodKopya" data-kopyala=""><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="2"/><path d="M4 12V5a1 1 0 0 1 1-1h7"/></svg><span>Kopyala</span></button>
+                </div>
+                <span class="sip-bk__tur" id="kodTur"></span>
+            </div>
+            <div class="sip-bk__liste-kap" id="kodListeKap" hidden>
+                <p class="sip-bk__etiket">Tüm barkodlar <b id="kodSayi"></b></p>
+                <div class="sip-bk__liste" id="kodListe" role="listbox" aria-label="Barkodlar"></div>
+            </div>
             <p class="sip-barkod__bos" id="kodBos" hidden></p>
         </div>
     </div>
@@ -269,19 +285,13 @@
         </div>
     </div>
 
-    <!-- Görsel büyütme -->
-    <div class="sip-kat sip-buyuk" id="siparisBuyuk" hidden>
-        <button type="button" class="sip-kapat" id="buyukKapat" aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
-        <div class="sip-buyuk__ic">
-            <img id="buyukGorsel" alt="">
-            <p id="buyukAd"></p>
-        </div>
-    </div>
-
+    <div class="sip-sr" id="sipDuyuru" role="status" aria-live="polite"></div>
     <div class="sip-bildirim" id="siparisBildirim" role="status" aria-live="polite"><svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-9"/></svg><span></span></div>
 
+    <script src="../js/urun-foto.js?v=20261007a"></script>
+    <script src="../js/barkod-svg.js?v=20261007a"></script>
     <script src="../js/siparis-sirala.js?v=20260908a"></script>
-    <script src="../js/siparisler.js?v=20260908b"></script>
+    <script src="../js/siparisler.js?v=20261007a"></script>
     <script>
         // Başlıktaki kullanıcı adı; diğer sayfalarla aynı davranış.
         (function () {

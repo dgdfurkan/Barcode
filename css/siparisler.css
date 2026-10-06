@@ -1646,3 +1646,239 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
         transition: none !important;
     }
 }
+
+/* ==================================================================
+   Ekim 2026: tik hissi, kopukluk şeridi, kaydırarak geri, kişi
+   fotoğrafı, barkod penceresi
+   ================================================================== */
+
+.sip-sr {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---- Kopukluk şeridi ---- */
+.sip-kopuk {
+    display: flex; align-items: flex-start; gap: 12px;
+    margin: 0 0 16px;
+    padding: 12px 16px;
+    border: 1px solid var(--kirmizi-cizgi);
+    border-radius: 12px;
+    background: var(--kirmizi-50);
+    color: var(--kirmizi);
+}
+.sip-kopuk[hidden] { display: none; }
+.sip-kopuk svg { width: 20px; height: 20px; flex: none; margin-top: 1px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sip-kopuk strong { display: block; font-size: 13px; font-weight: 700; color: var(--kirmizi); }
+.sip-kopuk p { margin: 4px 0 0; font-size: 12px; line-height: 1.45; color: var(--yazi-orta); }
+
+/* ---- Tik: tek adet ----
+   Düğme hafifçe büzülüp açılıyor, tik çiziliyor, satırın zemini soldan
+   sağa yeşille doluyor. Hepsi 400 ms içinde biter. */
+.sip-urun--tik .sip-al { animation: sip-al-pop 360ms var(--motion-ease-out) both; }
+.sip-urun--tik .sip-al svg path {
+    stroke-dasharray: 20;
+    stroke-dashoffset: 20;
+    animation: sip-tik-ciz 260ms 70ms var(--motion-ease-out) forwards;
+}
+.sip-urun--tik::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: inherit;
+    background: rgba(14, 159, 110, 0.14);
+    transform-origin: left center;
+    pointer-events: none;
+    animation: sip-satir-dol 420ms var(--motion-ease-out) both;
+}
+.sip-urun--geri .sip-al { animation: sip-al-geri 220ms var(--motion-ease-standard) both; }
+
+@keyframes sip-al-pop {
+    0% { transform: scale(1); }
+    30% { transform: scale(0.92); }
+    65% { transform: scale(1.06); }
+    100% { transform: scale(1); }
+}
+@keyframes sip-tik-ciz { to { stroke-dashoffset: 0; } }
+@keyframes sip-satir-dol {
+    0% { transform: scaleX(0); opacity: 1; }
+    60% { transform: scaleX(1); opacity: 1; }
+    100% { transform: scaleX(1); opacity: 0; }
+}
+@keyframes sip-al-geri {
+    0% { transform: scale(1); }
+    40% { transform: scale(0.95); }
+    100% { transform: scale(1); }
+}
+
+/* ---- Tik: çoklu adet ----
+   Ekranın kenarı adet kadar nabız atıyor; satırın ortasında "×3 ADET"
+   damgası beliriyor. Renk adetle değişiyor (2 mavi, 3 mor, 4 turuncu,
+   5+ kırmızı). Hiçbiri dokunuşu engellemiyor. */
+.sip-coklu-efekt {
+    position: fixed; inset: 0; z-index: 95;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(ellipse at center, transparent 45%, var(--efekt-renk, #2563eb) 118%);
+    /* Kenarda keskin bir hat + içe doğru sönen ışık: oyunlardaki hasar
+       çerçevesi gibi, ekranın neresine bakılırsa bakılsın göze çarpıyor. */
+    box-shadow: inset 0 0 0 5px var(--efekt-renk, #2563eb), inset 0 0 72px 12px var(--efekt-renk, #2563eb);
+}
+.sip-coklu-efekt.oyna { animation: sip-kenar-nabiz 230ms ease-out var(--n, 2) both; }
+@keyframes sip-kenar-nabiz {
+    0% { opacity: 0; }
+    30% { opacity: 0.85; }
+    100% { opacity: 0; }
+}
+
+.sip-damga {
+    position: absolute; left: 50%; top: 50%; z-index: 5;
+    display: inline-flex; align-items: baseline; gap: 6px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: var(--efekt-renk, #2563eb);
+    color: #fff;
+    box-shadow: 0 10px 28px rgba(16, 24, 40, 0.28);
+    pointer-events: none;
+    white-space: nowrap;
+    transform: translate(-50%, -50%);
+    animation: sip-damga 1150ms var(--motion-ease-out) both;
+}
+.sip-damga b { font-family: var(--baslik-font); font-size: 26px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.sip-damga small { font-size: 10px; font-weight: 800; letter-spacing: 0.12em; }
+@keyframes sip-damga {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+    16% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+    28% { transform: translate(-50%, -50%) scale(1); }
+    78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -60%) scale(0.96); }
+}
+
+.sip-adet--nabiz { animation: sip-adet-nabiz 230ms ease-out var(--n, 2); }
+@keyframes sip-adet-nabiz {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.14); }
+    100% { transform: scale(1); }
+}
+
+/* ---- Kaydırarak geri ---- */
+.sip-geri-golge {
+    position: fixed; inset: 0; z-index: 59;
+    background: rgba(16, 24, 40, 0.22);
+    pointer-events: none;
+}
+.sip-geri-golge[hidden] { display: none; }
+.sip-detay--suruk { box-shadow: -16px 0 40px rgba(16, 24, 40, 0.22); will-change: transform; }
+
+/* ---- Kişi fotoğrafı ---- */
+.sip-kart__kisi--foto { cursor: zoom-in; }
+.sip-kart__kisi--foto .sip-kart__bas { box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--cizgi-sert); }
+button.sip-avatar { padding: 0; border: 0; cursor: zoom-in; font: inherit; }
+button.sip-avatar:focus-visible { outline: 2px solid var(--mavi); outline-offset: 2px; }
+
+/* ---- Barkod penceresi ----
+   Üstte ürün, ortada seçili kodun gerçek barkodu ve okunaklı haneleri,
+   altta bütün kodlar. Liste kendi içinde kayıyor, pencere taşmıyor. */
+.sip-kutu--barkod {
+    width: min(420px, 100%);
+    padding: 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+}
+.sip-bk__ust {
+    display: grid; grid-template-columns: 56px minmax(0, 1fr) 44px; align-items: center; gap: 12px;
+    padding: 16px 12px 16px 16px;
+    border-bottom: 1px solid var(--cizgi);
+}
+.sip-bk__gorsel {
+    width: 56px; height: 56px; padding: 4px;
+    border: 1px solid var(--cizgi); border-radius: 12px;
+    background: #fff; cursor: zoom-in;
+}
+.sip-bk__gorsel[hidden] { display: none; }
+.sip-bk__gorsel img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.sip-bk__metin { min-width: 0; }
+.sip-bk__metin h3 {
+    margin: 0;
+    font-family: var(--baslik-font); font-size: 15px; font-weight: 700; line-height: 1.35;
+    color: var(--lacivert);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    overflow-wrap: anywhere;
+}
+.sip-bk__metin p { margin: 4px 0 0; font-size: 12px; font-weight: 600; color: var(--sonuk); font-variant-numeric: tabular-nums; }
+.sip-bk__ust .sip-kapat { width: 44px; height: 44px; border-radius: 999px; }
+
+.sip-bk__secili { padding: 16px; text-align: center; }
+.sip-bk__secili[hidden] { display: none; }
+.sip-bk__cizim {
+    max-width: 320px; height: 72px;
+    margin: 0 auto;
+    padding: 8px 16px;
+    border: 1px solid var(--cizgi); border-radius: 12px;
+    background: #fff;
+}
+.sip-bk__cizim[hidden] { display: none; }
+.sip-bk__cizim svg { width: 100%; height: 100%; display: block; }
+.sip-bk__no-satir { margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.sip-bk__no {
+    font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, 'Roboto Mono', Consolas, monospace;
+    font-size: 20px; font-weight: 600; letter-spacing: 0.06em;
+    font-variant-numeric: tabular-nums slashed-zero;
+    color: var(--yazi);
+    overflow-wrap: anywhere;
+}
+.sip-bk__kopya {
+    height: 36px; padding: 0 12px;
+    display: inline-flex; align-items: center; gap: 4px;
+    border: 1px solid var(--cizgi); border-radius: 9px;
+    background: #fff; color: var(--yazi-orta);
+    font-size: 12px; font-weight: 700;
+}
+.sip-bk__kopya svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.sip-bk__kopya:hover { border-color: #bfd0f5; color: var(--mavi); }
+.sip-bk__kopya.is-tamam { border-color: var(--yesil-cizgi); background: var(--yesil-50); color: var(--yesil-koyu); }
+.sip-bk__tur { display: block; margin-top: 4px; font-size: 11px; font-weight: 600; color: var(--soluk); }
+
+.sip-bk__liste-kap { padding: 0 16px 16px; border-top: 1px solid var(--cizgi); }
+.sip-bk__liste-kap[hidden] { display: none; }
+.sip-bk__etiket { margin: 12px 0 8px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; color: var(--sonuk); text-transform: uppercase; }
+.sip-bk__etiket b { margin-left: 4px; color: var(--mavi); }
+.sip-bk__liste {
+    display: flex; flex-direction: column; gap: 4px;
+    max-height: min(36vh, 240px);
+    overflow-y: auto; overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+.sip-bk__satir {
+    min-height: 44px;
+    display: grid; grid-template-columns: 24px minmax(0, 1fr) auto 20px; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    border: 1px solid var(--cizgi); border-radius: 9px;
+    background: #fff;
+    text-align: left;
+}
+.sip-bk__satir:hover { border-color: #c2d3f7; }
+.sip-bk__satir.is-secili { border-color: var(--mavi); background: var(--mavi-50); }
+.sip-bk__sira {
+    width: 24px; height: 24px; border-radius: 999px;
+    display: grid; place-items: center;
+    background: var(--kagit); color: var(--sonuk);
+    font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.sip-bk__satir.is-secili .sip-bk__sira { background: var(--mavi); color: #fff; }
+.sip-bk__satir-kod {
+    min-width: 0;
+    font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, 'Roboto Mono', Consolas, monospace;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums slashed-zero;
+    color: var(--yazi);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sip-bk__satir-tur { font-size: 11px; font-weight: 600; color: var(--soluk); white-space: nowrap; }
+.sip-bk__tik { width: 18px; height: 18px; fill: none; stroke: var(--mavi); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.sip-bk__satir.is-secili .sip-bk__tik { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+    .sip-coklu-efekt.oyna { animation: none; opacity: 0.45; }
+    .sip-damga { animation: none; }
+    .sip-urun--tik::before { animation: none; opacity: 0; }
+}

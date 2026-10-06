@@ -99,10 +99,33 @@
             durum.surum = d.surum || null;
             durum.kimlik = d.kimlik || null;
             haberVer();
-            // Kurulu olduğunu yeni öğrendiysek hak listesini hemen gönder.
-            if (ilkKez) moduleriBildir();
+            /* Kurulu olduğunu yeni öğrendiysek hak listesini hemen gönder.
+               `JB_ASISTAN_YALNIZ_JETON` sayfaları (sayım, ajanda...) hak
+               listesine dokunmuyor: orada haklar geç yükleniyor, eksik bir
+               liste eklentideki modülleri kapatabilirdi. Yalnız jeton. */
+            if (ilkKez && !global.JB_ASISTAN_YALNIZ_JETON) moduleriBildir();
+            /* Eklenti her selam verdiğinde jetonu yeniden ver. Eklenti
+               güncellenip yeniden kurulunca kendi deposu sıfırlanıyor;
+               sayfa açık kalsa bile jeton ona yeniden ulaşmalı. */
+            else yetkiBildir();
         }
     });
+
+    /* JETON TAZELİĞİ
+       Site jetonu kendisi yeniliyor (js/auth-token.js). Eskiden eklentiye
+       yalnız sayfa açılışında veriliyordu; site günlerce açık kalınca
+       eklentideki kopyanın süresi doluyor ve depo panelinden gelen
+       siparişler hiçbir uyarı olmadan duruyordu. Artık jeton her
+       değiştiğinde, başka sekme değiştirdiğinde, sekmeye dönüldüğünde ve
+       on dakikada bir yeniden veriliyor. Mesaj küçük, maliyeti yok. */
+    global.addEventListener('jb:jeton-degisti', yetkiBildir);
+    global.addEventListener('storage', function (e) {
+        if (e && e.key === 'jb_token') yetkiBildir();
+    });
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') yetkiBildir();
+    });
+    setInterval(yetkiBildir, 10 * 60 * 1000);
 
     global.JetBarkodAsistan = {
         durum: durum,
