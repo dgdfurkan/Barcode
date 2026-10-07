@@ -2589,25 +2589,13 @@
         try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
     }
 
-    /* Geri düğmesi ve geri tuşu: panel sağa kayıp kapanıyor. */
-    var _kapanisSaati = null;
+    /* Geri düğmesi, Esc ve geri tuşu: kaydırarak kapatmanın aynısı.
+       Panel sağa kayıyor, arkadaki liste soldan gelip yerine oturuyor,
+       gölge sönüyor. Eskiden yalnız panel kayıyordu ve liste birden
+       beliriyordu; kaydırmayla aynı his yoktu. */
     function detayiKaydirarakKapat() {
-        var p = el('siparisDetay');
-        if (!p || azaltilmisHareket()) { detayiGercektenKapat(); return; }
-        var w = p.getBoundingClientRect().width || window.innerWidth;
-        p.style.transition = 'transform var(--motion-panel) var(--motion-ease-out)';
-        p.style.transform = 'translate3d(' + w + 'px,0,0)';
-        clearTimeout(_kapanisSaati);
-        _kapanisSaati = setTimeout(function () {
-            /* Aynı karede sınıf düşüyor ve satır içi stil siliniyor: panel
-               zaten ekran dışında, CSS'in kendi kapanış konumu da orası.
-               Ayrı karelerde yapılınca panel bir an geri gelip yeniden
-               kayıyordu. */
-            detayiGercektenKapat();
-            p.style.transition = 'none';
-            p.style.transform = '';
-            requestAnimationFrame(function () { p.style.transition = ''; });
-        }, 230);
+        if (azaltilmisHareket() || !global.JBSiparisKaydir) { detayiGercektenKapat(); return; }
+        global.JBSiparisKaydir.kapat(detayiGercektenKapat);
     }
 
     function detayiGercektenKapat() {
@@ -2766,7 +2754,29 @@
             golge.style.opacity = '';
         }
 
-        global.JBSiparisKaydir = { sifirla: function () { if (!d || !d.bitiyor) sifirla(); } };
+        global.JBSiparisKaydir = {
+            sifirla: function () { if (!d || !d.bitiyor) sifirla(); },
+            /* Düğmeyle kapanış: kaydırmanın son yarısını baştan sona oynat.
+               Zaten kapanıyorsa ikinci çağrı yok sayılıyor (Esc'ye iki kez
+               basmak animasyonu yarıda kesmesin). */
+            kapat: function (bitince) {
+                if (d && d.bitiyor) return;
+                var w = panel.getBoundingClientRect().width || window.innerWidth;
+                d = { bitiyor: true, yon: 'x', dx: 0, w: w, iz: [] };
+                golge.hidden = false;
+                panel.classList.add('sip-detay--suruk');
+                stilYaz(null, 0, w);
+                void panel.offsetWidth;            // başlangıç karesi otursun
+                var sure = 320;
+                stilYaz(sure + 'ms cubic-bezier(0.32, 0.72, 0, 1)', w, w);
+                bitisSaati = setTimeout(function () {
+                    /* Panel ekran dışındayken aynı karede kapanıyor ve
+                       stiller siliniyor: bir an geri görünme olmuyor. */
+                    bitince();
+                    sifirla();
+                }, sure + 16);
+            }
+        };
 
         function cerceve() {
             kare = 0;
