@@ -975,12 +975,17 @@
        aynı URL browser cache'ten anında paint edilir, harflerden
        fotoğrafa "zıplama" olmuyor. */
     var _fotoOnbellek = new Set();
+    /* Yüklenmiş fotoğraflar. Kart yeniden kurulsa bile (başka şeride
+       geçince) bu adreslerdeki fotoğraf görünür başlıyor; saydamdan
+       belirme geçişi tekrar oynamıyor, fotoğraf bir an kaybolmuyor. */
+    var _fotoYuklu = new Set();
     function fotoOnyukle(url) {
         if (!url || _fotoOnbellek.has(url)) return;
         _fotoOnbellek.add(url);
         var img = new Image();
         img.decoding = 'async';
         img.referrerPolicy = 'no-referrer';
+        img.onload = function () { _fotoYuklu.add(url); };
         img.src = url;
     }
 
@@ -993,7 +998,9 @@
            `yuklu` sınıfıyla belirir. Cache'ten geliyorsa yükleme
            anlıktır ve geçiş görülmez. */
         var fotoHtml = (varMi && foto)
-            ? '<img src="' + kacir(foto) + '" alt="" decoding="async" referrerpolicy="no-referrer" onload="this.classList.add(\'yuklu\')" onerror="this.remove()">'
+            ? '<img src="' + kacir(foto) + '" alt="" decoding="async" referrerpolicy="no-referrer"' +
+              (_fotoYuklu.has(foto) ? ' class="yuklu"' : ' onload="this.classList.add(\'yuklu\')"') +
+              ' onerror="this.remove()">'
             : '';
         var icerik = varMi
             ? (foto ? '' : '<b>' + kacir(bas) + '</b>')
@@ -1506,11 +1513,93 @@
             el(bosId).hidden = false;
         } else {
             el(bosId).hidden = true;
-            kutu.innerHTML = liste.map(function (s, idx) {
-                return kartCiz(s, kartYeni ? Math.min(idx, 12) : null);
-            }).join('');
+            seritiYamala(kutu, liste, kartYeni);
         }
         return liste;
+    }
+
+    /* KARTLAR YERİNDE GÜNCELLENİYOR
+       Eskiden her çizimde (her tikte, detaya girip çıkınca, her yoklamada)
+       şeridin bütün kartları silinip yeniden yazılıyordu. Kurye ve
+       toplayıcı fotoğrafları da yeniden yükleniyor, milisaniyelik bir an
+       kaybolup geri geliyordu; ekran bozuluyormuş gibi görünüyordu.
+
+       Şimdi kartlar sipariş kimliğiyle eşleniyor. Değişmeyen kart hiç
+       ellenmiyor. Değişende yalnız değişen parça değişiyor: ilerleme
+       çubuğu yerinde kayıyor, süre yazısı yerinde yazılıyor, kişi kısmı
+       ancak kişi gerçekten değiştiyse yenileniyor. Yeni gelen kart
+       belirme animasyonuyla giriyor, var olanlar bir daha oynamıyor. */
+    var _kartParcalari = new WeakMap();
+    var _kartSablonu = document.createElement('div');
+
+    function kartParcala(html) {
+        _kartSablonu.innerHTML = html;
+        var dugum = _kartSablonu.firstElementChild;
+        _kartSablonu.removeChild(dugum);
+        return {
+            dugum: dugum,
+            /* Karşılaştırmada fotoğrafın yüklenme izi (yuklu sınıfı, onload)
+               yok sayılıyor: yalnız fotoğraf yüklendi diye kişi kısmı
+               yeniden kurulmasın. */
+            parcalar: Array.prototype.map.call(dugum.children, function (c) {
+                return c.outerHTML.replace(/ class="yuklu"| onload="[^"]*"/g, '');
+            })
+        };
+    }
+
+    function kartYamala(eski, yeni) {
+        ['class', 'style', 'aria-label'].forEach(function (a) {
+            var v = yeni.dugum.getAttribute(a);
+            /* Belirme sınıfı ilk girişte kalsın; yeniden eklemek animasyonu
+               baştan oynatır, kaldırmak ise etkisiz. */
+            if (a === 'class' && eski.classList.contains('sip-kart--gir')) v = (v || '') + ' sip-kart--gir';
+            if (eski.getAttribute(a) !== v) {
+                if (v == null) eski.removeAttribute(a); else eski.setAttribute(a, v);
+            }
+        });
+        var eskiParcalar = _kartParcalari.get(eski) || [];
+        var yeniCocuklar = Array.prototype.slice.call(yeni.dugum.children);
+        yeniCocuklar.forEach(function (yc, i) {
+            if (eskiParcalar[i] === yeni.parcalar[i]) return;
+            var ec = eski.children[i];
+            if (!ec) { eski.appendChild(yc); return; }
+            if (ec.classList.contains('sip-kart__ilerleme') && yc.classList.contains('sip-kart__ilerleme')) {
+                // Çubuk yerinde kaysın: genişlik geçişi korunuyor
+                var ei = ec.querySelector('i'); var yi = yc.querySelector('i');
+                if (ei && yi) ei.style.width = yi.style.width;
+                var es = ec.querySelector('strong'); var ys = yc.querySelector('strong');
+                if (es && ys && es.innerHTML !== ys.innerHTML) es.innerHTML = ys.innerHTML;
+                return;
+            }
+            eski.replaceChild(yc, ec);
+        });
+        while (eski.children.length > yeniCocuklar.length) eski.removeChild(eski.lastElementChild);
+        _kartParcalari.set(eski, yeni.parcalar);
+    }
+
+    function seritiYamala(kutu, liste, kartYeni) {
+        var mevcut = new Map();
+        Array.prototype.slice.call(kutu.children).forEach(function (n) {
+            var id = n.getAttribute('data-siparis');
+            if (id && !mevcut.has(id)) mevcut.set(id, n);
+            else kutu.removeChild(n);   // iskelet ya da yinelenen düğüm
+        });
+        var onceki = null;
+        liste.forEach(function (s, idx) {
+            var n = mevcut.get(s.id);
+            if (n) {
+                mevcut.delete(s.id);
+                kartYamala(n, kartParcala(kartCiz(s, null)));
+            } else {
+                var p = kartParcala(kartCiz(s, kartYeni ? Math.min(idx, 12) : null));
+                n = p.dugum;
+                _kartParcalari.set(n, kartParcala(kartCiz(s, null)).parcalar);
+            }
+            var hedef = onceki ? onceki.nextSibling : kutu.firstChild;
+            if (n !== hedef) kutu.insertBefore(n, hedef);
+            onceki = n;
+        });
+        mevcut.forEach(function (n) { if (n.parentNode === kutu) kutu.removeChild(n); });
     }
 
     /**
@@ -1642,7 +1731,13 @@
         el('olcuParca').textContent = adetYaz(s.toplam_adet != null ? s.toplam_adet : urunler.length);
         el('olcuCesit').textContent = urunler.length;
         el('olcuPoset').innerHTML = (s.poset_sayisi != null ? s.poset_sayisi : '–');
-        el('detayKisiler').innerHTML = yanKisiler(s);
+        /* Görevliler yalnız değiştiyse yeniden yazılıyor; yoksa her tikte
+           fotoğraflar bir an kaybolup geri geliyordu. */
+        var kisilerHtml = yanKisiler(s);
+        if (kisilerHtml !== durum.kisilerHtml) {
+            durum.kisilerHtml = kisilerHtml;
+            el('detayKisiler').innerHTML = kisilerHtml;
+        }
         el('yanNot').textContent = s.eksik_urun_var
             ? 'Panelde eksik ürün işaretli. Bulamazsan panelden bildir.'
             : 'Toplama sırasına göre listelendi.';
