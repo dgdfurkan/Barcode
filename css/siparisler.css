@@ -2171,3 +2171,52 @@ button.sip-avatar:focus-visible { outline: 2px solid var(--mavi); outline-offset
     .sip-arac.donuyor svg { animation: none; }
     .sip-arac, .sip-arac:active svg { transition: none; transform: none; }
 }
+
+
+/* ==================================================================
+   Eşit boy: şerit başlıkları ve sipariş kartları
+   ------------------------------------------------------------------
+   Kart boyu içeriğe göre oynuyordu: toplayıcı ile kurye yan yana
+   sığmayınca alt satıra kayıyor, kimi kart iki kimi üç satır oluyordu;
+   banko numarası olmayan kartın üst satırı da kısaydı. Şerit başlığında
+   sayı, başlık sığmayınca alta iniyordu: "Hazırlanıyor"da altta,
+   "Yolda"da yanda. Hepsi yamuk görünüyordu.
+
+   Şimdi her parçanın sabit bir satırı var. Kişiler her zaman alt alta
+   iki satır (atanmamışsa boş ikonla), adlar tek satırda kesiliyor, üst
+   satırın boyu numaradan bağımsız. Başlıkta ad tek satırda kesiliyor;
+   sayı her genişlikte aynı yerde.
+   ================================================================== */
+.sip-serit__ust { height: 68px; min-height: 0; }
+.sip-serit__ust h2 { flex-wrap: nowrap; min-width: 0; }
+.sip-serit__ad {
+    min-width: 0;
+    font-style: normal;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sip-serit__ust h2 span { flex: none; }
+.sip-serit__ust p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sip-kart__ust { height: 28px; flex-wrap: nowrap; min-width: 0; }
+.sip-kart__numara { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sip-kart__sure { flex: none; }
+.sip-kart__kisiler {
+    flex-direction: column; align-items: stretch; flex-wrap: nowrap;
+    gap: 6px;
+}
+.sip-kart__kisi { width: 100%; height: 22px; overflow: hidden; }
+.sip-kart__ilerleme strong { white-space: nowrap; }
+
+@media (max-width: 900px) {
+    .sip-serit__ust { height: 60px; }
+}
+
+@media (max-width: 560px) {
+    /* Dar ekranda sayı her şeritte başlığın ALTINDA: üçü de aynı düzende */
+    .sip-serit__ust { height: 46px; }
+    .sip-serit__ust h2 { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; gap: 2px; }
+    .sip-serit__ust h2 span { margin-left: 0; }
+    .sip-kart__ust { height: 16px; }
+    .sip-kart__kisiler { gap: 4px; }
+    .sip-kart__kisi { height: 18px; }
+}
