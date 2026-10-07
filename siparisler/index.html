@@ -18,7 +18,7 @@
     <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
     <link rel="stylesheet" href="../css/motion.css?v=20260907a" />
-    <link rel="stylesheet" href="../css/siparisler.css?v=20261007b" />
+    <link rel="stylesheet" href="../css/siparisler.css?v=20261008a" />
     <link rel="stylesheet" href="../css/urun-foto.css?v=20261007a" />
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
@@ -195,7 +195,7 @@
                 <div class="sip-yol" id="altYol"><span></span></div>
                 <p><strong id="altAlinan">0</strong> / <span id="altToplam">0</span> ürün alındı</p>
             </div>
-            <button type="button" class="sip-bitir" id="detayBitir" disabled><span>Toplandı</span><svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-9"/></svg></button>
+            <button type="button" class="sip-bitir" id="detayBitir" data-hal="bos" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg><span>Bitir</span></button>
         </footer>
     </section>
 
@@ -213,10 +213,9 @@
             <div class="sip-bk__secili" id="kodSecili">
                 <div class="sip-bk__cizim" id="kodCizim"></div>
                 <div class="sip-bk__no-satir">
-                    <span class="sip-bk__no" id="kodNo"></span>
+                    <span class="sip-bk__tur" id="kodTur"></span>
                     <button type="button" class="sip-bk__kopya" id="kodKopya" data-kopyala=""><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="2"/><path d="M4 12V5a1 1 0 0 1 1-1h7"/></svg><span>Kopyala</span></button>
                 </div>
-                <span class="sip-bk__tur" id="kodTur"></span>
             </div>
             <div class="sip-bk__liste-kap" id="kodListeKap" hidden>
                 <p class="sip-bk__etiket">Tüm barkodlar <b id="kodSayi"></b></p>
@@ -245,43 +244,88 @@
     <!-- Ayarlar: cihaza özel -->
     <div class="sip-kat" id="siparisAyar" hidden>
         <div class="sip-kutu sip-ayar" role="dialog" aria-modal="true" aria-labelledby="ayarBaslik">
-            <div class="sip-kutu__ust">
-                <div><small>CİHAZA ÖZEL</small><h2 id="ayarBaslik">Sipariş ayarları</h2></div>
+            <div class="sip-ayar__bas">
+                <div>
+                    <h2 id="ayarBaslik">Sipariş ayarları</h2>
+                    <p>Yalnız bu cihazda geçerli. Telefondaki seçim bilgisayarı etkilemez.</p>
+                </div>
                 <button type="button" class="sip-kapat" id="ayarKapat" aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
             </div>
-            <p class="sip-ayar__not">Bu tercihler yalnızca kullandığın cihazda geçerli. Telefonundaki seçim bilgisayarınkini etkilemez.</p>
+            <div class="sip-ayar__sekmeler" id="ayarSekmeler" role="tablist" aria-label="Ayar bölümleri">
+                <button type="button" role="tab" data-ayar-sekme="siralama" aria-controls="ayarBolumSiralama">Sıralama</button>
+                <button type="button" role="tab" data-ayar-sekme="toplama" aria-controls="ayarBolumToplama">Toplama</button>
+                <button type="button" role="tab" data-ayar-sekme="kategoriler" aria-controls="ayarBolumKategoriler">Kategoriler</button>
+                <button type="button" role="tab" data-ayar-sekme="efektler" aria-controls="ayarBolumEfektler">Efektler</button>
+            </div>
+            <div class="sip-ayar__govde">
+                <section class="sip-ayar__bolum" data-ayar-bolum="siralama" id="ayarBolumSiralama" role="tabpanel" aria-label="Sıralama">
+                    <h3 class="sip-ayar__baslik">Şeritlerde sipariş sırası</h3>
+                    <p class="sip-ayar__aciklama">Ana ekrandaki her şerit hangi sırayla dizilsin. Şerit başlığındaki rozete dokunarak da değişir.</p>
+                    <div class="sip-ayar-liste" id="ayarSeritSira"></div>
+                    <div class="sip-ayar__sifirla" id="ayarSeritNot" hidden>
+                        <button type="button" class="sip-ayar-bag" id="ayarSeritSifirla">Varsayılana dön</button>
+                        <span>Hazırlanıyor: eski önce · Hazırlandı: yeni önce · Yolda: kurye</span>
+                    </div>
 
-            <fieldset>
-                <legend>Toplama sırası</legend>
-                <p class="sip-ayar__not">Bir siparişin İÇİNDEKİ ürünler hangi sırayla dizilsin. Depoda hangi rafa önce gittiğine göre ayarla.</p>
-                <div class="sip-sira" id="ayarSira"></div>
-            </fieldset>
+                    <h3 class="sip-ayar__baslik">“Kolay önce” ağırlık sırası</h3>
+                    <p class="sip-ayar__aciklama">Bir şerit “Kolay önce” sıralanınca kullanılır. Hafiften ağıra diz; kategorisiz sipariş hepsinden önce gelir.</p>
+                    <div class="sip-sira" id="ayarYukSira"></div>
+                </section>
 
-            <fieldset>
-                <legend>Sipariş öncelik sırası</legend>
-                <p class="sip-ayar__not">Şerit başlığında “Kolay önce” seçiliyken kullanılır. Hafiften ağıra diz: üstteki kategoriyi taşıyan sipariş önce gelir, kategorisiz sipariş hepsinden önce.</p>
-                <div class="sip-sira" id="ayarYukSira"></div>
-            </fieldset>
+                <section class="sip-ayar__bolum" data-ayar-bolum="toplama" id="ayarBolumToplama" role="tabpanel" aria-label="Toplama" hidden>
+                    <h3 class="sip-ayar__baslik">Ürünlerin toplama sırası</h3>
+                    <p class="sip-ayar__aciklama">Bir siparişin içindeki ürünler hangi sırayla dizilsin. Depoda hangi rafa önce gidiyorsan onu üste al.</p>
+                    <div class="sip-sira" id="ayarSira"></div>
+                </section>
 
-            <!--
-              Kategoriler. Hangi ürünün fırın, hangisinin dondurma ya da su
-              sayılacağı burada: her kategorinin kendi rengi ve anahtar
-              kelime listesi var, ikisi de düzenlenebiliyor. Kullanıcı
-              tamamen yeni bir kategori de açabiliyor; toplama sırasına
-              otomatik giriyor, oradan yerini değiştirebiliyor. Renk girdisi
-              Hızlı Bul eklentisindeki kategori renk seçimiyle aynı düzen.
-            -->
-            <fieldset>
-                <legend>Kategoriler</legend>
-                <p class="sip-ayar__not">Katalogdan ürün arayıp kategoriye ekle. Tek tek seçmenin uzun süreceği geniş gruplar için "anahtar kelimeler" bölümü var.</p>
-                <div class="sip-kategoriler" id="ayarKategoriler"></div>
-                <div class="sip-kategori-ekle">
-                    <input type="text" id="kategoriAdi" placeholder="Yeni kategori adı, örn. Temizlik" maxlength="24">
-                    <input type="color" id="kategoriRenk" value="#16a34a" aria-label="Yeni kategori rengi">
-                    <button type="button" id="kategoriEkle">Ekle</button>
-                </div>
-            </fieldset>
+                <!--
+                  Kategoriler. Hangi ürünün fırın, hangisinin dondurma ya da su
+                  sayılacağı burada: her kategorinin kendi rengi ve anahtar
+                  kelime listesi var. Kullanıcı yeni kategori de açabiliyor;
+                  toplama sırasına otomatik giriyor.
+                -->
+                <section class="sip-ayar__bolum" data-ayar-bolum="kategoriler" id="ayarBolumKategoriler" role="tabpanel" aria-label="Kategoriler" hidden>
+                    <h3 class="sip-ayar__baslik">Kategoriler</h3>
+                    <p class="sip-ayar__aciklama">Katalogdan ürün arayıp kategoriye ekle. Geniş gruplar için anahtar kelime kullan.</p>
+                    <div class="sip-kategoriler" id="ayarKategoriler"></div>
+                    <div class="sip-kategori-ekle">
+                        <input type="text" id="kategoriAdi" placeholder="Yeni kategori adı, örn. Temizlik" maxlength="24">
+                        <input type="color" id="kategoriRenk" value="#16a34a" aria-label="Yeni kategori rengi">
+                        <button type="button" id="kategoriEkle">Ekle</button>
+                    </div>
+                </section>
 
+                <section class="sip-ayar__bolum" data-ayar-bolum="efektler" id="ayarBolumEfektler" role="tabpanel" aria-label="Efektler" hidden>
+                    <h3 class="sip-ayar__baslik">Çoklu adet efekti</h3>
+                    <p class="sip-ayar__aciklama">2 ve üstü adetli ürün tiklenince ne olsun. Göz yorarsa yumuşat ya da yalnız sayıya geç.</p>
+                    <div class="sip-secenekler" id="ayarEfektMod" role="radiogroup" aria-label="Efekt türü">
+                        <label class="sip-secenek"><input type="radio" name="efektMod" value="tam"><span><b>Tam</b><small>Ekranın kenarı adet kadar parlar, ortada sayı çıkar</small></span></label>
+                        <label class="sip-secenek"><input type="radio" name="efektMod" value="sayi"><span><b>Yalnız sayı</b><small>Ortada “×3 ADET”, ekran kenarı sakin</small></span></label>
+                        <label class="sip-secenek"><input type="radio" name="efektMod" value="kapali"><span><b>Kapalı</b><small>Yalnız normal tik</small></span></label>
+                    </div>
+
+                    <div class="sip-kaydirici" id="ayarEfektGucSatir">
+                        <div class="sip-kaydirici__ust">
+                            <label for="ayarEfektGuc">Kenar ışığının sertliği</label>
+                            <output id="ayarEfektGucDeger" for="ayarEfektGuc">60</output>
+                        </div>
+                        <input type="range" id="ayarEfektGuc" min="0" max="100" step="5" value="60">
+                        <div class="sip-kaydirici__uclar"><span>Yumuşak</span><span>Sert</span></div>
+                    </div>
+
+                    <label class="sip-anahtar" id="ayarTitresimSatir">
+                        <span><b>Titreşim</b><small>Adet kadar kısa titreşim (Android)</small></span>
+                        <input type="checkbox" id="ayarTitresim" role="switch">
+                        <i aria-hidden="true"></i>
+                    </label>
+
+                    <div class="sip-dene" id="ayarEfektOnizleme">
+                        <span class="sip-adet sip-adet--coklu" data-adet="3">3</span>
+                        <span class="sip-dene__yazi">3 adetlik bir ürünle dene</span>
+                        <button type="button" id="ayarEfektDene">Dene</button>
+                    </div>
+                </section>
+            </div>
         </div>
     </div>
 
@@ -289,9 +333,9 @@
     <div class="sip-bildirim" id="siparisBildirim" role="status" aria-live="polite"><svg viewBox="0 0 20 20"><path d="m4 10 4 4 8-9"/></svg><span></span></div>
 
     <script src="../js/urun-foto.js?v=20261007a"></script>
-    <script src="../js/barkod-svg.js?v=20261007a"></script>
+    <script src="../js/barkod-svg.js?v=20261008a"></script>
     <script src="../js/siparis-sirala.js?v=20260908a"></script>
-    <script src="../js/siparisler.js?v=20261007b"></script>
+    <script src="../js/siparisler.js?v=20261008a"></script>
     <script>
         // Başlıktaki kullanıcı adı; diğer sayfalarla aynı davranış.
         (function () {

@@ -97,39 +97,98 @@
     function desen(kod) {
         var k = String(kod == null ? '' : kod).trim();
         if (!k) return null;
-        if (/^\d{12}$/.test(k) && gecerliEan('0' + k)) return { tur: 'UPC-A', bitler: ean13Desen('0' + k), sessiz: 9 };
-        if (/^\d{13}$/.test(k) && gecerliEan(k)) return { tur: 'EAN-13', bitler: ean13Desen(k), sessiz: 9 };
-        if (/^\d{8}$/.test(k) && gecerliEan(k)) return { tur: 'EAN-8', bitler: ean8Desen(k), sessiz: 7 };
+        if (/^\d{12}$/.test(k) && gecerliEan('0' + k)) return { tur: 'UPC-A', bitler: ean13Desen('0' + k), ean: '0' + k, metin: k };
+        if (/^\d{13}$/.test(k) && gecerliEan(k)) return { tur: 'EAN-13', bitler: ean13Desen(k), ean: k, metin: k };
+        if (/^\d{8}$/.test(k) && gecerliEan(k)) return { tur: 'EAN-8', bitler: ean8Desen(k), ean: k, metin: k };
         var c = code128Desen(k);
-        return c ? { tur: 'Code 128', bitler: c, sessiz: 10 } : null;
+        return c ? { tur: 'Code 128', bitler: c, metin: k } : null;
+    }
+
+    function kacir(t) {
+        return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    }
+
+    /* Kılavuz çubukları (başlangıç, orta, bitiş) gerçek etiketlerdeki gibi
+       rakamların arasına uzanıyor. Modül aralıkları standarttan. */
+    function kilavuzMu(tur, i) {
+        if (tur === 'EAN-13' || tur === 'UPC-A') return i < 3 || (i >= 45 && i < 50) || i >= 92;
+        if (tur === 'EAN-8') return i < 3 || (i >= 31 && i < 36) || i >= 64;
+        return false;
     }
 
     /**
+     * ÇİZİM NEDEN TAM PİKSEL
+     * Eski sürüm barkodu kutuya esnetiyordu (preserveAspectRatio="none").
+     * Bir modül 2,5 piksel gibi kesirli bir genişliğe düşünce ekran bazı
+     * çubukları 2, bazılarını 3 piksel çiziyordu: oranlar bozuluyor, barkod
+     * kırık görünüyor ve okuyucu okumuyordu. Artık her modül tam sayı
+     * piksel (sığan en büyük değer) ve SVG kendi boyunda, esnetilmiyor.
+     *
+     * Çubuklarda çizgi (stroke) asla olmamalı. Siparişler sayfasının ikon
+     * kuralı pencere içindeki her SVG'ye 1,8 piksel çizgi veriyordu; çubuklar
+     * kalınlaşıp aradaki boşlukları yiyordu. Gruplarda stroke="none" var.
+     *
      * @param {string} kod
-     * @param {{yukseklik?: number, etiket?: string}} [secenek]
-     * @returns {{svg: string, tur: string}|null}
+     * @param {{genislik?: number, cubuk?: number, etiket?: string}} [secenek]
+     *   genislik  Sığması gereken alan (px). Varsayılan 300.
+     *   cubuk     Veri çubuklarının boyu (px). Varsayılan 56.
+     * @returns {{svg: string, tur: string, genislik: number, yukseklik: number}|null}
      */
     function ciz(kod, secenek) {
+        secenek = secenek || {};
         var d = desen(kod);
         if (!d) return null;
-        var h = (secenek && secenek.yukseklik) || 56;
         var bit = d.bitler;
-        var genislik = bit.length + d.sessiz * 2;
+        var ean = !!d.ean;
+        var solSessiz = ean ? (d.tur === 'EAN-8' ? 7 : 11) : 10;
+        var sagSessiz = ean ? 7 : 10;
+        var modulSayisi = solSessiz + bit.length + sagSessiz;
+        var alan = Math.max(120, secenek.genislik || 300);
+        var px = Math.max(1, Math.min(4, Math.floor(alan / modulSayisi)));
+        var cubuk = secenek.cubuk || 56;
+        var uzama = ean ? Math.round(px * 3.5) : 0;
+        var yaziBoy = px >= 2 ? 15 : 12;
+        var yaziUst = cubuk + (ean ? 3 : 6);
+        var W = modulSayisi * px;
+        var H = yaziUst + yaziBoy + 2;
+
         var cubuklar = '';
         var i = 0;
         while (i < bit.length) {
             if (bit[i] !== '1') { i++; continue; }
             var bas = i;
-            while (i < bit.length && bit[i] === '1') i++;
-            cubuklar += '<rect x="' + (bas + d.sessiz) + '" y="0" width="' + (i - bas) + '" height="' + h + '"/>';
+            var uzun = kilavuzMu(d.tur, i);
+            while (i < bit.length && bit[i] === '1' && kilavuzMu(d.tur, i) === uzun) i++;
+            cubuklar += '<rect x="' + ((bas + solSessiz) * px) + '" y="0" width="' + ((i - bas) * px) +
+                '" height="' + (cubuk + (uzun ? uzama : 0)) + '"/>';
         }
-        var etiket = (secenek && secenek.etiket) || (d.tur + ' barkodu');
-        var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + genislik + ' ' + h + '"' +
-            ' preserveAspectRatio="none" shape-rendering="crispEdges" role="img" aria-label="' +
-            etiket.replace(/"/g, '&quot;').replace(/</g, '&lt;') + '">' +
-            '<rect width="' + genislik + '" height="' + h + '" fill="#fff"/>' +
-            '<g fill="#111827">' + cubuklar + '</g></svg>';
-        return { svg: svg, tur: d.tur };
+
+        var yazi = '';
+        var y = yaziUst + yaziBoy - 3;
+        var font = ' font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="' +
+            yaziBoy + '" font-weight="600" fill="#111827" text-anchor="middle"';
+        var hane = function (karakter, modulMerkez) {
+            return '<text x="' + Math.round((modulMerkez + solSessiz) * px) + '" y="' + y + '"' + font + '>' + karakter + '</text>';
+        };
+        if (d.tur === 'EAN-13' || d.tur === 'UPC-A') {
+            var e = d.ean;
+            yazi += '<text x="' + Math.round((solSessiz - 4) * px) + '" y="' + y + '"' + font + '>' + e[0] + '</text>';
+            for (var a = 1; a <= 6; a++) yazi += hane(e[a], 3 + 7 * (a - 1) + 3.5);
+            for (var b = 7; b <= 12; b++) yazi += hane(e[b], 50 + 7 * (b - 7) + 3.5);
+        } else if (d.tur === 'EAN-8') {
+            for (var c1 = 0; c1 < 4; c1++) yazi += hane(d.ean[c1], 3 + 7 * c1 + 3.5);
+            for (var c2 = 4; c2 < 8; c2++) yazi += hane(d.ean[c2], 36 + 7 * (c2 - 4) + 3.5);
+        } else {
+            yazi += '<text x="' + Math.round(W / 2) + '" y="' + y + '"' + font + '>' + kacir(d.metin) + '</text>';
+        }
+
+        var etiket = secenek.etiket || (d.tur + ' barkodu ' + d.metin);
+        var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H +
+            '" viewBox="0 0 ' + W + ' ' + H + '" shape-rendering="crispEdges" role="img" aria-label="' + kacir(etiket) + '">' +
+            '<rect width="' + W + '" height="' + H + '" fill="#fff" stroke="none"/>' +
+            '<g fill="#111827" stroke="none">' + cubuklar + '</g>' +
+            '<g shape-rendering="auto" stroke="none">' + yazi + '</g></svg>';
+        return { svg: svg, tur: d.tur, genislik: W, yukseklik: H };
     }
 
     global.JBBarkodSvg = { ciz: ciz, desen: desen, gecerliEan: gecerliEan };
