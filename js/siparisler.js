@@ -989,11 +989,8 @@
         var icerik = varMi
             ? (foto ? '' : '<b>' + kacir(bas) + '</b>')
             : (kurye ? BOS_ICON_KURYE : BOS_ICON_TOPLAYICI);
-        var fotoli = varMi && foto;
         return '<span class="sip-kart__kisi' + (kurye ? ' sip-kart__kisi--kurye' : '') +
-                    (varMi ? '' : ' sip-kart__kisi--bos') + (fotoli ? ' sip-kart__kisi--foto' : '') + '"' +
-                    (fotoli ? ' data-kisi-foto="' + kacir(foto) + '" data-kisi-ad="' + kacir(ad) +
-                        '" data-kisi-rol="' + (kurye ? 'Kurye' : 'Toplayıcı') + '" title="Fotoğrafı büyüt"' : '') + '>' +
+                    (varMi ? '' : ' sip-kart__kisi--bos') + '">' +
             '<span class="sip-kart__bas" style="background:' + renk + '">' +
                 fotoHtml + icerik +
             '</span>' +
@@ -2660,15 +2657,8 @@
 
         kaydirarakGeriKur();
 
-        /* Kişi fotoğrafı: kartta ve detayda. Kartın kendisi siparişi
-           açıyor; fotoğraflı kişiye dokunmak onun yerine fotoğrafı açıyor. */
-        el('siparisAkis').addEventListener('click', function (e) {
-            var kf = e.target.closest('[data-kisi-foto]');
-            if (!kf) return;
-            e.stopPropagation();
-            e.preventDefault();
-            kisiFotoAc(kf);
-        }, true);
+        /* Kişi fotoğrafı yalnız sipariş detayında büyüyor. Ana ekrandaki
+           kartın her yeri siparişi açıyor; kişiye dokunmak da öyle. */
         el('detayKisiler').addEventListener('click', function (e) {
             var kf = e.target.closest('[data-kisi-foto]');
             if (kf) kisiFotoAc(kf);

@@ -1770,8 +1770,6 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 .sip-detay--suruk { box-shadow: -16px 0 40px rgba(16, 24, 40, 0.22); will-change: transform; }
 
 /* ---- Kişi fotoğrafı ---- */
-.sip-kart__kisi--foto { cursor: zoom-in; }
-.sip-kart__kisi--foto .sip-kart__bas { box-shadow: 0 0 0 2px #fff, 0 0 0 3px var(--cizgi-sert); }
 button.sip-avatar { padding: 0; border: 0; cursor: zoom-in; font: inherit; }
 button.sip-avatar:focus-visible { outline: 2px solid var(--mavi); outline-offset: 2px; }
 
