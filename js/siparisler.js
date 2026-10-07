@@ -2501,7 +2501,11 @@
     function kapananSayiTazele() {
         var d = el('kapananSayi');
         if (!d) return;
-        var yeni = String(kapananlar().length);
+        var n = kapananlar().length;
+        var yeni = String(n);
+        /* Sıfırken rozet yok: "0" yazan bir rozet bilgi değil gürültü. */
+        d.hidden = n === 0;
+        el('kapananlarAc').setAttribute('aria-label', n ? 'Kapananlar, ' + n + ' sipariş' : 'Kapananlar');
         if (d.textContent === yeni) return;
         d.textContent = yeni;
         /* Değişimi tek seferlik bir vurguyla bildiriyoruz. Sınıf önce
@@ -2866,12 +2870,21 @@
             if (baslik) siraDegistir(baslik);
         });
 
+        /* Yenile: çekim sürdükçe ikon döner, bitince durur (en az bir tur,
+           yoksa hızlı yanıtta göz hareketi yakalayamıyor). */
         el('siparisYenile').addEventListener('click', function () {
             var d = el('siparisYenile');
-            d.classList.remove('donuyor');
-            void d.offsetWidth;
+            if (d.classList.contains('donuyor')) return;
             d.classList.add('donuyor');
-            tazele(true);
+            d.setAttribute('aria-busy', 'true');
+            var bas = Date.now();
+            sonTamCekim = 0;
+            tazele(true).then(function () {
+                setTimeout(function () {
+                    d.classList.remove('donuyor');
+                    d.removeAttribute('aria-busy');
+                }, Math.max(0, 600 - (Date.now() - bas)));
+            });
         });
 
         /* Doğrudan `detayiKapat` bağlanamaz: dinleyici event nesnesini

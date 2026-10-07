@@ -2101,3 +2101,73 @@ button.sip-avatar:focus-visible { outline: 2px solid var(--mavi); outline-offset
     .sip-ayar__sekmeler button, .sip-anahtar i, .sip-anahtar i::after,
     .sip-ayar .sip-secenek input[type="radio"] + span::before { transition: none; }
 }
+
+
+/* ==================================================================
+   Başlık araçları: tek grup
+   ------------------------------------------------------------------
+   Üç ayrı gölgeli kutu yerine tek çerçeveli grup, aralarında ince
+   ayraç. Hover'da zıplama yok; zemin hafifçe koyulaşıyor. Kapananlar
+   sayısı yalnız sıfırdan büyükken görünüyor. Telefonda yalnız ikonlar,
+   sayı ikonun köşesinde.
+   ================================================================== */
+.sip-baslik__eylem { display: flex; align-items: center; }
+.sip-arac-grup {
+    display: inline-flex; align-items: stretch;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--cizgi-sert);
+    border-radius: 12px;
+    background: var(--yuzey);
+    box-shadow: var(--golge-s);
+    overflow: hidden;
+}
+.sip-arac {
+    position: relative;
+    min-width: 44px; height: 100%;
+    padding: 0 16px;
+    border: 0;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    background: transparent;
+    color: var(--yazi-orta);
+    font-size: 13px; font-weight: 600;
+    white-space: nowrap;
+    transition: background-color var(--motion-micro) var(--motion-ease-standard),
+                color var(--motion-micro) var(--motion-ease-standard);
+}
+.sip-arac + .sip-arac { box-shadow: inset 1px 0 0 var(--cizgi); }
+.sip-arac svg { width: 18px; height: 18px; flex: none; }
+.sip-arac:hover { background: var(--kagit); color: var(--yazi); }
+.sip-arac:active svg { transform: scale(0.92); }
+.sip-arac:focus-visible { outline: 2px solid var(--mavi); outline-offset: -2px; border-radius: 12px; }
+.sip-arac--ikon { width: 44px; padding: 0; }
+.sip-arac__sayi {
+    min-width: 20px; height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    display: inline-grid; place-items: center;
+    background: var(--mavi); color: #fff;
+    font-size: 11px; font-weight: 700; line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+.sip-arac__sayi[hidden] { display: none; }
+.sip-arac__sayi.sip-sayi--degisti { animation: sip-sayi-vurgu var(--motion-normal) var(--motion-ease-out); }
+.sip-arac.donuyor svg { animation: sip-don 700ms linear infinite; }
+.sip-arac.donuyor { color: var(--mavi); }
+
+@media (max-width: 900px) {
+    .sip-baslik { align-items: flex-end; }
+    .sip-arac { width: 44px; padding: 0; }
+    .sip-arac__ad { display: none; }
+    .sip-arac__sayi {
+        position: absolute; top: 6px; right: 5px;
+        min-width: 16px; height: 16px; padding: 0 4px;
+        font-size: 10px;
+        box-shadow: 0 0 0 2px var(--yuzey);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sip-arac.donuyor svg { animation: none; }
+    .sip-arac, .sip-arac:active svg { transition: none; transform: none; }
+}
