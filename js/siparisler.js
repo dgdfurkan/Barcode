@@ -2637,6 +2637,36 @@
             if (yan) yan.scrollTop = 0;
         }
         var govde = el('detayGovde'); if (govde) govde.scrollTop = 0;
+        if (durum.secili && durum.odak) odagaKaydir();
+    }
+
+    /* ODAK MODU
+       Siparişleri peş peşe toplayan depocu her siparişte künyeyi geçip
+       ürünlere inmek için kaydırıyordu. Odak açıkken detay doğrudan
+       "Toplama sırası / Ürünler" başlığından başlıyor; künye yukarıda,
+       istenirse yukarı kaydırınca görünüyor. Kapalıyken her şey eskisi
+       gibi en üstten başlıyor. Tercih bu cihazda saklanıyor.
+
+       Yalnız telefonda iş görüyor: masaüstünde künye yanda ve ürünler
+       zaten ilk bakışta görünüyor, orada kaydırılacak bir şey yok. */
+    function odagaKaydir() {
+        var detay = el('siparisDetay');
+        var kap = detay && detay.querySelector('.sip-detay__yerlesim');
+        var hedef = detay && detay.querySelector('.sip-calisma');
+        if (!kap || !hedef) return;
+        if (kap.scrollHeight <= kap.clientHeight + 1) return;
+        var fark = hedef.getBoundingClientRect().top - kap.getBoundingClientRect().top;
+        kap.scrollTop = Math.max(0, kap.scrollTop + fark - 8);
+    }
+
+    function odakDugmesiniYaz() {
+        var d = el('odakModu');
+        if (!d) return;
+        d.setAttribute('aria-pressed', durum.odak ? 'true' : 'false');
+        d.classList.toggle('is-acik', !!durum.odak);
+        d.title = durum.odak
+            ? 'Odak açık: siparişe girince ürünlerden başlıyor. Kapatmak için dokun.'
+            : 'Odak modu: siparişe girince ürünlerden başla';
     }
 
     var BANT_HARITA = {
@@ -2923,10 +2953,17 @@
             var ad = e.target.closest('[data-barkod]');
             if (ad) { var u2 = urunBul(Number(ad.getAttribute('data-barkod'))); if (u2) kodlariAc(u2); return; }
 
-            /* İşaretleme yalnız yuvarlak düğmeden. Barkodu okumak için ada
-               dokunan depocu ürünü yanlışlıkla alınmış işaretlemesin. */
+            /* İşaretleme tik düğmesinden ve hemen yanındaki adet kutusundan.
+               Ada dokunmak barkodu açıyor; depocu barkoda bakarken ürünü
+               yanlışlıkla alınmış işaretlemesin. */
             var al = e.target.closest('[data-isaretle]');
-            if (!al) return;
+            if (!al) {
+                var adet = e.target.closest('.sip-adet');
+                var satir = adet && adet.closest('.sip-urun[data-sira]');
+                if (!satir) return;
+                al = satir.querySelector('[data-isaretle]');
+                if (!al) return;
+            }
             var u3 = urunBul(Number(al.getAttribute('data-isaretle')));
             if (u3) urunIsaretle(durum.secili, u3, !u3.alindi);
         });
@@ -3020,6 +3057,13 @@
         });
 
         el('siparisAyarAc').addEventListener('click', ayarAc);
+
+        el('odakModu').addEventListener('click', function () {
+            durum.odak = !durum.odak;
+            ayarYaz({ odak: durum.odak });
+            odakDugmesiniYaz();
+            bildir(durum.odak ? 'Odak açık: siparişler ürünlerden başlayacak' : 'Odak kapalı');
+        });
 
         // ---- Ayar sekmeleri ----
         el('ayarSekmeler').addEventListener('click', function (e) {
@@ -3227,6 +3271,8 @@
 
         var ayar = ayarOku();
         if (['liste', 'ikili', 'uclu', 'dortlu'].indexOf(ayar.detayGorunum) !== -1) durum.detayGorunum = ayar.detayGorunum;
+        durum.odak = ayar.odak === true;
+        odakDugmesiniYaz();
         durum.seritSira = Object.assign({}, SERIT_VARSAYILAN);
         if (ayar.seritSira && typeof ayar.seritSira === 'object') {
             Object.keys(SERIT_VARSAYILAN).forEach(function (b) {

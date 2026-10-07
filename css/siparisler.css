@@ -2220,3 +2220,43 @@ button.sip-avatar:focus-visible { outline: 2px solid var(--mavi); outline-offset
     .sip-kart__kisiler { gap: 4px; }
     .sip-kart__kisi { height: 18px; }
 }
+
+
+/* Adet kutusuna dokunmak da tikliyor */
+.sip-urun .sip-adet { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+/* ---- Odak modu düğmesi ----
+   Kapalıyken diğer üst bağlantılar gibi sakin; açıkken dolu mavi, göz
+   ilk bakışta açık olduğunu görüyor. Durum yalnız renkle değil, ikonun
+   ortası da dolarak anlatılıyor. */
+.sip-odak {
+    position: relative;
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--cizgi);
+    border-radius: 12px;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--kagit);
+    color: var(--yazi-orta);
+    font: inherit; font-size: 13px; font-weight: 700;
+    cursor: pointer;
+    transition: background-color var(--motion-micro) var(--motion-ease-standard),
+                border-color var(--motion-micro) var(--motion-ease-standard),
+                color var(--motion-micro) var(--motion-ease-standard);
+}
+.sip-odak svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.sip-odak svg circle:last-of-type { fill: transparent; transition: fill var(--motion-micro) var(--motion-ease-standard); }
+.sip-odak:hover { border-color: var(--soluk); background: var(--yuzey); color: var(--mavi); }
+.sip-odak:focus-visible { outline: 2px solid var(--mavi); outline-offset: 2px; }
+.sip-odak.is-acik { border-color: var(--mavi); background: var(--mavi); color: #fff; }
+.sip-odak.is-acik:hover { border-color: var(--mavi-koyu); background: var(--mavi-koyu); color: #fff; }
+.sip-odak.is-acik svg circle:last-of-type { fill: currentColor; }
+
+@media (max-width: 900px) {
+    .sip-odak { width: 44px; padding: 0; justify-content: center; }
+    .sip-odak span { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sip-odak, .sip-odak svg circle { transition: none; }
+}
