@@ -2260,3 +2260,72 @@ button.sip-avatar:focus-visible { outline: 2px solid var(--mavi); outline-offset
 @media (prefers-reduced-motion: reduce) {
     .sip-odak, .sip-odak svg circle { transition: none; }
 }
+
+
+/* ==================================================================
+   Boş şerit kutusu ve dar ekran başlığı
+   ------------------------------------------------------------------
+   1. "Sipariş yok" kutusu `display: grid` taşıdığı için `hidden`
+      özniteliğini eziyordu: şeritte sipariş varken bile altında
+      "Yolda sipariş yok" duruyordu.
+   2. Boş kutu en az 130 piksel, kart ise daha kısaydı; şeritler
+      yamuk görünüyordu. Artık kart ile boş kutu aynı değişkenden boy
+      alıyor (--kart-boy), ikisi her genişlikte birebir aynı.
+   3. Dar ekranda başlık, sıralama düğmesi yüzünden "Hazırlanı…" diye
+      kesiliyordu. Orada şerit ikonu gizleniyor, sıralama düğmesi sayının
+      satırına iniyor; başlık tam genişliği kullanıyor. Başlığın tamamı
+      zaten dokunulabilir (sıralamayı değiştiriyor).
+   ================================================================== */
+.sip-akis { --kart-boy: 208px; }
+.sip-kart { height: var(--kart-boy); min-height: 0; }
+.sip-serit__bos { min-height: 0; height: var(--kart-boy); padding: 12px; }
+.sip-serit__bos[hidden] { display: none; }
+
+@media (max-width: 560px) {
+    .sip-akis { --kart-boy: 100px; }
+    .sip-serit__bos { padding: 8px; font-size: 11px; line-height: 1.35; border-radius: 9px; }
+
+    .sip-serit__ust { position: sticky; display: block; height: 52px; padding: 7px 8px; }
+    .sip-serit__ikon { display: none; }
+    .sip-serit__ust > div { width: 100%; }
+    .sip-serit__ust h2 { font-size: 12px; gap: 4px; }
+    .sip-serit__ust h2 span { height: 20px; min-width: 20px; font-size: 11px; }
+    .sip-sira-rozet {
+        position: absolute; right: 6px; bottom: 6px;
+        width: 24px; height: 24px; padding: 0;
+        justify-content: center;
+    }
+    .sip-sira-rozet svg { width: 13px; height: 13px; }
+}
+
+/* 561-900 px: üç şerit yan yana, sıralama rozetinin yazısı başlığı
+   kesiyordu. Rozet orada da yalnız ikon; hangi sıralamanın seçili
+   olduğu ikondan ve rozetin title'ından okunuyor. */
+@media (min-width: 561px) and (max-width: 900px) {
+    .sip-sira-rozet { width: 32px; padding: 0; justify-content: center; gap: 0; }
+    .sip-sira-rozet b { display: none; }
+}
+
+/* 561-700 px de şeritler dar: başlık düzeni telefondakiyle aynı yapıda
+   (ikon gizli, sayı başlığın altında, sıralama düğmesi sayının
+   satırında), yalnız yazılar büyük. Telefon ölçüleri hemen aşağıda
+   yeniden veriliyor; sıra önemli, sonraki kural kazanıyor. */
+@media (max-width: 800px) {
+    .sip-serit__ust { display: block; height: 62px; padding: 8px 10px; }
+    .sip-serit__ikon { display: none; }
+    .sip-serit__ust > div { width: 100%; }
+    .sip-serit__ust p { display: none; }
+    .sip-serit__ust h2 { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; gap: 4px; }
+    .sip-serit__ust h2 span { margin-left: 0; }
+    .sip-sira-rozet {
+        position: absolute; right: 8px; bottom: 8px;
+        width: 28px; height: 28px; padding: 0;
+        justify-content: center; gap: 0;
+    }
+    .sip-sira-rozet b { display: none; }
+}
+@media (max-width: 560px) {
+    .sip-serit__ust { height: 52px; padding: 7px 8px; }
+    .sip-serit__ust h2 { font-size: 12px; gap: 4px; }
+    .sip-sira-rozet { right: 6px; bottom: 6px; width: 24px; height: 24px; }
+}
