@@ -2,14 +2,16 @@
  * Sayım raporu: uçlar ve arka plan işçisi
  *
  * AKIŞ
- * 1. Tarayıcı POST /api/rapor/sayim ile isteği bırakır. Sunucu hız
- *    sınırını kontrol edip satırı kuyruğa yazar ve hemen 202 döner.
+ * 1. Tarayıcı POST /api/rapor/sayim ile isteği ve seçilen ayarı (şablon,
+ *    bölümler, biçim) bırakır. Sunucu hız sınırını kontrol edip satırı
+ *    kuyruğa yazar, ayarı kullanıcının tercihi olarak saklar, hemen 202 döner.
  * 2. İşçi kuyruğu sırayla işler: sayım satırlarını veritabanından okur,
- *    hesaplar, PDF'i bellekte üretir, Telegram'a gönderir. Kullanıcı
- *    sayfayı kapatsa da iş biter; servis yeniden başlarsa yarım kalan
- *    iş kuyruktan devam eder.
- * 3. PDF diske yazılmaz. Telegram'ın verdiği dosya kimliği saklanır,
- *    "Tekrar gönder" PDF'i yeniden üretmeden o kimlikle gönderir.
+ *    hesaplar, istenen biçimde (PDF, kare kart ya da ikisi) bellekte üretir,
+ *    Telegram'a gönderir. Kullanıcı sayfayı kapatsa da iş biter; servis
+ *    yeniden başlarsa yarım kalan iş kuyruktan devam eder. Kart gittikten
+ *    sonra PDF'te geçici hata olursa yeniden denemede kart tekrar gitmez.
+ * 3. Dosyalar diske yazılmaz. Telegram'ın verdiği dosya kimlikleri
+ *    saklanır, "Tekrar gönder" yeniden üretmeden o kimliklerle gönderir.
  *
  * KÖTÜYE KULLANIM SINIRLARI (kullanıcı başına, veritabanında; servis
  * yeniden başlasa da sıfırlanmaz)
@@ -23,8 +25,11 @@
 
 const telegram = require('./telegram');
 const katalog = require('./katalog');
+const gorsel = require('./gorsel');
 const { raporHesapla } = require('./hesap');
-const { pdfUret, tabloAdi, tl, adet } = require('./pdf');
+const { ayarDuzelt, pdfVar, kartVar } = require('./ayar');
+const { pdfUret, gorselGerekenler, tabloAdi, tl, adet } = require('./pdf');
+const { kartUret, kartGorselleri } = require('./kart');
 
 const SINIR = {
     araSn: 60,
@@ -88,18 +93,36 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         return r.rows[0] || null;
     }
 
+    async function tercihOku(username) {
+        try {
+            const r = await pool.query('SELECT ayar FROM rapor.tercihler WHERE username = $1', [username]);
+            return r.rows[0] ? ayarDuzelt(r.rows[0].ayar) : null;
+        } catch (e) {
+            return null; // tablo henüz yoksa varsayılanla devam
+        }
+    }
+
+    async function tercihYaz(username, ayar) {
+        await pool.query(
+            `INSERT INTO rapor.tercihler (username, ayar, guncellendi) VALUES ($1, $2, now())
+             ON CONFLICT (username) DO UPDATE SET ayar = EXCLUDED.ayar, guncellendi = now()`,
+            [username, ayar]
+        );
+    }
+
     // -----------------------------------------------------------------
-    // Durum ve bağlantı
+    // Durum, bağlantı, tercih
     // -----------------------------------------------------------------
     app.get('/api/rapor/durum', uye, async (req, res) => {
         try {
-            const [b, s] = await Promise.all([
+            const [b, s, tercih] = await Promise.all([
                 baglantiOku(req.auth.username),
                 pool.query(
                     `SELECT max(istendi_at) AS son FROM rapor.sayim_raporlari
                      WHERE username = $1 AND istendi_at > now() - interval '1 day'`,
                     [req.auth.username]
                 ),
+                tercihOku(req.auth.username),
             ]);
             const son = s.rows[0]?.son ? new Date(s.rows[0].son).getTime() : 0;
             const kalanSn = Math.max(0, Math.ceil((son + SINIR.araSn * 1000 - Date.now()) / 1000));
@@ -107,18 +130,24 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 ok: true,
                 bot: telegram.botBilgisi(),
                 baglanti: b
-                    ? {
-                          id: String(b.chat_id),
-                          ad: b.tg_ad || '',
-                          kullaniciAdi: b.tg_kullanici_adi || '',
-                          durum: b.durum,
-                          baglandi: b.baglandi_at,
-                      }
+                    ? { id: String(b.chat_id), ad: b.tg_ad || '', kullaniciAdi: b.tg_kullanici_adi || '', durum: b.durum, baglandi: b.baglandi_at }
                     : null,
+                tercih,
                 sinir: { araSn: SINIR.araSn, kalanSn },
             });
         } catch (e) {
             console.error('rapor durum:', e.message);
+            return res.status(500).json({ ok: false, error: 'server_error' });
+        }
+    });
+
+    app.put('/api/rapor/tercih', uye, async (req, res) => {
+        try {
+            const ayar = ayarDuzelt(req.body?.ayar);
+            await tercihYaz(req.auth.username, ayar);
+            return res.json({ ok: true, tercih: ayar });
+        } catch (e) {
+            console.error('rapor tercih:', e.message);
             return res.status(500).json({ ok: false, error: 'server_error' });
         }
     });
@@ -202,10 +231,10 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 return red;
             }
             const r = await istemci.query(
-                `INSERT INTO rapor.sayim_raporlari (username, tablo, yedek_fiyat, tg_dosya_id, ozet, sayfa, boyut)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                `INSERT INTO rapor.sayim_raporlari (username, tablo, yedek_fiyat, ayar, kaynak, ozet, sayfa, boyut)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                  RETURNING id, no`,
-                [username, alanlar.tablo, alanlar.yedekFiyat || null, alanlar.dosyaId || null,
+                [username, alanlar.tablo, alanlar.yedekFiyat || null, alanlar.ayar || null, alanlar.kaynak || null,
                     alanlar.ozet || null, alanlar.sayfa || null, alanlar.boyut || null]
             );
             await istemci.query('COMMIT');
@@ -229,6 +258,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     app.post('/api/rapor/sayim', uye, async (req, res) => {
         const tablo = String(req.body?.tablo || '').trim();
         if (!tablo || tablo.length > 200) return res.status(400).json({ ok: false, error: 'tablo_gecersiz' });
+        const ayar = ayarDuzelt(req.body?.ayar);
         try {
             const engel = await gonderilebilirMi(req.auth.username);
             if (engel) return res.status(engel.kod).json(engel.govde);
@@ -238,8 +268,11 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             );
             if (Number(v.rows[0].n) === 0) return res.status(404).json({ ok: false, error: 'tablo_bos' });
             if (Number(v.rows[0].sayilan) === 0) return res.status(409).json({ ok: false, error: 'sayim_yok' });
-            const sonuc = await kuyrugaYaz(req.auth.username, { tablo, yedekFiyat: yedekFiyatDogrula(req.body?.fiyatlar) });
-            if (sonuc.kod === 202) setImmediate(isciyiDurt);
+            const sonuc = await kuyrugaYaz(req.auth.username, { tablo, ayar, yedekFiyat: yedekFiyatDogrula(req.body?.fiyatlar) });
+            if (sonuc.kod === 202) {
+                setImmediate(isciyiDurt);
+                tercihYaz(req.auth.username, ayar).catch((e) => console.warn('rapor tercih yazilamadi:', e.message));
+            }
             return res.status(sonuc.kod).json(sonuc.govde);
         } catch (e) {
             console.error('rapor istegi:', e.message);
@@ -250,8 +283,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     app.get('/api/rapor/gecmis', uye, async (req, res) => {
         try {
             const r = await pool.query(
-                `SELECT id, no, tablo, durum, hata, ozet, sayfa, istendi_at, gonderildi_at,
-                        (tg_dosya_id IS NOT NULL) AS tekrar_olur
+                `SELECT id, no, tablo, durum, hata, ozet, sayfa, ayar, istendi_at, gonderildi_at,
+                        (tg_dosya_id IS NOT NULL OR tg_kart_id IS NOT NULL) AS tekrar_olur
                  FROM rapor.sayim_raporlari
                  WHERE username = $1
                  ORDER BY istendi_at DESC
@@ -260,21 +293,26 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             );
             return res.json({
                 ok: true,
-                liste: r.rows.map((x) => ({
-                    id: x.id,
-                    no: Number(x.no),
-                    tablo: x.tablo,
-                    tabloAd: tabloAdi(x.tablo),
-                    durum: x.durum,
-                    hata: x.hata || '',
-                    ozet: x.ozet
-                        ? { net: x.ozet.net, sayilan: x.ozet.sayilan, urun: x.ozet.urun, eksik: x.ozet.eksik?.urun, fazla: x.ozet.fazla?.urun }
-                        : null,
-                    sayfa: x.sayfa,
-                    istendi: x.istendi_at,
-                    gonderildi: x.gonderildi_at,
-                    tekrar: x.durum === 'gonderildi' && x.tekrar_olur,
-                })),
+                liste: r.rows.map((x) => {
+                    const a = x.ayar ? ayarDuzelt(x.ayar) : null;
+                    return {
+                        id: x.id,
+                        no: Number(x.no),
+                        tablo: x.tablo,
+                        tabloAd: tabloAdi(x.tablo),
+                        durum: x.durum,
+                        hata: x.hata || '',
+                        bicim: a ? a.bicim : 'pdf',
+                        sablon: a ? a.sablon : '',
+                        ozet: x.ozet
+                            ? { net: x.ozet.net, sayilan: x.ozet.sayilan, urun: x.ozet.urun, eksik: x.ozet.eksik?.urun, fazla: x.ozet.fazla?.urun, fiyatli: a ? a.fiyat : true }
+                            : null,
+                        sayfa: x.sayfa,
+                        istendi: x.istendi_at,
+                        gonderildi: x.gonderildi_at,
+                        tekrar: x.durum === 'gonderildi' && x.tekrar_olur,
+                    };
+                }),
             });
         } catch (e) {
             console.error('rapor gecmis:', e.message);
@@ -287,8 +325,9 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(400).json({ ok: false, error: 'gecersiz' });
         try {
             const r = await pool.query(
-                `SELECT tablo, ozet, sayfa, boyut, tg_dosya_id FROM rapor.sayim_raporlari
-                 WHERE id = $1 AND username = $2 AND durum = 'gonderildi' AND tg_dosya_id IS NOT NULL`,
+                `SELECT id, tablo, ozet, sayfa, boyut, ayar FROM rapor.sayim_raporlari
+                 WHERE id = $1 AND username = $2 AND durum = 'gonderildi'
+                   AND (tg_dosya_id IS NOT NULL OR tg_kart_id IS NOT NULL)`,
                 [id, req.auth.username]
             );
             const eski = r.rows[0];
@@ -296,7 +335,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const engel = await gonderilebilirMi(req.auth.username);
             if (engel) return res.status(engel.kod).json(engel.govde);
             const sonuc = await kuyrugaYaz(req.auth.username, {
-                tablo: eski.tablo, dosyaId: eski.tg_dosya_id, ozet: eski.ozet, sayfa: eski.sayfa, boyut: eski.boyut,
+                tablo: eski.tablo, kaynak: eski.id, ayar: eski.ayar, ozet: eski.ozet, sayfa: eski.sayfa, boyut: eski.boyut,
             });
             if (sonuc.kod === 202) setImmediate(isciyiDurt);
             return res.status(sonuc.kod).json(sonuc.govde);
@@ -338,14 +377,18 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         return `Sayim-Raporu-${kisa}-${gun}.pdf`;
     }
 
-    function aciklama(tablo, o) {
+    function aciklama(tablo, o, ayar) {
         if (!o) return `Sayım raporu: ${tabloAdi(tablo)}`;
-        return [
-            `Sayım raporu: ${tabloAdi(tablo)}`,
-            `Sayılan ${adet(o.sayilan)} / ${adet(o.urun)} ürün`,
-            `Eksik ${adet(o.eksik?.urun || 0)} ürün (${tl(o.eksik?.tl || 0, true)}) · Fazla ${adet(o.fazla?.urun || 0)} ürün (${tl(o.fazla?.tl || 0, true)})`,
-            `Net fark: ${tl(o.net, true)}`,
-        ].join('\n').slice(0, 1000);
+        const fiyatli = !ayar || ayar.fiyat !== false;
+        const satir = [`Sayım raporu: ${tabloAdi(tablo)}`, `Sayılan ${adet(o.sayilan)} / ${adet(o.urun)} ürün`];
+        if (fiyatli) {
+            satir.push(`Eksik ${adet(o.eksik?.urun || 0)} ürün (${tl(o.eksik?.tl || 0, true)}) · Fazla ${adet(o.fazla?.urun || 0)} ürün (${tl(o.fazla?.tl || 0, true)})`);
+            satir.push(`Net fark: ${tl(o.net, true)}`);
+        } else {
+            satir.push(`Eksik ${adet(o.eksik?.urun || 0)} ürün (${adet(o.eksik?.adet || 0)} adet) · Fazla ${adet(o.fazla?.urun || 0)} ürün (${adet(o.fazla?.adet || 0)} adet)`);
+        }
+        if (ayar && ayar.not) satir.push(ayar.not);
+        return satir.join('\n').slice(0, 1000);
     }
 
     async function hataYaz(is, metin) {
@@ -362,54 +405,79 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         }
         const b = await baglantiOku(is.username);
         if (!b || b.durum !== 'aktif') return hataYaz(is, 'Telegram bağlı değil.');
+        const ayar = ayarDuzelt(is.ayar);
 
         try {
-            let sonuc;
             let ozet = is.ozet;
             let sayfa = is.sayfa;
             let boyut = is.boyut;
-            if (is.tg_dosya_id) {
-                sonuc = await telegram.cagir('sendDocument', {
-                    chat_id: b.chat_id,
-                    document: is.tg_dosya_id,
-                    caption: aciklama(is.tablo, ozet),
-                });
+            let kartId = is.tg_kart_id || null;
+            let dosyaId = is.tg_dosya_id || null;
+
+            if (is.kaynak) {
+                // Tekrar gönderim: üretmeden, kayıtlı dosya kimlikleriyle
+                const k = (await pool.query('SELECT tg_dosya_id, tg_kart_id FROM rapor.sayim_raporlari WHERE id = $1', [is.kaynak])).rows[0];
+                if (!k || (!k.tg_dosya_id && !k.tg_kart_id)) return hataYaz(is, 'Önceki belge bulunamadı.');
+                const yazi = aciklama(is.tablo, ozet, ayar);
+                if (k.tg_kart_id && !kartId) {
+                    await telegram.cagir('sendPhoto', { chat_id: b.chat_id, photo: k.tg_kart_id, caption: k.tg_dosya_id ? '' : yazi });
+                    kartId = k.tg_kart_id;
+                    await pool.query('UPDATE rapor.sayim_raporlari SET tg_kart_id = $2 WHERE id = $1', [is.id, kartId]);
+                }
+                if (k.tg_dosya_id && !dosyaId) {
+                    await telegram.cagir('sendDocument', { chat_id: b.chat_id, document: k.tg_dosya_id, caption: yazi });
+                    dosyaId = k.tg_dosya_id;
+                }
             } else {
                 await katalog.hazirla();
                 const satirlar = (await pool.query('SELECT * FROM rapor.sayim_satirlari($1, $2)', [is.username, is.tablo])).rows;
                 if (!satirlar.length) return hataYaz(is, 'Tablo boş ya da silinmiş.');
                 const veri = raporHesapla(satirlar, katalog.bul, is.yedek_fiyat || {});
                 const tarih = new Date();
-                const pdf = await pdfUret(veri, {
-                    tablo: is.tablo,
-                    kullanici: is.username,
-                    tarih,
-                    no: 'SR-' + String(is.no).padStart(6, '0'),
-                });
+                const bilgi = { tablo: is.tablo, kullanici: is.username, tarih, no: 'SR-' + String(is.no).padStart(6, '0') };
                 ozet = veri.ozet;
-                sayfa = pdf.sayfa;
-                boyut = pdf.buffer.length;
-                const form = new FormData();
-                form.append('chat_id', String(b.chat_id));
-                form.append('caption', aciklama(is.tablo, ozet));
-                form.append('document', new Blob([pdf.buffer], { type: 'application/pdf' }), dosyaAdi(is.tablo, tarih));
-                sonuc = await telegram.cagir('sendDocument', form, 60000);
+                const istenen = [];
+                if (kartVar(ayar) && !kartId) istenen.push(...kartGorselleri(veri, ayar));
+                if (pdfVar(ayar) && !dosyaId) istenen.push(...gorselGerekenler(veri, ayar));
+                const gorseller = istenen.length ? await gorsel.topluGetir(istenen) : new Map();
+
+                if (kartVar(ayar) && !kartId) {
+                    const png = kartUret(veri, bilgi, ayar, gorseller);
+                    const form = new FormData();
+                    form.append('chat_id', String(b.chat_id));
+                    // PDF de gidecekse açıklama PDF'te; kart tek başına giderse kartta
+                    if (!pdfVar(ayar)) form.append('caption', aciklama(is.tablo, ozet, ayar));
+                    form.append('photo', new Blob([png], { type: 'image/png' }), 'sayim-karti.png');
+                    const sonuc = await telegram.cagir('sendPhoto', form, 60000);
+                    const foto = Array.isArray(sonuc?.photo) ? sonuc.photo[sonuc.photo.length - 1] : null;
+                    kartId = foto?.file_id || 'gonderildi';
+                    // Ara kayıt: PDF'te geçici hata olursa kart yeniden gitmesin
+                    await pool.query('UPDATE rapor.sayim_raporlari SET tg_kart_id = $2, ozet = $3 WHERE id = $1', [is.id, kartId, ozet]);
+                }
+                if (pdfVar(ayar) && !dosyaId) {
+                    const pdf = await pdfUret(veri, bilgi, ayar, gorseller);
+                    sayfa = pdf.sayfa;
+                    boyut = pdf.buffer.length;
+                    const form = new FormData();
+                    form.append('chat_id', String(b.chat_id));
+                    form.append('caption', aciklama(is.tablo, ozet, ayar));
+                    form.append('document', new Blob([pdf.buffer], { type: 'application/pdf' }), dosyaAdi(is.tablo, tarih));
+                    const sonuc = await telegram.cagir('sendDocument', form, 60000);
+                    dosyaId = sonuc?.document?.file_id || null;
+                }
             }
             await pool.query(
                 `UPDATE rapor.sayim_raporlari
                  SET durum = 'gonderildi', hata = NULL, ozet = $2, sayfa = $3, boyut = $4,
-                     tg_dosya_id = $5, gonderildi_at = now(), yedek_fiyat = NULL
+                     tg_dosya_id = $5, tg_kart_id = $6, gonderildi_at = now(), yedek_fiyat = NULL
                  WHERE id = $1`,
-                [is.id, ozet, sayfa, boyut, sonuc?.document?.file_id || is.tg_dosya_id || null]
+                [is.id, ozet, sayfa, boyut, dosyaId, kartId && kartId !== 'gonderildi' ? kartId : null]
             );
         } catch (e) {
             const tg = e instanceof telegram.TelegramHatasi;
             if (tg && telegram.kaliciMi(e)) {
                 if (e.kod === 403) {
-                    await pool.query(
-                        `UPDATE rapor.telegram_baglantilari SET durum = 'engelli' WHERE username = $1`,
-                        [is.username]
-                    );
+                    await pool.query(`UPDATE rapor.telegram_baglantilari SET durum = 'engelli' WHERE username = $1`, [is.username]);
                     return hataYaz(is, 'Bot Telegram\'da engellenmiş. Ayarlardan yeniden bağlayın.');
                 }
                 console.warn('rapor kalici hata:', telegram.temizle(e.message));
@@ -465,6 +533,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             if (Date.now() - sonTemizlik > 24 * 3600 * 1000) {
                 sonTemizlik = Date.now();
                 await pool.query(`DELETE FROM rapor.sayim_raporlari WHERE istendi_at < now() - interval '180 days'`);
+                gorsel.budama();
             }
         } catch (e) {
             // Tablo henüz yoksa (SQL çalışmadıysa) sessiz kal

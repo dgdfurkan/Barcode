@@ -55,6 +55,7 @@ function raporHesapla(satirlar, urunBul, yedekFiyat) {
             ad: (k && k.ad) || 'Katalogda olmayan ürün',
             barkod: (k && k.barkod) || '',
             kategori: (k && k.kategori) || '',
+            gorsel: (k && k.gorsel) || '',
         };
         const depo = sayi(s.warehouse_stock);
         const sistem = sayi(s.system_stock);

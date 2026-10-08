@@ -131,6 +131,8 @@ class CountingSystem {
         this.currentUser = null;
         this.STORAGE_KEY = 'counting_data';
         this.currentTableName = 'Ana Sayım'; // Aktif sayım tablosu
+        /** Sayfa açılışında en son sayım yapılan tabloyu aç (ilk tam yüklemeden sonra kapanır) */
+        this._acilistaEnGuncelSec = true;
         /** Genel / günlük alt sekme geçişlerinde son seçilen tablolar */
         this._lastGeneralTableName = 'Ana Sayım';
         this._lastDailyTableName = null;
@@ -977,6 +979,7 @@ class CountingSystem {
                 const deviceTableForFetch = this._loadDeviceCurrentTable();
                 const serverTableForFetch = metaBlob?._currentTable || localFull?._currentTable;
                 const resolvedForFetch =
+                    (this._acilistaEnGuncelSec ? this._enGuncelTabloAdi(localFull) : null) ||
                     serverTableForFetch ||
                     deviceTableForFetch ||
                     'Ana Sayım';
@@ -1002,6 +1005,18 @@ class CountingSystem {
                     this._countingItemsTableReady = true;
                 } else {
                     this._countingItemsTableReady = false;
+                }
+
+                // Sunucu metası yerel önbellekten yeniyse en güncel tablo değişmiş
+                // olabilir (başka cihazda sayım). O tabloyu da açılmadan önce çek.
+                if (countingItemsAvailable && this._acilistaEnGuncelSec && metaBlob) {
+                    const enGuncel = this._enGuncelTabloAdi(metaBlob);
+                    if (enGuncel && enGuncel !== resolvedForFetch) {
+                        const ek = await this._queryCountingItems(this._getCountingItemsSelectColumns(true), (q) =>
+                            q.eq('username', this.currentUser.username).eq('table_name', enGuncel)
+                        );
+                        if (!ek.error && Array.isArray(ek.data)) itemRows = itemRows.concat(ek.data);
+                    }
                 }
             }
 
@@ -1102,6 +1117,7 @@ class CountingSystem {
             };
 
             this._finalizeCountingHydration(fullData, tables);
+            this._acilistaEnGuncelSec = false;
             this._saveFullBlobToLocalStorage();
 
             console.log('✅ loadCountingData tamamlandı, tablo:', this.currentTableName);
@@ -2227,7 +2243,11 @@ class CountingSystem {
 
         const deviceTable = this._loadDeviceCurrentTable();
         const serverTable = fullData._currentTable;
-        let resolvedTable = serverTable || deviceTable || 'Ana Sayım';
+        let resolvedTable =
+            (this._acilistaEnGuncelSec ? this._enGuncelTabloAdi(fullData) : null) ||
+            serverTable ||
+            deviceTable ||
+            'Ana Sayım';
         if (!tables[resolvedTable]) {
             resolvedTable = Object.keys(tables).find((n) => !this._isTableTombstoned(n)) || 'Ana Sayım';
         }
@@ -2249,6 +2269,29 @@ class CountingSystem {
         }
     }
 
+    /**
+     * Sayfa açılışında gösterilecek tablo: son sayım hareketi (yoksa oluşturulma)
+     * en yeni olan genel tablo. Günlük tablolar ve geçersiz/silinmiş tablolar
+     * aday değil; hiç zaman bilgisi yoksa null (eski davranışa düşülür).
+     */
+    _enGuncelTabloAdi(blob) {
+        if (!blob || typeof blob !== 'object') return null;
+        const meta = blob._tableMeta || {};
+        const adlar = new Set([...Object.keys(meta), ...Object.keys(blob._tables || {})]);
+        let enIyi = null;
+        let enMs = 0;
+        for (const ad of adlar) {
+            if (!this.isValidTableNameKey(ad) || this._isTableTombstoned(ad) || this.isDailyTableName(ad)) continue;
+            const m = { ...(blob._tables?.[ad]?._tableMeta || {}), ...(meta[ad] || {}) };
+            const ms = Math.max(Date.parse(m.lastActivityAt || '') || 0, Date.parse(m.createdAt || '') || 0);
+            if (ms > enMs) {
+                enMs = ms;
+                enIyi = ad;
+            }
+        }
+        return enIyi;
+    }
+
     async _loadTableProductsFromDb(tableName) {
         if (!tableName || !window.jbDb || !this.currentUser) return false;
         if (this._countingItemsTableReady !== true) return false;
@@ -2260,48 +2303,100 @@ class CountingSystem {
                 (q) => q.eq('username', this.currentUser.username).eq('table_name', tableName)
             );
             if (error || !rows) return false;
-
-            if (!this.cachedFullData) this.cachedFullData = { _api_info: {}, _tables: {}, _tableMeta: {} };
-            if (!this.cachedFullData._tables) this.cachedFullData._tables = {};
-            if (!this.cachedFullData._tables[tableName]) {
-                this.cachedFullData._tables[tableName] = {};
-            }
-            const slot = this.cachedFullData._tables[tableName];
-            const meta = this.cachedFullData._tableMeta?.[tableName];
-            if (meta?.createdAt || meta?.lastActivityAt) {
-                if (!slot._tableMeta) slot._tableMeta = {};
-                if (meta.createdAt) slot._tableMeta.createdAt = meta.createdAt;
-                if (meta.lastActivityAt) slot._tableMeta.lastActivityAt = meta.lastActivityAt;
-            }
-            if (Array.isArray(meta?._productOrder)) slot._productOrder = [...meta._productOrder];
-
-            for (const row of rows) {
-                slot[row.product_id] = this._mapCountingItemRowToEntry(row);
-            }
-
-            if (tableName === this.currentTableName) {
-                this.countingData = slot;
-            }
+            this._tabloSlotunuDoldur(tableName, rows);
             return true;
         } catch (e) {
             return false;
         }
     }
 
-    async _warmCountingTablesInBackground() {
-        if (this._countingItemsTableReady !== true || !this.cachedFullData) return;
-        const names = new Set([
-            ...Object.keys(this.cachedFullData._tableMeta || {}),
-            ...Object.keys(this.cachedFullData._tables || {}),
-        ]);
-        for (const tName of names) {
-            if (!this.isValidTableNameKey(tName) || this._isTableTombstoned(tName)) continue;
-            if (tName === this.currentTableName) continue;
-            const slot = this.cachedFullData._tables?.[tName];
-            if (slot && this._countTableProductKeys(slot) > 0) continue;
-            await this._loadTableProductsFromDb(tName);
+    _tabloSlotunuDoldur(tableName, rows) {
+        if (!this.cachedFullData) this.cachedFullData = { _api_info: {}, _tables: {}, _tableMeta: {} };
+        if (!this.cachedFullData._tables) this.cachedFullData._tables = {};
+        if (!this.cachedFullData._tables[tableName]) {
+            this.cachedFullData._tables[tableName] = {};
         }
-        this._scheduleTableSelectorUpdate(80);
+        const slot = this.cachedFullData._tables[tableName];
+        const meta = this.cachedFullData._tableMeta?.[tableName];
+        if (meta?.createdAt || meta?.lastActivityAt) {
+            if (!slot._tableMeta) slot._tableMeta = {};
+            if (meta.createdAt) slot._tableMeta.createdAt = meta.createdAt;
+            if (meta.lastActivityAt) slot._tableMeta.lastActivityAt = meta.lastActivityAt;
+        }
+        if (Array.isArray(meta?._productOrder)) slot._productOrder = [...meta._productOrder];
+
+        for (const row of rows) {
+            slot[row.product_id] = this._mapCountingItemRowToEntry(row);
+        }
+
+        if (tableName === this.currentTableName) {
+            this.countingData = slot;
+        }
+    }
+
+    /**
+     * Diğer tabloların ürünleri: tablo çiplerindeki renk ve sayılar bunlarla
+     * hesaplanıyor. Eskiden her tablo için ayrı ve sırayla bir istek atılıyordu;
+     * 40 tabloda çipler saniyelerce boş kalıyor, tıklanınca doluyordu. Artık
+     * bütün tablolar tek sorguda (1000'erli sayfa) geliyor, çipler bir kerede
+     * boyanıyor. Taşınan veri aynı, yalnız istek sayısı düştü.
+     */
+    async _warmCountingTablesInBackground() {
+        if (this._countingItemsTableReady !== true || !this.cachedFullData || this._isitmaSuruyor) return;
+        const bekleyen = () => {
+            const names = new Set([
+                ...Object.keys(this.cachedFullData._tableMeta || {}),
+                ...Object.keys(this.cachedFullData._tables || {}),
+            ]);
+            return [...names].filter((tName) => {
+                if (!this.isValidTableNameKey(tName) || this._isTableTombstoned(tName)) return false;
+                if (tName === this.currentTableName) return false;
+                const slot = this.cachedFullData._tables?.[tName];
+                return !(slot && this._countTableProductKeys(slot) > 0);
+            });
+        };
+        if (bekleyen().length === 0) return;
+        this._isitmaSuruyor = true;
+        try {
+            const SAYFA = 1000;
+            const satirlar = [];
+            let tamam = false;
+            for (let bas = 0; bas < 60000; bas += SAYFA) {
+                const { data, error } = await this._queryCountingItems(this._getCountingItemsSelectColumns(true), (q) =>
+                    q
+                        .eq('username', this.currentUser.username)
+                        .neq('table_name', this.currentTableName)
+                        .order('id')
+                        .range(bas, bas + SAYFA - 1)
+                );
+                if (error || !Array.isArray(data)) break;
+                for (const r of data) satirlar.push(r);
+                if (data.length < SAYFA) {
+                    tamam = true;
+                    break;
+                }
+            }
+
+            if (tamam) {
+                const gruplar = new Map();
+                for (const r of satirlar) {
+                    if (!r || !r.table_name || !r.product_id) continue;
+                    if (!gruplar.has(r.table_name)) gruplar.set(r.table_name, []);
+                    gruplar.get(r.table_name).push(r);
+                }
+                // Bu arada kullanıcı tablo değiştirip doldurmuş olabilir: yalnız hâlâ boş olanlar
+                for (const tName of bekleyen()) {
+                    const rows = gruplar.get(tName);
+                    if (rows && rows.length) this._tabloSlotunuDoldur(tName, rows);
+                }
+            } else {
+                for (const tName of bekleyen()) await this._loadTableProductsFromDb(tName);
+            }
+        } finally {
+            this._isitmaSuruyor = false;
+        }
+        this._invalidateFinanceCache();
+        this._scheduleTableSelectorUpdate(0);
     }
 
     _isSheetStockFetchLocked() {

@@ -32,6 +32,16 @@
         hata: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h0"/></svg>',
         saat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
         yenile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>',
+        paylas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg>',
+        resim: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="9" cy="9" r="1.8"/><path d="m21 15-4.5-4.5L7 20"/></svg>',
+        grafik: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+        liste: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>',
+        kisi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>',
+        kutu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/></svg>',
+        para: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="3"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9.5v5M18 9.5v5"/></svg>',
+        simsek: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>',
+        katman: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>',
+        ayYildiz: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg>',
         tekrar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.7L20 8.5"/><path d="M20 3.5v5h-5"/><path d="M20 12a8 8 0 0 1-13.7 5.7L4 15.5"/><path d="M4 20.5v-5h5"/></svg>',
     };
 
@@ -50,6 +60,29 @@
         hesap_kapali: 'Hesabınız kapalı ya da süresi dolmuş.',
         unauthorized: 'Oturum süresi dolmuş. Sayfayı yenileyin.',
     };
+
+    /* Sunucudaki ayar.js ile aynı alanlar. Sunucu yine de her alanı doğruluyor. */
+    var VARSAYILAN_AYAR = {
+        sablon: 'tam', bicim: 'pdf', ozet: true, grafik: true, eksik: true, fazla: true, sayilmayan: true,
+        gorsel: true, fiyat: true, barkod: true, sinir: 0, kartTema: 'mavi', kartUrunler: true, not: '',
+    };
+    var TUM = { ozet: true, grafik: true, eksik: true, fazla: true, sayilmayan: true, gorsel: true, fiyat: true, barkod: true, sinir: 0 };
+    var SABLONLAR = [
+        { id: 'tam', ad: 'Tam rapor', aciklama: 'Özet, grafik ve bütün listeler', ikon: 'belge', ayar: Object.assign({ bicim: 'pdf' }, TUM) },
+        { id: 'yonetici', ad: 'Yönetici özeti', aciklama: 'Tek sayfa: özet ve grafikler', ikon: 'grafik', ayar: Object.assign({}, TUM, { bicim: 'pdf', eksik: false, fazla: false, sayilmayan: false }) },
+        { id: 'eksik', ad: 'Eksik listesi', aciklama: 'Eksikler, görsel ve barkodla', ikon: 'liste', ayar: Object.assign({}, TUM, { bicim: 'pdf', grafik: false, fazla: false, sayilmayan: false }) },
+        { id: 'eksikFazla', ad: 'Eksik ve fazla', aciklama: 'Sayılmayanlar hariç', ikon: 'katman', ayar: Object.assign({}, TUM, { bicim: 'pdf', sayilmayan: false }) },
+        { id: 'personel', ad: 'Personel için', aciklama: 'Fiyatsız, yalnız adetler', ikon: 'kisi', ayar: Object.assign({}, TUM, { bicim: 'pdf', fiyat: false }) },
+        { id: 'tedarik', ad: 'Tedarik listesi', aciklama: 'Eksikler; barkodlu, fiyatsız', ikon: 'kutu', ayar: Object.assign({}, TUM, { bicim: 'pdf', ozet: false, grafik: false, fazla: false, sayilmayan: false, fiyat: false }) },
+        { id: 'kalan', ad: 'Kalan sayım', aciklama: 'Henüz sayılmayan ürünler', ikon: 'saat', ayar: Object.assign({}, TUM, { bicim: 'pdf', ozet: false, grafik: false, eksik: false, fazla: false, fiyat: false }) },
+        { id: 'finans', ad: 'Finans odaklı', aciklama: 'TL etkisi en büyük 25 ürün', ikon: 'para', ayar: Object.assign({}, TUM, { bicim: 'pdf', sayilmayan: false, gorsel: false, sinir: 25 }) },
+        { id: 'hizli', ad: 'Hızlı özet', aciklama: 'Görselsiz, her listeden 10', ikon: 'simsek', ayar: Object.assign({}, TUM, { bicim: 'pdf', grafik: false, sayilmayan: false, gorsel: false, sinir: 10 }) },
+        { id: 'kart', ad: 'Bilgi kartı', aciklama: 'Kare görsel, paylaşmaya hazır', ikon: 'resim', ayar: Object.assign({}, TUM, { bicim: 'kart', kartTema: 'mavi', kartUrunler: true }) },
+        { id: 'kartKoyu', ad: 'Bilgi kartı · koyu', aciklama: 'Koyu tema, fiyatsız', ikon: 'ayYildiz', ayar: Object.assign({}, TUM, { bicim: 'kart', kartTema: 'koyu', fiyat: false, kartUrunler: true }) },
+        { id: 'kartRapor', ad: 'Kart + tam rapor', aciklama: 'Önce kart, ardından PDF', ikon: 'paylas', ayar: Object.assign({}, TUM, { bicim: 'ikisi', kartTema: 'mavi', kartUrunler: true }) },
+    ];
+    /* Şablonu belirleyen alanlar (not hariç: not şablon değiştirince korunur) */
+    var SABLON_ALANLARI = ['bicim', 'ozet', 'grafik', 'eksik', 'fazla', 'sayilmayan', 'gorsel', 'fiyat', 'barkod', 'sinir', 'kartTema', 'kartUrunler'];
 
     var DURUM_ETIKETI = {
         bekliyor: ['Sırada', 'mavi', 'saat'],
@@ -72,6 +105,10 @@
         izleZaman: null,
         sayacZaman: null,
     };
+
+    /* Gönderim paneli durumu. ayar: hesaptaki son tercih, panelde değişince
+       gecikmeli olarak sunucuya yazılıyor (cihazda değil hesapta duruyor). */
+    var g = { panel: null, acik: false, acan: null, ayar: Object.assign({}, VARSAYILAN_AYAR), degisti: false, kayitZaman: null };
 
     var kok = null;
     var panel = null;
@@ -187,6 +224,7 @@
                 d.hata = '';
                 d.bot = c.j.bot || null;
                 d.baglanti = c.j.baglanti || null;
+                if (c.j.tercih && !g.degisti) g.ayar = ayarBirlestir(c.j.tercih);
                 if (c.j.sinir) {
                     d.sinirSn = c.j.sinir.araSn || 60;
                     if (c.j.sinir.kalanSn > 0) bekleBaslat(c.j.sinir.kalanSn);
@@ -308,27 +346,39 @@
         b.dataset.hal = hal;
         b.disabled = kapali;
         b.setAttribute('aria-busy', hal === 'gonderiliyor' || hal === 'hazirlaniyor' ? 'true' : 'false');
+        gonderDugmesiCiz();
     }
 
-    async function anaEylem() {
+    function anaEylem() {
         var hal = anaHal();
-        if (hal === 'bagla') { panelAc(kok.querySelector('[data-sr="gonder"]'), true); return; }
+        var dugme = kok.querySelector('[data-sr="gonder"]');
+        if (hal === 'bagla') { panelAc(dugme, true); return; }
         if (hal !== 'gonder') return;
+        gonderPanelAc(dugme);
+    }
+
+    /** Rapor isteğini bırak (gönderim panelinin ana düğmesi) */
+    async function gonder() {
+        if (anaHal() !== 'gonder') return;
         var tablo = seciliTablo();
         if (!tablo) return;
         d.gonderiliyor = true;
         dugmeCiz();
+        var ayar = Object.assign({}, g.ayar);
         var c = await istek('/api/rapor/sayim', {
             method: 'POST',
-            body: JSON.stringify({ tablo: tablo, fiyatlar: yedekFiyatlar(tablo) }),
+            body: JSON.stringify({ tablo: tablo, fiyatlar: ayar.fiyat ? yedekFiyatlar(tablo) : null, ayar: ayar }),
         });
         d.gonderiliyor = false;
         if (c.kod === 202 && c.j.ok) {
             d.tamamAni = Date.now();
+            g.degisti = false;
             bekleBaslat(d.sinirSn);
             izle(c.j.id);
-            bildir('Rapor hazırlanıyor. Birkaç saniye içinde Telegram\'ınızda olur; sayfayı kapatabilirsiniz.', 'basari');
+            var ne = ayar.bicim === 'kart' ? 'Bilgi kartı' : ayar.bicim === 'ikisi' ? 'Kart ve rapor' : 'Rapor';
+            bildir(ne + ' hazırlanıyor. Birkaç saniye içinde Telegram\'ınızda olur; sayfayı kapatabilirsiniz.', 'basari');
             setTimeout(dugmeCiz, 2500);
+            gonderPanelKapat();
             if (panelDurum.acik) gecmisYukle();
         } else {
             if (c.j.error === 'cok_sik' && c.j.bekleSn) bekleBaslat(c.j.bekleSn);
@@ -397,9 +447,8 @@
             '<button type="button" class="sr-ikon-dugme" data-sr="yenile" aria-label="Listeyi yenile">' + ikon.yenile + '</button></div>' +
             '<div data-sr="gecmis" aria-live="polite"></div>' +
             '</section>' +
-            '<p class="sr-dipnot">Rapor A4 PDF, en fazla 4 sayfa: önce özet, sonra eksik, fazla ve sayılmayan ürünler. ' +
-            'Fiyatlar orijinal (üstü çizili) fiyattan. Sayılmayan ürün eksik sayılmaz. ' +
-            'Üst üste basmaya karşı dakikada bir rapor gönderilebilir.</p>' +
+            '<p class="sr-dipnot">Rapor A4 PDF (en fazla 4 sayfa) ya da kare bilgi kartı olarak gelir; içeriği gönderirken şablonla seçersiniz. ' +
+            'Sayılmayan ürün eksik sayılmaz. Üst üste basmaya karşı dakikada bir rapor gönderilebilir.</p>' +
             '</div></div>';
         document.body.appendChild(panel);
 
@@ -440,8 +489,9 @@
         panelDurum.baglaGorunum = !!baglaGorunum;
         panel.hidden = false;
         document.documentElement.classList.add('sr-kilit');
-        // Bir kare sonra sınıf: geçiş başlasın
-        requestAnimationFrame(function () { requestAnimationFrame(function () { panel.classList.add('is-acik'); }); });
+        // Yerleşimi zorla, sonra sınıf: geçiş başlasın (kare beklemeden; gizli sekmede de açılır)
+        void panel.offsetWidth;
+        panel.classList.add('is-acik');
         panel.querySelector('[data-sr="kapat"]').focus({ preventScroll: true });
         durumYukle(true).then(function () {
             if (!panelDurum.acik) return;
@@ -462,7 +512,7 @@
         var bitir = function () {
             if (panelDurum.acik) return;
             panel.hidden = true;
-            document.documentElement.classList.remove('sr-kilit');
+            if (!g.acik) document.documentElement.classList.remove('sr-kilit');
         };
         var azalt = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         if (azalt) bitir(); else setTimeout(bitir, 240);
@@ -524,8 +574,8 @@
         }
         var not;
         if (kod && kod.hata) not = '<p class="sr-bagla__not">' + kacir(kod.hata) + '</p>';
-        else if (kod && kod.adres && Date.now() < kod.bitis) not = '<p class="sr-bagla__not" role="status"><span class="sr-bekle-nokta" aria-hidden="true"></span>Telegram\'dan onay bekleniyor. Bağlantı 10 dakika geçerli.</p>';
-        else not = '<p class="sr-bagla__not">&nbsp;</p>';
+        else if (kod && kod.adres && Date.now() < kod.bitis) not = '<p class="sr-bagla__not" role="status"><span class="sr-bekle-nokta" aria-hidden="true"></span><span>Onay bekleniyor · bağlantı 10 dk geçerli</span></p>';
+        else not = '<p class="sr-bagla__not"><span>Bağlantı hazırlanıyor</span></p>';
 
         yer.innerHTML =
             '<ol class="sr-adimlar">' +
@@ -535,7 +585,7 @@
             '</ol>' +
             '<div class="sr-bagla">' +
             '<div class="sr-bagla__ust">' + dugme +
-            (masaustu ? '<div class="sr-qr" data-sr-qr' + (kod && kod.adres ? '' : ' hidden') + ' aria-label="Telegram bağlantısının karekodu" role="img"></div>' : '') +
+            (masaustu ? '<div class="sr-qr" data-sr-qr aria-label="Telegram bağlantısının karekodu" role="img"></div>' : '') +
             '</div>' + not +
             '</div>' +
             (b ? '<div class="sr-hesap__eylem"><button type="button" class="sr-dugme sr-dugme--ikincil" data-sr="vazgec">Vazgeç, mevcut hesap kalsın</button></div>' : '');
@@ -634,15 +684,14 @@
     function qrCiz(kutu, adres) {
         if (!kutu) return;
         qrKutuphanesi().then(function (hazir) {
-            if (!hazir || !kutu.isConnected) { kutu.hidden = true; return; }
+            // Kutu yerini hep koruyor; çizilemezse boş kalıyor, yerleşim oynamıyor
+            if (!hazir || !kutu.isConnected) return;
             kutu.innerHTML = '';
             try {
                 new window.QRCode(kutu, { text: adres, width: 168, height: 168, correctLevel: window.QRCode.CorrectLevel.M });
                 kutu.removeAttribute('title');
-                kutu.hidden = false;
-            } catch (e) {
-                kutu.hidden = true;
-            }
+                kutu.classList.add('is-hazir');
+            } catch (e) { /* boş kutu kalır */ }
         });
     }
 
@@ -688,8 +737,10 @@
         yer.innerHTML = '<ul class="sr-liste">' + liste.map(function (x) {
             var et = DURUM_ETIKETI[x.durum] || DURUM_ETIKETI.bekliyor;
             var ikonSinif = x.durum === 'gonderildi' ? 'gonderildi' : x.durum === 'hata' ? 'hata' : 'bekliyor';
+            var bicimAd = x.bicim === 'kart' ? 'Bilgi kartı' : x.bicim === 'ikisi' ? 'Kart + PDF' : 'PDF';
             var ozet = [];
-            if (x.ozet && x.ozet.net !== undefined && x.ozet.net !== null) {
+            ozet.push(bicimAd);
+            if (x.ozet && x.ozet.fiyatli !== false && x.ozet.net !== undefined && x.ozet.net !== null) {
                 var sinif = x.ozet.net < 0 ? 'sr-satir__eksi' : x.ozet.net > 0 ? 'sr-satir__arti' : '';
                 ozet.push('Net <b class="' + sinif + '">' + kacir(tl(x.ozet.net) || '₺0,00') + '</b>');
             }
@@ -724,6 +775,280 @@
             bildir(hataMetni(c), c.j.error === 'cok_sik' ? 'uyari' : 'hata');
             dugme.disabled = false;
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Gönderim paneli: şablon ve ayrıntılar
+    // ------------------------------------------------------------------
+    function ayarBirlestir(ham) {
+        var a = Object.assign({}, VARSAYILAN_AYAR);
+        if (!ham || typeof ham !== 'object') return a;
+        Object.keys(VARSAYILAN_AYAR).forEach(function (k) {
+            if (ham[k] !== undefined && typeof ham[k] === typeof VARSAYILAN_AYAR[k]) a[k] = ham[k];
+        });
+        return a;
+    }
+
+    /** Ayarın birebir uyduğu şablon; yoksa 'ozel' */
+    function sablonBul(a) {
+        for (var i = 0; i < SABLONLAR.length; i++) {
+            var sa = Object.assign({}, VARSAYILAN_AYAR, SABLONLAR[i].ayar);
+            var uyar = SABLON_ALANLARI.every(function (k) {
+                // Kart alanları PDF'e, PDF alanları karta bakmaz
+                if (sa.bicim === 'pdf' && (k === 'kartTema' || k === 'kartUrunler')) return true;
+                if (sa.bicim === 'kart' && ['ozet', 'grafik', 'eksik', 'fazla', 'sayilmayan', 'gorsel', 'barkod', 'sinir'].indexOf(k) >= 0) return true;
+                return sa[k] === a[k];
+            });
+            if (uyar) return SABLONLAR[i].id;
+        }
+        return 'ozel';
+    }
+
+    function tercihKaydetGecikmeli() {
+        if (g.kayitZaman) clearTimeout(g.kayitZaman);
+        g.kayitZaman = setTimeout(function () {
+            g.kayitZaman = null;
+            istek('/api/rapor/tercih', { method: 'PUT', body: JSON.stringify({ ayar: g.ayar }) });
+        }, 900);
+    }
+
+    function ayarDegistir(degisim) {
+        Object.assign(g.ayar, degisim);
+        g.ayar.sablon = sablonBul(g.ayar);
+        g.degisti = true;
+        gonderPanelCiz();
+        tercihKaydetGecikmeli();
+    }
+
+    function anahtar(ad, etiket, aciklama, deger, kapali) {
+        return '<label class="sr-anahtar' + (kapali ? ' is-kapali' : '') + '">' +
+            '<span class="sr-anahtar__metin"><strong>' + kacir(etiket) + '</strong>' + (aciklama ? '<span>' + kacir(aciklama) + '</span>' : '') + '</span>' +
+            '<input type="checkbox" role="switch" data-ayar="' + ad + '"' + (deger ? ' checked' : '') + (kapali ? ' disabled' : '') + '>' +
+            '<span class="sr-anahtar__kol" aria-hidden="true"></span></label>';
+    }
+
+    function segment(ad, secenekler, deger, etiket, kapali) {
+        return '<div class="sr-segment' + (kapali ? ' is-kapali' : '') + '" role="radiogroup" aria-label="' + kacir(etiket) + '">' +
+            secenekler.map(function (o) {
+                var secili = o[0] === deger;
+                return '<button type="button" role="radio" aria-checked="' + secili + '" data-ayar="' + ad + '" data-deger="' + kacir(String(o[0])) + '"' +
+                    (kapali ? ' disabled' : '') + '>' + kacir(o[1]) + '</button>';
+            }).join('') + '</div>';
+    }
+
+    function gonderPanelKur() {
+        if (g.panel) return;
+        g.panel = document.createElement('div');
+        g.panel.className = 'sr-perde';
+        g.panel.hidden = true;
+        g.panel.innerHTML =
+            '<div class="sr-panel sr-panel--genis" role="dialog" aria-modal="true" aria-labelledby="srGonderBaslik">' +
+            '<header class="sr-panel__bas"><div class="sr-panel__bas-metin">' +
+            '<h2 class="sr-panel__baslik" id="srGonderBaslik">Rapor gönder</h2>' +
+            '<p class="sr-panel__alt" data-g="tablo"></p></div>' +
+            '<button type="button" class="sr-ikon-dugme" data-g="kapat" aria-label="Kapat">' + ikon.kapat + '</button></header>' +
+            '<div class="sr-panel__govde" data-g="govde"></div>' +
+            '<footer class="sr-panel__ayak"><p class="sr-ayak__ozet" data-g="ozet"></p>' +
+            '<button type="button" class="sr-dugme sr-dugme--ana" data-g="gonder"></button></footer>' +
+            '</div>';
+        document.body.appendChild(g.panel);
+
+        g.panel.addEventListener('click', function (e) {
+            if (e.target === g.panel) { gonderPanelKapat(); return; }
+            var h = e.target.closest('[data-g], [data-sablon], button[data-ayar]');
+            if (!h) return;
+            if (h.getAttribute('data-g') === 'kapat') return gonderPanelKapat();
+            if (h.getAttribute('data-g') === 'gonder') return gonder();
+            if (h.getAttribute('data-g') === 'hesap') { gonderPanelKapat(); return panelAc(kok.querySelector('[data-sr="ayar"]')); }
+            var sid = h.getAttribute('data-sablon');
+            if (sid) {
+                var sb = SABLONLAR.find(function (x) { return x.id === sid; });
+                if (sb) ayarDegistir(Object.assign({}, VARSAYILAN_AYAR, sb.ayar, { not: g.ayar.not }));
+                return;
+            }
+            var ad = h.getAttribute('data-ayar');
+            if (ad && h.tagName === 'BUTTON') {
+                var ham = h.getAttribute('data-deger');
+                var degisim = {};
+                degisim[ad] = ad === 'sinir' ? Number(ham) : ham;
+                ayarDegistir(degisim);
+            }
+        });
+        g.panel.addEventListener('change', function (e) {
+            var h = e.target;
+            if (h && h.matches('input[type="checkbox"][data-ayar]')) {
+                var degisim = {};
+                degisim[h.getAttribute('data-ayar')] = h.checked;
+                ayarDegistir(degisim);
+            }
+        });
+        g.panel.addEventListener('input', function (e) {
+            var h = e.target;
+            if (h && h.matches('input[data-ayar="not"]')) {
+                g.ayar.not = h.value.slice(0, 80);
+                g.degisti = true;
+                var sayac = g.panel.querySelector('[data-g="not-sayac"]');
+                if (sayac) sayac.textContent = g.ayar.not.length + '/80';
+                tercihKaydetGecikmeli();
+            }
+        });
+        g.panel.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') { e.stopPropagation(); gonderPanelKapat(); }
+            if (e.key === 'Tab') {
+                var odak = g.panel.querySelectorAll('button:not([disabled]), input:not([disabled]), a[href]');
+                if (!odak.length) return;
+                if (e.shiftKey && document.activeElement === odak[0]) { e.preventDefault(); odak[odak.length - 1].focus(); }
+                else if (!e.shiftKey && document.activeElement === odak[odak.length - 1]) { e.preventDefault(); odak[0].focus(); }
+            }
+        });
+    }
+
+    function ayarOzeti(a) {
+        if (a.bicim === 'kart') {
+            return 'Kare bilgi kartı · ' + ({ mavi: 'mavi', koyu: 'koyu', acik: 'açık' }[a.kartTema] || 'mavi') + ' tema' + (a.fiyat ? '' : ' · fiyatsız');
+        }
+        var bolum = [];
+        if (a.ozet) bolum.push('özet');
+        if (a.grafik) bolum.push('grafik');
+        var liste = ['eksik', 'fazla', 'sayilmayan'].filter(function (k) { return a[k]; }).length;
+        if (liste) bolum.push(liste + ' liste');
+        var parca = [(a.bicim === 'ikisi' ? 'Kart + PDF' : 'PDF') + ': ' + (bolum.join(', ') || 'özet')];
+        parca.push(a.gorsel ? 'görselli' : 'görselsiz');
+        if (!a.fiyat) parca.push('fiyatsız');
+        if (a.sinir) parca.push('ilk ' + a.sinir);
+        return parca.join(' · ');
+    }
+
+    function gonderPanelCiz() {
+        if (!g.panel) return;
+        var a = g.ayar;
+        var tablo = seciliTablo();
+        g.panel.querySelector('[data-g="tablo"]').textContent = tablo ? 'Tablo: ' + tabloGorunenAd(tablo) : 'Önce Finans ekranında bir tablo seçin';
+        var pdfKapali = a.bicim === 'kart';
+        var kartKapali = a.bicim === 'pdf';
+        var b = d.baglanti;
+        var govde = g.panel.querySelector('[data-g="govde"]');
+        var kaydir = govde.scrollTop;
+        var eskiSerit = govde.querySelector('.sr-sablonlar');
+        var yatay = eskiSerit ? eskiSerit.scrollLeft : 0;
+        var odakAyar = document.activeElement && g.panel.contains(document.activeElement)
+            ? (document.activeElement.getAttribute('data-ayar') || '') + '|' + (document.activeElement.getAttribute('data-deger') || document.activeElement.getAttribute('data-sablon') || '')
+            : '';
+
+        govde.innerHTML =
+            '<section class="sr-bolum"><h3 class="sr-bolum__baslik">Şablon</h3>' +
+            '<div class="sr-sablonlar" role="radiogroup" aria-label="Rapor şablonu">' +
+            SABLONLAR.map(function (sb) {
+                var secili = a.sablon === sb.id;
+                return '<button type="button" class="sr-sablon" role="radio" aria-checked="' + secili + '" data-sablon="' + sb.id + '">' +
+                    '<span class="sr-sablon__ikon">' + (ikon[sb.ikon] || ikon.belge) + '</span>' +
+                    '<span class="sr-sablon__metin"><strong>' + kacir(sb.ad) + '</strong><span>' + kacir(sb.aciklama) + '</span></span>' +
+                    '<span class="sr-sablon__isaret" aria-hidden="true">' + ikon.tamam + '</span></button>';
+            }).join('') + '</div>' +
+            '<p class="sr-ipucu">' + (a.sablon === 'ozel' ? 'Özel ayar: aşağıdaki seçimler kullanılacak.' : 'Aşağıdan ayrıntıları değiştirebilirsiniz; seçimleriniz hesabınızda saklanır.') + '</p>' +
+            '</section>' +
+
+            '<section class="sr-bolum"><h3 class="sr-bolum__baslik">Biçim</h3>' +
+            segment('bicim', [['pdf', 'PDF rapor'], ['kart', 'Bilgi kartı'], ['ikisi', 'İkisi']], a.bicim, 'Biçim') +
+            '</section>' +
+
+            '<section class="sr-bolum' + (pdfKapali ? ' is-sonuk' : '') + '"><h3 class="sr-bolum__baslik">PDF içeriği</h3>' +
+            '<div class="sr-anahtarlar">' +
+            anahtar('ozet', 'Özet kartları', 'Eksik, fazla, net fark ve değerler', a.ozet, pdfKapali) +
+            anahtar('grafik', 'Grafikler', 'Ürün durumu ve en çok etkileyenler', a.grafik, pdfKapali) +
+            anahtar('eksik', 'Eksik ürünler', '', a.eksik, pdfKapali) +
+            anahtar('fazla', 'Fazla ürünler', '', a.fazla, pdfKapali) +
+            anahtar('sayilmayan', 'Sayılmayan ürünler', '', a.sayilmayan, pdfKapali) +
+            anahtar('gorsel', 'Ürün görselleri', 'Listelerde ürün fotoğrafı', a.gorsel, pdfKapali) +
+            anahtar('barkod', 'Barkod', 'Ürün adının altında', a.barkod, pdfKapali) +
+            '</div>' +
+            '<p class="sr-alt-etiket">Liste başına ürün</p>' +
+            segment('sinir', [[10, '10'], [25, '25'], [50, '50'], [0, 'Sığdığı kadar']], a.sinir, 'Liste başına ürün', pdfKapali) +
+            '</section>' +
+
+            '<section class="sr-bolum' + (kartKapali ? ' is-sonuk' : '') + '"><h3 class="sr-bolum__baslik">Bilgi kartı</h3>' +
+            '<div class="sr-temalar" role="radiogroup" aria-label="Kart teması">' +
+            [['mavi', 'Mavi'], ['koyu', 'Koyu'], ['acik', 'Açık']].map(function (t) {
+                return '<button type="button" class="sr-tema sr-tema--' + t[0] + '" role="radio" aria-checked="' + (a.kartTema === t[0]) + '" data-ayar="kartTema" data-deger="' + t[0] + '"' +
+                    (kartKapali ? ' disabled' : '') + '><span class="sr-tema__ornek" aria-hidden="true"></span>' + t[1] + '</button>';
+            }).join('') + '</div>' +
+            '<div class="sr-anahtarlar">' + anahtar('kartUrunler', 'En çok eksik ürünler', 'Kartın altında görselleriyle ilk 3 ürün', a.kartUrunler, kartKapali) + '</div>' +
+            '</section>' +
+
+            '<section class="sr-bolum"><h3 class="sr-bolum__baslik">Ortak</h3>' +
+            '<div class="sr-anahtarlar">' + anahtar('fiyat', 'Fiyat ve TL', 'Kapalıysa her şey adet üzerinden', a.fiyat, false) + '</div>' +
+            '<label class="sr-not"><span class="sr-alt-etiket">Not <em>(isteğe bağlı, rapora ve karta yazılır)</em></span>' +
+            '<span class="sr-not__kutu"><input type="text" maxlength="80" data-ayar="not" placeholder="Örn. Akşam vardiyası sayımı" value="' + kacir(a.not) + '">' +
+            '<span class="sr-not__sayac" data-g="not-sayac">' + a.not.length + '/80</span></span></label>' +
+            '</section>' +
+
+            (b ? '<button type="button" class="sr-hesap-serit" data-g="hesap">' +
+                '<span class="sr-nokta ' + (b.durum === 'aktif' ? 'sr-nokta--yesil' : 'sr-nokta--sari') + '"></span>' +
+                '<span>Gönderilecek hesap: <strong>' + kacir(b.ad || (b.kullaniciAdi ? '@' + b.kullaniciAdi : 'Telegram')) + '</strong></span>' +
+                '<span class="sr-hesap-serit__git">Belgeler ve hesap</span></button>' : '');
+
+        govde.scrollTop = kaydir;
+        var yeniSerit = govde.querySelector('.sr-sablonlar');
+        if (yeniSerit) yeniSerit.scrollLeft = yatay;
+        if (odakAyar) {
+            var parca = odakAyar.split('|');
+            var hedef = parca[0]
+                ? g.panel.querySelector('[data-ayar="' + parca[0] + '"]' + (parca[1] ? '[data-deger="' + parca[1] + '"]' : ''))
+                : g.panel.querySelector('[data-sablon="' + parca[1] + '"]');
+            if (hedef) { try { hedef.focus({ preventScroll: true }); } catch (e) { /* yok */ } }
+        }
+        g.panel.querySelector('[data-g="ozet"]').textContent = ayarOzeti(a);
+        gonderDugmesiCiz();
+    }
+
+    function gonderDugmesiCiz() {
+        if (!g.panel || !g.acik) return;
+        var b = g.panel.querySelector('[data-g="gonder"]');
+        var hal = anaHal();
+        var icerik;
+        var kapali = true;
+        if (hal === 'gonder') { icerik = ikon.ucak + '<span>Telegram\'a gönder</span>'; kapali = false; }
+        else if (hal === 'gonderiliyor') icerik = '<span class="sr-cark" aria-hidden="true"></span><span>Gönderiliyor</span>';
+        else if (hal === 'bekle') icerik = ikon.saat + '<span>Tekrar ' + kalanSn() + ' sn</span>';
+        else if (hal === 'hazirlaniyor' || hal === 'tamam') icerik = '<span class="sr-cark" aria-hidden="true"></span><span>Hazırlanıyor</span>';
+        else icerik = ikon.ucak + '<span>Telegram\'a gönder</span>';
+        var anahtarDeger = hal + (hal === 'bekle' ? kalanSn() : '');
+        if (b.dataset.icerik !== anahtarDeger) { b.innerHTML = icerik; b.dataset.icerik = anahtarDeger; }
+        b.disabled = kapali;
+    }
+
+    function gonderPanelAc(acan) {
+        gonderPanelKur();
+        if (g.acik) return;
+        g.acik = true;
+        g.acan = acan || null;
+        g.panel.hidden = false;
+        document.documentElement.classList.add('sr-kilit');
+        gonderPanelCiz();
+        g.panel.querySelector('[data-g="govde"]').scrollTop = 0;
+        void g.panel.offsetWidth;
+        g.panel.classList.add('is-acik');
+        var secili = g.panel.querySelector('.sr-sablon[aria-checked="true"]');
+        // Telefonda yatay şeritte seçili şablon görünür olsun
+        if (secili) {
+            var serit = secili.parentNode;
+            if (serit.scrollWidth > serit.clientWidth) serit.scrollLeft = Math.max(0, secili.offsetLeft - 16);
+        }
+        try { (secili || g.panel.querySelector('[data-g="kapat"]')).focus({ preventScroll: true }); } catch (e) { /* yok */ }
+    }
+
+    function gonderPanelKapat() {
+        if (!g.acik) return;
+        g.acik = false;
+        g.panel.classList.remove('is-acik');
+        var azalt = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var bitir = function () {
+            if (g.acik) return;
+            g.panel.hidden = true;
+            if (!panelDurum.acik) document.documentElement.classList.remove('sr-kilit');
+        };
+        if (azalt) bitir(); else setTimeout(bitir, 240);
+        if (g.acan && document.contains(g.acan)) { try { g.acan.focus({ preventScroll: true }); } catch (e) { /* yok */ } }
     }
 
     // ------------------------------------------------------------------
@@ -764,5 +1089,5 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', basla);
     else basla();
 
-    window.JBSayimRapor = { ac: function () { panelAc(null); }, kapat: panelKapat };
+    window.JBSayimRapor = { ac: function () { panelAc(null); }, kapat: panelKapat, gonderAc: function () { gonderPanelAc(null); } };
 })();

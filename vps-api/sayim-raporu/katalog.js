@@ -4,7 +4,7 @@
  * Sayım satırında yalnız ürün kimliği var; ad, barkod ve kategori sitenin
  * yayımladığı products.json'dan geliyor. Katalog sitede zaten herkese açık.
  *
- * - Bellekte yalnız rapora gereken üç alan tutuluyor (yaklaşık 1 MB).
+ * - Bellekte yalnız rapora gereken dört alan tutuluyor (yaklaşık 2 MB).
  * - 6 saatte bir ETag ile soruluyor; değişmediyse 304, gövde inmiyor.
  * - Son başarılı kopya diske yazılıyor; servis yeniden başlayınca ağ
  *   beklemeden açılıyor, site o an erişilemese bile rapor çıkıyor.
@@ -18,7 +18,8 @@ const KATALOG_URL = process.env.RAPOR_KATALOG_URL || 'https://jetbarkod.com.tr/p
 const TAZELEME_MS = 6 * 60 * 60 * 1000;
 const ZAMAN_ASIMI_MS = 30000;
 const AZAMI_BOYUT = 40 * 1024 * 1024;
-const DISK = path.join(__dirname, '..', 'veri', 'katalog-ozet.json');
+// v2: görsel adresi eklendi; eski önbellek (görselsiz) okunmasın diye ad değişti
+const DISK = path.join(__dirname, '..', 'veri', 'katalog-ozet-v2.json');
 
 let urunler = new Map();
 let etag = '';
@@ -35,6 +36,7 @@ function ozetle(json) {
             ad: String(p.name || '').slice(0, 200),
             barkod: bk ? String(bk.code).slice(0, 40) : '',
             kategori: String(p.category || '').slice(0, 80),
+            gorsel: typeof p.image === 'string' && p.image.startsWith('https://') ? p.image.slice(0, 300) : '',
         });
     }
     return m;
