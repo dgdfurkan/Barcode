@@ -122,7 +122,7 @@ function kartUret(veri, bilgi, ayarGirdi, gorseller) {
     parca.push(`<rect x="${P}" y="${y}" width="72" height="72" rx="20" fill="${T.logoZemin}"/>`);
     parca.push(`<image href="${LOGO}" x="${P + 6}" y="${y + 6}" width="60" height="60"/>`);
     parca.push(metin(P + 92, y + 34, 'Jet Barkod', { boy: 32, aile: 'Manrope', agirlik: 800, renk: T.yazi }));
-    parca.push(metin(P + 92, y + 64, 'Sayım raporu', { boy: 22, renk: T.sonuk }));
+    parca.push(metin(P + 92, y + 64, 'Sayım Raporu', { boy: 22, renk: T.sonuk }));
     const tarih = bilgi.tarih.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
     const tG = genislik(OLCU.govdeKalin, tarih, 22) + 40;
     parca.push(`<rect x="${S - P - tG}" y="${y + 14}" width="${tG}" height="44" rx="22" fill="${T.kutu}" stroke="${T.cizgi}"/>`);
@@ -192,10 +192,17 @@ function kartUret(veri, bilgi, ayarGirdi, gorseller) {
                 const g = gorseller && gorseller.get(p.id);
                 if (g) parca.push(`<image href="${veriUri(g)}" x="${P + 4}" y="${y + 4}" width="56" height="56" preserveAspectRatio="xMidYMid meet"/>`);
                 else parca.push(`<rect x="${P + 20}" y="${y + 20}" width="24" height="24" rx="6" fill="#eef0f3"/>`);
-                const deger = fiyatli && p.tl !== null ? tl(p.tl, true) : adet(p.fark, true) + ' adet';
-                const dG = genislik(OLCU.govdeKalin, deger, 28);
+                // Sağda iki satır: adet farkı (her zaman) ve fiyat açıksa TL etkisi
+                const adetMetni = adet(p.fark, true) + ' adet';
+                const tlMetni = fiyatli && p.tl !== null ? tl(p.tl, true) : '';
+                const dG = Math.max(genislik(OLCU.govdeKalin, adetMetni, 26), tlMetni ? genislik(OLCU.govde, tlMetni, 22) : 0);
                 parca.push(metin(P + 88, y + 42, kirp(OLCU.govdeKalin, p.ad, 28, IC - 88 - dG - 32), { boy: 28, agirlik: 600, renk: T.yazi }));
-                parca.push(metin(S - P, y + 42, deger, { boy: 28, agirlik: 600, renk: T.eksik, hiza: 'end' }));
+                if (tlMetni) {
+                    parca.push(metin(S - P, y + 28, adetMetni, { boy: 26, agirlik: 600, renk: T.eksik, hiza: 'end' }));
+                    parca.push(metin(S - P, y + 56, tlMetni, { boy: 22, renk: T.sonuk, hiza: 'end' }));
+                } else {
+                    parca.push(metin(S - P, y + 42, adetMetni, { boy: 26, agirlik: 600, renk: T.eksik, hiza: 'end' }));
+                }
                 y += SATIR;
             }
         }

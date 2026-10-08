@@ -181,25 +181,50 @@ async function isle(m, baglan) {
         const username = koduKullan(eslesme[1]);
         if (!username) {
             if (yanitlayabilirMi(chatId)) {
-                await mesaj(chatId, 'Bu bağlantının süresi dolmuş. Jet Barkod\'da Sayım > Finans > Sayım raporu ekranından "Telegram\'ı bağla" düğmesine yeniden basın.');
+                await mesaj(chatId, 'Bu bağlantının süresi dolmuş. Jet Barkod\'da Sayım > Finans > Sayım Raporu ekranından "Telegram\'ı bağla" düğmesine yeniden basın.');
             }
             return;
         }
         const ad = [m.from?.first_name, m.from?.last_name].filter(Boolean).join(' ').slice(0, 120);
-        const ok = await baglan({
+        const sonuc = await baglan({
             username,
             chatId,
             ad,
             kullaniciAdi: String(m.from?.username || '').slice(0, 64),
         });
-        if (ok) {
-            await mesaj(chatId, `Bağlandı. Jet Barkod hesabınız (${username}) için sayım raporları artık buraya PDF olarak gelecek.`);
+        if (sonuc === 'sinir') {
+            await mesaj(chatId, 'Bu Jet Barkod hesabına en fazla 5 Telegram hesabı bağlanabilir. Önce Jet Barkod\'dan birini kaldırın.');
+        } else if (sonuc) {
+            await mesaj(chatId, `Bağlandı. Jet Barkod hesabınız (${username}) için sayım raporları artık buraya da gelecek.`);
         }
         return;
     }
 
     if (yanitlayabilirMi(chatId)) {
-        await mesaj(chatId, 'Bu bot Jet Barkod sayım raporlarını PDF olarak gönderir.\n\nBağlamak için: Jet Barkod > Sayım > Finans > Sayım raporu > "Telegram\'ı bağla".');
+        await mesaj(chatId, 'Bu bot Jet Barkod sayım raporlarını PDF olarak gönderir.\n\nBağlamak için: Jet Barkod > Sayım > Finans > Sayım Raporu > "Telegram\'ı bağla".');
+    }
+}
+
+/**
+ * Gönderilmiş bir dosyayı Telegram'dan geri indir (sitede görüntülemek için).
+ * Bot API en fazla 20 MB veriyor; bizim dosyalar 2 MB'ın altında.
+ */
+async function dosyaIndir(dosyaId) {
+    const f = await cagir('getFile', { file_id: dosyaId });
+    if (!f || !f.file_path || !/^[A-Za-z0-9_./-]{1,200}$/.test(f.file_path)) throw new TelegramHatasi(404, 'dosya yok');
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 20000);
+    try {
+        const res = await fetch(`${API}/file/bot${JETON}/${f.file_path}`, { signal: ctrl.signal });
+        if (!res.ok) throw new TelegramHatasi(res.status, 'HTTP ' + res.status);
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length > 20 * 1024 * 1024) throw new TelegramHatasi(413, 'dosya cok buyuk');
+        return buf;
+    } catch (e) {
+        if (e instanceof TelegramHatasi) throw e;
+        throw new TelegramHatasi(0, e.name === 'AbortError' ? 'zaman asimi' : e.message);
+    } finally {
+        clearTimeout(t);
     }
 }
 
@@ -216,6 +241,7 @@ module.exports = {
     baglantiAdresi,
     dinle,
     botBilgisi,
+    dosyaIndir,
     temizle,
     TelegramHatasi,
 };

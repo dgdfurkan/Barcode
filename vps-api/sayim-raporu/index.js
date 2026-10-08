@@ -15,10 +15,10 @@
  *
  * KÖTÜYE KULLANIM SINIRLARI (kullanıcı başına, veritabanında; servis
  * yeniden başlasa da sıfırlanmaz)
- * - İki istek arası en az 60 saniye
+ * - İki istek arası en az 15 saniye
  * - Aynı anda en fazla 1 bekleyen iş
- * - Saatte 20, günde 60 istek. Gerçek kullanımda bu tavana varılmaz;
- *   ama biri her dakika basan bir betik yazsa bile günde 60'ı geçemez.
+ * - Saatte 40, günde 150 istek. Gerçek kullanımda bu tavana varılmaz;
+ *   ama biri sürekli basan bir betik yazsa bile saatte 40'ı geçemez.
  * - Bütün kullanıcılar için kuyrukta en fazla 200 iş; işçi tek sıra.
  */
 'use strict';
@@ -32,14 +32,15 @@ const { pdfUret, gorselGerekenler, tabloAdi, tl, adet } = require('./pdf');
 const { kartUret, kartGorselleri } = require('./kart');
 
 const SINIR = {
-    araSn: 60,
-    saatte: 20,
-    gunde: 60,
+    araSn: 15,
+    saatte: 40,
+    gunde: 150,
     kuyruk: 200,
-    bagla: 6, // 10 dakikada bağlantı kodu
+    bagla: 10, // 10 dakikada bağlantı kodu (5 hesaba yetecek kadar)
     istek: 90, // dakikada toplam uç çağrısı
 };
 const AZAMI_DENEME = 4;
+const AZAMI_HESAP = 5;
 const TAKILMA_DK = 3;
 
 function kur(app, { pool, verifyToken, bearerOf }) {
@@ -84,14 +85,20 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         next();
     }
 
-    async function baglantiOku(username) {
+    /** Kullanıcının bağlı Telegram hesapları (en fazla 5), bağlanma sırasıyla */
+    async function hesaplarOku(username) {
         const r = await pool.query(
-            `SELECT chat_id, tg_ad, tg_kullanici_adi, durum, baglandi_at
-             FROM rapor.telegram_baglantilari WHERE username = $1`,
+            `SELECT id, chat_id, tg_ad, tg_kullanici_adi, durum, baglandi_at
+             FROM rapor.telegram_baglantilari WHERE username = $1
+             ORDER BY baglandi_at`,
             [username]
         );
-        return r.rows[0] || null;
+        return r.rows;
     }
+
+    const hesapJson = (b) => ({
+        hesap: b.id, id: String(b.chat_id), ad: b.tg_ad || '', kullaniciAdi: b.tg_kullanici_adi || '', durum: b.durum, baglandi: b.baglandi_at,
+    });
 
     async function tercihOku(username) {
         try {
@@ -115,8 +122,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     // -----------------------------------------------------------------
     app.get('/api/rapor/durum', uye, async (req, res) => {
         try {
-            const [b, s, tercih] = await Promise.all([
-                baglantiOku(req.auth.username),
+            const [hesaplar, s, tercih] = await Promise.all([
+                hesaplarOku(req.auth.username),
                 pool.query(
                     `SELECT max(istendi_at) AS son FROM rapor.sayim_raporlari
                      WHERE username = $1 AND istendi_at > now() - interval '1 day'`,
@@ -129,9 +136,10 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             return res.json({
                 ok: true,
                 bot: telegram.botBilgisi(),
-                baglanti: b
-                    ? { id: String(b.chat_id), ad: b.tg_ad || '', kullaniciAdi: b.tg_kullanici_adi || '', durum: b.durum, baglandi: b.baglandi_at }
-                    : null,
+                hesaplar: hesaplar.map(hesapJson),
+                // Eski istemci için: ilk etkin hesap
+                baglanti: hesaplar.length ? hesapJson(hesaplar.find((h) => h.durum === 'aktif') || hesaplar[0]) : null,
+                azamiHesap: AZAMI_HESAP,
                 tercih,
                 sinir: { araSn: SINIR.araSn, kalanSn },
             });
@@ -159,6 +167,18 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         }
         const { kod, bitis } = telegram.kodUret(req.auth.username);
         return res.json({ ok: true, adres: telegram.baglantiAdresi(kod), bitis });
+    });
+
+    app.delete('/api/rapor/bagla/:hesap', uye, async (req, res) => {
+        const hesap = String(req.params.hesap || '');
+        if (!/^[0-9a-f-]{36}$/i.test(hesap)) return res.status(400).json({ ok: false, error: 'gecersiz' });
+        try {
+            await pool.query('DELETE FROM rapor.telegram_baglantilari WHERE username = $1 AND id = $2', [req.auth.username, hesap]);
+            return res.json({ ok: true });
+        } catch (e) {
+            console.error('rapor baglanti silme:', e.message);
+            return res.status(500).json({ ok: false, error: 'server_error' });
+        }
     });
 
     app.delete('/api/rapor/bagla', uye, async (req, res) => {
@@ -249,9 +269,9 @@ function kur(app, { pool, verifyToken, bearerOf }) {
 
     async function gonderilebilirMi(username) {
         if (!telegram.botBilgisi().hazir) return { kod: 503, govde: { ok: false, error: 'bot_hazir_degil' } };
-        const b = await baglantiOku(username);
-        if (!b) return { kod: 409, govde: { ok: false, error: 'baglanti_yok' } };
-        if (b.durum !== 'aktif') return { kod: 409, govde: { ok: false, error: 'bot_engelli' } };
+        const h = await hesaplarOku(username);
+        if (!h.length) return { kod: 409, govde: { ok: false, error: 'baglanti_yok' } };
+        if (!h.some((x) => x.durum === 'aktif')) return { kod: 409, govde: { ok: false, error: 'bot_engelli' } };
         return null;
     }
 
@@ -284,6 +304,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         try {
             const r = await pool.query(
                 `SELECT id, no, tablo, durum, hata, ozet, sayfa, ayar, istendi_at, gonderildi_at,
+                        (tg_dosya_id IS NOT NULL) AS pdf_var, (tg_kart_id IS NOT NULL) AS kart_var,
                         (tg_dosya_id IS NOT NULL OR tg_kart_id IS NOT NULL) AS tekrar_olur
                  FROM rapor.sayim_raporlari
                  WHERE username = $1
@@ -311,6 +332,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                         istendi: x.istendi_at,
                         gonderildi: x.gonderildi_at,
                         tekrar: x.durum === 'gonderildi' && x.tekrar_olur,
+                        belge: { pdf: x.pdf_var, kart: x.kart_var },
                     };
                 }),
             });
@@ -342,6 +364,74 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         } catch (e) {
             console.error('rapor tekrar:', e.message);
             return res.status(500).json({ ok: false, error: 'server_error' });
+        }
+    });
+
+    // -----------------------------------------------------------------
+    // Önizleme: göndermeden, aynı üreticiyle (PDF ya da kart)
+    // -----------------------------------------------------------------
+    // Kullanıcı başına aynı anda tek önizleme, dakikada 30; sunucu genelinde
+    // aynı anda en fazla 3. Üretim ~200 ms, görseller önbellekten.
+    const onizlemeSayaci = new Map();
+    const onizlemeMesgul = new Set();
+    let onizlemeAktif = 0;
+
+    app.post('/api/rapor/onizleme', uye, async (req, res) => {
+        const kullanici = req.auth.username;
+        const tablo = String(req.body?.tablo || '').trim();
+        if (!tablo || tablo.length > 200) return res.status(400).json({ ok: false, error: 'tablo_gecersiz' });
+        const tur = req.body?.tur === 'kart' ? 'kart' : 'pdf';
+        if (onizlemeMesgul.has(kullanici)) return res.status(429).json({ ok: false, error: 'mesgul' });
+        if (!pencere(onizlemeSayaci, kullanici, 30, 60000)) return res.status(429).json({ ok: false, error: 'cok_istek' });
+        if (onizlemeAktif >= 3) return res.status(503).json({ ok: false, error: 'yogun' });
+        onizlemeMesgul.add(kullanici);
+        onizlemeAktif++;
+        try {
+            const ayar = ayarDuzelt(req.body?.ayar);
+            await katalog.hazirla();
+            const satirlar = (await pool.query('SELECT * FROM rapor.sayim_satirlari($1, $2)', [kullanici, tablo])).rows;
+            if (!satirlar.length) return res.status(404).json({ ok: false, error: 'tablo_bos' });
+            const veri = raporHesapla(satirlar, katalog.bul, yedekFiyatDogrula(req.body?.fiyatlar) || {});
+            const bilgi = { tablo, kullanici, tarih: new Date(), no: 'Önizleme' };
+            const gorseller = await gorsel.topluGetir(tur === 'kart' ? kartGorselleri(veri, ayar) : gorselGerekenler(veri, ayar), 10000);
+            res.set('Cache-Control', 'no-store');
+            if (tur === 'kart') return res.type('image/png').send(kartUret(veri, bilgi, ayar, gorseller));
+            const p = await pdfUret(veri, bilgi, ayar, gorseller);
+            return res.type('application/pdf').send(p.buffer);
+        } catch (e) {
+            console.error('rapor onizleme:', e.message);
+            return res.status(500).json({ ok: false, error: 'server_error' });
+        } finally {
+            onizlemeMesgul.delete(kullanici);
+            onizlemeAktif--;
+        }
+    });
+
+    // -----------------------------------------------------------------
+    // Gönderilmiş belgeyi sitede görmek: Telegram'dan geri indirip aktar
+    // -----------------------------------------------------------------
+    const belgeSayaci = new Map();
+
+    app.get('/api/rapor/belge/:id/:tur', uye, async (req, res) => {
+        const id = String(req.params.id || '');
+        const tur = req.params.tur === 'kart' ? 'kart' : req.params.tur === 'pdf' ? 'pdf' : '';
+        if (!/^[0-9a-f-]{36}$/i.test(id) || !tur) return res.status(400).json({ ok: false, error: 'gecersiz' });
+        if (!pencere(belgeSayaci, req.auth.username, 20, 60000)) return res.status(429).json({ ok: false, error: 'cok_istek' });
+        try {
+            const r = await pool.query(
+                'SELECT tg_dosya_id, tg_kart_id FROM rapor.sayim_raporlari WHERE id = $1 AND username = $2',
+                [id, req.auth.username]
+            );
+            const satir = r.rows[0];
+            const dosyaId = satir && (tur === 'pdf' ? satir.tg_dosya_id : satir.tg_kart_id);
+            if (!dosyaId) return res.status(404).json({ ok: false, error: 'bulunamadi' });
+            const buf = await telegram.dosyaIndir(dosyaId);
+            const tip = buf[0] === 0x25 ? 'application/pdf' : buf[0] === 0x89 ? 'image/png' : 'image/jpeg';
+            res.set('Cache-Control', 'private, max-age=300');
+            return res.type(tip).send(buf);
+        } catch (e) {
+            console.warn('rapor belge:', telegram.temizle(e.message));
+            return res.status(502).json({ ok: false, error: 'indirilemedi' });
         }
     });
 
@@ -378,9 +468,9 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     }
 
     function aciklama(tablo, o, ayar) {
-        if (!o) return `Sayım raporu: ${tabloAdi(tablo)}`;
+        if (!o) return `Sayım Raporu: ${tabloAdi(tablo)}`;
         const fiyatli = !ayar || ayar.fiyat !== false;
-        const satir = [`Sayım raporu: ${tabloAdi(tablo)}`, `Sayılan ${adet(o.sayilan)} / ${adet(o.urun)} ürün`];
+        const satir = [`Sayım Raporu: ${tabloAdi(tablo)}`, `Sayılan ${adet(o.sayilan)} / ${adet(o.urun)} ürün`];
         if (fiyatli) {
             satir.push(`Eksik ${adet(o.eksik?.urun || 0)} ürün (${tl(o.eksik?.tl || 0, true)}) · Fazla ${adet(o.fazla?.urun || 0)} ürün (${tl(o.fazla?.tl || 0, true)})`);
             satir.push(`Net fark: ${tl(o.net, true)}`);
@@ -403,86 +493,134 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         if (!u || !u.is_active || (u.trial_end && new Date() > new Date(u.trial_end))) {
             return hataYaz(is, 'Hesap kapalı.');
         }
-        const b = await baglantiOku(is.username);
-        if (!b || b.durum !== 'aktif') return hataYaz(is, 'Telegram bağlı değil.');
         const ayar = ayarDuzelt(is.ayar);
+        const etkin = (await hesaplarOku(is.username)).filter((h) => h.durum === 'aktif');
+        let alicilar = etkin;
+        if (ayar.alicilar.length) {
+            const secili = etkin.filter((h) => ayar.alicilar.includes(h.id));
+            if (secili.length) alicilar = secili;
+        }
+        if (!alicilar.length) return hataYaz(is, 'Telegram hesabı bağlı değil.');
 
-        try {
-            let ozet = is.ozet;
-            let sayfa = is.sayfa;
-            let boyut = is.boyut;
-            let kartId = is.tg_kart_id || null;
-            let dosyaId = is.tg_dosya_id || null;
+        // Hangi alıcıya hangi parça gitti: geçici hatada yeniden denenirken
+        // aynı hesaba ikinci kez gitmesin
+        const ilerleme = new Set(Array.isArray(is.ilerleme) ? is.ilerleme : []);
+        const ilerlemeYaz = () => pool.query('UPDATE rapor.sayim_raporlari SET ilerleme = $2 WHERE id = $1', [is.id, JSON.stringify([...ilerleme])]);
 
-            if (is.kaynak) {
-                // Tekrar gönderim: üretmeden, kayıtlı dosya kimlikleriyle
-                const k = (await pool.query('SELECT tg_dosya_id, tg_kart_id FROM rapor.sayim_raporlari WHERE id = $1', [is.kaynak])).rows[0];
-                if (!k || (!k.tg_dosya_id && !k.tg_kart_id)) return hataYaz(is, 'Önceki belge bulunamadı.');
-                const yazi = aciklama(is.tablo, ozet, ayar);
-                if (k.tg_kart_id && !kartId) {
-                    await telegram.cagir('sendPhoto', { chat_id: b.chat_id, photo: k.tg_kart_id, caption: k.tg_dosya_id ? '' : yazi });
-                    kartId = k.tg_kart_id;
-                    await pool.query('UPDATE rapor.sayim_raporlari SET tg_kart_id = $2 WHERE id = $1', [is.id, kartId]);
-                }
-                if (k.tg_dosya_id && !dosyaId) {
-                    await telegram.cagir('sendDocument', { chat_id: b.chat_id, document: k.tg_dosya_id, caption: yazi });
-                    dosyaId = k.tg_dosya_id;
-                }
-            } else {
-                await katalog.hazirla();
-                const satirlar = (await pool.query('SELECT * FROM rapor.sayim_satirlari($1, $2)', [is.username, is.tablo])).rows;
-                if (!satirlar.length) return hataYaz(is, 'Tablo boş ya da silinmiş.');
-                const veri = raporHesapla(satirlar, katalog.bul, is.yedek_fiyat || {});
-                const tarih = new Date();
-                const bilgi = { tablo: is.tablo, kullanici: is.username, tarih, no: 'SR-' + String(is.no).padStart(6, '0') };
-                ozet = veri.ozet;
-                const istenen = [];
-                if (kartVar(ayar) && !kartId) istenen.push(...kartGorselleri(veri, ayar));
-                if (pdfVar(ayar) && !dosyaId) istenen.push(...gorselGerekenler(veri, ayar));
-                const gorseller = istenen.length ? await gorsel.topluGetir(istenen) : new Map();
+        let ozet = is.ozet;
+        let sayfa = is.sayfa;
+        let boyut = is.boyut;
+        let kartId = is.tg_kart_id || null;
+        let dosyaId = is.tg_dosya_id || null;
+        let kartIste = kartVar(ayar);
+        let pdfIste = pdfVar(ayar);
+        let png = null;
+        let pdf = null;
+        let tarih = new Date();
 
-                if (kartVar(ayar) && !kartId) {
-                    const png = kartUret(veri, bilgi, ayar, gorseller);
-                    const form = new FormData();
-                    form.append('chat_id', String(b.chat_id));
-                    // PDF de gidecekse açıklama PDF'te; kart tek başına giderse kartta
-                    if (!pdfVar(ayar)) form.append('caption', aciklama(is.tablo, ozet, ayar));
-                    form.append('photo', new Blob([png], { type: 'image/png' }), 'sayim-karti.png');
-                    const sonuc = await telegram.cagir('sendPhoto', form, 60000);
-                    const foto = Array.isArray(sonuc?.photo) ? sonuc.photo[sonuc.photo.length - 1] : null;
-                    kartId = foto?.file_id || 'gonderildi';
-                    // Ara kayıt: PDF'te geçici hata olursa kart yeniden gitmesin
-                    await pool.query('UPDATE rapor.sayim_raporlari SET tg_kart_id = $2, ozet = $3 WHERE id = $1', [is.id, kartId, ozet]);
-                }
-                if (pdfVar(ayar) && !dosyaId) {
-                    const pdf = await pdfUret(veri, bilgi, ayar, gorseller);
-                    sayfa = pdf.sayfa;
-                    boyut = pdf.buffer.length;
-                    const form = new FormData();
-                    form.append('chat_id', String(b.chat_id));
-                    form.append('caption', aciklama(is.tablo, ozet, ayar));
-                    form.append('document', new Blob([pdf.buffer], { type: 'application/pdf' }), dosyaAdi(is.tablo, tarih));
-                    const sonuc = await telegram.cagir('sendDocument', form, 60000);
-                    dosyaId = sonuc?.document?.file_id || null;
-                }
+        if (is.kaynak) {
+            // Tekrar gönderim: üretmeden, kayıtlı dosya kimlikleriyle
+            const k = (await pool.query('SELECT tg_dosya_id, tg_kart_id FROM rapor.sayim_raporlari WHERE id = $1', [is.kaynak])).rows[0];
+            if (!k || (!k.tg_dosya_id && !k.tg_kart_id)) return hataYaz(is, 'Önceki belge bulunamadı.');
+            kartId = kartId || k.tg_kart_id;
+            dosyaId = dosyaId || k.tg_dosya_id;
+            kartIste = !!kartId;
+            pdfIste = !!dosyaId;
+        } else if ((kartIste && !kartId) || (pdfIste && !dosyaId)) {
+            await katalog.hazirla();
+            const satirlar = (await pool.query('SELECT * FROM rapor.sayim_satirlari($1, $2)', [is.username, is.tablo])).rows;
+            if (!satirlar.length) return hataYaz(is, 'Tablo boş ya da silinmiş.');
+            const veri = raporHesapla(satirlar, katalog.bul, is.yedek_fiyat || {});
+            const bilgi = { tablo: is.tablo, kullanici: is.username, tarih, no: 'SR-' + String(is.no).padStart(6, '0') };
+            ozet = veri.ozet;
+            const istenen = [];
+            if (kartIste && !kartId) istenen.push(...kartGorselleri(veri, ayar));
+            if (pdfIste && !dosyaId) istenen.push(...gorselGerekenler(veri, ayar));
+            const gorseller = istenen.length ? await gorsel.topluGetir(istenen) : new Map();
+            if (kartIste && !kartId) png = kartUret(veri, bilgi, ayar, gorseller);
+            if (pdfIste && !dosyaId) {
+                const p = await pdfUret(veri, bilgi, ayar, gorseller);
+                pdf = p.buffer;
+                sayfa = p.sayfa;
+                boyut = p.buffer.length;
             }
-            await pool.query(
-                `UPDATE rapor.sayim_raporlari
-                 SET durum = 'gonderildi', hata = NULL, ozet = $2, sayfa = $3, boyut = $4,
-                     tg_dosya_id = $5, tg_kart_id = $6, gonderildi_at = now(), yedek_fiyat = NULL
-                 WHERE id = $1`,
-                [is.id, ozet, sayfa, boyut, dosyaId, kartId && kartId !== 'gonderildi' ? kartId : null]
-            );
-        } catch (e) {
-            const tg = e instanceof telegram.TelegramHatasi;
-            if (tg && telegram.kaliciMi(e)) {
-                if (e.kod === 403) {
-                    await pool.query(`UPDATE rapor.telegram_baglantilari SET durum = 'engelli' WHERE username = $1`, [is.username]);
-                    return hataYaz(is, 'Bot Telegram\'da engellenmiş. Ayarlardan yeniden bağlayın.');
+            await pool.query('UPDATE rapor.sayim_raporlari SET ozet = $2 WHERE id = $1', [is.id, ozet]);
+        }
+
+        const yazi = aciklama(is.tablo, ozet, ayar);
+        const kalici = [];
+        for (const h of alicilar) {
+            try {
+                if (kartIste && !ilerleme.has(h.id + ':kart')) {
+                    let sonuc;
+                    // Kart tek başına gidiyorsa açıklama kartta, PDF de varsa PDF'te
+                    const baslik = pdfIste ? '' : yazi;
+                    if (kartId) {
+                        sonuc = await telegram.cagir('sendPhoto', { chat_id: h.chat_id, photo: kartId, caption: baslik });
+                    } else {
+                        const form = new FormData();
+                        form.append('chat_id', String(h.chat_id));
+                        if (baslik) form.append('caption', baslik);
+                        form.append('photo', new Blob([png], { type: 'image/png' }), 'sayim-karti.png');
+                        sonuc = await telegram.cagir('sendPhoto', form, 60000);
+                        const foto = Array.isArray(sonuc?.photo) ? sonuc.photo[sonuc.photo.length - 1] : null;
+                        if (foto?.file_id) {
+                            kartId = foto.file_id;
+                            await pool.query('UPDATE rapor.sayim_raporlari SET tg_kart_id = $2 WHERE id = $1', [is.id, kartId]);
+                        }
+                    }
+                    ilerleme.add(h.id + ':kart');
+                    await ilerlemeYaz();
                 }
+                if (pdfIste && !ilerleme.has(h.id + ':pdf')) {
+                    if (dosyaId) {
+                        await telegram.cagir('sendDocument', { chat_id: h.chat_id, document: dosyaId, caption: yazi });
+                    } else {
+                        const form = new FormData();
+                        form.append('chat_id', String(h.chat_id));
+                        form.append('caption', yazi);
+                        form.append('document', new Blob([pdf], { type: 'application/pdf' }), dosyaAdi(is.tablo, tarih));
+                        const sonuc = await telegram.cagir('sendDocument', form, 60000);
+                        if (sonuc?.document?.file_id) {
+                            dosyaId = sonuc.document.file_id;
+                            await pool.query('UPDATE rapor.sayim_raporlari SET tg_dosya_id = $2 WHERE id = $1', [is.id, dosyaId]);
+                        }
+                    }
+                    ilerleme.add(h.id + ':pdf');
+                    await ilerlemeYaz();
+                }
+            } catch (e) {
+                if (!(e instanceof telegram.TelegramHatasi) || !telegram.kaliciMi(e)) throw e; // geçici: iş yeniden denenir
                 console.warn('rapor kalici hata:', telegram.temizle(e.message));
-                return hataYaz(is, 'Telegram belgeyi kabul etmedi.');
+                if (e.kod === 403) {
+                    await pool.query(`UPDATE rapor.telegram_baglantilari SET durum = 'engelli' WHERE id = $1`, [h.id]);
+                }
+                kalici.push(h);
             }
+        }
+
+        if (kalici.length === alicilar.length) {
+            return hataYaz(is, kalici.length > 1
+                ? 'Hiçbir hesaba gönderilemedi. Bot engellenmiş olabilir; hesapları yeniden bağlayın.'
+                : 'Bot Telegram\'da engellenmiş ya da sohbet silinmiş. Hesabı yeniden bağlayın.');
+        }
+        const not = kalici.length
+            ? `${kalici.map((h) => h.tg_ad || h.tg_kullanici_adi || 'Bir hesap').join(', ')} hesabına gönderilemedi.`
+            : null;
+        await pool.query(
+            `UPDATE rapor.sayim_raporlari
+             SET durum = 'gonderildi', hata = $7, ozet = $2, sayfa = $3, boyut = $4,
+                 tg_dosya_id = $5, tg_kart_id = $6, gonderildi_at = now(), yedek_fiyat = NULL
+             WHERE id = $1`,
+            [is.id, ozet, sayfa, boyut, dosyaId, kartId, not]
+        );
+    }
+
+    /** İşçinin hata sarmalayıcısı: geçici hatada iş kuyruğa geri döner */
+    async function isleGuvenli(is) {
+        try {
+            await isle(is);
+        } catch (e) {
             console.warn('rapor gecici hata:', telegram.temizle(e.message));
             if (is.deneme >= AZAMI_DENEME) return hataYaz(is, 'Gönderilemedi, birkaç kez denendi.');
             const bekle = Math.max(e.bekle || 0, 15 * 2 ** (is.deneme - 1));
@@ -502,7 +640,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             for (;;) {
                 const is = await isAl();
                 if (!is) break;
-                await isle(is).catch(async (e) => {
+                await isleGuvenli(is).catch(async (e) => {
                     console.error('rapor isi:', telegram.temizle(e.message));
                     await hataYaz(is, 'Rapor hazırlanamadı.').catch(() => {});
                 });
@@ -548,12 +686,18 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     // -----------------------------------------------------------------
     async function baglan({ username, chatId, ad, kullaniciAdi }) {
         try {
+            const sayim = await pool.query(
+                `SELECT count(*) FILTER (WHERE chat_id = $2) AS ayni, count(*) AS toplam
+                 FROM rapor.telegram_baglantilari WHERE username = $1`,
+                [username, chatId]
+            );
+            if (Number(sayim.rows[0].ayni) === 0 && Number(sayim.rows[0].toplam) >= AZAMI_HESAP) return 'sinir';
+            // Aynı sohbet yeniden bağlanırsa yeni satır açılmıyor, ad ve durum tazeleniyor
             await pool.query(
                 `INSERT INTO rapor.telegram_baglantilari (username, chat_id, tg_ad, tg_kullanici_adi, durum, baglandi_at)
                  VALUES ($1, $2, $3, $4, 'aktif', now())
-                 ON CONFLICT (username) DO UPDATE SET
-                    chat_id = EXCLUDED.chat_id, tg_ad = EXCLUDED.tg_ad,
-                    tg_kullanici_adi = EXCLUDED.tg_kullanici_adi, durum = 'aktif', baglandi_at = now()`,
+                 ON CONFLICT (username, chat_id) DO UPDATE SET
+                    tg_ad = EXCLUDED.tg_ad, tg_kullanici_adi = EXCLUDED.tg_kullanici_adi, durum = 'aktif', baglandi_at = now()`,
                 [username, chatId, ad || null, kullaniciAdi || null]
             );
             console.log('telegram baglandi:', username);

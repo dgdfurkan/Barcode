@@ -23,6 +23,7 @@ const VARSAYILAN = Object.freeze({
     kartTema: 'mavi', // acik | koyu | mavi
     kartUrunler: true, // kartta en çok eksik 3 ürün
     not: '',
+    alicilar: [], // boşsa bağlı bütün Telegram hesapları
 });
 
 const BICIM = new Set(['pdf', 'kart', 'ikisi']);
@@ -40,6 +41,11 @@ function ayarDuzelt(ham) {
     if (TEMA.has(g.kartTema)) a.kartTema = g.kartTema;
     if (typeof g.not === 'string') {
         a.not = g.not.replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+    }
+    if (Array.isArray(g.alicilar)) {
+        a.alicilar = [...new Set(g.alicilar.filter((x) => typeof x === 'string' && /^[0-9a-f-]{36}$/i.test(x)))].slice(0, 5);
+    } else {
+        a.alicilar = [];
     }
     // Boş PDF olmasın: hiçbir bölüm seçilmediyse özet açık
     if (!a.ozet && !a.grafik && !a.eksik && !a.fazla && !a.sayilmayan) a.ozet = true;

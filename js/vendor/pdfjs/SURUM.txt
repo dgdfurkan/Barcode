@@ -1,0 +1,2 @@
+pdf.js 5.7.284 (pdfjs-dist, legacy build), Mozilla, Apache-2.0.
+Yalnız sayım raporu önizlemesi açılınca yükleniyor (js/sayim-rapor.js).

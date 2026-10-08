@@ -161,7 +161,7 @@ function pdfUret(veri, bilgi, ayarGirdi, gorseller) {
             margins: { top: M, bottom: 0, left: M, right: M },
             bufferPages: true,
             compress: true,
-            info: { Title: `Sayım Raporu: ${baslik}`, Author: 'Jet Barkod', Creator: 'Jet Barkod', Producer: 'Jet Barkod', Subject: 'Sayım raporu' },
+            info: { Title: `Sayım Raporu: ${baslik}`, Author: 'Jet Barkod', Creator: 'Jet Barkod', Producer: 'Jet Barkod', Subject: 'Sayım Raporu' },
         });
         for (const [ad, yol] of Object.entries(FONT)) doc.registerFont(ad, yol);
 
