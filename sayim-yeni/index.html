@@ -48,10 +48,11 @@
     <script src="../js/barcode-visual.js?v=20260828i"></script>
     <script src="../js/getir-cdn-paste.js?v=20260928a"></script>
     <script src="../js/barcode-scanner.js?v=20260828i"></script>
-    <script src="../js/counting.js?v=20261008a"></script>
+    <script src="../js/counting.js?v=20261009a"></script>
     <script src="../js/urun-foto.js?v=20261007a" defer></script>
     <script src="../js/sayim-eslesmeyen.js?v=20260928a" defer></script>
     <script src="../js/sayim-rapor.js?v=20261008c" defer></script>
+    <script src="../js/sayim-dongu.js?v=20261009a" defer></script>
     <script src="../js/terminal-scanner.js?v=20260828i"></script>
     <script src="../js/counting-v2-ui.js?v=20260901a"></script>
     <script src="../js/sayim-tablo-secici.js?v=20260928a"></script>
@@ -2436,6 +2437,7 @@
     <link rel="stylesheet" href="../css/urun-foto.css?v=20261007a" />
     <link rel="stylesheet" href="../css/sayim-eslesmeyen.css?v=20260928a" />
     <link rel="stylesheet" href="../css/sayim-rapor.css?v=20261008c" />
+    <link rel="stylesheet" href="../css/sayim-dongu.css?v=20261009a" />
 </head>
 <body class="bg-gray-50 counting-v2">
     <div id="appBoot" class="app-boot app-boot--active" data-boot-steps="auth,data,ui" role="status" aria-live="polite" aria-label="Sayfa yükleniyor">
@@ -2533,6 +2535,14 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                         </svg>
                         <span>Sayım</span>
+                    </div>
+                </button>
+                <button id="tabDongu" class="tab-button flex-1 px-4 sm:px-6 py-3 sm:py-4 text-sm sm:text-base font-semibold text-gray-600 hover:text-gray-900 transition-colors border-b-2 border-transparent hover:border-gray-300" data-tab="dongu" type="button" title="Alt kategorilerin düzenli sayımı">
+                    <div class="flex items-center justify-center space-x-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9M18.5 3v4.2h-4.2M5.5 21v-4.2h4.2"/>
+                        </svg>
+                        <span>Döngü</span>
                     </div>
                 </button>
                 <button id="tabFinans" class="tab-button flex-1 px-4 sm:px-6 py-3 sm:py-4 text-sm sm:text-base font-semibold text-gray-600 hover:text-gray-900 transition-colors border-b-2 border-transparent hover:border-gray-300" data-tab="finans">

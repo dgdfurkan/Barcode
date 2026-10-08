@@ -140,4 +140,6 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
 - `sql_files/security_02_drop_plaintext_password.sql` çalıştırılacak.
 - `sql_files/siparis_canli.sql` çalıştırılacak (siparişlerde tik 1-2 sn'de diğer cihaza). Çalışana kadar
   sayfa 3 sn'de bir tam çekimle idare ediyor.
+- `sql_files/sayim_dongu.sql` çalıştırılacak (Sayım > Döngü: son çekim, döngü ayarı, katalog dışı ürünler).
+  Çalışana kadar Döngü çalışır ama son çekim zamanı yalnız o cihazda kalır.
 - VPS'te apt upgrade + reboot bekliyor.

@@ -8359,6 +8359,106 @@ class CountingSystem {
         }
     }
 
+    /**
+     * Sayım Döngüsü: Getir'den çekilen alt kategori ürünlerini AKTİF tabloya yazar.
+     * Tablo tamamen yenilenir: listede olmayan ürünler silinir, kalanların depo ve
+     * sistem stoğu sıfırlanır, sıra Getir'in sırası (stok çoktan aza) olur. Fiyat
+     * yanıttan gelir. Yol applyImportedRows ile aynı: tablo kilidi, sıra, toplu kayıt.
+     *
+     * @param {Array<{product:object, row:object}>} items
+     * @param {{tablo:string, kaynak?:string}} options tablo aktif tabloyla aynı olmalı
+     */
+    async applyDonguProducts(items, options = {}) {
+        if (!Array.isArray(items) || items.length === 0) throw new Error('Yazılacak ürün yok');
+        this._beginBulkImportLock('Ürünler tabloya yazılıyor');
+        try {
+            this._verifyCountingDataTableBinding();
+            const targetTable = this.currentTableName;
+            if (!targetTable || (options.tablo && options.tablo !== targetTable)) {
+                throw new Error('Aktif tablo değişti, işlem durduruldu');
+            }
+            const ids = [];
+            const seen = new Set();
+            for (const it of items) {
+                const product = it && it.product;
+                if (!product || !product.id || seen.has(product.id)) continue;
+                seen.add(product.id);
+                ids.push(product.id);
+                if (!this.countingData[product.id]) this.addProductToCounting(product, { skipSave: true });
+                else this._resetCountingEntryStockFields(this.countingData[product.id]);
+                const entry = this.countingData[product.id];
+                if (entry && it.row) {
+                    const fields = this._extractPriceFieldsFromApiProduct(it.row);
+                    if (fields.price != null || fields.struckPrice != null) {
+                        this._mergePriceFieldsIntoCountingEntry(entry, fields);
+                        this._cacheProductPriceFields(product.id, fields, entry);
+                    }
+                }
+            }
+
+            await this._purgeTableProductsNotInSet(ids);
+            this._ensureActiveTable(targetTable, 'döngü temizlik sonrası');
+            this.applyImportedProductOrder(ids, { replaceRest: true });
+            this._verifyCountingDataTableBinding();
+            this._syncProductOrderMeta();
+            this.pushAuditEntry(
+                `Döngü · ${this.formatTableDisplayName(targetTable)} · ${ids.length} ürün${options.kaynak ? ' · ' + options.kaynak : ''}`,
+                { cat: 'import', tbl: targetTable }
+            );
+
+            this._rapidRenderedIds = [];
+            this._rapidRenderedStates.clear();
+            this._invalidateFinanceCache(targetTable);
+            this.renderTable();
+            if (this.currentViewMode === 'rapid') this.renderRapidCountingMode();
+            this.updateStatistics();
+            this.updateCountingProgress();
+            this.updateTableSelector();
+
+            this._ensureActiveTable(targetTable, 'döngü kayıt öncesi');
+            await this.saveCountingData();
+            this._ensureActiveTable(targetTable, 'döngü kayıt sonrası');
+            await this._bulkSaveProductEntries(ids, targetTable);
+            this._ensureActiveTable(targetTable, 'döngü ürün kayıtları sonrası');
+            return { added: ids.length };
+        } finally {
+            this._endBulkImportLock();
+            this.updateTableSelector();
+            this.updateActiveTableActivityLine();
+        }
+    }
+
+    /**
+     * Katalogda olmayan ürünleri (Getir'den gelen) ürün dizinine ekler; sayım
+     * listesi ürünü dizinde bulamazsa satırı çizmiyor. Var olan ürüne dokunmaz.
+     * @param {Array<{id:string, name:string, image?:string, barcodes?:Array<{code:string}>, category?:string}>} list
+     * @returns {number} eklenen sayısı
+     */
+    registerExternalProducts(list) {
+        if (!Array.isArray(list) || !list.length) return 0;
+        let eklenen = 0;
+        for (const p of list) {
+            if (!p || !p.id || this.productIndex.has(p.id)) continue;
+            const urun = {
+                id: String(p.id),
+                name: String(p.name || 'Adsız ürün'),
+                category: p.category || '',
+                brand: '',
+                description: '',
+                image: p.image || '',
+                barcodes: Array.isArray(p.barcodes) ? p.barcodes.filter((b) => b && b.code) : [],
+                shelf: '-',
+                price: null,
+                stock: null,
+                _harici: true,
+            };
+            this.allProducts.push(urun);
+            this.productIndex.set(urun.id, urun);
+            eklenen++;
+        }
+        return eklenen;
+    }
+
     async importDailyCountForDate(iso) {
         try {
             await this.ensureDailyTableForDate(iso);
