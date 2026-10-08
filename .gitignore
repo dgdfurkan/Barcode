@@ -69,3 +69,6 @@ Jet-Barkod-Siparisler-Premium/
 .claude/skills/brag
 .claude/skills/hyperframes-*
 brag-output*/
+
+# VPS API çalışma verisi (katalog önbelleği)
+vps-api/veri/

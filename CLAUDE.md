@@ -140,4 +140,7 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
 - `sql_files/security_02_drop_plaintext_password.sql` çalıştırılacak.
 - `sql_files/siparis_canli.sql` çalıştırılacak (siparişlerde tik 1-2 sn'de diğer cihaza). Çalışana kadar
   sayfa 3 sn'de bir tam çekimle idare ediyor.
+- Sayım raporu (PDF, Telegram): `sql_files/sayim_raporu_telegram.sql` çalıştırılacak, `vps-api/` (server.js,
+  package.json, package-lock.json, `sayim-raporu/`) VPS'e kopyalanıp `npm install --omit=dev` yapılacak,
+  `.env`'e `TELEGRAM_RAPOR_BOT_TOKEN` girilecek. Jeton depoya asla yazılmaz.
 - VPS'te apt upgrade + reboot bekliyor.

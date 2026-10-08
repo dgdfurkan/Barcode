@@ -947,6 +947,11 @@ app.use(
     })
 );
 
+// =====================================================================
+// Sayım raporu: PDF üretip kullanıcının Telegram'ına gönderir
+// =====================================================================
+require('./sayim-raporu').kur(app, { pool, verifyToken, bearerOf });
+
 app.use((req, res) => res.status(404).json({ ok: false, error: 'not_found' }));
 
 app.listen(PORT, '127.0.0.1', () => {

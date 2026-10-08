@@ -51,6 +51,7 @@
     <script src="../js/counting.js?v=20260928a"></script>
     <script src="../js/urun-foto.js?v=20261007a" defer></script>
     <script src="../js/sayim-eslesmeyen.js?v=20260928a" defer></script>
+    <script src="../js/sayim-rapor.js?v=20261008a" defer></script>
     <script src="../js/terminal-scanner.js?v=20260828i"></script>
     <script src="../js/counting-v2-ui.js?v=20260901a"></script>
     <script src="../js/sayim-tablo-secici.js?v=20260928a"></script>
@@ -2434,6 +2435,7 @@
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
     <link rel="stylesheet" href="../css/urun-foto.css?v=20261007a" />
     <link rel="stylesheet" href="../css/sayim-eslesmeyen.css?v=20260928a" />
+    <link rel="stylesheet" href="../css/sayim-rapor.css?v=20261008a" />
 </head>
 <body class="bg-gray-50 counting-v2">
     <div id="appBoot" class="app-boot app-boot--active" data-boot-steps="auth,data,ui" role="status" aria-live="polite" aria-label="Sayfa yükleniyor">
@@ -2652,6 +2654,9 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Sayım raporu: PDF, Telegram (js/sayim-rapor.js) -->
+            <div id="sayimRaporKart" class="sr-kart-yer"></div>
 
             <!-- Summary Cards -->
             <div id="financialSummaryCards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
