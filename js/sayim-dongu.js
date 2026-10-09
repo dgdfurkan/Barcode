@@ -202,7 +202,8 @@
         oturum_yok: 'Getir oturumu bulunamadı. Bilgisayarda franchise-v2.getir.com/inventory-management/current sayfasını açıp yenileyin; eklenti oturumu yakalar ve telefona da geçer.',
         oturum_bitti: 'Getir oturumunun süresi dolmuş. Bilgisayarda Getir franchise sayfasını yenileyin, sonra tekrar deneyin.',
         depo_yok: 'Depo bilgisi bulunamadı. Getir franchise sayfasını açıp yenileyin.',
-        kimlik_yok: 'Bu alt kategorinin Getir kimliği henüz bilinmiyor. Tabloya bu kategoriden birkaç ürün ekleyin ya da başka bir alt kategoriyi çekin; kimlik Getir yanıtlarından öğrenilir.',
+        kimlik_yok: 'Getir\'de bu alt kategoriyi bulamadım: tabloda ürün yok, katalogda da adı bu kategoriyi çağrıştıran ürün çıkmadı. Tabloya bu kategoriden bir ürün ekleyip tekrar deneyin.',
+        esles: 'Getir alt kategorisi seçilmeli.',
         bos: 'Getir bu alt kategoride depoda ürün döndürmedi.',
         getir: 'Getir isteği başarısız oldu. Biraz sonra tekrar deneyin.',
         ag: 'Getir\'e ulaşılamadı. İnternet bağlantınızı kontrol edin.',
@@ -261,7 +262,34 @@
 
     function gorselAdresi(ad) {
         var t = TOHUM[ad];
-        return t && t[1] ? GORSEL_KOKU + t[1] + '?format=webp&width=96&height=96' : '';
+        if (t && t[1]) return GORSEL_KOKU + t[1] + '?format=webp&width=96&height=96';
+        // Belgede yoksa Getir yanıtlarından öğrenilen kategori ikonu
+        var og = ogrenilenBul(ad);
+        return og && og.g ? og.g : '';
+    }
+
+    /** Ad karşılaştırması için gevşek biçim: "Donuk Et, Tavuk & Balık" = "Donuk Et & Tavuk & Balık" */
+    function normSiki(ad) {
+        return norm(ad).replace(/[&,.\/]/g, ' ').replace(/\sve\s/g, ' ').split(/\s+/).filter(Boolean).sort().join(' ');
+    }
+
+    /** Öğrenilen kayıt: eski biçim yalnız kimlik dizgesi, yeni biçim { id, g } */
+    function ogrenilenKayit(v) {
+        if (!v) return null;
+        if (typeof v === 'string') return { id: v, g: '' };
+        return v.id ? { id: v.id, g: v.g || '' } : null;
+    }
+
+    var sikiDizin = null; // normSiki -> kayıt; öğrenilenler değişince sıfırlanır
+    function ogrenilenBul(ad) {
+        var og = d.ayar.ogrenilen;
+        var dogrudan = ogrenilenKayit(og[norm(ad)]);
+        if (dogrudan) return dogrudan;
+        if (!sikiDizin) {
+            sikiDizin = new Map();
+            Object.keys(og).forEach(function (k) { sikiDizin.set(normSiki(k), og[k]); });
+        }
+        return ogrenilenKayit(sikiDizin.get(normSiki(ad)));
     }
 
     function gunMetni(ms) {
@@ -309,7 +337,7 @@
                     if (r.anahtar === '_ayar') {
                         var ay = r.ayar || {};
                         if (SURELER.indexOf(Number(ay.sure)) >= 0) d.ayar.sure = Number(ay.sure);
-                        if (ay.ogrenilen && typeof ay.ogrenilen === 'object') d.ayar.ogrenilen = Object.assign({}, ay.ogrenilen, d.ayar.ogrenilen);
+                        if (ay.ogrenilen && typeof ay.ogrenilen === 'object') { d.ayar.ogrenilen = Object.assign({}, ay.ogrenilen, d.ayar.ogrenilen); sikiDizin = null; }
                         if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
                         return;
                     }
@@ -539,10 +567,14 @@
 
     function asilAltKategori(row) {
         var sc = row && row.subCategory;
-        if (!sc) return { id: null, ad: '' };
-        if (typeof sc === 'string') return { id: sc, ad: '' };
+        if (!sc) return { id: null, ad: '', g: '' };
+        if (typeof sc === 'string') return { id: sc, ad: '', g: '' };
         var ad = sc.name ? (sc.name.tr || sc.name.en || '') : '';
-        return { id: sc._id || sc.id || null, ad: ad };
+        var g = sc.picURL ? (sc.picURL.tr || sc.picURL.en || '') : '';
+        // Yalnız Getir'in kategori görsel sunucusu; küçük boyda istenir
+        g = /^https:\/\/cdn-image\.getir\.com\/market\/category\/[0-9a-f-]+\.(png|jpe?g|webp)/i.test(g)
+            ? g.split('?')[0] + '?format=webp&width=96&height=96' : '';
+        return { id: sc._id || sc.id || null, ad: ad, g: g };
     }
 
     /** Yanıttaki ürünlerin asıl alt kategorilerinden ad -> kimlik öğren */
@@ -552,9 +584,13 @@
             var a = asilAltKategori(row);
             if (!a.id || !a.ad || !/^[0-9a-f]{24}$/.test(a.id)) return;
             var n = norm(a.ad);
-            if (d.ayar.ogrenilen[n] !== a.id) { d.ayar.ogrenilen[n] = a.id; degisti = true; }
+            var eski = ogrenilenKayit(d.ayar.ogrenilen[n]);
+            if (!eski || eski.id !== a.id || (a.g && eski.g !== a.g)) {
+                d.ayar.ogrenilen[n] = { id: a.id, g: a.g || (eski && eski.id === a.id ? eski.g : '') };
+                degisti = true;
+            }
         });
-        if (degisti) ayarYaz();
+        if (degisti) { sikiDizin = null; ayarYaz(); }
     }
 
     /** Denenecek kimlikler: kayıtlı (doğrulanmış) > öğrenilen > belgedeki adaylar */
@@ -563,27 +599,49 @@
         var ekle = function (id) { if (id && /^[0-9a-f]{24}$/.test(id) && liste.indexOf(id) < 0) liste.push(id); };
         var k = d.kayitlar.get(ad);
         if (k) ekle(k.getir_id);
-        ekle(d.ayar.ogrenilen[norm(ad)]);
+        var og = ogrenilenBul(ad);
+        if (og) ekle(og.id);
         (TOHUM[ad] ? TOHUM[ad][2] : []).forEach(ekle);
         return liste;
     }
 
-    /** Kimliği bilinmeyen kategoride: tablodaki ürünlerin asıl kategorisinden (tek istek) */
-    async function tablodanOgren(ad, api, sinyal) {
-        var t = tabloVerisi(ad);
+    /**
+     * Kimliği bilinmeyen alt kategori için Getir'e sor. Örnek ürünler: önce
+     * tablodakiler, yoksa katalogda adı alt kategori sözcüklerini taşıyanlar
+     * ("Çiğ Köfte & Meze" -> "çiğ köfte", "meze"). Tek istek; yanıttaki ürünlerin
+     * asıl alt kategorileri Getir'in kendi ad, kimlik ve ikonuyla öğrenilir.
+     * @returns {Promise<{id:string}|{secenekler:Array}|null>}
+     */
+    async function kesif(ad, api, sinyal) {
         var s = cs();
-        if (!t) return null;
-        var ids = Object.keys(t).filter(function (k) {
-            return !(s.isReservedCountingKey && s.isReservedCountingKey(k)) && /^[0-9a-f]{24}$/.test(k);
-        }).slice(0, 30);
+        var ids = [];
+        var ekle = function (id) { if (/^[0-9a-f]{24}$/.test(id) && ids.indexOf(id) < 0) ids.push(id); };
+        var t = tabloVerisi(ad);
+        if (t) Object.keys(t).forEach(function (k) { if (!(s.isReservedCountingKey && s.isReservedCountingKey(k))) ekle(k); });
+        ids = ids.slice(0, 30);
+        if (ids.length < 10 && Array.isArray(s.allProducts)) {
+            var sozcukler = norm(ad).split(/\s*(?:&|,|\/|\sve\s)\s*/).map(function (x) { return x.trim(); }).filter(function (x) { return x.length >= 3; });
+            for (var i = 0; i < s.allProducts.length && ids.length < 40; i++) {
+                var p = s.allProducts[i];
+                var urunAdi = String(p && p.name || '').toLocaleLowerCase('tr');
+                if (sozcukler.some(function (sz) { return urunAdi.indexOf(sz) >= 0; })) ekle(String(p.id));
+            }
+        }
         if (!ids.length) return null;
         var sonuc = await stokIstegi(api, { warehouseIds: [api.depo], productIds: ids, sort: { available: -1 } }, 0, sinyal);
         ogren(sonuc.data);
+        var kesin = ogrenilenBul(ad);
+        if (kesin) return { id: kesin.id };
+        // Getir'deki ad bizimkiyle tutmadı: bulunan kategorileri kullanıcıya göster
         var say = {};
-        sonuc.data.forEach(function (row) { var a = asilAltKategori(row); if (a.id) say[a.id] = (say[a.id] || 0) + 1; });
-        var enIyi = null;
-        Object.keys(say).forEach(function (id) { if (!enIyi || say[id] > say[enIyi]) enIyi = id; });
-        return enIyi;
+        sonuc.data.forEach(function (row) {
+            var a = asilAltKategori(row);
+            if (!a.id || !a.ad) return;
+            if (!say[a.id]) say[a.id] = { id: a.id, ad: a.ad, g: a.g, n: 0 };
+            say[a.id].n++;
+        });
+        var secenekler = Object.keys(say).map(function (k) { return say[k]; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 6);
+        return secenekler.length ? { secenekler: secenekler } : null;
     }
 
     function hariciUrun(row) {
@@ -679,12 +737,13 @@
     // ------------------------------------------------------------------
     // Ürünleri çek
     // ------------------------------------------------------------------
-    async function urunleriCek(ad) {
+    async function urunleriCek(ad, onceki) {
         var s = cs();
         if (!s || d.cekim) return;
-        var secim = await cekPenceresi(ad);
+        var secim = onceki || await cekPenceresi(ad);
         if (!secim) return;
         var sifirAlma = secim.sifirAlma;
+        d.esles = null;
         var iptal = new AbortController();
         d.cekim = { ad: ad, asama: 'Getir oturumu kontrol ediliyor', sayfa: 0, toplamSayfa: 0, taranan: 0, uygun: 0, elenen: 0, iptal: iptal };
         d.sonuc = null;
@@ -692,12 +751,20 @@
         try {
             var api = await apiBilgisi();
             var liste = adaylar(ad);
-            if (!liste.length) {
-                d.cekim.asama = 'Alt kategori kimliği öğreniliyor';
+            var kesfedildi = false;
+            var kesfet = async function () {
+                kesfedildi = true;
+                d.cekim.asama = 'Getir\'de alt kategori aranıyor';
                 cekimCiz();
-                var og = await tablodanOgren(ad, api, iptal.signal);
-                if (og) liste.push(og);
-            }
+                var k = await kesif(ad, api, iptal.signal);
+                if (k && k.id) return [k.id];
+                if (k && k.secenekler) {
+                    d.esles = { ad: ad, secenekler: k.secenekler, secim: secim };
+                    throw hata('esles');
+                }
+                return [];
+            };
+            if (!liste.length) liste = await kesfet();
             if (!liste.length) throw hata('kimlik_yok');
 
             var bulunan = null;
@@ -732,6 +799,14 @@
                     await bekle(SAYFA_ARASI_MS);
                 }
                 if (uygun.length) { bulunan = uygun; kullanilan = altId; }
+            }
+            // Bilinen kimlikler sonuç vermediyse son çare Getir'e sor
+            if (!bulunan && !kesfedildi) {
+                var yeni = (await kesfet()).filter(function (id) { return liste.indexOf(id) < 0; });
+                if (yeni.length) {
+                    d.cekim.taranan = 0;
+                    return await urunleriCekKimlikle(ad, secim, yeni[0], iptal);
+                }
             }
             if (!bulunan) throw hata(d.cekim.taranan ? 'kimlik_yok' : 'bos');
 
@@ -784,13 +859,33 @@
             d.sonuc = { ad: ad, metin: parca.join(' · '), tur: 'basari' };
             bildir(ad + ': ' + parca[0] + '.', 'basari');
         } catch (e) {
-            var metin = e && e.kod ? e.message : (e && e.message) || HATA.getir;
-            d.sonuc = { ad: ad, metin: metin, tur: e && e.kod === 'iptal' ? 'bilgi' : 'hata' };
-            if (!(e && e.kod === 'iptal')) bildir(metin, 'hata');
+            if (e && e.kod === 'esles') {
+                d.sonuc = null;
+            } else {
+                var metin = e && e.kod ? e.message : (e && e.message) || HATA.getir;
+                d.sonuc = { ad: ad, metin: metin, tur: e && e.kod === 'iptal' ? 'bilgi' : 'hata' };
+                if (!(e && e.kod === 'iptal')) bildir(metin, 'hata');
+            }
         } finally {
             d.cekim = null;
             ciz();
         }
+    }
+
+    /** Bilinen kimlik bitince keşfedilen yeni kimlikle aynı çekimi yeniden başlat */
+    function urunleriCekKimlikle(ad, secim, id, iptal) {
+        d.kayitlar.set(ad, Object.assign({}, d.kayitlar.get(ad) || {}, { getir_id: id }));
+        d.cekim = null;
+        return urunleriCek(ad, secim);
+    }
+
+    /** Kullanıcı Getir alt kategorisini seçti: kalıcı kaydet, çekime devam */
+    async function eslesSec(id) {
+        var e = d.esles;
+        if (!e || !/^[0-9a-f]{24}$/.test(id)) return;
+        d.esles = null;
+        await kayitYaz(e.ad, { getir_id: id });
+        urunleriCek(e.ad, e.secim);
     }
 
     // ------------------------------------------------------------------
@@ -888,6 +983,8 @@
             else if (ne === 'filtre') { d.filtre = h.getAttribute('data-deger'); ciz(); }
             else if (ne === 'cek') urunleriCek(d.secili);
             else if (ne === 'iptal') { if (d.cekim) d.cekim.iptal.abort(); }
+            else if (ne === 'esles') eslesSec(h.getAttribute('data-id'));
+            else if (ne === 'esles-kapat') { d.esles = null; ciz(); }
             else if (ne === 'listeye') {
                 var hedef = document.getElementById('countingTableContainer');
                 if (hedef) hedef.scrollIntoView({ behavior: azaltilmisHareket() ? 'auto' : 'smooth', block: 'start' });
@@ -1046,6 +1143,18 @@
                 (c.toplamSayfa > 1 && c.asama !== 'Tabloya yazılıyor' ? ' · sayfa ' + c.sayfa + ' / ' + c.toplamSayfa : '') + '</p>' +
                 '<div class="sd-cekim__cubuk"><span style="transform:scaleX(' + oran.toFixed(3) + ')"></span></div>' +
                 '<p class="sd-cekim__sayilar"><span><strong>' + c.taranan + '</strong> tarandı</span><span><strong>' + c.uygun + '</strong> uygun</span><span><strong>' + c.elenen + '</strong> elendi</span></p>' +
+                '</div>';
+        }
+        if (d.esles && d.esles.ad === ad) {
+            return '<div class="sd-esles" role="group" aria-labelledby="sdEslesBaslik">' +
+                '<p class="sd-esles__baslik" id="sdEslesBaslik">Getir\'de bu adla bir alt kategori bulunamadı. Bu ürünler Getir\'de şu alt kategorilerde; hangisi ' + kacir(ad) + '?</p>' +
+                '<div class="sd-esles__liste">' + d.esles.secenekler.map(function (x) {
+                    return '<button type="button" class="sd-esles__secenek" data-sd="esles" data-id="' + kacir(x.id) + '">' +
+                        '<span class="sd-kart__gorsel">' + (x.g ? '<img src="' + kacir(x.g) + '" alt="" loading="lazy">' : SVG.kutu) + '</span>' +
+                        '<span class="sd-esles__metin"><strong>' + kacir(x.ad) + '</strong><span>' + x.n + ' örnek ürün</span></span></button>';
+                }).join('') + '</div>' +
+                '<button type="button" class="sd-dugme sd-dugme--metin" data-sd="esles-kapat">Hiçbiri</button>' +
+                '<p class="sd-ipucu">Seçim hesaba kaydedilir; bir dahaki çekimde sorulmaz.</p>' +
                 '</div>';
         }
         if (d.sonuc && d.sonuc.ad === ad) {

@@ -303,6 +303,34 @@ html.sd-modu.sd-tablosuz #countingTableContainer { display: none !important; }
 .sd-dugme--metin { background: transparent; color: var(--sd-mavi-koyu); padding: 0 12px; }
 .sd-dugme--metin:hover { background: var(--sd-mavi-acik); }
 
+/* Getir alt kategorisi seçimi (ad tutmadığında) */
+.sd-esles { padding: 12px; border: 1px solid var(--sd-cizgi); border-radius: 12px; background: var(--sd-kagit); }
+.sd-esles__baslik { margin: 0 0 12px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--sd-yazi); }
+.sd-esles__liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin-bottom: 8px; }
+
+.sd-esles__secenek {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 8px 12px 8px 8px;
+    border: 1px solid var(--sd-cizgi);
+    border-radius: 12px;
+    background: #fff;
+    font: inherit;
+    text-align: left;
+    color: inherit;
+    cursor: pointer;
+    transition: border-color var(--motion-fast, 140ms) var(--motion-ease-out, ease-out);
+}
+
+.sd-esles__secenek:hover { border-color: var(--sd-mavi); }
+.sd-esles__secenek:focus-visible { outline: 2px solid var(--sd-mavi); outline-offset: 2px; }
+.sd-esles__metin { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sd-esles__metin strong { font-size: 13px; line-height: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.sd-esles__metin span { font-size: 11px; line-height: 16px; color: var(--sd-sonuk); }
+.sd-esles .sd-ipucu { margin-top: 4px; }
+
 /* ==== Ürünleri çek penceresi ========================================= */
 html.sd-kilit, html.sd-kilit body { overflow: hidden; }
 
