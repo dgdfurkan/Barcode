@@ -241,6 +241,65 @@ html.sd-modu.sd-tablosuz #countingTableContainer { display: none !important; }
 .sd-rozet--yesil { background: var(--sd-yesil-acik); color: var(--sd-yesil-koyu); }
 .sd-rozet--gri { background: var(--sd-kagit); color: var(--sd-orta); }
 
+/* Sağ üst durum rozeti: dokununca el ile durum menüsü */
+.sd-durum { position: relative; flex: none; }
+.sd-durum__dugme {
+    gap: 4px;
+    min-height: 32px;
+    height: 32px;
+    padding: 0 8px 0 12px;
+    border: 0;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter var(--motion-fast, 140ms) var(--motion-ease-out, ease-out);
+}
+.sd-durum__dugme svg { width: 14px; height: 14px; transition: transform var(--motion-fast, 140ms) var(--motion-ease-out, ease-out); }
+.sd-durum__dugme[aria-expanded="true"] svg { transform: rotate(180deg); }
+.sd-durum__dugme:hover { filter: brightness(0.97); }
+.sd-durum__dugme:focus-visible { outline: 2px solid var(--sd-mavi); outline-offset: 2px; }
+.sd-durum__menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    z-index: 30;
+    width: min(288px, calc(100vw - 48px));
+    padding: 8px;
+    border: 1px solid var(--sd-cizgi);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 24px 48px -12px rgba(16, 24, 40, 0.24);
+    transform-origin: top right;
+    animation: sd-menu-ac var(--motion-normal, 180ms) var(--motion-ease-out, ease-out);
+}
+.sd-durum__baslik { margin: 0; padding: 4px 8px 8px; font-size: 11px; line-height: 16px; font-weight: 600; color: var(--sd-sonuk); }
+.sd-durum__secenek {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 52px;
+    padding: 8px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    color: var(--sd-yazi);
+    cursor: pointer;
+}
+.sd-durum__secenek:hover { background: var(--sd-kagit); }
+.sd-durum__secenek:focus-visible { outline: 2px solid var(--sd-mavi); outline-offset: -2px; }
+.sd-durum__secenek.is-secili { background: var(--sd-mavi-acik); }
+.sd-durum__secenek .sd-nokta { flex: none; }
+.sd-durum__metin { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sd-durum__metin strong { font-size: 13px; line-height: 18px; font-weight: 600; }
+.sd-durum__metin span { font-size: 11px; line-height: 16px; color: var(--sd-sonuk); }
+.sd-durum__onay { flex: none; width: 16px; height: 16px; color: var(--sd-mavi); }
+.sd-durum__onay svg { width: 16px; height: 16px; }
+@keyframes sd-menu-ac { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+
 .sd-detay__kimlik { display: flex; align-items: center; gap: 16px; }
 .sd-detay__gorsel { flex: none; width: 64px; height: 64px; display: grid; place-items: center; border-radius: 16px; background: var(--sd-kagit); color: var(--sd-soluk); overflow: hidden; }
 .sd-detay__gorsel img { width: 100%; height: 100%; object-fit: contain; }
@@ -482,6 +541,8 @@ html.sd-kilit, html.sd-kilit body { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
     .sd-giris .sd-ust, .sd-giris .sd-detay, .sd-giris .sd-kart { animation: none; }
     .sd-perde, .sd-pencere, .sd-anahtar__kol, .sd-anahtar__kol::after { transition: none; }
+    .sd-durum__menu { animation: none; }
+    .sd-durum__dugme, .sd-durum__dugme svg { transition: none; }
     .sd-pencere { transform: none; }
     .sd-kart, .sd-filtre, .sd-dugme, .sd-halka__dolu, .sd-kart__cubuk > span, .sd-ilerleme > span, .sd-cekim__cubuk > span { transition: none; }
     .sd-cark { animation-duration: 2s; }

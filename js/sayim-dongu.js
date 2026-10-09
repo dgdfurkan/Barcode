@@ -186,7 +186,6 @@
         gecikti: { ad: 'Gecikti', renk: 'kirmizi', sira: 0 },
         yok: { ad: 'Hiç sayılmadı', renk: 'gri', sira: 1 },
         yaklasiyor: { ad: 'Yaklaşıyor', renk: 'sari', sira: 2 },
-        bekliyor: { ad: 'Sayıma hazır', renk: 'mavi', sira: 3 },
         suruyor: { ad: 'Sürüyor', renk: 'mavi', sira: 4 },
         guncel: { ad: 'Güncel', renk: 'yesil', sira: 5 },
     };
@@ -194,7 +193,7 @@
         ['tumu', 'Tümü', null],
         ['gecikti', 'Gecikmiş', ['gecikti']],
         ['yok', 'Hiç sayılmadı', ['yok']],
-        ['suruyor', 'Sürüyor', ['suruyor', 'bekliyor']],
+        ['suruyor', 'Sürüyor', ['suruyor']],
         ['guncel', 'Güncel', ['guncel', 'yaklasiyor']],
     ];
 
@@ -220,7 +219,7 @@
         yukleniyor: null,
         dbYok: false,
         kayitlar: new Map(), // alt kategori adı -> { getir_id, cekildi_at, urun_sayisi }
-        ayar: { sure: 30, ogrenilen: {}, sifirAlma: false, sistemDoldur: false },
+        ayar: { sure: 30, ogrenilen: {}, sifirAlma: false, sistemDoldur: false, elDurum: {} },
         mod: false,
         secili: null,
         filtre: 'tumu',
@@ -306,6 +305,18 @@
         var m = gun <= 0 ? 'Bugün' : gun === 1 ? 'Dün' : gun + ' gün önce';
         return kucuk ? m.toLocaleLowerCase('tr') : m;
     }
+    /** "az önce", "12 dakika önce", "3 saat 5 dakika önce", "2 gün 4 saat önce" */
+    function goreliSure(ms) {
+        var dk = Math.floor((Date.now() - ms) / 60000);
+        if (dk < 1) return 'az önce';
+        if (dk < 60) return dk + ' dakika önce';
+        var sa = Math.floor(dk / 60);
+        if (sa < 24) return sa + ' saat' + (dk % 60 ? ' ' + (dk % 60) + ' dakika' : '') + ' önce';
+        var gun = Math.floor(sa / 24);
+        return gun + ' gün' + (sa % 24 ? ' ' + (sa % 24) + ' saat' : '') + ' önce';
+    }
+    function buyukBasla(m) { return m ? m.charAt(0).toLocaleUpperCase('tr') + m.slice(1) : m; }
+
     /** Detay kartı için: "Bugün 14:32", "Dün 09:10", "3 gün önce", "7 Ekim" */
     function zamanMetni(ms) {
         if (!ms) return '';
@@ -348,6 +359,7 @@
             if (ay.ogrenilen && typeof ay.ogrenilen === 'object') { d.ayar.ogrenilen = Object.assign({}, ay.ogrenilen, d.ayar.ogrenilen); sikiDizin = null; }
             if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
             if (typeof ay.sistemDoldur === 'boolean') d.ayar.sistemDoldur = ay.sistemDoldur;
+            elDurumBirlestir(ay.elDurum);
             if (SURELER.indexOf(Number(ay.sure)) >= 0) d.ayar.sure = Number(ay.sure);
             Object.keys(ham.kayitlar || {}).forEach(function (ad) {
                 if (!TOHUM[ad]) return;
@@ -388,6 +400,7 @@
                 var yeni = new Map();
                 var ayarVar = false;
                 var sunucuOgrenilen = 0;
+                var ayarYerelde = false;
                 (a.data || []).forEach(function (r) {
                     if (r.anahtar === '_ayar') {
                         ayarVar = true;
@@ -397,6 +410,7 @@
                         if (ay.ogrenilen && typeof ay.ogrenilen === 'object') { d.ayar.ogrenilen = Object.assign({}, ay.ogrenilen, d.ayar.ogrenilen); sikiDizin = null; }
                         if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
                         if (typeof ay.sistemDoldur === 'boolean') d.ayar.sistemDoldur = ay.sistemDoldur;
+                        if (elDurumBirlestir(ay.elDurum, true)) ayarYerelde = true;
                         return;
                     }
                     yeni.set(r.anahtar, { getir_id: r.getir_id || null, cekildi_at: r.cekildi_at || null, urun_sayisi: r.urun_sayisi });
@@ -417,7 +431,7 @@
                 });
                 d.kayitlar = yeni;
                 tasinacak.forEach(function (ad) { kayitYaz(ad, d.kayitlar.get(ad)); });
-                if (!ayarVar || Object.keys(d.ayar.ogrenilen).length > sunucuOgrenilen) ayarYaz();
+                if (!ayarVar || ayarYerelde || Object.keys(d.ayar.ogrenilen).length > sunucuOgrenilen) ayarYaz();
                 yerelYaz();
             }
             if (!b.error && Array.isArray(b.data) && b.data.length && cs() && cs().registerExternalProducts) {
@@ -470,6 +484,36 @@
     }
 
     var ayarZaman = null;
+    /**
+     * El ile durum (Sıraya al / Hiç sayılmadı / Otomatik) cihazlar arasında
+     * zamana göre birleşir; yeni olan kazanır. Otomatik, kod: null olarak saklanır.
+     * @returns {boolean} cihazda sunucudan yeni kayıt var mı
+     */
+    function elDurumBirlestir(gelen, sunucudan) {
+        if (!gelen || typeof gelen !== 'object') return false;
+        var yerel = d.ayar.elDurum || (d.ayar.elDurum = {});
+        var yereldeYeni = false;
+        Object.keys(yerel).forEach(function (ad) {
+            var g = gelen[ad];
+            if (!g || (Date.parse(yerel[ad].at || '') || 0) > (Date.parse(g.at || '') || 0)) yereldeYeni = true;
+        });
+        Object.keys(gelen).forEach(function (ad) {
+            var g = gelen[ad];
+            if (!g || typeof g !== 'object' || (g.kod !== null && g.kod !== 'suruyor' && g.kod !== 'yok')) return;
+            var y = yerel[ad];
+            if (!y || (Date.parse(g.at || '') || 0) > (Date.parse(y.at || '') || 0)) yerel[ad] = { kod: g.kod, at: g.at };
+        });
+        return !!sunucudan && yereldeYeni;
+    }
+
+    function elDurumAyarla(ad, kod) {
+        d.ayar.elDurum[ad] = { kod: kod, at: new Date().toISOString() };
+        d.durumMenu = false;
+        ayarYaz();
+        ciz();
+        bildir(ad + ': ' + (kod === 'suruyor' ? 'Sıraya alındı, Sürüyor\'da görünür.' : kod === 'yok' ? 'Hiç sayılmadı olarak işaretlendi.' : 'Durum yeniden sayımlara göre belirleniyor.'), 'basari');
+    }
+
     function ayarYaz(hemen) {
         yerelYaz();
         clearTimeout(ayarZaman);
@@ -480,7 +524,7 @@
             var anahtarlar = Object.keys(og);
             if (anahtarlar.length > 800) anahtarlar.slice(0, anahtarlar.length - 800).forEach(function (k) { delete og[k]; });
             window.jbDb.from('sayim_dongu').upsert({
-                username: kullanici(), anahtar: '_ayar', ayar: { sure: d.ayar.sure, ogrenilen: og, sifirAlma: d.ayar.sifirAlma, sistemDoldur: d.ayar.sistemDoldur }, guncellendi_at: new Date().toISOString(),
+                username: kullanici(), anahtar: '_ayar', ayar: { sure: d.ayar.sure, ogrenilen: og, sifirAlma: d.ayar.sifirAlma, sistemDoldur: d.ayar.sistemDoldur, elDurum: d.ayar.elDurum }, guncellendi_at: new Date().toISOString(),
             }, { onConflict: 'username,anahtar' }).then(function (r) {
                 if (r && r.error && tabloEksikMi(r.error)) d.dbYok = true;
             });
@@ -533,30 +577,39 @@
         return !!(s && s.cachedFullData && s.cachedFullData._tables && s.cachedFullData._tables[t] && !(s._isTableTombstoned && s._isTableTombstoned(t)));
     }
 
+    /**
+     * sayilan: depo girilmiş her ürün (stoğu 0 diye otomatik 0 / 0 yazılanlar dahil),
+     * gercek: kullanıcının saydıkları. Çekimde yazılan 0 / 0'lar durumu değiştirmez;
+     * çekimden sonra girilen 0 gerçek sayımdır.
+     */
     function istatistik(ad) {
         var s = cs();
         var t = tabloVerisi(ad);
-        if (!t || !tabloVarMi(ad)) return { var: false, toplam: 0, sayilan: 0, sonSayim: 0 };
+        if (!t || !tabloVarMi(ad)) return { var: false, toplam: 0, sayilan: 0, gercek: 0, sonSayim: 0 };
+        var cekildi = Date.parse((d.kayitlar.get(ad) || {}).cekildi_at || '') || 0;
         var toplam = 0;
         var sayilan = 0;
+        var gercek = 0;
         var son = 0;
         Object.keys(t).forEach(function (k) {
             if (s.isReservedCountingKey && s.isReservedCountingKey(k)) return;
             var e = t[k];
             if (!e || typeof e !== 'object') return;
             toplam++;
-            if (e.warehouseStock !== null && e.warehouseStock !== undefined) {
-                sayilan++;
-                var ms = Date.parse(e.warehouseStockAt || '') || 0;
-                if (ms > son) son = ms;
-            }
+            if (e.warehouseStock === null || e.warehouseStock === undefined) return;
+            sayilan++;
+            var ms = Date.parse(e.warehouseStockAt || e.lastUpdated || '') || 0;
+            var otomatik = Number(e.warehouseStock) === 0 && Number(e.systemStock) === 0 && (!cekildi || ms <= cekildi + 60000);
+            if (otomatik) return;
+            gercek++;
+            if (ms > son) son = ms;
         });
         if (!toplam) {
             // Ürünler henüz yüklenmediyse sıra bilgisinden tahmin
             var sira = (t._productOrder && t._productOrder.length) || 0;
-            return { var: sira > 0, toplam: sira, sayilan: 0, sonSayim: 0, yukleniyor: sira > 0 };
+            return { var: sira > 0, toplam: sira, sayilan: 0, gercek: 0, sonSayim: 0, yukleniyor: sira > 0 };
         }
-        return { var: true, toplam: toplam, sayilan: sayilan, sonSayim: son };
+        return { var: true, toplam: toplam, sayilan: sayilan, gercek: gercek, sonSayim: son };
     }
 
     function durumHesapla(ad) {
@@ -565,12 +618,18 @@
         var sureMs = d.ayar.sure * GUN;
         var simdi = Date.now();
         var cekildi = Date.parse(k.cekildi_at || '') || 0;
-        var oran = st.toplam ? st.sayilan / st.toplam : 0;
+        // El ile durum (Sıraya al / Hiç sayılmadı), ondan sonra bir sayım girilene
+        // kadar geçerli; sonra durum yine sayımlardan hesaplanır. Ürün çekmek
+        // durumu değiştirmez: sayım yoksa alt kategori "Hiç sayılmadı"da kalır.
+        var el = (d.ayar.elDurum || {})[ad];
+        var elKod = el && el.kod;
+        var elGecerli = !!elKod && !(st.sonSayim > (Date.parse(el.at || '') || 0));
+        var sayimVar = st.gercek > 0 && !(elGecerli && elKod === 'yok');
+        var oran = sayimVar && st.toplam ? st.sayilan / st.toplam : 0;
         var kod;
-        // Gerçek sayım yoksa (yalnız otomatik 0'lar) son çekim zamanı esas
-        var ref = st.sonSayim || cekildi || simdi;
-        if (!st.var) kod = 'yok';
-        else if (!st.sayilan) kod = cekildi && simdi - cekildi > sureMs ? 'gecikti' : cekildi ? 'bekliyor' : 'yok';
+        var ref = st.sonSayim || simdi;
+        if (elGecerli) kod = elKod;
+        else if (!st.var || !sayimVar) kod = 'yok';
         else if (simdi - ref > sureMs) kod = 'gecikti';
         else if (oran < 0.95) kod = 'suruyor';
         else if (simdi - ref > sureMs * 0.8) kod = 'yaklasiyor';
@@ -582,6 +641,8 @@
             st: st,
             oran: oran,
             cekildi: cekildi,
+            sayimVar: sayimVar,
+            el: elGecerli ? elKod : null,
             gecikmeGun: tabanMs ? Math.floor((simdi - tabanMs - sureMs) / GUN) : 0,
             kalanGun: tabanMs ? Math.ceil((tabanMs + sureMs - simdi) / GUN) : 0,
         };
@@ -590,12 +651,15 @@
     function durumAlt(du) {
         var st = du.st;
         switch (du.kod) {
-            case 'yok': return st.var ? st.toplam + ' ürün · sayım yok' : 'Ürünler çekilmedi';
-            case 'bekliyor': return st.toplam + ' ürün · ' + gunMetni(du.cekildi, true) + ' çekildi';
-            case 'suruyor': return st.sayilan + ' / ' + st.toplam + ' sayıldı';
+            case 'yok':
+                if (!st.var) return 'Ürünler çekilmedi';
+                return st.toplam + ' ürün · ' + (du.cekildi ? goreliSure(du.cekildi) + ' çekildi' : 'sayım yok');
+            case 'suruyor':
+                if (!du.sayimVar) return st.var ? 'Sırada · ' + st.toplam + ' ürün' : 'Sırada · ürünler çekilmedi';
+                return st.sayilan + ' / ' + st.toplam + ' sayıldı';
             case 'gecikti': return du.gecikmeGun > 0 ? du.gecikmeGun + ' gün gecikti' : 'Süresi doldu';
             case 'yaklasiyor': return du.kalanGun + ' gün kaldı';
-            default: return gunMetni(du.st.sonSayim) + ' sayıldı';
+            default: return buyukBasla(goreliSure(du.st.sonSayim)) + ' sayıldı';
         }
     }
 
@@ -764,7 +828,7 @@
     function cekPenceresi(ad) {
         return new Promise(function (coz) {
             var st = istatistik(ad);
-            var sifirla = st.var && st.sayilan > 0;
+            var sifirla = st.var && st.gercek > 0;
             var acan = document.activeElement;
             var secenek = d.ayar.sifirAlma;
             var anahtar = function (veri, baslik, acik) {
@@ -784,7 +848,7 @@
                 anahtar('sifir', 'Stoğu olmayanları alma', secenek) +
                 anahtar('sistem', 'Sistem stoğunu otomatik doldur', d.ayar.sistemDoldur) +
                 '</div>' +
-                (sifirla ? '<p class="sd-pencere__uyari">Bu tabloda ' + st.sayilan + ' ürün sayılmış. Devam ederseniz tablo yenilenir: depo ve sistem stokları sıfırlanır, artık satışta olmayan ürünler listeden çıkar.</p>' : '') +
+                (sifirla ? '<p class="sd-pencere__uyari">Bu tabloda ' + st.gercek + ' ürün sayılmış. Devam ederseniz tablo yenilenir: depo ve sistem stokları sıfırlanır, artık satışta olmayan ürünler listeden çıkar.</p>' : '') +
                 '<div class="sd-pencere__eylem">' +
                 '<button type="button" class="sd-dugme sd-dugme--ikincil" data-sd-p="vazgec">Vazgeç</button>' +
                 '<button type="button" class="sd-dugme sd-dugme--ana" data-sd-p="cek">' + SVG.indir + '<span>' + (sifirla ? 'Sıfırla ve çek' : 'Ürünleri çek') + '</span></button>' +
@@ -1046,6 +1110,7 @@
     function sec(ad, secenek) {
         var s = cs();
         d.secili = ad;
+        d.durumMenu = false;
         d.sonuc = d.sonuc && d.sonuc.ad === ad ? d.sonuc : null;
         try { sessionStorage.setItem(OTURUM_ANAHTARI, ad); } catch (e) { /* yok */ }
         document.documentElement.classList.add('sd-secim');
@@ -1062,6 +1127,7 @@
 
     function listeyeDon() {
         d.secili = null;
+        d.durumMenu = false;
         try { sessionStorage.removeItem(OTURUM_ANAHTARI); } catch (e) { /* yok */ }
         document.documentElement.classList.remove('sd-secim', 'sd-tablosuz');
         d.ilkCizim = true;
@@ -1103,11 +1169,27 @@
             else if (ne === 'iptal') { if (d.cekim) d.cekim.iptal.abort(); }
             else if (ne === 'esles') eslesSec(h.getAttribute('data-id'));
             else if (ne === 'esles-kapat') { d.esles = null; ciz(); }
+            else if (ne === 'durum') { d.durumMenu = !d.durumMenu; ciz(); var m = panel.querySelector('.sd-durum__secenek.is-secili'); if (m) m.focus({ preventScroll: true }); }
+            else if (ne === 'durum-sec') { var kod = h.getAttribute('data-kod'); elDurumAyarla(d.secili, kod === 'oto' ? null : kod); }
             else if (ne === 'listeye') {
                 var hedef = document.getElementById('countingTableContainer');
                 if (hedef) hedef.scrollIntoView({ behavior: azaltilmisHareket() ? 'auto' : 'smooth', block: 'start' });
             }
         });
+        document.addEventListener('click', function (e) {
+            if (d.durumMenu && !e.target.closest('.sd-durum')) { d.durumMenu = false; ciz(); }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape' || !d.durumMenu) return;
+            d.durumMenu = false;
+            ciz();
+            var b = panel.querySelector('[data-sd="durum"]');
+            if (b) b.focus({ preventScroll: true });
+        });
+        // "x dakika önce" metinleri dakikada bir tazelensin (değişen yer yeniden yazılır)
+        setInterval(function () {
+            if (d.mod && !d.cekim && document.visibilityState === 'visible') ciz();
+        }, 30000);
         panel.addEventListener('input', function (e) {
             if (e.target && e.target.matches('[data-sd="ara"]')) {
                 d.arama = e.target.value;
@@ -1158,9 +1240,9 @@
         var toplam = liste.length;
         var oran = toplam ? guncel / toplam : 0;
         var ot = oturumMetni();
-        var dagilim = ['guncel', 'yaklasiyor', 'suruyor', 'bekliyor', 'gecikti', 'yok'].map(function (k) {
+        var dagilim = ['guncel', 'yaklasiyor', 'suruyor', 'gecikti', 'yok'].map(function (k) {
             var n = say[k] || 0;
-            return n ? '<span class="sd-dagilim__p sd-r--' + DURUM[k].renk + (k === 'yaklasiyor' ? '-acik' : k === 'bekliyor' ? '-acik' : '') + '" style="flex-grow:' + n + '" title="' + kacir(DURUM[k].ad + ': ' + n) + '"></span>' : '';
+            return n ? '<span class="sd-dagilim__p sd-r--' + DURUM[k].renk + (k === 'yaklasiyor' ? '-acik' : '') + '" style="flex-grow:' + n + '" title="' + kacir(DURUM[k].ad + ': ' + n) + '"></span>' : '';
         }).join('');
         return '' +
             '<header class="sd-ust">' +
@@ -1225,8 +1307,9 @@
             ? '<button type="button" class="sd-dugme sd-dugme--ikincil" data-sd="iptal">Durdur</button>'
             : '<button type="button" class="sd-dugme sd-dugme--ana" data-sd="cek"' + (d.cekim ? ' disabled' : '') + '>' +
               (ilk ? SVG.indir + '<span>Ürünleri çek</span>' : SVG.yenile + '<span>Güncel ürünleri çek</span>') + '</button>';
+        var sayilan = x.sayimVar ? st.sayilan : 0;
         var yuzde = st.toplam ? Math.round(x.oran * 100) : 0;
-        var kalan = Math.max(0, st.toplam - st.sayilan);
+        var kalan = Math.max(0, st.toplam - sayilan);
         var ozetAlt = !st.var ? 'Ürünler henüz çekilmedi'
             : st.yukleniyor ? 'Ürünler yükleniyor'
             : !kalan ? 'Hepsi sayıldı'
@@ -1242,7 +1325,7 @@
             '<div class="sd-detay">' +
             '<div class="sd-detay__ust">' +
             '<button type="button" class="sd-geri" data-sd="geri" aria-label="Alt kategori listesine dön">' + SVG.geri + '<span>Döngü</span></button>' +
-            '<span class="sd-rozet sd-rozet--' + r + '">' + kacir(DURUM[x.kod].ad) + '</span>' +
+            durumSecici(x, r) +
             '</div>' +
             '<div class="sd-detay__kimlik">' +
             '<span class="sd-detay__gorsel">' + (g ? '<img src="' + kacir(g) + '" alt="">' : SVG.kutu) + '</span>' +
@@ -1254,7 +1337,7 @@
             '<div class="sd-ozet__halka">' + halka(st.var ? x.oran : 0, 72) +
             '<span class="sd-ozet__yuzde">' + (st.var ? '%' + yuzde : '-') + '</span></div>' +
             '<div class="sd-ozet__sayilar">' +
-            '<p class="sd-ozet__sayi"><strong>' + (st.var ? st.sayilan : 0) + '</strong><span>/ ' + (st.var ? st.toplam : 0) + ' ürün sayıldı</span></p>' +
+            '<p class="sd-ozet__sayi"><strong>' + sayilan + '</strong><span>/ ' + (st.var ? st.toplam : 0) + ' ürün sayıldı</span></p>' +
             '<p class="sd-ozet__alt">' + (st.var && !kalan && !st.yukleniyor ? SVG.onay : '') + kacir(ozetAlt) + '</p>' +
             '</div></div>' +
             '<div class="sd-ozet__zamanlar">' +
@@ -1265,6 +1348,26 @@
             '<div class="sd-eylem">' + dugme +
             (st.var && !cekiliyor ? '<button type="button" class="sd-dugme sd-dugme--metin" data-sd="listeye">Ürünlere git' + SVG.asagi + '</button>' : '') +
             '</div>' +
+            '</div>';
+    }
+
+    /** Sağ üstte durum rozeti; dokununca el ile durum seçilir */
+    function durumSecici(x, r) {
+        var secenek = function (kod, baslik, aciklama, renk, secili) {
+            return '<button type="button" class="sd-durum__secenek' + (secili ? ' is-secili' : '') + '" role="menuitemradio" aria-checked="' + secili + '" data-sd="durum-sec" data-kod="' + kod + '">' +
+                '<span class="sd-nokta sd-r--' + renk + '"></span>' +
+                '<span class="sd-durum__metin"><strong>' + baslik + '</strong><span>' + aciklama + '</span></span>' +
+                '<span class="sd-durum__onay">' + (secili ? SVG.onay : '') + '</span></button>';
+        };
+        return '<div class="sd-durum">' +
+            '<button type="button" class="sd-rozet sd-rozet--' + r + ' sd-durum__dugme" data-sd="durum" aria-haspopup="menu" aria-expanded="' + !!d.durumMenu + '" aria-label="Durum: ' + kacir(DURUM[x.kod].ad) + '. Değiştir">' +
+            kacir(DURUM[x.kod].ad) + SVG.asagi + '</button>' +
+            (d.durumMenu ? '<div class="sd-durum__menu" role="menu" aria-label="Durumu değiştir">' +
+                '<p class="sd-durum__baslik">Durumu değiştir</p>' +
+                secenek('suruyor', 'Sıraya al', 'Sayım başlamasa da Sürüyor\'da görünür.', 'mavi', x.el === 'suruyor') +
+                secenek('yok', 'Hiç sayılmadı', 'Yeni bir sayım girilene kadar burada kalır.', 'gri', x.el === 'yok') +
+                secenek('oto', 'Otomatik', 'Durum girilen sayımlara göre belirlenir.', 'yesil', !x.el) +
+                '</div>' : '') +
             '</div>';
     }
 
