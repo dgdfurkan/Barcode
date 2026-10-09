@@ -428,16 +428,28 @@
     // ------------------------------------------------------------------
     // Durum hesabı (sayım verisinden; ağ yok)
     // ------------------------------------------------------------------
+    /**
+     * Döngü tablosunun sayım motorundaki adı. Döngü kendi ad alanında
+     * ("Döngü|Bakliyat"): Genel'deki "Bakliyat" tablosuna asla dokunmaz,
+     * Genel/Günlük/Finans listelerinde görünmez.
+     */
+    function tabloAdi(ad) {
+        var s = cs();
+        return ((s && s.DONGU_TABLE_PREFIX) || 'Döngü|') + ad;
+    }
+
     function tabloVerisi(ad) {
         var s = cs();
         if (!s) return null;
-        if (ad === s.currentTableName && s.countingData) return s.countingData;
-        return s.cachedFullData && s.cachedFullData._tables ? s.cachedFullData._tables[ad] || null : null;
+        var t = tabloAdi(ad);
+        if (t === s.currentTableName && s.countingData) return s.countingData;
+        return s.cachedFullData && s.cachedFullData._tables ? s.cachedFullData._tables[t] || null : null;
     }
 
     function tabloVarMi(ad) {
         var s = cs();
-        return !!(s && s.cachedFullData && s.cachedFullData._tables && s.cachedFullData._tables[ad] && !(s._isTableTombstoned && s._isTableTombstoned(ad)));
+        var t = tabloAdi(ad);
+        return !!(s && s.cachedFullData && s.cachedFullData._tables && s.cachedFullData._tables[t] && !(s._isTableTombstoned && s._isTableTombstoned(t)));
     }
 
     function istatistik(ad) {
@@ -847,9 +859,10 @@
             d.cekim.asama = 'Tabloya yazılıyor';
             cekimCiz();
             if (s._importInProgress) throw hata('mesgul');
-            if (!tabloVarMi(ad)) await s.createTable(ad, { skipRender: true });
-            else if (s.currentTableName !== ad) await s.switchTable(ad, { skipCatchUp: true, skipRender: true });
-            await s.applyDonguProducts(items, { tablo: ad, kaynak: 'Getir' });
+            var hedef = tabloAdi(ad);
+            if (!tabloVarMi(ad)) await s.createTable(hedef, { skipRender: true });
+            else if (s.currentTableName !== hedef) await s.switchTable(hedef, { skipCatchUp: true, skipRender: true });
+            await s.applyDonguProducts(items, { tablo: hedef, kaynak: 'Getir' });
 
             await kayitYaz(ad, { getir_id: kullanilan, cekildi_at: new Date().toISOString(), urun_sayisi: items.length });
             var parca = [items.length + ' ürün tabloya yazıldı'];
@@ -903,6 +916,8 @@
         var s = cs();
         if (!s) return;
         if (s.currentTab !== 'sayim') s.switchTab('sayim');
+        // Döngü'den çıkınca Genel/Günlük kaldığı tabloya dönsün
+        if (s.currentTableName && !(s.isDonguTableName && s.isDonguTableName(s.currentTableName))) d.oncekiTablo = s.currentTableName;
         d.mod = true;
         try { localStorage.setItem(MOD_ANAHTARI, '1'); } catch (e) { /* yok */ }
         document.documentElement.classList.add('sd-modu');
@@ -921,6 +936,13 @@
     function modKapat() {
         if (!d.mod) return;
         d.mod = false;
+        var s = cs();
+        if (s && s.isDonguTableName && s.isDonguTableName(s.currentTableName) && !s._importInProgress) {
+            var geri = d.oncekiTablo && s.getTableList().some(function (t) { return t.name === d.oncekiTablo; })
+                ? d.oncekiTablo
+                : (s.getTableList().find(function (t) { return !s.isDailyTableName(t.name); }) || {}).name;
+            if (geri) s.switchTable(geri).catch(function () {});
+        }
         try { localStorage.setItem(MOD_ANAHTARI, '0'); } catch (e) { /* yok */ }
         document.documentElement.classList.remove('sd-modu', 'sd-secim');
         sekmeleriBoya();
@@ -933,8 +955,8 @@
         try { sessionStorage.setItem(OTURUM_ANAHTARI, ad); } catch (e) { /* yok */ }
         document.documentElement.classList.add('sd-secim');
         document.documentElement.classList.toggle('sd-tablosuz', !tabloVarMi(ad));
-        if (tabloVarMi(ad) && s && s.currentTableName !== ad && !s._importInProgress) {
-            s.switchTable(ad).catch(function () {});
+        if (tabloVarMi(ad) && s && s.currentTableName !== tabloAdi(ad) && !s._importInProgress) {
+            s.switchTable(tabloAdi(ad)).catch(function () {});
         }
         ciz();
         if (!secenek || secenek.kaydirma !== false) {

@@ -214,6 +214,8 @@ class CountingSystem {
         this._countingSheetScrollY = 0;
         /** Genel tablolardan ayrılmak için günlük tablo adları: `Günlük|YYYY-MM-DD` */
         this.DAILY_TABLE_PREFIX = 'Günlük|';
+        /** Sayım Döngüsü tabloları kendi ad alanında; Genel/Günlük/Finans listelerine karışmaz */
+        this.DONGU_TABLE_PREFIX = 'Döngü|';
         /** `deleteDailyTableModal` onayı için */
         this._pendingDailyDeleteTableName = null;
         /** Genel tablo dropdown — üst arama sonrası liste (dropdown içi filtre için) */
@@ -2281,7 +2283,7 @@ class CountingSystem {
         let enIyi = null;
         let enMs = 0;
         for (const ad of adlar) {
-            if (!this.isValidTableNameKey(ad) || this._isTableTombstoned(ad) || this.isDailyTableName(ad)) continue;
+            if (!this.isValidTableNameKey(ad) || this._isTableTombstoned(ad) || this.isDailyTableName(ad) || this.isDonguTableName(ad)) continue;
             const m = { ...(blob._tables?.[ad]?._tableMeta || {}), ...(meta[ad] || {}) };
             const ms = Math.max(Date.parse(m.lastActivityAt || '') || 0, Date.parse(m.createdAt || '') || 0);
             if (ms > enMs) {
@@ -3891,8 +3893,8 @@ class CountingSystem {
 
         let stockDiffText = '—';
         if (diff.type === 'zero') stockDiffText = 'Eşit';
-        else if (diff.type === 'positive') stockDiffText = `+${diff.value} fazla`;
-        else if (diff.type === 'negative') stockDiffText = `−${diff.value} eksik`;
+        else if (diff.type === 'positive') stockDiffText = `+${this._sayiMetni(diff.value)} fazla`;
+        else if (diff.type === 'negative') stockDiffText = `−${this._sayiMetni(diff.value)} eksik`;
 
         const totalStock =
             data.systemStock != null && data.reservedStock != null
@@ -5972,7 +5974,7 @@ class CountingSystem {
             : '—';
         const stockDiff =
             warehouseStock !== null && systemStock !== null && !Number.isNaN(warehouseStock) && !Number.isNaN(systemStock)
-                ? warehouseStock - systemStock
+                ? this._stokFarki(warehouseStock, systemStock)
                 : null;
         const difference =
             stockDiff !== null && resolvedPrice && resolvedPrice > 0 ? stockDiff * resolvedPrice : null;
@@ -6597,15 +6599,19 @@ class CountingSystem {
     }
 
     // Get list of all tables
-    getTableList() {
+    getTableList(options = {}) {
         const fullData = this.cachedFullData;
 
         if (!fullData || !fullData._tables) {
             return [{ name: 'Ana Sayım', isCurrent: true }];
         }
 
+        // Döngü tabloları Genel, Günlük, Stok farkı ve Finans listelerinde görünmez
         const tableNames = Object.keys(fullData._tables).filter(
-            (name) => this.isValidTableNameKey(name) && !this._isTableTombstoned(name)
+            (name) =>
+                this.isValidTableNameKey(name) &&
+                !this._isTableTombstoned(name) &&
+                (options.dongu === true || !this.isDonguTableName(name))
         );
         const rows = tableNames.map((name) => {
             const tableData = this.resolveTableDataForList(name);
@@ -6655,10 +6661,10 @@ class CountingSystem {
             const price = this._resolveFinancePrice(data);
             if (!price || Number.isNaN(price)) continue;
 
-            profitLoss += (Number(warehouseStock) - Number(systemStock)) * price;
+            profitLoss += this._stokFarki(warehouseStock, systemStock) * price;
         }
 
-        return profitLoss;
+        return Math.round(profitLoss * 100) / 100;
     }
 
     /** API ürün satırından fiyat alanlarını çıkar */
@@ -7148,6 +7154,44 @@ class CountingSystem {
         return typeof name === 'string' && name.startsWith(this.DAILY_TABLE_PREFIX);
     }
 
+    /** Döngü tablosu ("Döngü|Bakliyat"): yalnız Döngü sekmesinde görünür */
+    isDonguTableName(name) {
+        return typeof name === 'string' && name.startsWith(this.DONGU_TABLE_PREFIX);
+    }
+
+    /** Tartılan ürün: adı "(kg)" taşıyan ürün (ör. "Erpiliç Piliç Baget (kg)"); stok kilogramla, ondalıklı */
+    isKgProduct(productId) {
+        const p = productId ? this.productIndex.get(productId) : null;
+        return !!p && /\(\s*kg\s*\)/i.test(String(p.name || ''));
+    }
+
+    /** Stok farkı: kayan nokta artığı olmadan (1,25 − 1,2 = 0,05), 3 haneye yuvarlı */
+    _stokFarki(a, b) {
+        return Math.round((Number(a) - Number(b)) * 1000) / 1000;
+    }
+
+    /** Depo girişini sayıya çevir: kg üründe virgüllü ondalık (3 hane), diğerlerinde tam sayı */
+    _depoDegeriOku(metin, kg) {
+        const s = String(metin ?? '').trim().replace(',', '.');
+        if (!s || s === '.') return null;
+        const n = kg ? parseFloat(s) : parseInt(s, 10);
+        if (!Number.isFinite(n) || n < 0) return null;
+        return kg ? Math.round(n * 1000) / 1000 : n;
+    }
+
+    /** Sayıyı giriş kutusunda göster: kg üründe virgüllü */
+    /** Ekranda sayı: tam sayı olduğu gibi, ondalık Türkçe virgülle (0,05) */
+    _sayiMetni(v) {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return String(v ?? '');
+        return Number.isInteger(n) ? String(n) : n.toLocaleString('tr-TR', { maximumFractionDigits: 3 });
+    }
+
+    _depoMetni(v, kg) {
+        if (v === null || v === undefined || v === '') return '';
+        return kg ? String(v).replace('.', ',') : String(v);
+    }
+
     getIsoFromDailyTableName(name) {
         if (!this.isDailyTableName(name)) return null;
         return name.slice(this.DAILY_TABLE_PREFIX.length);
@@ -7170,6 +7214,7 @@ class CountingSystem {
 
     formatTableDisplayName(name) {
         if (!name) return '—';
+        if (this.isDonguTableName(name)) return name.slice(this.DONGU_TABLE_PREFIX.length);
         if (this.isDailyTableName(name)) {
             const iso = this.getIsoFromDailyTableName(name);
             return this.formatDailyDateLabelFromIso(iso);
@@ -9664,8 +9709,9 @@ class CountingSystem {
         if (increaseBtn) {
             increaseBtn.addEventListener('click', () => {
                 if (depoInput) {
-                    const currentValue = parseInt(depoInput.value) || 0;
-                    depoInput.value = currentValue + 1;
+                    const kg = this.isKgProduct(this.currentCountingProduct);
+                    const currentValue = this._depoDegeriOku(depoInput.value, kg) || 0;
+                    depoInput.value = this._depoMetni(Math.round((currentValue + 1) * 1000) / 1000, kg);
                     depoInput.dispatchEvent(new Event('input'));
                 }
             });
@@ -9674,8 +9720,9 @@ class CountingSystem {
         if (decreaseBtn) {
             decreaseBtn.addEventListener('click', () => {
                 if (depoInput) {
-                    const currentValue = parseInt(depoInput.value) || 0;
-                    depoInput.value = Math.max(0, currentValue - 1);
+                    const kg = this.isKgProduct(this.currentCountingProduct);
+                    const currentValue = this._depoDegeriOku(depoInput.value, kg) || 0;
+                    depoInput.value = this._depoMetni(Math.max(0, Math.round((currentValue - 1) * 1000) / 1000), kg);
                     depoInput.dispatchEvent(new Event('input'));
                 }
             });
@@ -9686,10 +9733,17 @@ class CountingSystem {
             btn.addEventListener('click', () => {
                 const key = btn.dataset.key;
                 if (key && depoInput) {
+                    const kg = this.isKgProduct(this.currentCountingProduct);
                     const currentValue = depoInput.value || '0';
-                    if (currentValue === '0') {
+                    if (key === ',') {
+                        // Virgül yalnız kg ürünlerde ve bir kez
+                        if (!kg || currentValue.includes(',')) return;
+                        depoInput.value = currentValue + ',';
+                    } else if (currentValue === '0') {
                         depoInput.value = key;
                     } else {
+                        // Kilogramda en fazla 3 ondalık (gram)
+                        if (kg && /,\d{3}$/.test(currentValue)) return;
                         depoInput.value = currentValue + key;
                     }
                     depoInput.dispatchEvent(new Event('input'));
@@ -9728,7 +9782,7 @@ class CountingSystem {
                 if (this.currentCountingProduct) {
                     const stockIndicator = document.getElementById('countingStockIndicator');
                     // Temporarily update countingData for calculation
-                    const tempWarehouseStock = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
+                    const tempWarehouseStock = this._depoDegeriOku(depoInput.value, this.isKgProduct(this.currentCountingProduct));
                     const originalData = this.countingData[this.currentCountingProduct] || {};
                     const tempData = { ...originalData, warehouseStock: tempWarehouseStock };
                     this.countingData[this.currentCountingProduct] = tempData;
@@ -9745,7 +9799,7 @@ class CountingSystem {
                     
                     this.autoSaveTimeout = setTimeout(() => {
                         if (this.currentCountingProduct) {
-                            const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
+                            const value = this._depoDegeriOku(depoInput.value, this.isKgProduct(this.currentCountingProduct));
                             void this.updateProductStock(this.currentCountingProduct, value, null).catch(
                                 (err) => console.error('Depo otomatik kayıt:', err)
                             );
@@ -9776,7 +9830,7 @@ class CountingSystem {
                 if (prevProductId) {
                     const depoInput = document.getElementById('countingDepoInput');
                     if (depoInput) {
-                        const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
+                        const value = this._depoDegeriOku(depoInput.value, this.isKgProduct(this.currentCountingProduct));
                         await this.updateProductStock(this.currentCountingProduct, value, null);
                         this.skippedProducts.delete(this.currentCountingProduct);
                     }
@@ -9804,7 +9858,7 @@ class CountingSystem {
                 if (nextProductId) {
                     const depoInput = document.getElementById('countingDepoInput');
                     if (depoInput) {
-                        const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
+                        const value = this._depoDegeriOku(depoInput.value, this.isKgProduct(this.currentCountingProduct));
                         await this.updateProductStock(this.currentCountingProduct, value, null);
                         this.skippedProducts.delete(this.currentCountingProduct);
                     }
@@ -10260,8 +10314,8 @@ class CountingSystem {
             const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
             const name = this.escapeHtml(p.productName || '');
             const bc = p.barcode ? this.escapeHtml(p.barcode) : '—';
-            const stockDiff = p.warehouseStock - p.systemStock;
-            const adetStr = stockDiff > 0 ? `+${stockDiff}` : `${stockDiff}`;
+            const stockDiff = this._stokFarki(p.warehouseStock, p.systemStock);
+            const adetStr = stockDiff > 0 ? `+${this._sayiMetni(stockDiff)}` : `${this._sayiMetni(stockDiff)}`;
             const tone =
                 kind === 'miss'
                     ? 'border-l-rose-400/90 bg-rose-50/40'
@@ -12886,7 +12940,7 @@ class CountingSystem {
             return { value: null, type: 'empty' };
         }
         
-        const diff = Number(warehouseStock) - Number(systemStock);
+        const diff = this._stokFarki(warehouseStock, systemStock);
         if (diff > 0) {
             return { value: diff, type: 'positive' };
         } else if (diff < 0) {
@@ -13026,13 +13080,13 @@ class CountingSystem {
                                         </svg>
                                     </button>
                             <input 
-                                type="number" 
-                                        inputmode="numeric"
-                                        pattern="[0-9]*"
+                                type="${this.isKgProduct(productId) ? 'text' : 'number'}" 
+                                        inputmode="${this.isKgProduct(productId) ? 'decimal' : 'numeric'}"
+                                        ${this.isKgProduct(productId) ? 'data-kg="1"' : 'pattern="[0-9]*"'}
                                         class="warehouse-stock-input flex-1 min-w-0 px-2 sm:px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-sm sm:text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all text-center"
                                         min="0"
                                         step="1"
-                                value="${data.warehouseStock !== null && data.warehouseStock !== undefined ? data.warehouseStock : ''}"
+                                value="${this._depoMetni(data.warehouseStock, this.isKgProduct(productId))}"
                                 placeholder="—"
                                 data-product-id="${productId}"
                             >
@@ -13211,13 +13265,13 @@ class CountingSystem {
                                             </svg>
                                         </button>
                                         <input 
-                                            type="number" 
-                                            inputmode="numeric"
-                                            pattern="[0-9]*"
+                                            type="${this.isKgProduct(productId) ? 'text' : 'number'}" 
+                                            inputmode="${this.isKgProduct(productId) ? 'decimal' : 'numeric'}"
+                                            ${this.isKgProduct(productId) ? 'data-kg="1"' : 'pattern="[0-9]*"'}
                                             class="warehouse-stock-input flex-1 min-w-[60px] px-1.5 sm:px-2 py-1.5 sm:py-2.5 bg-white border-2 border-orange-200 rounded-lg text-sm sm:text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all text-center"
                                             min="0"
                                             step="1"
-                                            value="${data.warehouseStock !== null && data.warehouseStock !== undefined ? data.warehouseStock : ''}"
+                                            value="${this._depoMetni(data.warehouseStock, this.isKgProduct(productId))}"
                                             placeholder="—"
                                             data-product-id="${productId}"
                                         >
@@ -13876,8 +13930,16 @@ class CountingSystem {
                 });
             }
         }
+        const kgUrun = this.isKgProduct(productId);
         if (depoInput) {
-            depoInput.value = data.warehouseStock !== null && data.warehouseStock !== undefined ? data.warehouseStock : '';
+            depoInput.value = this._depoMetni(data.warehouseStock, kgUrun);
+        }
+        // Virgül tuşu (7'nin altı) yalnız kg ürünlerde; hücre her zaman yerinde, tuş takımı kaymaz
+        const virgulTusu = document.getElementById('keypadVirgul');
+        if (virgulTusu) {
+            virgulTusu.classList.toggle('invisible', !kgUrun);
+            virgulTusu.disabled = !kgUrun;
+            virgulTusu.setAttribute('aria-hidden', kgUrun ? 'false' : 'true');
         }
         
         this.updateCountingBottomSheetSystemStockDisplay(data.systemStock, data.reservedStock);
@@ -13995,7 +14057,7 @@ class CountingSystem {
                     <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
                     </svg>
-                    +${diff.value} Fazla
+                    +${this._sayiMetni(diff.value)} Fazla
                 </span>
             `;
         } else if (diff.type === 'negative') {
@@ -14004,7 +14066,7 @@ class CountingSystem {
                     <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
                     </svg>
-                    -${diff.value} Eksik
+                    -${this._sayiMetni(diff.value)} Eksik
                 </span>
             `;
         } else {
@@ -14038,7 +14100,7 @@ class CountingSystem {
         if (this.currentCountingProduct) {
             const depoInput = document.getElementById('countingDepoInput');
             if (depoInput) {
-                const value = depoInput.value.trim() === '' ? null : parseInt(depoInput.value);
+                const value = this._depoDegeriOku(depoInput.value, this.isKgProduct(this.currentCountingProduct));
                 await this.updateProductStock(this.currentCountingProduct, value, null);
 
                 // Remove from skipped if was skipped
@@ -14148,6 +14210,8 @@ class CountingSystem {
         // --- Tablo/Kart: keydown delegation (sayı filtresi) ---
         document.addEventListener('keydown', (e) => {
             if (!e.target.classList.contains('warehouse-stock-input')) return;
+            // kg satırında tek virgül (ya da nokta) serbest
+            if (e.target.dataset.kg === '1' && (e.key === ',' || e.key === '.') && !/[.,]/.test(e.target.value)) return;
             const isNumber = e.key >= '0' && e.key <= '9';
             const isCtrl = e.ctrlKey || e.metaKey;
             const isCopyPaste = isCtrl && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase());
@@ -14159,7 +14223,9 @@ class CountingSystem {
         // --- input delegation (sanitize) ---
         document.addEventListener('input', (e) => {
             if (!e.target.classList.contains('warehouse-stock-input')) return;
-            const clean = e.target.value.replace(/[^0-9]/g, '');
+            const clean = e.target.dataset.kg === '1'
+                ? (e.target.value.replace(/[^0-9.,]/g, '').replace('.', ',').match(/^\d*(,\d{0,3})?/) || [''])[0]
+                : e.target.value.replace(/[^0-9]/g, '');
             if (e.target.value !== clean) e.target.value = clean;
         }, true);
 
@@ -14168,7 +14234,8 @@ class CountingSystem {
             if (!e.target.classList.contains('warehouse-stock-input')) return;
             e.preventDefault();
             const pasted = (e.clipboardData || window.clipboardData).getData('text');
-            const nums = pasted.replace(/[^0-9]/g, '');
+            const kg = e.target.dataset.kg === '1';
+            const nums = kg ? (pasted.replace(/[^0-9.,]/g, '').replace('.', ',').match(/^\d*(,\d{0,3})?/) || [''])[0] : pasted.replace(/[^0-9]/g, '');
             if (nums) {
                 e.target.value = nums;
                 e.target.dispatchEvent(new Event('change', { bubbles: true }));
@@ -14180,13 +14247,14 @@ class CountingSystem {
             if (!e.target.classList.contains('warehouse-stock-input')) return;
             const productId = e.target.dataset.productId;
             let value = e.target.value.trim();
+            const kg = e.target.dataset.kg === '1';
             if (value === '') {
                 value = null;
                 e.target.value = '';
             } else {
-                const num = Math.max(0, Math.floor(Number(value)));
-                value = num;
-                e.target.value = String(value);
+                const num = this._depoDegeriOku(value, kg);
+                value = num === null ? null : num;
+                e.target.value = this._depoMetni(value, kg);
             }
             this.updateProductStock(productId, value, null).catch(err => console.error('updateProductStock:', err));
         }, true);
@@ -14201,7 +14269,8 @@ class CountingSystem {
                 const productId = incrBtn.dataset.productId;
                 const inp = document.querySelector(`.warehouse-stock-input[data-product-id="${CSS.escape(productId)}"]`);
                 if (inp) {
-                    inp.value = String((parseInt(inp.value) || 0) + 1);
+                    const kg = inp.dataset.kg === '1';
+                    inp.value = this._depoMetni(Math.round(((this._depoDegeriOku(inp.value, kg) || 0) + 1) * 1000) / 1000, kg);
                     inp.dispatchEvent(new Event('change', { bubbles: true }));
                 }
                 return;
@@ -14215,8 +14284,9 @@ class CountingSystem {
                 const productId = decrBtn.dataset.productId;
                 const inp = document.querySelector(`.warehouse-stock-input[data-product-id="${CSS.escape(productId)}"]`);
                 if (inp) {
-                    const cur = inp.value === '' || isNaN(parseInt(inp.value)) ? 0 : parseInt(inp.value);
-                    inp.value = String(Math.max(0, cur - 1));
+                    const kg = inp.dataset.kg === '1';
+                    const cur = this._depoDegeriOku(inp.value, kg) || 0;
+                    inp.value = this._depoMetni(Math.max(0, Math.round((cur - 1) * 1000) / 1000), kg);
                     inp.dispatchEvent(new Event('change', { bubbles: true }));
                 }
                 return;
@@ -15191,7 +15261,7 @@ class CountingSystem {
             const warehouseValue = (resolvedPrice ? warehouseStock : 0) * (resolvedPrice || 0);
             const systemValue = (resolvedPrice ? systemStock : 0) * (resolvedPrice || 0);
             const difference = warehouseValue - systemValue;
-            const stockDiff = warehouseStock - systemStock;
+            const stockDiff = this._stokFarki(warehouseStock, systemStock);
             const barcodes = (product.barcodes || [])
                 .map((b) => (b && b.code != null ? String(b.code).trim() : ''))
                 .filter(Boolean);
@@ -15713,7 +15783,7 @@ class CountingSystem {
                     warehouseValue,
                     systemValue,
                     difference: warehouseValue - systemValue,
-                    stockDiff: warehouseStock - systemStock,
+                    stockDiff: this._stokFarki(warehouseStock, systemStock),
                     barcodes: ex.barcodes && ex.barcodes.length ? ex.barcodes : (p.barcodes || []),
                 });
             }
@@ -15898,7 +15968,7 @@ class CountingSystem {
             const barcodesHtml = productHasBarcodes(p)
                 ? `<div class="finance-barcodes-block mt-1.5 ${barcodesHiddenClass}" aria-hidden="${this._financeBarcodesVisible ? 'false' : 'true'}">${this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 2 })}</div>`
                 : '';
-            const adetStr = p.stockDiff > 0 ? `+${p.stockDiff}` : `${p.stockDiff}`;
+            const adetStr = p.stockDiff > 0 ? `+${this._sayiMetni(p.stockDiff)}` : `${this._sayiMetni(p.stockDiff)}`;
             const adetLabel = kind === 'miss' ? `${adetStr} adet eksik` : `${adetStr} adet fazla`;
             const stockDiffClass = p.stockDiff > 0 ? 'text-emerald-700' : p.stockDiff < 0 ? 'text-rose-700' : 'text-gray-600';
             const tone =
@@ -16397,7 +16467,7 @@ class CountingSystem {
         const stockDiffProducts = products
             .map(p => ({
                 ...p,
-                stockDiff: Math.abs(p.warehouseStock - p.systemStock)
+                stockDiff: Math.abs(this._stokFarki(p.warehouseStock, p.systemStock))
             }))
             .filter(p => p.stockDiff > 0)
             .sort((a, b) => b.stockDiff - a.stockDiff)
@@ -16416,11 +16486,11 @@ class CountingSystem {
                     label: 'Stok Farkı',
                     data: stockDiffProducts.map(p => p.stockDiff),
                     backgroundColor: stockDiffProducts.map(p => {
-                        const diff = p.warehouseStock - p.systemStock;
+                        const diff = this._stokFarki(p.warehouseStock, p.systemStock);
                         return diff > 0 ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)';
                     }),
                     borderColor: stockDiffProducts.map(p => {
-                        const diff = p.warehouseStock - p.systemStock;
+                        const diff = this._stokFarki(p.warehouseStock, p.systemStock);
                         return diff > 0 ? 'rgb(16, 185, 129)' : 'rgb(239, 68, 68)';
                     }),
                     borderWidth: 2,

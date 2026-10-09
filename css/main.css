@@ -1605,3 +1605,10 @@ h1, h2, h3, h4, h5, h6 {
     padding-right: 2rem;
   }
 }
+/* ==== Sayım alt penceresi: kg ürün virgül tuşu ve rezerve satırı ======
+   Derlenmiş Tailwind'de bu yardımcılar yok; npm run css derlemeyi bozduğu
+   için kimlikle burada. Virgül tuşu hücreyi hep tutar, yalnız görünürlüğü
+   değişir: tuş takımı hiçbir üründe kaymaz. */
+#keypadVirgul.invisible { visibility: hidden; }
+#keypadVirgul:active { background-color: #fde68a; }
+#countingReservedStock { flex-basis: 100%; order: 99; }
