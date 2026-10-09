@@ -8387,6 +8387,11 @@ class CountingSystem {
                 if (!this.countingData[product.id]) this.addProductToCounting(product, { skipSave: true });
                 else this._resetCountingEntryStockFields(this.countingData[product.id]);
                 const entry = this.countingData[product.id];
+                // Getir'de stoğu 0: depo ve sistem 0 işlenir, sayılmış sayılır
+                if (entry && it.sifir === true) {
+                    entry.warehouseStock = 0;
+                    entry.systemStock = 0;
+                }
                 if (entry && it.row) {
                     const fields = this._extractPriceFieldsFromApiProduct(it.row);
                     if (fields.price != null || fields.struckPrice != null) {

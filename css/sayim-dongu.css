@@ -75,25 +75,6 @@ html.sd-modu.sd-tablosuz #countingTableContainer { display: none !important; }
 .sd-baslik { margin: 4px 0 0; font-size: 18px; font-weight: 700; line-height: 24px; color: var(--sd-yazi); }
 .sd-sayi { font-size: 26px; line-height: 32px; font-variant-numeric: tabular-nums; }
 
-.sd-sure {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    height: 28px;
-    padding: 0 6px 0 8px;
-    border: 1px solid var(--sd-cizgi);
-    border-radius: 999px;
-    background: #fff;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--sd-mavi-koyu);
-    cursor: pointer;
-}
-
-.sd-sure svg { width: 14px; height: 14px; }
-.sd-sure:focus-visible { outline: 2px solid var(--sd-mavi); outline-offset: 2px; }
-
 .sd-oturum { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 .sd-oturum--yesil { color: var(--sd-yesil-koyu); }
 .sd-oturum--sari { color: var(--sd-sari-koyu); }
@@ -322,40 +303,84 @@ html.sd-modu.sd-tablosuz #countingTableContainer { display: none !important; }
 .sd-dugme--metin { background: transparent; color: var(--sd-mavi-koyu); padding: 0 12px; }
 .sd-dugme--metin:hover { background: var(--sd-mavi-acik); }
 
-/* Süre menüsü */
-.sd-menu {
-    position: absolute;
+/* ==== Ürünleri çek penceresi ========================================= */
+html.sd-kilit, html.sd-kilit body { overflow: hidden; }
+
+.sd-perde {
+    position: fixed;
+    inset: 0;
     z-index: 140;
-    width: 180px;
-    padding: 4px;
-    border: 1px solid var(--sd-cizgi);
-    border-radius: 12px;
-    background: #fff;
-    box-shadow: 0 16px 40px rgba(7, 21, 45, 0.16);
-    animation: sd-gel var(--motion-fast, 140ms) var(--motion-ease-out, ease-out) both;
-}
-
-.sd-menu__baslik { margin: 0; padding: 8px 12px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sd-sonuk); }
-
-.sd-menu button {
     display: flex;
     align-items: center;
-    width: 100%;
-    height: 40px;
-    padding: 0 12px;
-    border: 0;
-    border-radius: 9px;
-    background: transparent;
-    font: inherit;
-    font-size: 13px;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(16, 24, 40, 0.45);
+    opacity: 0;
+    transition: opacity var(--motion-normal, 180ms) var(--motion-ease-out, ease-out);
+}
+
+.sd-perde.is-acik { opacity: 1; }
+
+.sd-pencere {
+    width: min(420px, 100%);
+    padding: 20px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 24px 70px rgba(7, 21, 45, 0.22);
     color: var(--sd-yazi);
-    text-align: left;
+    transform: translateY(12px) scale(0.98);
+    transition: transform var(--motion-panel, 220ms) var(--motion-ease-out, ease-out);
+}
+
+.sd-perde.is-acik .sd-pencere { transform: none; }
+.sd-pencere__baslik { margin: 4px 0 0; font-size: 18px; font-weight: 700; line-height: 24px; overflow-wrap: anywhere; }
+.sd-pencere__metin { margin: 8px 0 16px; font-size: 12px; line-height: 16px; color: var(--sd-sonuk); }
+.sd-pencere__uyari { margin: 12px 0 0; padding: 12px; border-radius: 9px; background: var(--sd-sari-acik); color: var(--sd-sari-koyu); font-size: 12px; line-height: 16px; }
+.sd-pencere__eylem { display: flex; justify-content: flex-end; gap: 8px; margin: 20px 0 0; }
+.sd-pencere__eylem .sd-dugme--ana { min-width: 0; }
+
+.sd-anahtar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 64px;
+    padding: 12px;
+    border: 1px solid var(--sd-cizgi);
+    border-radius: 12px;
     cursor: pointer;
 }
 
-.sd-menu button:hover, .sd-menu button:focus-visible { background: var(--sd-kagit); outline: none; }
-.sd-menu button[aria-checked="true"] { color: var(--sd-mavi-koyu); font-weight: 700; }
-.sd-menu button[aria-checked="true"]::after { content: ''; margin-left: auto; width: 8px; height: 8px; border-radius: 999px; background: var(--sd-mavi); }
+.sd-anahtar__metin { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sd-anahtar__metin strong { font-size: 13px; line-height: 18px; font-weight: 600; }
+.sd-anahtar__metin span { min-height: 32px; font-size: 12px; line-height: 16px; color: var(--sd-sonuk); }
+.sd-anahtar input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+
+.sd-anahtar__kol {
+    position: relative;
+    flex: none;
+    width: 40px;
+    height: 24px;
+    border-radius: 999px;
+    background: #d0d5dd;
+    transition: background-color var(--motion-fast, 140ms) var(--motion-ease-out, ease-out);
+}
+
+.sd-anahtar__kol::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.2);
+    transition: transform var(--motion-fast, 140ms) var(--motion-ease-out, ease-out);
+}
+
+.sd-anahtar input:checked + .sd-anahtar__kol { background: var(--sd-mavi); }
+.sd-anahtar input:checked + .sd-anahtar__kol::after { transform: translateX(16px); }
+.sd-anahtar input:focus-visible + .sd-anahtar__kol { outline: 2px solid var(--sd-mavi); outline-offset: 2px; }
 
 /* ==== Sekme çubuğu: dört sekme dar ekranda da sığsın ================= */
 @media (max-width: 479px) {
@@ -383,10 +408,15 @@ html.sd-modu.sd-tablosuz #countingTableContainer { display: none !important; }
     .sd-hucreler { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .sd-eylem .sd-dugme--ana { flex: 1 1 100%; }
     .sd-eylem .sd-dugme--metin { flex: 1 1 100%; }
+    .sd-perde { align-items: flex-end; padding: 0; }
+    .sd-pencere { width: 100%; border-radius: 16px 16px 0 0; padding: 20px 16px calc(16px + env(safe-area-inset-bottom)); transform: translateY(100%); }
+    .sd-pencere__eylem .sd-dugme { flex: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .sd-giris .sd-ust, .sd-giris .sd-detay, .sd-giris .sd-kart, .sd-menu { animation: none; }
+    .sd-giris .sd-ust, .sd-giris .sd-detay, .sd-giris .sd-kart { animation: none; }
+    .sd-perde, .sd-pencere, .sd-anahtar__kol, .sd-anahtar__kol::after { transition: none; }
+    .sd-pencere { transform: none; }
     .sd-kart, .sd-filtre, .sd-dugme, .sd-halka__dolu, .sd-kart__cubuk > span, .sd-ilerleme > span, .sd-cekim__cubuk > span { transition: none; }
     .sd-cark { animation-duration: 2s; }
 }

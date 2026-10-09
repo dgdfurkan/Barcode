@@ -208,6 +208,7 @@
         ag: 'Getir\'e ulaşılamadı. İnternet bağlantınızı kontrol edin.',
         iptal: 'Ürün çekme durduruldu.',
         mesgul: 'Sayım tablosu şu an başka bir işlem yapıyor. Birkaç saniye sonra deneyin.',
+        hepsi_sifir: 'Bu alt kategorideki ürünlerin hepsinin stoğu 0. "Stoğu 0 olanları alma" kapalıyken tekrar deneyin.',
     };
 
     var d = {
@@ -216,7 +217,7 @@
         yukleniyor: null,
         dbYok: false,
         kayitlar: new Map(), // alt kategori adı -> { getir_id, cekildi_at, urun_sayisi }
-        ayar: { sure: 30, ogrenilen: {} },
+        ayar: { sure: 30, ogrenilen: {}, sifirAlma: false },
         mod: false,
         secili: null,
         filtre: 'tumu',
@@ -226,7 +227,7 @@
         ilkCizim: true,
     };
     var panel = null;
-    var sureMenusu = null;
+    var pencere = null;
 
     // ------------------------------------------------------------------
     // Yardımcılar
@@ -309,6 +310,7 @@
                         var ay = r.ayar || {};
                         if (SURELER.indexOf(Number(ay.sure)) >= 0) d.ayar.sure = Number(ay.sure);
                         if (ay.ogrenilen && typeof ay.ogrenilen === 'object') d.ayar.ogrenilen = Object.assign({}, ay.ogrenilen, d.ayar.ogrenilen);
+                        if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
                         return;
                     }
                     yeni.set(r.anahtar, { getir_id: r.getir_id || null, cekildi_at: r.cekildi_at || null, urun_sayisi: r.urun_sayisi });
@@ -371,7 +373,7 @@
             var anahtarlar = Object.keys(og);
             if (anahtarlar.length > 800) anahtarlar.slice(0, anahtarlar.length - 800).forEach(function (k) { delete og[k]; });
             window.jbDb.from('sayim_dongu').upsert({
-                username: kullanici(), anahtar: '_ayar', ayar: { sure: d.ayar.sure, ogrenilen: og }, guncellendi_at: new Date().toISOString(),
+                username: kullanici(), anahtar: '_ayar', ayar: { sure: d.ayar.sure, ogrenilen: og, sifirAlma: d.ayar.sifirAlma }, guncellendi_at: new Date().toISOString(),
             }, { onConflict: 'username,anahtar' });
         }, 600);
     }
@@ -424,7 +426,7 @@
             toplam++;
             if (e.warehouseStock !== null && e.warehouseStock !== undefined) {
                 sayilan++;
-                var ms = Date.parse(e.warehouseStockAt || e.lastUpdated || '') || 0;
+                var ms = Date.parse(e.warehouseStockAt || '') || 0;
                 if (ms > son) son = ms;
             }
         });
@@ -444,7 +446,8 @@
         var cekildi = Date.parse(k.cekildi_at || '') || 0;
         var oran = st.toplam ? st.sayilan / st.toplam : 0;
         var kod;
-        var ref = st.sonSayim || 0;
+        // Gerçek sayım yoksa (yalnız otomatik 0'lar) son çekim zamanı esas
+        var ref = st.sonSayim || cekildi || simdi;
         if (!st.var) kod = 'yok';
         else if (!st.sayilan) kod = cekildi && simdi - cekildi > sureMs ? 'gecikti' : cekildi ? 'bekliyor' : 'yok';
         else if (simdi - ref > sureMs) kod = 'gecikti';
@@ -604,20 +607,84 @@
     }
 
     // ------------------------------------------------------------------
+    // Ürünleri çek: seçenek penceresi
+    // ------------------------------------------------------------------
+    /** @returns {Promise<{sifirAlma:boolean}|null>} null = vazgeçildi */
+    function cekPenceresi(ad) {
+        return new Promise(function (coz) {
+            var st = istatistik(ad);
+            var sifirla = st.var && st.sayilan > 0;
+            var acan = document.activeElement;
+            var secenek = d.ayar.sifirAlma;
+            pencere = document.createElement('div');
+            pencere.className = 'sd-perde';
+            pencere.innerHTML =
+                '<div class="sd-pencere" role="dialog" aria-modal="true" aria-labelledby="sdPencereBaslik">' +
+                '<p class="sd-etiket">' + kacir(st.var ? 'Güncel ürünleri çek' : 'Ürünleri çek') + '</p>' +
+                '<h2 class="sd-pencere__baslik" id="sdPencereBaslik">' + kacir(ad) + '</h2>' +
+                '<p class="sd-pencere__metin">Getir\'deki mevcut stoktan, stoğu çoktan aza sıralı gelir. Başka kategoriye ait ürünler otomatik elenir.</p>' +
+                '<label class="sd-anahtar">' +
+                '<span class="sd-anahtar__metin"><strong>Stoğu 0 olanları alma</strong><span data-sd-aciklama></span></span>' +
+                '<input type="checkbox" role="switch" data-sd-sifir' + (secenek ? ' checked' : '') + '>' +
+                '<span class="sd-anahtar__kol" aria-hidden="true"></span></label>' +
+                (sifirla ? '<p class="sd-pencere__uyari">Tabloda ' + st.sayilan + ' ürün sayılmış. Tablo yenilenir: depo ve sistem stokları sıfırlanır, Getir\'de artık olmayan ürünler çıkar.</p>' : '') +
+                '<div class="sd-pencere__eylem">' +
+                '<button type="button" class="sd-dugme sd-dugme--ikincil" data-sd-p="vazgec">Vazgeç</button>' +
+                '<button type="button" class="sd-dugme sd-dugme--ana" data-sd-p="cek">' + SVG.indir + '<span>' + (sifirla ? 'Sıfırla ve çek' : 'Ürünleri çek') + '</span></button>' +
+                '</div></div>';
+            document.body.appendChild(pencere);
+            document.documentElement.classList.add('sd-kilit');
+            var kutu = pencere.querySelector('[data-sd-sifir]');
+            var aciklama = pencere.querySelector('[data-sd-aciklama]');
+            var aciklamaYaz = function () {
+                aciklama.textContent = kutu.checked
+                    ? 'Getir\'de stoğu 0 görünen ürünler tabloya hiç eklenmez.'
+                    : 'Listenin sonuna eklenir; depo ve sistem stoğu 0 olarak işlenir, sayılmış sayılır.';
+            };
+            aciklamaYaz();
+            kutu.addEventListener('change', aciklamaYaz);
+            var bitir = function (sonuc) {
+                document.removeEventListener('keydown', tus, true);
+                pencere.classList.remove('is-acik');
+                var p = pencere;
+                pencere = null;
+                setTimeout(function () { p.remove(); }, azaltilmisHareket() ? 0 : 200);
+                document.documentElement.classList.remove('sd-kilit');
+                if (sonuc) {
+                    d.ayar.sifirAlma = kutu.checked;
+                    ayarYaz();
+                }
+                try { if (acan && acan.focus) acan.focus({ preventScroll: true }); } catch (e) { /* yok */ }
+                coz(sonuc ? { sifirAlma: kutu.checked } : null);
+            };
+            var tus = function (e) {
+                if (e.key === 'Escape') { e.stopPropagation(); bitir(false); return; }
+                if (e.key !== 'Tab') return;
+                var odak = pencere.querySelectorAll('button, input');
+                if (e.shiftKey && document.activeElement === odak[0]) { e.preventDefault(); odak[odak.length - 1].focus(); }
+                else if (!e.shiftKey && document.activeElement === odak[odak.length - 1]) { e.preventDefault(); odak[0].focus(); }
+            };
+            document.addEventListener('keydown', tus, true);
+            pencere.addEventListener('click', function (e) {
+                if (e.target === pencere) return bitir(false);
+                var h = e.target.closest('[data-sd-p]');
+                if (h) bitir(h.getAttribute('data-sd-p') === 'cek');
+            });
+            void pencere.offsetWidth;
+            pencere.classList.add('is-acik');
+            pencere.querySelector('[data-sd-p="cek"]').focus({ preventScroll: true });
+        });
+    }
+
+    // ------------------------------------------------------------------
     // Ürünleri çek
     // ------------------------------------------------------------------
     async function urunleriCek(ad) {
         var s = cs();
         if (!s || d.cekim) return;
-        var st = istatistik(ad);
-        if (st.var && st.sayilan > 0) {
-            var onay = window.JBDiyalog && window.JBDiyalog.onay
-                ? await window.JBDiyalog.onay(
-                    ad + ' tablosunda ' + st.sayilan + ' ürün sayılmış. Güncel ürünler çekilince tablo yenilenir: depo ve sistem stokları sıfırlanır, listede olmayan ürünler çıkar.',
-                    { baslik: 'Tablo sıfırlansın mı?', tehlikeli: true, onayYazi: 'Sıfırla ve çek', vazgecYazi: 'Vazgeç' })
-                : window.confirm('Tablo sıfırlanıp güncel ürünler çekilsin mi?');
-            if (!onay) return;
-        }
+        var secim = await cekPenceresi(ad);
+        if (!secim) return;
+        var sifirAlma = secim.sifirAlma;
         var iptal = new AbortController();
         d.cekim = { ad: ad, asama: 'Getir oturumu kontrol ediliyor', sayfa: 0, toplamSayfa: 0, taranan: 0, uygun: 0, elenen: 0, iptal: iptal };
         d.sonuc = null;
@@ -668,13 +735,34 @@
             }
             if (!bulunan) throw hata(d.cekim.taranan ? 'kimlik_yok' : 'bos');
 
+            // Stoğu 0 olanlar: ya hiç alınmaz ya da listenin sonuna 0 / 0 işlenerek
+            // (sayılmış sayılır; ilerleme ve finans doğru çıkar). Sayım sayfasının
+            // sistem stoğunu okuduğu yöntemle karar veriliyor.
+            var stokOku = function (row) {
+                try {
+                    var pk = s.pickSystemStockFromProductRow ? s.pickSystemStockFromProductRow(row) : null;
+                    if (pk && pk.stock !== null && pk.stock !== undefined && !isNaN(pk.stock)) return Number(pk.stock);
+                } catch (e) { /* yedek alan */ }
+                var a = Number(row.available);
+                return isNaN(a) ? null : a;
+            };
+            var dolu = [];
+            var sifir = [];
+            bulunan.forEach(function (row) {
+                var stok = stokOku(row);
+                (stok !== null && stok <= 0 ? sifir : dolu).push(row);
+            });
+            var alinacak = sifirAlma ? dolu : dolu.concat(sifir);
+            if (!alinacak.length) throw hata('hepsi_sifir');
+
             // Katalogda olmayanları tanıt ve hesaba kaydet
             var yeniHarici = [];
-            var items = bulunan.map(function (row) {
+            var sifirKume = new Set(sifir);
+            var items = alinacak.map(function (row) {
                 var id = String(row.id || row._id || row.product);
                 var p = s.productIndex.get(id);
                 if (!p) { p = hariciUrun(row); yeniHarici.push(p); }
-                return { product: p, row: row };
+                return { product: p, row: row, sifir: sifirKume.has(row) };
             });
             if (yeniHarici.length) {
                 s.registerExternalProducts(yeniHarici);
@@ -690,6 +778,7 @@
 
             await kayitYaz(ad, { getir_id: kullanilan, cekildi_at: new Date().toISOString(), urun_sayisi: items.length });
             var parca = [items.length + ' ürün tabloya yazıldı'];
+            if (sifir.length) parca.push(sifirAlma ? sifir.length + ' stoğu 0 ürün alınmadı' : sifir.length + ' stoğu 0 ürün sona eklendi, 0 olarak işlendi');
             if (elenen) parca.push(elenen + ' başka kategorinin ürünü elendi');
             if (yeniHarici.length) parca.push(yeniHarici.length + ' ürün katalogda yoktu, eklendi');
             d.sonuc = { ad: ad, metin: parca.join(' · '), tur: 'basari' };
@@ -799,7 +888,6 @@
             else if (ne === 'filtre') { d.filtre = h.getAttribute('data-deger'); ciz(); }
             else if (ne === 'cek') urunleriCek(d.secili);
             else if (ne === 'iptal') { if (d.cekim) d.cekim.iptal.abort(); }
-            else if (ne === 'sure') sureMenusuAc(h);
             else if (ne === 'listeye') {
                 var hedef = document.getElementById('countingTableContainer');
                 if (hedef) hedef.scrollIntoView({ behavior: azaltilmisHareket() ? 'auto' : 'smooth', block: 'start' });
@@ -864,8 +952,7 @@
             '<div class="sd-ust__metin">' +
             '<p class="sd-etiket">Sayım Döngüsü</p>' +
             '<h2 class="sd-baslik"><span class="sd-sayi">' + guncel + '</span> / ' + toplam + ' alt kategori güncel</h2>' +
-            '<p class="sd-alt">Her alt kategori <button type="button" class="sd-sure" data-sd="sure" aria-haspopup="true">' + d.ayar.sure + ' günde' + SVG.asagi + '</button> bir sayılır' +
-            '<span class="sd-oturum sd-oturum--' + ot.renk + '"><span class="sd-nokta"></span>' + kacir(ot.metin) + '</span></p>' +
+            '<p class="sd-alt"><span class="sd-oturum sd-oturum--' + ot.renk + '"><span class="sd-nokta"></span>' + kacir(ot.metin) + '</span></p>' +
             '</div>' +
             '<div class="sd-ust__halka">' + halka(oran, 72) + '<span class="sd-ust__yuzde">%' + Math.round(oran * 100) + '</span></div>' +
             '</header>' +
@@ -893,11 +980,7 @@
             if (filtre && filtre[2] && filtre[2].indexOf(x.kod) < 0) return false;
             return !q || norm(x.ad).indexOf(q) >= 0;
         });
-        liste.sort(function (a, b) {
-            if (DURUM[a.kod].sira !== DURUM[b.kod].sira) return DURUM[a.kod].sira - DURUM[b.kod].sira;
-            if (a.kod === 'gecikti' && a.gecikmeGun !== b.gecikmeGun) return b.gecikmeGun - a.gecikmeGun;
-            return a.ad.localeCompare(b.ad, 'tr');
-        });
+        liste.sort(function (a, b) { return a.ad.localeCompare(b.ad, 'tr'); });
         var html;
         if (!liste.length) {
             html = '<div class="sd-bos">' + (q ? 'Aramaya uyan alt kategori yok.' : 'Bu durumda alt kategori yok.') + '</div>';
@@ -980,43 +1063,6 @@
         if (!panel || !d.mod) return;
         var yer = panel.querySelector('[data-sd-cekim]');
         if (yer && d.cekim && d.secili === d.cekim.ad) yer.innerHTML = cekimHtml(d.cekim.ad);
-    }
-
-    function sureMenusuAc(acan) {
-        if (sureMenusu) { sureMenusu.remove(); sureMenusu = null; return; }
-        sureMenusu = document.createElement('div');
-        sureMenusu.className = 'sd-menu';
-        sureMenusu.setAttribute('role', 'menu');
-        sureMenusu.innerHTML = '<p class="sd-menu__baslik">Sayım sıklığı</p>' + SURELER.map(function (g) {
-            return '<button type="button" role="menuitemradio" aria-checked="' + (g === d.ayar.sure) + '" data-gun="' + g + '">' + g + ' günde bir</button>';
-        }).join('');
-        document.body.appendChild(sureMenusu);
-        var r = acan.getBoundingClientRect();
-        var sol = Math.min(window.innerWidth - 188, Math.max(8, r.left));
-        sureMenusu.style.top = (r.bottom + window.scrollY + 6) + 'px';
-        sureMenusu.style.left = sol + 'px';
-        var kapat = function (e) {
-            if (e && sureMenusu && sureMenusu.contains(e.target) && !e.target.closest('[data-gun]')) return;
-            if (e && e.target === acan) return;
-            document.removeEventListener('pointerdown', kapat, true);
-            document.removeEventListener('keydown', esc, true);
-            if (sureMenusu) { sureMenusu.remove(); sureMenusu = null; }
-        };
-        var esc = function (e) { if (e.key === 'Escape') { e.stopPropagation(); kapat(); acan.focus(); } };
-        sureMenusu.addEventListener('click', function (e) {
-            var b = e.target.closest('[data-gun]');
-            if (!b) return;
-            d.ayar.sure = Number(b.getAttribute('data-gun'));
-            ayarYaz();
-            kapat();
-            ciz();
-        });
-        setTimeout(function () {
-            document.addEventListener('pointerdown', kapat, true);
-            document.addEventListener('keydown', esc, true);
-            var secili = sureMenusu && sureMenusu.querySelector('[aria-checked="true"]');
-            if (secili) secili.focus();
-        }, 0);
     }
 
     // ------------------------------------------------------------------
