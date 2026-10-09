@@ -18,7 +18,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
     <link rel="shortcut icon" href="../assets/logo.png?v=2">
 
-    <link rel="stylesheet" href="../css/main.css?v=20261009a" />
+    <link rel="stylesheet" href="../css/main.css?v=20261009b" />
     <link rel="stylesheet" href="../css/app-boot.css?v=20260828i" />
     <link rel="stylesheet" href="../css/tailwind.css?v=20260828i" />
     <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
@@ -46,7 +46,7 @@
     <script src="../js/barcode-visual.js?v=20260828i"></script>
     <script src="../js/getir-cdn-paste.js?v=20260928a"></script>
     <script src="../js/barcode-scanner.js?v=20260828i"></script>
-    <script src="../js/counting.js?v=20261009d"></script>
+    <script src="../js/counting.js?v=20261009e"></script>
     <script src="../js/urun-foto.js?v=20261007a" defer></script>
     <script src="../js/sayim-eslesmeyen.js?v=20260928a" defer></script>
     <script src="../js/terminal-scanner.js?v=20260828i"></script>
@@ -1369,12 +1369,16 @@
     </script>
 
     <div id="countingStatusDock" class="counting-status-overlay hidden" role="status" aria-live="polite" aria-busy="true">
-        <div class="counting-status-card">
-            <div class="counting-status-center">
-                <div class="counting-jump-loader" aria-hidden="true"></div>
+        <div class="counting-status-card cs-kart">
+            <div class="cs-ikon" aria-hidden="true">
+                <span class="cs-halka"></span>
+                <span class="cs-satirlar"><i></i><i></i><i></i></span>
+            </div>
+            <div class="counting-status-center cs-metin">
                 <p id="countingStatusMsg" class="counting-status-msg">Yükleniyor…</p>
                 <p id="countingStatusDetail" class="counting-status-detail"></p>
             </div>
+            <span class="cs-serit" aria-hidden="true"><span></span></span>
         </div>
     </div>
 </body>

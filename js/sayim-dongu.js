@@ -316,6 +316,41 @@
         return !!err && (err.code === '42P01' || err.code === 'PGRST205' || /does not exist|could not find the table/i.test(err.message || ''));
     }
 
+    // ------------------------------------------------------------------
+    // Cihaz yedeği: öğrenilen kimlik ve ikonlar, alt kategori kimlik seçimleri,
+    // son çekimler. Sunucu tablosu yokken ya da istek düşerken de kaybolmasın;
+    // sunucu açılınca eksikler oraya taşınır.
+    // ------------------------------------------------------------------
+    function yerelAnahtar() { return 'jb_dongu_' + (kullanici() || 'anonim'); }
+
+    function yerelOku() {
+        try {
+            var ham = JSON.parse(localStorage.getItem(yerelAnahtar()) || 'null');
+            if (!ham || typeof ham !== 'object') return;
+            var ay = ham.ayar || {};
+            if (ay.ogrenilen && typeof ay.ogrenilen === 'object') { d.ayar.ogrenilen = Object.assign({}, ay.ogrenilen, d.ayar.ogrenilen); sikiDizin = null; }
+            if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
+            if (SURELER.indexOf(Number(ay.sure)) >= 0) d.ayar.sure = Number(ay.sure);
+            Object.keys(ham.kayitlar || {}).forEach(function (ad) {
+                if (!TOHUM[ad]) return;
+                var k = ham.kayitlar[ad] || {};
+                d.kayitlar.set(ad, Object.assign({}, k, d.kayitlar.get(ad) || {}));
+            });
+        } catch (e) { /* bozuk yedek: yok say */ }
+    }
+
+    var yerelZaman = null;
+    function yerelYaz() {
+        clearTimeout(yerelZaman);
+        yerelZaman = setTimeout(function () {
+            try {
+                var kayitlar = {};
+                d.kayitlar.forEach(function (v, ad) { kayitlar[ad] = { getir_id: v.getir_id || null, cekildi_at: v.cekildi_at || null, urun_sayisi: v.urun_sayisi == null ? null : v.urun_sayisi }; });
+                localStorage.setItem(yerelAnahtar(), JSON.stringify({ ayar: d.ayar, kayitlar: kayitlar }));
+            } catch (e) { /* kota dolu: sunucu kaydı yeter */ }
+        }, 150);
+    }
+
     function dbYukle(zorla) {
         if (d.yukleniyor) return d.yukleniyor;
         if (d.yuklendi && !zorla) return Promise.resolve();
@@ -333,9 +368,13 @@
             } else {
                 d.dbYok = false;
                 var yeni = new Map();
+                var ayarVar = false;
+                var sunucuOgrenilen = 0;
                 (a.data || []).forEach(function (r) {
                     if (r.anahtar === '_ayar') {
+                        ayarVar = true;
                         var ay = r.ayar || {};
+                        sunucuOgrenilen = ay.ogrenilen && typeof ay.ogrenilen === 'object' ? Object.keys(ay.ogrenilen).length : 0;
                         if (SURELER.indexOf(Number(ay.sure)) >= 0) d.ayar.sure = Number(ay.sure);
                         if (ay.ogrenilen && typeof ay.ogrenilen === 'object') { d.ayar.ogrenilen = Object.assign({}, ay.ogrenilen, d.ayar.ogrenilen); sikiDizin = null; }
                         if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
@@ -343,7 +382,24 @@
                     }
                     yeni.set(r.anahtar, { getir_id: r.getir_id || null, cekildi_at: r.cekildi_at || null, urun_sayisi: r.urun_sayisi });
                 });
+                // Cihazda olup sunucuda olmayanlar (sunucu tablosu sonradan kurulduysa) sunucuya taşınır
+                var tasinacak = [];
+                d.kayitlar.forEach(function (v, ad) {
+                    var sv = yeni.get(ad);
+                    if (!sv) { yeni.set(ad, v); tasinacak.push(ad); return; }
+                    var birlesik = Object.assign({}, sv);
+                    if (!birlesik.getir_id && v.getir_id) { birlesik.getir_id = v.getir_id; tasinacak.push(ad); }
+                    if ((Date.parse(v.cekildi_at || '') || 0) > (Date.parse(birlesik.cekildi_at || '') || 0)) {
+                        birlesik.cekildi_at = v.cekildi_at;
+                        birlesik.urun_sayisi = v.urun_sayisi;
+                        if (tasinacak.indexOf(ad) < 0) tasinacak.push(ad);
+                    }
+                    yeni.set(ad, birlesik);
+                });
                 d.kayitlar = yeni;
+                tasinacak.forEach(function (ad) { kayitYaz(ad, d.kayitlar.get(ad)); });
+                if (!ayarVar || Object.keys(d.ayar.ogrenilen).length > sunucuOgrenilen) ayarYaz();
+                yerelYaz();
             }
             if (!b.error && Array.isArray(b.data) && b.data.length && cs() && cs().registerExternalProducts) {
                 // Katalog yüklenmeden eklenirse loadProducts dizini baştan kurup siler
@@ -385,14 +441,18 @@
     async function kayitYaz(ad, alanlar) {
         var eski = d.kayitlar.get(ad) || {};
         d.kayitlar.set(ad, Object.assign({}, eski, alanlar));
+        yerelYaz();
         if (d.dbYok || !window.jbDb) return;
-        var satir = Object.assign({ username: kullanici(), anahtar: ad, guncellendi_at: new Date().toISOString() }, alanlar);
+        var temiz = {};
+        ['getir_id', 'cekildi_at', 'urun_sayisi'].forEach(function (k) { if (alanlar && alanlar[k] !== undefined) temiz[k] = alanlar[k]; });
+        var satir = Object.assign({ username: kullanici(), anahtar: ad, guncellendi_at: new Date().toISOString() }, temiz);
         var r = await window.jbDb.from('sayim_dongu').upsert(satir, { onConflict: 'username,anahtar' });
         if (r.error && tabloEksikMi(r.error)) d.dbYok = true;
     }
 
     var ayarZaman = null;
-    function ayarYaz() {
+    function ayarYaz(hemen) {
+        yerelYaz();
         clearTimeout(ayarZaman);
         ayarZaman = setTimeout(function () {
             if (d.dbYok || !window.jbDb) return;
@@ -402,8 +462,10 @@
             if (anahtarlar.length > 800) anahtarlar.slice(0, anahtarlar.length - 800).forEach(function (k) { delete og[k]; });
             window.jbDb.from('sayim_dongu').upsert({
                 username: kullanici(), anahtar: '_ayar', ayar: { sure: d.ayar.sure, ogrenilen: og, sifirAlma: d.ayar.sifirAlma }, guncellendi_at: new Date().toISOString(),
-            }, { onConflict: 'username,anahtar' });
-        }, 600);
+            }, { onConflict: 'username,anahtar' }).then(function (r) {
+                if (r && r.error && tabloEksikMi(r.error)) d.dbYok = true;
+            });
+        }, hemen ? 0 : 600);
     }
 
     async function hariciYaz(urunler) {
@@ -1247,6 +1309,10 @@
         var acikti = false;
         try { acikti = localStorage.getItem(MOD_ANAHTARI) === '1' && (localStorage.getItem('counting_active_tab') || 'sayim') === 'sayim'; } catch (e) { /* yok */ }
         if (acikti) modAc();
+        yerelOku();
+        document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden' && ayarZaman) ayarYaz(true);
+        });
         // Katalog dışı ürünler mod açılmasa da listede görünsün
         dbYukle(false);
         return true;

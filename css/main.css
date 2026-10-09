@@ -1612,3 +1612,110 @@ h1, h2, h3, h4, h5, h6 {
 #keypadVirgul.invisible { visibility: hidden; }
 #keypadVirgul:active { background-color: #fde68a; }
 #countingReservedStock { flex-basis: 100%; order: 99; }
+
+/* ==== Sayım durum kutusu (countingStatusDock) =========================
+   Yükleme, tablo oluşturma ve içe aktarma bildirimi. Kilitli işlemde
+   (is-lock) simgede satırlar sırayla dolar, açıklamanın önünde kilit
+   çıkar; altta akan ince şerit. Yalnız transform ve opacity hareket eder. */
+#countingStatusDock .cs-kart {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: min(360px, calc(100vw - 32px));
+    padding: 14px 16px 16px 14px;
+    border: 1px solid #e4e7ec;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 16px 40px -12px rgba(16, 24, 40, 0.24);
+    overflow: hidden;
+}
+
+#countingStatusDock .cs-ikon {
+    position: relative;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: #e8effd;
+}
+
+#countingStatusDock .cs-halka {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(37, 99, 235, 0.2);
+    border-top-color: #2563eb;
+    border-radius: 999px;
+    animation: cs-don 0.8s linear infinite;
+}
+
+#countingStatusDock .cs-satirlar { display: none; flex-direction: column; gap: 3px; width: 20px; }
+#countingStatusDock .cs-satirlar i {
+    display: block;
+    height: 4px;
+    border-radius: 999px;
+    background: #2563eb;
+    transform-origin: left center;
+    transform: scaleX(0.15);
+    opacity: 0.35;
+    animation: cs-satir 1.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+#countingStatusDock .cs-satirlar i:nth-child(2) { animation-delay: 0.18s; }
+#countingStatusDock .cs-satirlar i:nth-child(3) { animation-delay: 0.36s; }
+#countingStatusDock.is-lock .cs-halka { display: none; }
+#countingStatusDock.is-lock .cs-satirlar { display: flex; }
+
+#countingStatusDock .cs-metin { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+#countingStatusDock .counting-status-msg { margin: 0; max-width: 100%; font-size: 13px; font-weight: 600; line-height: 18px; color: #111827; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#countingStatusDock .counting-status-detail { margin: 0; max-width: 100%; font-size: 12px; line-height: 16px; color: #667085; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#countingStatusDock.is-lock .counting-status-detail:not(:empty) {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 6px;
+    color: #475467;
+}
+
+#countingStatusDock.is-lock .counting-status-detail:not(:empty)::before {
+    content: '';
+    flex: none;
+    width: 12px;
+    height: 12px;
+    background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Crect x='5' y='11' width='14' height='10' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+#countingStatusDock .cs-serit { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: #eef2f7; overflow: hidden; }
+#countingStatusDock .cs-serit > span {
+    display: block;
+    width: 40%;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0), #2563eb 50%, rgba(37, 99, 235, 0));
+    transform: translateX(-100%);
+    animation: cs-akis 1.3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+/* Kilitliyken arka plan biraz daha belirgin, kart ortaya yakın */
+#countingStatusDock.is-lock.is-visible { background: rgba(16, 24, 40, 0.18); }
+
+@keyframes cs-don { to { transform: rotate(360deg); } }
+@keyframes cs-satir {
+    0% { transform: scaleX(0.15); opacity: 0.35; }
+    45% { transform: scaleX(1); opacity: 1; }
+    100% { transform: scaleX(1); opacity: 0.35; }
+}
+@keyframes cs-akis {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(250%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #countingStatusDock .cs-halka { animation-duration: 2s; }
+    #countingStatusDock .cs-satirlar i { animation: none; transform: none; opacity: 1; }
+    #countingStatusDock .cs-serit > span { animation: none; transform: none; width: 100%; opacity: 0.4; }
+}

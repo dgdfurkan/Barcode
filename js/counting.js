@@ -2144,7 +2144,7 @@ class CountingSystem {
             Number(this._suppressCatchUpUntil) || 0,
             Date.now() + 60000
         );
-        this.showCountingStatus(message, 'Tablo değiştirmeyin', { lock: true });
+        this.showCountingStatus(message, 'Bitene kadar tablo kilitli', { lock: true });
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
             this._saveDebounceTimer = null;
