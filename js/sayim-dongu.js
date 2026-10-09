@@ -981,7 +981,6 @@
         // Döngü'den çıkınca Genel/Günlük kaldığı tabloya dönsün
         if (s.currentTableName && !(s.isDonguTableName && s.isDonguTableName(s.currentTableName))) d.oncekiTablo = s.currentTableName;
         d.mod = true;
-        try { localStorage.setItem(MOD_ANAHTARI, '1'); } catch (e) { /* yok */ }
         document.documentElement.classList.add('sd-modu');
         sekmeleriBoya();
         if (!d.secili) {
@@ -1005,7 +1004,6 @@
                 : (s.getTableList().find(function (t) { return !s.isDailyTableName(t.name); }) || {}).name;
             if (geri) s.switchTable(geri).catch(function () {});
         }
-        try { localStorage.setItem(MOD_ANAHTARI, '0'); } catch (e) { /* yok */ }
         document.documentElement.classList.remove('sd-modu', 'sd-secim');
         sekmeleriBoya();
     }
@@ -1306,9 +1304,8 @@
             if (document.visibilityState === 'visible' && d.mod) dbYukle(true);
         });
 
-        var acikti = false;
-        try { acikti = localStorage.getItem(MOD_ANAHTARI) === '1' && (localStorage.getItem('counting_active_tab') || 'sayim') === 'sayim'; } catch (e) { /* yok */ }
-        if (acikti) modAc();
+        // Sayfa her açılışta Sayım sekmesinde açılır; Döngü kaldığı yerden açılmaz
+        try { localStorage.removeItem(MOD_ANAHTARI); } catch (e) { /* yok */ }
         yerelOku();
         document.addEventListener('visibilitychange', function () {
             if (document.visibilityState === 'hidden' && ayarZaman) ayarYaz(true);

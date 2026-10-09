@@ -980,10 +980,11 @@ class CountingSystem {
                 }
                 const deviceTableForFetch = this._loadDeviceCurrentTable();
                 const serverTableForFetch = metaBlob?._currentTable || localFull?._currentTable;
+                const genelMi = (n) => (n && !this.isDonguTableName(n) ? n : null);
                 const resolvedForFetch =
                     (this._acilistaEnGuncelSec ? this._enGuncelTabloAdi(localFull) : null) ||
-                    serverTableForFetch ||
-                    deviceTableForFetch ||
+                    genelMi(serverTableForFetch) ||
+                    genelMi(deviceTableForFetch) ||
                     'Ana Sayım';
 
                 const [userRes, itemsRes] = await Promise.all([
@@ -2144,7 +2145,7 @@ class CountingSystem {
             Number(this._suppressCatchUpUntil) || 0,
             Date.now() + 60000
         );
-        this.showCountingStatus(message, 'Bitene kadar tablo kilitli', { lock: true });
+        this.showCountingStatus(message, 'Bitene kadar tablo kilitli', { lock: true, tablo: this.currentTableName });
         if (this._saveDebounceTimer) {
             clearTimeout(this._saveDebounceTimer);
             this._saveDebounceTimer = null;
@@ -2182,6 +2183,12 @@ class CountingSystem {
             detailEl.textContent = detail || '';
             detailEl.style.display = detail ? 'block' : 'none';
         }
+        const tableEl = document.getElementById('countingStatusTable');
+        if (tableEl && (!lock || options.tablo !== undefined)) {
+            const etiket = lock && options.tablo ? this._durumTabloEtiketi(options.tablo) : '';
+            tableEl.textContent = etiket;
+            tableEl.hidden = !etiket;
+        }
         if (dock) {
             dock.classList.toggle('is-lock', lock);
             dock.classList.remove('hidden');
@@ -2189,6 +2196,15 @@ class CountingSystem {
         }
         document.documentElement.classList.add('counting-status-active');
         document.documentElement.classList.toggle('counting-status-lock', lock);
+    }
+
+    /** Durum penceresinde yazılan tablonun adı: "Döngü · Bakliyat", "Günlük · 9 Ekim 2026" */
+    _durumTabloEtiketi(name) {
+        if (!name) return '';
+        const ad = this.formatTableDisplayName(name);
+        if (this.isDonguTableName(name)) return `Döngü · ${ad}`;
+        if (this.isDailyTableName(name)) return `Günlük · ${ad}`;
+        return ad;
     }
 
     updateCountingStatus(message, detail = '', options = {}) {
@@ -2203,9 +2219,12 @@ class CountingSystem {
         if (this._statusDepth > 0) return;
         const dock = document.getElementById('countingStatusDock');
         if (dock) {
-            dock.classList.remove('is-visible', 'is-lock');
+            // Kilit sınıfı solma bitince kalkar; pencere ortadan alta kaymasın
+            dock.classList.remove('is-visible');
             setTimeout(() => {
-                if ((this._statusDepth || 0) === 0) dock.classList.add('hidden');
+                if ((this._statusDepth || 0) !== 0) return;
+                dock.classList.add('hidden');
+                dock.classList.remove('is-lock');
             }, 260);
         }
         document.documentElement.classList.remove('counting-status-active', 'counting-status-lock');
@@ -2245,13 +2264,18 @@ class CountingSystem {
 
         const deviceTable = this._loadDeviceCurrentTable();
         const serverTable = fullData._currentTable;
+        // Sayfa her açılışta Sayım sekmesinde, genel bir tabloyla açılır; Döngü tablosu seçilmez
+        const genelMi = (n) => (n && !this.isDonguTableName(n) ? n : null);
         let resolvedTable =
             (this._acilistaEnGuncelSec ? this._enGuncelTabloAdi(fullData) : null) ||
-            serverTable ||
-            deviceTable ||
+            genelMi(serverTable) ||
+            genelMi(deviceTable) ||
             'Ana Sayım';
         if (!tables[resolvedTable]) {
-            resolvedTable = Object.keys(tables).find((n) => !this._isTableTombstoned(n)) || 'Ana Sayım';
+            resolvedTable =
+                Object.keys(tables).find((n) => !this._isTableTombstoned(n) && !this.isDonguTableName(n)) ||
+                Object.keys(tables).find((n) => !this._isTableTombstoned(n)) ||
+                'Ana Sayım';
         }
         this.currentTableName = resolvedTable;
         this._saveDeviceCurrentTable(resolvedTable);
@@ -13458,19 +13482,28 @@ class CountingSystem {
             gridContainer.innerHTML = `<div class="col-span-full text-center py-12 text-gray-500">${emptyMsg}</div>`;
             this._rapidRenderedIds = [];
             this._rapidRenderedStates.clear();
+            this._rapidRenderedTable = this.currentTableName;
             return;
         }
 
+        /* Başka tablonun kartı ızgarada kalmasın. Eskiden yalnız hafızadaki
+           listeye (_rapidRenderedIds) bakılıyordu; liste sıfırlanınca eski
+           tablonun kartları DOM'da kalıp yeni tablonun altına diziliyordu. */
+        if (this._rapidRenderedTable !== this.currentTableName) {
+            gridContainer.innerHTML = '';
+            this._rapidRenderedIds = [];
+            this._rapidRenderedStates.clear();
+            this._rapidRenderedTable = this.currentTableName;
+        }
         const newIds = new Set(sortedProductIds);
         const prevIds = new Set(this._rapidRenderedIds);
 
-        // Silinen ürünlerin kartlarını DOM'dan kaldır
-        for (const oldId of prevIds) {
-            if (!newIds.has(oldId)) {
-                const el = gridContainer.querySelector(`[data-product-id="${CSS.escape(oldId)}"]`);
-                if (el) el.remove();
-                this._rapidRenderedStates.delete(oldId);
-            }
+        // Bu tabloda olmayan ya da hafızada bilinmeyen her kartı kaldır
+        for (const el of Array.from(gridContainer.children)) {
+            const id = el.dataset ? el.dataset.productId : '';
+            if (id && newIds.has(id) && prevIds.has(id)) continue;
+            el.remove();
+            if (id) this._rapidRenderedStates.delete(id);
         }
 
         // Yeni / değişen kartları işle

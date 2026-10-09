@@ -1614,9 +1614,10 @@ h1, h2, h3, h4, h5, h6 {
 #countingReservedStock { flex-basis: 100%; order: 99; }
 
 /* ==== Sayım durum kutusu (countingStatusDock) =========================
-   Yükleme, tablo oluşturma ve içe aktarma bildirimi. Kilitli işlemde
-   (is-lock) simgede satırlar sırayla dolar, açıklamanın önünde kilit
-   çıkar; altta akan ince şerit. Yalnız transform ve opacity hareket eder. */
+   Kısa yükleme bildirimi altta ince bir kart. Kilitli işlem (is-lock:
+   içe aktarma, Döngü yazımı) ekranın ortasında pencere olur: hangi
+   tabloya yazıldığı, satırları dolan tablo simgesi, akan şerit.
+   Yalnız transform ve opacity hareket eder. */
 #countingStatusDock .cs-kart {
     position: relative;
     display: flex;
@@ -1671,6 +1672,8 @@ h1, h2, h3, h4, h5, h6 {
 #countingStatusDock .cs-metin { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
 #countingStatusDock .counting-status-msg { margin: 0; max-width: 100%; font-size: 13px; font-weight: 600; line-height: 18px; color: #111827; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #countingStatusDock .counting-status-detail { margin: 0; max-width: 100%; font-size: 12px; line-height: 16px; color: #667085; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#countingStatusDock .cs-tablo,
+#countingStatusDock .cs-tablo[hidden] { display: none; }
 
 #countingStatusDock.is-lock .counting-status-detail:not(:empty) {
     display: inline-flex !important;
@@ -1700,8 +1703,77 @@ h1, h2, h3, h4, h5, h6 {
     animation: cs-akis 1.3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
-/* Kilitliyken arka plan biraz daha belirgin, kart ortaya yakın */
-#countingStatusDock.is-lock.is-visible { background: rgba(16, 24, 40, 0.18); }
+/* ---- Kilitli işlem: ekranın ortasında pencere ---- */
+#countingStatusDock.is-lock {
+    align-items: center;
+    padding: 16px;
+}
+#countingStatusDock.is-lock.is-visible {
+    background: rgba(16, 24, 40, 0.36);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+}
+#countingStatusDock.is-lock .cs-kart {
+    flex-direction: column;
+    gap: 16px;
+    width: min(320px, calc(100vw - 32px));
+    padding: 32px 24px 24px;
+    border-color: #eaecf0;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 32px 64px -16px rgba(16, 24, 40, 0.42);
+    overflow: visible;
+    transform: translateY(12px) scale(0.96);
+    opacity: 0;
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+}
+#countingStatusDock.is-lock.is-visible .cs-kart { transform: none; opacity: 1; }
+
+#countingStatusDock.is-lock .cs-ikon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background: #eef4ff;
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+/* Simgenin çevresinde yavaş nabız: işin sürdüğünü sessizce söyler */
+#countingStatusDock.is-lock .cs-ikon::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 2px solid #2563eb;
+    opacity: 0;
+    animation: cs-nabiz 1.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+#countingStatusDock.is-lock .cs-satirlar { gap: 5px; width: 30px; }
+#countingStatusDock.is-lock .cs-satirlar i { height: 5px; }
+
+#countingStatusDock.is-lock .cs-metin { flex: none; width: 100%; align-items: center; gap: 4px; text-align: center; }
+#countingStatusDock.is-lock .cs-tablo:not([hidden]) {
+    display: block;
+    max-width: 100%;
+    margin-bottom: 4px;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: #f2f4f7;
+    color: #344054;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#countingStatusDock.is-lock .counting-status-msg { font-size: 15px; line-height: 20px; white-space: normal; }
+#countingStatusDock.is-lock .cs-serit {
+    position: relative;
+    left: auto;
+    right: auto;
+    bottom: auto;
+    flex: none;
+    width: 100%;
+    height: 4px;
+    border-radius: 999px;
+}
 
 @keyframes cs-don { to { transform: rotate(360deg); } }
 @keyframes cs-satir {
@@ -1713,9 +1785,15 @@ h1, h2, h3, h4, h5, h6 {
     from { transform: translateX(-100%); }
     to { transform: translateX(250%); }
 }
+@keyframes cs-nabiz {
+    0% { transform: scale(1); opacity: 0.35; }
+    100% { transform: scale(1.4); opacity: 0; }
+}
 
 @media (prefers-reduced-motion: reduce) {
     #countingStatusDock .cs-halka { animation-duration: 2s; }
     #countingStatusDock .cs-satirlar i { animation: none; transform: none; opacity: 1; }
     #countingStatusDock .cs-serit > span { animation: none; transform: none; width: 100%; opacity: 0.4; }
+    #countingStatusDock.is-lock .cs-ikon::after { animation: none; }
+    #countingStatusDock.is-lock .cs-kart { transform: none; transition: opacity 0.2s ease; }
 }
