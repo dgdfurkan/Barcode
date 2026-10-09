@@ -6965,6 +6965,15 @@ class CountingSystem {
     _syncFinancialTableFromSayim() {
         const current = this.currentTableName;
         const eligible = this.getFinanceEligibleTableNames();
+        // Döngü: sayımı olan bir Döngü tablosundan gelindiyse o, Döngü seçiliyse korunur
+        if (this.isDonguTableName(current) || this.isDonguTableName(this.selectedFinancialTable)) {
+            const donguSayilan = new Set(this._donguFinansTablolari().map((t) => t.name));
+            if (donguSayilan.has(current)) {
+                this.selectedFinancialTable = current;
+                return;
+            }
+            if (this.isDonguTableName(current) && donguSayilan.has(this.selectedFinancialTable)) return;
+        }
         if (current && !this.isDailyTableName(current)) {
             const exists = this.getTableList().some((t) => t.name === current);
             if (exists) {
@@ -8456,10 +8465,19 @@ class CountingSystem {
                 if (!this.countingData[product.id]) this.addProductToCounting(product, { skipSave: true });
                 else this._resetCountingEntryStockFields(this.countingData[product.id]);
                 const entry = this.countingData[product.id];
+                if (entry) delete entry.reservedStock;
                 // Getir'de stoğu 0: depo ve sistem 0 işlenir, sayılmış sayılır
                 if (entry && it.sifir === true) {
                     entry.warehouseStock = 0;
                     entry.systemStock = 0;
+                } else if (entry && it.sistem != null && !Number.isNaN(Number(it.sistem))) {
+                    // "Sistem stoğunu doldur" açık: mevcut stok sistem stoğu olur, rezerve de yazılır
+                    entry.systemStock = Number(it.sistem);
+                    entry.systemStockAt = new Date().toISOString();
+                    const rezerve = it.row ? this.extractReservedStockFromProductItem(it.row) : null;
+                    if (rezerve !== null && rezerve !== undefined && !Number.isNaN(Number(rezerve))) {
+                        entry.reservedStock = Number(rezerve);
+                    }
                 }
                 if (entry && it.row) {
                     const fields = this._extractPriceFieldsFromApiProduct(it.row);
@@ -15443,6 +15461,7 @@ class CountingSystem {
 
         // Setup financial table selector (same as counting table selector)
         this.setupFinancialTableSelector();
+        this._setupFinanceDonguSelector();
 
         // Orijinal fiyat toggle
         const struckPriceToggle = document.getElementById('financeStruckPriceToggle');
@@ -15604,6 +15623,18 @@ class CountingSystem {
         const tables = this.getTableList();
         const financialTableSelectorBtn = document.getElementById('financialTableSelectorBtn');
         let activeLabel = 'Tablo seçin';
+        const donguSecili = this.isDonguTableName(this.selectedFinancialTable);
+        this._updateFinanceDonguButton();
+        if (donguSecili) {
+            financialTableSelectorBtn?.classList.remove('preset-subcat-table-selector-active');
+            if (financeActiveTableLabel) {
+                financeActiveTableLabel.textContent = `Döngü · ${this.formatTableDisplayName(this.selectedFinancialTable)}`;
+            }
+            if (financialTableSelectorText) financialTableSelectorText.textContent = 'Tablo seçin';
+            const acik = document.getElementById('financialTableSelectorDropdown');
+            if (acik && !acik.classList.contains('hidden')) this._renderFinancialTableSelectorList();
+            return;
+        }
         if (this.selectedFinancialTable === 'all') {
             activeLabel = 'Tüm Kategoriler';
             financialTableSelectorBtn?.classList.remove('preset-subcat-table-selector-active');
@@ -15630,6 +15661,132 @@ class CountingSystem {
         if (financialTableSelectorDropdown && !financialTableSelectorDropdown.classList.contains('hidden')) {
             this._renderFinancialTableSelectorList();
         }
+    }
+
+    /**
+     * Finans > Döngü seçicisi: en az bir ürünü sayılmış Döngü tabloları.
+     * Stoğu 0 diye otomatik 0 / 0 işlenen ürünler sayım sayılmaz.
+     * @returns {Array<{name:string, label:string, total:number, counted:number, profitLoss:number}>}
+     */
+    _donguFinansTablolari() {
+        const tables = this.cachedFullData?._tables || {};
+        const out = [];
+        for (const name of Object.keys(tables)) {
+            if (!this.isDonguTableName(name) || this._isTableTombstoned(name)) continue;
+            const data = this.resolveTableDataForList ? this.resolveTableDataForList(name) : tables[name];
+            if (!data || typeof data !== 'object') continue;
+            let total = 0;
+            let counted = 0;
+            for (const pid of Object.keys(data)) {
+                if (this.isReservedCountingKey(pid)) continue;
+                const e = data[pid];
+                if (!e || typeof e !== 'object') continue;
+                total++;
+                const w = e.warehouseStock;
+                if (w === null || w === undefined) continue;
+                if (Number(w) === 0 && Number(e.systemStock) === 0) continue;
+                counted++;
+            }
+            if (!counted) continue;
+            out.push({
+                name,
+                label: this.formatTableDisplayName(name),
+                total,
+                counted,
+                profitLoss: this.calculateTableProfitLoss(data),
+            });
+        }
+        return out.sort((a, b) => a.label.localeCompare(b.label, 'tr'));
+    }
+
+    _updateFinanceDonguButton() {
+        const btn = document.getElementById('financeDonguBtn');
+        if (!btn) return;
+        const list = this._donguFinansTablolari();
+        const secili = this.isDonguTableName(this.selectedFinancialTable);
+        const metin = document.getElementById('financeDonguText');
+        const sayi = document.getElementById('financeDonguCount');
+        btn.classList.toggle('is-aktif', secili);
+        if (metin) metin.textContent = secili ? this.formatTableDisplayName(this.selectedFinancialTable) : 'Döngü';
+        if (sayi) {
+            sayi.textContent = String(list.length);
+            sayi.hidden = secili || list.length === 0;
+        }
+        btn.title = list.length ? `Döngü: ${list.length} sayılan alt kategori` : 'Döngü: henüz sayılan alt kategori yok';
+        const menu = document.getElementById('financeDonguDropdown');
+        if (menu && !menu.classList.contains('hidden')) this._renderFinanceDonguMenu(list);
+    }
+
+    _renderFinanceDonguMenu(list = this._donguFinansTablolari()) {
+        const yer = document.getElementById('financeDonguList');
+        if (!yer) return;
+        if (!list.length) {
+            yer.innerHTML =
+                '<div class="fd-bos"><strong>Henüz sayılan alt kategori yok</strong>' +
+                '<span>Döngü sekmesinde bir alt kategoriyi saydığınızda burada listelenir.</span></div>';
+            return;
+        }
+        const gorsel = window.JBSayimDongu && typeof window.JBSayimDongu.gorsel === 'function'
+            ? window.JBSayimDongu.gorsel
+            : () => '';
+        yer.innerHTML = list.map((t) => {
+            const pl = Math.round(t.profitLoss * 100) / 100;
+            const tur = pl > 0 ? 'arti' : pl < 0 ? 'eksi' : 'sifir';
+            const tutar = pl === 0 ? 'Fark yok' : `${pl > 0 ? '+' : '−'}${this.formatCurrency(Math.abs(pl))}`;
+            const g = gorsel(t.label);
+            const secili = t.name === this.selectedFinancialTable;
+            return `<button type="button" role="option" class="fd-satir${secili ? ' is-secili' : ''}" aria-selected="${secili}" data-tablo="${this.escapeHtml(t.name)}">` +
+                `<span class="fd-satir__gorsel">${g ? `<img src="${this.escapeHtml(g)}" alt="" loading="lazy">` : ''}</span>` +
+                `<span class="fd-satir__metin"><strong>${this.escapeHtml(t.label)}</strong><span>${t.counted} / ${t.total} ürün sayıldı</span></span>` +
+                `<span class="fd-satir__tutar fd-tutar--${tur}">${tutar}</span>` +
+                '</button>';
+        }).join('');
+    }
+
+    _closeFinanceDonguMenu() {
+        const menu = document.getElementById('financeDonguDropdown');
+        const btn = document.getElementById('financeDonguBtn');
+        if (menu) menu.classList.add('hidden');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+
+    _setupFinanceDonguSelector() {
+        const btn = document.getElementById('financeDonguBtn');
+        const menu = document.getElementById('financeDonguDropdown');
+        if (!btn || !menu || btn.dataset.setup === 'true') return;
+        btn.dataset.setup = 'true';
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!menu.classList.contains('hidden')) return this._closeFinanceDonguMenu();
+            this._closeFinancialTableSelectorDropdown();
+            this._renderFinanceDonguMenu();
+            menu.classList.remove('hidden');
+            btn.setAttribute('aria-expanded', 'true');
+        });
+        menu.addEventListener('click', async (e) => {
+            const row = e.target.closest('[data-tablo]');
+            if (!row) return;
+            const name = row.getAttribute('data-tablo');
+            this._closeFinanceDonguMenu();
+            if (this.selectedFinancialTable !== name) this._clearFinancePasteGuide();
+            this.selectedFinancialTable = name;
+            this.updateFinancialTableSelector();
+            await this.renderSingleTableFinancialData(name);
+            this._scheduleBackgroundPriceEnrichment(name);
+        });
+        document.addEventListener('click', (e) => {
+            if (menu.classList.contains('hidden')) return;
+            if (btn.contains(e.target) || menu.contains(e.target)) return;
+            this._closeFinanceDonguMenu();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !menu.classList.contains('hidden')) {
+                this._closeFinanceDonguMenu();
+                btn.focus();
+            }
+        });
+        // Genel seçici açılınca Döngü menüsü kapansın
+        document.getElementById('financialTableSelectorBtn')?.addEventListener('click', () => this._closeFinanceDonguMenu());
     }
 
     async renderAllTablesFinancialData() {

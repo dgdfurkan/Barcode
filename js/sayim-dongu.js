@@ -199,18 +199,20 @@
     ];
 
     var HATA = {
-        oturum_yok: 'Getir oturumu bulunamadı. Bilgisayarda franchise-v2.getir.com/inventory-management/current sayfasını açıp yenileyin; eklenti oturumu yakalar ve telefona da geçer.',
-        oturum_bitti: 'Getir oturumunun süresi dolmuş. Bilgisayarda Getir franchise sayfasını yenileyin, sonra tekrar deneyin.',
-        depo_yok: 'Depo bilgisi bulunamadı. Getir franchise sayfasını açıp yenileyin.',
-        kimlik_yok: 'Getir\'de bu alt kategoriyi bulamadım: tabloda ürün yok, katalogda da adı bu kategoriyi çağrıştıran ürün çıkmadı. Tabloya bu kategoriden bir ürün ekleyip tekrar deneyin.',
-        esles: 'Getir alt kategorisi seçilmeli.',
-        bos: 'Getir bu alt kategoride depoda ürün döndürmedi.',
-        getir: 'Getir isteği başarısız oldu. Biraz sonra tekrar deneyin.',
-        ag: 'Getir\'e ulaşılamadı. İnternet bağlantınızı kontrol edin.',
+        oturum_yok: 'Oturum bulunamadı. Bilgisayarda franchise panelinin stok sayfasını açıp yenileyin; eklenti oturumu yakalar ve telefona da aktarır.',
+        oturum_bitti: 'Oturumun süresi dolmuş. Bilgisayarda franchise panelini yenileyip tekrar deneyin.',
+        depo_yok: 'Depo bilgisi bulunamadı. Franchise panelini açıp yenileyin.',
+        kimlik_yok: 'Bu alt kategori bulunamadı. Tabloda bu kategoriden ürün yok, katalogda da adıyla eşleşen bir ürün çıkmadı. Tabloya bu kategoriden bir ürün ekleyip tekrar deneyin.',
+        esles: 'Önce alt kategoriyi seçin.',
+        bos: 'Bu alt kategoride depoda ürün bulunamadı.',
+        getir: 'Ürünler alınamadı. Biraz sonra tekrar deneyin.',
+        ag: 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.',
         iptal: 'Ürün çekme durduruldu.',
-        mesgul: 'Sayım tablosu şu an başka bir işlem yapıyor. Birkaç saniye sonra deneyin.',
-        hepsi_sifir: 'Bu alt kategorideki ürünlerin hepsinin stoğu 0. "Stoğu 0 olanları alma" kapalıyken tekrar deneyin.',
+        mesgul: 'Sayım tablosu şu an başka bir işlem yapıyor. Birkaç saniye sonra tekrar deneyin.',
+        hepsi_sifir: 'Bu alt kategorideki ürünlerin hepsinin stoğu 0. "Stoğu olmayanları alma" seçeneğini kapatıp tekrar deneyin.',
     };
+
+    var IPUCU_ILK = 'Ürünler depodaki mevcut stoğa göre, en çok stoğu olandan en aza doğru sıralanır. Bu alt kategoriye ait olmayan ürünler otomatik olarak ayıklanır.';
 
     var d = {
         bagli: false,
@@ -218,7 +220,7 @@
         yukleniyor: null,
         dbYok: false,
         kayitlar: new Map(), // alt kategori adı -> { getir_id, cekildi_at, urun_sayisi }
-        ayar: { sure: 30, ogrenilen: {}, sifirAlma: false },
+        ayar: { sure: 30, ogrenilen: {}, sifirAlma: false, sistemDoldur: false },
         mod: false,
         secili: null,
         filtre: 'tumu',
@@ -292,12 +294,27 @@
         return ogrenilenKayit(sikiDizin.get(normSiki(ad)));
     }
 
-    function gunMetni(ms) {
+    /** Takvim günüyle: "Bugün", "Dün", "3 gün önce". kucuk: cümle içinde */
+    function gunFarki(ms) {
+        var bugun = new Date(); bugun.setHours(0, 0, 0, 0);
+        var o = new Date(ms); o.setHours(0, 0, 0, 0);
+        return Math.round((bugun - o) / GUN);
+    }
+    function gunMetni(ms, kucuk) {
         if (!ms) return '';
-        var gun = Math.floor((Date.now() - ms) / GUN);
-        if (gun <= 0) return 'bugün';
-        if (gun === 1) return 'dün';
-        return gun + ' gün önce';
+        var gun = gunFarki(ms);
+        var m = gun <= 0 ? 'Bugün' : gun === 1 ? 'Dün' : gun + ' gün önce';
+        return kucuk ? m.toLocaleLowerCase('tr') : m;
+    }
+    /** Detay kartı için: "Bugün 14:32", "Dün 09:10", "3 gün önce", "7 Ekim" */
+    function zamanMetni(ms) {
+        if (!ms) return '';
+        var gun = gunFarki(ms);
+        var saat = new Date(ms).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+        if (gun <= 0) return 'Bugün ' + saat;
+        if (gun === 1) return 'Dün ' + saat;
+        if (gun < 7) return gun + ' gün önce';
+        return new Date(ms).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
     }
 
     function azaltilmisHareket() {
@@ -330,6 +347,7 @@
             var ay = ham.ayar || {};
             if (ay.ogrenilen && typeof ay.ogrenilen === 'object') { d.ayar.ogrenilen = Object.assign({}, ay.ogrenilen, d.ayar.ogrenilen); sikiDizin = null; }
             if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
+            if (typeof ay.sistemDoldur === 'boolean') d.ayar.sistemDoldur = ay.sistemDoldur;
             if (SURELER.indexOf(Number(ay.sure)) >= 0) d.ayar.sure = Number(ay.sure);
             Object.keys(ham.kayitlar || {}).forEach(function (ad) {
                 if (!TOHUM[ad]) return;
@@ -378,6 +396,7 @@
                         if (SURELER.indexOf(Number(ay.sure)) >= 0) d.ayar.sure = Number(ay.sure);
                         if (ay.ogrenilen && typeof ay.ogrenilen === 'object') { d.ayar.ogrenilen = Object.assign({}, ay.ogrenilen, d.ayar.ogrenilen); sikiDizin = null; }
                         if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
+                        if (typeof ay.sistemDoldur === 'boolean') d.ayar.sistemDoldur = ay.sistemDoldur;
                         return;
                     }
                     yeni.set(r.anahtar, { getir_id: r.getir_id || null, cekildi_at: r.cekildi_at || null, urun_sayisi: r.urun_sayisi });
@@ -461,7 +480,7 @@
             var anahtarlar = Object.keys(og);
             if (anahtarlar.length > 800) anahtarlar.slice(0, anahtarlar.length - 800).forEach(function (k) { delete og[k]; });
             window.jbDb.from('sayim_dongu').upsert({
-                username: kullanici(), anahtar: '_ayar', ayar: { sure: d.ayar.sure, ogrenilen: og, sifirAlma: d.ayar.sifirAlma }, guncellendi_at: new Date().toISOString(),
+                username: kullanici(), anahtar: '_ayar', ayar: { sure: d.ayar.sure, ogrenilen: og, sifirAlma: d.ayar.sifirAlma, sistemDoldur: d.ayar.sistemDoldur }, guncellendi_at: new Date().toISOString(),
             }, { onConflict: 'username,anahtar' }).then(function (r) {
                 if (r && r.error && tabloEksikMi(r.error)) d.dbYok = true;
             });
@@ -572,7 +591,7 @@
         var st = du.st;
         switch (du.kod) {
             case 'yok': return st.var ? st.toplam + ' ürün · sayım yok' : 'Ürünler çekilmedi';
-            case 'bekliyor': return st.toplam + ' ürün · ' + gunMetni(du.cekildi) + ' çekildi';
+            case 'bekliyor': return st.toplam + ' ürün · ' + gunMetni(du.cekildi, true) + ' çekildi';
             case 'suruyor': return st.sayilan + ' / ' + st.toplam + ' sayıldı';
             case 'gecikti': return du.gecikmeGun > 0 ? du.gecikmeGun + ' gün gecikti' : 'Süresi doldu';
             case 'yaklasiyor': return du.kalanGun + ' gün kaldı';
@@ -609,14 +628,14 @@
         if (!info || !info.token) {
             try { var ham = JSON.parse(localStorage.getItem('getir_api_info') || 'null'); if (ham && ham.token) info = ham; } catch (e) { /* yok */ }
         }
-        if (!info || !info.token) return { metin: 'Getir oturumu yok', renk: 'kirmizi' };
+        if (!info || !info.token) return { metin: 'Oturum yok', renk: 'kirmizi' };
         var bitis = s.getEffectiveExpiryMs ? s.getEffectiveExpiryMs(info) : null;
-        if (!bitis) return { metin: 'Getir oturumu var', renk: 'yesil' };
+        if (!bitis) return { metin: 'Oturum açık', renk: 'yesil' };
         var kalan = bitis - Date.now();
-        if (kalan <= 60000) return { metin: 'Getir oturumu doldu', renk: 'kirmizi' };
+        if (kalan <= 60000) return { metin: 'Oturum süresi doldu', renk: 'kirmizi' };
         var sa = Math.floor(kalan / 3600000);
         var dk = Math.floor((kalan % 3600000) / 60000);
-        return { metin: 'Getir oturumu ' + (sa ? sa + ' sa ' : '') + dk + ' dk', renk: kalan < 3600000 ? 'sari' : 'yesil' };
+        return { metin: 'Oturum: ' + (sa ? sa + ' sa ' : '') + dk + ' dk kaldı', renk: kalan < 3600000 ? 'sari' : 'yesil' };
     }
 
     async function stokIstegi(api, govde, offset, sinyal) {
@@ -741,25 +760,31 @@
     // ------------------------------------------------------------------
     // Ürünleri çek: seçenek penceresi
     // ------------------------------------------------------------------
-    /** @returns {Promise<{sifirAlma:boolean}|null>} null = vazgeçildi */
+    /** @returns {Promise<{sifirAlma:boolean, sistemDoldur:boolean}|null>} null = vazgeçildi */
     function cekPenceresi(ad) {
         return new Promise(function (coz) {
             var st = istatistik(ad);
             var sifirla = st.var && st.sayilan > 0;
             var acan = document.activeElement;
             var secenek = d.ayar.sifirAlma;
+            var anahtar = function (veri, baslik, acik) {
+                return '<label class="sd-anahtar">' +
+                    '<span class="sd-anahtar__metin"><strong>' + baslik + '</strong><span data-sd-aciklama="' + veri + '"></span></span>' +
+                    '<input type="checkbox" role="switch" data-sd-' + veri + (acik ? ' checked' : '') + '>' +
+                    '<span class="sd-anahtar__kol" aria-hidden="true"></span></label>';
+            };
             pencere = document.createElement('div');
             pencere.className = 'sd-perde';
             pencere.innerHTML =
                 '<div class="sd-pencere" role="dialog" aria-modal="true" aria-labelledby="sdPencereBaslik">' +
                 '<p class="sd-etiket">' + kacir(st.var ? 'Güncel ürünleri çek' : 'Ürünleri çek') + '</p>' +
                 '<h2 class="sd-pencere__baslik" id="sdPencereBaslik">' + kacir(ad) + '</h2>' +
-                '<p class="sd-pencere__metin">Getir\'deki mevcut stoktan, stoğu çoktan aza sıralı gelir. Başka kategoriye ait ürünler otomatik elenir.</p>' +
-                '<label class="sd-anahtar">' +
-                '<span class="sd-anahtar__metin"><strong>Stoğu 0 olanları alma</strong><span data-sd-aciklama></span></span>' +
-                '<input type="checkbox" role="switch" data-sd-sifir' + (secenek ? ' checked' : '') + '>' +
-                '<span class="sd-anahtar__kol" aria-hidden="true"></span></label>' +
-                (sifirla ? '<p class="sd-pencere__uyari">Tabloda ' + st.sayilan + ' ürün sayılmış. Tablo yenilenir: depo ve sistem stokları sıfırlanır, Getir\'de artık olmayan ürünler çıkar.</p>' : '') +
+                '<p class="sd-pencere__metin">' + IPUCU_ILK + '</p>' +
+                '<div class="sd-anahtarlar">' +
+                anahtar('sifir', 'Stoğu olmayanları alma', secenek) +
+                anahtar('sistem', 'Sistem stoğunu otomatik doldur', d.ayar.sistemDoldur) +
+                '</div>' +
+                (sifirla ? '<p class="sd-pencere__uyari">Bu tabloda ' + st.sayilan + ' ürün sayılmış. Devam ederseniz tablo yenilenir: depo ve sistem stokları sıfırlanır, artık satışta olmayan ürünler listeden çıkar.</p>' : '') +
                 '<div class="sd-pencere__eylem">' +
                 '<button type="button" class="sd-dugme sd-dugme--ikincil" data-sd-p="vazgec">Vazgeç</button>' +
                 '<button type="button" class="sd-dugme sd-dugme--ana" data-sd-p="cek">' + SVG.indir + '<span>' + (sifirla ? 'Sıfırla ve çek' : 'Ürünleri çek') + '</span></button>' +
@@ -767,14 +792,18 @@
             document.body.appendChild(pencere);
             document.documentElement.classList.add('sd-kilit');
             var kutu = pencere.querySelector('[data-sd-sifir]');
-            var aciklama = pencere.querySelector('[data-sd-aciklama]');
+            var sistemKutu = pencere.querySelector('[data-sd-sistem]');
             var aciklamaYaz = function () {
-                aciklama.textContent = kutu.checked
-                    ? 'Getir\'de stoğu 0 görünen ürünler tabloya hiç eklenmez.'
-                    : 'Listenin sonuna eklenir; depo ve sistem stoğu 0 olarak işlenir, sayılmış sayılır.';
+                pencere.querySelector('[data-sd-aciklama="sifir"]').textContent = kutu.checked
+                    ? 'Stoğu 0 olan ürünler tabloya eklenmez.'
+                    : 'Stoğu 0 olan ürünler listenin sonuna eklenir ve sayılmış kabul edilir; depo ve sistem stoğu 0 yazılır.';
+                pencere.querySelector('[data-sd-aciklama="sistem"]').textContent = sistemKutu.checked
+                    ? 'Her ürünün mevcut stoğu sistem stoğu olarak yazılır. Size yalnızca depoyu saymak kalır.'
+                    : 'Sistem stokları boş gelir; sayım sırasında ayrıca çekilir.';
             };
             aciklamaYaz();
             kutu.addEventListener('change', aciklamaYaz);
+            sistemKutu.addEventListener('change', aciklamaYaz);
             var bitir = function (sonuc) {
                 document.removeEventListener('keydown', tus, true);
                 pencere.classList.remove('is-acik');
@@ -784,10 +813,11 @@
                 document.documentElement.classList.remove('sd-kilit');
                 if (sonuc) {
                     d.ayar.sifirAlma = kutu.checked;
+                    d.ayar.sistemDoldur = sistemKutu.checked;
                     ayarYaz();
                 }
                 try { if (acan && acan.focus) acan.focus({ preventScroll: true }); } catch (e) { /* yok */ }
-                coz(sonuc ? { sifirAlma: kutu.checked } : null);
+                coz(sonuc ? { sifirAlma: kutu.checked, sistemDoldur: sistemKutu.checked } : null);
             };
             var tus = function (e) {
                 if (e.key === 'Escape') { e.stopPropagation(); bitir(false); return; }
@@ -817,9 +847,10 @@
         var secim = onceki || await cekPenceresi(ad);
         if (!secim) return;
         var sifirAlma = secim.sifirAlma;
+        var sistemDoldur = secim.sistemDoldur === true;
         d.esles = null;
         var iptal = new AbortController();
-        d.cekim = { ad: ad, asama: 'Getir oturumu kontrol ediliyor', sayfa: 0, toplamSayfa: 0, taranan: 0, uygun: 0, elenen: 0, iptal: iptal };
+        d.cekim = { ad: ad, asama: 'Oturum kontrol ediliyor', sayfa: 0, toplamSayfa: 0, taranan: 0, uygun: 0, elenen: 0, iptal: iptal };
         d.sonuc = null;
         ciz();
         try {
@@ -828,7 +859,7 @@
             var kesfedildi = false;
             var kesfet = async function () {
                 kesfedildi = true;
-                d.cekim.asama = 'Getir\'de alt kategori aranıyor';
+                d.cekim.asama = 'Alt kategori aranıyor';
                 cekimCiz();
                 var k = await kesif(ad, api, iptal.signal);
                 if (k && k.id) return [k.id];
@@ -851,7 +882,7 @@
                 elenen = 0;
                 var offset = 0;
                 for (var sayfa = 1; sayfa <= AZAMI_SAYFA; sayfa++) {
-                    d.cekim.asama = 'Getir\'den ürünler alınıyor';
+                    d.cekim.asama = 'Ürünler alınıyor';
                     d.cekim.sayfa = sayfa;
                     cekimCiz();
                     var cevap = await stokIstegi(api, { subCategory: altId, warehouseIds: [api.depo], sort: { available: -1 } }, offset, iptal.signal);
@@ -911,7 +942,8 @@
                 var id = String(row.id || row._id || row.product);
                 var p = s.productIndex.get(id);
                 if (!p) { p = hariciUrun(row); yeniHarici.push(p); }
-                return { product: p, row: row, sifir: sifirKume.has(row) };
+                var sifirMi = sifirKume.has(row);
+                return { product: p, row: row, sifir: sifirMi, sistem: sistemDoldur && !sifirMi ? stokOku(row) : null };
             });
             if (yeniHarici.length) {
                 s.registerExternalProducts(yeniHarici);
@@ -924,15 +956,18 @@
             var hedef = tabloAdi(ad);
             if (!tabloVarMi(ad)) await s.createTable(hedef, { skipRender: true });
             else if (s.currentTableName !== hedef) await s.switchTable(hedef, { skipCatchUp: true, skipRender: true });
-            await s.applyDonguProducts(items, { tablo: hedef, kaynak: 'Getir' });
+            await s.applyDonguProducts(items, { tablo: hedef });
 
             await kayitYaz(ad, { getir_id: kullanilan, cekildi_at: new Date().toISOString(), urun_sayisi: items.length });
-            var parca = [items.length + ' ürün tabloya yazıldı'];
-            if (sifir.length) parca.push(sifirAlma ? sifir.length + ' stoğu 0 ürün alınmadı' : sifir.length + ' stoğu 0 ürün sona eklendi, 0 olarak işlendi');
-            if (elenen) parca.push(elenen + ' başka kategorinin ürünü elendi');
-            if (yeniHarici.length) parca.push(yeniHarici.length + ' ürün katalogda yoktu, eklendi');
-            d.sonuc = { ad: ad, metin: parca.join(' · '), tur: 'basari' };
-            bildir(ad + ': ' + parca[0] + '.', 'basari');
+            var parca = [items.length + ' ürün tabloya eklendi.'];
+            if (sistemDoldur) parca.push('Sistem stokları mevcut stoktan dolduruldu.');
+            if (sifir.length) parca.push(sifirAlma
+                ? 'Stoğu olmayan ' + sifir.length + ' ürün eklenmedi.'
+                : 'Stoğu olmayan ' + sifir.length + ' ürün listenin sonuna eklendi ve 0 olarak işaretlendi.');
+            if (elenen) parca.push('Başka kategoriye ait ' + elenen + ' ürün ayıklandı.');
+            if (yeniHarici.length) parca.push('Katalogda olmayan ' + yeniHarici.length + ' ürün kataloğa eklendi.');
+            d.sonuc = { ad: ad, metin: parca.join(' '), tur: 'basari' };
+            bildir(ad + ': ' + parca[0], 'basari');
         } catch (e) {
             if (e && e.kod === 'esles') {
                 d.sonuc = null;
@@ -1043,6 +1078,7 @@
         yenile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>',
         saat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
         kutu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/></svg>',
+        onay: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>',
         asagi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
     };
 
@@ -1189,7 +1225,19 @@
             ? '<button type="button" class="sd-dugme sd-dugme--ikincil" data-sd="iptal">Durdur</button>'
             : '<button type="button" class="sd-dugme sd-dugme--ana" data-sd="cek"' + (d.cekim ? ' disabled' : '') + '>' +
               (ilk ? SVG.indir + '<span>Ürünleri çek</span>' : SVG.yenile + '<span>Güncel ürünleri çek</span>') + '</button>';
-        var hucre = function (etiket, deger) { return '<div class="sd-hucre"><span>' + etiket + '</span><strong>' + deger + '</strong></div>'; };
+        var yuzde = st.toplam ? Math.round(x.oran * 100) : 0;
+        var kalan = Math.max(0, st.toplam - st.sayilan);
+        var ozetAlt = !st.var ? 'Ürünler henüz çekilmedi'
+            : st.yukleniyor ? 'Ürünler yükleniyor'
+            : !kalan ? 'Hepsi sayıldı'
+            : kalan + ' ürün sayılmayı bekliyor';
+        var zaman = function (ikon, etiket, ms, bos) {
+            return '<div class="sd-zaman">' +
+                '<span class="sd-zaman__ikon">' + ikon + '</span>' +
+                '<span class="sd-zaman__metin"><span>' + etiket + '</span>' +
+                '<strong' + (ms ? '' : ' class="is-bos"') + '>' + kacir(ms ? zamanMetni(ms) : bos) + '</strong></span>' +
+                '</div>';
+        };
         return '' +
             '<div class="sd-detay">' +
             '<div class="sd-detay__ust">' +
@@ -1201,13 +1249,18 @@
             '<div><p class="sd-etiket">' + kacir(t[0] || 'Alt kategori') + '</p><h2 class="sd-detay__ad">' + kacir(ad) + '</h2>' +
             '<p class="sd-alt">' + kacir(durumAlt(x)) + '</p></div>' +
             '</div>' +
-            '<div class="sd-hucreler">' +
-            hucre('Ürün', st.var ? st.toplam : '-') +
-            hucre('Sayılan', st.var ? st.sayilan + (st.toplam ? ' <em>%' + Math.round(x.oran * 100) + '</em>' : '') : '-') +
-            hucre('Son çekim', x.cekildi ? kacir(gunMetni(x.cekildi)) : '-') +
-            hucre('Son sayım', st.sonSayim ? kacir(gunMetni(st.sonSayim)) : '-') +
-            '</div>' +
-            '<div class="sd-ilerleme" aria-hidden="true"><span class="sd-r--' + r + '" style="transform:scaleX(' + (st.var ? x.oran.toFixed(3) : 0) + ')"></span></div>' +
+            '<div class="sd-ozet" style="--sd-renk:var(--sd-' + r + ')">' +
+            '<div class="sd-ozet__ilerleme">' +
+            '<div class="sd-ozet__halka">' + halka(st.var ? x.oran : 0, 72) +
+            '<span class="sd-ozet__yuzde">' + (st.var ? '%' + yuzde : '-') + '</span></div>' +
+            '<div class="sd-ozet__sayilar">' +
+            '<p class="sd-ozet__sayi"><strong>' + (st.var ? st.sayilan : 0) + '</strong><span>/ ' + (st.var ? st.toplam : 0) + ' ürün sayıldı</span></p>' +
+            '<p class="sd-ozet__alt">' + (st.var && !kalan && !st.yukleniyor ? SVG.onay : '') + kacir(ozetAlt) + '</p>' +
+            '</div></div>' +
+            '<div class="sd-ozet__zamanlar">' +
+            zaman(SVG.indir, 'Son çekim', x.cekildi, 'Hiç çekilmedi') +
+            zaman(SVG.saat, 'Son sayım', st.sonSayim, 'Henüz sayılmadı') +
+            '</div></div>' +
             '<div class="sd-cekim" data-sd-cekim>' + cekimHtml(ad) + '</div>' +
             '<div class="sd-eylem">' + dugme +
             (st.var && !cekiliyor ? '<button type="button" class="sd-dugme sd-dugme--metin" data-sd="listeye">Ürünlere git' + SVG.asagi + '</button>' : '') +
@@ -1229,7 +1282,7 @@
         }
         if (d.esles && d.esles.ad === ad) {
             return '<div class="sd-esles" role="group" aria-labelledby="sdEslesBaslik">' +
-                '<p class="sd-esles__baslik" id="sdEslesBaslik">Getir\'de bu adla bir alt kategori bulunamadı. Bu ürünler Getir\'de şu alt kategorilerde; hangisi ' + kacir(ad) + '?</p>' +
+                '<p class="sd-esles__baslik" id="sdEslesBaslik">Bu adla bir alt kategori bulunamadı. Bu ürünler şu alt kategorilerde görünüyor. Hangisi ' + kacir(ad) + '?</p>' +
                 '<div class="sd-esles__liste">' + d.esles.secenekler.map(function (x) {
                     return '<button type="button" class="sd-esles__secenek" data-sd="esles" data-id="' + kacir(x.id) + '">' +
                         '<span class="sd-kart__gorsel">' + (x.g ? '<img src="' + kacir(x.g) + '" alt="" loading="lazy">' : SVG.kutu) + '</span>' +
@@ -1244,9 +1297,9 @@
         }
         var x = durumHesapla(ad);
         if (!x.st.var) {
-            return '<p class="sd-ipucu">Ürünler Getir\'deki mevcut stoktan, stoğu çoktan aza sıralı gelir. Başka kategoriye ait ürünler otomatik elenir.</p>';
+            return '<p class="sd-ipucu">' + IPUCU_ILK + '</p>';
         }
-        return '<p class="sd-ipucu">Güncel ürünleri çekmek tabloyu yeniler: depo ve sistem stokları sıfırlanır, Getir\'de artık olmayan ürünler çıkar.</p>';
+        return '<p class="sd-ipucu">Güncel ürünleri çekmek tabloyu yeniler: depo ve sistem stokları sıfırlanır, artık satışta olmayan ürünler listeden çıkar.</p>';
     }
 
     /** Çekim sürerken yalnız ilerleme kutusunu güncelle (tüm paneli değil) */
@@ -1327,5 +1380,5 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', basla);
     else basla();
 
-    window.JBSayimDongu = { ac: modAc, kapat: modKapat, cek: urunleriCek };
+    window.JBSayimDongu = { ac: modAc, kapat: modKapat, cek: urunleriCek, gorsel: gorselAdresi };
 })();

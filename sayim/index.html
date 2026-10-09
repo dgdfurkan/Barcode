@@ -48,11 +48,11 @@
     <script src="../js/barcode-visual.js?v=20260828i"></script>
     <script src="../js/getir-cdn-paste.js?v=20260928a"></script>
     <script src="../js/barcode-scanner.js?v=20260828i"></script>
-    <script src="../js/counting.js?v=20261009f"></script>
+    <script src="../js/counting.js?v=20261009g"></script>
     <script src="../js/urun-foto.js?v=20261007a" defer></script>
     <script src="../js/sayim-eslesmeyen.js?v=20260928a" defer></script>
     <script src="../js/sayim-rapor.js?v=20261008c" defer></script>
-    <script src="../js/sayim-dongu.js?v=20261009f" defer></script>
+    <script src="../js/sayim-dongu.js?v=20261009g" defer></script>
     <script src="../js/terminal-scanner.js?v=20260828i"></script>
     
     <style>
@@ -2432,7 +2432,7 @@
     <link rel="stylesheet" href="../css/urun-foto.css?v=20261007a" />
     <link rel="stylesheet" href="../css/sayim-eslesmeyen.css?v=20260928a" />
     <link rel="stylesheet" href="../css/sayim-rapor.css?v=20261008c" />
-    <link rel="stylesheet" href="../css/sayim-dongu.css?v=20261009e" />
+    <link rel="stylesheet" href="../css/sayim-dongu.css?v=20261009g" />
 </head>
 <body class="bg-gray-50">
     <div id="appBoot" class="app-boot app-boot--active" data-boot-steps="auth,data,ui" role="status" aria-live="polite" aria-label="Sayfa yükleniyor">
@@ -2654,6 +2654,19 @@
                                     </div>
                                 </div>
                                 <div id="financialTableSelectorList" class="max-h-[min(50vh,14rem)] overflow-y-auto overscroll-contain px-1"></div>
+                            </div>
+                        </div>
+                        <!-- Döngü tabloları: yalnız sayılanlar (js/counting.js _setupFinanceDonguSelector) -->
+                        <div class="fd-kap">
+                            <button type="button" id="financeDonguBtn" class="fd-dugme" aria-expanded="false" aria-haspopup="listbox" aria-controls="financeDonguDropdown">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+                                <span id="financeDonguText" class="fd-dugme__metin">Döngü</span>
+                                <span id="financeDonguCount" class="fd-sayi" hidden>0</span>
+                                <svg class="fd-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                            </button>
+                            <div id="financeDonguDropdown" class="fd-menu hidden" role="listbox" aria-label="Sayılan Döngü tabloları">
+                                <div class="fd-menu__ust"><strong>Döngü</strong><span>Sayımı yapılmış alt kategoriler</span></div>
+                                <div id="financeDonguList" class="fd-liste"></div>
                             </div>
                         </div>
                     </div>
