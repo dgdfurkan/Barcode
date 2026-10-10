@@ -6039,8 +6039,6 @@ class CountingSystem {
     }
 
     _clearFinancePasteGuide() {
-        this._financeSktKova = null;
-        this._financeSktGorunum = 'sira';
         this._financeSktZaman = null;
         this._financeSktHata = null;
         this._financePasteGuide = null;
@@ -6121,7 +6119,7 @@ class CountingSystem {
 
     _formatPasteGuideStock(val) {
         if (val === null || val === undefined || val === '') return '—';
-        return String(val);
+        return this._sayiMetni(val);
     }
 
     /** Rehber satırı — güncel sayım verisi + orijinal fiyat toggle */
@@ -6193,7 +6191,6 @@ class CountingSystem {
         if (g === null) return 'sonra';
         if (g <= 3) return 'k3';
         if (g <= 7) return 'k7';
-        if (g <= 30) return 'k30';
         return 'sonra';
     }
 
@@ -6211,105 +6208,71 @@ class CountingSystem {
         return g + ' Gün';
     }
 
-    /**
-     * Rehber satırında partiler: adetle orantılı renkli şerit, altında her
-     * parti (tarih, adet, kalan gün, raf). Toplam depo sayımıyla tutmazsa uyarı.
-     */
+    /** Rehber: finans tablosunda eksik ya da fazla çıkan ürünler, sayım sırasıyla */
+    _rehberUrunleri() {
+        const tablo = this.selectedFinancialTable;
+        if (!tablo || tablo === 'all') return [];
+        const sira = new Map(((this.cachedFullData?._tables?.[tablo]?._productOrder) || []).map((id, i) => [id, i]));
+        const gorulen = new Set();
+        const out = [];
+        for (const p of this._lastFinanceExecutiveProducts || []) {
+            if (!p?.productId || gorulen.has(p.productId)) continue;
+            const f = Number(p.stockDiff);
+            if (p.stockDiff === null || p.stockDiff === undefined || Number.isNaN(f) || f === 0) continue;
+            gorulen.add(p.productId);
+            out.push(p);
+        }
+        return out.sort((a, b) => (sira.get(a.productId) ?? 1e9) - (sira.get(b.productId) ?? 1e9));
+    }
+
+    _rehberSktGecerli() {
+        return !!this._financeSktZaman && this._financeSktTablo === this.selectedFinancialTable;
+    }
+
+    /** Satırdaki partiler: tarih, adet (büyük), kaç gün kaldığı */
     _renderFinancePasteGuideSktHtml(productId, depo = null) {
+        if (!this._rehberSktGecerli()) return '';
         const entries = this._getFinancePasteGuideSktEntries(productId);
-        const getirildi = !!this._financeSktZaman && this._financePasteGuideMatchesCurrentTable();
-        if (!entries.length) {
-            return getirildi ? '<div class="skt-blok"><span class="skt-yok">SKT Kaydı Yok</span></div>' : '';
-        }
-        const toplam = entries.reduce((t, e) => t + (Number(e.qty) || 0), 0) || 1;
-        const serit = entries.map((e) =>
-            `<span class="skt-serit__p skt-ton--${this._sktKova(e)}" style="flex-grow:${Number(e.qty) || 0}"></span>`
-        ).join('');
-        const partiler = entries.map((e) => {
-            const ipucu = `SKT ${e.date}${e.removeDate ? ' · satıştan kalkış ' + e.removeDate : ''}${e.raf ? ' · ' + e.raf : ''}`;
-            return `<span class="skt-parti skt-ton--${this._sktKova(e)}" title="${this.escapeHtml(ipucu)}">` +
-                `<i aria-hidden="true"></i>` +
-                `<b>${this._sktKisaTarih(e.date)}</b>` +
-                `<span class="skt-parti__adet">${this._sayiMetni(e.qty)} Adet</span>` +
-                `<span class="skt-parti__gun">${this._sktGunMetni(e)}</span>` +
-                (e.raf ? `<span class="skt-parti__raf">${this.escapeHtml(e.raf)}</span>` : '') +
-                '</span>';
-        }).join('');
-        const sktToplam = entries.reduce((t, e) => t + (Number(e.qty) || 0), 0);
-        const tutmuyor = depo !== null && depo !== undefined && !Number.isNaN(Number(depo)) && Math.abs(Number(depo) - sktToplam) > 0.0005;
-        return `<div class="skt-blok">
-            <div class="skt-blok__ust"><span class="skt-baslik">SKT</span>
-                <span class="skt-toplam${tutmuyor ? ' is-uyari' : ''}">${tutmuyor ? `Depo ${this._sayiMetni(depo)} · SKT ${this._sayiMetni(sktToplam)}` : `${entries.length} Parti · ${this._sayiMetni(sktToplam)} Adet`}</span></div>
-            <div class="skt-serit" aria-hidden="true">${serit}</div>
-            <div class="skt-partiler">${partiler}</div>
-        </div>`;
-    }
-
-    /** Tarihe göre: bütün partiler satıştan kalkış sırasıyla, aciliyet gruplarıyla */
-    _renderFinanceSktTarihHtml(items) {
-        const satirlar = [];
-        for (const p of items) {
-            for (const e of this._getFinancePasteGuideSktEntries(p.productId)) satirlar.push({ p, e, gun: this._sktKalanGun(e), kova: this._sktKova(e) });
-        }
-        const kovaSecili = this._financeSktKova;
-        const liste = satirlar
-            .filter((x) => !kovaSecili || x.kova === kovaSecili)
-            .sort((a, b) => (a.gun ?? 1e9) - (b.gun ?? 1e9));
-        if (!liste.length) return '<p class="py-6 text-center text-xs text-gray-400">Bu aralıkta parti yok.</p>';
-        const ADLAR = { k3: '3 Gün İçinde', k7: '7 Gün İçinde', k30: '30 Gün İçinde', sonra: 'Daha Sonra' };
-        let son = null;
-        let html = '';
-        for (const x of liste) {
-            if (x.kova !== son) {
-                const grupAdet = liste.filter((y) => y.kova === x.kova).reduce((t, y) => t + (Number(y.e.qty) || 0), 0);
-                html += `<div class="skt-grup skt-ton--${x.kova}"><i aria-hidden="true"></i><span>${ADLAR[x.kova]}</span><b>${this._sayiMetni(grupAdet)} Adet</b></div>`;
-                son = x.kova;
-            }
-            const img = this.escapeHtml(x.p.imageUrl || '../assets/logo.png');
-            html += `<div class="skt-tsatir skt-ton--${x.kova}">
-                <div class="skt-tsatir__tarih"><b>${this._sktKisaTarih(x.e.removeDate || x.e.date)}</b><span>${this._sktGunMetni(x.e)}</span></div>
-                <img src="${img}" alt="" loading="lazy" onerror="this.src='../assets/logo.png'">
-                <div class="skt-tsatir__govde"><p>${this.escapeHtml(x.p.productName || '')}</p>
-                    <span>SKT ${this.escapeHtml(x.e.date)}${x.e.raf ? ` · <code>${this.escapeHtml(x.e.raf)}</code>` : ''}</span></div>
-                <span class="skt-tsatir__adet">${this._sayiMetni(x.e.qty)}<small>Adet</small></span>
+        if (!entries.length) return '<p class="rh-skt-yok">SKT kaydı yok</p>';
+        const kartlar = entries.map((e) => {
+            const ipucu = `SKT ${e.date}${e.removeDate ? ' · satıştan kalkış ' + e.removeDate : ''}`;
+            const gun = this._sktGunMetni(e);
+            return `<div class="rh-parti rh-parti--${this._sktKova(e)}" title="${this.escapeHtml(ipucu)}">
+                <span class="rh-parti__tarih">${this._sktKisaTarih(e.date)}</span>
+                <span class="rh-parti__adet">${this._sayiMetni(e.qty)}<small> Adet</small></span>
+                ${gun ? `<span class="rh-parti__gun">${gun}</span>` : ''}
             </div>`;
-        }
-        return html;
+        }).join('');
+        const toplam = entries.reduce((t, e) => t + (Number(e.qty) || 0), 0);
+        const tutmuyor = depo !== null && depo !== undefined && !Number.isNaN(Number(depo)) && Math.abs(Number(depo) - toplam) > 0.0005;
+        return `<div class="rh-skt">${kartlar}</div>` +
+            (tutmuyor ? `<p class="rh-skt-not">SKT toplamı ${this._sayiMetni(toplam)} · depo ${this._sayiMetni(depo)}</p>` : '');
     }
 
-    /** Asistan ile warehouse panelinden SKT: tablodaki ürünler, tablo sırasıyla */
-    async fetchFinanceGuideSkt(tableProducts) {
+    /** Asistan ile warehouse panelinden SKT: yalnız rehberdeki (eksik / fazla) ürünler */
+    async fetchFinanceGuideSkt() {
         const tablo = this.selectedFinancialTable;
         if (!tablo || tablo === 'all') {
             this.showToast('Önce tek bir tablo seçin', 'warning', 2500);
             return;
         }
         if (this._financeSktYukleniyor) return;
-        const helper = window.getirExtensionHelper;
-        const sira = new Map(((this.cachedFullData?._tables?.[tablo]?._productOrder) || []).map((id, i) => [id, i]));
-        const gorulen = new Set();
-        const items = [];
-        for (const p of Array.isArray(tableProducts) ? tableProducts : []) {
-            if (!p?.productId || gorulen.has(p.productId)) continue;
-            gorulen.add(p.productId);
-            items.push(p);
-        }
-        items.sort((a, b) => (sira.get(a.productId) ?? 1e9) - (sira.get(b.productId) ?? 1e9));
+        const items = this._rehberUrunleri();
         if (!items.length) {
-            this.showToast('Bu tabloda ürün yok', 'info', 2500);
+            this.showToast('Bu tabloda eksik ya da fazla ürün yok', 'info', 2500);
             return;
         }
-        this._financePasteGuide = { tableKey: tablo, items, totalPaste: items.length, unmatched: 0, otomatik: true };
+        const helper = window.getirExtensionHelper;
         this._financePasteGuideSkt = new Map();
-        this._financePasteGuideSelectedIndex = null;
         this._financeSktZaman = null;
+        this._financeSktTablo = tablo;
         this._financeSktHata = null;
         if (!helper?.fetchExpiryProducts) {
             this._financeSktHata = 'Jet Barkod Asistan bulunamadı. Eklentinin açık olduğundan emin olup sayfayı yenileyin.';
             this._refreshFinancePasteGuideSection();
             return;
         }
-        this._financeSktYukleniyor = { mesaj: 'Warehouse paneli açılıyor', bas: Date.now(), oran: 0.04 };
+        this._financeSktYukleniyor = { mesaj: 'Warehouse paneli açılıyor', oran: 0.04 };
         this._refreshFinancePasteGuideSection();
         const ilerle = (e) => {
             if (e.source !== window || e.data?.type !== 'WAREHOUSE_EXPIRY_PROGRESS' || !this._financeSktYukleniyor) return;
@@ -6329,24 +6292,28 @@ class CountingSystem {
                 warehouseId: this._getFinancePasteGuideWarehouseId(),
             });
             for (const [pid, dizi] of Object.entries(sonuc?.byProductId || {})) {
-                const liste = (Array.isArray(dizi) ? dizi : [])
-                    .filter((e) => e && e.date && Number(e.qty) > 0)
-                    .map((e) => ({ date: String(e.date), qty: Number(e.qty), removeDate: e.removeDate || null, raf: e.raf || null }));
+                // Aynı tarihli partiler tek kart: raf ayrımı gösterilmiyor
+                const tarihe = new Map();
+                for (const e of Array.isArray(dizi) ? dizi : []) {
+                    if (!e || !e.date || !(Number(e.qty) > 0)) continue;
+                    const v = tarihe.get(e.date);
+                    if (v) v.qty += Number(e.qty);
+                    else tarihe.set(e.date, { date: String(e.date), qty: Number(e.qty), removeDate: e.removeDate || null });
+                }
+                const liste = [...tarihe.values()];
                 if (liste.length) {
                     this._sortFinancePasteGuideSktEntries(liste);
                     this._financePasteGuideSkt.set(String(pid), liste);
                 }
             }
             this._financeSktZaman = Date.now();
-            const bulunan = this._countFinancePasteGuideSktMatched();
+            const bulunan = items.filter((p) => this._getFinancePasteGuideSktEntries(p.productId).length).length;
             this.showToast(`${bulunan} / ${items.length} üründe SKT bulundu`, bulunan ? 'success' : 'info', 2500);
         } catch (e) {
             const m = (e && e.message) || '';
-            this._financeSktHata = /sekmesi açık değil|warehouse\.getir\.com/i.test(m)
-                ? 'warehouse.getir.com bu tarayıcıda açık bir sekmede olmalı. Sekmeyi açıp tekrar deneyin.'
-                : /oturum/i.test(m)
-                  ? 'Warehouse oturumu bulunamadı. warehouse.getir.com sekmesini bir kez yenileyip tekrar deneyin.'
-                  : m || 'SKT alınamadı. Birkaç saniye sonra tekrar deneyin.';
+            this._financeSktHata = /giriş/i.test(m)
+                ? 'Warehouse paneline giriş yapılmamış. warehouse.getir.com\'a bir kez giriş yapıp tekrar deneyin.'
+                : m || 'SKT alınamadı. Birkaç saniye sonra tekrar deneyin.';
         } finally {
             window.removeEventListener('message', ilerle);
             this._financeSktYukleniyor = null;
@@ -6797,229 +6764,102 @@ class CountingSystem {
         const img = this.escapeHtml(p.imageUrl || '../assets/logo.png');
         const name = this.escapeHtml(p.productName || '');
         const d = this._getFinancePasteGuideItemDisplay(p);
-        const depo = this._formatPasteGuideStock(d.warehouseStock);
-        const sistem = this._formatPasteGuideStock(d.systemStock);
-        const adetStr =
-            d.stockDiff !== null ? (d.stockDiff > 0 ? `+${d.stockDiff}` : `${d.stockDiff}`) : '';
-        const stockDiffClass =
-            d.stockDiff > 0 ? 'text-emerald-700' : d.stockDiff < 0 ? 'text-rose-700' : 'text-gray-600';
-        const toneClass =
-            d.stockDiff > 0 ? 'text-emerald-700' : d.stockDiff < 0 ? 'text-rose-700' : 'text-gray-600';
-        const tlClass =
-            d.stockDiff > 0 ? 'text-emerald-800' : d.stockDiff < 0 ? 'text-rose-800' : 'text-gray-700';
-        let adetLabel = '';
-        if (d.stockDiff > 0) adetLabel = `${adetStr} adet fazla`;
-        else if (d.stockDiff < 0) adetLabel = `${adetStr} adet eksik`;
-
-        const barcodeList =
-            Array.isArray(p.barcodes) && p.barcodes.length ? p.barcodes : p.barcode ? [p.barcode] : [];
-        const hasBarcodes = barcodeList.some((b) => {
-            if (b == null) return false;
-            if (typeof b === 'object' && b.code != null) return String(b.code).trim().length > 0;
-            return String(b).trim().length > 0;
-        });
-        const barcodesHiddenClass = this._financeBarcodesVisible ? '' : 'hidden';
-        const barcodesHtml = hasBarcodes
-            ? `<div class="finance-barcodes-block finance-barkod-sag ${barcodesHiddenClass}" aria-hidden="${this._financeBarcodesVisible ? 'false' : 'true'}">${this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 1, width: 150, height: 36, ekGizle: true })}</div>`
+        const fark = d.stockDiff;
+        const farkHtml = fark !== null && fark !== 0
+            ? `<span class="rh-fark rh-fark--${fark < 0 ? 'eksik' : 'fazla'}">${fark > 0 ? '+' : '−'}${this._sayiMetni(Math.abs(fark))} ${fark < 0 ? 'Eksik' : 'Fazla'}</span>`
             : '';
-
-        const selected = this._financePasteGuideSelectedIndex === idx;
-        const rowBgClass =
-            d.stockDiff < 0
-                ? 'border-rose-100/90 bg-rose-50/85'
-                : d.stockDiff > 0
-                  ? 'border-emerald-100/90 bg-emerald-50/85'
-                  : 'border-slate-100 bg-white';
-        const selectedClass = selected ? 'ring-2 ring-slate-400/90 shadow-sm' : '';
-        const sktHtml = this._renderFinancePasteGuideSktHtml(p?.productId, d.warehouseStock);
-
+        const barcodeList = Array.isArray(p.barcodes) && p.barcodes.length ? p.barcodes : p.barcode ? [p.barcode] : [];
+        const hasBarcodes = barcodeList.some((b) => b != null && String(typeof b === 'object' ? b.code ?? '' : b).trim());
+        const barcodesHtml = hasBarcodes
+            ? `<div class="finance-barcodes-block rh-barkod ${this._financeBarcodesVisible ? '' : 'hidden'}" aria-hidden="${this._financeBarcodesVisible ? 'false' : 'true'}">${this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 1, width: 150, height: 36, ekGizle: true })}</div>`
+            : '';
+        const secili = this._financePasteGuideSelectedIndex === idx;
         return `
-            <div class="finance-paste-guide-row flex cursor-pointer items-start gap-2.5 rounded-lg border px-2.5 py-2 transition-shadow sm:gap-3 sm:px-3 ${rowBgClass} ${selectedClass}" data-guide-index="${idx}" role="button" tabindex="0" aria-pressed="${selected ? 'true' : 'false'}">
-                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/80 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">${idx + 1}</span>
-                <img src="${img}" alt="" class="h-10 w-10 shrink-0 rounded-md border border-slate-100 object-cover sm:h-11 sm:w-11" loading="lazy" />
-                <div class="min-w-0 flex-1">
-                    <div class="finance-ad-satiri">
-                        <p class="min-w-0 flex-1 text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</p>
-                        ${barcodesHtml}
+            <div class="rh-satir${secili ? ' is-secili' : ''}" data-guide-index="${idx}" role="button" tabindex="0" aria-pressed="${secili}" title="Görseli büyüt">
+                <span class="rh-no">${idx + 1}</span>
+                <img class="rh-gorsel" src="${img}" alt="" loading="lazy" onerror="this.src='../assets/logo.png'">
+                <div class="rh-govde">
+                    <div class="rh-ust">
+                        <p class="rh-ad">${name}</p>
+                        ${farkHtml}
                     </div>
-                    <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
-                        <span>Depo: <strong>${depo}</strong></span>
-                        <span>Sistem: <strong>${sistem}</strong></span>
-                        ${d.stockDiff !== null ? `<span class="font-semibold ${stockDiffClass}">(${adetStr})</span>` : ''}
-                    </div>
-                    <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px]">
-                        ${adetLabel ? `<span class="font-semibold ${toneClass}">${adetLabel}</span>` : ''}
-                        <span class="text-gray-500">Birim ${this.escapeHtml(d.priceText)}</span>
-                        ${
-                            d.difference !== null
-                                ? `<span class="font-bold ${tlClass}">${d.difference >= 0 ? '+' : ''}${this.formatCurrency(d.difference)}</span>`
-                                : ''
-                        }
-                    </div>
-                    ${sktHtml}
+                    <p class="rh-sayilar">Depo <b>${this._formatPasteGuideStock(d.warehouseStock)}</b> · Sistem <b>${this._formatPasteGuideStock(d.systemStock)}</b></p>
+                    ${barcodesHtml}
+                    ${this._renderFinancePasteGuideSktHtml(p?.productId, d.warehouseStock)}
                 </div>
             </div>`;
     }
 
     _renderFinancePasteGuideHtml() {
-        const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
         const tek = this.selectedFinancialTable && this.selectedFinancialTable !== 'all';
-        const hasItems = !!(guide?.items?.length);
+        const items = this._rehberUrunleri();
         const yuk = this._financeSktYukleniyor;
-        const getirildi = hasItems && !!this._financeSktZaman;
-        const gorunum = getirildi && this._financeSktGorunum === 'tarih' ? 'tarih' : 'sira';
-        const listHtml = hasItems
-            ? gorunum === 'tarih'
-                ? this._renderFinanceSktTarihHtml(guide.items)
-                : guide.items.map((p, idx) => this._renderFinancePasteGuideRowHtml(p, idx)).join('')
-            : `<p class="py-6 text-center text-xs text-gray-400">${tek ? 'SKT\'leri Getir\'e basınca tablodaki ürünler sayım sırasıyla, son kullanma tarihleri ve adetleriyle burada görünür.' : 'Önce tek bir tablo seçin.'}</p>`;
-
-        // Özet kutuları: aciliyete göre adet ve parti (tıklayınca Tarihe Göre süzülür)
-        let ozetHtml = '';
-        if (getirildi) {
-            const kova = { k3: [0, 0], k7: [0, 0], k30: [0, 0], sonra: [0, 0] };
-            for (const p of guide.items) {
-                for (const e of this._getFinancePasteGuideSktEntries(p.productId)) {
-                    const k = kova[this._sktKova(e)];
-                    k[0] += Number(e.qty) || 0;
-                    k[1]++;
-                }
-            }
-            const bulunan = this._countFinancePasteGuideSktMatched();
-            const kutu = (anahtar, ad) => `<button type="button" class="skt-kutu skt-ton--${anahtar}${this._financeSktKova === anahtar ? ' is-secili' : ''}" data-skt-kova="${anahtar}" aria-pressed="${this._financeSktKova === anahtar}">
-                    <span class="skt-kutu__ad"><i aria-hidden="true"></i>${ad}</span>
-                    <strong>${this._sayiMetni(kova[anahtar][0])}<small> Adet</small></strong>
-                    <span class="skt-kutu__alt">${kova[anahtar][1]} Parti</span>
-                </button>`;
-            ozetHtml = `<div class="skt-kutular">${kutu('k3', '3 Gün İçinde')}${kutu('k7', '7 Gün İçinde')}${kutu('k30', '30 Gün İçinde')}${kutu('sonra', 'Daha Sonra')}</div>
-                <div class="skt-arac">
-                    <div class="skt-gorunum" role="tablist" aria-label="SKT görünümü">
-                        <button type="button" role="tab" data-skt-gorunum="sira" aria-selected="${gorunum === 'sira'}">Sayım Sırası</button>
-                        <button type="button" role="tab" data-skt-gorunum="tarih" aria-selected="${gorunum === 'tarih'}">Tarihe Göre</button>
-                    </div>
-                    <span class="skt-bulunan"><b>${bulunan}</b> / ${guide.items.length} Üründe SKT</span>
-                </div>`;
+        const gecerli = this._rehberSktGecerli();
+        const listHtml = items.length
+            ? items.map((p, idx) => this._renderFinancePasteGuideRowHtml(p, idx)).join('')
+            : `<p class="rh-bos">${tek ? 'Bu tabloda eksik ya da fazla ürün yok.' : 'Önce tek bir tablo seçin.'}</p>`;
+        let ozet = '';
+        if (gecerli && items.length) {
+            const bulunan = items.filter((p) => this._getFinancePasteGuideSktEntries(p.productId).length).length;
+            let yakin = 0;
+            for (const p of items) for (const e of this._getFinancePasteGuideSktEntries(p.productId)) if (this._sktKova(e) !== 'sonra') yakin++;
+            ozet = `<p class="rh-ozet"><b>${bulunan}</b> / ${items.length} üründe SKT${yakin ? ` · <span class="rh-ozet__uyari"><b>${yakin}</b> parti 7 gün içinde satıştan kalkıyor</span>` : ''}</p>`;
         }
-        const durumHtml = yuk
+        const durum = yuk
             ? `<div class="skt-yuk"><div class="skt-yuk__ust"><span class="skt-cark" aria-hidden="true"></span><span data-skt-mesaj>${this.escapeHtml(yuk.mesaj)}</span></div>
                 <div class="skt-yuk__cubuk"><span data-skt-oran style="transform:scaleX(${(yuk.oran || 0.04).toFixed(3)})"></span></div></div>`
             : this._financeSktHata
-              ? `<span class="skt-durum is-hata">${this.escapeHtml(this._financeSktHata)}</span>`
-              : '';
-        const dugmeMetni = yuk ? 'Getiriliyor…' : this._financeSktZaman ? 'SKT\'leri Yenile' : 'SKT\'leri Getir';
-        const headerHtml = hasItems
-            ? `<div class="finance-paste-guide-head sticky top-0 z-10 mb-1.5 hidden items-center gap-2.5 rounded-lg bg-slate-100/95 px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400 backdrop-blur sm:flex sm:gap-3 sm:px-3">
-                    <span class="w-6 shrink-0 text-center">#</span>
-                    <span class="w-10 shrink-0 sm:w-11"></span>
-                    <span class="min-w-0 flex-1">Ürün · depo / sistem / SKT</span>
-               </div>`
-            : '';
-
+              ? `<p class="skt-durum is-hata">${this.escapeHtml(this._financeSktHata)}</p>`
+              : ozet;
+        const dugme = yuk ? 'Getiriliyor…' : gecerli ? 'SKT\'leri Yenile' : 'SKT\'leri Getir';
         return `
-            <div class="finance-paste-guide-section -mx-1 mt-5 rounded-xl border border-slate-200/80 bg-slate-50/50 px-2 py-4 sm:-mx-2 sm:px-4" id="financePasteGuideSection">
-                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div class="rh-bolum" id="financePasteGuideSection">
+                <div class="rh-baslik">
                     <div class="min-w-0">
-                        <h4 class="text-sm font-semibold text-gray-900">Sayım Sırası Rehberi</h4>
-                        <p class="mt-0.5 text-[11px] text-gray-500">Son kullanma tarihleri warehouse panelinden, ürün ürün adetleriyle</p>
+                        <h4>Sayım Sırası Rehberi</h4>
+                        <p>Eksik ve fazla çıkan ürünler, sayım sırasıyla${items.length ? ` · ${items.length} ürün` : ''}</p>
                     </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        ${hasItems && !yuk ? `<button type="button" id="financePasteGuideClearBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Temizle</button>` : ''}
-                        <button type="button" id="financePasteGuideSktBtn" class="skt-dugme" ${tek && !yuk ? '' : 'disabled'} title="Tablodaki ürünlerin son kullanma tarihlerini getir">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-                            <span>${dugmeMetni}</span>
-                        </button>
-                    </div>
+                    <button type="button" id="financePasteGuideSktBtn" class="skt-dugme" ${tek && items.length && !yuk ? '' : 'disabled'} title="Bu ürünlerin son kullanma tarihlerini getir">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                        <span>${dugme}</span>
+                    </button>
                 </div>
-                <div id="financePasteGuideStatus" class="mb-2" role="status" aria-live="polite">${durumHtml}${yuk ? '' : ozetHtml}</div>
-                ${gorunum === 'tarih' ? '' : headerHtml}
-                <div id="financePasteGuideList" class="finance-paste-guide-list max-h-[min(38rem,72vh)] space-y-1.5 overflow-y-auto overscroll-contain pr-0.5">${listHtml}</div>
+                <div id="financePasteGuideStatus" role="status" aria-live="polite">${durum}</div>
+                <div id="financePasteGuideList" class="rh-liste">${listHtml}</div>
             </div>`;
     }
 
     _renderFinancePasteGuideList() {
         const list = document.getElementById('financePasteGuideList');
         if (!list) return;
-        const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
-        if (!guide?.items?.length) {
-            list.innerHTML = '<p class="py-6 text-center text-xs text-gray-400">Liste yapıştırınca eşleşen ürünler burada sırayla görünür.</p>';
-            return;
-        }
-        list.innerHTML = guide.items.map((p, idx) => this._renderFinancePasteGuideRowHtml(p, idx)).join('');
+        const items = this._rehberUrunleri();
+        list.innerHTML = items.length
+            ? items.map((p, idx) => this._renderFinancePasteGuideRowHtml(p, idx)).join('')
+            : '<p class="rh-bos">Bu tabloda eksik ya da fazla ürün yok.</p>';
+        this._bindFinanceBarcodeCopy(list);
     }
 
-    _bindFinancePasteGuide(container, tableProducts) {
+    _bindFinancePasteGuide(container) {
         if (!container) return;
-        const pasteBtn = container.querySelector('#financePasteGuideBtn');
-        const clearBtn = container.querySelector('#financePasteGuideClearBtn');
         const sktBtn = container.querySelector('#financePasteGuideSktBtn');
-        const sktPasteBtn = container.querySelector('#financePasteGuideSktPasteBtn');
-        const sktCopyLinkBtn = container.querySelector('#financePasteGuideSktCopyLinkBtn');
         const list = container.querySelector('#financePasteGuideList');
-        if (pasteBtn) {
-            pasteBtn.addEventListener('click', () => {
-                void this.importFinancePasteFromClipboard(tableProducts);
-            });
-        }
-        if (clearBtn) {
-            clearBtn.addEventListener('click', () => {
-                this._clearFinancePasteGuide();
-                this._financeSktZaman = null;
-                this._financeSktHata = null;
-                this._updateFinancePasteGuideStatus('');
-                void this.renderFinancialTab();
-            });
-        }
-        if (sktBtn) {
-            sktBtn.addEventListener('click', () => {
-                void this.fetchFinanceGuideSkt(tableProducts);
-            });
-        }
-        if (sktPasteBtn) {
-            sktPasteBtn.addEventListener('click', () => {
-                void this.importFinancePasteGuideSktFromClipboard();
-            });
-        }
-        if (sktCopyLinkBtn && this._financePasteGuideSktUrl) {
-            sktCopyLinkBtn.addEventListener('click', () => {
-                void navigator.clipboard
-                    .writeText(this._financePasteGuideSktUrl)
-                    .then(() => this.showToast('SKT linki kopyalandı', 'success', 2000))
-                    .catch(() => this.showToast('Link kopyalanamadı', 'error', 2500));
-            });
-        }
-        const bolum = container.querySelector('#financePasteGuideSection');
-        if (bolum && !bolum.dataset.sktBound) {
-            bolum.dataset.sktBound = '1';
-            bolum.addEventListener('click', (e) => {
-                const g = e.target.closest('[data-skt-gorunum]');
-                if (g) {
-                    this._financeSktGorunum = g.getAttribute('data-skt-gorunum');
-                    if (this._financeSktGorunum === 'sira') this._financeSktKova = null;
-                    this._refreshFinancePasteGuideSection();
-                    return;
-                }
-                const k = e.target.closest('[data-skt-kova]');
-                if (k) {
-                    const v = k.getAttribute('data-skt-kova');
-                    this._financeSktKova = this._financeSktKova === v ? null : v;
-                    this._financeSktGorunum = 'tarih';
-                    this._refreshFinancePasteGuideSection();
-                }
-            });
-        }
+        if (sktBtn) sktBtn.addEventListener('click', () => void this.fetchFinanceGuideSkt());
         if (list && !list.dataset.guideSelectBound) {
             list.dataset.guideSelectBound = '1';
+            // Satıra dokununca: satır işaretlenir (nerede kaldığın görünsün) ve görsel büyük açılır
             list.addEventListener('click', (e) => {
+                if (e.target.closest('[data-barcode-copy]')) return;
                 const row = e.target.closest('[data-guide-index]');
                 if (!row) return;
                 const idx = parseInt(row.getAttribute('data-guide-index'), 10);
                 if (Number.isNaN(idx)) return;
-                this._financePasteGuideSelectedIndex = this._financePasteGuideSelectedIndex === idx ? null : idx;
-                this._renderFinancePasteGuideList();
-                const updated = list.querySelector(`[data-guide-index="${idx}"]`);
-                if (updated && this._financePasteGuideSelectedIndex === idx) {
-                    updated.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                }
+                const p = this._rehberUrunleri()[idx];
+                this._financePasteGuideSelectedIndex = idx;
+                list.querySelectorAll('.rh-satir.is-secili').forEach((r) => { r.classList.remove('is-secili'); r.setAttribute('aria-pressed', 'false'); });
+                row.classList.add('is-secili');
+                row.setAttribute('aria-pressed', 'true');
+                const src = String(p?.imageUrl || '').split('?')[0];
+                if (src) this.openProductImageLightbox(src, p?.productName || '');
             });
             list.addEventListener('keydown', (e) => {
                 if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -16792,6 +16632,11 @@ class CountingSystem {
         if (this._financePasteGuide && this._financePasteGuide.tableKey !== this.selectedFinancialTable) {
             this._clearFinancePasteGuide();
         }
+        // Rehberde işaretli satır yalnız aynı tabloda kalır
+        if (this._rehberTablo !== this.selectedFinancialTable) {
+            this._rehberTablo = this.selectedFinancialTable;
+            this._financePasteGuideSelectedIndex = null;
+        }
 
         const safeSummary = summary || {
             totalWarehouseValue: 0,
@@ -16951,7 +16796,7 @@ class CountingSystem {
         `;
         this._bindFinanceBarcodeCopy(container);
         this._bindFinanceBarcodeToggle(container);
-        this._bindFinancePasteGuide(container, list);
+        this._bindFinancePasteGuide(container);
         container.querySelector('#financeSatisKontrolBtn')?.addEventListener('click', () => void this.satisKontrolu());
     }
 
