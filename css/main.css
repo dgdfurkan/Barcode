@@ -1611,7 +1611,7 @@ h1, h2, h3, h4, h5, h6 {
    değişir: tuş takımı hiçbir üründe kaymaz. */
 #keypadVirgul.invisible { visibility: hidden; }
 #keypadVirgul:active { background-color: #fde68a; }
-#countingReservedStock { flex-basis: 100%; order: 99; }
+.cs-stok-yigin { display: inline-flex; flex-direction: column; justify-content: center; min-width: 0; }
 
 /* ==== Sayım durum kutusu (countingStatusDock) =========================
    Kısa yükleme bildirimi altta ince bir kart. Kilitli işlem (is-lock:
