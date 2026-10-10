@@ -746,21 +746,26 @@
         };
     }
 
-    /** Depo taramasından tahmini ürün sayısı (stoğu 0 alınmayacaksa yalnız stoklular) */
+    /**
+     * Depo taramasından tahmini ürün sayısı: "53 ürün · 14 stokta", "10 ürün · stokta yok".
+     * Aynı adlı alt kategoriden hangisinin dolu olduğu kartta görünsün diye stok da yazılır.
+     */
     function tahmin(ad) {
         var k = kaynak()[ad];
-        if (!k || !k[4]) return null;
-        return d.ayar.sifirAlma ? k[4].n : k[4].t;
+        if (!k || !k[4] || !k[4].t) return null;
+        var n = k[4].n;
+        var t = k[4].t;
+        return t + ' ürün · ' + (n === 0 ? 'stokta yok' : n >= t ? 'hepsi stokta' : n + ' stokta');
     }
 
     function durumAlt(du) {
         var st = du.st;
         switch (du.kod) {
             case 'yok':
-                if (!st.var) { var th = tahmin(du.ad); return th != null ? 'Tahmini ' + th + ' ürün' : 'Ürünler çekilmedi'; }
+                if (!st.var) { var th = tahmin(du.ad); return th ? 'Tahmini ' + th : 'Ürünler çekilmedi'; }
                 return st.toplam + ' ürün · ' + (du.cekildi ? goreliSure(du.cekildi) + ' çekildi' : 'sayım yok');
             case 'suruyor':
-                if (!du.sayimVar) { var tt = tahmin(du.ad); return st.var ? 'Sırada · ' + st.toplam + ' ürün' : 'Sırada · ' + (tt != null ? 'tahmini ' + tt + ' ürün' : 'ürünler çekilmedi'); }
+                if (!du.sayimVar) { var tt = tahmin(du.ad); return st.var ? 'Sırada · ' + st.toplam + ' ürün' : 'Sırada · ' + (tt ? 'tahmini ' + tt : 'ürünler çekilmedi'); }
                 return st.sayilan + ' / ' + st.toplam + ' sayıldı';
             case 'gecikti': return du.gecikmeGun > 0 ? du.gecikmeGun + ' gün gecikti' : 'Süresi doldu';
             case 'yaklasiyor': return du.kalanGun + ' gün kaldı';
@@ -1761,7 +1766,7 @@
         var yuzde = st.toplam ? Math.round(x.oran * 100) : 0;
         var kalan = Math.max(0, st.toplam - sayilan);
         var thm = tahmin(ad);
-        var ozetAlt = !st.var ? (thm != null ? 'Depoda tahmini ' + thm + ' ürün var, henüz çekilmedi' : 'Ürünler henüz çekilmedi')
+        var ozetAlt = !st.var ? (thm ? 'Depoda tahmini ' + thm + ', henüz çekilmedi' : 'Ürünler henüz çekilmedi')
             : st.yukleniyor ? 'Ürünler yükleniyor'
             : !kalan ? 'Hepsi sayıldı'
             : kalan + ' ürün sayılmayı bekliyor';
