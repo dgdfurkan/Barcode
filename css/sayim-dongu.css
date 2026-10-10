@@ -94,6 +94,20 @@ html.sd-modu.sd-tablosuz #countingTableContainer { display: none !important; }
 .sd-uyari { margin: 12px 0 0; padding: 8px 12px; border-radius: 9px; background: var(--sd-sari-acik); color: var(--sd-sari-koyu); font-size: 12px; line-height: 16px; }
 
 /* Araçlar: süzgeç + arama */
+/* Depodan öğren: listenin kaynağı ve tarama ilerlemesi */
+.sd-depo { margin: 16px 0 0; padding: 12px; border: 1px solid var(--sd-cizgi); border-radius: 12px; background: #fff; }
+.sd-depo--davet { border-color: rgba(37, 99, 235, 0.25); background: var(--sd-mavi-acik); }
+.sd-depo__satir { display: flex; align-items: center; gap: 12px; }
+.sd-depo__ikon { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--sd-kagit); color: var(--sd-orta); }
+.sd-depo--davet .sd-depo__ikon { background: #fff; color: var(--sd-mavi); }
+.sd-depo__ikon svg { width: 20px; height: 20px; }
+.sd-depo__ikon--tamam { background: var(--sd-yesil-acik); color: var(--sd-yesil-koyu); }
+.sd-depo__metin { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sd-depo__metin strong { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--sd-yazi); }
+.sd-depo__metin span { font-size: 12px; line-height: 16px; color: var(--sd-sonuk); font-variant-numeric: tabular-nums; }
+.sd-depo .sd-dugme { flex: none; }
+.sd-depo .sd-cekim__cubuk { margin: 12px 0 0; }
+
 .sd-arac { display: flex; align-items: center; gap: 12px; margin: 16px 0 12px; }
 .sd-filtreler { flex: 1; min-width: 0; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
 .sd-filtreler::-webkit-scrollbar { display: none; }
@@ -527,6 +541,8 @@ html.sd-kilit, html.sd-kilit body { overflow: hidden; }
     .sd-detay__gorsel { width: 56px; height: 56px; border-radius: 12px; }
     .sd-hucreler { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .sd-ozet { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    .sd-depo--davet .sd-depo__satir { flex-wrap: wrap; }
+    .sd-depo--davet .sd-dugme { flex: 1 1 100%; }
     .sd-ozet__halka, .sd-ozet__halka .sd-halka { width: 64px; height: 64px; }
     .sd-ozet__zamanlar { flex-direction: row; gap: 8px; padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--sd-cizgi); }
     .sd-zaman { flex: 1 1 0; gap: 8px; }

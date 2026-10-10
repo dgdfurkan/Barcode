@@ -177,6 +177,10 @@
     var SAYFA = 100;
     var AZAMI_SAYFA = 15;
     var SAYFA_ARASI_MS = 350;
+    /* Depo taraması: stoklu ürünler stok çoktan aza sıralı gelir, ilk 0'da durulur.
+       Tek seferlik, kullanıcı başlatır; sayfalar arası daha uzun beklenir. */
+    var TARAMA_ARASI_MS = 600;
+    var TARAMA_AZAMI_SAYFA = 80;
     var SURELER = [7, 14, 21, 30, 45, 60, 90];
     var GUN = 864e5;
     var OTURUM_ANAHTARI = 'jb_dongu_secili';
@@ -208,6 +212,7 @@
         ag: 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.',
         iptal: 'Ürün çekme durduruldu.',
         mesgul: 'Sayım tablosu şu an başka bir işlem yapıyor. Birkaç saniye sonra tekrar deneyin.',
+        bos_depo: 'Depoda stoklu ürün bulunamadı. Biraz sonra tekrar deneyin.',
         hepsi_sifir: 'Bu alt kategorideki ürünlerin hepsinin stoğu 0. "Stoğu olmayanları alma" seçeneğini kapatıp tekrar deneyin.',
     };
 
@@ -261,8 +266,71 @@
         return e;
     }
 
+    /**
+     * Alt kategori evreni: ad -> [üst kategori, belge görseli, kimlikler, öğrenilen görsel].
+     * Depo taraması yapıldıysa liste depodaki gerçek (operasyondaki) alt kategorilerden
+     * kurulur; yapılmadıysa başlangıç listesi. Döngü tablosu olan alt kategori her
+     * durumda listede kalır (sayımı kaybolmasın).
+     */
+    var kaynakOnbellek = null;
+    var kaynakAnahtar = '';
+    function kaynak() {
+        var s = cs();
+        var tablolar = s && s.cachedFullData && s.cachedFullData._tables ? s.cachedFullData._tables : {};
+        var dp = d.ayar.depo;
+        var adlar = Object.keys(tablolar).filter(function (n) { return n.indexOf('Döngü|') === 0; });
+        var anahtar = (dp ? dp.at + ':' + dp.liste.length : '-') + '|' + adlar.join(',');
+        if (kaynakOnbellek && kaynakAnahtar === anahtar) return kaynakOnbellek;
+        var m = {};
+        if (!dp || !dp.liste.length) {
+            Object.keys(TOHUM).forEach(function (ad) { m[ad] = TOHUM[ad]; });
+        } else {
+            // Var olan tablo adıyla eşleşen depo alt kategorisi o adla görünür
+            // "Çiğköfte & Meze" = "Çiğ Köfte & Meze": yalnız harf ve rakam karşılaştırılır
+            var harfler = function (a) { return norm(a).replace(/[^0-9a-zçğıöşü]/g, ''); };
+            var tabloAdlari = {};
+            adlar.forEach(function (n) { var ad = n.slice(6); tabloAdlari[harfler(ad)] = ad; tabloAdlari[normSiki(ad)] = ad; });
+            dp.liste.forEach(function (x) {
+                var ad = tabloAdlari[harfler(x.ad)] || tabloAdlari[normSiki(x.ad)] || x.ad;
+                var t = TOHUM[ad];
+                m[ad] = [x.ust || (t && t[0]) || '', t ? t[1] : '', [x.id], x.g || ''];
+            });
+        }
+        adlar.forEach(function (n) {
+            var ad = n.slice(6);
+            if (!m[ad]) m[ad] = TOHUM[ad] || ['', '', []];
+        });
+        kaynakOnbellek = m;
+        kaynakAnahtar = anahtar;
+        return m;
+    }
+
+    /** Sunucudan ya da cihazdan gelen depo listesini doğrula (görsel adresi dahil) */
+    function depoDuzelt(dp) {
+        if (!dp || typeof dp !== 'object' || !Array.isArray(dp.liste) || !Date.parse(dp.at || '')) return null;
+        var liste = [];
+        var gorulen = {};
+        dp.liste.slice(0, 400).forEach(function (x) {
+            if (!x || !/^[0-9a-f]{24}$/.test(String(x.id)) || gorulen[x.id]) return;
+            var ad = String(x.ad || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+            if (!ad) return;
+            gorulen[x.id] = true;
+            var g = /^https:\/\/cdn-image\.getir\.com\/market\/category\/[0-9a-f-]+\.(png|jpe?g|webp)\?format=webp&width=96&height=96$/i.test(String(x.g || '')) ? x.g : '';
+            liste.push({ id: String(x.id), ad: ad, ust: String(x.ust || '').replace(/\s+/g, ' ').trim().slice(0, 80), g: g, n: Math.max(0, Math.min(99999, parseInt(x.n, 10) || 0)) });
+        });
+        return liste.length ? { at: new Date(Date.parse(dp.at)).toISOString(), liste: liste } : null;
+    }
+
+    function depoBirlestir(gelen) {
+        var dp = depoDuzelt(gelen);
+        if (!dp) return false;
+        if (!d.ayar.depo || Date.parse(dp.at) > Date.parse(d.ayar.depo.at)) { d.ayar.depo = dp; return false; }
+        return Date.parse(d.ayar.depo.at) > Date.parse(dp.at);
+    }
+
     function gorselAdresi(ad) {
-        var t = TOHUM[ad];
+        var t = kaynak()[ad];
+        if (t && t[3]) return t[3];
         if (t && t[1]) return GORSEL_KOKU + t[1] + '?format=webp&width=96&height=96';
         // Belgede yoksa Getir yanıtlarından öğrenilen kategori ikonu
         var og = ogrenilenBul(ad);
@@ -360,9 +428,9 @@
             if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
             if (typeof ay.sistemDoldur === 'boolean') d.ayar.sistemDoldur = ay.sistemDoldur;
             elDurumBirlestir(ay.elDurum);
+            depoBirlestir(ay.depo);
             if (SURELER.indexOf(Number(ay.sure)) >= 0) d.ayar.sure = Number(ay.sure);
             Object.keys(ham.kayitlar || {}).forEach(function (ad) {
-                if (!TOHUM[ad]) return;
                 var k = ham.kayitlar[ad] || {};
                 d.kayitlar.set(ad, Object.assign({}, k, d.kayitlar.get(ad) || {}));
             });
@@ -411,6 +479,8 @@
                         if (typeof ay.sifirAlma === 'boolean') d.ayar.sifirAlma = ay.sifirAlma;
                         if (typeof ay.sistemDoldur === 'boolean') d.ayar.sistemDoldur = ay.sistemDoldur;
                         if (elDurumBirlestir(ay.elDurum, true)) ayarYerelde = true;
+                        if (!ay.depo && d.ayar.depo) ayarYerelde = true;
+                        else if (depoBirlestir(ay.depo)) ayarYerelde = true;
                         return;
                     }
                     yeni.set(r.anahtar, { getir_id: r.getir_id || null, cekildi_at: r.cekildi_at || null, urun_sayisi: r.urun_sayisi });
@@ -524,7 +594,7 @@
             var anahtarlar = Object.keys(og);
             if (anahtarlar.length > 800) anahtarlar.slice(0, anahtarlar.length - 800).forEach(function (k) { delete og[k]; });
             window.jbDb.from('sayim_dongu').upsert({
-                username: kullanici(), anahtar: '_ayar', ayar: { sure: d.ayar.sure, ogrenilen: og, sifirAlma: d.ayar.sifirAlma, sistemDoldur: d.ayar.sistemDoldur, elDurum: d.ayar.elDurum }, guncellendi_at: new Date().toISOString(),
+                username: kullanici(), anahtar: '_ayar', ayar: { sure: d.ayar.sure, ogrenilen: og, sifirAlma: d.ayar.sifirAlma, sistemDoldur: d.ayar.sistemDoldur, elDurum: d.ayar.elDurum, depo: d.ayar.depo || null }, guncellendi_at: new Date().toISOString(),
             }, { onConflict: 'username,anahtar' }).then(function (r) {
                 if (r && r.error && tabloEksikMi(r.error)) d.dbYok = true;
             });
@@ -664,7 +734,7 @@
     }
 
     function hepsi() {
-        return Object.keys(TOHUM).map(durumHesapla);
+        return Object.keys(kaynak()).map(durumHesapla);
     }
 
     // ------------------------------------------------------------------
@@ -722,11 +792,109 @@
         return { data: j.data, toplam: Number(j.total) || 0 };
     }
 
+    /** Satırın mevcut stoğu; sayım sayfasının sistem stoğunu okuduğu yöntemle */
+    function stokDegeri(row) {
+        var s = cs();
+        try {
+            var pk = s && s.pickSystemStockFromProductRow ? s.pickSystemStockFromProductRow(row) : null;
+            if (pk && pk.stock !== null && pk.stock !== undefined && !isNaN(pk.stock)) return Number(pk.stock);
+        } catch (e) { /* yedek alan */ }
+        var a = Number(row && row.available);
+        return isNaN(a) ? null : a;
+    }
+
+    /**
+     * Depodaki gerçek alt kategorileri öğren. Mevcut stok sayfasının attığı istek
+     * (filtresiz, stok çoktan aza): sayfa sayfa okunur, ilk stoğu 0 üründe durulur.
+     * Her ürünün asıl alt kategorisi (operasyondaki ad, üst kategori, ikon) toplanır.
+     */
+    async function depoTara() {
+        if (d.tarama || d.cekim) return;
+        var iptal = new AbortController();
+        d.tarama = { sayfa: 0, toplamSayfa: 0, urun: 0, alt: 0, iptal: iptal };
+        ciz();
+        try {
+            var api = await apiBilgisi();
+            var harita = {};
+            var urun = 0;
+            for (var sayfa = 0; sayfa < TARAMA_AZAMI_SAYFA; sayfa++) {
+                if (sayfa) await bekle(TARAMA_ARASI_MS);
+                if (iptal.signal.aborted) throw hata('iptal');
+                var r = await stokIstegi(api, { warehouseIds: [api.depo], sort: { available: -1 } }, sayfa * SAYFA, iptal.signal);
+                ogren(r.data);
+                var bitti = false;
+                r.data.forEach(function (row) {
+                    if (bitti) return;
+                    var stok = stokDegeri(row);
+                    if (stok === null || stok <= 0) { bitti = true; return; }
+                    var a = asilAltKategori(row);
+                    if (!a.id || !a.ad || !/^[0-9a-f]{24}$/.test(a.id)) return;
+                    if (!harita[a.id]) {
+                        var ust = row.category && row.category.name ? (row.category.name.tr || row.category.name.en || '') : '';
+                        harita[a.id] = { id: a.id, ad: a.ad, ust: ust, g: a.g, n: 0 };
+                    }
+                    harita[a.id].n++;
+                    urun++;
+                });
+                d.tarama.sayfa = sayfa + 1;
+                d.tarama.toplamSayfa = Math.max(1, Math.ceil(r.toplam / SAYFA));
+                d.tarama.urun = urun;
+                d.tarama.alt = Object.keys(harita).length;
+                taramaCiz();
+                if (bitti || r.data.length < SAYFA || (sayfa + 1) * SAYFA >= r.toplam) break;
+            }
+            var dp = depoDuzelt({ at: new Date().toISOString(), liste: Object.keys(harita).map(function (k) { return harita[k]; }) });
+            if (!dp) throw hata('bos_depo');
+            d.ayar.depo = dp;
+            kaynakOnbellek = null;
+            ayarYaz(true);
+            bildir('Depoda ' + dp.liste.length + ' alt kategori bulundu; liste güncellendi.', 'basari');
+        } catch (e) {
+            if (!(e && e.kod === 'iptal')) bildir(e && e.kod ? e.message : HATA.getir, 'hata');
+        } finally {
+            d.tarama = null;
+            ciz();
+        }
+    }
+
+    function depoKutusu() {
+        var t = d.tarama;
+        if (t) {
+            var oran = t.toplamSayfa ? Math.min(1, t.sayfa / t.toplamSayfa) : 0.04;
+            return '<div class="sd-depo is-tarama" data-sd-depo role="status" aria-live="polite">' +
+                '<div class="sd-depo__satir"><span class="sd-depo__ikon"><span class="sd-cark" aria-hidden="true"></span></span>' +
+                '<div class="sd-depo__metin"><strong>Depo taranıyor</strong>' +
+                '<span>' + (t.sayfa ? t.sayfa + '. sayfa · ' + t.urun + ' stoklu ürün · ' + t.alt + ' alt kategori' : 'Oturum kontrol ediliyor') + '</span></div>' +
+                '<button type="button" class="sd-dugme sd-dugme--ikincil" data-sd="tarama-iptal">Durdur</button></div>' +
+                '<div class="sd-cekim__cubuk"><span style="transform:scaleX(' + oran.toFixed(3) + ')"></span></div>' +
+                '</div>';
+        }
+        var dp = d.ayar.depo;
+        if (dp && dp.liste.length) {
+            return '<div class="sd-depo" data-sd-depo><div class="sd-depo__satir">' +
+                '<span class="sd-depo__ikon sd-depo__ikon--tamam">' + SVG.onay + '</span>' +
+                '<div class="sd-depo__metin"><strong>Liste depodan</strong><span>' + dp.liste.length + ' alt kategori · ' + kacir(goreliSure(Date.parse(dp.at))) + ' tarandı</span></div>' +
+                '<button type="button" class="sd-dugme sd-dugme--ikincil" data-sd="tarama"' + (d.cekim ? ' disabled' : '') + '>' + SVG.yenile + '<span>Yenile</span></button>' +
+                '</div></div>';
+        }
+        return '<div class="sd-depo sd-depo--davet" data-sd-depo><div class="sd-depo__satir">' +
+            '<span class="sd-depo__ikon">' + SVG.kutu + '</span>' +
+            '<div class="sd-depo__metin"><strong>Alt kategorileri depodan öğren</strong>' +
+            '<span>Liste şu an genel katalogdan geliyor. Depodaki stoklu ürünler bir kez taranır; yalnız bu depoda gerçekten olan alt kategoriler, operasyondaki adlarıyla listelenir.</span></div>' +
+            '<button type="button" class="sd-dugme sd-dugme--ana" data-sd="tarama"' + (d.cekim ? ' disabled' : '') + '>Öğren</button>' +
+            '</div></div>';
+    }
+
+    function taramaCiz() {
+        var yer = panel && panel.querySelector('[data-sd-depo]');
+        if (yer) yer.outerHTML = depoKutusu();
+    }
+
     function asilAltKategori(row) {
         var sc = row && row.subCategory;
         if (!sc) return { id: null, ad: '', g: '' };
         if (typeof sc === 'string') return { id: sc, ad: '', g: '' };
-        var ad = sc.name ? (sc.name.tr || sc.name.en || '') : '';
+        var ad = sc.name ? String(sc.name.tr || sc.name.en || '').replace(/\s+/g, ' ').trim() : '';
         var g = sc.picURL ? (sc.picURL.tr || sc.picURL.en || '') : '';
         // Yalnız Getir'in kategori görsel sunucusu; küçük boyda istenir
         g = /^https:\/\/cdn-image\.getir\.com\/market\/category\/[0-9a-f-]+\.(png|jpe?g|webp)/i.test(g)
@@ -758,7 +926,8 @@
         if (k) ekle(k.getir_id);
         var og = ogrenilenBul(ad);
         if (og) ekle(og.id);
-        (TOHUM[ad] ? TOHUM[ad][2] : []).forEach(ekle);
+        var kt = kaynak()[ad];
+        (kt ? kt[2] : []).forEach(ekle);
         return liste;
     }
 
@@ -907,7 +1076,7 @@
     // ------------------------------------------------------------------
     async function urunleriCek(ad, onceki) {
         var s = cs();
-        if (!s || d.cekim) return;
+        if (!s || d.cekim || d.tarama) return;
         var secim = onceki || await cekPenceresi(ad);
         if (!secim) return;
         var sifirAlma = secim.sifirAlma;
@@ -982,14 +1151,7 @@
             // Stoğu 0 olanlar: ya hiç alınmaz ya da listenin sonuna 0 / 0 işlenerek
             // (sayılmış sayılır; ilerleme ve finans doğru çıkar). Sayım sayfasının
             // sistem stoğunu okuduğu yöntemle karar veriliyor.
-            var stokOku = function (row) {
-                try {
-                    var pk = s.pickSystemStockFromProductRow ? s.pickSystemStockFromProductRow(row) : null;
-                    if (pk && pk.stock !== null && pk.stock !== undefined && !isNaN(pk.stock)) return Number(pk.stock);
-                } catch (e) { /* yedek alan */ }
-                var a = Number(row.available);
-                return isNaN(a) ? null : a;
-            };
+            var stokOku = stokDegeri;
             var dolu = [];
             var sifir = [];
             bulunan.forEach(function (row) {
@@ -1085,7 +1247,7 @@
         if (!d.secili) {
             var son = null;
             try { son = sessionStorage.getItem(OTURUM_ANAHTARI); } catch (e) { /* yok */ }
-            if (son && TOHUM[son] && tabloVarMi(son)) d.secili = son;
+            if (son && kaynak()[son] && tabloVarMi(son)) d.secili = son;
         }
         d.ilkCizim = true;
         if (d.secili) sec(d.secili, { kaydirma: false });
@@ -1166,6 +1328,8 @@
             else if (ne === 'geri') listeyeDon();
             else if (ne === 'filtre') { d.filtre = h.getAttribute('data-deger'); ciz(); }
             else if (ne === 'cek') urunleriCek(d.secili);
+            else if (ne === 'tarama') depoTara();
+            else if (ne === 'tarama-iptal') { if (d.tarama) d.tarama.iptal.abort(); }
             else if (ne === 'iptal') { if (d.cekim) d.cekim.iptal.abort(); }
             else if (ne === 'esles') eslesSec(h.getAttribute('data-id'));
             else if (ne === 'esles-kapat') { d.esles = null; ciz(); }
@@ -1188,7 +1352,7 @@
         });
         // "x dakika önce" metinleri dakikada bir tazelensin (değişen yer yeniden yazılır)
         setInterval(function () {
-            if (d.mod && !d.cekim && document.visibilityState === 'visible') ciz();
+            if (d.mod && !d.cekim && !d.tarama && document.visibilityState === 'visible') ciz();
         }, 30000);
         panel.addEventListener('input', function (e) {
             if (e.target && e.target.matches('[data-sd="ara"]')) {
@@ -1254,6 +1418,7 @@
             '<div class="sd-ust__halka">' + halka(oran, 72) + '<span class="sd-ust__yuzde">%' + Math.round(oran * 100) + '</span></div>' +
             '</header>' +
             '<div class="sd-dagilim" aria-hidden="true">' + dagilim + '</div>' +
+            depoKutusu() +
             (d.dbYok ? '<p class="sd-uyari">Döngü kaydı için veritabanı güncellemesi bekleniyor; ürün çekme çalışır, son çekim zamanı bu cihazda tutulur.</p>' : '') +
             '<div class="sd-arac">' +
             '<div class="sd-filtreler" role="tablist" aria-label="Duruma göre süz">' +
@@ -1297,7 +1462,7 @@
 
     function detayHtml(ad) {
         var x = durumHesapla(ad);
-        var t = TOHUM[ad] || ['', '', []];
+        var t = kaynak()[ad] || ['', '', []];
         var g = gorselAdresi(ad);
         var r = DURUM[x.kod].renk;
         var st = x.st;
