@@ -192,6 +192,7 @@
         yaklasiyor: { ad: 'Yaklaşıyor', renk: 'sari', sira: 2 },
         suruyor: { ad: 'Sürüyor', renk: 'mavi', sira: 4 },
         guncel: { ad: 'Güncel', renk: 'yesil', sira: 5 },
+        pasif: { ad: 'Pasif', renk: 'gri', sira: 6 },
     };
     var FILTRELER = [
         ['tumu', 'Tümü', null],
@@ -199,6 +200,7 @@
         ['yok', 'Hiç Sayılmadı', ['yok']],
         ['suruyor', 'Sürüyor', ['suruyor']],
         ['guncel', 'Güncel', ['guncel', 'yaklasiyor']],
+        ['pasif', 'Pasif', ['pasif']],
     ];
 
     var HATA = {
@@ -290,8 +292,31 @@
             var harfler = function (a) { return norm(a).replace(/[^0-9a-zçğıöşü]/g, ''); };
             var tabloAdlari = {};
             adlar.forEach(function (n) { var ad = n.slice(6); tabloAdlari[harfler(ad)] = ad; tabloAdlari[normSiki(ad)] = ad; });
+            // Depoda aynı adı taşıyan farklı alt kategoriler olabiliyor ("Sürülebilir"
+            // hem Kahvaltılık hem Atıştırmalık). Ada göre kurulan liste bunları üst
+            // üste yazıyordu; aynı adlılar üst kategorisiyle ayrılır. Yalın adlı tablo,
+            // kayıtlı kimliği tutan alt kategoride kalır.
+            var adSay = {};
+            dp.liste.forEach(function (x) { var k = harfler(x.ad); adSay[k] = (adSay[k] || 0) + 1; });
+            var alinan = {};
             dp.liste.forEach(function (x) {
-                var ad = tabloAdlari[harfler(x.ad)] || tabloAdlari[normSiki(x.ad)] || x.ad;
+                var k = harfler(x.ad);
+                var tabloAd = tabloAdlari[k] || tabloAdlari[normSiki(x.ad)];
+                var ad;
+                if (adSay[k] > 1) {
+                    // Yalın ad: tablosu olan ya da kaydı bu kimliği tutan alt kategoride kalır
+                    // (ürünleri silinse de ad değişmez)
+                    var yalin = tabloAd || x.ad;
+                    var kayit = d.kayitlar.get(yalin);
+                    var sahip = !alinan[yalin] && (tabloAd
+                        ? (!kayit || !kayit.getir_id || kayit.getir_id === x.id)
+                        : !!(kayit && kayit.getir_id === x.id));
+                    ad = sahip ? yalin : x.ad + ' (' + (x.ust || 'Diğer') + ')';
+                } else {
+                    ad = tabloAd || x.ad;
+                }
+                if (m[ad]) ad = x.ad + ' (' + (x.ust || 'Diğer') + ' ' + x.id.slice(-4) + ')';
+                alinan[ad] = true;
                 var t = TOHUM[ad];
                 m[ad] = [x.ust || (t && t[0]) || '', t ? t[1] : '', [x.id], x.g || '', { n: x.n, t: x.t || x.n }];
             });
@@ -571,7 +596,7 @@
         });
         Object.keys(gelen).forEach(function (ad) {
             var g = gelen[ad];
-            if (!g || typeof g !== 'object' || (g.kod !== null && g.kod !== 'suruyor' && g.kod !== 'yok')) return;
+            if (!g || typeof g !== 'object' || (g.kod !== null && g.kod !== 'suruyor' && g.kod !== 'yok' && g.kod !== 'pasif')) return;
             var y = yerel[ad];
             if (!y || (Date.parse(g.at || '') || 0) > (Date.parse(y.at || '') || 0)) yerel[ad] = { kod: g.kod, at: g.at };
         });
@@ -583,7 +608,7 @@
         d.durumMenu = false;
         ayarYaz();
         ciz();
-        bildir(ad + ': ' + (kod === 'suruyor' ? 'Sıraya alındı, Sürüyor\'da görünür.' : kod === 'yok' ? 'Hiç sayılmadı olarak işaretlendi.' : 'Durum yeniden sayımlara göre belirleniyor.'), 'basari');
+        bildir(ad + ': ' + (kod === 'suruyor' ? 'Sıraya alındı, Sürüyor\'da görünür.' : kod === 'yok' ? 'Hiç sayılmadı olarak işaretlendi.' : kod === 'pasif' ? 'Pasif olarak işaretlendi; döngüde sayılmıyor.' : 'Durum yeniden sayımlara göre belirleniyor.'), 'basari');
     }
 
     function ayarYaz(hemen) {
@@ -695,7 +720,8 @@
         // durumu değiştirmez: sayım yoksa alt kategori "Hiç sayılmadı"da kalır.
         var el = (d.ayar.elDurum || {})[ad];
         var elKod = el && el.kod;
-        var elGecerli = !!elKod && !(st.sonSayim > (Date.parse(el.at || '') || 0));
+        // Pasif kalıcıdır: sayım girilse de döngüde sayılmaz, Otomatik seçilene kadar
+        var elGecerli = !!elKod && (elKod === 'pasif' || !(st.sonSayim > (Date.parse(el.at || '') || 0)));
         var sayimVar = st.gercek > 0 && !(elGecerli && elKod === 'yok');
         var oran = sayimVar && st.toplam ? st.sayilan / st.toplam : 0;
         var kod;
@@ -738,6 +764,7 @@
                 return st.sayilan + ' / ' + st.toplam + ' sayıldı';
             case 'gecikti': return du.gecikmeGun > 0 ? du.gecikmeGun + ' gün gecikti' : 'Süresi doldu';
             case 'yaklasiyor': return du.kalanGun + ' gün kaldı';
+            case 'pasif': return 'Pasif · döngüde sayılmıyor';
             default: return buyukBasla(goreliSure(du.st.sonSayim)) + ' sayıldı';
         }
     }
@@ -1038,9 +1065,10 @@
         var ekle = function (id) { if (id && /^[0-9a-f]{24}$/.test(id) && liste.indexOf(id) < 0) liste.push(id); };
         var k = d.kayitlar.get(ad);
         if (k) ekle(k.getir_id);
+        var kt = kaynak()[ad];
+        if (d.ayar.depo && kt) kt[2].forEach(ekle);
         var og = ogrenilenBul(ad);
         if (og) ekle(og.id);
-        var kt = kaynak()[ad];
         (kt ? kt[2] : []).forEach(ekle);
         return liste;
     }
@@ -1183,6 +1211,71 @@
             pencere.classList.add('is-acik');
             pencere.querySelector('[data-sd-p="cek"]').focus({ preventScroll: true });
         });
+    }
+
+    /** Tehlikeli işlem onayı; varsayılan odak Vazgeç'te. @returns {Promise<boolean>} */
+    function onayPenceresi(o) {
+        return new Promise(function (coz) {
+            var acan = document.activeElement;
+            var perde = document.createElement('div');
+            perde.className = 'sd-perde';
+            perde.innerHTML = '<div class="sd-pencere" role="alertdialog" aria-modal="true" aria-labelledby="sdOnayBaslik">' +
+                '<p class="sd-etiket">' + kacir(o.etiket) + '</p>' +
+                '<h2 class="sd-pencere__baslik" id="sdOnayBaslik">' + kacir(o.baslik) + '</h2>' +
+                '<p class="sd-pencere__metin">' + kacir(o.metin) + '</p>' +
+                (o.uyari ? '<p class="sd-pencere__uyari">' + kacir(o.uyari) + '</p>' : '') +
+                '<div class="sd-pencere__eylem">' +
+                '<button type="button" class="sd-dugme sd-dugme--ikincil" data-o="hayir">Vazgeç</button>' +
+                '<button type="button" class="sd-dugme sd-dugme--tehlike" data-o="evet">' + SVG.sil + '<span>' + kacir(o.onay) + '</span></button>' +
+                '</div></div>';
+            document.body.appendChild(perde);
+            document.documentElement.classList.add('sd-kilit');
+            var bitir = function (sonuc) {
+                document.removeEventListener('keydown', tus, true);
+                perde.classList.remove('is-acik');
+                setTimeout(function () { perde.remove(); }, azaltilmisHareket() ? 0 : 200);
+                document.documentElement.classList.remove('sd-kilit');
+                try { if (acan && acan.focus) acan.focus({ preventScroll: true }); } catch (e) { /* yok */ }
+                coz(sonuc);
+            };
+            var tus = function (e) { if (e.key === 'Escape') { e.stopPropagation(); bitir(false); } };
+            document.addEventListener('keydown', tus, true);
+            perde.addEventListener('click', function (e) {
+                if (e.target === perde) return bitir(false);
+                var h = e.target.closest('[data-o]');
+                if (h) bitir(h.getAttribute('data-o') === 'evet');
+            });
+            void perde.offsetWidth;
+            perde.classList.add('is-acik');
+            perde.querySelector('[data-o="hayir"]').focus({ preventScroll: true });
+        });
+    }
+
+    /** Döngü tablosunu boşalt: tablo silinir, alt kategori listede kalır */
+    async function urunleriSil(ad) {
+        var s = cs();
+        if (!s || !ad || !tabloVarMi(ad)) return;
+        if (d.cekim || s._importInProgress) { bildir(HATA.mesgul, 'bilgi'); return; }
+        var st = istatistik(ad);
+        var tamam = await onayPenceresi({
+            etiket: 'Ürünleri Sil',
+            baslik: ad,
+            metin: 'Tablodaki ' + st.toplam + ' ürün silinir' + (st.gercek ? ', ' + st.gercek + ' ürünün sayımı da gider.' : '.') + ' Alt kategori listede kalır; ürünleri istediğin zaman yeniden çekebilirsin.',
+            uyari: st.gercek ? 'Bu işlem geri alınamaz.' : '',
+            onay: 'Ürünleri Sil',
+        });
+        if (!tamam) return;
+        try {
+            await s.deleteTable(tabloAdi(ad));
+        } catch (e) {
+            bildir((e && e.message) || 'Ürünler silinemedi.', 'hata');
+            return;
+        }
+        if (tabloVarMi(ad)) { bildir('Ürünler silinemedi. Birkaç saniye sonra tekrar dene.', 'hata'); return; }
+        kayitYaz(ad, { cekildi_at: null, urun_sayisi: null }).catch(function () {});
+        d.sonuc = null;
+        ciz();
+        bildir(ad + ': ürünler silindi.', 'basari');
     }
 
     // ------------------------------------------------------------------
@@ -1430,6 +1523,7 @@
         saat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
         kutu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/></svg>',
         onay: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>',
+        sil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>',
         asagi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
     };
 
@@ -1456,6 +1550,7 @@
             else if (ne === 'esles') eslesSec(h.getAttribute('data-id'));
             else if (ne === 'esles-kapat') { d.esles = null; ciz(); }
             else if (ne === 'durum') { d.durumMenu = !d.durumMenu; ciz(); var m = panel.querySelector('.sd-durum__secenek.is-secili'); if (m) m.focus({ preventScroll: true }); }
+            else if (ne === 'urun-sil') { d.durumMenu = false; ciz(); urunleriSil(d.secili); }
             else if (ne === 'durum-sec') { var kod = h.getAttribute('data-kod'); elDurumAyarla(d.secili, kod === 'oto' ? null : kod); }
             else if (ne === 'listeye') {
                 var hedef = document.getElementById('countingTableContainer');
@@ -1544,7 +1639,8 @@
             '<div class="sd-liste" data-sd-liste role="list"></div>';
     }
 
-    function basHtml(liste) {
+    function basHtml(tum) {
+        var liste = tum.filter(function (x) { return x.kod !== 'pasif'; });
         var say = {};
         liste.forEach(function (x) { say[x.kod] = (say[x.kod] || 0) + 1; });
         var guncel = (say.guncel || 0) + (say.yaklasiyor || 0);
@@ -1573,7 +1669,7 @@
         var say = {};
         liste.forEach(function (x) { say[x.kod] = (say[x.kod] || 0) + 1; });
         return FILTRELER.map(function (f) {
-            var n = f[2] ? f[2].reduce(function (t, k) { return t + (say[k] || 0); }, 0) : liste.length;
+            var n = f[2] ? f[2].reduce(function (t, k) { return t + (say[k] || 0); }, 0) : liste.length - (say.pasif || 0);
             return '<button type="button" role="tab" class="sd-filtre" aria-selected="' + (d.filtre === f[0]) + '" data-sd="filtre" data-deger="' + f[0] + '">' +
                 kacir(f[1]) + '<span class="sd-filtre__sayi">' + n + '</span></button>';
         }).join('');
@@ -1612,6 +1708,7 @@
             el.querySelector('.sr-only').textContent = DURUM[x.kod].ad;
             el.__imza = imza;
         }
+        el.classList.toggle('is-pasif', x.kod === 'pasif');
         var oran = (x.st.var ? x.oran : 0).toFixed(3);
         if (el.__oran !== oran) { cubuk.style.transform = 'scaleX(' + oran + ')'; el.__oran = oran; }
     }
@@ -1623,6 +1720,7 @@
         var q = norm(d.arama);
         var liste = (tum || hepsi()).filter(function (x) {
             if (filtre && filtre[2] && filtre[2].indexOf(x.kod) < 0) return false;
+            if ((!filtre || !filtre[2]) && x.kod === 'pasif') return false;
             return !q || norm(x.ad).indexOf(q) >= 0;
         });
         liste.sort(function (a, b) { return a.ad.localeCompare(b.ad, 'tr'); });
@@ -1720,6 +1818,11 @@
                 secenek('suruyor', 'Sıraya Al', 'Sayım başlamasa da Sürüyor\'da görünür.', 'mavi', x.el === 'suruyor') +
                 secenek('yok', 'Hiç Sayılmadı', 'Yeni bir sayım girilene kadar burada kalır.', 'gri', x.el === 'yok') +
                 secenek('oto', 'Otomatik', 'Durum girilen sayımlara göre belirlenir.', 'yesil', !x.el) +
+                secenek('pasif', 'Pasif', 'Döngüde sayılmaz; yalnız Pasif filtresinde görünür.', 'gri', x.el === 'pasif') +
+                (x.st.var ? '<div class="sd-durum__ayrac" role="separator"></div>' +
+                    '<button type="button" class="sd-durum__secenek sd-durum__secenek--tehlike" role="menuitem" data-sd="urun-sil">' +
+                    '<span class="sd-durum__ikon">' + SVG.sil + '</span>' +
+                    '<span class="sd-durum__metin"><strong>Ürünleri Sil</strong><span>Tablodaki ' + x.st.toplam + ' ürün silinir.</span></span></button>' : '') +
                 '</div>' : '') +
             '</div>';
     }
@@ -1840,6 +1943,7 @@
     function ozet() {
         var o = { toplam: 0, sayildi: 0, suruyor: 0, gecikti: 0, yok: 0, sure: d.ayar.sure };
         hepsi().forEach(function (x) {
+            if (x.kod === 'pasif') return;
             o.toplam++;
             if (x.kod === 'guncel' || x.kod === 'yaklasiyor') o.sayildi++;
             else if (x.kod === 'suruyor') o.suruyor++;

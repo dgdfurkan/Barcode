@@ -331,6 +331,12 @@ html.sd-modu.sd-tablosuz #countingTableContainer { display: none !important; }
 .sd-durum__secenek:focus-visible { outline: 2px solid var(--sd-mavi); outline-offset: -2px; }
 .sd-durum__secenek.is-secili { background: var(--sd-mavi-acik); }
 .sd-durum__secenek .sd-nokta { flex: none; }
+.sd-durum__ayrac { height: 1px; margin: 8px; background: var(--sd-cizgi); }
+.sd-durum__ikon { flex: none; width: 20px; height: 20px; display: grid; place-items: center; }
+.sd-durum__ikon svg { width: 16px; height: 16px; }
+.sd-durum__secenek--tehlike { color: var(--sd-kirmizi-koyu); }
+.sd-durum__secenek--tehlike:hover { background: var(--sd-kirmizi-acik); }
+.sd-durum__secenek--tehlike .sd-durum__metin strong { color: var(--sd-kirmizi-koyu); }
 .sd-durum__metin { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .sd-durum__metin strong { font-size: 13px; line-height: 18px; font-weight: 600; }
 .sd-durum__metin span { font-size: 11px; line-height: 16px; color: var(--sd-sonuk); }
@@ -429,6 +435,10 @@ html.sd-modu.sd-tablosuz #countingTableContainer { display: none !important; }
 .sd-dugme--ana:not(:disabled):hover { background: var(--sd-mavi-koyu); }
 .sd-dugme--ikincil { background: #fff; border-color: var(--sd-cizgi); color: var(--sd-orta); }
 .sd-dugme--ikincil:hover { background: var(--sd-kagit); }
+.sd-dugme--tehlike { background: var(--sd-kirmizi); color: #fff; }
+.sd-dugme--tehlike:hover { background: var(--sd-kirmizi-koyu); }
+.sd-dugme--tehlike svg { width: 16px; height: 16px; }
+.sd-kart.is-pasif { opacity: 0.64; }
 .sd-dugme--metin { background: transparent; color: var(--sd-mavi-koyu); padding: 0 12px; }
 .sd-dugme--metin:hover { background: var(--sd-mavi-acik); }
 
