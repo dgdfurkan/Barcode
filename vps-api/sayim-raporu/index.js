@@ -27,7 +27,7 @@ const telegram = require('./telegram');
 const katalog = require('./katalog');
 const gorsel = require('./gorsel');
 const { raporHesapla } = require('./hesap');
-const { ayarDuzelt, pdfVar, kartVar } = require('./ayar');
+const { ayarDuzelt, donguDuzelt, donguMu, pdfVar, kartVar } = require('./ayar');
 const { pdfUret, gorselGerekenler, tabloAdi, tl, adet } = require('./pdf');
 const { kartUret, kartGorselleri } = require('./kart');
 
@@ -288,7 +288,10 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             );
             if (Number(v.rows[0].n) === 0) return res.status(404).json({ ok: false, error: 'tablo_bos' });
             if (Number(v.rows[0].sayilan) === 0) return res.status(409).json({ ok: false, error: 'sayim_yok' });
-            const sonuc = await kuyrugaYaz(req.auth.username, { tablo, ayar, yedekFiyat: yedekFiyatDogrula(req.body?.fiyatlar) });
+            // Döngü özeti işin ayarıyla saklanır (kişisel tercihe yazılmaz)
+            const dongu = donguMu(tablo) ? donguDuzelt(req.body?.dongu) : null;
+            const isAyari = dongu ? { ...ayar, dongu } : ayar;
+            const sonuc = await kuyrugaYaz(req.auth.username, { tablo, ayar: isAyari, yedekFiyat: yedekFiyatDogrula(req.body?.fiyatlar) });
             if (sonuc.kod === 202) {
                 setImmediate(isciyiDurt);
                 tercihYaz(req.auth.username, ayar).catch((e) => console.warn('rapor tercih yazilamadi:', e.message));
@@ -392,7 +395,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const satirlar = (await pool.query('SELECT * FROM rapor.sayim_satirlari($1, $2)', [kullanici, tablo])).rows;
             if (!satirlar.length) return res.status(404).json({ ok: false, error: 'tablo_bos' });
             const veri = raporHesapla(satirlar, katalog.bul, yedekFiyatDogrula(req.body?.fiyatlar) || {});
-            const bilgi = { tablo, kullanici, tarih: new Date(), no: 'Önizleme' };
+            const bilgi = { tablo, kullanici, tarih: new Date(), no: 'Önizleme', dongu: donguMu(tablo) ? donguDuzelt(req.body?.dongu) : null };
             const gorseller = await gorsel.topluGetir(tur === 'kart' ? kartGorselleri(veri, ayar) : gorselGerekenler(veri, ayar), 10000);
             res.set('Cache-Control', 'no-store');
             if (tur === 'kart') return res.type('image/png').send(kartUret(veri, bilgi, ayar, gorseller));
@@ -467,10 +470,12 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         return `Sayim-Raporu-${kisa}-${gun}.pdf`;
     }
 
-    function aciklama(tablo, o, ayar) {
-        if (!o) return `Sayım Raporu: ${tabloAdi(tablo)}`;
+    function aciklama(tablo, o, ayar, dongu) {
+        const ad = (dongu || donguMu(tablo) ? 'Döngü · ' : '') + tabloAdi(tablo);
+        if (!o) return `Sayım Raporu: ${ad}`;
         const fiyatli = !ayar || ayar.fiyat !== false;
-        const satir = [`Sayım Raporu: ${tabloAdi(tablo)}`, `Sayılan ${adet(o.sayilan)} / ${adet(o.urun)} ürün`];
+        const satir = [`Sayım Raporu: ${ad}`, `Sayılan ${adet(o.sayilan)} / ${adet(o.urun)} ürün`];
+        if (dongu) satir.push(`Döngü: ${adet(dongu.sayildi)} / ${adet(dongu.toplam)} alt kategori sayıldı`);
         if (fiyatli) {
             satir.push(`Eksik ${adet(o.eksik?.urun || 0)} ürün (${tl(o.eksik?.tl || 0, true)}) · Fazla ${adet(o.fazla?.urun || 0)} ürün (${tl(o.fazla?.tl || 0, true)})`);
             satir.push(`Net fark: ${tl(o.net, true)}`);
@@ -531,7 +536,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const satirlar = (await pool.query('SELECT * FROM rapor.sayim_satirlari($1, $2)', [is.username, is.tablo])).rows;
             if (!satirlar.length) return hataYaz(is, 'Tablo boş ya da silinmiş.');
             const veri = raporHesapla(satirlar, katalog.bul, is.yedek_fiyat || {});
-            const bilgi = { tablo: is.tablo, kullanici: is.username, tarih, no: 'SR-' + String(is.no).padStart(6, '0') };
+            const bilgi = { tablo: is.tablo, kullanici: is.username, tarih, no: 'SR-' + String(is.no).padStart(6, '0'), dongu: donguMu(is.tablo) ? donguDuzelt(is.ayar && is.ayar.dongu) : null };
             ozet = veri.ozet;
             const istenen = [];
             if (kartIste && !kartId) istenen.push(...kartGorselleri(veri, ayar));
@@ -547,7 +552,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             await pool.query('UPDATE rapor.sayim_raporlari SET ozet = $2 WHERE id = $1', [is.id, ozet]);
         }
 
-        const yazi = aciklama(is.tablo, ozet, ayar);
+        const yazi = aciklama(is.tablo, ozet, ayar, donguMu(is.tablo) ? donguDuzelt(is.ayar && is.ayar.dongu) : null);
         const kalici = [];
         for (const h of alicilar) {
             try {

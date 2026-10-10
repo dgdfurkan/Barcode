@@ -220,6 +220,12 @@
         return t;
     }
 
+    /** Döngü tablosunda döngünün genel durumu: kaç alt kategori sayıldı, dağılım */
+    function donguOzeti(t) {
+        if (!/^Döngü\|/.test(String(t || '')) || !window.JBSayimDongu || typeof window.JBSayimDongu.ozet !== 'function') return null;
+        try { return window.JBSayimDongu.ozet(); } catch (e) { return null; }
+    }
+
     function tabloGorunenAd(t) {
         var s = sistem();
         try { return s && s.formatTableDisplayName ? s.formatTableDisplayName(t) : t; } catch (e) { return t; }
@@ -477,7 +483,7 @@
         var ayar = Object.assign({}, g.ayar);
         var c = await istek('/api/rapor/sayim', {
             method: 'POST',
-            body: JSON.stringify({ tablo: tablo, fiyatlar: ayar.fiyat ? yedekFiyatlar(tablo) : null, ayar: ayar }),
+            body: JSON.stringify({ tablo: tablo, fiyatlar: ayar.fiyat ? yedekFiyatlar(tablo) : null, ayar: ayar, dongu: donguOzeti(tablo) }),
         });
         d.gonderiliyor = false;
         if (c.kod === 202 && c.j.ok) {
@@ -1322,7 +1328,8 @@
         var a = g.ayar;
         var tur = a.bicim === 'ikisi' ? g.onTur : a.bicim === 'kart' ? 'kart' : 'pdf';
         var alanlar = ['fiyat', 'not'].concat(tur === 'pdf' ? PDF_ALANLARI : KART_ALANLARI);
-        return [seciliTablo(), tur].concat(alanlar.map(function (k) { return a[k]; })).join('|');
+        var dg = donguOzeti(seciliTablo());
+        return [seciliTablo(), tur, dg ? [dg.toplam, dg.sayildi, dg.suruyor, dg.gecikti].join('.') : ''].concat(alanlar.map(function (k) { return a[k]; })).join('|');
     }
 
     /** Ayar değişince 600 ms bekle; aynı ayar ikinci kez istenmez */
@@ -1346,7 +1353,7 @@
         if (!blob) {
             var c = await istekHam('/api/rapor/onizleme', {
                 method: 'POST',
-                body: JSON.stringify({ tablo: tablo, tur: tur, ayar: a, fiyatlar: a.fiyat ? yedekFiyatlar(tablo) : null }),
+                body: JSON.stringify({ tablo: tablo, tur: tur, ayar: a, fiyatlar: a.fiyat ? yedekFiyatlar(tablo) : null, dongu: donguOzeti(tablo) }),
             });
             if (no !== g.on.istekNo) return;
             if (!c.blob) {

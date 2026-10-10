@@ -131,7 +131,8 @@ function kartUret(veri, bilgi, ayarGirdi, gorseller) {
     const ortaBasi = parca.length;
 
     // Durum etiketi ve tablo adı
-    parca.push(metin(P, y, tamam ? 'SAYIM TAMAMLANDI' : 'SAYIM DURUMU', { boy: 22, agirlik: 600, renk: T.sonuk, aralik: 3 }));
+    const dongu = bilgi.dongu || null;
+    parca.push(metin(P, y, dongu ? 'DÖNGÜ · ALT KATEGORİ' : tamam ? 'SAYIM TAMAMLANDI' : 'SAYIM DURUMU', { boy: 22, agirlik: 600, renk: T.sonuk, aralik: 3 }));
     y += 20;
     const satirlar = ikiSatir(OLCU.baslik, tabloAdi(bilgi.tablo), 66, IC);
     for (const s of satirlar) {
@@ -152,6 +153,45 @@ function kartUret(veri, bilgi, ayarGirdi, gorseller) {
     parca.push(`<rect x="${P}" y="${y}" width="${IC}" height="16" rx="8" fill="${T.serit}"/>`);
     if (oran > 0) parca.push(`<rect x="${P}" y="${y}" width="${Math.max(16, IC * oran)}" height="16" rx="8" fill="${T.dolgu}"/>`);
     y += 44;
+
+    // Döngü ilerlemesi: kaç alt kategori sayıldı, dağılım şeridi
+    if (dongu) {
+        const dilimler = [
+            [dongu.sayildi, T.fazla],
+            [dongu.suruyor, T.dolgu],
+            [dongu.gecikti, T.eksik],
+        ];
+        const kH = 156;
+        parca.push(`<rect x="${P}" y="${y}" width="${IC}" height="${kH}" rx="28" fill="${T.kutu}" stroke="${T.cizgi}"/>`);
+        parca.push(metin(P + 28, y + 44, 'DÖNGÜ', { boy: 20, agirlik: 600, renk: T.sonuk, aralik: 2 }));
+        const sag = `${adet(dongu.sayildi)} / ${adet(dongu.toplam)} alt kategori sayıldı`;
+        parca.push(metin(S - P - 28, y + 46, sag, { boy: 26, agirlik: 600, renk: T.yazi, hiza: 'end' }));
+        const sx = P + 28;
+        const sG = IC - 56;
+        const sy = y + 70;
+        parca.push(`<clipPath id="dongu"><rect x="${sx}" y="${sy}" width="${sG}" height="14" rx="7"/></clipPath>`);
+        parca.push(`<rect x="${sx}" y="${sy}" width="${sG}" height="14" rx="7" fill="${T.serit}"/>`);
+        let dx = sx;
+        const dSvg = [];
+        for (const [n, renk] of dilimler) {
+            const g = (n / dongu.toplam) * sG;
+            if (g > 0) dSvg.push(`<rect x="${dx}" y="${sy}" width="${g + 0.5}" height="14" fill="${renk}"/>`);
+            dx += g;
+        }
+        parca.push(`<g clip-path="url(#dongu)">${dSvg.join('')}</g>`);
+        // Renk açıklaması: sığmayan etiket yazılmaz, kart taşmaz
+        const aciklama = [['Sayıldı', dongu.sayildi, T.fazla], ['Sürüyor', dongu.suruyor, T.dolgu], ['Gecikti', dongu.gecikti, T.eksik], ['Hiç sayılmadı', dongu.yok, T.serit]];
+        let lx = sx;
+        for (const [ad, n, renk] of aciklama) {
+            const etiket = `${ad} ${adet(n)}`;
+            const g = 26 + genislik(OLCU.govde, etiket, 22);
+            if (lx + g > sx + sG) break;
+            parca.push(`<rect x="${lx}" y="${sy + 34}" width="16" height="16" rx="5" fill="${renk}"/>`);
+            parca.push(metin(lx + 26, sy + 49, etiket, { boy: 22, renk: T.yazi }));
+            lx += g + 28;
+        }
+        y += kH + 24;
+    }
 
     // Üç kutu
     const kG = (IC - 32) / 3;

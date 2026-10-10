@@ -1648,5 +1648,18 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', basla);
     else basla();
 
-    window.JBSayimDongu = { ac: modAc, kapat: modKapat, cek: urunleriCek, gorsel: gorselAdresi };
+    /** Raporlar için döngünün genel durumu (alt kategori sayıları) */
+    function ozet() {
+        var o = { toplam: 0, sayildi: 0, suruyor: 0, gecikti: 0, yok: 0, sure: d.ayar.sure };
+        hepsi().forEach(function (x) {
+            o.toplam++;
+            if (x.kod === 'guncel' || x.kod === 'yaklasiyor') o.sayildi++;
+            else if (x.kod === 'suruyor') o.suruyor++;
+            else if (x.kod === 'gecikti') o.gecikti++;
+            else o.yok++;
+        });
+        return o;
+    }
+
+    window.JBSayimDongu = { ac: modAc, kapat: modKapat, cek: urunleriCek, gorsel: gorselAdresi, ozet: ozet };
 })();

@@ -52,7 +52,31 @@ function ayarDuzelt(ham) {
     return a;
 }
 
+/**
+ * Döngü özeti: tarayıcı sayım döngüsünün durumunu sayılarla gönderir
+ * (toplam alt kategori ve duruma göre dağılım). Yalnız Döngü tablosunda
+ * kullanılır; her alan tam sayıya ve toplamın içine sıkıştırılır.
+ * @returns {{toplam:number, sayildi:number, suruyor:number, gecikti:number, yok:number, sure:number}|null}
+ */
+function donguDuzelt(ham) {
+    if (!ham || typeof ham !== 'object' || Array.isArray(ham)) return null;
+    const sayi = (v, ust) => {
+        const n = Math.floor(Number(v));
+        return Number.isFinite(n) && n > 0 ? Math.min(n, ust) : 0;
+    };
+    const toplam = sayi(ham.toplam, 2000);
+    if (!toplam) return null;
+    let kalan = toplam;
+    const al = (v) => { const n = Math.min(sayi(v, 2000), kalan); kalan -= n; return n; };
+    const sayildi = al(ham.sayildi);
+    const suruyor = al(ham.suruyor);
+    const gecikti = al(ham.gecikti);
+    return { toplam, sayildi, suruyor, gecikti, yok: kalan, sure: sayi(ham.sure, 365) || 30 };
+}
+
+const donguMu = (tablo) => /^Döngü\|/.test(String(tablo || ''));
+
 const pdfVar = (a) => a.bicim === 'pdf' || a.bicim === 'ikisi';
 const kartVar = (a) => a.bicim === 'kart' || a.bicim === 'ikisi';
 
-module.exports = { VARSAYILAN, ayarDuzelt, pdfVar, kartVar };
+module.exports = { VARSAYILAN, ayarDuzelt, donguDuzelt, donguMu, pdfVar, kartVar };

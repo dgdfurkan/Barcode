@@ -79,8 +79,10 @@ function tarihBicim(d) {
     });
 }
 
-/** Günlük tablo adı "Günlük|2026-10-08" -> "8 Ekim 2026 günlük sayımı" */
+/** Günlük tablo adı "Günlük|2026-10-08" -> "8 Ekim 2026 günlük sayımı", Döngü önekiyle gelen alt kategori adı yalın */
 function tabloAdi(ad) {
+    const dg = /^Döngü\|(.+)$/.exec(String(ad || ''));
+    if (dg) return dg[1];
     const m = /^Günlük\|(\d{4})-(\d{2})-(\d{2})$/.exec(String(ad || ''));
     if (!m) return String(ad || 'Adsız tablo');
     const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], 12));
@@ -173,6 +175,7 @@ function pdfUret(veri, bilgi, ayarGirdi, gorseller) {
 
         let y = M;
         const o = veri.ozet;
+        const dongu = bilgi.dongu || null;
 
         function devamBasligi() {
             doc.image(LOGO, M, M - 4, { width: 16, height: 16 });
@@ -209,7 +212,7 @@ function pdfUret(veri, bilgi, ayarGirdi, gorseller) {
         y = M + 60;
 
         // ---- Başlık -----------------------------------------------------
-        yaz(doc, 'SAYIM TABLOSU', M, y, { boy: 7.5, renk: R.sonuk, aralik: 0.8 });
+        yaz(doc, dongu ? 'DÖNGÜ · ALT KATEGORİ' : 'SAYIM TABLOSU', M, y, { boy: 7.5, renk: R.sonuk, aralik: 0.8 });
         y += 12;
         doc.font('baslikFont').fontSize(21).fillColor(R.yazi);
         doc.text(kirp(doc, baslik, CW * 2 - 40), M, y, { width: CW, height: 56, ellipsis: true, lineGap: 1 });
@@ -232,6 +235,44 @@ function pdfUret(veri, bilgi, ayarGirdi, gorseller) {
         doc.roundedRect(M, y, CW, 7, 3.5).fill(R.kagit);
         if (oran > 0) doc.roundedRect(M, y, Math.max(7, CW * oran), 7, 3.5).fill(R.mavi);
         y += 22;
+
+        // ---- Döngü ilerlemesi (Döngü tablosunda) ------------------------
+        if (dongu) {
+            const dOran = dongu.toplam ? dongu.sayildi / dongu.toplam : 0;
+            const kutuH = 74;
+            doc.roundedRect(M, y, CW, kutuH, 10).lineWidth(0.6).fillAndStroke('#fbfcfe', R.cizgi);
+            yaz(doc, 'DÖNGÜ İLERLEMESİ', M + 14, y + 12, { boy: 7, renk: R.sonuk, aralik: 0.6 });
+            yaz(doc, `${adet(dongu.sayildi)} / ${adet(dongu.toplam)}`, M + 14, y + 24, { font: 'baslikKalin', boy: 15, genislik: 120 });
+            const solG = doc.font('baslikKalin').fontSize(15).widthOfString(`${adet(dongu.sayildi)} / ${adet(dongu.toplam)}`);
+            yaz(doc, `alt kategori sayıldı  ·  ${yuzde(dOran * 100)}`, M + 20 + solG, y + 29, { boy: 9, renk: R.orta, genislik: CW - 40 - solG });
+            const dilimler = [
+                ['Sayıldı', dongu.sayildi, R.yesilCubuk],
+                ['Sürüyor', dongu.suruyor, R.mavi],
+                ['Gecikti', dongu.gecikti, R.kirmiziCubuk],
+                ['Hiç sayılmadı', dongu.yok, R.gri],
+            ];
+            const sx = M + 14;
+            const sG = CW - 28;
+            const sy = y + 46;
+            doc.save();
+            doc.roundedRect(sx, sy, sG, 6, 3).clip();
+            doc.rect(sx, sy, sG, 6).fill(R.kagit);
+            let dx = sx;
+            for (const [, n, renk] of dilimler) {
+                const g = (n / dongu.toplam) * sG;
+                if (g > 0) doc.rect(dx, sy, g + 0.4, 6).fill(renk);
+                dx += g;
+            }
+            doc.restore();
+            let lx = sx;
+            for (const [ad, n, renk] of dilimler) {
+                doc.roundedRect(lx, sy + 13.5, 6, 6, 1.5).fill(renk);
+                const etiket = `${ad} ${adet(n)}`;
+                yaz(doc, etiket, lx + 10, sy + 12, { boy: 7.5, renk: R.orta });
+                lx += 10 + doc.font('govde').fontSize(7.5).widthOfString(etiket) + 16;
+            }
+            y += kutuH + 14;
+        }
 
         // ---- Özet kartları ---------------------------------------------
         if (ayar.ozet) {
