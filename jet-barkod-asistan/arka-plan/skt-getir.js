@@ -56,181 +56,107 @@ function sendExpiryResponse(callerTabs, payload) {
   }
 }
 
-async function findWarehouseTab() {
-  let warehouseTabs = await chrome.tabs.query({ url: 'https://warehouse.getir.com/*' });
-  if (warehouseTabs?.length) return warehouseTabs[0];
-  const allTabs = await chrome.tabs.query({});
-  warehouseTabs = (allTabs || []).filter((t) => {
-    const u = (t.url || '').toLowerCase();
-    return u.includes('warehouse') && u.includes('getir');
-  });
-  return warehouseTabs?.[0] || null;
+/*
+ * SKT, warehouse panelinin KENDİ isteğiyle alınıyor. Panelin oturumu 15
+ * dakikalık ve yalnız panel açıkken yenileniyor; bu oturumu dışarıdan
+ * yenilemek ya da isteği taklit etmek güvenlik çizgimizin dışında. Bunun
+ * yerine öne çıkmayan bir sekmede SKT listesi sayfası açılıyor, adresteki
+ * ürün kimlikleri değiştirilerek panelin isteği yeniden attırılıyor ve
+ * sayfa köprüsünün duyurduğu yanıt okunuyor. İş bitince sekme kapanıyor.
+ */
+const SKT_LISTE = (depo) => `https://warehouse.getir.com/r/${depo}/stock/stock-management/product/expiration/list`;
+const PARCA_URUN = 40;
+const PARCA_ARASI_MS = 700;
+
+function bugunIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-async function fetchExpiryBatchInWarehouseTab(tabId, warehouseId, endDateStr, productIds) {
-  const results = await chrome.scripting.executeScript({
+function bekle(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+/** Sekme yüklenip panel uygulaması SKT sayfasında hazır olana kadar bekler */
+async function sekmeHazirBekle(tabId, zamanAsimiMs = 30000) {
+  const bitis = Date.now() + zamanAsimiMs;
+  while (Date.now() < bitis) {
+    let tab = null;
+    try { tab = await chrome.tabs.get(tabId); } catch (e) { return { ok: false, hata: 'Warehouse sekmesi kapandı.' }; }
+    const url = tab.url || tab.pendingUrl || '';
+    // Oturum yoksa giriş sayfasında kalır (sessiz giriş denemesi prompt=none ile geçer)
+    if (/stockid\.getirapi\.com/.test(url) && !/prompt=none/.test(url) && tab.status === 'complete') {
+      return { ok: false, hata: 'Warehouse paneline giriş yapılmamış. warehouse.getir.com\'a bir kez giriş yapın.' };
+    }
+    if (tab.status === 'complete' && /\/expiration\/list/.test(url)) {
+      try {
+        const [r] = await chrome.scripting.executeScript({
+          target: { tabId },
+          world: 'MAIN',
+          func: () => !!(window.__jbSayfaKoprusu && document.querySelector('#root, #app, [id*="root"]') && /\/expiration\/list/.test(location.pathname) && document.querySelector('button')),
+        });
+        if (r && r.result) return { ok: true };
+      } catch (e) { /* sayfa yükleniyor */ }
+    }
+    await bekle(400);
+  }
+  return { ok: false, hata: 'Warehouse paneli yanıt vermedi. Biraz sonra tekrar deneyin.' };
+}
+
+/**
+ * Panelin adresindeki ürün kimliklerini değiştirip panelin kendi isteğini
+ * attırır, sayfa köprüsünün duyurduğu yanıtı döndürür.
+ */
+async function panelIstegiYaptir(tabId, depo, ids) {
+  const [r] = await chrome.scripting.executeScript({
     target: { tabId },
     world: 'MAIN',
-    args: [warehouseId, endDateStr, productIds],
-    func: async function (warehouseIdParam, endDateStrParam, productIdsParam) {
-      function formatTrDate(iso) {
-        const d = new Date(iso);
-        if (Number.isNaN(d.getTime())) {
-          const raw = String(iso || '').split('T')[0];
-          if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-            const [y, m, day] = raw.split('-');
-            return `${day}.${m}.${y}`;
-          }
-          return raw;
-        }
-        const day = String(d.getDate()).padStart(2, '0');
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const year = d.getFullYear();
-        return `${day}.${month}.${year}`;
-      }
-
-      function findWarehouseToken() {
-        const stores = [localStorage, sessionStorage];
-        for (const store of stores) {
-          for (let i = 0; i < store.length; i++) {
-            const key = store.key(i);
-            const value = store.getItem(key);
-            if (value && value.startsWith('eyJ') && value.length > 500) {
-              const lowerKey = (key || '').toLowerCase();
-              if (lowerKey.includes('access') || lowerKey.includes('token') || value.length > 800) {
-                return value;
-              }
-            }
-          }
-        }
-        let best = null;
-        for (const store of stores) {
-          for (let i = 0; i < store.length; i++) {
-            const value = store.getItem(store.key(i));
-            if (value && value.startsWith('eyJ') && value.length > 500) {
-              if (!best || value.length > best.length) best = value;
-            }
-          }
-        }
-        return best;
-      }
-
-      function buildDateRange(endDateStr) {
-        const tzOffsetHours = 3;
-        const now = new Date();
-        const localNow = new Date(now.getTime() + tzOffsetHours * 3600000);
-        const localStart = new Date(
-          Date.UTC(localNow.getUTCFullYear(), localNow.getUTCMonth(), localNow.getUTCDate(), 0, 0, 0, 0)
-        );
-        const startDate = new Date(localStart.getTime() - tzOffsetHours * 3600000);
-        const endParts = String(endDateStr || '2030-07-31').split('-');
-        const localEnd = new Date(
-          Date.UTC(+endParts[0], +endParts[1] - 1, +endParts[2], 23, 59, 59, 999)
-        );
-        const endDate = new Date(localEnd.getTime() - tzOffsetHours * 3600000);
-        return { startDate: startDate.toISOString(), endDate: endDate.toISOString() };
-      }
-
-      function parseItems(json, requestedIds) {
-        const byProductId = {};
-        requestedIds.forEach((id) => {
-          byProductId[id] = [];
-        });
-
-        let items = [];
-        if (json?.data?.items && Array.isArray(json.data.items)) items = json.data.items;
-        else if (json?.data && Array.isArray(json.data)) items = json.data;
-        else if (Array.isArray(json)) items = json;
-
-        for (const item of items) {
-          // Yanıtta ürün kimliği `id` alanında geliyor (get-expiring-products)
-          const pid =
-            item.productId ||
-            item.product_id ||
-            item.product?.id ||
-            item.product?._id ||
-            item.id ||
-            (requestedIds.length === 1 ? requestedIds[0] : null);
-          if (!pid || !requestedIds.includes(String(pid))) continue;
-          const exp = item.expiryDate || item.expirationDate;
-          const removeRaw = item.removeFromSaleDate || item.removeFromSaleDateTime;
-          const count = Number(item.count ?? item.quantity ?? 0);
-          if (!exp || !count) continue;
-          const dateStr = formatTrDate(exp);
-          const removeDateStr = removeRaw ? formatTrDate(removeRaw) : null;
-          const raf = item.location && item.location.barcode ? String(item.location.barcode).slice(0, 40) : null;
-          const sid = String(pid);
-          if (!byProductId[sid]) byProductId[sid] = [];
-          const existing = byProductId[sid].find((e) => e.date === dateStr && e.raf === raf);
-          if (existing) existing.qty += count;
-          else byProductId[sid].push({ date: dateStr, qty: count, removeDate: removeDateStr, raf });
-        }
-
-        Object.keys(byProductId).forEach((pid) => {
-          byProductId[pid].sort((a, b) => {
-            const [da, ma, ya] = a.date.split('.').map(Number);
-            const [db, mb, yb] = b.date.split('.').map(Number);
-            return new Date(ya, ma - 1, da) - new Date(yb, mb - 1, db);
-          });
-        });
-        return byProductId;
-      }
-
+    args: [depo, ids, bugunIso()],
+    func: (depoP, idsP, bugunP) => new Promise((coz) => {
+      let bitti = false;
+      const son = (v) => { if (bitti) return; bitti = true; window.removeEventListener('message', dinle); clearTimeout(zaman); coz(v); };
+      const dinle = (e) => {
+        const d = e.data;
+        if (!d || d.type !== 'GETIR_DATA_RECEIVED' || !/\/get-expiring-products/.test(d.url || '')) return;
+        const veri = d.payload && Array.isArray(d.payload.data) ? d.payload.data : null;
+        if (!veri) return son({ ok: false, hata: 'SKT yanıtı okunamadı' });
+        // Bu parçanın yanıtı mı: dönen ürünler istenenlerin içinde olmalı
+        const istenen = new Set(idsP);
+        if (veri.some((x) => x && x.id && !istenen.has(String(x.id)))) return;
+        son({ ok: true, data: veri });
+      };
+      window.addEventListener('message', dinle);
+      const zaman = setTimeout(() => son({ ok: false, hata: 'Panel SKT listesini getirmedi (zaman aşımı)' }), 20000);
+      const adres = `/r/${depoP}/stock/stock-management/product/expiration/list?offset=1&productIds=${idsP.join(',')}&startDate=${bugunP}&endDate=2030-07-31`;
       try {
-        const token = findWarehouseToken();
-        if (!token) {
-          return {
-            success: false,
-            error: 'Warehouse oturumu bulunamadı. warehouse.getir.com sekmesini bir kez yenileyin.'
-          };
-        }
-
-        const pathMatch = window.location.pathname.match(/\/r\/([a-f0-9]{24})\//i);
-        const whId = pathMatch ? pathMatch[1] : warehouseIdParam;
-        const range = buildDateRange(endDateStrParam);
-        const url = `https://warehouse-panel-api-gateway.getirapi.com/warehouse/${whId}/get-expiring-products`;
-
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json, text/plain, */*',
-            Authorization: `Bearer ${token}`,
-            Origin: 'https://warehouse.getir.com',
-            Referer: `https://warehouse.getir.com/r/${whId}/stock/stock-management/product/expiration/list`,
-            'x-requester-client': 'warehouse-panel-frontend',
-            language: 'tr',
-            countryCode: 'TR'
-          },
-          body: JSON.stringify({
-            removeFromSaleDateRange: {
-              startDate: range.startDate,
-              endDate: range.endDate
-            },
-            productIds: productIdsParam
-          })
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          return {
-            success: false,
-            error: `SKT API HTTP ${response.status}${errText ? `: ${errText.slice(0, 120)}` : ''}`
-          };
-        }
-
-        const json = await response.json();
-        return { success: true, byProductId: parseItems(json, productIdsParam.map(String)) };
-      } catch (error) {
-        return { success: false, error: error.message || 'SKT isteği başarısız' };
+        history.pushState({}, '', adres);
+        dispatchEvent(new PopStateEvent('popstate', { state: {} }));
+      } catch (err) {
+        son({ ok: false, hata: 'Panel adresi değiştirilemedi' });
       }
-    }
+    }),
   });
+  return (r && r.result) || { ok: false, hata: 'Warehouse sekmesinde betik çalıştırılamadı' };
+}
 
-  if (!results?.[0]?.result) {
-    return { success: false, error: 'Warehouse sekmesinde SKT script çalıştırılamadı' };
+/** Panel yanıtı -> ürün kimliği başına partiler (tarih, adet, satıştan kalkış, raf) */
+function partileriAyikla(veri, birlesik) {
+  const trTarih = (iso) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso || '').slice(0, 10);
+    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+  };
+  for (const item of veri) {
+    const pid = item && (item.id || item.productId);
+    const adet = Number(item && (item.count ?? item.quantity));
+    if (!pid || !item.expiryDate || !adet) continue;
+    const sid = String(pid);
+    if (!birlesik[sid]) birlesik[sid] = [];
+    const date = trTarih(item.expiryDate);
+    const removeDate = item.removeFromSaleDate ? trTarih(item.removeFromSaleDate) : null;
+    const raf = item.location && item.location.barcode ? String(item.location.barcode).slice(0, 40) : null;
+    const var_ = birlesik[sid].find((e) => e.date === date && e.raf === raf);
+    if (var_) var_.qty += adet;
+    else birlesik[sid].push({ date, qty: adet, removeDate, raf });
   }
-  return results[0].result;
 }
 
 export async function handleFetchExpiryProducts(message, sendResponse, sender = null) {
@@ -243,7 +169,6 @@ export async function handleFetchExpiryProducts(message, sendResponse, sender = 
   // veri getirir hem Getir tarafında açıklanamaz trafik olur.
   const warehouseId = message.warehouseId || null;
   const endDate = message.endDate || '2030-07-31';
-  const batchSize = Math.min(Math.max(Number(message.batchSize) || 12, 1), 30);
   const callerTabs = await resolveCallerTabs(sender);
 
   if (!warehouseId) {
@@ -260,74 +185,52 @@ export async function handleFetchExpiryProducts(message, sendResponse, sender = 
     return;
   }
 
+  let tabId = null;
   try {
-    sendExpiryProgress(callerTabs, '🔍 Warehouse sekmesi aranıyor…');
-    const tab = await findWarehouseTab();
-    if (!tab) {
-      sendExpiryResponse(callerTabs, {
-        success: false,
-        error: 'warehouse.getir.com sekmesi açık değil. SKT sayfasını aynı tarayıcıda açık tutun.',
-        byProductId: {}
-      });
+    sendExpiryProgress(callerTabs, 'Warehouse paneli açılıyor');
+    const pencere = callerTabs[0] && callerTabs[0].windowId;
+    const tab = await chrome.tabs.create({ url: SKT_LISTE(warehouseId), active: false, ...(pencere ? { windowId: pencere } : {}) });
+    tabId = tab.id;
+    const hazir = await sekmeHazirBekle(tabId);
+    if (!hazir.ok) {
+      sendExpiryResponse(callerTabs, { success: false, error: hazir.hata, byProductId: {} });
       return;
     }
 
-    const batches = chunkArray(productIds, batchSize);
+    const parcalar = chunkArray(productIds, PARCA_URUN);
     const merged = {};
-    productIds.forEach((id) => {
-      merged[id] = [];
-    });
+    productIds.forEach((id) => { merged[id] = []; });
 
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i];
-      sendExpiryProgress(
-        callerTabs,
-        `📅 SKT alınıyor… ${Math.min((i + 1) * batchSize, productIds.length)}/${productIds.length} ürün`
-      );
-
-      const batchResult = await fetchExpiryBatchInWarehouseTab(tab.id, warehouseId, endDate, batch);
-      if (!batchResult.success) {
-        sendExpiryResponse(callerTabs, {
-          success: false,
-          error: batchResult.error || 'SKT alınamadı',
-          byProductId: merged
-        });
+    for (let i = 0; i < parcalar.length; i++) {
+      sendExpiryProgress(callerTabs, `SKT alınıyor ${Math.min((i + 1) * PARCA_URUN, productIds.length)} / ${productIds.length} ürün`);
+      let sonuc = await panelIstegiYaptir(tabId, warehouseId, parcalar[i]);
+      // Panel ilk açılışta oturumu tazeliyor olabilir: bir kez daha dene
+      if (!sonuc.ok) { await bekle(1500); sonuc = await panelIstegiYaptir(tabId, warehouseId, parcalar[i]); }
+      if (!sonuc.ok) {
+        sendExpiryResponse(callerTabs, { success: false, error: sonuc.hata || 'SKT alınamadı', byProductId: merged });
         return;
       }
-
-      Object.entries(batchResult.byProductId || {}).forEach(([pid, entries]) => {
-        if (!merged[pid]) merged[pid] = [];
-        (entries || []).forEach((entry) => {
-          const existing = merged[pid].find((e) => e.date === entry.date && e.raf === entry.raf);
-          if (existing) existing.qty += entry.qty;
-          else merged[pid].push({ ...entry });
-        });
-        merged[pid].sort((a, b) => {
-          const [da, ma, ya] = a.date.split('.').map(Number);
-          const [db, mb, yb] = b.date.split('.').map(Number);
-          return new Date(ya, ma - 1, da) - new Date(yb, mb - 1, db);
-        });
-      });
-
-      if (i < batches.length - 1) {
-        // Paneldeki sayfa geçişinden yavaş: istekler sakin aralıkla
-        await new Promise((r) => setTimeout(r, 450));
-      }
+      partileriAyikla(sonuc.data, merged);
+      if (i < parcalar.length - 1) await bekle(PARCA_ARASI_MS);
     }
 
-    const withData = Object.values(merged).filter((arr) => arr.length > 0).length;
-    sendExpiryProgress(callerTabs, `✅ ${withData}/${productIds.length} ürün için SKT bulundu`);
-    sendExpiryResponse(callerTabs, {
-      success: true,
-      byProductId: merged,
-      total: productIds.length,
-      withData
+    Object.keys(merged).forEach((pid) => {
+      merged[pid].sort((a, b) => {
+        const [da, ma, ya] = a.date.split('.').map(Number);
+        const [db, mb, yb] = b.date.split('.').map(Number);
+        return new Date(ya, ma - 1, da) - new Date(yb, mb - 1, db);
+      });
     });
+    const withData = Object.values(merged).filter((arr) => arr.length > 0).length;
+    sendExpiryProgress(callerTabs, `${withData} / ${productIds.length} üründe SKT bulundu`);
+    sendExpiryResponse(callerTabs, { success: true, byProductId: merged, total: productIds.length, withData });
   } catch (error) {
     sendExpiryResponse(callerTabs, {
       success: false,
       error: error.message || 'SKT çekimi başarısız',
       byProductId: {}
     });
+  } finally {
+    if (tabId) { try { await chrome.tabs.remove(tabId); } catch (e) { /* zaten kapalı */ } }
   }
 }
