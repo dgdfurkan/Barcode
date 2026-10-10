@@ -592,7 +592,7 @@
                                         }
                                         // warehouse field'ından yakala
                                         else if (bodyObj.warehouse && bodyObj.warehouse !== apiEndpoints.warehouseId) {
-                                            apiEndpoints.warehouseId = bodyObj.warehouse;
+                                            apiEndpoints.warehouseId = (w => (w && typeof w === 'object') ? (w._id || w.id || null) : w)(bodyObj.warehouse);
                                             if (!isPassiveMode) {
                                                 jbLog('🏭 Warehouse ID yakalandı (request body - warehouse):', apiEndpoints.warehouseId);
                                             }
@@ -641,7 +641,7 @@
                                     // Eğer data array ise, ilk elemandan warehouse ID'yi al
                                     if (Array.isArray(data) && data.length > 0) {
                                         if (data[0].warehouse) {
-                                            foundWarehouseId = data[0].warehouse;
+                                            foundWarehouseId = (w => (w && typeof w === 'object') ? (w._id || w.id || null) : w)(data[0].warehouse);
                                         }
                                         // Warehouse name'i de kontrol et
                                         if (data[0].warehouseName || data[0].warehouse?.name) {
@@ -651,7 +651,7 @@
                                     // Eğer data.data array ise
                                     else if (data.data && Array.isArray(data.data) && data.data.length > 0) {
                                         if (data.data[0].warehouse) {
-                                            foundWarehouseId = data.data[0].warehouse;
+                                            foundWarehouseId = (w => (w && typeof w === 'object') ? (w._id || w.id || null) : w)(data.data[0].warehouse);
                                         }
                                         // Warehouse name'i de kontrol et
                                         if (data.data[0].warehouseName || data.data[0].warehouse?.name) {
@@ -872,7 +872,7 @@
                                 }
                                 // warehouse field'ından yakala
                                 else if (bodyObj.warehouse && bodyObj.warehouse !== apiEndpoints.warehouseId) {
-                                    apiEndpoints.warehouseId = bodyObj.warehouse;
+                                    apiEndpoints.warehouseId = (w => (w && typeof w === 'object') ? (w._id || w.id || null) : w)(bodyObj.warehouse);
                                     if (!isPassiveMode) {
                                         jbLog('🏭 Warehouse ID yakalandı (XHR request body - warehouse):', apiEndpoints.warehouseId);
                                     }

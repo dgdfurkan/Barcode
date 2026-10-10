@@ -785,7 +785,7 @@
                 return st.toplam + ' ürün · ' + (du.cekildi ? goreliSure(du.cekildi) + ' çekildi' : 'sayım yok');
             case 'suruyor':
                 if (!du.sayimVar) return 'Sırada · ' + (st.var ? st.toplam + ' Ürün' : tahminMetni(du.ad));
-                return st.sayilan + ' / ' + st.toplam + ' sayıldı';
+                return st.sayilan + ' / ' + st.toplam + ' Sayıldı';
             case 'gecikti': return du.gecikmeGun > 0 ? du.gecikmeGun + ' Gün Gecikti' : 'Süresi Doldu';
             case 'yaklasiyor': return du.kalanGun + ' gün kaldı';
             case 'pasif': return tahmin(du.ad) === 0 ? 'Pasif · Stokta Ürün Yok' : 'Pasif';
@@ -802,17 +802,26 @@
     // ------------------------------------------------------------------
     async function apiBilgisi() {
         var s = cs();
-        var info = null;
-        try { info = s && s._resolveApiInfoForDebug ? await s._resolveApiInfoForDebug() : null; } catch (e) { info = null; }
+        // Eldeki bütün oturum kayıtlarından en tazesi: tablo kaydı eski kalmış olabilir
+        var adaylar = [];
+        if (s && s.cachedFullData && s.cachedFullData._api_info) adaylar.push(s.cachedFullData._api_info);
+        if (s && s.countingData && s.countingData._api_info) adaylar.push(s.countingData._api_info);
+        try { var yerel = JSON.parse(localStorage.getItem('getir_api_info') || 'null'); if (yerel) adaylar.push(yerel); } catch (e) { /* yok */ }
+        try { var cozulen = s && s._resolveApiInfoForDebug ? await s._resolveApiInfoForDebug() : null; if (cozulen) adaylar.push(cozulen); } catch (e) { /* yok */ }
+        var info = s && s.pickBestApiInfo ? s.pickBestApiInfo(adaylar) : adaylar.filter(function (x) { return x && x.token; })[0];
         if (!info || !info.token) throw hata('oturum_yok');
+        // Depo kimliği bazen { _id, name } nesnesi olarak kayıtlı; düz kimliği al, yoksa diğer kayıtlarda ara
+        var depoBul = function (v) { var k = v && typeof v === 'object' ? (v._id || v.id) : v; k = String(k || '').trim(); return /^[0-9a-f]{24}$/i.test(k) ? k : null; };
+        var depo = depoBul(info.warehouseId);
+        for (var i = 0; !depo && i < adaylar.length; i++) depo = adaylar[i] && depoBul(adaylar[i].warehouseId);
         var bitis = s.getEffectiveExpiryMs ? s.getEffectiveExpiryMs(info) : null;
         if (bitis && Date.now() >= bitis - 60000) throw hata('oturum_bitti');
-        if (!info.warehouseId || !/^[0-9a-f]{24}$/.test(String(info.warehouseId))) throw hata('depo_yok');
+        if (!depo) throw hata('depo_yok');
         var jeton = String(info.token).trim();
         if (!/^Bearer /.test(jeton)) jeton = 'Bearer ' + jeton;
         // Jeton yalnız Getir'in stok ucuna gider; kayıtlı başka bir adres kullanılmaz
         var uc = /^https:\/\/franchise-api-gateway\.getirapi\.com\/stocks$/.test(String(info.stockEndpoint || '')) ? info.stockEndpoint : STOK_UCU;
-        return { jeton: jeton, depo: String(info.warehouseId), uc: uc, bitis: bitis };
+        return { jeton: jeton, depo: depo, uc: uc, bitis: bitis };
     }
 
     function oturumMetni() {
@@ -931,9 +940,21 @@
         }
     }
 
+    /** "45 saniye", "2 dakika 50 saniye" (5 saniyeye yuvarlı) */
     function sureMetni(sn) {
-        if (sn < 60) return 'bir dakikadan az';
-        return 'yaklaşık ' + Math.ceil(sn / 60) + ' dakika';
+        var t = Math.max(5, Math.round(sn / 5) * 5);
+        var dk = Math.floor(t / 60);
+        var kalan = t % 60;
+        if (!dk) return kalan + ' saniye';
+        return dk + ' dakika' + (kalan ? ' ' + kalan + ' saniye' : '');
+    }
+    /** Bir sayfanın tahmini süresi: bekleme + yanıt */
+    var SAYFA_SN = TARAMA_ARASI_MS / 1000 + 0.6;
+    function taramaSayfaTahmini() {
+        var dp = d.ayar.depo;
+        var urun = dp ? dp.liste.reduce(function (t, x) { return t + (x.t || 0); }, 0) : 0;
+        if (!urun) { var s = cs(); urun = s && Array.isArray(s.allProducts) ? s.allProducts.length : 0; }
+        return urun ? Math.ceil(urun / SAYFA) : 0;
     }
 
     /** Başlığın altındaki sade bağlantı: listenin kaynağı ya da güncelleme ilerlemesi */
@@ -971,12 +992,13 @@
             var oran = t.toplamSayfa ? Math.min(1, t.sayfa / t.toplamSayfa) : 0.02;
             var gecen = (Date.now() - t.bas) / 1000;
             var kalan = t.sayfa && t.toplamSayfa ? (gecen / t.sayfa) * (t.toplamSayfa - t.sayfa) : null;
+            var kalanMetin = kalan === null ? '' : t.sayfa >= t.toplamSayfa ? 'Bitiyor' : 'Kalan ' + sureMetni(kalan);
             govde = '<p class="sd-etiket">Depo Listesi</p><h2 class="sd-pencere__baslik" id="sdDpBaslik">Liste Güncelleniyor</h2>' +
                 '<div class="sd-dp__ilerleme"><strong>%' + Math.round(oran * 100) + '</strong><span>' +
-                (t.sayfa ? 'Sayfa ' + t.sayfa + ' / ' + t.toplamSayfa : 'Oturum kontrol ediliyor') + '</span></div>' +
+                (t.sayfa ? 'Sayfa ' + t.sayfa + ' / ' + t.toplamSayfa + (kalanMetin ? ' · ' + kalanMetin : '') : 'Oturum kontrol ediliyor') + '</span></div>' +
                 '<div class="sd-cekim__cubuk"><span style="transform:scaleX(' + oran.toFixed(3) + ')"></span></div>' +
                 '<p class="sd-dp__alt">' + t.urun + ' ürün okundu · ' + t.alt + ' alt kategori bulundu' +
-                (kalan != null ? ' · kalan ' + sureMetni(kalan) : '') + '</p>' +
+                '</p>' +
                 '<p class="sd-pencere__metin">Pencereyi kapatabilir, sayıma devam edebilirsin. Sayfayı kapatırsan güncelleme durur ve liste değişmez.</p>';
             eylem = '<button type="button" class="sd-dugme sd-dugme--metin" data-sd-dp="durdur">Durdur</button>' +
                 '<button type="button" class="sd-dugme sd-dugme--ana" data-sd-dp="kapat">Arka Planda Sürsün</button>';
@@ -997,11 +1019,12 @@
             eylem = '<button type="button" class="sd-dugme sd-dugme--ikincil" data-sd-dp="kapat">Kapat</button>' +
                 '<button type="button" class="sd-dugme sd-dugme--ana" data-sd-dp="baslat">Tekrar Dene</button>';
         } else {
-            var sure = dp && dp.sayfa ? sureMetni(dp.sayfa * 1.8) : 'birkaç dakika';
+            var sayfaT = taramaSayfaTahmini();
+            var sure = sayfaT ? 'yaklaşık ' + sureMetni(sayfaT * SAYFA_SN) : 'birkaç dakika';
             govde = '<p class="sd-etiket">Depo Listesi</p><h2 class="sd-pencere__baslik" id="sdDpBaslik">Alt Kategori Listesini Güncelle</h2>' +
                 '<p class="sd-pencere__metin">Depodaki her ürünün gerçek alt kategorisi not edilir. Liste, yalnız bu depoda olan alt kategorilerle ve operasyondaki adlarıyla yeniden kurulur.</p>' +
                 '<ul class="sd-dp__satirlar">' +
-                satir(SVG.saat, '<strong>' + buyukBasla(sure) + '</strong> sürer. İstekler bir saniye arayla, sakin gönderilir.') +
+                satir(SVG.saat, '<strong>' + buyukBasla(sure) + '</strong> sürer' + (sayfaT ? ' (' + sayfaT + ' sayfa)' : '') + '. İstekler bir saniye arayla, sakin gönderilir.') +
                 satir(SVG.kutu, 'Stoğu 0 olanlar dahil bütün ürünler okunur; kartlarda tahmini ürün sayısı görünür.') +
                 satir(SVG.onay, 'Var olan tabloların ve sayımların değişmez. Bu sırada sayıma devam edebilirsin.') +
                 '</ul>' +
@@ -1291,6 +1314,7 @@
             onay: 'Ürünleri Sil',
         });
         if (!tamam) return;
+        var kimlik = ((kaynak()[ad] || [])[2] || [])[0] || null;
         try {
             await s.deleteTable(tabloAdi(ad));
         } catch (e) {
@@ -1300,6 +1324,15 @@
         if (tabloVarMi(ad)) { bildir('Ürünler silinemedi. Birkaç saniye sonra tekrar dene.', 'hata'); return; }
         kayitYaz(ad, { cekildi_at: null, urun_sayisi: null }).catch(function () {});
         d.sonuc = null;
+        // Tablo adıyla depo adı farklıysa ("Çiğ Köfte" / "Çiğköfte") seçim depo adına geçer
+        if (kimlik && !kaynak()[ad]) {
+            var m = kaynak();
+            var yeniAd = Object.keys(m).find(function (k) { return (m[k][2] || [])[0] === kimlik; });
+            if (yeniAd) {
+                d.secili = yeniAd;
+                try { sessionStorage.setItem(OTURUM_ANAHTARI, yeniAd); } catch (e) { /* yok */ }
+            }
+        }
         ciz();
         bildir(ad + ': ürünler silindi.', 'basari');
     }
@@ -1317,7 +1350,7 @@
         var sistemDoldur = secim.sistemDoldur === true;
         d.esles = null;
         var iptal = new AbortController();
-        d.cekim = { ad: ad, asama: 'Oturum kontrol ediliyor', sayfa: 0, toplamSayfa: 0, taranan: 0, uygun: 0, elenen: 0, iptal: iptal };
+        d.cekim = { ad: ad, asama: 'Oturum kontrol ediliyor', sayfa: 0, toplamSayfa: 0, taranan: 0, uygun: 0, elenen: 0, iptal: iptal, bas: Date.now() };
         d.sonuc = null;
         ciz();
         try {
@@ -1674,10 +1707,22 @@
         var toplam = liste.length;
         var oran = toplam ? guncel / toplam : 0;
         var ot = oturumMetni();
-        var dagilim = ['guncel', 'yaklasiyor', 'suruyor', 'gecikti', 'yok'].map(function (k) {
-            var n = say[k] || 0;
-            return n ? '<span class="sd-dagilim__p sd-r--' + DURUM[k].renk + (k === 'yaklasiyor' ? '-acik' : '') + '" style="flex-grow:' + n + '" title="' + kacir(DURUM[k].ad + ': ' + n) + '"></span>' : '';
-        }).join('');
+        // Ürün ilerlemesi: çekilmiş alt kategorilerdeki sayılan / toplam ürün
+        var urunToplam = 0;
+        var urunSayilan = 0;
+        liste.forEach(function (x) {
+            if (!x.st.var) return;
+            urunToplam += x.st.toplam;
+            if (x.sayimVar) urunSayilan += Math.min(x.st.sayilan, x.st.toplam);
+        });
+        var uOran = urunToplam ? urunSayilan / urunToplam : 0;
+        var bicim = function (n) { return n.toLocaleString('tr-TR'); };
+        var ilerleme = '<div class="sd-ib">' +
+            '<div class="sd-ib__ust"><span>' + (urunToplam
+                ? '<strong>' + bicim(urunSayilan) + '</strong> / ' + bicim(urunToplam) + ' Ürün Sayıldı'
+                : 'Henüz Ürün Çekilmedi') + '</span>' +
+            '<b>%' + Math.round(uOran * 100) + '</b></div>' +
+            '<div class="sd-ib__cubuk"><span style="transform:scaleX(' + uOran.toFixed(4) + ')"></span></div></div>';
         return '' +
             '<header class="sd-ust">' +
             '<div class="sd-ust__metin">' +
@@ -1688,7 +1733,7 @@
             '</div>' +
             '<div class="sd-ust__halka">' + halka(oran, 72) + '<span class="sd-ust__yuzde">%' + Math.round(oran * 100) + '</span></div>' +
             '</header>' +
-            '<div class="sd-dagilim" aria-hidden="true">' + dagilim + '</div>' +
+            ilerleme +
             (d.dbYok ? '<p class="sd-uyari">Döngü kaydı için veritabanı güncellemesi bekleniyor; ürün çekme çalışır, son çekim zamanı bu cihazda tutulur.</p>' : '');
     }
 
@@ -1710,7 +1755,9 @@
         el.setAttribute('data-sd', 'kart');
         el.setAttribute('data-ad', x.ad);
         el.style.setProperty('--sd-i', String(Math.min(i, 24)));
-        el.innerHTML = '<span class="sd-kart__gorsel"></span>' +
+        el.innerHTML = '<span class="sd-kart__dolgu" aria-hidden="true"></span>' +
+            '<span class="sd-kart__yuzde" aria-hidden="true"></span>' +
+            '<span class="sd-kart__gorsel"></span>' +
             '<span class="sd-kart__metin"><strong></strong><span class="sd-kart__alt"></span></span>' +
             '<span class="sd-kart__cubuk" aria-hidden="true"><span></span></span>' +
             '<span class="sr-only"></span>';
@@ -1736,8 +1783,16 @@
             el.__imza = imza;
         }
         el.classList.toggle('is-pasif', x.kod === 'pasif');
+        if (el.__renk !== r) { el.style.setProperty('--sd-renk', 'var(--sd-' + r + ')'); el.__renk = r; }
         var oran = (x.st.var ? x.oran : 0).toFixed(3);
-        if (el.__oran !== oran) { cubuk.style.transform = 'scaleX(' + oran + ')'; el.__oran = oran; }
+        if (el.__oran !== oran) {
+            cubuk.style.transform = 'scaleX(' + oran + ')';
+            el.querySelector('.sd-kart__dolgu').style.transform = 'scaleX(' + oran + ')';
+            var y = x.st.var && x.sayimVar ? '%' + Math.round(x.oran * 100) : '';
+            el.querySelector('.sd-kart__yuzde').textContent = y;
+            el.classList.toggle('has-yuzde', !!y);
+            el.__oran = oran;
+        }
     }
 
     function listeCiz(tum) {
@@ -1861,7 +1916,8 @@
             if (c.asama === 'Tabloya yazılıyor') oran = 1;
             return '<div class="sd-cekim__kutu" role="status" aria-live="polite">' +
                 '<p class="sd-cekim__asama"><span class="sd-cark" aria-hidden="true"></span>' + kacir(c.asama) +
-                (c.toplamSayfa > 1 && c.asama !== 'Tabloya yazılıyor' ? ' · sayfa ' + c.sayfa + ' / ' + c.toplamSayfa : '') + '</p>' +
+                (c.toplamSayfa > 1 && c.asama !== 'Tabloya yazılıyor' ? ' · Sayfa ' + c.sayfa + ' / ' + c.toplamSayfa +
+                    (c.sayfa < c.toplamSayfa ? ' · Kalan ' + sureMetni(((Date.now() - c.bas) / 1000 / Math.max(1, c.sayfa)) * (c.toplamSayfa - c.sayfa)) : '') : '') + '</p>' +
                 '<div class="sd-cekim__cubuk"><span style="transform:scaleX(' + oran.toFixed(3) + ')"></span></div>' +
                 '<p class="sd-cekim__sayilar"><span><strong>' + c.taranan + '</strong> tarandı</span><span><strong>' + c.uygun + '</strong> uygun</span><span><strong>' + c.elenen + '</strong> elendi</span></p>' +
                 '</div>';
@@ -1899,6 +1955,131 @@
     // Sayım sistemine bağlanma
     // ------------------------------------------------------------------
     var cizZaman = null;
+    // ------------------------------------------------------------------
+    // Genel sekme: alt kategori adındaki eski tabloları temizleme
+    // ------------------------------------------------------------------
+    /** Genel'deki, adı bir alt kategoriye ait tablolar (Döngü ve günlük hariç) */
+    function temizlikAdaylari() {
+        var s = cs();
+        if (!s || !s.getTableList) return [];
+        var m = d.ayar.depo ? kaynak() : null;
+        return s.getTableList().filter(function (t) {
+            if (t.name === 'Ana Sayım' || s.isDailyTableName(t.name) || s.isDonguTableName(t.name)) return false;
+            return (s.isPresetSubcategoryTable && s.isPresetSubcategoryTable(t.name)) || !!(m && m[t.name] && m[t.name][4]);
+        }).map(function (t) {
+            var veri = s.cachedFullData && s.cachedFullData._tables ? s.cachedFullData._tables[t.name] : null;
+            var sayim = 0;
+            if (veri) Object.keys(veri).forEach(function (k) {
+                var e = veri[k];
+                if (k.charAt(0) !== '_' && e && typeof e === 'object' && e.warehouseStock !== null && e.warehouseStock !== undefined) sayim++;
+            });
+            return { ad: t.name, urun: t.productCount || 0, sayim: sayim };
+        }).sort(function (a, b) { return a.ad.localeCompare(b.ad, 'tr'); });
+    }
+
+    var bantZaman = null;
+    function bantZamanla() {
+        clearTimeout(bantZaman);
+        bantZaman = setTimeout(temizlikBandi, 400);
+    }
+
+    function temizlikBandi() {
+        var kap = document.querySelector('#sayimPanelGeneral > div');
+        if (!kap) return;
+        var bant = document.getElementById('sdTemizlikBandi');
+        var liste = temizlikAdaylari();
+        if (!liste.length) { if (bant) bant.remove(); return; }
+        var html = '<span class="sd-temizlik__ikon">' + SVG.kutu + '</span>' +
+            '<span class="sd-temizlik__metin"><strong>Genel\'de ' + liste.length + ' Alt Kategori Tablosu Var</strong>' +
+            '<span>Alt kategoriler artık Döngü\'de sayılıyor. Bu tabloları Genel\'den kaldırabilirsin.</span></span>' +
+            '<button type="button" class="sd-dugme sd-dugme--ikincil" data-sd-tm="ac">Gözden Geçir</button>';
+        if (!bant) {
+            bant = document.createElement('div');
+            bant.id = 'sdTemizlikBandi';
+            bant.className = 'sd-temizlik';
+            bant.addEventListener('click', function (e) { if (e.target.closest('[data-sd-tm="ac"]')) temizlikPenceresi(); });
+            kap.insertBefore(bant, kap.firstChild);
+        }
+        if (bant.__html !== html) { bant.innerHTML = html; bant.__html = html; }
+    }
+
+    function temizlikPenceresi() {
+        var s = cs();
+        var liste = temizlikAdaylari();
+        if (!s || !liste.length) return;
+        // Sayımı olan tablolar varsayılan olarak seçili gelmez
+        var secili = new Set(liste.filter(function (x) { return !x.sayim; }).map(function (x) { return x.ad; }));
+        var acan = document.activeElement;
+        var perde = document.createElement('div');
+        perde.className = 'sd-perde';
+        var ciz2 = function () {
+            var secSayim = liste.filter(function (x) { return secili.has(x.ad) && x.sayim; });
+            var toplamSayim = secSayim.reduce(function (t, x) { return t + x.sayim; }, 0);
+            var hepsi = secili.size === liste.length;
+            perde.innerHTML = '<div class="sd-pencere sd-tm" role="dialog" aria-modal="true" aria-labelledby="sdTmBaslik">' +
+                '<p class="sd-etiket">Genel Sekme</p>' +
+                '<h2 class="sd-pencere__baslik" id="sdTmBaslik">Alt Kategori Tablolarını Kaldır</h2>' +
+                '<p class="sd-pencere__metin">Seçtiğin tablolar Genel\'den silinir. Döngü tabloların ve oradaki sayımların etkilenmez.</p>' +
+                '<div class="sd-tm__ust"><span>' + secili.size + ' / ' + liste.length + ' tablo seçili</span>' +
+                '<button type="button" class="sd-kaynak" data-tm="hepsi">' + (hepsi ? 'Seçimi Kaldır' : 'Tümünü Seç') + '</button></div>' +
+                '<div class="sd-tm__liste">' + liste.map(function (x) {
+                    return '<label class="sd-tm__satir"><input type="checkbox" data-tm-ad="' + kacir(x.ad) + '"' + (secili.has(x.ad) ? ' checked' : '') + '>' +
+                        '<span class="sd-tm__ad">' + kacir(x.ad) + '</span>' +
+                        '<span class="sd-tm__bilgi">' + x.urun + ' Ürün' + (x.sayim ? ' · <em>' + x.sayim + ' Sayım</em>' : '') + '</span></label>';
+                }).join('') + '</div>' +
+                (toplamSayim ? '<p class="sd-pencere__uyari">Seçilenlerden ' + secSayim.length + ' tabloda toplam ' + toplamSayim + ' sayım var; bunlar da silinir. Bu işlem geri alınamaz.</p>' : '') +
+                '<div class="sd-pencere__eylem">' +
+                '<button type="button" class="sd-dugme sd-dugme--ikincil" data-tm="vazgec">Vazgeç</button>' +
+                '<button type="button" class="sd-dugme sd-dugme--tehlike" data-tm="sil"' + (secili.size ? '' : ' disabled') + '>' + SVG.sil + '<span>Seçilenleri Sil (' + secili.size + ')</span></button>' +
+                '</div></div>';
+        };
+        var kapat = function () {
+            document.removeEventListener('keydown', tus, true);
+            perde.classList.remove('is-acik');
+            setTimeout(function () { perde.remove(); }, azaltilmisHareket() ? 0 : 200);
+            document.documentElement.classList.remove('sd-kilit');
+            try { if (acan && acan.focus) acan.focus({ preventScroll: true }); } catch (e) { /* yok */ }
+        };
+        var tus = function (e) { if (e.key === 'Escape') { e.stopPropagation(); kapat(); } };
+        perde.addEventListener('change', function (e) {
+            var ad = e.target && e.target.getAttribute('data-tm-ad');
+            if (!ad) return;
+            if (e.target.checked) secili.add(ad); else secili.delete(ad);
+            var kay = perde.querySelector('.sd-tm__liste').scrollTop;
+            ciz2();
+            perde.querySelector('.sd-tm__liste').scrollTop = kay;
+        });
+        perde.addEventListener('click', async function (e) {
+            if (e.target === perde) return kapat();
+            var h = e.target.closest('[data-tm]');
+            if (!h) return;
+            var ne = h.getAttribute('data-tm');
+            if (ne === 'vazgec') return kapat();
+            if (ne === 'hepsi') {
+                if (secili.size === liste.length) secili.clear();
+                else liste.forEach(function (x) { secili.add(x.ad); });
+                return ciz2();
+            }
+            if (ne === 'sil' && secili.size) {
+                h.disabled = true;
+                h.querySelector('span').textContent = 'Siliniyor…';
+                var n = 0;
+                try { n = await s.deleteTablesBulk(Array.from(secili)); } catch (er) { n = 0; }
+                kapat();
+                bantZamanla();
+                bildir(n ? n + ' tablo Genel\'den kaldırıldı.' : 'Tablolar silinemedi. Birkaç saniye sonra tekrar dene.', n ? 'basari' : 'hata');
+            }
+        });
+        ciz2();
+        document.body.appendChild(perde);
+        document.documentElement.classList.add('sd-kilit');
+        document.addEventListener('keydown', tus, true);
+        void perde.offsetWidth;
+        perde.classList.add('is-acik');
+        var ilk = perde.querySelector('[data-tm="vazgec"]');
+        if (ilk) ilk.focus({ preventScroll: true });
+    }
+
     function gecikmeliCiz() {
         if (!d.mod) return;
         clearTimeout(cizZaman);
@@ -1928,7 +2109,7 @@
             if (typeof asil !== 'function') return;
             s[ad] = function () {
                 var sonuc = asil.apply(this, arguments);
-                try { gecikmeliCiz(); } catch (e) { /* panel yan iş, sayımı bozmasın */ }
+                try { gecikmeliCiz(); bantZamanla(); } catch (e) { /* panel yan iş, sayımı bozmasın */ }
                 return sonuc;
             };
         });
@@ -1951,6 +2132,7 @@
         });
         // Katalog dışı ürünler mod açılmasa da listede görünsün
         dbYukle(false);
+        bantZamanla();
         return true;
     }
 

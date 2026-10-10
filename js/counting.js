@@ -255,6 +255,8 @@ class CountingSystem {
         this._suppressCatchUpUntil = 0;
         /** Silinen tablolar — DB temizlenene kadar listeden gizlenir */
         this._deletedTableTombstones = new Set();
+        /** Kalıcı silme kaydı: tablo adı -> silinme zamanı (ms). Meta ile cihazlara yayılır. */
+        this._silinenler = {};
         this._metaSaveTimer = null;
         this._countingHydratedFromLocal = false;
         /** Per-product debounce timers: { productId: timeoutId } */
@@ -672,6 +674,17 @@ class CountingSystem {
         });
     }
 
+    /**
+     * Depo kimliği: eklenti bazı panel yanıtlarından kimliği { _id, name }
+     * nesnesi olarak yakalayabiliyor. Her okumada düz kimliğe çevrilir.
+     * @returns {string|null} 24 haneli kimlik
+     */
+    _depoKimligi(v) {
+        const k = v && typeof v === 'object' ? (v._id || v.id || '') : v;
+        const s = String(k || '').trim();
+        return /^[0-9a-f]{24}$/i.test(s) ? s : null;
+    }
+
     mergeApiInfoForSave(winner, prev) {
         if (!winner) return prev;
         const bare = String(winner.token).replace(/^Bearer\s+/i, '').trim();
@@ -684,8 +697,8 @@ class CountingSystem {
         const tokenExpiry = jwtExp || this.normalizeExpiry(winner.tokenExpiry) || null;
         return {
             token,
-            warehouseId: winner.warehouseId || prev?.warehouseId,
-            warehouseName: winner.warehouseName || prev?.warehouseName,
+            warehouseId: this._depoKimligi(winner.warehouseId) || this._depoKimligi(prev?.warehouseId) || undefined,
+            warehouseName: winner.warehouseName || winner.warehouseId?.name || prev?.warehouseName,
             tokenExpiry: tokenExpiry || null,
             baseUrl: winner.baseUrl || prev?.baseUrl || 'https://franchise-api-gateway.getirapi.com',
             stockEndpoint: winner.stockEndpoint || prev?.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks',
@@ -705,7 +718,10 @@ class CountingSystem {
      */
     async _protectApiInfoInFullBlob(fullData) {
         if (!fullData || typeof fullData !== 'object') return fullData;
-        const remote = await this.fetchDbApiInfo();
+        const uzak = await this._uzakSayimVerisi();
+        const remote = uzak?._api_info || null;
+        // Yalnız meta yazımında: sunucudaki tablo listesi, silme kayıtları ve geçmişle birleştir
+        if (uzak && !fullData._tables && fullData._tableMeta) this._uzakMetaylaBirlestir(fullData, uzak);
         const local = fullData._api_info || this.cachedFullData?._api_info || null;
         const best = this.pickBestApiInfo([remote, local].filter(Boolean));
         if (best && best.token) {
@@ -724,6 +740,65 @@ class CountingSystem {
         if (!best || !best.token) return null;
         const prev = this.pickBestApiInfo(existingCandidates.filter(Boolean)) || {};
         return this.mergeApiInfoForSave(best, prev);
+    }
+
+    /**
+     * Meta yazımı cihazın kendi listesiyle sunucuyu baştan yazıyordu: başka
+     * cihazın açtığı tablo düşüyor, silinen tablo geri geliyordu. Artık yazmadan
+     * önce birleşir: silme kayıtları birleşir, başka cihazın tabloları korunur,
+     * silinmiş tablo yazılmaz, işlem geçmişi birleşir.
+     */
+    _uzakMetaylaBirlestir(p, uzak) {
+        this._silinenleriBirlestir(uzak._silinenler);
+        p._silinenler = { ...this._silinenler };
+        const um = uzak._tableMeta && typeof uzak._tableMeta === 'object' ? uzak._tableMeta : {};
+        for (const [ad, meta] of Object.entries(um)) {
+            if (p._tableMeta[ad] || !this.isValidTableNameKey(ad)) continue;
+            if (this._silindiMi(ad, meta?.createdAt)) continue;
+            p._tableMeta[ad] = meta;
+        }
+        for (const ad of Object.keys(p._tableMeta)) {
+            if (this._silindiMi(ad, p._tableMeta[ad]?.createdAt)) delete p._tableMeta[ad];
+        }
+        if (Array.isArray(uzak._auditLog) && Array.isArray(p._auditLog)) {
+            const gorulen = new Set();
+            const hepsi = [];
+            for (const r of [...uzak._auditLog, ...p._auditLog]) {
+                if (!r || typeof r !== 'object') continue;
+                const k = `${r.t}|${r.m}`;
+                if (gorulen.has(k)) continue;
+                gorulen.add(k);
+                hepsi.push(r);
+            }
+            hepsi.sort((a, b) => (a.t || 0) - (b.t || 0));
+            p._auditLog = hepsi.slice(-this.AUDIT_LOG_MAX);
+            this.auditLog = p._auditLog.slice();
+        }
+        // Sunucudan gelen silme kayıtlarını bu cihaza da uygula (kayıt bittikten sonra)
+        setTimeout(() => {
+            if (this._silinenleriUygula()) {
+                this.renderTable();
+                this.updateStatistics();
+                this.updateTableSelector();
+            }
+        }, 0);
+    }
+
+    async _uzakSayimVerisi() {
+        if (!window.jbDb || !this.currentUser) return null;
+        try {
+            const { data: userData } = await window.jbDb
+                .from('users')
+                .select('counting_data')
+                .eq('username', this.currentUser.username)
+                .maybeSingle();
+            if (userData && userData.counting_data) {
+                return typeof userData.counting_data === 'string' ? JSON.parse(userData.counting_data) : userData.counting_data;
+            }
+        } catch (e) {
+            /* ignore */
+        }
+        return null;
     }
 
     async fetchDbApiInfo() {
@@ -922,6 +997,7 @@ class CountingSystem {
             const localFull = JSON.parse(stored);
             const metaBlob = this.migrateToNestedStructure(localFull);
             if (!localFull?._tables || Object.keys(localFull._tables).length === 0) return false;
+            this._silinenleriBirlestir(localFull._silinenler);
 
             const tables = {};
             for (const [tName, tData] of Object.entries(localFull._tables)) {
@@ -954,8 +1030,12 @@ class CountingSystem {
                 if (stored) {
                     localFull = JSON.parse(stored);
                     metaBlob = this.migrateToNestedStructure(localFull);
+                    this._silinenleriBirlestir(localFull?._silinenler);
                     if (localFull?._tables && Object.keys(localFull._tables).length > 0) {
-                        const tables = { ...localFull._tables };
+                        const tables = {};
+                        for (const [tName, tData] of Object.entries(localFull._tables)) {
+                            if (!this._silindiMi(tName, tData?._tableMeta?.createdAt)) tables[tName] = tData;
+                        }
                         const fullData = {
                             _api_info: localFull._api_info || {},
                             _auditLog: localFull._auditLog || [],
@@ -1031,10 +1111,12 @@ class CountingSystem {
             const serverTable = metaBlob?._currentTable;
             const resolvedTable = serverTable || deviceTable || 'Ana Sayım';
 
+            // Başka cihazlarda silinen tablolar bu cihazın önbelleğinden geri gelmesin
+            this._silinenleriBirlestir(localFull?._silinenler, metaBlob?._silinenler);
             const tables = {};
             if (this.cachedFullData?._tables) {
                 for (const [tName, tData] of Object.entries(this.cachedFullData._tables)) {
-                    if (this._isTableTombstoned(tName)) continue;
+                    if (this._isTableTombstoned(tName) || this._silindiMi(tName, tData?._tableMeta?.createdAt)) continue;
                     tables[tName] = this._cloneTableDataSlot(tData);
                 }
             }
@@ -1043,13 +1125,14 @@ class CountingSystem {
                 tables[resolvedTable] = tables[resolvedTable] || {};
                 for (const row of itemRows) {
                     const rowTable = row.table_name || resolvedTable;
+                    if (this._silindiMi(rowTable, metaBlob?._tableMeta?.[rowTable]?.createdAt)) continue;
                     if (!tables[rowTable]) tables[rowTable] = {};
                     tables[rowTable][row.product_id] = this._mapCountingItemRowToEntry(row);
                 }
 
                 const tableMeta = metaBlob?._tableMeta || {};
                 for (const [tName, meta] of Object.entries(tableMeta)) {
-                    if (this._isTableTombstoned(tName)) continue;
+                    if (this._deletedTableTombstones.has(tName) || this._silindiMi(tName, meta?.createdAt)) continue;
                     if (!tables[tName]) tables[tName] = {};
                     if (meta.createdAt || meta.lastActivityAt) {
                         if (!tables[tName]._tableMeta) tables[tName]._tableMeta = {};
@@ -1269,6 +1352,7 @@ class CountingSystem {
             _auditLog: this.auditLog.slice(-this.AUDIT_LOG_MAX),
             _tableMeta: tableMeta,
             _tables: tables,
+            _silinenler: { ...(this._silinenler || {}) },
         };
     }
 
@@ -1320,6 +1404,7 @@ class CountingSystem {
             _tableMeta: tableMeta,
             _currentTable: this.currentTableName || null,
             _currentTableAt: Date.now(),
+            _silinenler: { ...(this._silinenler || {}) },
         };
     }
 
@@ -2231,7 +2316,66 @@ class CountingSystem {
     }
 
     _isTableTombstoned(tableName) {
-        return this._deletedTableTombstones?.has(tableName) === true;
+        if (this._deletedTableTombstones?.has(tableName) === true) return true;
+        return this._silindiMi(tableName, this._tabloOlusmaZamani(tableName));
+    }
+
+    _tabloOlusmaZamani(ad) {
+        return this.cachedFullData?._tables?.[ad]?._tableMeta?.createdAt || this.cachedFullData?._tableMeta?.[ad]?.createdAt || null;
+    }
+
+    /**
+     * Silme kaydı bu tabloyu kapsıyor mu: silinmeden SONRA aynı adla açılan
+     * tablo (oluşma zamanı daha yeni) silinmiş sayılmaz.
+     */
+    _silindiMi(ad, olusma) {
+        const ts = this._silinenler?.[ad];
+        if (!ts) return false;
+        const c = Date.parse(olusma || '') || 0;
+        return !c || c <= ts;
+    }
+
+    /** Yerel, sunucu ve diğer cihazlardan gelen silme kayıtlarını birleştirir; 120 günden eskileri atar */
+    _silinenleriBirlestir(...kaynaklar) {
+        if (!this._silinenler) this._silinenler = {};
+        const sinir = Date.now() - 120 * 864e5;
+        for (const k of kaynaklar) {
+            if (!k || typeof k !== 'object') continue;
+            for (const [ad, ts] of Object.entries(k)) {
+                const n = Number(ts);
+                if (!this.isValidTableNameKey(ad) || !Number.isFinite(n) || n < sinir) continue;
+                if (n > (this._silinenler[ad] || 0)) this._silinenler[ad] = n;
+            }
+        }
+        for (const [ad, ts] of Object.entries(this._silinenler)) if (ts < sinir) delete this._silinenler[ad];
+    }
+
+    /** Başka cihazda silinen tabloları bu cihazdan da kaldırır. @returns {boolean} değişti mi */
+    _silinenleriUygula() {
+        const T = this.cachedFullData?._tables;
+        if (!T) return false;
+        let degisti = false;
+        for (const ad of Object.keys(T)) {
+            if (!this._silindiMi(ad, T[ad]?._tableMeta?.createdAt || this.cachedFullData._tableMeta?.[ad]?.createdAt)) continue;
+            if (this._importInProgress && ad === this.currentTableName) continue;
+            delete T[ad];
+            if (this.cachedFullData._tableMeta) delete this.cachedFullData._tableMeta[ad];
+            degisti = true;
+        }
+        if (!degisti) return false;
+        if (!T[this.currentTableName]) {
+            const adlar = Object.keys(T);
+            let yeni = adlar.find((n) => !this.isDonguTableName(n) && !this.isDailyTableName(n)) || adlar[0];
+            if (!yeni) {
+                yeni = 'Ana Sayım';
+                T[yeni] = { _tableMeta: { createdAt: new Date().toISOString() } };
+            }
+            this.currentTableName = yeni;
+            this.countingData = T[yeni];
+            this._saveDeviceCurrentTable(yeni);
+        }
+        this._saveFullBlobToLocalStorage();
+        return true;
     }
 
     _scheduleMetaSave(delay = 450) {
@@ -2556,11 +2700,12 @@ class CountingSystem {
 
         this.updateCountingBottomSheetSystemStockDisplay(data.systemStock, data.reservedStock);
         const depoInput = document.getElementById('countingDepoInput');
-        if (depoInput) {
-            depoInput.value =
-                data.warehouseStock !== null && data.warehouseStock !== undefined
-                    ? data.warehouseStock
-                    : '';
+        // Yazılmakta olan değer ezilmesin ("1," -> "1" virgülü siliyordu); kg'de virgüllü göster
+        if (depoInput && !this.autoSaveTimeout) {
+            const kg = this.isKgProduct(productId);
+            const yazilan = this._depoDegeriOku(depoInput.value, kg);
+            const ayni = yazilan === (data.warehouseStock ?? null) && /,\d{0,2}$/.test(depoInput.value);
+            if (!ayni) depoInput.value = this._depoMetni(data.warehouseStock, kg);
         }
         const stockIndicator = document.getElementById('countingStockIndicator');
         this.updateStockIndicator(productId, stockIndicator);
@@ -5337,12 +5482,18 @@ class CountingSystem {
 
         let tablesChanged = false;
 
-        // ── Tabloları MERGE et (silme yok, sadece ekleme/birleştirme) ──
+        // ── Silme kayıtları: başka cihazda silinen tablo burada da kalkar ──
+        if (incoming._silinenler) {
+            this._silinenleriBirlestir(incoming._silinenler);
+            if (this._silinenleriUygula()) tablesChanged = true;
+        }
+
+        // ── Tabloları MERGE et (silme kaydı olanlar hariç) ──
         if (incoming._tables && typeof incoming._tables === 'object') {
             for (const [tName, incomingTableData] of Object.entries(incoming._tables)) {
                 if (!this.isValidTableNameKey(tName)) continue;
-                if (this._isTableTombstoned(tName)) continue;
                 if (!incomingTableData || typeof incomingTableData !== 'object') continue;
+                if (this._deletedTableTombstones.has(tName) || this._silindiMi(tName, incomingTableData._tableMeta?.createdAt)) continue;
 
                 if (!this.cachedFullData._tables[tName]) {
                     // Yeni tablo geldi → ekle
@@ -5435,6 +5586,7 @@ class CountingSystem {
         if (incoming._tableMeta && typeof incoming._tableMeta === 'object') {
             const currentMeta = this.cachedFullData._tableMeta || {};
             for (const [tName, meta] of Object.entries(incoming._tableMeta)) {
+                if (this._deletedTableTombstones.has(tName) || this._silindiMi(tName, meta?.createdAt)) continue;
                 if (!this.cachedFullData._tables[tName]) {
                     this.cachedFullData._tables[tName] = {
                         _tableMeta: { createdAt: meta?.createdAt || new Date().toISOString() },
@@ -6026,7 +6178,7 @@ class CountingSystem {
     }
 
     _getFinancePasteGuideWarehouseId() {
-        return this.cachedFullData?._api_info?.warehouseId || '5dcafe6ae2c61b1e52cf1704';
+        return this._depoKimligi(this.cachedFullData?._api_info?.warehouseId) || '5dcafe6ae2c61b1e52cf1704';
     }
 
     _formatFinancePasteGuideSktStartDate() {
@@ -6585,6 +6737,8 @@ class CountingSystem {
         }
 
         this._deletedTableTombstones.add(tableName);
+        if (!this._silinenler) this._silinenler = {};
+        this._silinenler[tableName] = Date.now();
 
         delete fullData._tables[tableName];
         if (fullData._tableMeta) delete fullData._tableMeta[tableName];
@@ -6620,6 +6774,61 @@ class CountingSystem {
                 this._deletedTableTombstones.delete(tableName);
             }
         })();
+    }
+
+    /**
+     * Birden çok tabloyu tek seferde siler (genel sekmedeki alt kategori
+     * temizliği). Silme kaydı her tabloya yazılır, sunucudaki satırlar 50'şerli
+     * tek istekle silinir, meta bir kez kaydedilir.
+     * @param {string[]} names
+     * @returns {Promise<number>} silinen tablo sayısı
+     */
+    async deleteTablesBulk(names) {
+        if (this._tableChangeBlocked('silin')) return 0;
+        const fullData = this.cachedFullData;
+        const T = fullData?._tables;
+        if (!T || !Array.isArray(names)) return 0;
+        const silinecek = [...new Set(names)].filter((n) => T[n] && !this._isTableTombstoned(n));
+        if (!silinecek.length) return 0;
+        if (!this._silinenler) this._silinenler = {};
+        const simdi = Date.now();
+        for (const n of silinecek) {
+            this._silinenler[n] = simdi;
+            delete T[n];
+            if (fullData._tableMeta) delete fullData._tableMeta[n];
+        }
+        this.pushAuditEntry(`${silinecek.length} tablo silindi · alt kategori temizliği`, { cat: 'table', tbl: '' });
+        if (!T[this.currentTableName]) {
+            const adlar = Object.keys(T).filter((n) => !this._isTableTombstoned(n));
+            let yeni = adlar.find((n) => !this.isDonguTableName(n) && !this.isDailyTableName(n)) || adlar[0];
+            if (!yeni) {
+                yeni = 'Ana Sayım';
+                T[yeni] = { _tableMeta: { createdAt: new Date().toISOString() } };
+            }
+            this.currentTableName = yeni;
+            this.countingData = T[yeni];
+            this._saveDeviceCurrentTable(yeni);
+            this._persistCurrentTableToMeta();
+        }
+        this._saveFullBlobToLocalStorage();
+        this.renderTable();
+        this.updateStatistics();
+        this.updateTableSelector();
+        this.syncSayimSubTabToTable();
+        if (window.jbDb && this.currentUser && this._countingItemsTableReady === true) {
+            for (let i = 0; i < silinecek.length; i += 50) {
+                try {
+                    await window.jbDb.from('counting_items')
+                        .delete()
+                        .eq('username', this.currentUser.username)
+                        .in('table_name', silinecek.slice(i, i + 50));
+                } catch (e) {
+                    console.error('deleteTablesBulk satır silme:', e);
+                }
+            }
+        }
+        await this._saveMetaOnly();
+        return silinecek.length;
     }
 
     // Get list of all tables
@@ -9840,6 +10049,7 @@ class CountingSystem {
                     }
                     
                     this.autoSaveTimeout = setTimeout(() => {
+                        this.autoSaveTimeout = null;
                         if (this.currentCountingProduct) {
                             const value = this._depoDegeriOku(depoInput.value, this.isKgProduct(this.currentCountingProduct));
                             void this.updateProductStock(this.currentCountingProduct, value, null).catch(
@@ -12156,10 +12366,8 @@ class CountingSystem {
                     apiInfo.stockEndpoint = 'https://franchise-api-gateway.getirapi.com/stocks';
                 }
                 
-                if (!apiInfo.warehouseId) {
-                    // Varsayılan warehouse ID
-                    apiInfo.warehouseId = '5dcafe6ae2c61b1e52cf1704';
-                }
+                // Varsayılan warehouse ID; nesne olarak gelen kimlik düzleştirilir
+                apiInfo.warehouseId = this._depoKimligi(apiInfo.warehouseId) || '5dcafe6ae2c61b1e52cf1704';
                 
                 // API bilgilerini Supabase'e kaydet (telefondan erişim için)
                 await this.saveApiInfoToDb(apiInfo);
@@ -12313,7 +12521,7 @@ class CountingSystem {
             });
 
             const endpoint = apiInfo.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks';
-            const warehouseId = apiInfo.warehouseId || '5dcafe6ae2c61b1e52cf1704';
+            const warehouseId = this._depoKimligi(apiInfo.warehouseId) || '5dcafe6ae2c61b1e52cf1704';
             let authToken = apiInfo.token;
             if (!authToken.startsWith('Bearer ')) authToken = 'Bearer ' + authToken.trim();
 
@@ -12380,7 +12588,7 @@ class CountingSystem {
             if (!apiInfo?.token) return null;
 
             const endpoint = apiInfo.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks';
-            const warehouseId = apiInfo.warehouseId || '5dcafe6ae2c61b1e52cf1704';
+            const warehouseId = this._depoKimligi(apiInfo.warehouseId) || '5dcafe6ae2c61b1e52cf1704';
             let authToken = apiInfo.token;
             if (!authToken.startsWith('Bearer ')) authToken = 'Bearer ' + authToken.trim();
 
@@ -12503,7 +12711,7 @@ class CountingSystem {
             
             // franchise-api-gateway.getirapi.com/stocks endpoint'ini kullan
             const endpoint = apiInfo.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks';
-            const warehouseId = apiInfo.warehouseId || '5dcafe6ae2c61b1e52cf1704';
+            const warehouseId = this._depoKimligi(apiInfo.warehouseId) || '5dcafe6ae2c61b1e52cf1704';
             
             // Yeni API formatı: warehouseIds (array), productIds (array), sort
             let requestBody = {
@@ -15214,7 +15422,7 @@ class CountingSystem {
                     apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
                     apiStatusText.textContent = 'Token bilgisi eksik';
                     if (apiInfo.warehouseId) {
-                        const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                        const warehouseName = apiInfo.warehouseName || String(this._depoKimligi(apiInfo.warehouseId) || '').substring(0, 8) + '...';
                         apiWarehouseName.textContent = `Depo: ${warehouseName}`;
                     } else {
                         apiWarehouseName.textContent = 'Depo bilgisi yok';
@@ -15226,7 +15434,7 @@ class CountingSystem {
                     apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
                     apiStatusText.textContent = 'Token süresi dolmuş';
                     if (apiInfo.warehouseId) {
-                        const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                        const warehouseName = apiInfo.warehouseName || String(this._depoKimligi(apiInfo.warehouseId) || '').substring(0, 8) + '...';
                         apiWarehouseName.textContent = `Depo: ${warehouseName}`;
                     } else {
                         apiWarehouseName.textContent = 'Depo bilgisi yok';
@@ -15238,7 +15446,7 @@ class CountingSystem {
                     apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>';
                     apiStatusText.textContent = 'Token yakında dolacak';
                     if (apiInfo.warehouseId) {
-                        const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                        const warehouseName = apiInfo.warehouseName || String(this._depoKimligi(apiInfo.warehouseId) || '').substring(0, 8) + '...';
                         apiWarehouseName.textContent = `Depo: ${warehouseName}`;
                     } else {
                         apiWarehouseName.textContent = 'Depo bilgisi yok';
@@ -15250,7 +15458,7 @@ class CountingSystem {
                     apiStatusIcon.innerHTML = '<svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
                     apiStatusText.textContent = 'API güncel ve aktif';
                     if (apiInfo.warehouseId) {
-                        const warehouseName = apiInfo.warehouseName || apiInfo.warehouseId.substring(0, 8) + '...';
+                        const warehouseName = apiInfo.warehouseName || String(this._depoKimligi(apiInfo.warehouseId) || '').substring(0, 8) + '...';
                         apiWarehouseName.textContent = `Depo: ${warehouseName}`;
                     } else {
                         apiWarehouseName.textContent = 'Depo bilgisi yok';

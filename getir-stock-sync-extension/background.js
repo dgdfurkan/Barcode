@@ -194,11 +194,11 @@ chrome.webRequest.onCompleted.addListener(
                     
                     // Warehouse ID'yi response'dan çıkar
                     if (Array.isArray(data) && data.length > 0 && data[0].warehouse) {
-                        warehouseId = data[0].warehouse;
+                        warehouseId = (w => (w && typeof w === 'object') ? (w._id || w.id || null) : w)(data[0].warehouse);
                     } else if (data.data && Array.isArray(data.data) && data.data.length > 0 && data.data[0].warehouse) {
-                        warehouseId = data.data[0].warehouse;
+                        warehouseId = (w => (w && typeof w === 'object') ? (w._id || w.id || null) : w)(data.data[0].warehouse);
                     } else if (data.warehouse) {
-                        warehouseId = data.warehouse;
+                        warehouseId = (w => (w && typeof w === 'object') ? (w._id || w.id || null) : w)(data.warehouse);
                     }
                     
                     if (warehouseId) {
