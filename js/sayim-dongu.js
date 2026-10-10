@@ -196,7 +196,6 @@
     };
     var FILTRELER = [
         ['tumu', 'Tümü', null],
-        ['gecikti', 'Gecikmiş', ['gecikti']],
         ['yok', 'Hiç Sayılmadı', ['yok']],
         ['suruyor', 'Sürüyor', ['suruyor']],
         ['guncel', 'Güncel', ['guncel', 'yaklasiyor']],
@@ -598,7 +597,7 @@
             var g = gelen[ad];
             if (!g || typeof g !== 'object' || (g.kod !== null && g.kod !== 'suruyor' && g.kod !== 'yok' && g.kod !== 'pasif')) return;
             var y = yerel[ad];
-            if (!y || (Date.parse(g.at || '') || 0) > (Date.parse(y.at || '') || 0)) yerel[ad] = { kod: g.kod, at: g.at };
+            if (!y || (Date.parse(g.at || '') || 0) > (Date.parse(y.at || '') || 0)) yerel[ad] = { kod: g.kod, at: g.at, oto: g.oto === true };
         });
         return !!sunucudan && yereldeYeni;
     }
@@ -746,30 +745,50 @@
         };
     }
 
-    /**
-     * Depo taramasından tahmini ürün sayısı: "53 ürün · 14 stokta", "10 ürün · stokta yok".
-     * Aynı adlı alt kategoriden hangisinin dolu olduğu kartta görünsün diye stok da yazılır.
-     */
+    /** Depo taramasından stoktaki ürün sayısı; tarama yoksa null */
     function tahmin(ad) {
         var k = kaynak()[ad];
-        if (!k || !k[4] || !k[4].t) return null;
-        var n = k[4].n;
-        var t = k[4].t;
-        return t + ' ürün · ' + (n === 0 ? 'stokta yok' : n >= t ? 'hepsi stokta' : n + ' stokta');
+        return k && k[4] ? k[4].n : null;
+    }
+    function tahminMetni(ad) {
+        var n = tahmin(ad);
+        if (n === null) return 'Ürünler Çekilmedi';
+        return n ? 'Tahmini ' + n + ' Ürün' : 'Stokta Ürün Yok';
+    }
+
+    /**
+     * Depoda stoğu olmayan alt kategoriler kendiliğinden Pasif olur; stok gelince
+     * kendiliğinden açılır. Kullanıcının elle seçtiği duruma dokunulmaz.
+     */
+    function otomatikPasif() {
+        if (!d.ayar.depo) return;
+        var m = kaynak();
+        var el = d.ayar.elDurum || (d.ayar.elDurum = {});
+        var degisti = false;
+        var simdi = new Date().toISOString();
+        Object.keys(m).forEach(function (ad) {
+            var k = m[ad][4];
+            if (!k) return;
+            var e = el[ad];
+            if (e && !e.oto) return;
+            if (k.n === 0 && !(e && e.kod === 'pasif')) { el[ad] = { kod: 'pasif', at: simdi, oto: true }; degisti = true; }
+            else if (k.n > 0 && e && e.kod === 'pasif') { el[ad] = { kod: null, at: simdi, oto: true }; degisti = true; }
+        });
+        if (degisti) ayarYaz();
     }
 
     function durumAlt(du) {
         var st = du.st;
         switch (du.kod) {
             case 'yok':
-                if (!st.var) { var th = tahmin(du.ad); return th ? 'Tahmini ' + th : 'Ürünler çekilmedi'; }
+                if (!st.var) return tahminMetni(du.ad);
                 return st.toplam + ' ürün · ' + (du.cekildi ? goreliSure(du.cekildi) + ' çekildi' : 'sayım yok');
             case 'suruyor':
-                if (!du.sayimVar) { var tt = tahmin(du.ad); return st.var ? 'Sırada · ' + st.toplam + ' ürün' : 'Sırada · ' + (tt ? 'tahmini ' + tt : 'ürünler çekilmedi'); }
+                if (!du.sayimVar) return 'Sırada · ' + (st.var ? st.toplam + ' Ürün' : tahminMetni(du.ad));
                 return st.sayilan + ' / ' + st.toplam + ' sayıldı';
-            case 'gecikti': return du.gecikmeGun > 0 ? du.gecikmeGun + ' gün gecikti' : 'Süresi doldu';
+            case 'gecikti': return du.gecikmeGun > 0 ? du.gecikmeGun + ' Gün Gecikti' : 'Süresi Doldu';
             case 'yaklasiyor': return du.kalanGun + ' gün kaldı';
-            case 'pasif': return 'Pasif · döngüde sayılmıyor';
+            case 'pasif': return tahmin(du.ad) === 0 ? 'Pasif · Stokta Ürün Yok' : 'Pasif';
             default: return buyukBasla(goreliSure(du.st.sonSayim)) + ' sayıldı';
         }
     }
@@ -893,8 +912,9 @@
             var yeniler = onceki ? dp.liste.filter(function (x) { return onceki.indexOf(x.id) < 0; }).length : null;
             d.ayar.depo = dp;
             kaynakOnbellek = null;
+            otomatikPasif();
             ayarYaz(true);
-            d.taramaSonuc = { alt: dp.liste.length, urun: urun, yeni: yeniler };
+            d.taramaSonuc = { alt: dp.liste.length, urun: urun, yeni: yeniler, pasif: dp.liste.filter(function (x) { return x.n === 0; }).length };
             if (!d.depoPencere) bildir('Alt kategori listesi güncellendi: ' + dp.liste.length + ' alt kategori.', 'basari');
         } catch (e) {
             if (e && e.kod === 'iptal') {
@@ -966,6 +986,7 @@
                 '<ul class="sd-dp__satirlar">' +
                 satir(SVG.onay, '<strong>' + r.alt + ' alt kategori</strong> bulundu, ' + r.urun + ' ürün okundu.') +
                 (r.yeni ? satir(SVG.yenile, r.yeni + ' alt kategori listeye yeni eklendi.') : '') +
+                (r.pasif ? satir(SVG.kutu, 'Stokta ürünü olmayan ' + r.pasif + ' alt kategori Pasif yapıldı. İstersen sağ üstten Otomatik\'e alabilirsin.') : '') +
                 satir(SVG.kutu, 'Kartlarda depodaki tahmini ürün sayısı görünüyor. Var olan tabloların ve sayımların olduğu gibi duruyor.') +
                 '</ul>';
             eylem = '<button type="button" class="sd-dugme sd-dugme--ana" data-sd-dp="kapat">Tamam</button>';
@@ -1463,6 +1484,7 @@
             if (son && kaynak()[son] && tabloVarMi(son)) d.secili = son;
         }
         d.ilkCizim = true;
+        otomatikPasif();
         if (d.secili) sec(d.secili, { kaydirma: false });
         ciz();
         dbYukle(false);
@@ -1766,7 +1788,7 @@
         var yuzde = st.toplam ? Math.round(x.oran * 100) : 0;
         var kalan = Math.max(0, st.toplam - sayilan);
         var thm = tahmin(ad);
-        var ozetAlt = !st.var ? (thm ? 'Depoda tahmini ' + thm + ', henüz çekilmedi' : 'Ürünler henüz çekilmedi')
+        var ozetAlt = !st.var ? (thm === null ? 'Ürünler henüz çekilmedi' : thm ? 'Depoda tahmini ' + thm + ' ürün var, henüz çekilmedi' : 'Depoda bu alt kategoride stokta ürün yok')
             : st.yukleniyor ? 'Ürünler yükleniyor'
             : !kalan ? 'Hepsi sayıldı'
             : kalan + ' ürün sayılmayı bekliyor';
