@@ -1,13 +1,14 @@
 /**
  * Sayım raporu: ürün görselleri
  *
- * PDF ve bilgi kartı için küçük ürün görseli (160 px). Görseller katalogdaki
- * herkese açık CDN adreslerinden alınıyor; Getir API'sine istek yok.
+ * PDF ve bilgi kartı için ürün görseli (480 px: PDF'te yakınlaştırınca da
+ * net). Görseller katalogdaki herkese açık CDN adreslerinden alınıyor;
+ * Getir API'sine istek yok.
  *
- * - cdn-image.getir.com: sunucu boyutlandırıyor (?width=160&format=jpeg),
- *   gelen dosya ~3 KB JPEG.
+ * - cdn-image.getir.com: sunucu boyutlandırıyor (?width=480&format=jpeg),
+ *   gelen dosya ~20-40 KB JPEG.
  * - Diğer izinli adresler tam boy JPEG/PNG veriyor; burada resvg ile
- *   160 px PNG'ye küçültülüyor (~15 ms).
+ *   480 px PNG'ye küçültülüyor.
  * - Her görsel bir kez indirilip diske yazılıyor; sonraki raporlar ağa
  *   çıkmıyor. Başarısız adres bir saat tekrar denenmiyor.
  * - Yalnız izinli alan adları, yalnız https, boyut ve süre sınırlı:
@@ -18,8 +19,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const KLASOR = path.join(__dirname, '..', 'veri', 'gorsel');
-const BOY = 160;
+// Klasör adı boyutla değişir: eski 160 px önbellek kullanılmaz
+const KLASOR = path.join(__dirname, '..', 'veri', 'gorsel-480');
+const BOY = 480;
 const AZAMI_INDIRME = 3 * 1024 * 1024;
 const ZAMAN_ASIMI_MS = 8000;
 const AYNI_ANDA = 4;
@@ -30,6 +32,8 @@ let Resvg = null;
 try { ({ Resvg } = require('@resvg/resvg-js')); } catch (e) { /* küçültme kapalı, yalnız hazır JPEG */ }
 
 try { fs.mkdirSync(KLASOR, { recursive: true }); } catch (e) { /* yazılamazsa önbelleksiz çalışır */ }
+// Eski 160 px önbellek artık kullanılmıyor; diskte yer tutmasın
+try { fs.rmSync(path.join(__dirname, '..', 'veri', 'gorsel'), { recursive: true, force: true }); } catch (e) { /* yoksa geç */ }
 
 function jpegMi(b) { return b && b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff; }
 function pngMi(b) { return b && b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47; }
@@ -65,7 +69,7 @@ async function indir(url) {
         if (Number(res.headers.get('content-length') || 0) > AZAMI_INDIRME) return null;
         const buf = Buffer.from(await res.arrayBuffer());
         if (buf.length > AZAMI_INDIRME) return null;
-        if (u.hostname === 'cdn-image.getir.com' && jpegMi(buf) && buf.length < 200 * 1024) return buf;
+        if (u.hostname === 'cdn-image.getir.com' && jpegMi(buf) && buf.length < 600 * 1024) return buf;
         if (jpegMi(buf)) return kucult(buf, 'jpeg');
         if (pngMi(buf)) return kucult(buf, 'png');
         return null;
@@ -117,7 +121,8 @@ async function topluGetir(urunler, butceMs = 25000) {
 }
 
 /** Önbellek tavanı: en eski dosyalardan sil (günde bir) */
-function budama(tavan = 15000) {
+/** Görsel 480 px (~30 KB): 6000 dosya ~180 MB */
+function budama(tavan = 6000) {
     try {
         const dosyalar = fs.readdirSync(KLASOR);
         if (dosyalar.length <= tavan) return;

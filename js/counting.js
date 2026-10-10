@@ -2144,14 +2144,15 @@ class CountingSystem {
     }
 
     /** Toplu counting_items upsert — yapıştırma sonrası tek seferde (50'şer chunk) */
-    async _bulkSaveProductEntries(productIds, tableName) {
+    async _bulkSaveProductEntries(productIds, tableName, kaynak = null) {
         if (this._countingItemsTableReady !== true || !Array.isArray(productIds) || productIds.length === 0) return;
         const tName = tableName || this.currentTableName;
         if (!tName) return;
+        const veri = kaynak || this.countingData;
 
         const rows = [];
         for (const pid of productIds) {
-            const snapshot = this._snapshotProductEntry(this.countingData[pid]);
+            const snapshot = this._snapshotProductEntry(veri[pid]);
             if (snapshot) rows.push(this._buildCountingItemUpsertRow(tName, pid, snapshot));
         }
         if (rows.length === 0) return;
@@ -4652,7 +4653,7 @@ class CountingSystem {
         if (!helper?.fetchExpiryProducts) {
             this._productDetailExpiryErrors.set(
                 pid,
-                'SKT eklentisi bağlı değil — getir-stock-sync extension gerekli.'
+                'SKT için Jet Barkod Asistan gerekli; eklenti açık mı kontrol edin.'
             );
             this._productDetailExpiryFetched.add(pid);
             return;
@@ -6038,6 +6039,8 @@ class CountingSystem {
     }
 
     _clearFinancePasteGuide() {
+        this._financeSktZaman = null;
+        this._financeSktHata = null;
         this._financePasteGuide = null;
         this._financePasteGuideSkt = new Map();
         this._financePasteGuideSktLinkReady = false;
@@ -6163,18 +6166,375 @@ class CountingSystem {
         return this._financePasteGuideSkt.get(String(productId)) || [];
     }
 
-    _renderFinancePasteGuideSktHtml(productId) {
+    /** "07.11.2026" -> Date (yerel gece yarısı) */
+    _sktTarihi(metin) {
+        const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(String(metin || '').trim());
+        return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+    }
+
+    /** Satıştan kalkışa kalan gün (yoksa SKT'ye) */
+    _sktKalanGun(e) {
+        const t = this._sktTarihi(e.removeDate) || this._sktTarihi(e.date);
+        if (!t) return null;
+        const bugun = new Date();
+        bugun.setHours(0, 0, 0, 0);
+        return Math.round((t - bugun) / 864e5);
+    }
+
+    /**
+     * Rehber satırında partiler: tarih, adet, satıştan kalkışa kalan gün, raf.
+     * Toplam SKT adedi depo sayımıyla tutmuyorsa satırda belirtilir.
+     */
+    _renderFinancePasteGuideSktHtml(productId, depo = null) {
         const entries = this._getFinancePasteGuideSktEntries(productId);
+        const getirildi = !!this._financeSktZaman && this._financePasteGuideMatchesCurrentTable();
         if (!entries.length) {
-            return '';
+            return getirildi ? '<div class="skt-satir"><span class="skt-yok">SKT Kaydı Yok</span></div>' : '';
         }
-        const chips = entries
-            .map(
-                (e) =>
-                    `<span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 ring-1 ring-amber-100/80"><span>${this.escapeHtml(e.date)}</span><span class="font-bold">×${e.qty}</span></span>`
-            )
-            .join('');
-        return `<div class="mt-1.5 flex flex-wrap items-center gap-1 text-[10px]"><span class="shrink-0 font-semibold text-gray-500">SKT</span>${chips}</div>`;
+        const kisa = (metin) => {
+            const t = this._sktTarihi(metin);
+            return t ? t.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' }) + (t.getFullYear() !== new Date().getFullYear() ? ' ' + t.getFullYear() : '') : this.escapeHtml(metin);
+        };
+        const toplam = entries.reduce((t, e) => t + (Number(e.qty) || 0), 0);
+        const parcalar = entries.map((e) => {
+            const gun = this._sktKalanGun(e);
+            const ton = gun === null ? 'skt-cip--gri' : gun <= 3 ? 'skt-cip--kirmizi' : gun <= 7 ? 'skt-cip--sari' : 'skt-cip--yesil';
+            const gunMetni = gun === null ? '' : gun <= 0 ? 'Bugün' : gun + ' Gün';
+            const ipucu = `SKT ${e.date}${e.removeDate ? ' · satıştan kalkış ' + e.removeDate : ''}${e.raf ? ' · ' + e.raf : ''}`;
+            return `<span class="skt-cip ${ton}" title="${this.escapeHtml(ipucu)}">` +
+                `<span class="skt-cip__tarih">${kisa(e.date)}</span>` +
+                `<span class="skt-cip__adet">×${this._sayiMetni(e.qty)}</span>` +
+                (gunMetni ? `<span class="skt-cip__gun">${gunMetni}</span>` : '') +
+                (e.raf ? `<span class="skt-cip__raf">${this.escapeHtml(e.raf)}</span>` : '') +
+                '</span>';
+        }).join('');
+        const tutmuyor = depo !== null && depo !== undefined && !Number.isNaN(Number(depo)) && Math.abs(Number(depo) - toplam) > 0.0005;
+        return `<div class="skt-satir"><span class="skt-baslik">SKT</span>${parcalar}` +
+            `<span class="skt-toplam${tutmuyor ? ' is-uyari' : ''}">${tutmuyor ? `Depo ${this._sayiMetni(depo)} · SKT ${this._sayiMetni(toplam)}` : `Toplam ${this._sayiMetni(toplam)}`}</span></div>`;
+    }
+
+    /** Asistan ile warehouse panelinden SKT: tablodaki ürünler, tablo sırasıyla */
+    async fetchFinanceGuideSkt(tableProducts) {
+        const tablo = this.selectedFinancialTable;
+        if (!tablo || tablo === 'all') {
+            this.showToast('Önce tek bir tablo seçin', 'warning', 2500);
+            return;
+        }
+        if (this._financeSktYukleniyor) return;
+        const helper = window.getirExtensionHelper;
+        const sira = new Map(((this.cachedFullData?._tables?.[tablo]?._productOrder) || []).map((id, i) => [id, i]));
+        const gorulen = new Set();
+        const items = [];
+        for (const p of Array.isArray(tableProducts) ? tableProducts : []) {
+            if (!p?.productId || gorulen.has(p.productId)) continue;
+            gorulen.add(p.productId);
+            items.push(p);
+        }
+        items.sort((a, b) => (sira.get(a.productId) ?? 1e9) - (sira.get(b.productId) ?? 1e9));
+        if (!items.length) {
+            this.showToast('Bu tabloda ürün yok', 'info', 2500);
+            return;
+        }
+        this._financePasteGuide = { tableKey: tablo, items, totalPaste: items.length, unmatched: 0, otomatik: true };
+        this._financePasteGuideSkt = new Map();
+        this._financePasteGuideSelectedIndex = null;
+        this._financeSktZaman = null;
+        this._financeSktHata = null;
+        if (!helper?.fetchExpiryProducts) {
+            this._financeSktHata = 'Jet Barkod Asistan bulunamadı. Eklentinin açık olduğundan emin olup sayfayı yenileyin.';
+            this._refreshFinancePasteGuideSection();
+            return;
+        }
+        this._financeSktYukleniyor = { mesaj: 'Warehouse paneli aranıyor', bas: Date.now() };
+        this._refreshFinancePasteGuideSection();
+        const ilerle = (e) => {
+            if (e.source !== window || e.data?.type !== 'WAREHOUSE_EXPIRY_PROGRESS' || !this._financeSktYukleniyor) return;
+            this._financeSktYukleniyor.mesaj = String(e.data.message || '').replace(/^[^0-9A-Za-zÇĞİÖŞÜçğıöşü]+/, '').slice(0, 120);
+            const el = document.getElementById('financePasteGuideStatus');
+            if (el) el.querySelector('[data-skt-mesaj]') && (el.querySelector('[data-skt-mesaj]').textContent = this._financeSktYukleniyor.mesaj);
+        };
+        window.addEventListener('message', ilerle);
+        try {
+            const sonuc = await helper.fetchExpiryProducts(items.map((p) => p.productId), {
+                warehouseId: this._getFinancePasteGuideWarehouseId(),
+            });
+            for (const [pid, dizi] of Object.entries(sonuc?.byProductId || {})) {
+                const liste = (Array.isArray(dizi) ? dizi : [])
+                    .filter((e) => e && e.date && Number(e.qty) > 0)
+                    .map((e) => ({ date: String(e.date), qty: Number(e.qty), removeDate: e.removeDate || null, raf: e.raf || null }));
+                if (liste.length) {
+                    this._sortFinancePasteGuideSktEntries(liste);
+                    this._financePasteGuideSkt.set(String(pid), liste);
+                }
+            }
+            this._financeSktZaman = Date.now();
+            const bulunan = this._countFinancePasteGuideSktMatched();
+            this.showToast(`${bulunan} / ${items.length} üründe SKT bulundu`, bulunan ? 'success' : 'info', 2500);
+        } catch (e) {
+            const m = (e && e.message) || '';
+            this._financeSktHata = /sekmesi açık değil|warehouse\.getir\.com/i.test(m)
+                ? 'warehouse.getir.com bu tarayıcıda açık bir sekmede olmalı. Sekmeyi açıp tekrar deneyin.'
+                : /oturum/i.test(m)
+                  ? 'Warehouse oturumu bulunamadı. warehouse.getir.com sekmesini bir kez yenileyip tekrar deneyin.'
+                  : m || 'SKT alınamadı. Birkaç saniye sonra tekrar deneyin.';
+        } finally {
+            window.removeEventListener('message', ilerle);
+            this._financeSktYukleniyor = null;
+            this._refreshFinancePasteGuideSection();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Satış Kontrolü: sayımdan sonra satış / giriş olan ürünlerde depo
+    // sayısını aynı farkı koruyarak güncelle (sistem 5→4 ise depo 4→3)
+    // ─────────────────────────────────────────────────────────────
+
+    /** Franchise stok ucu için en taze oturum ve düz depo kimliği */
+    async _satisApiBilgisi() {
+        const adaylar = [this.cachedFullData?._api_info, this.countingData?._api_info];
+        try { const y = JSON.parse(localStorage.getItem('getir_api_info') || 'null'); if (y) adaylar.push(y); } catch (e) { /* yok */ }
+        try { const c = await this._resolveApiInfoForDebug(); if (c) adaylar.push(c); } catch (e) { /* yok */ }
+        const info = this.pickBestApiInfo(adaylar.filter(Boolean));
+        if (!info?.token) throw new Error('Oturum bulunamadı. Franchise panelini açıp yenileyin.');
+        const bitis = this.getEffectiveExpiryMs(info);
+        if (bitis && Date.now() >= bitis - 60000) throw new Error('Oturumun süresi dolmuş. Franchise panelini yenileyip tekrar deneyin.');
+        let depo = this._depoKimligi(info.warehouseId);
+        for (let i = 0; !depo && i < adaylar.length; i++) depo = this._depoKimligi(adaylar[i]?.warehouseId);
+        if (!depo) throw new Error('Depo bilgisi bulunamadı. Franchise panelini açıp yenileyin.');
+        const uc = /^https:\/\/franchise-api-gateway\.getirapi\.com\/stocks$/.test(String(info.stockEndpoint || ''))
+            ? info.stockEndpoint
+            : 'https://franchise-api-gateway.getirapi.com/stocks';
+        let jeton = String(info.token).trim();
+        if (!/^Bearer /.test(jeton)) jeton = `Bearer ${jeton}`;
+        return { uc, depo, jeton };
+    }
+
+    /**
+     * Ürünlerin güncel sistem stoğu: Mevcut stok sayfasının ürün süzgeciyle
+     * aynı istek, 50 ürünlük parçalar, parçalar arası 400 ms.
+     * @returns {Promise<Map<string, {stok:number, rezerve:number|null}>>}
+     */
+    async _guncelStoklariGetir(ids, ilerleme) {
+        const api = await this._satisApiBilgisi();
+        const sonuc = new Map();
+        const PARCA = 50;
+        for (let i = 0; i < ids.length; i += PARCA) {
+            if (i) await new Promise((r) => setTimeout(r, 400));
+            const parca = ids.slice(i, i + PARCA);
+            let r;
+            try {
+                r = await fetch(`${api.uc}?limit=100&offset=0`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: api.jeton },
+                    body: JSON.stringify({ warehouseIds: [api.depo], productIds: parca, sort: { available: -1 } }),
+                });
+            } catch (e) {
+                throw new Error('Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin.');
+            }
+            if (r.status === 401 || r.status === 403) throw new Error('Oturumun süresi dolmuş. Franchise panelini yenileyip tekrar deneyin.');
+            if (!r.ok) throw new Error('Stoklar alınamadı. Birkaç saniye sonra tekrar deneyin.');
+            const j = await r.json().catch(() => null);
+            for (const row of Array.isArray(j?.data) ? j.data : []) {
+                const id = String(row.id || row._id || row.product || '');
+                const pk = this.pickSystemStockFromProductRow(row);
+                const stok = Number(pk?.stock);
+                if (!id || pk?.stock === null || pk?.stock === undefined || Number.isNaN(stok)) continue;
+                const rez = this.extractReservedStockFromProductItem(row);
+                sonuc.set(id, { stok, rezerve: rez === null || rez === undefined || Number.isNaN(Number(rez)) ? null : Number(rez) });
+            }
+            if (ilerleme) ilerleme(Math.min(ids.length, i + PARCA), ids.length);
+        }
+        return sonuc;
+    }
+
+    async satisKontrolu() {
+        const tablo = this.selectedFinancialTable;
+        if (!tablo || tablo === 'all' || this._satisKontrolSuruyor) return;
+        const veri = tablo === this.currentTableName ? this.countingData : this.cachedFullData?._tables?.[tablo];
+        if (!veri) return;
+        const ids = Object.keys(veri).filter((k) => {
+            if (this.isReservedCountingKey(k)) return false;
+            const e = veri[k];
+            return e && e.warehouseStock !== null && e.warehouseStock !== undefined && e.systemStock !== null && e.systemStock !== undefined;
+        });
+        if (!ids.length) {
+            this.showToast('Bu tabloda karşılaştırılacak sayım yok', 'info', 2500);
+            return;
+        }
+        this._satisKontrolSuruyor = true;
+        const panel = this._satisPaneliAc(tablo);
+        panel.yukleniyor(0, ids.length);
+        try {
+            const guncel = await this._guncelStoklariGetir(ids, (n, t) => panel.yukleniyor(n, t));
+            const degisen = [];
+            let bulunamayan = 0;
+            for (const pid of ids) {
+                const g = guncel.get(pid);
+                if (!g) { bulunamayan++; continue; }
+                const e = veri[pid];
+                const sistemEski = Number(e.systemStock);
+                const depoEski = Number(e.warehouseStock);
+                const fark = this._stokFarki(g.stok, sistemEski);
+                if (!fark) continue;
+                const hamDepo = Math.round((depoEski + fark) * 1000) / 1000;
+                const urun = this.productIndex.get(pid) || {};
+                degisen.push({
+                    pid,
+                    ad: urun.name || pid,
+                    gorsel: urun.image || '',
+                    sistemEski,
+                    sistemYeni: g.stok,
+                    depoEski,
+                    depoYeni: Math.max(0, hamDepo),
+                    kirpildi: hamDepo < 0,
+                    fark,
+                    rezerve: g.rezerve,
+                });
+            }
+            degisen.sort((a, b) => a.fark - b.fark);
+            panel.sonuc(degisen, bulunamayan, ids.length);
+        } catch (err) {
+            panel.hata((err && err.message) || 'Kontrol tamamlanamadı.');
+        } finally {
+            this._satisKontrolSuruyor = false;
+        }
+    }
+
+    /** Onaylanan değişiklikleri tabloya yazar: sistem güncel, depo aynı farkla */
+    async _satisDuzeltmesiUygula(tablo, degisen) {
+        const veri = tablo === this.currentTableName ? this.countingData : this.cachedFullData?._tables?.[tablo];
+        if (!veri || !degisen.length) return 0;
+        const simdi = new Date().toISOString();
+        const ids = [];
+        for (const d of degisen) {
+            const e = veri[d.pid];
+            if (!e) continue;
+            e.systemStock = d.sistemYeni;
+            e.warehouseStock = d.depoYeni;
+            if (d.rezerve !== null && d.rezerve !== undefined) e.reservedStock = d.rezerve;
+            e.systemStockAt = simdi;
+            e.lastUpdated = simdi;
+            ids.push(d.pid);
+        }
+        if (!ids.length) return 0;
+        const satis = degisen.filter((d) => d.fark < 0).reduce((t, d) => t - d.fark, 0);
+        const giris = degisen.filter((d) => d.fark > 0).reduce((t, d) => t + d.fark, 0);
+        this.pushAuditEntry(
+            `Satış kontrolü · ${this.formatTableDisplayName(tablo)} · ${ids.length} ürün güncellendi${satis ? ` · ${this._sayiMetni(satis)} satış` : ''}${giris ? ` · ${this._sayiMetni(giris)} giriş` : ''}`,
+            { cat: 'stock', tbl: tablo }
+        );
+        this.touchTableLastActivity?.(tablo, simdi);
+        await this._bulkSaveProductEntries(ids, tablo, veri);
+        this._scheduleMetaSave(300);
+        this._invalidateFinanceCache(tablo);
+        if (tablo === this.currentTableName) {
+            this.renderTable();
+            this.updateStatistics();
+        }
+        await this.renderSingleTableFinancialData(tablo);
+        return ids.length;
+    }
+
+    /** Satış Kontrolü penceresi: yükleniyor, sonuç (onay), hata */
+    _satisPaneliAc(tablo) {
+        document.getElementById('satisKontrolPerde')?.remove();
+        const perde = document.createElement('div');
+        perde.id = 'satisKontrolPerde';
+        perde.className = 'sk-perde';
+        perde.innerHTML = '<div class="sk-pencere" role="dialog" aria-modal="true" aria-labelledby="skBaslik"></div>';
+        document.body.appendChild(perde);
+        const kutu = perde.firstChild;
+        const acan = document.activeElement;
+        const kapat = () => {
+            document.removeEventListener('keydown', tus, true);
+            perde.classList.remove('is-acik');
+            setTimeout(() => perde.remove(), 200);
+            try { acan?.focus?.({ preventScroll: true }); } catch (e) { /* yok */ }
+        };
+        const tus = (e) => { if (e.key === 'Escape' && !perde.dataset.kilit) { e.stopPropagation(); kapat(); } };
+        document.addEventListener('keydown', tus, true);
+        perde.addEventListener('click', (e) => { if (e.target === perde && !perde.dataset.kilit) kapat(); });
+        const ust = (alt) => `<p class="sk-etiket">Satış Kontrolü</p>
+            <h2 class="sk-baslik" id="skBaslik">${this.escapeHtml(this.formatTableDisplayName(tablo))}</h2>
+            <p class="sk-metin">${alt}</p>`;
+        void perde.offsetWidth;
+        perde.classList.add('is-acik');
+        const sn = (v) => this._sayiMetni(v);
+        return {
+            yukleniyor: (n, t) => {
+                const oran = t ? n / t : 0;
+                kutu.innerHTML = ust('Sayımdan sonra satış ya da giriş olan ürünler aranıyor.') +
+                    `<div class="sk-ilerleme"><div class="sk-ilerleme__ust"><span><strong>${n}</strong> / ${t} Ürün Kontrol Edildi</span><b>%${Math.round(oran * 100)}</b></div>
+                    <div class="sk-cubuk"><span style="transform:scaleX(${oran.toFixed(3)})"></span></div></div>
+                    <div class="sk-eylem"><button type="button" class="sk-dugme sk-dugme--ikincil" data-sk="kapat">Kapat</button></div>`;
+                kutu.querySelector('[data-sk="kapat"]').onclick = kapat;
+            },
+            hata: (mesaj) => {
+                kutu.innerHTML = ust('Kontrol tamamlanamadı.') +
+                    `<p class="sk-uyari">${this.escapeHtml(mesaj)}</p>
+                    <div class="sk-eylem"><button type="button" class="sk-dugme sk-dugme--ikincil" data-sk="kapat">Kapat</button>
+                    <button type="button" class="sk-dugme sk-dugme--ana" data-sk="tekrar">Tekrar Dene</button></div>`;
+                kutu.querySelector('[data-sk="kapat"]').onclick = kapat;
+                kutu.querySelector('[data-sk="tekrar"]').onclick = () => { kapat(); void this.satisKontrolu(); };
+            },
+            sonuc: (degisen, bulunamayan, toplam) => {
+                if (!degisen.length) {
+                    kutu.innerHTML = ust(`${toplam} ürün kontrol edildi.`) +
+                        `<div class="sk-bos"><span class="sk-bos__ikon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></span>
+                        <strong>Sayımdan Sonra Değişiklik Yok</strong><span>Bütün ürünlerin sistem stoğu sayımdaki gibi.</span></div>
+                        ${bulunamayan ? `<p class="sk-not">${bulunamayan} ürünün güncel stoğu alınamadı.</p>` : ''}
+                        <div class="sk-eylem"><button type="button" class="sk-dugme sk-dugme--ana" data-sk="kapat">Tamam</button></div>`;
+                    kutu.querySelector('[data-sk="kapat"]').onclick = kapat;
+                    return;
+                }
+                const satis = degisen.filter((d) => d.fark < 0).reduce((t, d) => t - d.fark, 0);
+                const giris = degisen.filter((d) => d.fark > 0).reduce((t, d) => t + d.fark, 0);
+                const satir = (d) => {
+                    const tur = d.fark < 0 ? 'satis' : 'giris';
+                    const farkEski = this._stokFarki(d.depoEski, d.sistemEski);
+                    const farkYeni = this._stokFarki(d.depoYeni, d.sistemYeni);
+                    return `<li class="sk-satir">
+                        <img src="${this.escapeHtml(d.gorsel || '../assets/logo.png')}" alt="" loading="lazy" onerror="this.src='../assets/logo.png'">
+                        <div class="sk-satir__govde">
+                            <p class="sk-satir__ad">${this.escapeHtml(d.ad)}</p>
+                            <div class="sk-satir__degerler">
+                                <span>Sistem <b>${sn(d.sistemEski)}</b> → <b>${sn(d.sistemYeni)}</b></span>
+                                <span>Depo <b>${sn(d.depoEski)}</b> → <b>${sn(d.depoYeni)}</b></span>
+                                <span>Fark <b>${farkYeni > 0 ? '+' : ''}${sn(farkYeni)}</b>${farkEski === farkYeni ? ' · aynı' : ''}</span>
+                            </div>
+                            ${d.kirpildi ? '<p class="sk-satir__not">Depo sıfırın altına inemez; bu üründe fark değişir.</p>' : ''}
+                        </div>
+                        <span class="sk-rozet sk-rozet--${tur}">${d.fark > 0 ? '+' : '−'}${sn(Math.abs(d.fark))} ${tur === 'satis' ? 'Satış' : 'Giriş'}</span>
+                    </li>`;
+                };
+                kutu.innerHTML = ust('Sayımdan sonra stoğu değişen ürünler. Onaylarsan sistem stoğu güncellenir, depo sayısı aynı farkla düzeltilir.') +
+                    `<div class="sk-ozet"><span><strong>${degisen.length}</strong> Üründe Değişiklik</span>
+                        ${satis ? `<span class="sk-ozet--satis"><strong>${sn(satis)}</strong> Adet Satış</span>` : ''}
+                        ${giris ? `<span class="sk-ozet--giris"><strong>${sn(giris)}</strong> Adet Giriş</span>` : ''}</div>
+                    <ul class="sk-liste">${degisen.map(satir).join('')}</ul>
+                    ${bulunamayan ? `<p class="sk-not">${bulunamayan} ürünün güncel stoğu alınamadı; bunlara dokunulmadı.</p>` : ''}
+                    <div class="sk-eylem"><button type="button" class="sk-dugme sk-dugme--ikincil" data-sk="kapat">Vazgeç</button>
+                    <button type="button" class="sk-dugme sk-dugme--ana" data-sk="onay">Onayla ve Güncelle (${degisen.length})</button></div>`;
+                kutu.querySelector('[data-sk="kapat"]').onclick = kapat;
+                kutu.querySelector('[data-sk="onay"]').onclick = async (ev) => {
+                    const b = ev.currentTarget;
+                    b.disabled = true;
+                    b.textContent = 'Güncelleniyor…';
+                    perde.dataset.kilit = '1';
+                    try {
+                        const n = await this._satisDuzeltmesiUygula(tablo, degisen);
+                        delete perde.dataset.kilit;
+                        kapat();
+                        this.showToast(`${n} ürün güncellendi`, 'success', 2500);
+                    } catch (e) {
+                        delete perde.dataset.kilit;
+                        b.disabled = false;
+                        b.textContent = 'Tekrar Dene';
+                        this.showToast('Güncellenemedi, tekrar deneyin', 'error', 3000);
+                    }
+                };
+            },
+        };
     }
 
     _getFinancePasteGuideWarehouseId() {
@@ -6390,7 +6750,7 @@ class CountingSystem {
         });
         const barcodesHiddenClass = this._financeBarcodesVisible ? '' : 'hidden';
         const barcodesHtml = hasBarcodes
-            ? `<div class="finance-barcodes-block mt-1.5 ${barcodesHiddenClass}" aria-hidden="${this._financeBarcodesVisible ? 'false' : 'true'}">${this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 2 })}</div>`
+            ? `<div class="finance-barcodes-block finance-barkod-sag ${barcodesHiddenClass}" aria-hidden="${this._financeBarcodesVisible ? 'false' : 'true'}">${this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 1, width: 150, height: 36, ekGizle: true })}</div>`
             : '';
 
         const selected = this._financePasteGuideSelectedIndex === idx;
@@ -6401,15 +6761,17 @@ class CountingSystem {
                   ? 'border-emerald-100/90 bg-emerald-50/85'
                   : 'border-slate-100 bg-white';
         const selectedClass = selected ? 'ring-2 ring-slate-400/90 shadow-sm' : '';
-        const sktHtml = this._renderFinancePasteGuideSktHtml(p?.productId);
+        const sktHtml = this._renderFinancePasteGuideSktHtml(p?.productId, d.warehouseStock);
 
         return `
             <div class="finance-paste-guide-row flex cursor-pointer items-start gap-2.5 rounded-lg border px-2.5 py-2 transition-shadow sm:gap-3 sm:px-3 ${rowBgClass} ${selectedClass}" data-guide-index="${idx}" role="button" tabindex="0" aria-pressed="${selected ? 'true' : 'false'}">
                 <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/80 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">${idx + 1}</span>
                 <img src="${img}" alt="" class="h-10 w-10 shrink-0 rounded-md border border-slate-100 object-cover sm:h-11 sm:w-11" loading="lazy" />
                 <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</p>
-                    ${barcodesHtml}
+                    <div class="finance-ad-satiri">
+                        <p class="min-w-0 flex-1 text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</p>
+                        ${barcodesHtml}
+                    </div>
                     <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
                         <span>Depo: <strong>${depo}</strong></span>
                         <span>Sistem: <strong>${sistem}</strong></span>
@@ -6431,55 +6793,65 @@ class CountingSystem {
 
     _renderFinancePasteGuideHtml() {
         const guide = this._financePasteGuideMatchesCurrentTable() ? this._financePasteGuide : null;
-        const canPaste = this.selectedFinancialTable !== 'all';
+        const tek = this.selectedFinancialTable && this.selectedFinancialTable !== 'all';
         const hasItems = !!(guide?.items?.length);
-        const sktLinkReady = !!(hasItems && this._financePasteGuideSktLinkReady && this._financePasteGuideSktUrl);
-        const sktMatched = hasItems ? this._countFinancePasteGuideSktMatched() : 0;
+        const yuk = this._financeSktYukleniyor;
         const listHtml = hasItems
             ? guide.items.map((p, idx) => this._renderFinancePasteGuideRowHtml(p, idx)).join('')
-            : `<p class="py-6 text-center text-xs text-gray-400">${canPaste ? 'Liste yapıştırınca eşleşen ürünler burada sırayla görünür.' : 'Tek tablo seçin, ardından sayım listesini yapıştırın.'}</p>`;
+            : `<p class="py-6 text-center text-xs text-gray-400">${tek ? 'SKT\'leri Getir\'e basınca tablodaki ürünler sırayla, son kullanma tarihleriyle burada görünür.' : 'Önce tek bir tablo seçin.'}</p>`;
+
+        // Özet: SKT bulunan ürün, 7 gün içinde satıştan kalkacak parti ve adet
+        let ozetHtml = '';
+        if (hasItems && this._financeSktZaman) {
+            let parti = 0;
+            let yakinParti = 0;
+            let yakinAdet = 0;
+            let toplamAdet = 0;
+            for (const p of guide.items) {
+                for (const e of this._getFinancePasteGuideSktEntries(p.productId)) {
+                    parti++;
+                    toplamAdet += Number(e.qty) || 0;
+                    const g = this._sktKalanGun(e);
+                    if (g !== null && g <= 7) { yakinParti++; yakinAdet += Number(e.qty) || 0; }
+                }
+            }
+            const bulunan = this._countFinancePasteGuideSktMatched();
+            ozetHtml = `<div class="skt-ozet">
+                <span><strong>${bulunan}</strong> / ${guide.items.length} Üründe SKT</span>
+                <span><strong>${parti}</strong> Parti · ${this._sayiMetni(toplamAdet)} Adet</span>
+                <span class="${yakinParti ? 'is-uyari' : ''}"><strong>${yakinParti}</strong> Parti 7 Gün İçinde${yakinParti ? ' · ' + this._sayiMetni(yakinAdet) + ' Adet' : ''}</span>
+            </div>`;
+        }
+        const durumHtml = yuk
+            ? `<span class="skt-durum"><span class="skt-cark" aria-hidden="true"></span><span data-skt-mesaj>${this.escapeHtml(yuk.mesaj)}</span></span>`
+            : this._financeSktHata
+              ? `<span class="skt-durum is-hata">${this.escapeHtml(this._financeSktHata)}</span>`
+              : '';
+        const dugmeMetni = yuk ? 'Getiriliyor…' : this._financeSktZaman ? 'SKT\'leri Yenile' : 'SKT\'leri Getir';
         const headerHtml = hasItems
             ? `<div class="finance-paste-guide-head sticky top-0 z-10 mb-1.5 hidden items-center gap-2.5 rounded-lg bg-slate-100/95 px-2.5 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400 backdrop-blur sm:flex sm:gap-3 sm:px-3">
                     <span class="w-6 shrink-0 text-center">#</span>
                     <span class="w-10 shrink-0 sm:w-11"></span>
-                    <span class="min-w-0 flex-1">Ürün · depo / sistem / birim</span>
+                    <span class="min-w-0 flex-1">Ürün · depo / sistem / SKT</span>
                </div>`
-            : '';
-        const sktPanelHtml = sktLinkReady
-            ? `<div id="financePasteGuideSktPanel" class="mb-3 rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-2.5">
-                    <p class="text-[11px] font-semibold text-amber-950">Warehouse SKT linki hazır</p>
-                    <p class="mt-1 text-[10px] text-amber-900/80">Linke gidin · tabloyu kopyalayın · <strong>SKT Yapıştır</strong> · sayfa sayfa tekrarlayın</p>
-                    <div class="mt-2 flex flex-wrap items-center gap-2">
-                        <a href="${this.escapeHtml(this._financePasteGuideSktUrl)}" target="_blank" rel="noopener noreferrer" class="inline-flex max-w-full items-center rounded-md bg-white px-2.5 py-1.5 text-[10px] font-semibold text-amber-950 ring-1 ring-amber-200 hover:bg-amber-50 truncate">Warehouse SKT sayfasını aç</a>
-                        <button type="button" id="financePasteGuideSktCopyLinkBtn" class="rounded-md border border-amber-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-amber-900 hover:bg-amber-100">Linki kopyala</button>
-                    </div>
-               </div>`
-            : '';
-
-        const statusText = guide
-            ? sktLinkReady
-                ? `${sktMatched}/${guide.items.length} ürün SKT · linke gidin · SKT Yapıştır aktif`
-                : `${guide.items.length} ürün · yapıştırma sırası`
             : '';
 
         return `
             <div class="finance-paste-guide-section -mx-1 mt-5 rounded-xl border border-slate-200/80 bg-slate-50/50 px-2 py-4 sm:-mx-2 sm:px-4" id="financePasteGuideSection">
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <div>
+                    <div class="min-w-0">
                         <h4 class="text-sm font-semibold text-gray-900">Sayım Sırası Rehberi</h4>
-                        <p class="mt-0.5 text-[11px] text-gray-500">Kaydedilmez · sayfa yenilenince silinir · fiyatlar ${this._financeUseStruckPrice ? 'orijinal' : 'satış'} fiyatına göre</p>
+                        <p class="mt-0.5 text-[11px] text-gray-500">SKT'ler warehouse panelinden alınır · warehouse.getir.com bir sekmede açık olmalı</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <button type="button" id="financePasteGuideBtn" class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none" ${canPaste ? '' : 'disabled'} title="Panodan sayım listesi yapıştır">
-                            Yapıştır
+                        ${hasItems && !yuk ? `<button type="button" id="financePasteGuideClearBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Temizle</button>` : ''}
+                        <button type="button" id="financePasteGuideSktBtn" class="skt-dugme" ${tek && !yuk ? '' : 'disabled'} title="Tablodaki ürünlerin son kullanma tarihlerini getir">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                            <span>${dugmeMetni}</span>
                         </button>
-                        ${hasItems ? `<button type="button" id="financePasteGuideClearBtn" class="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Temizle</button>` : ''}
-                        ${hasItems ? `<button type="button" id="financePasteGuideSktBtn" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100" title="Tüm ürünler için warehouse SKT linki oluştur">SKT Getir</button>` : ''}
-                        ${hasItems ? `<button type="button" id="financePasteGuideSktPasteBtn" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-40 disabled:pointer-events-none" ${sktLinkReady ? '' : 'disabled'} title="Warehouse tablo HTML\'ini panodan yapıştır">SKT Yapıştır</button>` : ''}
                     </div>
                 </div>
-                <span id="financePasteGuideStatus" class="mb-2 block text-xs text-gray-500 min-h-[1rem]" role="status" aria-live="polite">${statusText}</span>
-                ${sktPanelHtml}
+                <div id="financePasteGuideStatus" class="mb-2" role="status" aria-live="polite">${durumHtml}${ozetHtml}</div>
                 ${headerHtml}
                 <div id="financePasteGuideList" class="finance-paste-guide-list max-h-[min(38rem,72vh)] space-y-1.5 overflow-y-auto overscroll-contain pr-0.5">${listHtml}</div>
             </div>`;
@@ -6512,13 +6884,15 @@ class CountingSystem {
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
                 this._clearFinancePasteGuide();
+                this._financeSktZaman = null;
+                this._financeSktHata = null;
                 this._updateFinancePasteGuideStatus('');
                 void this.renderFinancialTab();
             });
         }
         if (sktBtn) {
             sktBtn.addEventListener('click', () => {
-                this.prepareFinancePasteGuideSktLink();
+                void this.fetchFinanceGuideSkt(tableProducts);
             });
         }
         if (sktPasteBtn) {
@@ -16223,7 +16597,7 @@ class CountingSystem {
             .join('');
 
         const extra =
-            codes.length > maxVisible
+            codes.length > maxVisible && !options.ekGizle
                 ? `<span class="self-center rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold text-slate-600">+${codes.length - maxVisible} barkod</span>`
                 : '';
 
@@ -16364,7 +16738,7 @@ class CountingSystem {
                 ? p.barcodes
                 : (p.barcode ? [p.barcode] : []);
             const barcodesHtml = productHasBarcodes(p)
-                ? `<div class="finance-barcodes-block mt-1.5 ${barcodesHiddenClass}" aria-hidden="${this._financeBarcodesVisible ? 'false' : 'true'}">${this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 2 })}</div>`
+                ? `<div class="finance-barcodes-block finance-barkod-sag ${barcodesHiddenClass}" aria-hidden="${this._financeBarcodesVisible ? 'false' : 'true'}">${this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 1, width: 150, height: 36, ekGizle: true })}</div>`
                 : '';
             const adetStr = p.stockDiff > 0 ? `+${this._sayiMetni(p.stockDiff)}` : `${this._sayiMetni(p.stockDiff)}`;
             const adetLabel = kind === 'miss' ? `${adetStr} adet eksik` : `${adetStr} adet fazla`;
@@ -16377,8 +16751,10 @@ class CountingSystem {
                 <div class="flex gap-2.5 rounded-lg border border-gray-100 ${tone.bar} border-l-[3px] p-2.5 pl-2">
                     <img src="${img}" alt="" class="h-11 w-11 shrink-0 rounded-lg border border-white object-cover shadow-sm" loading="lazy" />
                     <div class="min-w-0 flex-1">
-                        <p class="text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</p>
-                        ${barcodesHtml}
+                        <div class="finance-ad-satiri">
+                            <p class="min-w-0 flex-1 text-sm font-medium leading-snug text-gray-900 [overflow-wrap:anywhere]">${name}</p>
+                            ${barcodesHtml}
+                        </div>
                         <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-600">
                             <span>Depo: <strong>${p.warehouseStock ?? '—'}</strong></span>
                             <span>Sistem: <strong>${p.systemStock ?? '—'}</strong></span>
@@ -16406,6 +16782,15 @@ class CountingSystem {
                         <p class="mt-0.5 text-xs text-gray-500">${this.escapeHtml(scopeShort)}</p>
                     </div>
                     <div class="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                        <div class="flex flex-wrap items-center justify-end gap-2">
+                        ${
+                            this.selectedFinancialTable && this.selectedFinancialTable !== 'all'
+                                ? `<button type="button" id="financeSatisKontrolBtn" class="finance-barcodes-toggle inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md" title="Sayımdan sonra satış ya da giriş olan ürünleri bul, depoyu aynı farkla güncelle">
+                            <svg class="h-4 w-4 shrink-0 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.3 2.3c-.6.6-.2 1.7.7 1.7H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                            <span>Satış Kontrolü</span>
+                        </button>`
+                                : ''
+                        }
                         ${
                             hasAnyBarcodes
                                 ? `<button type="button" id="financeBarcodesToggleBtn" class="finance-barcodes-toggle inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-slate-300 hover:shadow-md" aria-pressed="${this._financeBarcodesVisible ? 'true' : 'false'}" title="Terminal okutma için barkod görsellerini aç / kapat">
@@ -16414,6 +16799,7 @@ class CountingSystem {
                         </button>`
                                 : ''
                         }
+                        </div>
                         <p class="text-[11px] text-gray-400 sm:text-right">${this.escapeHtml(now)}</p>
                     </div>
                 </div>
@@ -16467,6 +16853,7 @@ class CountingSystem {
         this._bindFinanceBarcodeCopy(container);
         this._bindFinanceBarcodeToggle(container);
         this._bindFinancePasteGuide(container, list);
+        container.querySelector('#financeSatisKontrolBtn')?.addEventListener('click', () => void this.satisKontrolu());
     }
 
     setupChartCarousel() {

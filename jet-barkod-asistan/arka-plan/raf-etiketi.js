@@ -589,6 +589,7 @@ async function fetchExpiryBatchInWarehouseTab(tabId, warehouseId, endDateStr, pr
         for (const item of items) {
           const pid =
             item.productId ||
+            item.id ||
             item.product_id ||
             item.product?.id ||
             item.product?._id ||

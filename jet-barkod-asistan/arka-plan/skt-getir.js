@@ -143,11 +143,13 @@ async function fetchExpiryBatchInWarehouseTab(tabId, warehouseId, endDateStr, pr
         else if (Array.isArray(json)) items = json;
 
         for (const item of items) {
+          // Yanıtta ürün kimliği `id` alanında geliyor (get-expiring-products)
           const pid =
             item.productId ||
             item.product_id ||
             item.product?.id ||
             item.product?._id ||
+            item.id ||
             (requestedIds.length === 1 ? requestedIds[0] : null);
           if (!pid || !requestedIds.includes(String(pid))) continue;
           const exp = item.expiryDate || item.expirationDate;
@@ -156,11 +158,12 @@ async function fetchExpiryBatchInWarehouseTab(tabId, warehouseId, endDateStr, pr
           if (!exp || !count) continue;
           const dateStr = formatTrDate(exp);
           const removeDateStr = removeRaw ? formatTrDate(removeRaw) : null;
+          const raf = item.location && item.location.barcode ? String(item.location.barcode).slice(0, 40) : null;
           const sid = String(pid);
           if (!byProductId[sid]) byProductId[sid] = [];
-          const existing = byProductId[sid].find((e) => e.date === dateStr && e.removeDate === removeDateStr);
+          const existing = byProductId[sid].find((e) => e.date === dateStr && e.raf === raf);
           if (existing) existing.qty += count;
-          else byProductId[sid].push({ date: dateStr, qty: count, removeDate: removeDateStr });
+          else byProductId[sid].push({ date: dateStr, qty: count, removeDate: removeDateStr, raf });
         }
 
         Object.keys(byProductId).forEach((pid) => {
@@ -295,7 +298,7 @@ export async function handleFetchExpiryProducts(message, sendResponse, sender = 
       Object.entries(batchResult.byProductId || {}).forEach(([pid, entries]) => {
         if (!merged[pid]) merged[pid] = [];
         (entries || []).forEach((entry) => {
-          const existing = merged[pid].find((e) => e.date === entry.date);
+          const existing = merged[pid].find((e) => e.date === entry.date && e.raf === entry.raf);
           if (existing) existing.qty += entry.qty;
           else merged[pid].push({ ...entry });
         });
@@ -307,7 +310,8 @@ export async function handleFetchExpiryProducts(message, sendResponse, sender = 
       });
 
       if (i < batches.length - 1) {
-        await new Promise((r) => setTimeout(r, 120));
+        // Paneldeki sayfa geçişinden yavaş: istekler sakin aralıkla
+        await new Promise((r) => setTimeout(r, 450));
       }
     }
 
