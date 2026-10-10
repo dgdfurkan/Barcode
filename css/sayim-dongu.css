@@ -94,19 +94,43 @@ html.sd-modu.sd-tablosuz #countingTableContainer { display: none !important; }
 .sd-uyari { margin: 12px 0 0; padding: 8px 12px; border-radius: 9px; background: var(--sd-sari-acik); color: var(--sd-sari-koyu); font-size: 12px; line-height: 16px; }
 
 /* Araçlar: süzgeç + arama */
-/* Depodan öğren: listenin kaynağı ve tarama ilerlemesi */
-.sd-depo { margin: 16px 0 0; padding: 12px; border: 1px solid var(--sd-cizgi); border-radius: 12px; background: #fff; }
-.sd-depo--davet { border-color: rgba(37, 99, 235, 0.25); background: var(--sd-mavi-acik); }
-.sd-depo__satir { display: flex; align-items: center; gap: 12px; }
-.sd-depo__ikon { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; background: var(--sd-kagit); color: var(--sd-orta); }
-.sd-depo--davet .sd-depo__ikon { background: #fff; color: var(--sd-mavi); }
-.sd-depo__ikon svg { width: 20px; height: 20px; }
-.sd-depo__ikon--tamam { background: var(--sd-yesil-acik); color: var(--sd-yesil-koyu); }
-.sd-depo__metin { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.sd-depo__metin strong { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--sd-yazi); }
-.sd-depo__metin span { font-size: 12px; line-height: 16px; color: var(--sd-sonuk); font-variant-numeric: tabular-nums; }
-.sd-depo .sd-dugme { flex: none; }
-.sd-depo .sd-cekim__cubuk { margin: 12px 0 0; }
+/* Başlık altındaki sade "Depo Listesi" bağlantısı */
+.sd-kaynak {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 32px;
+    margin: -8px 0;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    font: inherit;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--sd-sonuk);
+    cursor: pointer;
+    transition: background-color var(--motion-fast, 140ms) var(--motion-ease-out, ease-out), color var(--motion-fast, 140ms) var(--motion-ease-out, ease-out);
+}
+.sd-kaynak svg { width: 14px; height: 14px; }
+.sd-kaynak:hover { background: var(--sd-kagit); color: var(--sd-orta); }
+.sd-kaynak:focus-visible { outline: 2px solid var(--sd-mavi); outline-offset: 0; }
+.sd-kaynak.is-suruyor { color: var(--sd-mavi-koyu); font-weight: 600; font-variant-numeric: tabular-nums; }
+.sd-kaynak .sd-cark { width: 12px; height: 12px; }
+
+/* Depo listesi penceresi */
+.sd-dp .sd-pencere__baslik { margin-bottom: 4px; }
+.sd-dp__satirlar { display: flex; flex-direction: column; gap: 12px; margin: 16px 0 0; padding: 0; list-style: none; }
+.sd-dp__satirlar li { display: flex; align-items: flex-start; gap: 12px; font-size: 13px; line-height: 18px; color: var(--sd-orta); }
+.sd-dp__satirlar strong { color: var(--sd-yazi); font-weight: 600; }
+.sd-dp__ikon { flex: none; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 9px; background: var(--sd-mavi-acik); color: var(--sd-mavi); }
+.sd-dp__ikon svg { width: 16px; height: 16px; }
+.sd-dp__ilerleme { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 16px 0 0; }
+.sd-dp__ilerleme strong { font-size: 26px; line-height: 32px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--sd-yazi); }
+.sd-dp__ilerleme span { font-size: 12px; line-height: 16px; color: var(--sd-sonuk); font-variant-numeric: tabular-nums; }
+.sd-dp .sd-cekim__cubuk { margin: 8px 0 0; }
+.sd-dp__alt { margin: 12px 0 0; font-size: 12px; line-height: 16px; color: var(--sd-sonuk); font-variant-numeric: tabular-nums; }
+.sd-dp .sd-pencere__metin { margin: 12px 0 0; }
 
 .sd-arac { display: flex; align-items: center; gap: 12px; margin: 16px 0 12px; }
 .sd-filtreler { flex: 1; min-width: 0; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
@@ -541,8 +565,6 @@ html.sd-kilit, html.sd-kilit body { overflow: hidden; }
     .sd-detay__gorsel { width: 56px; height: 56px; border-radius: 12px; }
     .sd-hucreler { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .sd-ozet { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-    .sd-depo--davet .sd-depo__satir { flex-wrap: wrap; }
-    .sd-depo--davet .sd-dugme { flex: 1 1 100%; }
     .sd-ozet__halka, .sd-ozet__halka .sd-halka { width: 64px; height: 64px; }
     .sd-ozet__zamanlar { flex-direction: row; gap: 8px; padding: 12px 0 0; border-left: 0; border-top: 1px solid var(--sd-cizgi); }
     .sd-zaman { flex: 1 1 0; gap: 8px; }
@@ -558,6 +580,7 @@ html.sd-kilit, html.sd-kilit body { overflow: hidden; }
     .sd-giris .sd-ust, .sd-giris .sd-detay, .sd-giris .sd-kart { animation: none; }
     .sd-perde, .sd-pencere, .sd-anahtar__kol, .sd-anahtar__kol::after { transition: none; }
     .sd-durum__menu { animation: none; }
+    .sd-kaynak { transition: none; }
     .sd-durum__dugme, .sd-durum__dugme svg { transition: none; }
     .sd-pencere { transform: none; }
     .sd-kart, .sd-filtre, .sd-dugme, .sd-halka__dolu, .sd-kart__cubuk > span, .sd-ilerleme > span, .sd-cekim__cubuk > span { transition: none; }

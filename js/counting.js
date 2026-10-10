@@ -15722,7 +15722,7 @@ class CountingSystem {
         if (!yer) return;
         if (!list.length) {
             yer.innerHTML =
-                '<div class="fd-bos"><strong>Henüz sayılan alt kategori yok</strong>' +
+                '<div class="fd-bos"><strong>Henüz Sayılan Alt Kategori Yok</strong>' +
                 '<span>Döngü sekmesinde bir alt kategoriyi saydığınızda burada listelenir.</span></div>';
             return;
         }
