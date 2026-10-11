@@ -4,6 +4,7 @@
  *
  * warehouse.getir.com sipariş panelinde ürün tablolarına kopyalama düğmesi
  * ekler. Satır başına küçük bir düğme, tablonun üstüne de "Tümünü Kopyala".
+ * Sipariş kartının boş bir yerine tıklamak da "Tümünü Kopyala" yapar.
  * Kopyalanan HTML, Jet Barkod arama kutusuna yapıştırılınca barkoda ve
  * görsele çözülüyor.
  *
@@ -201,13 +202,15 @@
         });
     }
 
-    function tumunuKopyala() {
+    function tumunuKopyala(kok) {
+        // Eylem menüsünden çağrılınca ilk değişken bir DOM öğesi olmayabilir
+        if (!kok || typeof kok.querySelectorAll !== 'function') kok = null;
         var html = null;
-        var kap = satirKabi();
+        var kap = satirKabi(kok);
         if (kap) {
             html = kap.outerHTML;
         } else {
-            var govde = document.querySelector('.ant-modal .ant-modal-body');
+            var govde = kok || document.querySelector('.ant-modal .ant-modal-body');
             if (govde) html = govde.innerHTML;
         }
         if (!html) return JBA.bildir('Ürün tablosu bulunamadı.', 'olumsuz');
@@ -294,6 +297,49 @@
         }
     }
 
+    // ==================================================================
+    // Sipariş kartının boş bir yerine tıklamak = Tümünü Kopyala
+    // ==================================================================
+
+    // Kart, başlığıyla birlikte bütün modal. Kendi işi olan öğeler: görsel
+    // büyütme, başlıktaki sipariş kimliği (ant-tag), "Şüpheli Ol" ve diğer
+    // düğmeler. Bunlara tıklanınca kopyalama yapılmaz.
+    var ETKILESIMLI = 'a, button, input, textarea, select, option, label, img, svg, video,' +
+        ' [role="button"], [role="link"], [role="checkbox"], [role="switch"], [role="tab"],' +
+        ' [role="menuitem"], [role="combobox"], [contenteditable=""], [contenteditable="true"],' +
+        ' .ant-btn, .ant-image, .ant-typography-copy, .ant-select, .ant-checkbox-wrapper,' +
+        ' .ant-radio-wrapper, .ant-switch, .ant-dropdown-trigger, .ant-modal-close,' +
+        ' .ant-pagination, .ant-tag, .jba-satir-kopyala, .jba-tum-kap';
+
+    var sonKartKopyasi = 0;
+
+    function etkilesimliMi(hedef, govde) {
+        for (var el = hedef; el && el !== govde; el = el.parentElement) {
+            if (el.nodeType !== 1) continue;
+            if (el.matches(ETKILESIMLI)) return true;
+            // Panel tıklanabilir öğelere el imleci veriyor (sipariş kimliği gibi)
+            if (global.getComputedStyle(el).cursor === 'pointer') return true;
+        }
+        return false;
+    }
+
+    function kartTiklandi(e) {
+        if (e.button !== 0 || e.defaultPrevented) return;
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        var hedef = e.target && e.target.nodeType === 1 ? e.target : e.target && e.target.parentElement;
+        if (!hedef) return;
+        var govde = hedef.closest('.ant-modal-content');
+        if (!govde || etkilesimliMi(hedef, govde)) return;
+        // Metin seçmek için sürüklendiyse kopyalama yapılmaz
+        var secim = global.getSelection ? String(global.getSelection()) : '';
+        if (secim.trim()) return;
+        if (!satirKabi(govde)) return;
+        var simdi = Date.now();
+        if (simdi - sonKartKopyasi < 800) return;
+        sonKartKopyasi = simdi;
+        tumunuKopyala(govde);
+    }
+
     function tara() {
         tumunuDugmesi();
         var gorulen = [];
@@ -329,10 +375,12 @@
             // Getir paneli tek sayfa uygulaması: tablo sonradan geliyor,
             // modal açılıp kapanıyor. Tek gözlemci her değişiklikte tarıyor.
             this._birak = ctx.izle(tara);
+            document.addEventListener('click', kartTiklandi);
         },
 
         durdur: function () {
             if (this._birak) this._birak();
+            document.removeEventListener('click', kartTiklandi);
             document.querySelectorAll('.jba-satir-kopyala, .jba-tum-kap').forEach(function (e) { e.remove(); });
         },
 
