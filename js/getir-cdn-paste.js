@@ -251,8 +251,8 @@
 
     /**
      * Getir HTML'den satır sırasıyla { name, imageUrl, adet } listesi.
-     * Adet başlıktaki "Adet" sütunundan, başlık yoksa ad sütunundan sonraki ilk
-     * tam sayı hücresinden okunur. Aynı ürün (ad + görsel) birden çok satırda
+     * Adet yalnız başlığında "Adet" sütunu olan tablodan okunur. Bu başlık Asistan'ın
+     * "Tümünü Kopyala" çıktısında var; tek satır kopyasında yok, orada adet gelmez. Aynı ürün (ad + görsel) birden çok satırda
      * geçiyorsa tek satırda toplanır ve adetleri toplanır (Ekmek 2 + Ekmek 1 = 3).
      * kg ürünlerinde adet okunmaz.
      * @param {string} html
@@ -283,7 +283,6 @@
                 var adet = null;
                 if (!kgUrunuMu(name)) {
                     if (adetIdx >= 2 && cells[adetIdx]) adet = adetOku(cells[adetIdx].textContent);
-                    for (var c = 2; adet === null && c < cells.length; c++) adet = adetOku(cells[c].textContent);
                 }
 
                 var key = (name.toLowerCase() + '|' + (imageUrl || '')).toLowerCase();

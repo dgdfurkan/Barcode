@@ -35,7 +35,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="../veri/temp_products.js?v=20261003a"></script>
-    <script src="../js/getir-cdn-paste.js?v=20261012b"></script>
+    <script src="../js/getir-cdn-paste.js?v=20261012c"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
     <script src="../js/asistan-koprusu.js?v=20261007a"></script>
     <script src="../js/eklenti-rehberi.js?v=20260829a"></script>
@@ -847,30 +847,43 @@
             margin-bottom: 1rem;
         }
         
-        /* Toplu Kopyalama adeti: ızgara kartının sağ üstünde "×5" */
+        /* Toplu Kopyalama adeti: ızgara kartının sağ üstünde "×2".
+           ×1 sakin durur; birden fazla istenen ürün mavi dolguyla göze çarpar. */
         .arama-adet {
             position: absolute;
-            top: 12px;
-            right: 12px;
+            top: 8px;
+            right: 8px;
             z-index: 2;
             display: inline-flex;
-            align-items: baseline;
+            align-items: center;
+            justify-content: center;
             gap: 2px;
             min-width: 44px;
-            justify-content: center;
-            padding: 6px 12px;
+            height: 32px;
+            padding: 0 12px;
             border-radius: 999px;
-            background: #111827;
-            color: #fff;
-            font-size: 18px;
+            background: #ffffff;
+            color: #111827;
+            border: 1px solid #d0d5dd;
+            font-size: 15px;
             font-weight: 800;
-            line-height: 20px;
-            letter-spacing: -0.01em;
+            line-height: 1;
             font-variant-numeric: tabular-nums;
-            box-shadow: 0 6px 16px rgba(17, 24, 39, 0.22), 0 0 0 2px #fff;
+            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
             pointer-events: none;
         }
-        .arama-adet small { font-size: 13px; font-weight: 700; opacity: 0.7; }
+        .arama-adet small { font-size: 12px; font-weight: 700; color: #667085; }
+        .arama-adet.is-cok {
+            height: 36px;
+            min-width: 52px;
+            padding: 0 14px;
+            background: #2563eb;
+            border-color: #2563eb;
+            color: #ffffff;
+            font-size: 18px;
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.32), 0 0 0 2px #ffffff;
+        }
+        .arama-adet.is-cok small { color: rgba(255, 255, 255, 0.8); font-size: 13px; }
 
         .product-card {
             background: white;
@@ -6609,7 +6622,7 @@
         function adetRozeti(productId) {
             const n = aktifAdetler && aktifAdetler[productId];
             if (!n || n < 1) return '';
-            return `<span class="arama-adet" aria-label="${n} adet isteniyor"><small>×</small>${n}</span>`;
+            return `<span class="arama-adet${n > 1 ? ' is-cok' : ''}" aria-label="${n} adet isteniyor"><small>×</small>${n}</span>`;
         }
 
         function parseHtmlTableWithImages(htmlContent) {
