@@ -221,17 +221,48 @@
         return getirRow || getirImg || fullTableMarkers;
     }
 
+    /** "5", "x5", "×5", "5 adet" -> 5; ondalık ya da metinse null */
+    function adetOku(metin) {
+        var t = String(metin == null ? '' : metin).replace(/\s+/g, ' ').trim();
+        var m = /^(?:[x×]\s*)?(\d{1,4})(?:\s*(?:adet|ad\.?|x))?$/i.exec(t);
+        if (!m) return null;
+        var n = parseInt(m[1], 10);
+        return n > 0 ? n : null;
+    }
+
+    function kgUrunuMu(ad) {
+        return /\(\s*kg\s*\)/i.test(String(ad || ''));
+    }
+
+    /** Başlıkta "Adet" yazan sütunun sırası; yoksa -1 */
+    function adetSutunu(doc) {
+        var satirlar = doc.querySelectorAll('tr');
+        for (var i = 0; i < satirlar.length; i++) {
+            var th = satirlar[i].querySelectorAll('th');
+            if (!th.length) continue;
+            for (var j = 0; j < th.length; j++) {
+                if (/^adet\b/i.test((th[j].textContent || '').trim())) return j;
+            }
+        }
+        return -1;
+    }
+
     /**
-     * Getir HTML'den satır sırasıyla { name, imageUrl } listesi.
+     * Getir HTML'den satır sırasıyla { name, imageUrl, adet } listesi.
+     * Adet başlıktaki "Adet" sütunundan, başlık yoksa ad sütunundan sonraki ilk
+     * tam sayı hücresinden okunur. Aynı ürün (ad + görsel) birden çok satırda
+     * geçiyorsa tek satırda toplanır ve adetleri toplanır (Ekmek 2 + Ekmek 1 = 3).
+     * kg ürünlerinde adet okunmaz.
      * @param {string} html
-     * @returns {Array<{ name: string, imageUrl: string|null }>}
+     * @returns {Array<{ name: string, imageUrl: string|null, adet: number|null }>}
      */
     function extractGetirRowsFromHtml(html) {
         if (!html || typeof html !== 'string') return [];
         try {
             var doc = new DOMParser().parseFromString(html, 'text/html');
+            var adetIdx = adetSutunu(doc);
             var out = [];
-            var seen = new Set();
+            var gorulen = new Map();
             Array.from(doc.querySelectorAll('tr')).forEach(function (tr) {
                 if (tr.closest('thead')) return;
                 var cells = tr.querySelectorAll('td');
@@ -244,10 +275,22 @@
                 if (/^[\p{Extended_Pictographic}\s]+$/u.test(name)) return;
                 var imageUrl = img.src && String(img.src).trim();
                 if (imageUrl && !/^https?:\/\//i.test(imageUrl)) imageUrl = null;
+
+                var adet = null;
+                if (!kgUrunuMu(name)) {
+                    if (adetIdx >= 2 && cells[adetIdx]) adet = adetOku(cells[adetIdx].textContent);
+                    for (var c = 2; adet === null && c < cells.length; c++) adet = adetOku(cells[c].textContent);
+                }
+
                 var key = (name.toLowerCase() + '|' + (imageUrl || '')).toLowerCase();
-                if (seen.has(key)) return;
-                seen.add(key);
-                out.push({ name: name, imageUrl: imageUrl || null });
+                var onceki = gorulen.get(key);
+                if (onceki) {
+                    if (adet !== null) onceki.adet = (onceki.adet || 0) + adet;
+                    return;
+                }
+                var satir = { name: name, imageUrl: imageUrl || null, adet: adet };
+                gorulen.set(key, satir);
+                out.push(satir);
             });
             return out;
         } catch (e) {
@@ -275,7 +318,7 @@
     function resolveProductsFromGetirHtmlDetailed(html, products) {
         var rows = extractGetirRowsFromHtml(html);
         if (!rows.length || !products || !products.length) {
-            return { products: [], rows: rows || [], unmatched: [] };
+            return { products: [], rows: rows || [], unmatched: [], adetler: {} };
         }
 
         var imageIndex = getOrBuildGetirImageProductIndex(products);
@@ -283,6 +326,8 @@
         var resolved = [];
         var unmatched = [];
         var seenIds = new Set();
+        // Ürün kimliği başına toplam istenen adet (farklı ad / görselle gelen aynı ürün de toplanır)
+        var adetler = {};
 
         rows.forEach(function (row) {
             var product = null;
@@ -297,12 +342,15 @@
                 unmatched.push(row);
                 return;
             }
+            if (row.adet !== null && row.adet !== undefined && !kgUrunuMu(product.name)) {
+                adetler[product.id] = (adetler[product.id] || 0) + row.adet;
+            }
             if (seenIds.has(product.id)) return;
             seenIds.add(product.id);
             resolved.push(product);
         });
 
-        return { products: resolved, rows: rows, unmatched: unmatched };
+        return { products: resolved, rows: rows, unmatched: unmatched, adetler: adetler };
     }
 
     /**

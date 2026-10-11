@@ -35,7 +35,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <script src="../veri/temp_products.js?v=20261003a"></script>
-    <script src="../js/getir-cdn-paste.js?v=20260928a"></script>
+    <script src="../js/getir-cdn-paste.js?v=20261012a"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
     <script src="../js/asistan-koprusu.js?v=20261007a"></script>
     <script src="../js/eklenti-rehberi.js?v=20260829a"></script>
@@ -847,6 +847,31 @@
             margin-bottom: 1rem;
         }
         
+        /* Toplu Kopyalama adeti: ızgara kartının sağ üstünde "×5" */
+        .arama-adet {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 2;
+            display: inline-flex;
+            align-items: baseline;
+            gap: 2px;
+            min-width: 44px;
+            justify-content: center;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: #111827;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 800;
+            line-height: 20px;
+            letter-spacing: -0.01em;
+            font-variant-numeric: tabular-nums;
+            box-shadow: 0 6px 16px rgba(17, 24, 39, 0.22), 0 0 0 2px #fff;
+            pointer-events: none;
+        }
+        .arama-adet small { font-size: 13px; font-weight: 700; opacity: 0.7; }
+
         .product-card {
             background: white;
             border: 1px solid #e5e5e5;
@@ -5097,6 +5122,7 @@
                     <div class="group bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden ${isOutOfStock ? 'opacity-60' : ''}" data-product-id="${product.id}">
                         <!-- Image Area -->
                         <div class="h-48 p-2 bg-slate-50 flex items-center justify-center relative cursor-pointer" onclick="showImageModal('${productImage.replace(/'/g, "\\'")}', '${productName}')">
+                            ${adetRozeti(product.id)}
                             <img src="${productImage}" loading="lazy" decoding="async"
                                  alt="${product.name}" 
                                  class="w-auto h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-300"
@@ -6570,6 +6596,22 @@
         
         // Parse HTML table and extract image URLs, then find matching products and return their barcodes
         // This ensures exact matching by barcode instead of fuzzy name matching
+        /*
+         * Toplu Kopyalama adetleri: Getir sipariş tablosundaki "Adet" sütunu.
+         * Yapıştırılan liste barkodlara çevrilirken ürün başına toplam adet
+         * burada tutulur; aynı barkod listesiyle yapılan aramada ızgara
+         * kartının sağ üstünde "×5" olarak görünür. Başka bir arama rozetleri kaldırır.
+         */
+        let sonYapistirmaAdetleri = null;
+        let aktifAdetler = null;
+        const adetAnahtari = (t) => String(t == null ? '' : t).replace(/\s+/g, '');
+
+        function adetRozeti(productId) {
+            const n = aktifAdetler && aktifAdetler[productId];
+            if (!n || n < 1) return '';
+            return `<span class="arama-adet" aria-label="${n} adet isteniyor"><small>×</small>${n}</span>`;
+        }
+
         function parseHtmlTableWithImages(htmlContent) {
             try {
                 // Clear previous map
@@ -6596,7 +6638,12 @@
                             if (bc && bc.code) barcodeSet.add(bc.code);
                         });
                         if (barcodeSet.size > 0) {
-                            return Array.from(barcodeSet).join(', ');
+                            const barkodSorgusu = Array.from(barcodeSet).join(', ');
+                            const adetler = detailed.adetler || {};
+                            sonYapistirmaAdetleri = Object.keys(adetler).length
+                                ? { sorgu: adetAnahtari(barkodSorgusu), adet: adetler }
+                                : null;
+                            return barkodSorgusu;
                         }
                     }
                 } else if (
@@ -7176,6 +7223,10 @@
                 // Parse table data if present (for non-HTML or non-premium users)
                 parsedQuery = parseTableData(query);
             }
+            // Adet rozetleri yalnız yapıştırılan listenin barkodlarıyla yapılan aramada
+            aktifAdetler = sonYapistirmaAdetleri && adetAnahtari(parsedQuery) === sonYapistirmaAdetleri.sorgu
+                ? sonYapistirmaAdetleri.adet
+                : null;
             
             // If parsed query is different from original, split by comma for individual products
             // Otherwise, split by comma for multiple terms
