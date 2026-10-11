@@ -223,7 +223,9 @@
 
     /** "5", "x5", "×5", "5 adet" -> 5; ondalık ya da metinse null */
     function adetOku(metin) {
-        var t = String(metin == null ? '' : metin).replace(/\s+/g, ' ').trim();
+        var t = String(metin == null ? '' : metin)
+            .replace(/[\p{Extended_Pictographic}\uFE0F]/gu, '')
+            .replace(/\s+/g, ' ').trim();
         var m = /^(?:[x×]\s*)?(\d{1,4})(?:\s*(?:adet|ad\.?|x))?$/i.exec(t);
         if (!m) return null;
         var n = parseInt(m[1], 10);
@@ -260,6 +262,8 @@
         if (!html || typeof html !== 'string') return [];
         try {
             var doc = new DOMParser().parseFromString(html, 'text/html');
+            // Asistan'ın satıra eklediği kopyala düğmesi hücre metnine karışmasın ("2📋")
+            doc.querySelectorAll('button, .jba-satir-kopyala, .jba-tum-kap').forEach(function (e) { e.remove(); });
             var adetIdx = adetSutunu(doc);
             var out = [];
             var gorulen = new Map();
