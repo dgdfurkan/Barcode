@@ -6239,7 +6239,7 @@ class CountingSystem {
             const ipucu = `SKT ${e.date}${e.removeDate ? ' · satıştan kalkış ' + e.removeDate : ''}`;
             const acil = kova !== 'sonra' ? `<span class="rh-parti__gun"><i aria-hidden="true"></i>${this._sktGunMetni(e)}</span>` : '';
             return `<span class="rh-parti rh-parti--${kova}" title="${this.escapeHtml(ipucu)}">` +
-                `<span class="rh-parti__tarih">${this._sktKisaTarih(e.date)}</span>` +
+                `<span class="rh-parti__tarih">${this.escapeHtml(e.date)}</span>` +
                 `<span class="rh-parti__adet">${this._sayiMetni(e.qty)} <small>adet</small></span>${acil}</span>`;
         }).join('');
         const toplam = entries.reduce((t, e) => t + (Number(e.qty) || 0), 0);
@@ -6764,8 +6764,9 @@ class CountingSystem {
         const name = this.escapeHtml(p.productName || '');
         const d = this._getFinancePasteGuideItemDisplay(p);
         const fark = d.stockDiff;
+        const tur = fark < 0 ? 'eksik' : 'fazla';
         const farkHtml = fark !== null && fark !== 0
-            ? `<span class="rh-fark rh-fark--${fark < 0 ? 'eksik' : 'fazla'}">${fark > 0 ? '+' : '−'}${this._sayiMetni(Math.abs(fark))} ${fark < 0 ? 'eksik' : 'fazla'}</span>`
+            ? `<span class="rh-fark rh-fark--${tur}">${fark > 0 ? '+' : '−'}${this._sayiMetni(Math.abs(fark))} ${fark < 0 ? 'Eksik' : 'Fazla'}</span>`
             : '';
         const barcodeList = Array.isArray(p.barcodes) && p.barcodes.length ? p.barcodes : p.barcode ? [p.barcode] : [];
         const hasBarcodes = barcodeList.some((b) => b != null && String(typeof b === 'object' ? b.code ?? '' : b).trim());
@@ -6774,16 +6775,17 @@ class CountingSystem {
             : '';
         const secili = this._financePasteGuideSelectedIndex === idx;
         return `
-            <div class="rh-satir${secili ? ' is-secili' : ''}" data-guide-index="${idx}" role="button" tabindex="0" aria-pressed="${secili}" title="Görseli büyüt">
+            <div class="rh-satir rh-satir--${tur}${secili ? ' is-secili' : ''}" data-guide-index="${idx}" role="button" tabindex="0" aria-pressed="${secili}">
                 <span class="rh-no">${idx + 1}</span>
-                <img class="rh-gorsel" src="${img}" alt="" loading="lazy" onerror="this.src='../assets/logo.png'">
+                <button type="button" class="rh-gorsel-dugme" data-rh-gorsel="${idx}" aria-label="Görseli büyüt">
+                    <img class="rh-gorsel" src="${img}" alt="" loading="lazy" onerror="this.src='../assets/logo.png'">
+                </button>
                 <div class="rh-urun">
                     <p class="rh-ad">${name}</p>
-                    <p class="rh-sayilar">Depo ${this._formatPasteGuideStock(d.warehouseStock)}<span aria-hidden="true">·</span>Sistem ${this._formatPasteGuideStock(d.systemStock)}</p>
+                    <p class="rh-sayilar"><span>Depo: <b>${this._formatPasteGuideStock(d.warehouseStock)}</b></span><span>Sistem: <b>${this._formatPasteGuideStock(d.systemStock)}</b></span>${farkHtml}</p>
                     ${barcodesHtml}
+                    ${this._renderFinancePasteGuideSktHtml(p?.productId, d.warehouseStock)}
                 </div>
-                <div class="rh-fark-yer">${farkHtml}</div>
-                ${this._renderFinancePasteGuideSktHtml(p?.productId, d.warehouseStock)}
             </div>`;
     }
 
@@ -6854,20 +6856,25 @@ class CountingSystem {
         container.querySelector('[data-rh="tekrar"]')?.addEventListener('click', () => void this.fetchFinanceGuideSkt());
         if (list && !list.dataset.guideSelectBound) {
             list.dataset.guideSelectBound = '1';
-            // Satıra dokununca: satır işaretlenir (nerede kaldığın görünsün) ve görsel büyük açılır
+            // Fotoğrafa dokununca büyük görsel; satırın geri kalanı yalnız işaretler (nerede kaldığın görünsün)
             list.addEventListener('click', (e) => {
                 if (e.target.closest('[data-barcode-copy]')) return;
+                const foto = e.target.closest('[data-rh-gorsel]');
+                if (foto) {
+                    e.stopPropagation();
+                    const p = this._rehberUrunleri()[parseInt(foto.getAttribute('data-rh-gorsel'), 10)];
+                    const src = String(p?.imageUrl || '').split('?')[0];
+                    if (src) this.openProductImageLightbox(src, p?.productName || '');
+                    return;
+                }
                 const row = e.target.closest('[data-guide-index]');
                 if (!row) return;
                 const idx = parseInt(row.getAttribute('data-guide-index'), 10);
                 if (Number.isNaN(idx)) return;
-                const p = this._rehberUrunleri()[idx];
-                this._financePasteGuideSelectedIndex = idx;
+                const ayni = this._financePasteGuideSelectedIndex === idx;
+                this._financePasteGuideSelectedIndex = ayni ? null : idx;
                 list.querySelectorAll('.rh-satir.is-secili').forEach((r) => { r.classList.remove('is-secili'); r.setAttribute('aria-pressed', 'false'); });
-                row.classList.add('is-secili');
-                row.setAttribute('aria-pressed', 'true');
-                const src = String(p?.imageUrl || '').split('?')[0];
-                if (src) this.openProductImageLightbox(src, p?.productName || '');
+                if (!ayni) { row.classList.add('is-secili'); row.setAttribute('aria-pressed', 'true'); }
             });
             list.addEventListener('keydown', (e) => {
                 if (e.key !== 'Enter' && e.key !== ' ') return;
