@@ -969,6 +969,15 @@
             (dp ? 'Depo Listesi · ' + kacir(goreliSure(Date.parse(dp.at))) : 'Listeyi Depodan Güncelle') + '</button>';
     }
 
+    /** Başlıktaki "Paylaş" bağlantısı (js/dongu-paylasim.js) */
+    function paylasDugmesi() {
+        var p = window.JBDonguPaylasim;
+        if (!p) return '';
+        var acik = p.acikMi();
+        return '<button type="button" class="sd-kaynak' + (acik ? ' is-paylasimda' : '') + '" data-sd="paylas">' + SVG.paylas +
+            (acik ? 'Paylaşılıyor' : 'Paylaş') + '</button>';
+    }
+
     /** Onay ve ilerleme penceresi: tarama uzun sürer, kullanıcı bilerek başlatır */
     var depoPerde = null;
     function depoPenceresiAc() {
@@ -1576,6 +1585,7 @@
     // Çizim
     // ------------------------------------------------------------------
     var SVG = {
+        paylas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/></svg>',
         geri: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>',
         ara: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
         indir: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
@@ -1606,6 +1616,7 @@
             else if (ne === 'filtre') { d.filtre = h.getAttribute('data-deger'); ciz(); }
             else if (ne === 'cek') urunleriCek(d.secili);
             else if (ne === 'depo') depoPenceresiAc();
+            else if (ne === 'paylas') { if (window.JBDonguPaylasim) window.JBDonguPaylasim.ac(); }
             else if (ne === 'iptal') { if (d.cekim) d.cekim.iptal.abort(); }
             else if (ne === 'esles') eslesSec(h.getAttribute('data-id'));
             else if (ne === 'esles-kapat') { d.esles = null; ciz(); }
@@ -1676,6 +1687,8 @@
             var f = filtreHtml(liste);
             if (panel.__filtre !== f) { panel.querySelector('[data-sd-filtreler]').innerHTML = f; panel.__filtre = f; }
             listeCiz(liste);
+            // Paylaşılan rapor varsa özet değiştiğinde sunucudaki kopya tazelenir (gecikmeli)
+            try { if (window.JBDonguPaylasim) window.JBDonguPaylasim.degisti(); } catch (e) { /* yan iş */ }
         }
         // Giriş hareketi: listede yalnız ilk açılışta, ayrıntıda her açılışta
         if (d.ilkCizim && !azaltilmisHareket() && (d.secili || !d.girisOynadi)) {
@@ -1729,7 +1742,7 @@
             '<p class="sd-etiket">Sayım Döngüsü</p>' +
             '<h2 class="sd-baslik"><span class="sd-sayi">' + guncel + '</span> / ' + toplam + ' Alt Kategori Güncel</h2>' +
             '<p class="sd-alt"><span class="sd-oturum sd-oturum--' + ot.renk + '"><span class="sd-nokta"></span>' + kacir(ot.metin) + '</span>' +
-            '<span data-sd-kaynak>' + kaynakDugmesi() + '</span></p>' +
+            '<span data-sd-kaynak>' + kaynakDugmesi() + '</span>' + paylasDugmesi() + '</p>' +
             '</div>' +
             '<div class="sd-ust__halka">' + halka(oran, 72) + '<span class="sd-ust__yuzde">%' + Math.round(oran * 100) + '</span></div>' +
             '</header>' +
@@ -2162,5 +2175,34 @@
         return o;
     }
 
-    window.JBSayimDongu = { ac: modAc, kapat: modKapat, cek: urunleriCek, gorsel: gorselAdresi, ozet: ozet };
+    /**
+     * Herkese açık rapor için özet. Yalnız alt kategori adı, üst kategori,
+     * durum, ilerleme ve son sayım zamanı. Ürün, fiyat, stok adedi, depo ve
+     * hesap bilgisi girmez.
+     */
+    function paylasimVerisi() {
+        var m = kaynak();
+        var urunToplam = 0;
+        var urunSayilan = 0;
+        var kategoriler = hepsi().map(function (x) {
+            if (x.kod !== 'pasif' && x.st.var) {
+                urunToplam += x.st.toplam;
+                if (x.sayimVar) urunSayilan += Math.min(x.st.sayilan, x.st.toplam);
+            }
+            var g = gorselAdresi(x.ad);
+            return {
+                ad: String(x.ad).slice(0, 80),
+                ust: String((m[x.ad] || [])[0] || '').slice(0, 80),
+                kod: x.kod,
+                oran: Math.round((x.sayimVar ? x.oran : 0) * 1000) / 1000,
+                sayilan: x.sayimVar ? Math.min(x.st.sayilan || 0, x.st.toplam || 0) : 0,
+                toplam: x.st.toplam || 0,
+                son: x.st.sonSayim || null,
+                gorsel: /^https:\/\/cdn-image\.getir\.com\//.test(g) ? g : '',
+            };
+        }).slice(0, 400);
+        return { v: 1, sure: d.ayar.sure, ozet: ozet(), urunSayilan: urunSayilan, urunToplam: urunToplam, kategoriler: kategoriler };
+    }
+
+    window.JBSayimDongu = { ac: modAc, kapat: modKapat, cek: urunleriCek, gorsel: gorselAdresi, ozet: ozet, paylasimVerisi: paylasimVerisi, ciz: gecikmeliCiz };
 })();

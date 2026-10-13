@@ -732,3 +732,22 @@ html.sd-kilit, html.sd-kilit body { overflow: hidden; }
     .fd-menu { animation: none; }
     .fd-dugme, .fd-dugme .fd-ok { transition: none; }
 }
+
+/* ---------- Herkese açık rapor paylaşımı (js/dongu-paylasim.js) ---------- */
+.sd-kaynak.is-paylasimda { color: var(--sd-yesil-koyu); font-weight: 600; }
+.sd-pl__alan { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; }
+.sd-pl__alan > span { font-size: 11px; font-weight: 600; color: var(--sd-sonuk); }
+.sd-pl__girdi {
+    width: 100%; min-height: 44px; padding: 0 12px;
+    border: 1px solid var(--sd-cizgi); border-radius: 9px;
+    background: #fff; color: var(--sd-yazi); font: inherit; font-size: 13px;
+}
+.sd-pl__girdi:focus { outline: 2px solid var(--sd-mavi); outline-offset: -1px; border-color: var(--sd-mavi); }
+.sd-pl__bag { display: flex; gap: 8px; }
+.sd-pl__bag .sd-pl__girdi { flex: 1; min-width: 0; font-size: 12px; color: var(--sd-orta); background: var(--sd-kagit); }
+.sd-pl__bag .sd-dugme { flex: none; min-width: 0; }
+.sd-pl__not { margin: 12px 0 0; font-size: 12px; line-height: 16px; color: var(--sd-sonuk); }
+.sd-pl__ikincil { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--sd-cizgi); }
+.sd-pl__ikincil .sd-dugme { min-width: 0; }
+.sd-pl__tehlike { color: var(--sd-kirmizi-koyu); }
+.sd-pl__tehlike:hover { background: var(--sd-kirmizi-acik); }

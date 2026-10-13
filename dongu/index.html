@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://cdn-image.getir.com data:; font-src 'self'; connect-src https://api.flowcobalt.com; base-uri 'none'; form-action 'none'; object-src 'none'">
+    <meta name="referrer" content="no-referrer">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#f4f6f9">
+    <title>Döngü Raporu · Jet Barkod</title>
+    <link rel="icon" href="../assets/logo.png">
+    <link rel="stylesheet" href="../css/dongu-rapor.css?v=20261013a">
+</head>
+<body>
+    <main class="dr" id="rapor" aria-busy="true">
+        <header class="dr-ust">
+            <a class="dr-marka" href="/">Jet Barkod</a>
+            <h1 class="dr-baslik" id="baslik">Döngü Raporu</h1>
+            <p class="dr-guncel" id="guncel">&nbsp;</p>
+        </header>
+
+        <section class="dr-ozet" id="ozet" aria-label="Özet">
+            <div class="dr-ozet__ust">
+                <div class="dr-halka" aria-hidden="true">
+                    <svg viewBox="0 0 72 72"><circle class="dr-halka__iz" cx="36" cy="36" r="31"/><circle class="dr-halka__dolu" id="halka" cx="36" cy="36" r="31"/></svg>
+                    <span class="dr-halka__yuzde" id="yuzde">%0</span>
+                </div>
+                <div class="dr-ozet__metin">
+                    <p class="dr-etiket">Sayım Döngüsü</p>
+                    <p class="dr-buyuk" id="kategoriSatiri"><span class="dr-iskelet dr-iskelet--genis"></span></p>
+                    <p class="dr-kucuk" id="sureSatiri">&nbsp;</p>
+                </div>
+            </div>
+            <div class="dr-ilerleme">
+                <div class="dr-ilerleme__ust"><span id="urunSatiri">&nbsp;</span><b id="urunYuzde"></b></div>
+                <div class="dr-cubuk"><span id="urunCubuk"></span></div>
+            </div>
+            <div class="dr-kpi" id="kpi"></div>
+        </section>
+
+        <section class="dr-liste-bolum" aria-label="Alt kategoriler">
+            <div class="dr-arac">
+                <div class="dr-sekme" role="tablist" aria-label="Alt kategoriler" id="sekmeler">
+                    <button type="button" role="tab" data-sekme="kalan" aria-selected="true">Kalan</button>
+                    <button type="button" role="tab" data-sekme="sayilan" aria-selected="false">Sayılan</button>
+                    <button type="button" role="tab" data-sekme="tumu" aria-selected="false">Tümü</button>
+                </div>
+                <input type="search" class="dr-ara" id="ara" placeholder="Alt kategori ara" autocomplete="off" aria-label="Alt kategori ara">
+            </div>
+            <ul class="dr-liste" id="liste"></ul>
+            <p class="dr-pasif" id="pasif" hidden></p>
+        </section>
+
+        <footer class="dr-alt">
+            <a href="/">Jet Barkod</a> ile hazırlandı
+        </footer>
+    </main>
+
+    <section class="dr-durum" id="durum" hidden>
+        <div class="dr-durum__kart">
+            <p class="dr-marka">Jet Barkod</p>
+            <h1 class="dr-durum__baslik" id="durumBaslik"></h1>
+            <p class="dr-durum__metin" id="durumMetin"></p>
+            <button type="button" class="dr-dugme" id="tekrar" hidden>Tekrar Dene</button>
+        </div>
+    </section>
+
+    <script src="../js/dongu-rapor.js?v=20261013a"></script>
+</body>
+</html>
