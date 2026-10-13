@@ -1924,7 +1924,7 @@ h1, h2, h3, h4, h5, h6 {
 .rh-hata button { flex: none; min-height: 36px; padding: 0 12px; border: 1px solid rgba(180, 35, 24, 0.25); border-radius: 9px; background: #fff; font: inherit; font-size: 12px; font-weight: 600; color: var(--rh-kirmizi-koyu); cursor: pointer; }
 
 /* Kartlar: liste sayfayla birlikte kayar, iç kaydırma yok (kartlar sıkışıp SKT kırpılıyordu) */
-.rh-liste { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.rh-liste { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; max-width: 720px; }
 .rh-kart {
     position: relative;
     flex-shrink: 0;
