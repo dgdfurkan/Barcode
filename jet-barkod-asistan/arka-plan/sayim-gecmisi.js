@@ -38,6 +38,9 @@ const EN_FAZLA_GUN = 93;
 const TAMAMLANDI = 600;
 
 const KIMLIK = /^[0-9a-f]{24}$/;
+// Alışveriş poşetleri (Nonwoven, atlet, depozitolu): sayım geçmişine girmez.
+// "Poşet Çay", "Buzdolabı Poşeti", "Poşet Ton Balığı" gibi ürünler etkilenmez.
+const POSET = /nonwoven|atlet[^,()]*po[sş]et|depozitolu po[sş]et|çevre günü po[sş]et/i;
 const TARIH = /^\d{4}-\d{2}-\d{2}$/;
 
 let calisan = null; // { durdur: boolean, cagiran: tabId }
@@ -120,9 +123,16 @@ async function panelIstegi(tabId, { adres = null, tikla = null, desen, sure = YA
             history.pushState({}, '', adresP);
             dispatchEvent(new PopStateEvent('popstate', { state: {} }));
           } else if (tiklaP) {
-            const el = document.querySelector(tiklaP);
-            if (!el) return son({ ok: false, hata: 'dugme-yok' });
-            el.click();
+            // Tablo yeni sayfayı çizene kadar düğme olmayabilir ya da pasif kalabilir; 5 sn bekle
+            const sinir = Date.now() + 5000;
+            const dene = () => {
+              if (bitti) return;
+              const el = document.querySelector(tiklaP);
+              if (el) el.click();
+              else if (Date.now() < sinir) setTimeout(dene, 150);
+              else son({ ok: false, hata: 'dugme-yok' });
+            };
+            dene();
           }
         } catch (err) {
           son({ ok: false, hata: 'adres-degismedi' });
@@ -289,50 +299,83 @@ async function calistir(istek, cagiran) {
       mesaj: hedefler.length ? 'Sayım sonuçları okunuyor' : 'Yeni sayım yok',
     });
 
-    let ustUsteHata = 0;
-    for (const sayim of hedefler) {
-      if (calisan.durdur) break;
-      if (!KIMLIK.test(String(sayim.job || ''))) continue;
+    // Bir sayım okunamazsa sessizce atlanmaz: sona bırakılır, ikinci turda yeniden
+    // denenir; yine olmazsa kullanıcıya kaç sayımın eksik kaldığı söylenir.
+    const okunan = new Set();      // okunmuş görev kimlikleri (ikinci turda tekrar istenmez)
+    const durumSay = { ustUsteHata: 0 };
 
+    async function sayimiOku(sayim) {
       const gl = await gorevListesi(tabId, depo, sayim);
       if (!gl.ok) {
-        ustUsteHata++;
-        if (ustUsteHata >= UST_USTE_HATA_SINIRI) throw new Error('Depo paneli yanıt vermiyor. Oturum düşmüş olabilir.');
-        continue;
+        durumSay.ustUsteHata++;
+        if (durumSay.ustUsteHata >= UST_USTE_HATA_SINIRI) throw new Error('Depo paneli yanıt vermiyor. Oturum düşmüş olabilir.');
+        return { ok: false, kayitlar: [] };
       }
-
+      durumSay.ustUsteHata = 0;
       const kayitlar = [];
+      let eksik = 0;
       for (const gorev of gl.gorevler) {
-        if (calisan.durdur) break;
-        if (gorev.status !== TAMAMLANDI) { yapilan++; continue; }
+        if (calisan.durdur) { eksik++; continue; }
+        if (okunan.has(gorev.id)) continue;
+        if (gorev.status !== TAMAMLANDI) { okunan.add(gorev.id); yapilan++; continue; }
+        // Alışveriş poşetleri sayım geçmişinde istenmiyor; istek de atılmaz
+        if (POSET.test(urunAdi(gorev.data) || '')) { okunan.add(gorev.id); yapilan++; continue; }
         await bekle(GOREV_ARASI_MS);
         const r = await israrla(tabId, {
           adres: gorevYolu(depo, sayim.id, sayim.job, gorev.id),
           // Panel görev detayını iş kimliğiyle istiyor (/<iş>/tasks/<görev>); görev kimliği tek başına yeter
           desen: `/tasks/${gorev.id}(?:\\?|$)`,
         });
-        yapilan++;
         if (!r.ok) {
-          ustUsteHata++;
-          if (ustUsteHata >= UST_USTE_HATA_SINIRI) throw new Error('Depo paneli yanıt vermiyor. Oturum düşmüş olabilir.');
+          eksik++;
+          durumSay.ustUsteHata++;
+          if (durumSay.ustUsteHata >= UST_USTE_HATA_SINIRI) throw new Error('Depo paneli yanıt vermiyor. Oturum düşmüş olabilir.');
           continue;
         }
-        ustUsteHata = 0;
+        durumSay.ustUsteHata = 0;
         const k = kayitYap(sayim, gorev, r.veri && r.veri.data);
-        if (k) kayitlar.push(k);
+        okunan.add(gorev.id);
+        yapilan++;
+        if (k && !POSET.test(k.ad || '')) kayitlar.push(k);
         if (yapilan % 3 === 0) olay(cagiran, { tur: 'ilerleme', asama: 'gorev', yapilan, toplam: toplamGorev });
       }
+      return { ok: eksik === 0, kayitlar };
+    }
 
-      // Sayım eksiksiz alındıysa işaretlenir; yarım kaldıysa bir dahaki sefere tekrar istenir
-      const tam = !calisan.durdur && kayitlar.length >= gl.gorevler.filter((g) => g.status === TAMAMLANDI).length;
-      kayitSayisi += kayitlar.length;
-      if (kayitlar.length) olay(cagiran, { tur: 'parca', sayimId: sayim.id, tam, kayitlar });
+    const tekrar = [];
+    for (const sayim of hedefler) {
+      if (calisan.durdur) break;
+      if (!KIMLIK.test(String(sayim.job || ''))) { tekrar.push(sayim); continue; }
+      const r = await sayimiOku(sayim);
+      kayitSayisi += r.kayitlar.length;
+      olay(cagiran, { tur: 'parca', sayimId: sayim.id, tam: r.ok, kayitlar: r.kayitlar });
+      if (!r.ok) tekrar.push(sayim);
       olay(cagiran, { tur: 'ilerleme', asama: 'gorev', yapilan, toplam: toplamGorev });
+    }
+
+    // İkinci tur: listeye dönüp okunamayanları yeniden dene (panel durumu sıfırlanır)
+    let eksikSayim = 0;
+    if (tekrar.length && !calisan.durdur) {
+      olay(cagiran, { tur: 'ilerleme', asama: 'gorev', yapilan, toplam: toplamGorev, mesaj: tekrar.length + ' sayım yeniden deneniyor' });
+      await bekle(1500);
+      await israrla(tabId, {
+        adres: listeYolu(depo, bas, bit, 1) + '&jb=' + Date.now(),
+        desen: '/gstore-inventory-checks/filter',
+      });
+      for (const sayim of tekrar) {
+        if (calisan.durdur) { eksikSayim++; continue; }
+        if (!KIMLIK.test(String(sayim.job || ''))) { eksikSayim++; continue; }
+        await bekle(LISTE_ARASI_MS);
+        const r = await sayimiOku(sayim);
+        kayitSayisi += r.kayitlar.length;
+        olay(cagiran, { tur: 'parca', sayimId: sayim.id, tam: r.ok, kayitlar: r.kayitlar });
+        if (!r.ok) eksikSayim++;
+      }
     }
 
     olay(cagiran, {
       tur: 'bitti', ok: true, durduruldu: !!calisan.durdur,
-      sayimSayisi: tamamlanan.length, yeniSayim: hedefler.length, kayitSayisi,
+      sayimSayisi: tamamlanan.length, yeniSayim: hedefler.length, kayitSayisi, eksikSayim,
     });
   } catch (e) {
     olay(cagiran, { tur: 'bitti', ok: false, hata: (e && e.message) || 'Sayım geçmişi alınamadı.', kayitSayisi });

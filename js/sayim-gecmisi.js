@@ -24,6 +24,8 @@
     'use strict';
 
     var KIMLIK = /^[0-9a-f]{24}$/;
+    // Alışveriş poşetleri geçmişte gösterilmez ("Poşet Çay", "Buzdolabı Poşeti" etkilenmez)
+    var POSET = /nonwoven|atlet[^,()]*po[sş]et|depozitolu po[sş]et|çevre günü po[sş]et/i;
     var SAKLAMA_GUN = 120;
     var SATIR_SINIRI = 200;
     var GOREV_SURESI_SN = 0.8;
@@ -110,9 +112,17 @@
     function urunBilgisi(pid, kayit) {
         var c = cs();
         var p = c && c.productIndex && c.productIndex.get ? c.productIndex.get(pid) : null;
+        var barkod = '';
+        if (p && Array.isArray(p.barcodes)) {
+            for (var i = 0; i < p.barcodes.length && !barkod; i++) {
+                var b = p.barcodes[i];
+                barkod = String(b && typeof b === 'object' ? (b.code || '') : (b || '')).trim();
+            }
+        }
         return {
             ad: (p && p.name) || (kayit && kayit.ad) || 'Ürün',
             gorsel: (p && (p.image || p.imageUrl)) || '',
+            barkod: barkod,
         };
     }
 
@@ -307,6 +317,7 @@
                 durum.sonOzet = {
                     sayim: d.sayimSayisi || 0, yeni: d.yeniSayim || 0,
                     kayit: d.kayitSayisi || 0, durduruldu: !!d.durduruldu,
+                    eksik: d.eksikSayim || 0,
                 };
                 tamlariHesapla();
                 yereleYaz();
@@ -315,6 +326,7 @@
                 var c2 = cs();
                 if (c2 && c2.showToast) {
                     if (!d.ok) c2.showToast(durum.sonHata, 'error', 5000);
+                    else if (d.eksikSayim) c2.showToast(d.eksikSayim + ' sayım okunamadı. Sayımları Çek ile tekrar dene.', 'warning', 6000);
                     else if (d.durduruldu) c2.showToast('Durduruldu. Okunan sayımlar kaydedildi.', 'info', 3500);
                     else c2.showToast((d.kayitSayisi || 0) + ' ürün sayımı okundu.', 'success', 3000);
                 }
@@ -387,6 +399,7 @@
         durum.kayitlar.forEach(function (k) {
             if (k.sa < bas || k.sa > son) return;
             if (!a.otomatik && k.o) return;
+            if (POSET.test(urunBilgisi(k.p, k).ad)) return;
             out.push(k);
         });
         return out;
@@ -530,6 +543,8 @@
             durum.acik[p] = !durum.acik[p];
             listeCiz();
         }
+        else if (ne === 'kopyala') kopyala(t);
+        else if (ne === 'foto') fotoAc(t.getAttribute('data-src'), t.getAttribute('data-ad'));
     }
 
     function pencereCiz() {
@@ -581,6 +596,11 @@
         }
         if (durum.sonHata) {
             kutu.innerHTML = '<div class="sg-hata" role="alert">' + esc(durum.sonHata) + '</div>';
+            return;
+        }
+        if (durum.sonOzet && durum.sonOzet.eksik) {
+            kutu.innerHTML = '<div class="sg-uyari" role="alert"><b>' + durum.sonOzet.eksik + ' sayım okunamadı.</b> ' +
+                'Panel o sırada yanıt vermedi. "Sayımları Çek"e tekrar bas; yalnız eksik kalanlar okunur.</div>';
             return;
         }
         var not = durum.tabloVar === false
@@ -669,15 +689,21 @@
             var sinif = u.net > 0 ? 'fazla' : u.net < 0 ? 'eksik' : 'esit';
             var acik = !!durum.acik[u.p];
             return '<div class="sg-urun">' +
-                '<button type="button" class="sg-urun__bas" data-sg="urun" data-p="' + u.p + '" aria-expanded="' + acik + '">' +
+                '<div class="sg-urun__bas">' +
                     (x.b.gorsel
-                        ? '<img class="sg-urun__foto" src="' + esc(x.b.gorsel) + '" alt="" loading="lazy" decoding="async">'
+                        ? '<button type="button" class="sg-urun__foto-dugme" data-sg="foto" data-src="' + esc(x.b.gorsel) + '" data-ad="' + esc(x.b.ad) + '" aria-label="Görseli büyüt"><img class="sg-urun__foto" src="' + esc(x.b.gorsel) + '" alt="" loading="lazy" decoding="async"></button>'
                         : '<span class="sg-urun__foto" aria-hidden="true"></span>') +
-                    '<span class="sg-urun__metin"><span class="sg-urun__ad">' + esc(x.b.ad) + '</span>' +
-                    '<span class="sg-urun__bilgi"><span>' + u.kayitlar.length + ' sayım · son ' + esc(tarihMetni(u.son)) + '</span>' +
-                    (u.sifir ? '<span class="sg-etiket sg-etiket--sifir">Sıfırlandı</span>' : '') + '</span></span>' +
+                    '<span class="sg-urun__metin">' +
+                        '<button type="button" class="sg-urun__ad sg-kopya" data-sg="kopyala" data-metin="' + esc(x.b.ad) + '" title="Adı kopyala">' + esc(x.b.ad) + '</button>' +
+                        (x.b.barkod
+                            ? '<button type="button" class="sg-barkod sg-kopya" data-sg="kopyala" data-metin="' + esc(x.b.barkod) + '" title="Barkodu kopyala"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6v12M8 6v12M11 6v12M15 6v12M18 6v12M20 6v12"/></svg>' + esc(x.b.barkod) + '</button>'
+                            : '') +
+                        '<span class="sg-urun__bilgi"><span>' + u.kayitlar.length + ' sayım · son ' + esc(tarihMetni(u.son)) + '</span>' +
+                        (u.sifir ? '<span class="sg-etiket sg-etiket--sifir">Sıfırlandı</span>' : '') + '</span>' +
+                    '</span>' +
                     '<span class="sg-net sg-net--' + sinif + '">' + (u.net === 0 ? '0' : isaretli(u.net)) + '</span>' +
-                '</button>' +
+                    '<button type="button" class="sg-ac" data-sg="urun" data-p="' + u.p + '" aria-expanded="' + acik + '" aria-label="Sayımları göster"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>' +
+                '</div>' +
                 (acik ? '<div class="sg-kayitlar">' + u.kayitlar.map(kayitSatiri).join('') + '</div>' : '') +
             '</div>';
         }).join('') +
@@ -694,6 +720,26 @@
             '<span class="sg-kayit__adet">Sistem ' + sayi(k.sis) + ' → Sayılan ' + sayi(k.fiz) + (k.o ? ' <span class="sg-etiket">Günlük</span>' : '') + '</span>' +
             '<span class="sg-kayit__fark" style="color:' + renk + '">' + (f === 0 ? '0' : isaretli(f)) + '</span>' +
         '</div>';
+    }
+
+    function kopyala(dugme) {
+        var metin = dugme.getAttribute('data-metin') || '';
+        var bitti = function () {
+            dugme.classList.add('is-kopyalandi');
+            clearTimeout(dugme.__z);
+            dugme.__z = setTimeout(function () { dugme.classList.remove('is-kopyalandi'); }, 1200);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(metin).then(bitti, bitti);
+        else bitti();
+    }
+
+    /** Sayım sayfasının büyük görsel penceresi; bu pencerenin üstünde açılır */
+    function fotoAc(src, ad) {
+        var c = cs();
+        if (!src || !c || typeof c.openProductImageLightbox !== 'function') return;
+        var lb = document.getElementById('productImageLightbox');
+        if (lb) lb.style.zIndex = '170';
+        c.openProductImageLightbox(String(src).split('?')[0], ad || '');
     }
 
     async function tabloyaUygula() {
@@ -761,8 +807,10 @@
         var e = c.countingData && c.countingData[pid];
         var ek = e ? c._ekSayim(e) : 0;
         if (ek) {
+            var raf = c._rafDegeri(e);
+            var toplam = raf === null ? null : Math.round((raf + ek) * 1000) / 1000;
             b.className = 'sg-cip ' + (ek > 0 ? 'sg-cip--fazla' : 'sg-cip--eksik');
-            b.innerHTML = 'Önceki Sayım ' + esc(isaretli(ek));
+            b.innerHTML = 'Önceki ' + esc(isaretli(ek)) + ' · ' + (toplam === null ? 'Sayılmadı' : 'Toplam ' + esc(toplam < 0 ? '−' + sayi(Math.abs(toplam)) : sayi(toplam)));
             b.setAttribute('aria-label', 'Önceki sayım ' + isaretli(ek) + ', düzenle');
             return;
         }
@@ -822,6 +870,9 @@
             '<button type="button" class="sg-kapat" data-sg="kapat" aria-label="Kapat">' + IKON_KAPAT + '</button></div>' +
             '<div class="sg-govde">' +
                 panelSayim +
+                '<h3 class="sg-bolum-baslik">Rafta Sayılan</h3>' +
+                '<input type="text" class="sg-girdi sg-adet sg-adet--raf" data-sg="raf" inputmode="' + (kg ? 'decimal' : 'numeric') + '" autocomplete="off" value="' + esc(c._rafDegeri(e) === null ? '0' : sayi(c._rafDegeri(e))) + '" aria-label="Rafta sayılan">' +
+                (c._rafDegeri(e) === null ? '<p class="sg-not">Ürün henüz sayılmamış; rafta 0 kabul edilir. Saydıysan adedi yaz.</p>' : '') +
                 '<h3 class="sg-bolum-baslik">Önceki Sayımda</h3>' +
                 '<div class="sg-ikili" role="group" aria-label="Yön">' +
                     '<button type="button" data-sg="yon" data-yon="eksik" aria-pressed="' + (sec.yon === 'eksik') + '">Eksik Çıktı</button>' +
@@ -839,6 +890,13 @@
         );
         var d = duzenleyici;
         var girdi = d.querySelector('[data-sg="adet"]');
+        var rafGirdi = d.querySelector('[data-sg="raf"]');
+
+        function rafDegeri() {
+            var n = c._depoDegeriOku ? c._depoDegeriOku(rafGirdi.value, kg) : Number(String(rafGirdi.value).replace(',', '.'));
+            // Raf eksi olamaz; boşsa 0
+            return Number.isFinite(Number(n)) && Number(n) >= 0 ? Number(n) : 0;
+        }
 
         function deger() {
             var n = c._depoDegeriOku ? c._depoDegeriOku(girdi.value, kg) : Number(String(girdi.value).replace(',', '.'));
@@ -848,14 +906,13 @@
         }
         function hesapCiz() {
             var ek = deger();
-            var raf = c._rafDegeri(e);
+            var raf = rafDegeri();
             var sis = e.systemStock;
             var satir = '';
-            if (raf === null) {
-                satir = 'Ürün henüz sayılmadı. Rafta sayınca bu değer eklenir.';
-            } else {
+            {
                 var toplam = Math.round((raf + ek) * 1000) / 1000;
-                satir = 'Rafta <b>' + sayi(raf) + '</b> ' + (ek < 0 ? '−' : '+') + ' Önceki <b>' + sayi(Math.abs(ek)) + '</b> = Toplam <b>' + sayi(toplam) + '</b>';
+                // Eksi toplam yalnız önceki sayımla oluşur: rafta 0, önceki −17 → −17
+                satir = 'Rafta <b>' + sayi(raf) + '</b> ' + (ek < 0 ? '−' : '+') + ' Önceki <b>' + sayi(Math.abs(ek)) + '</b> = Toplam <b>' + (toplam < 0 ? '−' + sayi(Math.abs(toplam)) : sayi(toplam)) + '</b>';
                 if (sis !== null && sis !== undefined && sis !== '') {
                     var fark = Math.round((toplam - Number(sis)) * 1000) / 1000;
                     satir += '<br>Sistem <b>' + sayi(sis) + '</b> · Fark <b style="color:' + (fark > 0 ? '#047857' : fark < 0 ? '#b42318' : '#667085') + '">' +
@@ -866,6 +923,8 @@
         }
         hesapCiz();
         girdi.addEventListener('input', hesapCiz);
+        rafGirdi.addEventListener('input', hesapCiz);
+        rafGirdi.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') d.querySelector('[data-sg="kaydet"]').click(); });
         girdi.addEventListener('keydown', function (ev) { if (ev.key === 'Enter') d.querySelector('[data-sg="kaydet"]').click(); });
 
         d.addEventListener('click', async function (ev) {
@@ -889,7 +948,18 @@
             if (ne === 'kaldir' || ne === 'kaydet') {
                 t.disabled = true;
                 try {
-                    await c.setEkSayim(pid, ne === 'kaldir' ? 0 : deger());
+                    if (ne === 'kaldir') {
+                        await c.setEkSayim(pid, 0);
+                    } else {
+                        var yeniEk = deger();
+                        var yeniRaf = rafDegeri();
+                        await c.setEkSayim(pid, yeniEk);
+                        // Rafta sayılan değiştiyse ya da ürün hiç sayılmadıysa yaz (toplam = raf + önceki)
+                        if (c._rafDegeri(c.countingData[pid]) !== yeniRaf) await c.updateProductStock(pid, yeniRaf, null);
+                        if (typeof c.scheduleRenderTable === 'function') c.scheduleRenderTable();
+                        if (typeof c.updateStatistics === 'function') c.updateStatistics();
+                        if (pid === c.currentCountingProduct && typeof c._refreshOpenCountingSheetFromData === 'function') c._refreshOpenCountingSheetFromData();
+                    }
                     katmanKapat(d);
                 } catch (err) {
                     t.disabled = false;
@@ -924,8 +994,23 @@
         menu.insertBefore(b, sil || null);
     }
 
+    /** Aktif tablo kartının altında herkesin göreceği giriş düğmesi */
+    function kartaEkle() {
+        var kart = document.querySelector('#sayimActiveTableHost .skeleton-content') || document.getElementById('sayimActiveTableHost');
+        if (!kart || kart.querySelector('.sg-giris')) return;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'sg-giris';
+        b.innerHTML = '<span class="sg-giris__ikon">' + IKON_GECMIS + '</span>' +
+            '<span class="sg-giris__metin"><b>Sayım Geçmişi</b><small>Paneldeki sayımlar, farklar ve önceki sayım</small></span>' +
+            '<svg class="sg-giris__ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+        b.addEventListener('click', pencereAc);
+        kart.appendChild(b);
+    }
+
     function kur() {
         menuyeEkle();
+        kartaEkle();
         dinleyiciKur();
     }
 

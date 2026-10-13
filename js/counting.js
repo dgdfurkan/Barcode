@@ -6239,45 +6239,109 @@ class CountingSystem {
     }
 
     _rehberSktGecerli() {
+        if (this._financeSktTablo !== this.selectedFinancialTable) this._rehberSktGeriYukle();
         return !!this._financeSktZaman && this._financeSktTablo === this.selectedFinancialTable;
+    }
+
+    _sktZamanMetni(ms) {
+        if (!ms) return '';
+        const dk = Math.round((Date.now() - ms) / 60000);
+        if (dk < 1) return 'az önce';
+        if (dk < 60) return `${dk} dk önce`;
+        return `${Math.round(dk / 60)} sa önce`;
+    }
+
+    /** SKT'ler tablo başına saklanır: tablo değişse, sayfa yenilense de kaybolmaz (6 saat) */
+    _rehberSktAnahtari() { return `jb_rehber_skt_${this.currentUser?.username || '_'}`; }
+
+    _rehberSktSakla() {
+        const tablo = this._financeSktTablo;
+        if (!tablo || !this._financeSktZaman) return;
+        try {
+            const ham = JSON.parse(localStorage.getItem(this._rehberSktAnahtari()) || '{}') || {};
+            ham[tablo] = {
+                z: this._financeSktZaman,
+                i: [...(this._financeSktIstenen || [])],
+                v: Object.fromEntries(this._financePasteGuideSkt),
+            };
+            const siralı = Object.entries(ham).sort((a, b) => (b[1]?.z || 0) - (a[1]?.z || 0)).slice(0, 12);
+            localStorage.setItem(this._rehberSktAnahtari(), JSON.stringify(Object.fromEntries(siralı)));
+        } catch (e) { /* kota dolu olabilir */ }
+    }
+
+    _rehberSktGeriYukle() {
+        const tablo = this.selectedFinancialTable;
+        if (!tablo || tablo === 'all' || this._financeSktYukleniyor) return;
+        // Her kart çiziminde değil, tablo değişince bir kez bakılır
+        if (this._rehberGeriYuklenen === tablo) return;
+        this._rehberGeriYuklenen = tablo;
+        try {
+            const kayit = (JSON.parse(localStorage.getItem(this._rehberSktAnahtari()) || '{}') || {})[tablo];
+            if (!kayit || !kayit.z || Date.now() - kayit.z > 6 * 3600 * 1000) return;
+            this._financePasteGuideSkt = new Map(Object.entries(kayit.v || {}));
+            this._financeSktIstenen = new Set(kayit.i || []);
+            this._financeSktZaman = kayit.z;
+            this._financeSktTablo = tablo;
+            this._financeSktHata = null;
+        } catch (e) { /* bozuk kayıt */ }
+    }
+
+    /** Rehber açılınca SKT'ler kendiliğinden gelir; aynı liste için bir kez denenir */
+    _rehberSktOtomatik() {
+        const tablo = this.selectedFinancialTable;
+        if (!tablo || tablo === 'all' || this._financeSktYukleniyor || this.currentTab !== 'finans') return;
+        if (!window.getirExtensionHelper?.fetchExpiryProducts) return;
+        const items = this._rehberUrunleri();
+        if (!items.length) return;
+        const anahtar = `${tablo}|${items.map((p) => p.productId).join(',')}`;
+        if (this._rehberSktOtoAnahtar === anahtar) return;
+        this._rehberSktOtoAnahtar = anahtar;
+        const istenen = this._rehberSktGecerli() ? this._financeSktIstenen || new Set() : new Set();
+        if (items.every((p) => istenen.has(String(p.productId)))) return;
+        void this.fetchFinanceGuideSkt({ sessiz: true });
     }
 
     /** Kartın Son Kullanma bölümü: her parti tarih, büyük adet ve kalan gün */
     _renderFinancePasteGuideSktHtml(productId, depo = null) {
+        // SKT alınırken her kartta yer tutucu: kart boyu sonradan zıplamasın
+        if (this._financeSktYukleniyor) {
+            return '<div class="rh-skt" aria-hidden="true"><span class="rh-skt__etiket">SKT</span><div class="rh-lotlar"><span class="rh-lot rh-lot--iskelet"></span><span class="rh-lot rh-lot--iskelet"></span></div></div>';
+        }
         if (!this._rehberSktGecerli()) return '';
         const entries = this._getFinancePasteGuideSktEntries(productId);
         if (!entries.length) {
-            return '<div class="rh-skt"><p class="rh-skt__baslik">Son Kullanma</p><p class="rh-skt__yok">Warehouse panelinde bu ürüne ait SKT kaydı yok.</p></div>';
+            return '<div class="rh-skt"><span class="rh-skt__etiket">SKT</span><p class="rh-skt__yok">Panelde bu ürünün SKT kaydı yok</p></div>';
         }
         const lotlar = entries.map((e) => {
             const kova = this._sktKova(e);
+            const gun = this._sktKalanGun(e);
+            const gunMetni = gun === null ? '' : gun <= 0 ? 'Bugün' : gun === 1 ? 'Yarın' : `${gun} gün`;
             const ipucu = `SKT ${e.date}${e.removeDate ? ' · satıştan kalkış ' + e.removeDate : ''}`;
-            return `<div class="rh-lot rh-lot--${kova}" title="${this.escapeHtml(ipucu)}">
-                <span class="rh-lot__tarih">${this.escapeHtml(e.date)}</span>
-                <span class="rh-lot__adet"><b>${this._sayiMetni(e.qty)}</b> adet</span>
-                <span class="rh-lot__gun">${kova === 'sonra' ? (this._sktKalanGun(e) ?? '') + ' gün' : this._sktGunMetni(e)}</span>
-            </div>`;
+            return `<span class="rh-lot rh-lot--${kova}" title="${this.escapeHtml(ipucu)}">
+                <b>${this.escapeHtml(e.date)}</b><span>${this._sayiMetni(e.qty)} adet</span>${gunMetni ? `<i>${gunMetni}</i>` : ''}
+            </span>`;
         }).join('');
         const toplam = entries.reduce((t, e) => t + (Number(e.qty) || 0), 0);
         const tutmuyor = depo !== null && depo !== undefined && !Number.isNaN(Number(depo)) && Math.abs(Number(depo) - toplam) > 0.0005;
         return `<div class="rh-skt">
-            <p class="rh-skt__baslik">Son Kullanma<span>${entries.length} parti · ${this._sayiMetni(toplam)} adet</span></p>
+            <span class="rh-skt__etiket">SKT</span>
             <div class="rh-lotlar">${lotlar}</div>
-            ${tutmuyor ? `<p class="rh-skt__not">SKT toplamı ${this._sayiMetni(toplam)}, depoda ${this._sayiMetni(depo)} sayıldı</p>` : ''}
+            ${tutmuyor ? `<p class="rh-skt__not">Partilerde ${this._sayiMetni(toplam)} adet var, depoda ${this._sayiMetni(depo)} sayıldı</p>` : ''}
         </div>`;
     }
 
     /** Asistan ile warehouse panelinden SKT: yalnız rehberdeki (eksik / fazla) ürünler */
-    async fetchFinanceGuideSkt() {
+    async fetchFinanceGuideSkt(secenek = {}) {
+        const sessiz = secenek && secenek.sessiz === true;
         const tablo = this.selectedFinancialTable;
         if (!tablo || tablo === 'all') {
-            this.showToast('Önce tek bir tablo seçin', 'warning', 2500);
+            if (!sessiz) this.showToast('Önce tek bir tablo seçin', 'warning', 2500);
             return;
         }
         if (this._financeSktYukleniyor) return;
         const items = this._rehberUrunleri();
         if (!items.length) {
-            this.showToast('Bu tabloda eksik ya da fazla ürün yok', 'info', 2500);
+            if (!sessiz) this.showToast('Bu tabloda eksik ya da fazla ürün yok', 'info', 2500);
             return;
         }
         const helper = window.getirExtensionHelper;
@@ -6325,8 +6389,10 @@ class CountingSystem {
                 }
             }
             this._financeSktZaman = Date.now();
+            this._financeSktIstenen = new Set(items.map((p) => String(p.productId)));
+            this._rehberSktSakla();
             const bulunan = items.filter((p) => this._getFinancePasteGuideSktEntries(p.productId).length).length;
-            this.showToast(`${bulunan} / ${items.length} üründe SKT bulundu`, bulunan ? 'success' : 'info', 2500);
+            if (!sessiz) this.showToast(`${bulunan} / ${items.length} üründe SKT bulundu`, bulunan ? 'success' : 'info', 2500);
         } catch (e) {
             const m = (e && e.message) || '';
             this._financeSktHata = /giriş/i.test(m)
@@ -6786,27 +6852,30 @@ class CountingSystem {
         const tur = fark === null || fark === 0 ? 'esit' : fark < 0 ? 'eksik' : 'fazla';
         const farkMetni = fark === null ? '—' : fark === 0 ? '0' : `${fark > 0 ? '+' : '−'}${this._sayiMetni(Math.abs(fark))}`;
         const barcodeList = Array.isArray(p.barcodes) && p.barcodes.length ? p.barcodes : p.barcode ? [p.barcode] : [];
-        const hasBarcodes = barcodeList.some((b) => b != null && String(typeof b === 'object' ? b.code ?? '' : b).trim());
-        const barcodesHtml = hasBarcodes
+        const barkodlar = barcodeList
+            .map((b) => String(b && typeof b === 'object' ? (b.code ?? '') : (b ?? '')).trim())
+            .filter(Boolean);
+        const ilkBarkod = barkodlar[0] || '';
+        const barcodesHtml = barkodlar.length
             ? `<div class="finance-barcodes-block rh-barkod ${this._financeBarcodesVisible ? '' : 'hidden'}" aria-hidden="${this._financeBarcodesVisible ? 'false' : 'true'}">${this.renderFinanceScannableBarcodesHtml(barcodeList, { maxVisible: 1, width: 150, height: 36, ekGizle: true })}</div>`
             : '';
         const secili = this._financePasteGuideSelectedIndex === idx;
         return `
             <article class="rh-kart rh-kart--${tur}${secili ? ' is-secili' : ''}" data-guide-index="${idx}" tabindex="0" aria-pressed="${secili}">
                 <div class="rh-kart__ust">
-                    <span class="rh-sira">${String(idx + 1).padStart(2, '0')}</span>
                     <button type="button" class="rh-foto" data-rh-gorsel="${idx}" aria-label="Görseli büyüt">
                         <img src="${img}" alt="" loading="lazy" onerror="this.src='../assets/logo.png'">
+                        <span class="rh-sira">${idx + 1}</span>
                     </button>
                     <div class="rh-kimlik">
-                        <p class="rh-isim">${name}</p>
-                        <div class="rh-olcu">
-                            <div><span>Depo</span><b>${this._formatPasteGuideStock(d.warehouseStock)}</b></div>
-                            <div><span>Sistem</span><b>${this._formatPasteGuideStock(d.systemStock)}</b></div>
-                            <div class="rh-olcu__fark"><span>${tur === 'eksik' ? 'Eksik' : tur === 'fazla' ? 'Fazla' : 'Fark'}</span><b>${farkMetni}</b></div>
+                        <button type="button" class="rh-isim rh-kopya" data-rh-kopya="${this.escapeHtml(p.productName || p.name || '')}" title="Adı kopyala">${name}</button>
+                        <div class="rh-alt">
+                            ${ilkBarkod ? `<button type="button" class="rh-barkod-yazi rh-kopya" data-rh-kopya="${this.escapeHtml(ilkBarkod)}" title="Barkodu kopyala"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6v12M8 6v12M11 6v12M15 6v12M18 6v12M20 6v12"/></svg>${this.escapeHtml(ilkBarkod)}</button>` : ''}
+                            <span class="rh-meta">Depo <b>${this._formatPasteGuideStock(d.warehouseStock)}</b><i aria-hidden="true">·</i>Sistem <b>${this._formatPasteGuideStock(d.systemStock)}</b></span>
                         </div>
                         ${barcodesHtml}
                     </div>
+                    <div class="rh-fark rh-fark--${tur}"><b>${farkMetni}</b><span>${tur === 'eksik' ? 'Eksik' : tur === 'fazla' ? 'Fazla' : 'Eşit'}</span></div>
                 </div>
                 ${this._renderFinancePasteGuideSktHtml(p?.productId, d.warehouseStock)}
             </article>`;
@@ -6857,6 +6926,13 @@ class CountingSystem {
             ? `Sayım listesindeki ${items.length} ürün, yapıştırdığın sırayla${g.unmatched ? ` · ${g.unmatched} ürün bu tabloda yok` : ''}`
             : 'Tablonun eksik ve fazla ürünleri · sayım listesini yapıştırırsan o sırayla dizilir';
         const sktDugme = yuk ? 'Getiriliyor' : gecerli ? 'SKT\'leri Yenile' : 'SKT\'leri Getir';
+        const asistanVar = !!window.getirExtensionHelper?.fetchExpiryProducts;
+        const sktBilgi = yuk
+            ? ''
+            : gecerli
+                ? `SKT ${this._sktZamanMetni(this._financeSktZaman)} alındı`
+                : asistanVar ? '' : 'SKT bilgisayardaki Jet Barkod Asistan ile alınır';
+        if (tek && items.length && asistanVar) setTimeout(() => this._rehberSktOtomatik(), 0);
         return `
             <section class="rh-bolum" id="financePasteGuideSection" aria-labelledby="rhBaslik">
                 <header class="rh-baslik">
@@ -6876,6 +6952,7 @@ class CountingSystem {
                         <span>${sktDugme}</span>
                     </button>
                     ${yapistirildi && !yuk ? '<button type="button" id="financePasteGuideClearBtn" class="rh-metin-dugme">Listeyi Kaldır</button>' : ''}
+                    ${sktBilgi ? `<span class="rh-skt-bilgi">${this.escapeHtml(sktBilgi)}</span>` : ''}
                 </div>
                 ${kpi}
                 <div id="financePasteGuideStatus" role="status" aria-live="polite">${durum}</div>
@@ -6911,6 +6988,19 @@ class CountingSystem {
             // Fotoğrafa dokununca büyük görsel; satırın geri kalanı yalnız işaretler (nerede kaldığın görünsün)
             list.addEventListener('click', (e) => {
                 if (e.target.closest('[data-barcode-copy]')) return;
+                const kopya = e.target.closest('[data-rh-kopya]');
+                if (kopya) {
+                    e.stopPropagation();
+                    const metin = kopya.getAttribute('data-rh-kopya') || '';
+                    const bitti = () => {
+                        kopya.classList.add('is-kopyalandi');
+                        clearTimeout(kopya.__z);
+                        kopya.__z = setTimeout(() => kopya.classList.remove('is-kopyalandi'), 1200);
+                    };
+                    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(metin).then(bitti, bitti);
+                    else bitti();
+                    return;
+                }
                 const foto = e.target.closest('[data-rh-gorsel]');
                 if (foto) {
                     e.stopPropagation();
