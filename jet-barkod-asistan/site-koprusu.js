@@ -107,6 +107,30 @@
             return;
         }
 
+        /* Sayım Geçmişi: sayfa tarih aralığını veriyor, arka plan depo
+           panelinin sayım sonuçlarını okuyor. Olaylar aşağıda geri yayılıyor. */
+        if (d.type === 'JB_SAYIM_GECMISI_ISTEK') {
+            arkaPlana({
+                type: 'JBA_SAYIM_GECMISI',
+                warehouseId: String(d.warehouseId || ''),
+                baslangic: String(d.baslangic || ''),
+                bitis: String(d.bitis || ''),
+                otomatik: d.otomatik !== false,
+                bilinen: d.bilinen && typeof d.bilinen === 'object' ? d.bilinen : {}
+            }, function (y) {
+                gonder({
+                    type: 'JB_SAYIM_GECMISI_KABUL',
+                    ok: !!(y && y.ok),
+                    hata: (y && y.hata) || (y ? null : 'Asistan yanıt vermedi')
+                });
+            });
+            return;
+        }
+        if (d.type === 'JB_SAYIM_GECMISI_DURDUR') {
+            arkaPlana({ type: 'JBA_SAYIM_GECMISI_DURDUR' }, function () {});
+            return;
+        }
+
         // Sayfa açık modül listesini bildiriyor.
         if (d.type === 'JB_ASISTAN_MODULLER' && Array.isArray(d.moduller)) {
             var temiz = d.moduller.filter(function (x) { return typeof x === 'string'; });
@@ -138,6 +162,12 @@
         chrome.runtime.onMessage.addListener(function (m) {
             if (m && m.type === 'LOW_STOCK_LIST_UPDATE') {
                 gonder({ type: 'LOW_STOCK_LIST_UPDATE', list: m.list || [], username: m.username });
+            }
+            if (m && m.type === 'JBA_SAYIM_GECMISI_OLAY') {
+                var olay = {};
+                for (var k in m) { if (Object.prototype.hasOwnProperty.call(m, k)) olay[k] = m[k]; }
+                olay.type = 'JB_SAYIM_GECMISI_OLAY';
+                gonder(olay);
             }
         });
     } catch (e) { /* sessiz */ }

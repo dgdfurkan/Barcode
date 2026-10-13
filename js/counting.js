@@ -2705,12 +2705,14 @@ class CountingSystem {
         if (depoInput && !this.autoSaveTimeout) {
             const kg = this.isKgProduct(productId);
             const yazilan = this._depoDegeriOku(depoInput.value, kg);
-            const ayni = yazilan === (data.warehouseStock ?? null) && /,\d{0,2}$/.test(depoInput.value);
-            if (!ayni) depoInput.value = this._depoMetni(data.warehouseStock, kg);
+            const raf = this._rafDegeri(data);
+            const ayni = yazilan === raf && /,\d{0,2}$/.test(depoInput.value);
+            if (!ayni) depoInput.value = this._depoMetni(raf, kg);
         }
         const stockIndicator = document.getElementById('countingStockIndicator');
         this.updateStockIndicator(productId, stockIndicator);
         this.updateCorrectEntryButtonState();
+        try { window.JBSayimGecmisi?.pencereGuncelle?.(productId); } catch (e) { /* sessiz */ }
     }
 
     _persistCurrentTableToMeta() {
@@ -2999,6 +3001,7 @@ class CountingSystem {
             warehouseStockAt: meta.warehouseStockAt ?? null,
             systemStockAt: meta.systemStockAt ?? null,
         };
+        if (meta.ekSayim != null) entry.ekSayim = meta.ekSayim;
         if (row.struck_price != null && row.struck_price !== '') {
             const sp = Number(row.struck_price);
             if (!Number.isNaN(sp)) entry.struckPrice = sp;
@@ -3027,6 +3030,7 @@ class CountingSystem {
             addedAt: entry.addedAt ?? null,
             warehouseStockAt: entry.warehouseStockAt ?? null,
             systemStockAt: entry.systemStockAt ?? null,
+            ekSayim: Number(entry.ekSayim) || null,
         };
     }
 
@@ -3040,6 +3044,7 @@ class CountingSystem {
                 if (item.addedAt) meta.addedAt = item.addedAt;
                 if (item.warehouseStockAt) meta.warehouseStockAt = item.warehouseStockAt;
                 if (item.systemStockAt) meta.systemStockAt = item.systemStockAt;
+                if (item.ekSayim != null && Number.isFinite(Number(item.ekSayim))) meta.ekSayim = Number(item.ekSayim);
             } else if (item) {
                 stockHist.push(item);
             }
@@ -3055,6 +3060,8 @@ class CountingSystem {
         if (entry?.addedAt) tl.addedAt = entry.addedAt;
         if (entry?.warehouseStockAt) tl.warehouseStockAt = entry.warehouseStockAt;
         if (entry?.systemStockAt) tl.systemStockAt = entry.systemStockAt;
+        // "Önceki Sayım": satırla aynı kayıtta durur, her cihaza onunla gider
+        if (Number(entry?.ekSayim)) tl.ekSayim = Number(entry.ekSayim);
         if (Object.keys(tl).length > 0) out.push({ _tl: true, ...tl });
         return out;
     }
@@ -3066,6 +3073,7 @@ class CountingSystem {
         if (!entry.addedAt && meta.addedAt) entry.addedAt = meta.addedAt;
         if (!entry.warehouseStockAt && meta.warehouseStockAt) entry.warehouseStockAt = meta.warehouseStockAt;
         if (!entry.systemStockAt && meta.systemStockAt) entry.systemStockAt = meta.systemStockAt;
+        if (entry.ekSayim == null && meta.ekSayim != null) entry.ekSayim = meta.ekSayim;
         return entry;
     }
 
@@ -6585,7 +6593,7 @@ class CountingSystem {
     }
 
     _getFinancePasteGuideWarehouseId() {
-        return this._depoKimligi(this.cachedFullData?._api_info?.warehouseId) || '5dcafe6ae2c61b1e52cf1704';
+        return this._depoKimligi(this.cachedFullData?._api_info?.warehouseId) || null;
     }
 
     _formatFinancePasteGuideSktStartDate() {
@@ -8956,7 +8964,9 @@ class CountingSystem {
                 if (this._rowHasExplicitQuantity(row) && this.countingData[pid]) {
                     const q = Number(row.quantity);
                     if (!Number.isNaN(q) && q >= 0) {
-                        this.countingData[pid].warehouseStock = q;
+                        // İçe aktarılan adet raftaki adet; "Önceki Sayım" varsa toplama eklenir
+                        const ek = this._ekSayim(this.countingData[pid]);
+                        this.countingData[pid].warehouseStock = ek ? Math.round((q + ek) * 1000) / 1000 : q;
                         this.countingData[pid].lastUpdated = new Date().toISOString();
                     }
                 }
@@ -9049,7 +9059,7 @@ class CountingSystem {
                 if (entry) delete entry.reservedStock;
                 // Getir'de stoğu 0: depo ve sistem 0 işlenir, sayılmış sayılır
                 if (entry && it.sifir === true) {
-                    entry.warehouseStock = 0;
+                    entry.warehouseStock = this._ekSayim(entry) || 0;
                     entry.systemStock = 0;
                 } else if (entry && it.sistem != null && !Number.isNaN(Number(it.sistem))) {
                     // "Sistem stoğunu doldur" açık: mevcut stok sistem stoğu olur, rezerve de yazılır
@@ -10405,8 +10415,12 @@ class CountingSystem {
                 if (this.currentCountingProduct) {
                     const stockIndicator = document.getElementById('countingStockIndicator');
                     // Temporarily update countingData for calculation
-                    const tempWarehouseStock = this._depoDegeriOku(depoInput.value, this.isKgProduct(this.currentCountingProduct));
                     const originalData = this.countingData[this.currentCountingProduct] || {};
+                    const yazilanRaf = this._depoDegeriOku(depoInput.value, this.isKgProduct(this.currentCountingProduct));
+                    const ekSayim = this._ekSayim(originalData);
+                    const tempWarehouseStock = yazilanRaf === null || !ekSayim
+                        ? yazilanRaf
+                        : Math.round((yazilanRaf + ekSayim) * 1000) / 1000;
                     const tempData = { ...originalData, warehouseStock: tempWarehouseStock };
                     this.countingData[this.currentCountingProduct] = tempData;
                     
@@ -11742,6 +11756,47 @@ class CountingSystem {
         }, 24);
     }
 
+    /** Üründeki "Önceki Sayım" adedi (yoksa 0). Eksi = önceki sayımda eksik çıkmış. */
+    _ekSayim(entry) {
+        const n = Number(entry && entry.ekSayim);
+        return Number.isFinite(n) ? n : 0;
+    }
+
+    /** Rafta sayılan adet: toplamdan önceki sayım çıkarılmış hâli. */
+    _rafDegeri(entry) {
+        const ws = entry ? entry.warehouseStock : null;
+        if (ws === null || ws === undefined || ws === '') return null;
+        const n = Number(ws);
+        if (Number.isNaN(n)) return null;
+        return Math.round((n - this._ekSayim(entry)) * 1000) / 1000;
+    }
+
+    /**
+     * "Önceki Sayım" değerini yazar. Rafta sayılan değişmez, toplam yeniden
+     * hesaplanır. Ürün henüz sayılmadıysa değer bekler, sayılınca eklenir.
+     */
+    async setEkSayim(productId, ek) {
+        const entry = this.countingData && this.countingData[productId];
+        if (!entry) return false;
+        const yeni = Math.round((Number(ek) || 0) * 1000) / 1000;
+        const eski = this._ekSayim(entry);
+        if (yeni === eski) return true;
+        const raf = this._rafDegeri(entry);
+        if (yeni) entry.ekSayim = yeni;
+        else delete entry.ekSayim;
+        if (raf !== null) {
+            await this.updateProductStock(productId, raf, null);
+        } else {
+            entry.lastUpdated = new Date().toISOString();
+            this._scheduleProductSave(productId, 400);
+        }
+        this.scheduleRenderTable();
+        this.updateStatistics();
+        this._invalidateFinanceCache(this.currentTableName);
+        if (productId === this.currentCountingProduct) this._refreshOpenCountingSheetFromData();
+        return true;
+    }
+
     async updateProductStock(productId, warehouseStock, systemStock = null, price = null, priceText = null, reservedStock = undefined, struckPrice = null, struckPriceText = null) {
         if (!this.countingData[productId]) {
             console.error('Product not found in counting data:', productId);
@@ -11754,6 +11809,13 @@ class CountingSystem {
             const n = Number(v);
             return Number.isNaN(n) ? null : n;
         };
+
+        // Depo değeri her yerden rafta sayılan adet olarak gelir. Üründe
+        // "Önceki Sayım" varsa toplam yazılır; finans ve raporlar toplamla çalışır.
+        const ekSayim = this._ekSayim(this.countingData[productId]);
+        if (ekSayim && warehouseStock !== null && warehouseStock !== undefined && !Number.isNaN(Number(warehouseStock))) {
+            warehouseStock = Math.round((Number(warehouseStock) + ekSayim) * 1000) / 1000;
+        }
 
         const oldWarehouseStock = this.countingData[productId].warehouseStock;
         const oldSystemStock = this.countingData[productId].systemStock;
@@ -12736,8 +12798,9 @@ class CountingSystem {
                     apiInfo.stockEndpoint = 'https://franchise-api-gateway.getirapi.com/stocks';
                 }
                 
-                // Varsayılan warehouse ID; nesne olarak gelen kimlik düzleştirilir
-                apiInfo.warehouseId = this._depoKimligi(apiInfo.warehouseId) || '5dcafe6ae2c61b1e52cf1704';
+                // Nesne olarak gelen kimlik düzleştirilir. Sabit depo kimliği yok:
+                // bilinmeyen depoya istek atmak yanlış veri getirir.
+                apiInfo.warehouseId = this._depoKimligi(apiInfo.warehouseId) || null;
                 
                 // API bilgilerini Supabase'e kaydet (telefondan erişim için)
                 await this.saveApiInfoToDb(apiInfo);
@@ -12889,7 +12952,8 @@ class CountingSystem {
             });
 
             const endpoint = apiInfo.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks';
-            const warehouseId = this._depoKimligi(apiInfo.warehouseId) || '5dcafe6ae2c61b1e52cf1704';
+            const warehouseId = this._depoKimligi(apiInfo.warehouseId);
+            if (!warehouseId) throw new Error('Depo bilgisi bulunamadı. Franchise stok sayfasını bir kez açın.');
             let authToken = apiInfo.token;
             if (!authToken.startsWith('Bearer ')) authToken = 'Bearer ' + authToken.trim();
 
@@ -12956,7 +13020,8 @@ class CountingSystem {
             if (!apiInfo?.token) return null;
 
             const endpoint = apiInfo.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks';
-            const warehouseId = this._depoKimligi(apiInfo.warehouseId) || '5dcafe6ae2c61b1e52cf1704';
+            const warehouseId = this._depoKimligi(apiInfo.warehouseId);
+            if (!warehouseId) return null;
             let authToken = apiInfo.token;
             if (!authToken.startsWith('Bearer ')) authToken = 'Bearer ' + authToken.trim();
 
@@ -13079,7 +13144,8 @@ class CountingSystem {
             
             // franchise-api-gateway.getirapi.com/stocks endpoint'ini kullan
             const endpoint = apiInfo.stockEndpoint || 'https://franchise-api-gateway.getirapi.com/stocks';
-            const warehouseId = this._depoKimligi(apiInfo.warehouseId) || '5dcafe6ae2c61b1e52cf1704';
+            const warehouseId = this._depoKimligi(apiInfo.warehouseId);
+            if (!warehouseId) throw new Error('Depo bilgisi bulunamadı. Franchise stok sayfasını bir kez açın.');
             
             // Yeni API formatı: warehouseIds (array), productIds (array), sort
             let requestBody = {
@@ -13704,7 +13770,7 @@ class CountingSystem {
                                         class="warehouse-stock-input flex-1 min-w-0 px-2 sm:px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-sm sm:text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all text-center"
                                         min="0"
                                         step="1"
-                                value="${this._depoMetni(data.warehouseStock, this.isKgProduct(productId))}"
+                                value="${this._depoMetni(this._rafDegeri(data), this.isKgProduct(productId))}"
                                 placeholder="—"
                                 data-product-id="${productId}"
                             >
@@ -13889,7 +13955,7 @@ class CountingSystem {
                                             class="warehouse-stock-input flex-1 min-w-[60px] px-1.5 sm:px-2 py-1.5 sm:py-2.5 bg-white border-2 border-orange-200 rounded-lg text-sm sm:text-base font-bold text-gray-900 focus:ring-2 focus:ring-orange-500 focus:border-orange-400 transition-all text-center"
                                             min="0"
                                             step="1"
-                                            value="${this._depoMetni(data.warehouseStock, this.isKgProduct(productId))}"
+                                            value="${this._depoMetni(this._rafDegeri(data), this.isKgProduct(productId))}"
                                             placeholder="—"
                                             data-product-id="${productId}"
                                         >
@@ -14559,8 +14625,9 @@ class CountingSystem {
         }
         const kgUrun = this.isKgProduct(productId);
         if (depoInput) {
-            depoInput.value = this._depoMetni(data.warehouseStock, kgUrun);
+            depoInput.value = this._depoMetni(this._rafDegeri(data), kgUrun);
         }
+        try { window.JBSayimGecmisi?.pencereGuncelle?.(productId); } catch (e) { /* sessiz */ }
         // Virgül tuşu (7'nin altı) yalnız kg ürünlerde; hücre her zaman yerinde, tuş takımı kaymaz
         const virgulTusu = document.getElementById('keypadVirgul');
         if (virgulTusu) {

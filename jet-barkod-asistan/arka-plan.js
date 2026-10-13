@@ -11,6 +11,7 @@ import './arka-plan/raf-etiketi.js';
 import './arka-plan/urun-cekici.js';
 import './arka-plan/siparis-kopru.js';
 import './arka-plan/siteye-git.js';
+import './arka-plan/sayim-gecmisi.js';
 
 /**
  * Güncelleme sonrası açık panel sekmelerini tazele.
