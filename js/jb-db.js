@@ -265,6 +265,31 @@
         return m ? { kolon: m[1], deger: m[2] } : null;
     }
 
+    /*
+     * Yoklamayı hafifletmek için iki yol var. Eskiden her 4 saniyede süzgeçteki
+     * bütün satırlar çekiliyordu: sayım sayfasında kullanıcının tüm sayım
+     * satırları (geçmişleriyle) ve tüm sayım meta verisi. Telefonda pil, veri
+     * ve işlemci bunu taşımıyordu.
+     *
+     * ARTIMLI: yalnız damgası son görülenden yeni satırlar çekilir ve her biri
+     *   ayrı olay olarak verilir. Damga istemci saatinden yazıldığı için iki
+     *   dakikalık örtüşmeyle sorulur; aynı satır aynı damgayla iki kez verilmez.
+     * DAMGALI: önce tek kolonluk damga sorulur, değiştiyse satırın tamamı
+     *   çekilir. Damga tetikleyicisi bir sebeple çalışmıyorsa diye dakikada bir
+     *   yine tam okuma yapılır.
+     * Kolon okunamazsa (yetki, eski şema) eski tam yoklamaya dönülür.
+     */
+    var ARTIMLI = { counting_items: 'last_updated' };
+    var DAMGALI = { users: 'updated_at' };
+    var ORTUSME_MS = 120000;
+    var ARTIMLI_SAYFA = 500;
+    var DAMGALI_TAM_OKUMA_MS = 60000;
+
+    function zaman(v) {
+        var t = v ? new Date(v).getTime() : 0;
+        return isNaN(t) ? 0 : t;
+    }
+
     function Kanal(ad, istemci, kok) {
         this.name = ad;
         this._istemci = istemci;
@@ -296,8 +321,21 @@
         var self = this;
         setTimeout(function () { if (durumGeri) durumGeri('SUBSCRIBED'); }, 0);
         if (!this._timer) {
-            this._timer = setInterval(function () { self._yokla().catch(function () {}); }, 4000);
-            this._yokla().catch(function () {});
+            // Sekme arkadayken yoklama yok; öne gelince hemen bir tur.
+            // Yavaş ağda turlar üst üste binmesin diye biri bitmeden diğeri başlamaz.
+            var tur = function () {
+                if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+                if (self._mesgul) return;
+                self._mesgul = true;
+                self._yokla().catch(function () {}).then(function () { self._mesgul = false; });
+            };
+            this._tur = tur;
+            this._timer = setInterval(tur, 4000);
+            if (typeof document !== 'undefined') {
+                this._gorunurluk = function () { if (document.visibilityState === 'visible') tur(); };
+                document.addEventListener('visibilitychange', this._gorunurluk);
+            }
+            tur();
         }
         return this;
     };
@@ -315,8 +353,18 @@
         // yok. PostgreSQL'de kolon bazlı yetki varken `SELECT *` tamamen
         // reddedilir — bu yüzden users için kolonlar açıkça sayılıyor.
         var kolonlar = YOKLAMA_KOLONLARI[tablo] || '*';
-        var sorgu = this._istemci.from(tablo).select(kolonlar);
         var s = suzgecCoz(h.suzgec && h.suzgec.filter);
+
+        if (ARTIMLI[tablo] && !h._artimliYok) {
+            await this._artimliYokla(h, tablo, ARTIMLI[tablo], s);
+            if (!h._artimliYok) return;
+        }
+        if (DAMGALI[tablo] && !h._damgaYok) {
+            var degisti = await this._damgaDegistiMi(h, tablo, DAMGALI[tablo], s);
+            if (!h._damgaYok && !degisti) return;
+        }
+
+        var sorgu = this._istemci.from(tablo).select(kolonlar);
         if (s) sorgu = sorgu.eq(s.kolon, s.deger);
 
         var sonuc = await sorgu;
@@ -333,6 +381,89 @@
             });
         }
         this._sonGoruntu = goruntu;
+    };
+
+    /** Tek kolonluk damga değişti mi. İlk turda yalnız damgayı öğrenir. */
+    Kanal.prototype._damgaDegistiMi = async function (h, tablo, kolon, s) {
+        var q = this._istemci.from(tablo).select(kolon).order(kolon, { ascending: false, nullsFirst: false }).limit(1);
+        if (s) q = q.eq(s.kolon, s.deger);
+        var r = await q;
+        if (r.error) { h._damgaYok = true; return true; }
+        var damga = r.data && r.data[0] ? String(r.data[0][kolon] || '') : '';
+        var simdi = Date.now();
+        var ilk = h._damga === undefined;
+        var degisti = !ilk && damga !== h._damga;
+        var gecikti = !ilk && simdi - (h._sonTamOkuma || 0) >= DAMGALI_TAM_OKUMA_MS;
+        h._damga = damga;
+        // İlk turda tam okuma yapılır ki karşılaştırılacak anlık görüntü oluşsun
+        if (ilk || degisti || gecikti) { h._sonTamOkuma = simdi; return true; }
+        return false;
+    };
+
+    /** Damgası yeni satırları çekip her birini ayrı olay olarak verir. */
+    Kanal.prototype._artimliYokla = async function (h, tablo, kolon, s) {
+        var self = this;
+        var sor = function (altSinir, siniriDahil, ofset) {
+            var q = self._istemci.from(tablo).select('*');
+            if (s) q = q.eq(s.kolon, s.deger);
+            q = siniriDahil ? q.gte(kolon, altSinir) : q.gt(kolon, altSinir);
+            q = q._ekle('order', kolon + '.asc,id.asc');
+            return q.range(ofset || 0, (ofset || 0) + ARTIMLI_SAYFA - 1);
+        };
+
+        if (h._imlec === undefined) {
+            var q = this._istemci.from(tablo).select(kolon).order(kolon, { ascending: false, nullsFirst: false }).limit(1);
+            if (s) q = q.eq(s.kolon, s.deger);
+            var r = await q;
+            if (r.error) { h._artimliYok = true; return; }
+            var son = r.data && r.data[0] ? r.data[0][kolon] : null;
+            h._imlec = son || new Date(0).toISOString();
+            h._gorulen = new Map();
+            // Örtüşme penceresindeki satırlar sayfada zaten var; olay olarak verilmesin
+            if (son) {
+                var tohum = await sor(new Date(zaman(son) - ORTUSME_MS).toISOString(), true);
+                (tohum.data || []).forEach(function (satir) {
+                    h._gorulen.set(satir.id || (satir.table_name + '|' + satir.product_id), String(satir[kolon]));
+                });
+            }
+            return;
+        }
+
+        // Toplu kayıtta bir tur sayfayı doldurursa aynı alt sınırla sonraki
+        // sayfaya geçilir (aynı damgalı yüzlerce satır kaybolmasın).
+        var sayfa = h._sayfa || {
+            alt: new Date(Math.max(0, zaman(h._imlec) - ORTUSME_MS)).toISOString(),
+            ofset: 0,
+        };
+        var sonuc = await sor(sayfa.alt, false, sayfa.ofset);
+        if (sonuc.error) {
+            // Şema ya da sorgu hatası kalıcıdır, eski tam yoklamaya dön. Ağ hatası geçicidir.
+            if (/^(42|PGRST1)/.test(String(sonuc.error.code || ''))) h._artimliYok = true;
+            return;
+        }
+        var satirlar = sonuc.data || [];
+        h._sayfa = satirlar.length >= ARTIMLI_SAYFA
+            ? { alt: sayfa.alt, ofset: sayfa.ofset + satirlar.length }
+            : null;
+
+        for (var i = 0; i < satirlar.length; i++) {
+            var satir = satirlar[i];
+            var anahtar = satir.id || (satir.table_name + '|' + satir.product_id);
+            var damga = String(satir[kolon]);
+            if (zaman(damga) > zaman(h._imlec)) h._imlec = damga;
+            if (h._gorulen.get(anahtar) === damga) continue;
+            h._gorulen.set(anahtar, damga);
+            h.geri({
+                eventType: 'UPDATE',
+                new: satir,
+                old: null,
+                schema: (h.suzgec && h.suzgec.schema) || 'public',
+                table: tablo,
+            });
+        }
+
+        var esik = zaman(h._imlec) - ORTUSME_MS;
+        h._gorulen.forEach(function (d, k) { if (zaman(d) < esik) h._gorulen.delete(k); });
     };
 
     Kanal.prototype._bcYokla = async function (h) {
@@ -358,6 +489,10 @@
 
     Kanal.prototype.unsubscribe = async function () {
         if (this._timer) { clearInterval(this._timer); this._timer = null; }
+        if (this._gorunurluk && typeof document !== 'undefined') {
+            document.removeEventListener('visibilitychange', this._gorunurluk);
+            this._gorunurluk = null;
+        }
     };
 
     // ==================================================================

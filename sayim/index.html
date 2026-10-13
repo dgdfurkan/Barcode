@@ -3,8 +3,9 @@
 <head>
     <script src="../js/jb-diyalog.js?v=20260901b"></script>
     <script src="../js/console-quiet.js?v=20260828i"></script>
-    <script src="../js/app-boot.js?v=20260828i"></script>
+    <script src="../js/app-boot.js?v=20261013a"></script>
     <meta charset="UTF-8" />
+    <script>/* Yenileyince sayfa hep en üstten açılsın; tarayıcı eski kaydırma yerini geri yüklemesin. */try{history.scrollRestoration="manual"}catch(e){}</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -27,7 +28,7 @@
     <script src="../js/vendor/chart.umd.min.js?v=20260828i"></script>
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
-    <script src="../js/jb-db.js?v=20260828i"></script>
+    <script src="../js/jb-db.js?v=20261013a"></script>
     <script src="../veri/temp_products.js?v=20261003a"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <script src="../js/auth.js?v=20260919a"></script>
@@ -48,7 +49,7 @@
     <script src="../js/barcode-visual.js?v=20260828i"></script>
     <script src="../js/getir-cdn-paste.js?v=20261012c"></script>
     <script src="../js/barcode-scanner.js?v=20260828i"></script>
-    <script src="../js/counting.js?v=20261011f"></script>
+    <script src="../js/counting.js?v=20261013a"></script>
     <script src="../js/urun-foto.js?v=20261007a" defer></script>
     <script src="../js/sayim-eslesmeyen.js?v=20260928a" defer></script>
     <script src="../js/sayim-rapor.js?v=20261010b" defer></script>
@@ -4173,7 +4174,7 @@
             
             // Initialize user manager
             if (window.userDataManager) {
-                await window.userDataManager.init();
+                await window.userDataManager.hizliBaslat();
             }
 
             // Stoğu Düşük linki: sadece lowStockAlert premium varsa göster

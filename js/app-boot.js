@@ -247,4 +247,12 @@
     } else {
         init();
     }
+
+    // Uygulama gibi açılış: sürümlü dosyalar telefonda saklanır (kök dizindeki sw.js)
+    if ('serviceWorker' in navigator &&
+        /(^|\.)jetbarkod\.com\.tr$|^localhost$/.test(location.hostname)) {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js').catch(function () {});
+        });
+    }
 })(typeof window !== 'undefined' ? window : globalThis);

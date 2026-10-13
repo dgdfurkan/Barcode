@@ -360,6 +360,13 @@ class CountingSystem {
             await Promise.all([this.loadProducts(), this.loadCountingData()]);
             window.AppBoot?.step('data');
 
+            // Kullanıcı verisi önbellekten açıldı; sunucudaki farklı çıkarsa ürün listesi sessizce tazelenir
+            window.addEventListener('jb:kullanici-verisi', () => {
+                this.loadProducts()
+                    .then(() => { this.scheduleRenderTable(); this.updateStatistics(); })
+                    .catch(() => {});
+            });
+
             this.renderTable();
             this.updateViewMode();
             this.updateStatistics();
@@ -381,8 +388,9 @@ class CountingSystem {
                 this.updateAPIStatusCard();
             }, 500);
             
-            // Set up periodic API status updates (every 30 seconds)
+            // Set up periodic API status updates (every 30 seconds); arka sekmede istek yok
             setInterval(() => {
+                if (document.visibilityState === 'hidden') return;
                 this.updateAPIStatusCard();
             }, 30000);
             
@@ -463,13 +471,11 @@ class CountingSystem {
                 try {
                     const { data: userData } = await window.jbDb
                         .from('users')
-                        .select('counting_data')
+                        .select('_api_info:counting_data->_api_info')
                         .eq('username', this.currentUser.username)
                         .maybeSingle();
-                    if (userData && userData.counting_data) {
-                        const countingData = typeof userData.counting_data === 'string'
-                            ? JSON.parse(userData.counting_data)
-                            : userData.counting_data;
+                    if (userData && userData._api_info) {
+                        const countingData = userData;
                         existingApiInfo = countingData._api_info || null;
                         existingToken = countingData._api_info?.token;
                         existingTimestamp = countingData._api_info?.timestamp || 0;
@@ -806,16 +812,10 @@ class CountingSystem {
         try {
             const { data: userData } = await window.jbDb
                 .from('users')
-                .select('counting_data')
+                .select('_api_info:counting_data->_api_info')
                 .eq('username', this.currentUser.username)
                 .maybeSingle();
-            if (userData && userData.counting_data) {
-                const countingData =
-                    typeof userData.counting_data === 'string'
-                        ? JSON.parse(userData.counting_data)
-                        : userData.counting_data;
-                return countingData._api_info || null;
-            }
+            if (userData && userData._api_info) return userData._api_info;
         } catch (e) {
             /* ignore */
         }
@@ -12569,14 +12569,12 @@ class CountingSystem {
                         console.log('🔍 Supabase\'den API bilgileri okunuyor (kullanıcı:', username, ')...');
                         const { data: userData, error } = await window.jbDb
                             .from('users')
-                            .select('counting_data')
+                            .select('_api_info:counting_data->_api_info')
                             .eq('username', username)
                             .maybeSingle();
                     
-                    if (!error && userData && userData.counting_data) {
-                        const countingData = typeof userData.counting_data === 'string' 
-                            ? JSON.parse(userData.counting_data) 
-                            : userData.counting_data;
+                    if (!error && userData && userData._api_info) {
+                        const countingData = userData;
                         
                         if (countingData._api_info && countingData._api_info.token) {
                             // Token'ın Bearer prefix'i olup olmadığını kontrol et
@@ -12794,13 +12792,11 @@ class CountingSystem {
             if (session?.username) {
                 const { data: userData } = await window.jbDb
                     .from('users')
-                    .select('counting_data')
+                    .select('_api_info:counting_data->_api_info')
                     .eq('username', session.username)
                     .maybeSingle();
-                if (userData?.counting_data) {
-                    const cd = typeof userData.counting_data === 'string'
-                        ? JSON.parse(userData.counting_data)
-                        : userData.counting_data;
+                if (userData?._api_info) {
+                    const cd = userData;
                     if (cd?._api_info?.token) return cd._api_info;
                 }
             }
