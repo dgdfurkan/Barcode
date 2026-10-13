@@ -142,4 +142,9 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
   sayfa 3 sn'de bir tam çekimle idare ediyor.
 - `sql_files/sayim_dongu.sql` çalıştırılacak (Sayım > Döngü: son çekim, döngü ayarı, katalog dışı ürünler).
   Çalışana kadar Döngü çalışır ama son çekim zamanı yalnız o cihazda kalır.
+- `sql_files/sayim_gecmisi_paylasim.sql` çalıştırılacak. Sayım Geçmişi telefona gitsin ve herkese açık
+  Döngü raporu (`/dongu/#anahtar`) açılsın diye. Çalışana kadar geçmiş yalnız o tarayıcıda, Paylaş düğmesi
+  "sunucu güncellemesi bekleniyor" der.
+- `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
+  GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.
