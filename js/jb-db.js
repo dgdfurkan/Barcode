@@ -330,7 +330,25 @@
                 self._yokla().catch(function () {}).then(function () { self._mesgul = false; });
             };
             this._tur = tur;
-            this._timer = setInterval(tur, 4000);
+            // Canlı kanal açıksa yoklama yalnız güvenlik ağı: 20 sn'de bir.
+            // Haber gelince tur hemen atılır.
+            var sonTur = 0;
+            var seyrek = function () {
+                var canli = self._istemci.canli;
+                if (canli && canli.saglikliMi() && Date.now() - sonTur < 20000) return;
+                sonTur = Date.now();
+                tur();
+            };
+            this._timer = setInterval(seyrek, 4000);
+            if (this._istemci.canli) {
+                var tablolar = this._pg.map(function (h) { return h.suzgec && h.suzgec.table; }).filter(Boolean);
+                this._canliBirak = this._istemci.canli.dinle(function (olaylar, sifirla) {
+                    if (sifirla || olaylar.some(function (o) { return o.t === '*' || tablolar.indexOf(o.t) > -1; })) {
+                        sonTur = Date.now();
+                        tur();
+                    }
+                });
+            }
             if (typeof document !== 'undefined') {
                 this._gorunurluk = function () { if (document.visibilityState === 'visible') tur(); };
                 document.addEventListener('visibilitychange', this._gorunurluk);
@@ -489,6 +507,7 @@
 
     Kanal.prototype.unsubscribe = async function () {
         if (this._timer) { clearInterval(this._timer); this._timer = null; }
+        if (this._canliBirak) { this._canliBirak(); this._canliBirak = null; }
         if (this._gorunurluk && typeof document !== 'undefined') {
             document.removeEventListener('visibilitychange', this._gorunurluk);
             this._gorunurluk = null;
@@ -532,6 +551,104 @@
     // İstemci
     // ==================================================================
 
+    // ==================================================================
+    // Canlı kanal (uzun yoklama): sunucu değişiklik olduğu an haber verir
+    // ------------------------------------------------------------------
+    // vps-api/canli.js. Cihaz `GET /api/canli?son=<sıra>` ile bekler; bir
+    // sipariş ya da sayım satırı değişince cevap gelir ve dinleyiciler
+    // hemen tazeler. Haberde veri yok, yalnız tablo adı. Sekme arkadayken
+    // bekleme kapanır, öne gelince dinleyicilere "her şeyi tazele" denir.
+    // Sunucu bu ucu henüz tanımıyorsa (404) sessizce kapanır; sayfalar
+    // eski yoklamayla çalışmaya devam eder.
+    // ==================================================================
+    function canliYap(kok) {
+        var dinleyiciler = new Set();
+        var sira = -1;
+        var calisiyor = false;
+        var saglikli = false;
+        var kesici = null;
+        var hata = 0;
+        var kapaliKadar = 0;
+
+        function yay(olaylar, sifirla) {
+            dinleyiciler.forEach(function (fn) {
+                try { fn(olaylar || [], !!sifirla); } catch (e) { /* dinleyici hatası kanalı durdurmasın */ }
+            });
+        }
+
+        function bekle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+        function gizliMi() { return typeof document !== 'undefined' && document.visibilityState === 'hidden'; }
+
+        async function dongu() {
+            if (calisiyor) return;
+            calisiyor = true;
+            try {
+                while (dinleyiciler.size && !gizliMi() && Date.now() >= kapaliKadar) {
+                    var jeton = window.jetbarkodAuth && window.jetbarkodAuth.get && window.jetbarkodAuth.get();
+                    if (!jeton) { saglikli = false; break; }
+                    kesici = typeof AbortController !== 'undefined' ? new AbortController() : null;
+                    var zaman = setTimeout(function () { if (kesici) kesici.abort(); }, 35000);
+                    var basla = Date.now();
+                    try {
+                        var yanit = await fetch(kok + '/api/canli?son=' + sira, {
+                            headers: yetkiBasliklari({ Accept: 'application/json' }),
+                            cache: 'no-store',
+                            signal: kesici ? kesici.signal : undefined,
+                        });
+                        if (yanit.status === 404) { saglikli = false; kapaliKadar = Date.now() + 10 * 60 * 1000; break; }
+                        if (yanit.status === 401) { saglikli = false; await bekle(15000); continue; }
+                        if (!yanit.ok) throw new Error('durum ' + yanit.status);
+                        var j = await yanit.json();
+                        hata = 0;
+                        saglikli = j.bagli !== false;
+                        var ilk = sira < 0;
+                        sira = Number(j.seq) || 0;
+                        if (ilk) continue;
+                        if (j.sifirla) yay([], true);
+                        else if (j.olaylar && j.olaylar.length) yay(j.olaylar, false);
+                        if (j.dolu) await bekle(2000);
+                        // Haber yokken hemen dönen cevap (vekil sunucu erken kapattı): döngü dönmesin
+                        else if (!j.sifirla && !(j.olaylar && j.olaylar.length) && Date.now() - basla < 300) await bekle(1000);
+                    } catch (e) {
+                        if (gizliMi()) break;
+                        saglikli = false;
+                        hata++;
+                        await bekle(Math.min(30000, 500 * Math.pow(2, hata)));
+                    } finally {
+                        clearTimeout(zaman);
+                        kesici = null;
+                    }
+                }
+            } finally {
+                calisiyor = false;
+            }
+        }
+
+        if (typeof document !== 'undefined') {
+            document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'hidden') {
+                    saglikli = false;
+                    if (kesici) kesici.abort();
+                } else if (dinleyiciler.size) {
+                    // Arkadayken kaçanlar için bir kez tam tazeleme, sonra dinlemeye dön
+                    yay([], true);
+                    dongu();
+                }
+            });
+        }
+
+        return {
+            dinle: function (fn) {
+                dinleyiciler.add(fn);
+                dongu();
+                return function () { dinleyiciler.delete(fn); };
+            },
+            /** Kanal şu an açık ve sunucu veritabanını dinliyor mu */
+            saglikliMi: function () { return saglikli; },
+        };
+    }
+
     function istemciYap(temelUrl) {
         var kok = String(temelUrl || '').replace(/\/$/, '');
 
@@ -570,6 +687,7 @@
 
             storage: depo(kok),
             baseUrl: kok,
+            canli: canliYap(kok),
         };
 
         istemci.realtime = { channel: istemci.channel };

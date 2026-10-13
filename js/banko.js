@@ -160,8 +160,82 @@
      * sıfırlanıyor ve baştan başlanıyor: "görünmeyen kalana kadar devam et,
      * sonra yeniden".
      */
+    // ==================================================================
+    // Dolu bankolar
+    // ------------------------------------------------------------------
+    // Siparişler sayfasının bildiği bankolar: Hazırlanıyor ve Hazırlandı
+    // şeridindeki siparişlerin bankosu dolu. Kurye siparişi üstüne alınca
+    // (El Değiştiriliyor, Yolda) ya da sipariş bitince banko boşa düşer.
+    // Dolu banko önerilmez; ızgarada "dolu" görünür. Liste canlı kanalla
+    // (js/jb-db.js `canli`) sipariş değiştiği an tazelenir.
+    // ==================================================================
+
+    var dolu = new Set();
+    var doluZaman = 0;
+    var doluSoz = null;
+    var doluDinleyiciler = [];
+    var KOLON_YOLDA = /(el degistir|yolda|ulast)/;
+    var KOLON_BITTI = /(teslim|iptal|tamamlan)/;
+    var ESKIME_MS = 3 * 60 * 60 * 1000;
+
+    function sade(t) {
+        return String(t || '').toLocaleLowerCase('tr')
+            .replace(/ç/g, 'c').replace(/ğ/g, 'g').replace(/ı/g, 'i').replace(/ö/g, 'o').replace(/ş/g, 's').replace(/ü/g, 'u')
+            .replace(/\s+/g, ' ').trim();
+    }
+
+    function bankoNo(metin) {
+        var m = /(\d{1,3})\s*$/.exec(String(metin || '').trim());
+        if (!m) return null;
+        var n = parseInt(m[1], 10);
+        return n >= 1 && n <= ADET ? n : null;
+    }
+
+    function doluYukle(zorla) {
+        if (!zorla && doluSoz) return doluSoz;
+        if (!zorla && Date.now() - doluZaman < 5000) return Promise.resolve(dolu);
+        var db = global.jbDb;
+        var oturum = null;
+        try { oturum = global.authUtils && global.authUtils.checkAuth && global.authUtils.checkAuth(); } catch (e) { oturum = null; }
+        if (!db || !oturum || !oturum.username) return Promise.resolve(dolu);
+        doluZaman = Date.now();
+        doluSoz = db.from('orders')
+            .select('banko,kolon')
+            .eq('username', oturum.username)
+            .gte('updated_at', new Date(Date.now() - ESKIME_MS).toISOString())
+            .limit(300)
+            .then(function (r) {
+                if (r.error) return dolu;
+                var yeni = new Set();
+                (r.data || []).forEach(function (s) {
+                    var k = sade(s.kolon);
+                    if (KOLON_YOLDA.test(k) || KOLON_BITTI.test(k)) return;
+                    var no = bankoNo(s.banko);
+                    if (no) yeni.add(no);
+                });
+                dolu = yeni;
+                doluDinleyiciler.forEach(function (fn) { try { fn(); } catch (e) { /* sessiz */ } });
+                return dolu;
+            })
+            .catch(function () { return dolu; })
+            .then(function (v) { doluSoz = null; return v; });
+        return doluSoz;
+    }
+
+    var canliBagli = false;
+    function canliBagla() {
+        var db = global.jbDb;
+        if (canliBagli || !db || !db.canli) return;
+        canliBagli = true;
+        db.canli.dinle(function (olaylar, sifirla) {
+            if (sifirla || olaylar.some(function (o) { return o.t === 'orders' || o.t === '*'; })) doluYukle(true);
+        });
+    }
+
+    function doluMu(no) { return dolu.has(no); }
+
     function rastgele(disla) {
-        var havuz = aralik();
+        var havuz = aralik().filter(function (n) { return !dolu.has(n); });
         if (!havuz.length) return null;
 
         var yasak = gecmis().slice();
@@ -178,7 +252,7 @@
 
     /** Satırda gösterilecek, birbirinden farklı öneriler. */
     function oneriKumesi(adet) {
-        var havuz = aralik();
+        var havuz = aralik().filter(function (n) { return !dolu.has(n); });
         var yasak = gecmis();
         var uygun = havuz.filter(function (n) { return yasak.indexOf(n) === -1; });
         if (uygun.length < adet) uygun = havuz.slice();
@@ -348,6 +422,8 @@
             for (var k = 0; k < hucreler.length; k++) {
                 var no = parseInt(hucreler[k].dataset.no, 10);
                 hucreler[k].classList.toggle('kullanildi', !!harita[no]);
+                hucreler[k].classList.toggle('dolu', dolu.has(no));
+                hucreler[k].title = dolu.has(no) ? 'Dolu: bu bankoda sipariş var' : '';
                 hucreler[k].classList.toggle('disarida', no < s.altSinir || no > s.ustSinir);
                 var bu = no === secili;
                 hucreler[k].classList.toggle('secili', bu);
@@ -416,8 +492,11 @@
         function otomatikAc() {
             var s = secenekler();
             if (!s.otoAc) return;
-            var no = rastgele();
-            if (no) goster(no, s.otoKapatSn);
+            // Dolu liste en fazla 5 sn eski; değilse önce tazelenir (bir gidiş-dönüş)
+            doluYukle(false).then(function () {
+                var no = rastgele();
+                if (no) goster(no, s.otoKapatSn);
+            });
         }
 
         /* Karekoda dokunmak "bunu beğenmedim, başkasını ver" demek. Fiziksel
@@ -499,6 +578,15 @@
         onerileriYaz();
         isaretle();
 
+        // Dolu bankolar gelince öneriler ve ızgara tazelenir; açık bir
+        // karekod varsa dokunulmaz (depocu onu okutuyor olabilir)
+        doluDinleyiciler.push(function () {
+            if (perde.hidden) onerileriYaz();
+            isaretle();
+        });
+        doluYukle(false);
+        canliBagla();
+
         return {
             goster: goster,
             otomatikAc: otomatikAc,
@@ -522,6 +610,8 @@
         gecmisSifirla: function () { gecmisYaz([]); },
         rastgele: rastgele,
         oneriKumesi: oneriKumesi,
+        doluYukle: doluYukle,
+        doluMu: doluMu,
         kur: kur,
         karekod: karekod
     };

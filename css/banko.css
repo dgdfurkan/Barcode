@@ -444,6 +444,24 @@ body.bnk-acik { overflow: hidden; }
 /* Ayarlanan aralığın dışındaki bankolar ızgarada soluk */
 .bnk__hucre.disarida { opacity: 0.38; }
 
+/* Siparişte dolu banko: kırmızı çerçeve ve çapraz çizgi, önerilmez */
+.bnk__hucre.dolu {
+    position: relative;
+    color: #b42318;
+    background: #fdecec;
+    box-shadow: inset 0 0 0 1px rgba(217, 45, 32, 0.35);
+}
+.bnk__hucre.dolu::before {
+    content: '';
+    position: absolute;
+    left: 18%;
+    right: 18%;
+    top: 50%;
+    height: 1.5px;
+    background: rgba(180, 35, 24, 0.55);
+    transform: rotate(-20deg);
+}
+
 /* ---------- Ayar denetimleri ---------- */
 
 .bnk-ayar { display: contents; }

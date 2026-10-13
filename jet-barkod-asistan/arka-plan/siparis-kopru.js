@@ -236,6 +236,21 @@ function apiBasliklari(yetki, ekstra) {
     return h;
 }
 
+let teslimatSutunuYok = false;
+
+function ordersYaz(yetki, govde) {
+    return fetch(
+        SIPARIS_API + '/rest/v1/orders?on_conflict=username,order_id',
+        {
+            method: 'POST',
+            headers: apiBasliklari(yetki, {
+                'Prefer': 'resolution=merge-duplicates,return=representation'
+            }),
+            body: JSON.stringify([govde])
+        }
+    );
+}
+
 async function siparisYaz(yetki, s) {
     /* UPSERT yalnız DOLU alanları gönderir; kısmi paket (cache-only,
        kunye yok) mevcut DB verisini null'lamaz. sonuçta orders satırı
@@ -257,17 +272,24 @@ async function siparisYaz(yetki, s) {
     if (s.toplayiciFoto) govde.toplayici_foto = s.toplayiciFoto;
     if (s.kuryeFoto) govde.kurye_foto = s.kuryeFoto;
     if (s.sepetZamani) govde.sepet_zamani = s.sepetZamani;
+    // Teslimat bilgisi: sütunlar sql_files/siparis_canli_v2.sql ile geliyor
+    if (!teslimatSutunuYok) {
+        if (s.adres) govde.adres = String(s.adres).slice(0, 500);
+        if (s.adresTarifi) govde.adres_tarifi = String(s.adresTarifi).slice(0, 500);
+        if (s.musteriNotu) govde.musteri_notu = String(s.musteriNotu).slice(0, 500);
+    }
 
-    const yanit = await fetch(
-        SIPARIS_API + '/rest/v1/orders?on_conflict=username,order_id',
-        {
-            method: 'POST',
-            headers: apiBasliklari(yetki, {
-                'Prefer': 'resolution=merge-duplicates,return=representation'
-            }),
-            body: JSON.stringify([govde])
+    let yanit = await ordersYaz(yetki, govde);
+    // Sunucuda sütun henüz yoksa teslimat alanları olmadan yeniden yaz; sipariş akışı durmasın
+    if (!yanit.ok && yanit.status === 400 && ('adres' in govde || 'adres_tarifi' in govde || 'musteri_notu' in govde)) {
+        const ham = await yanit.clone().text().catch(() => '');
+        if (/adres|musteri_notu|PGRST204|42703/.test(ham)) {
+            teslimatSutunuYok = true;
+            setTimeout(() => { teslimatSutunuYok = false; }, 60 * 60 * 1000);
+            delete govde.adres; delete govde.adres_tarifi; delete govde.musteri_notu;
+            yanit = await ordersYaz(yetki, govde);
         }
-    );
+    }
 
     const metin = await yanit.text();
     if (!yanit.ok) throw new Error('orders ' + yanit.status + ': ' + metin.slice(0, 160));

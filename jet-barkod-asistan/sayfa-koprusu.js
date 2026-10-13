@@ -702,6 +702,12 @@
         if (d && d.type === 'JB_SIPARIS_SOR') {
             sonImza = null; _ilkDuyuruYapildi = false; siparisleriDuyur(); return;
         }
+        /* Arka plan nabzı (arka-plan/pano-nobet.js): sekme arkadayken Chrome
+           yukarıdaki 2 sn'lik zamanlayıcıyı dakikada bire düşürüyor ve
+           durum değişikliği Jet Barkod'a geç gidiyordu. Nabız bir mesaj
+           olduğu için kısılmıyor; duyuru her nabızda imzayla denetleniyor,
+           değişiklik yoksa hiçbir şey gönderilmiyor. */
+        if (d && d.type === 'JB_SIPARIS_TIK') { siparisleriDuyur(); return; }
         if (d && d.type === 'JB_JBA_SIFIRLA_SONUC') {
             _sifirlamaBekleyen = 0;
             if (d.ok) {

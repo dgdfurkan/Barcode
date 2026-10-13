@@ -952,6 +952,21 @@ app.use(
 // =====================================================================
 require('./sayim-raporu').kur(app, { pool, verifyToken, bearerOf });
 
+// =====================================================================
+// Canlı kanal: sipariş ve sayım değişikliği cihazlara anında (vps-api/canli.js)
+// =====================================================================
+require('./canli').kur(app, {
+    dbAyar: {
+        host: process.env.DB_HOST || '127.0.0.1',
+        port: Number(process.env.DB_PORT || 5432),
+        database: process.env.DB_NAME || 'jetbarkod',
+        user: process.env.DB_USER || 'jetbarkod',
+        password: process.env.DB_PASSWORD,
+    },
+    verifyToken,
+    bearerOf,
+});
+
 app.use((req, res) => res.status(404).json({ ok: false, error: 'not_found' }));
 
 app.listen(PORT, '127.0.0.1', () => {

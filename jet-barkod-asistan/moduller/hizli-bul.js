@@ -1018,7 +1018,7 @@
          */
         const semayiKaydet = (siparis) => {
             try {
-                if (!siparis || localStorage.getItem('jba_detay_sema')) return;
+                if (!siparis || localStorage.getItem('jba_detay_sema_v2')) return;
                 const p0 = (Array.isArray(siparis.products) && siparis.products[0]) || null;
                 const altlar = {};
                 if (p0) {
@@ -1027,7 +1027,13 @@
                         if (v && typeof v === 'object' && !Array.isArray(v)) altlar[k] = Object.keys(v);
                     });
                 }
-                localStorage.setItem('jba_detay_sema', JSON.stringify({
+                const adresAlanlari = {};
+                Object.keys(siparis).forEach((k) => {
+                    const v = siparis[k];
+                    if (/address|client|delivery/i.test(k)) adresAlanlari[k] = v && typeof v === 'object' ? Object.keys(v) : typeof v;
+                });
+                localStorage.setItem('jba_detay_sema_v2', JSON.stringify({
+                    adresAlanlari: adresAlanlari,
                     siparisAlanlari: Object.keys(siparis),
                     urunAlanlari: p0 ? Object.keys(p0) : null,
                     urunAltNesneler: altlar,
@@ -1095,17 +1101,67 @@
         /* Fotoğraf tek başına gönderilebilir. `siparisYaz` gövdeyi koşullu
            kuruyor: yalnız dolu alanlar gidiyor, boş alan DB'deki veriyi
            bozmuyor. Ürünsüz paket `satirlariYaz`'a hiç uğramıyor. */
-        const kisiFotosunuYolla = (oId, toplayiciFoto, kuryeFoto) => {
-            if (!toplayiciFoto && !kuryeFoto) return;
+        const kisiFotosunuYolla = (oId, toplayiciFoto, kuryeFoto, teslimat) => {
+            const t = teslimat || {};
+            if (!toplayiciFoto && !kuryeFoto && !t.adres && !t.musteriNotu) return;
             const paket = { siparisId: oId, urunler: [] };
             if (toplayiciFoto) paket.toplayiciFoto = toplayiciFoto;
             if (kuryeFoto) paket.kuryeFoto = kuryeFoto;
+            if (t.adres) paket.adres = t.adres;
+            if (t.adresTarifi) paket.adresTarifi = t.adresTarifi;
+            if (t.musteriNotu) paket.musteriNotu = t.musteriNotu;
             try {
                 chrome.runtime.sendMessage(
                     { type: 'JBA_SIPARIS_YAZ', siparisler: [paket] },
                     () => { if (chrome.runtime.lastError) { /* SW uyuyor */ } }
                 );
             } catch (e) { /* sessiz */ }
+        };
+
+        /* TESLİMAT BİLGİSİ
+           Detay yanıtındaki adres nesnesinin adı belgelenmiş değil; adı
+           "address" geçen nesne ya da metin aranıyor (en fazla 3 kat).
+           Müşteri adı ve telefonu ALINMIYOR; yalnız adres, adres tarifi ve
+           müşteri notu. Bulunan alanların ADLARI (değer değil) şemaya
+           yazılıyor ki gerekirse sonradan düzeltilsin. */
+        const metinMi = (v) => typeof v === 'string' && v.trim().length > 1;
+        const kisa = (v) => String(v).replace(/\s+/g, ' ').trim().slice(0, 500);
+        const teslimatCoz = (order) => {
+            const sonuc = { adres: '', adresTarifi: '', musteriNotu: '' };
+            if (!order || typeof order !== 'object') return sonuc;
+            if (metinMi(order.clientNote)) sonuc.musteriNotu = kisa(order.clientNote);
+            const yasak = /name|phone|gsm|mail|tel/i;
+            const adresNesnesi = (o) => {
+                const ad = ['address', 'fullAddress', 'addressText', 'text', 'line', 'detail', 'openAddress']
+                    .map((k) => o[k]).find(metinMi);
+                const tarif = ['description', 'addressDescription', 'directions', 'direction', 'addressNote', 'note']
+                    .map((k) => o[k]).find(metinMi);
+                return { ad: ad ? kisa(ad) : '', tarif: tarif ? kisa(tarif) : '' };
+            };
+            const ziyaret = (o, derinlik) => {
+                if (!o || typeof o !== 'object' || derinlik > 3 || sonuc.adres) return;
+                for (const k of Object.keys(o)) {
+                    if (yasak.test(k)) continue;
+                    const v = o[k];
+                    if (/address/i.test(k)) {
+                        if (metinMi(v)) { sonuc.adres = kisa(v); }
+                        else if (v && typeof v === 'object' && !Array.isArray(v)) {
+                            const a = adresNesnesi(v);
+                            if (a.ad) { sonuc.adres = a.ad; if (a.tarif) sonuc.adresTarifi = a.tarif; }
+                        }
+                        if (sonuc.adres) return;
+                    }
+                }
+                for (const k of Object.keys(o)) {
+                    if (yasak.test(k) || /products|picker|courier/i.test(k)) continue;
+                    const v = o[k];
+                    if (v && typeof v === 'object' && !Array.isArray(v)) ziyaret(v, derinlik + 1);
+                    if (sonuc.adres) return;
+                }
+            };
+            ziyaret(order, 0);
+            if (!sonuc.adresTarifi && metinMi(order.addressDescription)) sonuc.adresTarifi = kisa(order.addressDescription);
+            return sonuc;
         };
 
         const birSiparisiCek = async (oId) => {
@@ -1147,10 +1203,11 @@
             const toplayiciFoto = (order.picker && order.picker.picURL) || '';
             const kuryeFoto = (order.courier && order.courier.picURL) || '';
             const urunler = Array.isArray(order.products) ? order.products : [];
+            const teslimat = teslimatCoz(order);
 
             if (!urunler.length) {
                 urunsuzSoguma.set(oId, Date.now());
-                kisiFotosunuYolla(oId, toplayiciFoto, kuryeFoto);
+                kisiFotosunuYolla(oId, toplayiciFoto, kuryeFoto, teslimat);
                 yenidenDene(oId, 'urun_yok');
                 return;
             }
@@ -1171,7 +1228,10 @@
                     adet: typeof p?.orderCount === 'number' ? p.orderCount : null
                 })),
                 toplayiciFoto: toplayiciFoto,
-                kuryeFoto: kuryeFoto
+                kuryeFoto: kuryeFoto,
+                adres: teslimat.adres,
+                adresTarifi: teslimat.adresTarifi,
+                musteriNotu: teslimat.musteriNotu
             };
             saveCache();
             applyUI();
@@ -1532,6 +1592,9 @@
             if (girdi && !Array.isArray(girdi)) {
                 if (girdi.toplayiciFoto) sonuc.toplayiciFoto = girdi.toplayiciFoto;
                 if (girdi.kuryeFoto) sonuc.kuryeFoto = girdi.kuryeFoto;
+                if (girdi.adres) sonuc.adres = girdi.adres;
+                if (girdi.adresTarifi) sonuc.adresTarifi = girdi.adresTarifi;
+                if (girdi.musteriNotu) sonuc.musteriNotu = girdi.musteriNotu;
             }
             return sonuc;
         };
@@ -2205,6 +2268,58 @@
             setTimeout(() => { try { location.reload(); } catch (e) {} }, 4000);
             return true;
         };
+
+        /* ARKA PLAN NABZI
+           Sekme arkadayken Chrome bu sayfanın zamanlayıcılarını dakikada bire
+           kadar yavaşlatıyor; "Uyuyan sekme" ise sayfayı tamamen kapatıyor.
+           Siparişler Jet Barkod'a geç gidiyor ya da hiç gitmiyordu.
+
+           Eklentinin arka planı (arka-plan/pano-nobet.js) sekme kısıtına
+           girmiyor. Oradan 2 sn'de bir gelen nabız burada:
+             - sayfa köprüsüne "listeyi duyur" der (değişiklik yoksa sessiz),
+             - kartları tarar, detay kuyruğunu iter.
+           20 sn'de bir panelin aktif sipariş listesi (radar) karttakilerle
+           karşılaştırılıyor. Panelin soketi kopmuşsa kartlar donar: radarda
+           olup kartta olmayan sipariş bir dakika boyunca kalırsa arka plana
+           "pano bayat" denir, o da sekmeyi yeniler (en fazla 5 dk'da bir). */
+        let tikSayaci = 0;
+        let bayatSayaci = 0;
+        const domKodlari = () => {
+            const k = new Set();
+            document.querySelectorAll('[class*="orderCard--"]').forEach((c) => {
+                const kod = getShortCode(c);
+                if (kod) k.add(kod);
+            });
+            return k;
+        };
+        const radarNobeti = async () => {
+            const once = sonRadarZamani;
+            await forceRadarFetch();
+            if (!sonRadarIdler || sonRadarZamani === once) return;
+            const dom = domKodlari();
+            const eksik = sonRadarIdler.filter((id) => !dom.has(String(id).slice(-4)));
+            bayatSayaci = eksik.length ? bayatSayaci + 1 : 0;
+            if (bayatSayaci >= 3) {
+                bayatSayaci = 0;
+                try {
+                    chrome.runtime.sendMessage({ type: 'JBA_PANO_BAYAT', eksik: eksik.length }, () => { void chrome.runtime.lastError; });
+                } catch (e) { /* yetim bağlam */ }
+            }
+        };
+        const nabizIsle = () => {
+            if (yetimKaldiysaTazele()) return;
+            if (!nobet()) return;
+            try { window.postMessage({ type: 'JB_SIPARIS_TIK' }, location.origin); } catch (e) { /* sessiz */ }
+            checkAndSync();
+            if (fetchQueue.length && !isFetching) processQueue();
+            tikSayaci++;
+            if (tikSayaci % 10 === 0) radarNobeti();
+        };
+        try {
+            chrome.runtime.onMessage.addListener((m) => {
+                if (m && m.type === 'JBA_PANO_TIK') nabizIsle();
+            });
+        } catch (e) { /* yetim bağlam */ }
 
         const init = () => {
             nobet();

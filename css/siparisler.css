@@ -2329,3 +2329,132 @@ button.sip-avatar:focus-visible { outline: 2px solid var(--mavi); outline-offset
     .sip-serit__ust h2 { font-size: 12px; gap: 4px; }
     .sip-sira-rozet { right: 6px; bottom: 6px; width: 24px; height: 24px; }
 }
+
+/* ============================ PAKET, BİLGİ, TÜM BARKODLAR ============================
+   Paketlenen sipariş mor: tik yeşili ve şerit renkleriyle karışmasın diye
+   paletin ayrık rengi. Yalnız transform ve opacity hareket eder. */
+
+/* Kart: paketli sipariş uzaktan seçilsin */
+.sip-kart--paketli { border-color: rgba(124, 58, 237, 0.45); box-shadow: inset 0 0 0 1px rgba(124, 58, 237, 0.35), 0 2px 9px rgba(16, 24, 40, 0.035); }
+.sip-kart--paketli::before { height: 4px; background: var(--mor); }
+.sip-kart__paket {
+    margin-top: 12px; min-width: 0;
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 9px;
+    background: rgba(124, 58, 237, 0.1); color: var(--mor);
+}
+.sip-kart__paket svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.sip-kart__paket b { font-size: 12px; font-weight: 800; }
+.sip-kart__paket em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 600; color: #6d28d9; font-variant-numeric: tabular-nums; }
+
+/* Başlık: paket rozeti ve sağ üst düğmeler */
+.sip-tepe { grid-template-columns: 46px 1fr auto auto; }
+.sip-rozet--paket { border-color: rgba(124, 58, 237, 0.35); background: rgba(124, 58, 237, 0.08); color: var(--mor); }
+.sip-rozet--paket svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.sip-tepe__araclar { display: flex; gap: 8px; }
+.sip-tepe__dugme {
+    width: 44px; height: 44px;
+    display: grid; place-items: center;
+    border: 1px solid var(--cizgi-sert); border-radius: 12px;
+    background: var(--yuzey); color: var(--yazi);
+    transition: background-color 0.16s, border-color 0.16s, transform 0.16s var(--yay);
+}
+.sip-tepe__dugme svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.sip-tepe__dugme:hover { border-color: var(--mavi); color: var(--mavi); }
+.sip-tepe__dugme:active { transform: scale(0.94); }
+
+/* Yan panel: teslimat kartı */
+.sip-teslimat {
+    width: 100%; padding: 17px;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+    border: 1px solid var(--cizgi); border-radius: 16px;
+    background: var(--yuzey); box-shadow: var(--golge-s);
+    text-align: left; color: inherit;
+    transition: border-color 0.16s;
+}
+.sip-teslimat .sip-yan-etiket { margin: 0 0 4px; }
+.sip-teslimat strong {
+    width: 100%; font-size: 13px; font-weight: 700; line-height: 18px; color: var(--yazi);
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.sip-teslimat strong.bos { color: var(--soluk); font-weight: 600; }
+.sip-teslimat small { font-size: 11px; color: var(--mavi); font-weight: 600; }
+.sip-teslimat:hover { border-color: var(--mavi); }
+
+/* Alt çubuk: Paketle + Bitir yan yana */
+.sip-alt__dugmeler { display: flex; align-items: center; gap: 8px; }
+.sip-paket {
+    height: 44px; min-width: 112px; padding: 0 16px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: 1px solid var(--cizgi-sert); border-radius: 999px;
+    background: #fff; color: var(--yazi-orta);
+    font-size: 13px; font-weight: 700;
+    transition: background-color 0.16s, border-color 0.16s, color 0.16s, transform 0.16s var(--yay);
+}
+.sip-paket svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linejoin: round; }
+.sip-paket:hover { border-color: var(--mor); color: var(--mor); }
+.sip-paket:active { transform: scale(0.97); }
+.sip-paket--var { border-color: var(--mor); background: var(--mor); color: #fff; }
+.sip-paket--var:hover { color: #fff; background: #6d28d9; }
+
+/* Sipariş bilgisi penceresi */
+.sip-bilgi__govde { margin-top: 16px; display: flex; flex-direction: column; gap: 16px; }
+.sip-bilgi__bolum h3 { margin: 0 0 8px; color: var(--soluk); font-size: 11px; font-weight: 800; letter-spacing: 0.11em; text-transform: uppercase; }
+.sip-bilgi__bolum dl { margin: 0; border: 1px solid var(--cizgi); border-radius: 12px; overflow: hidden; }
+.sip-bilgi__satir { display: grid; grid-template-columns: 112px 1fr; gap: 12px; padding: 12px; border-top: 1px solid var(--cizgi); }
+.sip-bilgi__satir:first-child { border-top: 0; }
+.sip-bilgi__satir dt { color: var(--sonuk); font-size: 12px; font-weight: 600; }
+.sip-bilgi__satir dd { margin: 0; display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.sip-bilgi__satir dd span { flex: 1; min-width: 0; font-size: 13px; line-height: 18px; color: var(--yazi); overflow-wrap: anywhere; white-space: pre-line; }
+.sip-bilgi__kopya {
+    flex: none; width: 32px; height: 32px; margin: -6px -4px -6px 0;
+    display: grid; place-items: center; border: 0; border-radius: 9px;
+    background: var(--kagit); color: var(--sonuk);
+}
+.sip-bilgi__kopya svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.sip-bilgi__kopya:hover { color: var(--mavi); }
+.sip-bilgi__bos { margin: 0; padding: 12px; font-size: 12px; line-height: 16px; color: var(--sonuk); }
+
+/* Tüm barkodlar: tam ekran liste, kaydırarak okutma */
+.sip-kat--tam { padding: 12px; }
+.sip-tb { width: min(560px, 100%); height: calc(100dvh - 24px); max-height: none; display: flex; flex-direction: column; }
+.sip-tb__liste { flex: 1; min-height: 0; margin: 12px -4px 0; padding: 0 4px 12px; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 12px; }
+.sip-tb__urun { padding: 12px; border: 1px solid var(--cizgi); border-radius: 16px; background: #fff; }
+.sip-tb__urun.is-alindi { background: var(--yesil-50); border-color: var(--yesil-cizgi); }
+.sip-tb__ust { display: flex; align-items: center; gap: 12px; }
+.sip-tb__no {
+    flex: none; width: 28px; height: 28px; display: grid; place-items: center;
+    border-radius: 999px; background: var(--lacivert); color: #fff;
+    font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.sip-tb__urun.is-alindi .sip-tb__no { background: var(--yesil-koyu); }
+.sip-tb__metin { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sip-tb__metin strong { font-size: 13px; font-weight: 700; line-height: 18px; color: var(--yazi); overflow-wrap: anywhere; }
+.sip-tb__metin small { font-size: 11px; font-weight: 700; color: var(--yesil-koyu); }
+.sip-tb__adet { flex: none; padding: 4px 10px; border-radius: 999px; background: var(--kagit); font-size: 15px; font-weight: 800; color: var(--lacivert); font-variant-numeric: tabular-nums; }
+.sip-tb__cizim { margin-top: 12px; padding: 8px; border-radius: 12px; background: #fff; box-shadow: inset 0 0 0 1px var(--cizgi); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.sip-tb__cizim svg { display: block; max-width: 100%; height: auto; }
+.sip-tb__kod { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: var(--yazi-orta); font-variant-numeric: tabular-nums; }
+.sip-tb__yok { padding: 16px 0; font-size: 12px; color: var(--sonuk); }
+.sip-tb__secenek { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.sip-tb__secenek button {
+    min-height: 32px; padding: 0 10px; border: 1px solid var(--cizgi); border-radius: 999px;
+    background: #fff; font-size: 12px; font-weight: 600; color: var(--yazi-orta); font-variant-numeric: tabular-nums;
+}
+.sip-tb__secenek button[aria-pressed="true"] { border-color: var(--lacivert); background: var(--lacivert); color: #fff; }
+
+@media (max-width: 560px) {
+    .sip-tepe { grid-template-columns: 42px 1fr auto auto; gap: 8px; }
+    .sip-tepe__araclar { gap: 4px; }
+    .sip-tepe__dugme { width: 40px; height: 40px; border-radius: 10px; }
+    .sip-teslimat { padding: 13px; margin: 0 0 9px; }
+    .sip-paket { min-width: 0; padding: 0 12px; }
+    .sip-kart__paket { margin-top: 6px; padding: 4px 6px; gap: 4px; }
+    .sip-kart__paket svg { width: 12px; height: 12px; }
+    .sip-kart__paket b { font-size: 9.5px; }
+    .sip-kart__paket em { display: none; }
+    .sip-bilgi__satir { grid-template-columns: 96px 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .sip-tepe__dugme, .sip-paket, .sip-teslimat { transition: none; }
+}
