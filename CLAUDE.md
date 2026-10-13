@@ -138,8 +138,9 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
   Tek sebebi `admin_panel_inject.js`. jetbarkod.com.tr ile sınırlandırılabilir.
 - Site ile eklenti arasındaki `postMessage` çağrıları hedef kaynağı `'*'` veriyor. Kısıtlanmalı.
 - `sql_files/security_02_drop_plaintext_password.sql` çalıştırılacak.
-- `sql_files/siparis_canli.sql` çalıştırılacak (siparişlerde tik 1-2 sn'de diğer cihaza). Çalışana kadar
-  sayfa 3 sn'de bir tam çekimle idare ediyor.
+- `sql_files/siparis_canli_v2.sql` çalıştırılacak ve `vps-api/canli.js` + `server.js` VPS'e atılıp servis
+  yeniden başlatılacak (eski `siparis_canli.sql`'i de içeriyor). Anlık kanal, paket ve teslimat bilgisi bunlara
+  bağlı. Çalışana kadar sayfalar yoklamayla idare ediyor, Paketle "sunucu güncellemesi bekleniyor" der.
 - `sql_files/sayim_dongu.sql` çalıştırılacak (Sayım > Döngü: son çekim, döngü ayarı, katalog dışı ürünler).
   Çalışana kadar Döngü çalışır ama son çekim zamanı yalnız o cihazda kalır.
 - `sql_files/sayim_gecmisi_paylasim.sql` çalıştırılacak. Sayım Geçmişi telefona gitsin ve herkese açık
