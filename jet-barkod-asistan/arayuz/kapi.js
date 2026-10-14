@@ -177,9 +177,15 @@
     if (firinAyar) {
         chrome.storage.local.get('jbaFirinNobet', function (r) {
             var a = (r && r.jbaFirinNobet) || { acik: true, dk: 3 };
-            firinAyar.value = a.acik === false ? '0' : String(a.dk || 3);
+            firinAyar.value = a.acik === false ? '0' : (a.simule ? 'sim' : String(a.dk || 3));
         });
         firinAyar.addEventListener('change', function () {
+            /* Simülasyon: gerçek ürünlerden rastgele eksik senaryosu, dakikada bir,
+               kart 10 sn görünüp kapanır. Yalnız deneme için. */
+            if (firinAyar.value === 'sim') {
+                chrome.storage.local.set({ jbaFirinNobet: { acik: true, dk: 1, simule: true } });
+                return;
+            }
             var dk = parseInt(firinAyar.value, 10) || 0;
             chrome.storage.local.set({ jbaFirinNobet: dk ? { acik: true, dk: dk } : { acik: false, dk: 3 } });
         });

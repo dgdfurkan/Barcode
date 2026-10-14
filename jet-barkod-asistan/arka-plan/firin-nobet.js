@@ -81,12 +81,37 @@ function ekmekMi(ad) {
     return /^\s*(ekmek|ramazan\s+pidesi)\s*\(\s*\d+\s*(g|gr)\s*\)\s*$/i.test(ad || '');
 }
 
-/** Bildirimde gösterilecek ürünler: önerisi var, rafta yok ya da çok az, donukta var */
-function uyarilar(dilim) {
-    return ((dilim && dilim.urunler) || [])
+function etiket(d) {
+    return String(d.bas).slice(11, 16) + '-' + String(d.son).slice(11, 16).replace('00:00', '24:00');
+}
+
+/**
+ * Bildirimde gösterilecek ürünler: önerisi var, rafta yok ya da çok az,
+ * donukta var. Kart pişirme panelindeki gibi çizildiği için her ürünle
+ * dört dilimin önerisi ve pişirilecek adet de gidiyor.
+ */
+function uyarilar(dilimler, dilim) {
+    if (!dilim) return [];
+    return (dilim.urunler || [])
         .filter((u) => u && typeof u.ad === 'string' && typeof u.raf === 'number' && typeof u.donuk === 'number' && !ekmekMi(u.ad))
-        .map((u) => ({ ad: u.ad, gorsel: u.gorsel, raf: u.raf, donuk: u.donuk, oneri: Number(u.oneri) || 0 }))
-        .filter((u) => u.oneri > 0 && u.donuk > 0 && (u.raf <= 0 || u.raf * 5 <= u.oneri))
+        .map((u) => {
+            const oneri = Number(u.oneri) || 0;
+            const raf = Math.max(0, u.raf);
+            const donuk = Math.max(0, u.donuk);
+            return {
+                ad: u.ad,
+                gorsel: u.gorsel,
+                raf,
+                donuk,
+                oneri,
+                pisir: Math.max(0, Math.min(oneri - raf, donuk)),
+                oneriler: dilimler.map((d) => {
+                    const x = (d.urunler || []).find((y) => y && y.ad === u.ad);
+                    return x ? Number(x.oneri) || 0 : 0;
+                })
+            };
+        })
+        .filter((u) => u.oneri > 0 && u.donuk > 0 && u.pisir > 0 && (u.raf <= 0 || u.raf * 5 <= u.oneri))
         .sort((a, b) => (a.raf - b.raf) || (b.oneri - a.oneri))
         .slice(0, 12);
 }
@@ -95,11 +120,75 @@ async function panolar() {
     try { return await chrome.tabs.query({ url: PANO }); } catch (e) { return []; }
 }
 
-async function yay(sekmeler, liste, saat) {
-    aktifUyari = liste.length > 0;
+async function yay(sekmeler, liste, ek) {
+    if (!(ek && ek.sim)) aktifUyari = liste.length > 0;
+    const mesaj = Object.assign({ type: 'JBA_FIRIN_UYARI', liste, zaman: Date.now() }, ek || {});
     for (const t of sekmeler) {
-        chrome.tabs.sendMessage(t.id, { type: 'JBA_FIRIN_UYARI', liste, saat, zaman: Date.now() }).catch(() => {});
+        chrome.tabs.sendMessage(t.id, mesaj).catch(() => {});
     }
+}
+
+/** Yüklenmiş, uyumayan bir panel sekmesi; öndeki varsa o */
+function hedefSekme(sekmeler) {
+    const hazir = sekmeler.filter((t) => t.status === 'complete' && !t.discarded);
+    return hazir.find((t) => t.active) || hazir[0] || null;
+}
+
+// ==================================================================
+// Simülasyon (Asistan simgesi > Fırın Bildirimi > Simülasyon)
+//
+// Gerçek ürün listesi bir kez okunuyor (5 dk saklanıyor, Getir'e her
+// turda istek gitmiyor), içinden rastgele 1-4 ürün seçilip raf düşürülüyor.
+// Kart gerçek kartın aynısı, üstünde "Simülasyon" yazıyor, 10 sn sonra
+// kendiliğinden kapanıyor. Gerçek uyarı durumuna dokunmuyor.
+// ==================================================================
+
+const SIM_VERI_MS = 5 * 60 * 1000;
+const SIM_SURE_MS = 10 * 1000;
+let simVeri = null;
+
+function rastgele(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+
+function karistir(dizi) {
+    const d = dizi.slice();
+    for (let i = d.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [d[i], d[j]] = [d[j], d[i]];
+    }
+    return d;
+}
+
+function simSenaryo(dilimler, an) {
+    if (!dilimler || !dilimler.length) return null;
+    // Gece dilim yoksa ilk dilim varmış gibi
+    let i = dilimler.findIndex((d) => zaman(d.bas) <= an && an < zaman(d.son));
+    if (i < 0) i = 0;
+    const kopya = JSON.parse(JSON.stringify(dilimler));
+    const dilim = kopya[i];
+    const adaylar = (dilim.urunler || []).filter((u) => u && u.ad && !ekmekMi(u.ad));
+    if (!adaylar.length) return null;
+    const secilen = new Set(karistir(adaylar).slice(0, rastgele(1, Math.min(4, adaylar.length))).map((u) => u.ad));
+    dilim.urunler.forEach((u) => {
+        if (!secilen.has(u.ad)) { u.raf = typeof u.raf === 'number' ? Math.max(u.raf, 999) : 999; return; }
+        u.oneri = Math.max(Number(u.oneri) || 0, rastgele(4, 12));
+        u.raf = Math.random() < 0.5 ? 0 : Math.floor(u.oneri / 5);
+        u.donuk = typeof u.donuk === 'number' && u.donuk > 0 ? u.donuk : rastgele(6, 40);
+    });
+    return { dilimler: kopya, dilim, i };
+}
+
+async function simKontrol(hedef) {
+    if (!simVeri || Date.now() - simVeri.zaman > SIM_VERI_MS) {
+        const cevap = await chrome.tabs.sendMessage(hedef.id, { type: 'JBA_FIRIN_SOR' });
+        if (!cevap || !cevap.ok) return;
+        simVeri = { zaman: Date.now(), dilimler: cevap.dilimler || [] };
+    }
+    const an = Date.now();
+    const sen = simSenaryo(simVeri.dilimler, an);
+    if (!sen) return;
+    await yay(await panolar(), uyarilar(sen.dilimler, sen.dilim), {
+        sim: true, sure: SIM_SURE_MS, dilimler: sen.dilimler.map(etiket), simdiki: sen.i
+    });
 }
 
 async function kontrol(sebep) {
@@ -114,17 +203,20 @@ async function kontrol(sebep) {
     } catch (e) { /* liste yoksa açık say */ }
     const sekmeler = await panolar();
     if (!sekmeler.length) return;
+    const hedef = hedefSekme(sekmeler);
+    if (!hedef) return;
+
+    if (ayar.simule) {
+        calisiyor = true;
+        try { await simKontrol(hedef); } catch (e) { /* sonraki tur */ } finally { calisiyor = false; }
+        return;
+    }
 
     const simdi = Date.now();
     if (simdi - sonKontrol < EN_AZ_ARA_MS) return;
     if (simdi - sonHata < HATA_BEKLEME_MS) return;
     // Gereksiz kontrolü atla: uyarı yok, satış yok, dilim bitmedi, 15 dk dolmadı
     if (sebep === 'periyot' && !aktifUyari && !satisOldu && simdi < dilimBitis && simdi - sonKontrol < EN_GEC_MS) return;
-
-    // Yüklenmiş, uyumayan bir panel sekmesi; öndeki varsa o
-    const hazir = sekmeler.filter((t) => t.status === 'complete' && !t.discarded);
-    const hedef = hazir.find((t) => t.active) || hazir[0];
-    if (!hedef) return;
 
     calisiyor = true;
     sonKontrol = simdi;
@@ -137,10 +229,13 @@ async function kontrol(sebep) {
             return;
         }
         const an = Date.now();
-        const dilim = simdikiDilim(cevap.dilimler, an);
-        // Gece (dilim yok): bir sonraki dilimin başına kadar ya da 15 dk sonra yine bakılır
+        const dilimler = cevap.dilimler || [];
+        const dilim = simdikiDilim(dilimler, an);
+        // Gece (dilim yok): 15 dk sonra yine bakılır
         dilimBitis = dilim ? zaman(dilim.son) : an + EN_GEC_MS;
-        await yay(await panolar(), uyarilar(dilim), new Date(an).getHours());
+        await yay(await panolar(), uyarilar(dilimler, dilim), {
+            dilimler: dilimler.map(etiket), simdiki: dilim ? dilimler.indexOf(dilim) : -1
+        });
     } catch (e) {
         // Sekmede betik yok (yeni yüklendi, eski sürüm): sessizce sonraki tura
     } finally {
@@ -163,7 +258,17 @@ chrome.runtime.onInstalled.addListener(alarmKur);
 chrome.storage.onChanged.addListener((d, alan) => {
     if (alan === 'local' && d[AYAR_ANAHTARI]) {
         alarmKur();
-        ayarOku().then((a) => { if (!a.acik) panolar().then((s) => yay(s, [], new Date().getHours())); });
+        const eski = d[AYAR_ANAHTARI].oldValue || {};
+        ayarOku().then((a) => {
+            // Kapandı ya da simülasyondan çıkıldı: kart temizlensin, gerçek kontrol baştan
+            if (!a.acik || (eski.simule && !a.simule)) {
+                sonKontrol = 0;
+                dilimBitis = 0;
+                panolar().then((s) => yay(s, []));
+            }
+            if (a.acik && a.simule) kontrol('sim');
+            else if (a.acik) setTimeout(() => kontrol('ayar'), 1000);
+        });
     }
 });
 
