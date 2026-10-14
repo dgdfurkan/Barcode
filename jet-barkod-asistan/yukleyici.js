@@ -32,6 +32,11 @@
             try {
                 chrome.storage.local.get(LISTE_ANAHTARI, function (r) {
                     var l = r && r[LISTE_ANAHTARI];
+                    /* Fırın Bildirimi fırın hakkıyla geliyor. Liste bildirim
+                       eklenmeden önce kaydedildiyse site açılmayı beklemesin. */
+                    if (Array.isArray(l) && l.indexOf('firinPisirme') !== -1 && l.indexOf('firinUyari') === -1) {
+                        l = l.concat('firinUyari');
+                    }
                     coz(Array.isArray(l) ? l : null);
                 });
             } catch (e) {
@@ -168,6 +173,10 @@
                         ad: c.modul.ad,
                         ozet: c.modul.ozet || '',
                         calisiyor: !!c.calisiyor,
+                        /* Panel ikisini ayırıyor: yolu uymayan modül "kapalı"
+                           değil, yalnız bu sayfada uyumuyor. */
+                        buSayfada: !!JBA.buSayfayaUygun(c.modul),
+                        izinli: !sonAcikListe || sonAcikListe.indexOf(c.modul.kimlik) !== -1,
                         hata: c.hata ? String(c.hata.message || c.hata) : null,
                         eylemler: (c.modul.eylemler || []).map(function (e) { return e.ad; })
                     };

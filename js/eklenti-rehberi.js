@@ -94,9 +94,8 @@
         },
 
         /*
-         * Tek eklenti denemesi. Eskilerin hepsi yerinde duruyor; bu onların
-         * yerine geçmeye aday, henüz değil. Aynı anda ikisi kuruluysa
-         * warehouse sayfasında iki kopyalama düğmesi çıkar, beklenen davranış.
+         * Tek eklenti. Ayarlarda yalnız bu kart duruyor; eski eklentilerin
+         * kayıtları başka sayfalardan açılabilsin diye burada kalıyor.
          */
         jetBarkodAsistan: {
             tur: 'eklenti',
@@ -105,12 +104,12 @@
             site: 'warehouse.getir.com',
             dosya: 'Jet Barkod - Asistan',
             ikon: null,
-            ozet: 'Bütün araçlar tek eklentide. Dokuz modül: kopyalama, sayım, hızlı bul, fırın, stok uyarısı ve yönetici araçları.',
+            ozet: 'Bütün araçlar tek eklentide: toplu kopyalama, stok barkodları, sayım hazırlığı, hızlı bul, fırın pişirme, fırın bildirimi ve siparişler.',
             neYapar: [
                 'Yedi ayrı eklenti yerine tek kurulum, tek güncelleme.',
                 'Fırın Pişirme artık yer imi değil, sayfaya düğme koyuyor.',
                 'Her modül yalnız kendi sayfasında uyanıyor, başka yerde görünmüyor.',
-                'Sayfada tek düğme var; hangi modülün çalıştığını oradan görürsün.',
+                'Hangi modülün çalıştığını Chrome\'daki Asistan simgesinden görürsün.',
                 'Bir modül hata verse diğerleri çalışmaya devam eder.',
                 'Hakkın olmayan modül hiç başlamaz, kilit gerçekten işler.',
             ],

@@ -2,8 +2,10 @@
  * Modül: Fırın Bildirimi (kontrol panelinde)
  * ============================================================================
  *
- * Arka plandaki fırın nöbetçisi (arka-plan/firin-nobet.js) pişirilmesi
- * gereken ürün bulunca buraya `JBA_FIRIN_UYARI` yollar. Siparişler ekranının
+ * Arka plandaki fırın nöbetçisi (arka-plan/firin-nobet.js) belli aralıklarla
+ * buraya `JBA_FIRIN_SOR` der; burası sayfa köprüsünden (sayfa-koprusu.js)
+ * panelin fırın tahminini ister ve cevabı geri verir. Yeni sekme açılmaz.
+ * Pişirilmesi gereken ürün varsa nöbetçi `JBA_FIRIN_UYARI` yollar. Siparişler ekranının
  * sağ üstünde küçük, hafifçe nabız atan bir kart çıkar: hangi ürün, rafta
  * kaç, donukta kaç, öneri kaç. Karta dokununca fırın sayfası yeni sekmede
  * açılır. Liste boş gelince (pişirme yapıldı) kart kendiliğinden kapanır.
@@ -132,8 +134,37 @@
         });
     }
 
+    /* Sayfa köprüsüne sor, cevabı bekle (en fazla 20 sn) */
+    var soruNo = 0;
+    function tahminSor() {
+        return new Promise(function (coz) {
+            var no = 'f' + Date.now() + '-' + (++soruNo);
+            var bitti = false;
+            function dinle(e) {
+                if (e.source !== window || e.origin !== location.origin) return;
+                var d = e.data;
+                if (!d || d.type !== 'JB_FIRIN_TAHMIN' || d.no !== no) return;
+                son(d.sonuc || { ok: false });
+            }
+            function son(v) {
+                if (bitti) return;
+                bitti = true;
+                window.removeEventListener('message', dinle);
+                coz(v);
+            }
+            window.addEventListener('message', dinle);
+            setTimeout(function () { son({ ok: false, sebep: 'zaman aşımı' }); }, 20000);
+            window.postMessage({ type: 'JB_FIRIN_TAHMIN_SOR', no: no }, location.origin);
+        });
+    }
+
     try {
-        chrome.runtime.onMessage.addListener(function (m) {
+        chrome.runtime.onMessage.addListener(function (m, gonderen, cevapla) {
+            if (m && m.type === 'JBA_FIRIN_SOR') {
+                if (!etkin) { cevapla({ ok: false, sebep: 'kapalı' }); return false; }
+                tahminSor().then(cevapla);
+                return true;
+            }
             if (!m || m.type !== 'JBA_FIRIN_UYARI') return false;
             var liste = Array.isArray(m.liste) ? m.liste.filter(function (u) { return u && typeof u.ad === 'string'; }) : [];
             // Liste boşaldıysa (pişirme yapıldı) kapatma kaydı da sıfırlansın

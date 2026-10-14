@@ -79,7 +79,7 @@
         ozet.className = 'modul__ozet';
         ozet.textContent = m.hata
             ? 'Bu modül hata verdi, diğerleri çalışmaya devam ediyor.'
-            : (m.calisiyor ? m.ozet : 'Bu hak hesabında kapalı.');
+            : (m.calisiyor ? m.ozet : (m.izinli === false ? 'Bu hak hesabında kapalı.' : 'Sayfa yüklenince uyanır.'));
         kap.appendChild(ozet);
 
         if (m.calisiyor && m.eylemler && m.eylemler.length) {
@@ -122,7 +122,12 @@
     }
 
     function ciz(durum) {
-        var moduller = (durum && durum.moduller) || [];
+        /* Yalnız bu sayfada çalışan modüller. Eskiden host'taki bütün modüller
+           listeleniyordu; kontrol panelinde Fırın Pişirme "kapalı, hak yok"
+           görünüyordu, oysa yalnız fırın sayfasında uyanıyor. */
+        var moduller = ((durum && durum.moduller) || []).filter(function (m) {
+            return m.buSayfada !== false || m.calisiyor;
+        });
         var acik = moduller.filter(function (m) { return m.calisiyor; }).length;
         var bozukVar = moduller.some(function (m) { return m.hata; });
 

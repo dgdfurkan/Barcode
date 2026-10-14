@@ -689,6 +689,71 @@
         siparisleriDuyur();
     });
 
+    // ==================================================================
+    // Fırın tahmini (arka-plan/firin-nobet.js, moduller/firin-uyari.js)
+    //
+    // Fırın sayfası açılınca panel `GET /heating-estimations` atıyor;
+    // dilim dilim pişirme önerisi, o anki dilimde de raf ve donuk stok
+    // geliyor. Kontrol panelinde aynı isteği, panelin kendi sipariş
+    // isteğinden kopyalanan başlıklarla atıyoruz: jeton sayfada kalıyor,
+    // dışarı çıkmıyor. Yeni sekme açılmıyor, sayfa çizilmiyor.
+    // Sıklık sınırı burada da var: 50 sn içinde ikinci istek atılmaz,
+    // son cevap döner.
+    // ==================================================================
+
+    var FIRIN_ARA_MS = 50 * 1000;
+    var firinSon = null;
+    var firinZaman = 0;
+    var firinSuruyor = null;
+
+    function jetonVarMi() {
+        var h = yakalanan && yakalanan.headers;
+        if (!h) return false;
+        return Object.keys(h).some(function (k) { return k.toLowerCase() === 'authorization' && h[k]; });
+    }
+
+    function firinSade(yanit) {
+        var dilimler = (yanit && Array.isArray(yanit.data)) ? yanit.data : [];
+        return dilimler.slice(0, 6).map(function (d) {
+            return {
+                bas: String(d.startDate || ''),
+                son: String(d.endDate || ''),
+                urunler: (Array.isArray(d.products) ? d.products : []).slice(0, 60).map(function (p) {
+                    return {
+                        ad: String(p.fullName || p.name || '').slice(0, 120),
+                        gorsel: String(p.picURL || ''),
+                        oneri: Number(p.prediction) || 0,
+                        raf: typeof p.available === 'number' ? p.available : null,
+                        donuk: typeof p.frozen === 'number' ? p.frozen : null,
+                        pisen: Number(p.cookedQuantity) || 0
+                    };
+                })
+            };
+        });
+    }
+
+    function firinTahmini() {
+        if (firinSuruyor) return firinSuruyor;
+        if (firinSon && Date.now() - firinZaman < FIRIN_ARA_MS) return Promise.resolve(firinSon);
+        if (!jetonVarMi() || !asilFetch) return Promise.resolve({ ok: false, sebep: 'oturum' });
+        var ayar = sablon();
+        ayar.method = 'GET';
+        delete ayar.body;
+        firinSuruyor = asilFetch(TEMEL + '/heating-estimations', ayar)
+            .then(function (r) {
+                if (!r.ok) return { ok: false, sebep: 'http ' + r.status };
+                return r.json().then(function (j) { return { ok: true, dilimler: firinSade(j) }; });
+            })
+            .catch(function () { return { ok: false, sebep: 'ağ' }; })
+            .then(function (sonuc) {
+                firinSuruyor = null;
+                firinZaman = Date.now();
+                firinSon = sonuc;
+                return sonuc;
+            });
+        return firinSuruyor;
+    }
+
     setInterval(siparisleriDuyur, 2000);
     setTimeout(siparisleriDuyur, 3000);
 
@@ -708,6 +773,13 @@
            olduğu için kısılmıyor; duyuru her nabızda imzayla denetleniyor,
            değişiklik yoksa hiçbir şey gönderilmiyor. */
         if (d && d.type === 'JB_SIPARIS_TIK') { siparisleriDuyur(); return; }
+        if (d && d.type === 'JB_FIRIN_TAHMIN_SOR') {
+            var no = d.no;
+            firinTahmini().then(function (sonuc) {
+                gonder({ type: 'JB_FIRIN_TAHMIN', no: no, sonuc: sonuc });
+            });
+            return;
+        }
         if (d && d.type === 'JB_JBA_SIFIRLA_SONUC') {
             _sifirlamaBekleyen = 0;
             if (d.ok) {
