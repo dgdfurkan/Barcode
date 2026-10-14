@@ -1506,6 +1506,8 @@
             }
 
             cachedProducts = products;
+            // Arka plan nöbetçisi (arka-plan/firin-nobet.js) sonucu buradan okuyor
+            window.__jbaFirinSon = { zaman: Date.now(), urunler: products, eksik: eksikler.length };
             applyViewFromCache();
 
             /* Üç turda da okunamayan ürün varsa sessiz geçilmiyor: yanlış
@@ -1579,6 +1581,59 @@
     }
 
     // ==================================================================
+    // Arka plan okuması: fırın bildirimi için
+    // ------------------------------------------------------------------
+    // Asistan'ın arka planı kontrol paneli açıkken bu sayfayı öne çıkmayan
+    // bir sekmede açıyor ve `JBA_FIRIN_OKU` soruyor. Pişirme paneli burada
+    // her zamanki gibi hesaplanıyor (aynı kod, aynı kurallar), sonuç geri
+    // dönüyor, sekme kapanıyor. Getir'e giden istek sayfanın kendi isteği.
+    // ==================================================================
+
+    function bekle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+    async function arkaPlanOku() {
+        if (!firinSayfasiMi()) return { ok: false, hata: 'fırın sayfası değil' };
+        // Panel kartları çizilene kadar bekle (en fazla 30 sn)
+        var sinir = Date.now() + 30000;
+        while (Date.now() < sinir && !document.querySelector('[class*="heatingEstimationCard"], [class*="period-title"], .period-title, tbody tr')) {
+            await bekle(400);
+        }
+        var once = (window.__jbaFirinSon && window.__jbaFirinSon.zaman) || 0;
+        var m = document.getElementById('baking-assistant-modal');
+        if (m) m.remove();
+        var o = document.getElementById('baking-assistant-overlay');
+        if (o) o.remove();
+        paneliAc();
+        sinir = Date.now() + 45000;
+        while (Date.now() < sinir && !(window.__jbaFirinSon && window.__jbaFirinSon.zaman > once)) {
+            await bekle(400);
+        }
+        var son = window.__jbaFirinSon;
+        if (!son || son.zaman <= once) return { ok: false, hata: 'pişirme listesi okunamadı' };
+        return {
+            ok: true,
+            saat: new Date().getHours(),
+            eksik: son.eksik || 0,
+            urunler: (son.urunler || []).map(function (p) {
+                return {
+                    ad: String(p.name || '').slice(0, 120),
+                    gorsel: String(p.imgSrc || ''),
+                    raf: Number(p.currentStock) || 0,
+                    donuk: Number(p.frozenStock) || 0,
+                    oneriler: Array.isArray(p.recommendations) ? p.recommendations.slice(0, 4).map(Number) : [0, 0, 0, 0],
+                    stokOkundu: p.stokOkundu !== false
+                };
+            })
+        };
+    }
+
+    try {
+        chrome.runtime.onMessage.addListener(function (istek, gonderen, cevapla) {
+            if (!istek || istek.type !== 'JBA_FIRIN_OKU') return false;
+            arkaPlanOku().then(cevapla, function (e) { cevapla({ ok: false, hata: String(e && e.message || e) }); });
+            return true;
+        });
+    } catch (e) { /* yetim bağlam */ }
 
     JBA.kayit({
         kimlik: 'firinPisirme',

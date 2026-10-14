@@ -36,6 +36,32 @@ body {
     line-height: 1.45;
 }
 
+/* ---------- Ayar satırı ---------- */
+
+.ayar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--renk-cizgi);
+    background: var(--renk-yumusak);
+}
+.ayar__metin { flex: 1; min-width: 0; }
+.ayar__ad { margin: 0; font-size: 13px; font-weight: 600; }
+.ayar__ozet { margin: 2px 0 0; font-size: 11px; line-height: 1.35; color: var(--renk-soluk); }
+.ayar__secim {
+    flex: none;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--renk-cizgi);
+    border-radius: 8px;
+    background: var(--renk-zemin);
+    color: var(--renk-yazi);
+    font: inherit;
+    font-size: 12px;
+}
+.ayar__secim:focus { outline: 2px solid var(--renk-vurgu); outline-offset: 1px; }
+
 /* ---------- Başlık ---------- */
 
 .bas {

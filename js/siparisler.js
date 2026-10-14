@@ -1776,7 +1776,7 @@
         if (!s) return;
         var kimlik = siparisKimligi(s);
         el('bilgiEtiket').textContent = kimlik.bankoVar ? 'BANKO ' + kimlik.deger : 'SİPARİŞ';
-        el('bilgiBaslik').textContent = 'Sipariş Bilgisi';
+        el('bilgiBaslik').textContent = 'Teslimat ve Sipariş';
 
         var satir = function (etiket, deger, kopya) {
             if (deger === null || deger === undefined || String(deger).trim() === '') return '';
@@ -1816,10 +1816,13 @@
     function tbCiz(kutu, kod) {
         if (!kutu) return;
         if (!kod) { kutu.innerHTML = '<span class="sip-tb__yok">Katalogda barkod yok</span>'; return; }
-        var alan = Math.max(180, (kutu.clientWidth || 300) - 16);
+        var alan = Math.max(160, (kutu.clientWidth || 280) - 16);
         var cizim = global.JBBarkodSvg ? global.JBBarkodSvg.ciz(kod, { genislik: alan, cubuk: 64, etiket: kod + ' barkodu' }) : null;
         kutu.innerHTML = (cizim ? cizim.svg : '') + '<span class="sip-tb__kod">' + kacir(kodBicim(kod)) + '</span>';
     }
+
+    var OK_SOL = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg>';
+    var OK_SAG = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5"/></svg>';
 
     function tumBarkodlarAc() {
         var s = durum.secili;
@@ -1831,23 +1834,43 @@
         el('tbListe').innerHTML = urunler.length ? urunler.map(function (u, i) {
             var bilgi = barkodBul(u);
             var kodlar = bilgi.barkodlar;
-            return '<article class="sip-tb__urun' + (u.alindi ? ' is-alindi' : '') + '">' +
+            var gorsel = urunGorseli(u, bilgi);
+            var cok = kodlar.length > 1;
+            return '<article class="sip-tb__urun' + (u.alindi ? ' is-alindi' : '') + '" data-tb-i="' + i + '" data-tb-sira="0">' +
                 '<div class="sip-tb__ust">' +
-                    '<span class="sip-tb__no">' + (i + 1) + '</span>' +
+                    (gorsel
+                        ? '<button type="button" class="sip-tb__gorsel" data-tb-foto="' + i + '" aria-label="Görseli büyüt"><img src="' + kacir(gorsel) + '" alt="" loading="lazy" decoding="async"></button>'
+                        : '<span class="sip-tb__gorsel sip-tb__gorsel--bos" aria-hidden="true"></span>') +
                     '<div class="sip-tb__metin"><strong>' + kacir(urunBasligi(u, bilgi)) + '</strong>' +
-                        (u.alindi ? '<small>Alındı</small>' : '') + '</div>' +
-                    '<span class="sip-tb__adet">×' + kacir(adetYaz(u.adet)) + (u.birim ? ' ' + kacir(u.birim) : '') + '</span>' +
+                        (u.alindi ? '<small><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg>Alındı</small>' : '') + '</div>' +
+                    '<span class="sip-tb__adet"><small>×</small>' + kacir(adetYaz(u.adet)) + (u.birim ? '<em>' + kacir(u.birim) + '</em>' : '') + '</span>' +
                 '</div>' +
-                '<div class="sip-tb__cizim" data-tb-kod="' + kacir(kodlar[0] || '') + '"></div>' +
-                (kodlar.length > 1 ? '<div class="sip-tb__secenek" role="group" aria-label="Barkod seç">' + kodlar.map(function (k, j) {
-                    return '<button type="button" data-tb-sec="' + kacir(k) + '" aria-pressed="' + (j === 0) + '">' + kacir(k) + '</button>';
-                }).join('') + '</div>' : '') +
+                '<div class="sip-tb__barkod">' +
+                    (cok ? '<button type="button" class="sip-tb__ok" data-tb-ok="-1" aria-label="Önceki barkod">' + OK_SOL + '</button>' : '') +
+                    '<div class="sip-tb__cizim" data-tb-kod="' + kacir(kodlar[0] || '') + '"></div>' +
+                    (cok ? '<button type="button" class="sip-tb__ok" data-tb-ok="1" aria-label="Sonraki barkod">' + OK_SAG + '</button>' : '') +
+                '</div>' +
+                (cok ? '<p class="sip-tb__sayac"><b>1</b> / ' + kodlar.length + ' barkod</p>' : '') +
             '</article>';
         }).join('') : '<p class="sip-bilgi__bos">Ürünler henüz gelmedi.</p>';
         katAc('siparisTumBarkod');
         // Çizim kutunun gerçek genişliğine göre: pencere açıldıktan sonra
         el('tbListe').querySelectorAll('[data-tb-kod]').forEach(function (k) { tbCiz(k, k.getAttribute('data-tb-kod')); });
         el('tbListe').scrollTop = 0;
+    }
+
+    function tbBarkodKaydir(urunEl, yon) {
+        var s = durum.secili;
+        if (!s || !urunEl) return;
+        var u = (s.urunler || [])[Number(urunEl.getAttribute('data-tb-i'))];
+        if (!u) return;
+        var kodlar = barkodBul(u).barkodlar;
+        if (kodlar.length < 2) return;
+        var sira = (Number(urunEl.getAttribute('data-tb-sira')) + yon + kodlar.length) % kodlar.length;
+        urunEl.setAttribute('data-tb-sira', String(sira));
+        tbCiz(urunEl.querySelector('.sip-tb__cizim'), kodlar[sira]);
+        var sayac = urunEl.querySelector('.sip-tb__sayac b');
+        if (sayac) sayac.textContent = String(sira + 1);
     }
 
     function detayiCiz() {
@@ -1874,10 +1897,8 @@
         rozet.querySelector('b').textContent = BANT_ADI[bant] || '';
         el('detayYas').textContent = gecenSure(s) ? gecenSure(s) + ' önce' : '';
         el('detayPaketRozet').hidden = !paketliMi(s);
-        var adres = String(s.adres || '').trim();
-        el('detayAdresOzet').textContent = adres || 'Adres bilgisi yok';
-        el('detayAdresOzet').classList.toggle('bos', !adres);
-        el('detayAdresNot').textContent = s.musteri_notu ? 'Müşteri notu var · Ayrıntı için dokun' : 'Ayrıntı için dokun';
+        // Adres ekranda açıkça yazmıyor; sağ üstteki simgede nokta "adres/not var" der
+        el('detayAdresNokta').hidden = !(s.adres || s.musteri_notu);
 
         el('olcuParca').textContent = adetYaz(s.toplam_adet != null ? s.toplam_adet : urunler.length);
         el('olcuCesit').textContent = urunler.length;
@@ -3129,7 +3150,6 @@
 
         el('detayPaket').addEventListener('click', function () { paketDegistir(durum.secili); });
         el('detayBilgiAc').addEventListener('click', bilgiAc);
-        el('detayTeslimat').addEventListener('click', bilgiAc);
         el('detayBarkodlarAc').addEventListener('click', tumBarkodlarAc);
         el('bilgiKapat').addEventListener('click', function () { katKapat('siparisBilgi'); });
         el('tbKapat').addEventListener('click', function () { katKapat('siparisTumBarkod'); });
@@ -3140,11 +3160,13 @@
         });
         el('siparisTumBarkod').addEventListener('click', function (e) {
             if (e.target === el('siparisTumBarkod')) { katKapat('siparisTumBarkod'); return; }
-            var sec = e.target.closest('[data-tb-sec]');
-            if (!sec) return;
-            var urun = sec.closest('.sip-tb__urun');
-            urun.querySelectorAll('[data-tb-sec]').forEach(function (b) { b.setAttribute('aria-pressed', String(b === sec)); });
-            tbCiz(urun.querySelector('.sip-tb__cizim'), sec.getAttribute('data-tb-sec'));
+            var ok = e.target.closest('[data-tb-ok]');
+            if (ok) { tbBarkodKaydir(ok.closest('.sip-tb__urun'), Number(ok.getAttribute('data-tb-ok'))); return; }
+            var foto = e.target.closest('[data-tb-foto]');
+            if (foto && durum.secili) {
+                var fu = (durum.secili.urunler || [])[Number(foto.getAttribute('data-tb-foto'))];
+                if (fu) gorseliBuyut(fu);
+            }
         });
 
         el('detayBitir').addEventListener('click', function () {

@@ -556,11 +556,10 @@ function guvenliKimlik(id) {
    Tehlike şu: ikinci makinede panel henüz çizilmemişken "panelde sipariş
    yok" kararı verilirse, birinci makinenin taze kayıtları silinir.
 
-   Eşik YALNIZ "panel tamamen boş" dalında uygulanıyor. Panel doluyken
-   zaten kimlik karşılaştırması var: panelde duran sipariş silinmiyor,
-   panelden düşen anında siliniyor. Oraya da tazelik eşiği koysaydık
-   teslim edilen sipariş eşik süresi kadar ekranda kalırdı; kullanıcının
-   açıkça istemediği şey bu.
+   Eşik iki dalda da uygulanıyor. Panel doluyken de: başka cihazın paneli
+   bu siparişi görüyorsa ona dokunuyor ve sipariş silinmiyor. Teslim edilen
+   sipariş eşik süresi kadar veritabanında kalıyor ama site onu kolonundan
+   bitmiş sayıp göstermiyor.
 
    Boş panel kararı ise geri dönüşü olmayan bir silme başlattığı için
    ek koruma hak ediyor. Nabız aralığından geniş tutuluyor ki aktif
@@ -640,9 +639,14 @@ async function paneliSenkronla(yetki, panelIdleri, panelBos, zorla) {
             return;
         }
 
-        /* Panel dolu: kimlik karşılaştırması yeterli. Panelde olmayan
-           anında gidiyor, tazelik eşiği burada devrede değil. */
-        const yanit = await fetch(temel + '&select=order_id', { headers: apiBasliklari(yetki) });
+        /* Panel dolu: panelde olmayan sipariş silinir, AMA yalnız bir süredir
+           hiçbir cihazın dokunmadığıysa. Eskiden anında siliniyordu: ikinci
+           bilgisayarın paneli eski ya da donmuşsa birincinin canlı siparişini
+           siliyor, ürün satırları ve tikler de gidiyordu ("tikler gitti
+           geldi"). Panelinde gören her Asistan siparişe dakikada bir dokunuyor
+           (nabizAt); dokunulan sipariş silinmiyor. Veritabanı da aynı kuralı
+           ayrıca uyguluyor (sql_files/siparis_koruma.sql). */
+        const yanit = await fetch(temel + tazelikSuzgeci() + '&select=order_id', { headers: apiBasliklari(yetki) });
         if (!yanit.ok) return;
         const dbListe = await yanit.json();
         const panelSet = new Set(panelIdleri);
@@ -752,6 +756,10 @@ async function kuyrugaBak() {
                    denenmez ve eksik ürünle kalır. */
                 if (!yazma.toplam || yazma.yazilan === yazma.toplam) {
                     const imzalar = await imzalariOku();
+                    // İlk kez ürünleriyle yazılan sipariş: fırın ürünü varsa fırın nöbetçisine haber ver
+                    if (!imzalar[s.siparisId] && yazma.toplam && typeof globalThis.jbaFirinSatis === 'function') {
+                        try { globalThis.jbaFirinSatis(s.urunler); } catch (e) { /* yan iş */ }
+                    }
                     imzalar[s.siparisId] = siparisImzasi(s);
                     await imzalariYaz(imzalar);
                 }

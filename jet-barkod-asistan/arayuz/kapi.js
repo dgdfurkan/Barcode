@@ -166,4 +166,17 @@
             }
         });
     });
+
+    /* Fırın bildirimi sıklığı (arka-plan/firin-nobet.js okuyor) */
+    var firinAyar = document.getElementById('firinAyar');
+    if (firinAyar) {
+        chrome.storage.local.get('jbaFirinNobet', function (r) {
+            var a = (r && r.jbaFirinNobet) || { acik: true, dk: 3 };
+            firinAyar.value = a.acik === false ? '0' : String(a.dk || 3);
+        });
+        firinAyar.addEventListener('change', function () {
+            var dk = parseInt(firinAyar.value, 10) || 0;
+            chrome.storage.local.set({ jbaFirinNobet: dk ? { acik: true, dk: dk } : { acik: false, dk: 3 } });
+        });
+    }
 })();
