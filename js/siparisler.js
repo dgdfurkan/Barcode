@@ -360,7 +360,9 @@
 
     function imzaCikar(siparisler) {
         return siparisler.map(function (s) {
-            return s.id + ':' + s.toplama_durumu + ':' + s.durum + ':' +
+            // Paket ve teslimat bilgisi de imzada: yoksa başka cihazdaki "Paketle" ekrana düşmüyordu
+            return s.id + ':' + s.toplama_durumu + ':' + s.durum + ':' + (s.paketlendi_at || '') + ':' +
+                   (s.adres ? 1 : 0) + (s.musteri_notu ? 1 : 0) + ':' +
                    (s.urunler || []).filter(function (u) { return u.alindi; }).length +
                    '/' + (s.urunler || []).length;
         }).join('|');
