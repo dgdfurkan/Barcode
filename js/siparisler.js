@@ -1816,9 +1816,19 @@
     function tbCiz(kutu, kod) {
         if (!kutu) return;
         if (!kod) { kutu.innerHTML = '<span class="sip-tb__yok">Katalogda barkod yok</span>'; return; }
-        var alan = Math.max(160, (kutu.clientWidth || 280) - 16);
+        var alan = Math.min(360, Math.max(160, (kutu.clientWidth || 280) - 16));
         var cizim = global.JBBarkodSvg ? global.JBBarkodSvg.ciz(kod, { genislik: alan, cubuk: 64, etiket: kod + ' barkodu' }) : null;
-        kutu.innerHTML = (cizim ? cizim.svg : '') + '<span class="sip-tb__kod">' + kacir(kodBicim(kod)) + '</span>';
+        // Rakamlar çizimin altında zaten yazıyor; ayrıca yazılmıyor
+        kutu.innerHTML = cizim ? cizim.svg : '<span class="sip-tb__yok">' + kacir(kodBicim(kod)) + '</span>';
+    }
+
+    /* ×N rengi, tikteki efektle aynı dil: 2 mavi, 3 mor, 4 turuncu, 5+ kırmızı.
+       Tek adet ve tartılı ürün (kg) varsayılan lacivertte kalıyor. */
+    function tbAdetRengi(u) {
+        if (u.birim) return '';
+        var n = Math.floor(Number(u.adet) || 0);
+        if (n < 2) return '';
+        return COKLU_RENK[Math.min(n, 5)] || '';
     }
 
     var OK_SOL = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5"/></svg>';
@@ -1843,14 +1853,18 @@
                         : '<span class="sip-tb__gorsel sip-tb__gorsel--bos" aria-hidden="true"></span>') +
                     '<div class="sip-tb__metin"><strong>' + kacir(urunBasligi(u, bilgi)) + '</strong>' +
                         (u.alindi ? '<small><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg>Alındı</small>' : '') + '</div>' +
-                    '<span class="sip-tb__adet"><small>×</small>' + kacir(adetYaz(u.adet)) + (u.birim ? '<em>' + kacir(u.birim) + '</em>' : '') + '</span>' +
+                    '<span class="sip-tb__adet"' + (tbAdetRengi(u) ? ' style="background:' + tbAdetRengi(u) + '"' : '') + '><small>×</small>' + kacir(adetYaz(u.adet)) + (u.birim ? '<em>' + kacir(u.birim) + '</em>' : '') + '</span>' +
                 '</div>' +
                 '<div class="sip-tb__barkod">' +
-                    (cok ? '<button type="button" class="sip-tb__ok" data-tb-ok="-1" aria-label="Önceki barkod">' + OK_SOL + '</button>' : '') +
                     '<div class="sip-tb__cizim" data-tb-kod="' + kacir(kodlar[0] || '') + '"></div>' +
-                    (cok ? '<button type="button" class="sip-tb__ok" data-tb-ok="1" aria-label="Sonraki barkod">' + OK_SAG + '</button>' : '') +
                 '</div>' +
-                (cok ? '<p class="sip-tb__sayac"><b>1</b> / ' + kodlar.length + ' barkod</p>' : '') +
+                (cok
+                    ? '<div class="sip-tb__gecis">' +
+                        '<button type="button" class="sip-tb__ok" data-tb-ok="-1" aria-label="Önceki barkod">' + OK_SOL + '</button>' +
+                        '<p class="sip-tb__sayac"><b>1</b> / ' + kodlar.length + ' barkod</p>' +
+                        '<button type="button" class="sip-tb__ok" data-tb-ok="1" aria-label="Sonraki barkod">' + OK_SAG + '</button>' +
+                      '</div>'
+                    : '') +
             '</article>';
         }).join('') : '<p class="sip-bilgi__bos">Ürünler henüz gelmedi.</p>';
         katAc('siparisTumBarkod');

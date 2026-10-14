@@ -2429,26 +2429,27 @@ button.sip-avatar:focus-visible { outline: 2px solid var(--mavi); outline-offset
 }
 .sip-tb__adet small { font-size: 13px; font-weight: 700; opacity: 0.7; }
 .sip-tb__adet em { margin-left: 4px; font-style: normal; font-size: 11px; font-weight: 600; opacity: 0.8; }
-.sip-tb__urun.is-alindi .sip-tb__adet { background: var(--yesil-koyu); }
-.sip-tb__barkod { margin-top: 12px; display: flex; align-items: center; gap: 8px; }
+.sip-tb__barkod { margin-top: 12px; }
 .sip-tb__cizim {
-    flex: 1; min-width: 0; padding: 8px;
+    padding: 8px;
     border-radius: 12px; background: #fff; box-shadow: inset 0 0 0 1px var(--cizgi);
     display: flex; flex-direction: column; align-items: center; gap: 4px;
 }
 .sip-tb__cizim svg { display: block; max-width: 100%; height: auto; }
-.sip-tb__kod { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; color: var(--yazi-orta); font-variant-numeric: tabular-nums; }
 .sip-tb__yok { padding: 16px 0; font-size: 12px; color: var(--sonuk); }
+/* Birden çok barkodlu üründe geçiş: barkodun altında tek ince satır,
+   çizimden yer çalmıyor */
+.sip-tb__gecis { margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
 .sip-tb__ok {
-    flex: none; width: 40px; height: 64px;
+    flex: none; width: 44px; height: 32px;
     display: grid; place-items: center;
-    border: 1px solid var(--cizgi-sert); border-radius: 12px; background: #fff; color: var(--yazi);
+    border: 1px solid var(--cizgi-sert); border-radius: 999px; background: #fff; color: var(--yazi);
     transition: border-color 0.16s, color 0.16s, transform 0.16s var(--yay);
 }
-.sip-tb__ok svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.sip-tb__ok svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .sip-tb__ok:hover { border-color: var(--mavi); color: var(--mavi); }
 .sip-tb__ok:active { transform: scale(0.94); }
-.sip-tb__sayac { margin: 8px 0 0; text-align: center; font-size: 11px; font-weight: 600; color: var(--sonuk); font-variant-numeric: tabular-nums; }
+.sip-tb__sayac { margin: 0; min-width: 88px; text-align: center; font-size: 11px; font-weight: 600; color: var(--sonuk); font-variant-numeric: tabular-nums; }
 .sip-tb__sayac b { color: var(--yazi); }
 
 /* Sağ üstteki adres simgesi: adres ya da not varsa küçük nokta */
@@ -2467,7 +2468,6 @@ button.sip-avatar:focus-visible { outline: 2px solid var(--mavi); outline-offset
     .sip-bilgi__satir { grid-template-columns: 96px 1fr; }
     .sip-kat--tam { padding: 32px 12px; }
     .sip-tb { height: calc(100dvh - 64px); }
-    .sip-tb__ok { width: 36px; }
 }
 @media (prefers-reduced-motion: reduce) {
     .sip-tepe__dugme, .sip-paket, .sip-tb__ok { transition: none; }
