@@ -177,17 +177,49 @@
     if (firinAyar) {
         chrome.storage.local.get('jbaFirinNobet', function (r) {
             var a = (r && r.jbaFirinNobet) || { acik: true, dk: 3 };
-            firinAyar.value = a.acik === false ? '0' : (a.simule ? 'sim' : String(a.dk || 3));
+            firinAyar.value = a.acik === false ? '0' : String(a.simule ? 3 : (a.dk || 3));
         });
         firinAyar.addEventListener('change', function () {
-            /* Simülasyon: gerçek ürünlerden rastgele eksik senaryosu, dakikada bir,
-               kart 10 sn görünüp kapanır. Yalnız deneme için. */
-            if (firinAyar.value === 'sim') {
-                chrome.storage.local.set({ jbaFirinNobet: { acik: true, dk: 1, simule: true } });
-                return;
-            }
             var dk = parseInt(firinAyar.value, 10) || 0;
             chrome.storage.local.set({ jbaFirinNobet: dk ? { acik: true, dk: dk } : { acik: false, dk: 3 } });
+        });
+    }
+
+    /* Son kontrolün sonucu: nöbetçinin çalıştığı buradan görülüyor */
+    var firinDurum = document.getElementById('firinDurum');
+    function saatYaz(t) {
+        var d = new Date(t);
+        return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    }
+    function durumCiz(v) {
+        if (!firinDurum) return;
+        if (!v || !v.zaman) { firinDurum.textContent = 'Henüz kontrol yapılmadı.'; return; }
+        firinDurum.textContent = '';
+        var b = document.createElement('b');
+        b.textContent = 'Son kontrol ' + saatYaz(v.zaman);
+        firinDurum.appendChild(b);
+        firinDurum.appendChild(document.createTextNode(' · ' + String(v.metin || '')));
+    }
+    chrome.storage.local.get('jbaFirinDurum', function (r) { durumCiz(r && r.jbaFirinDurum); });
+    chrome.storage.onChanged.addListener(function (d, alan) {
+        if (alan === 'local' && d.jbaFirinDurum) durumCiz(d.jbaFirinDurum.newValue);
+    });
+
+    /* Simülasyon: tek sefer, gerçek ürünlerden rastgele eksik, kart 10 sn */
+    var firinSim = document.getElementById('firinSim');
+    if (firinSim) {
+        firinSim.addEventListener('click', function () {
+            firinSim.disabled = true;
+            firinSim.textContent = 'Hazırlanıyor...';
+            chrome.runtime.sendMessage({ type: 'JBA_FIRIN_SIM' }, function (c) {
+                void chrome.runtime.lastError;
+                firinSim.textContent = c && c.ok ? 'Panelde Gösterildi' : 'Gösterilemedi';
+                if (firinDurum && c && !c.ok && c.metin) firinDurum.textContent = c.metin;
+                setTimeout(function () {
+                    firinSim.disabled = false;
+                    firinSim.textContent = 'Simülasyonu Göster';
+                }, 3000);
+            });
         });
     }
 })();

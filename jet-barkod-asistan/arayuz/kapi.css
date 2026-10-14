@@ -61,6 +61,10 @@ body {
     font-size: 12px;
 }
 .ayar__secim:focus { outline: 2px solid var(--renk-vurgu); outline-offset: 1px; }
+.ayar--alt { padding-top: 0; border-top: 0; }
+.ayar__durum { flex: 1; min-width: 0; margin: 0; font-size: 11px; line-height: 1.35; color: var(--renk-soluk); }
+.ayar__durum b { color: var(--renk-yazi); font-weight: 600; }
+.ayar--alt .eylem { flex: none; width: 140px; text-align: center; }
 
 /* ---------- Başlık ---------- */
 

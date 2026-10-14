@@ -98,6 +98,8 @@
                 jetonYakala(url, girdi.headers);
             }
             hareketGovdesiYakala(url, init);
+            panelBasliklariYakala(url, init && init.headers);
+            if (typeof girdi === 'object' && girdi && girdi.headers) panelBasliklariYakala(url, girdi.headers);
             // Yanıt olduğu gibi geri gidiyor; sayfanın akışına karışmıyoruz.
             return asilFetch.apply(this, arguments).then(function (yanit) {
                 return yanitiDuyur(url, yanit);
@@ -135,6 +137,7 @@
                         (k === 'Authorization' || k === 'authorization') && v) {
                         jetonGonder(v);
                     }
+                    if (sonUrl.indexOf(TEMEL) === 0) { var o = {}; o[k] = v; panelBasliklariYakala(sonUrl, o); }
                     return asilBaslik2.apply(this, arguments);
                 };
 
@@ -706,10 +709,28 @@
     var firinZaman = 0;
     var firinSuruyor = null;
 
+    /* Panel isteklerini `new Request(url, { headers })` ile atıyor, ikinci
+       parametre boş geliyor. Başlıklar o yüzden hem init'ten hem Request
+       nesnesinden, panelin kendi API'sine giden her istekten toplanıyor.
+       Sayaçlar dakikada birkaç kez yenilendiği için jeton hep taze kalıyor.
+       Gövde türü (content-type) alınmıyor; fırın isteği GET. */
+    var panelBasliklari = {};
+
+    function panelBasliklariYakala(url, basliklar) {
+        if (!url || typeof url !== 'string' || url.indexOf(TEMEL) !== 0 || !basliklar) return;
+        try {
+            var ekle = function (v, k) {
+                var a = String(k).toLowerCase();
+                if (a === 'content-type' || a === 'content-length') return;
+                if (v) panelBasliklari[a] = String(v);
+            };
+            if (typeof basliklar.forEach === 'function') basliklar.forEach(ekle);
+            else Object.keys(basliklar).forEach(function (k) { ekle(basliklar[k], k); });
+        } catch (e) { /* sessiz */ }
+    }
+
     function jetonVarMi() {
-        var h = yakalanan && yakalanan.headers;
-        if (!h) return false;
-        return Object.keys(h).some(function (k) { return k.toLowerCase() === 'authorization' && h[k]; });
+        return String(panelBasliklari.authorization || '').indexOf('Bearer ') === 0;
     }
 
     function firinSade(yanit) {
@@ -736,10 +757,9 @@
         if (firinSuruyor) return firinSuruyor;
         if (firinSon && Date.now() - firinZaman < FIRIN_ARA_MS) return Promise.resolve(firinSon);
         if (!jetonVarMi() || !asilFetch) return Promise.resolve({ ok: false, sebep: 'oturum' });
-        var ayar = sablon();
-        ayar.method = 'GET';
-        delete ayar.body;
-        firinSuruyor = asilFetch(TEMEL + '/heating-estimations', ayar)
+        var basliklar = {};
+        Object.keys(panelBasliklari).forEach(function (k) { basliklar[k] = panelBasliklari[k]; });
+        firinSuruyor = asilFetch(TEMEL + '/heating-estimations', { method: 'GET', headers: basliklar, credentials: 'include' })
             .then(function (r) {
                 if (!r.ok) return { ok: false, sebep: 'http ' + r.status };
                 return r.json().then(function (j) { return { ok: true, dilimler: firinSade(j) }; });
