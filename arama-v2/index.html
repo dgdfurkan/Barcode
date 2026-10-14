@@ -4039,15 +4039,24 @@
             const r = sum % 10;
             return r === 0 ? 0 : 10 - r;
         }
+        /* EAN-13 YALNIZ KOD GERÇEKTEN EAN İSE
+           Eskiden 12 haneli her koda kontrol hanesi EKLENİYORDU: çizilen barkod
+           ürünün kodu değil, sonuna bir rakam eklenmiş başka bir sayıydı; el
+           okuyucusu okuyor ama sistem ürünü bulamıyordu. Kontrol hanesi tutmayan
+           13 haneli kod da EAN diye çizilmeye çalışılıyordu. Kural artık:
+             13 hane + doğru kontrol hanesi   → EAN-13
+             12 hane + geçerli UPC-A          → başına 0, EAN-13 (okuyucu 12 hane verir)
+             geri kalan her şey               → Code128, kodun kendisi birebir */
+        function eanKontrolTutuyor(d) {
+            return /^\d{13}$/.test(d) && calculateEan13Checksum(d) === Number(d[12]);
+        }
         function isEan13Compatible(text) {
-            if (!text || typeof text !== 'string') return false;
-            const digits = text.replace(/\D/g, '');
-            return digits.length === 12 || digits.length === 13;
+            return normalizeToEan13(text) !== null;
         }
         function normalizeToEan13(text) {
-            const digits = String(text).replace(/\D/g, '');
-            if (digits.length === 12) return digits + calculateEan13Checksum(digits);
-            if (digits.length === 13) return digits;
+            const s = String(text == null ? '' : text).trim();
+            if (/^\d{13}$/.test(s)) return eanKontrolTutuyor(s) ? s : null;
+            if (/^\d{12}$/.test(s) && eanKontrolTutuyor('0' + s)) return '0' + s;
             return null;
         }
         // EAN-13 SVG (JsBarcode ile; el terminalleri EAN-13'ü en iyi okur)

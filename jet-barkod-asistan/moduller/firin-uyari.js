@@ -3,18 +3,18 @@
  * ============================================================================
  *
  * Arka plandaki fırın nöbetçisi (arka-plan/firin-nobet.js) belli aralıklarla
- * buraya `JBA_FIRIN_SOR` der; burası sayfa köprüsünden (sayfa-koprusu.js)
- * panelin fırın tahminini ister ve cevabı geri verir. Yeni sekme açılmaz.
+ * buraya `JBA_FIRIN_SOR` der. Burası sayfa köprüsünden (sayfa-koprusu.js)
+ * panelin fırın tahminini ister, pişirme panelinin KENDİ hesabıyla
+ * (moduller/firin-hesap.js, aynı ayarlar) neyin pişeceğini bulur ve listeyi
+ * geri verir. Yeni sekme açılmaz.
  *
- * Pişirilmesi gereken ürün varsa nöbetçi `JBA_FIRIN_UYARI` yollar.
- * Siparişler ekranının sağ üstünde hafifçe nabız atan bir panel çıkar.
- * İçindeki kartlar pişirme panelindeki kartların küçüğü: görsel, ad, durum
- * etiketi, kaç adet pişirileceği, dört dilimin önerisi, mevcut ve donuk.
- * Yalnız pişirilecek ürünler gelir. Panele dokununca fırın sayfası yeni
- * sekmede açılır. Liste boş gelince (pişirme yapıldı) panel kapanır.
+ * Bildirimde yalnız donuktan pişecek ürünler var: panelde "N Adet
+ * Pişirilecek" yazan satırların aynısı. Taze üretim ekmek ve "fazla"
+ * satırları gelmiyor.
  *
- * Kapatılan panel aynı liste için bir daha çıkmaz; listeye yeni ürün girerse
- * yeniden çıkar. Simülasyonda üstte "Simülasyon" yazar, 10 sn sonra kapanır.
+ * Kart kapatılamıyor: pişirme yapılıp panel verisi güncellenene kadar
+ * duruyor, sonraki kontrolde liste boşalınca kendiliğinden kalkıyor.
+ * Simülasyonda üstte "Simülasyon" yazıyor, 10 sn sonra kapanıyor.
  * Panelin stilleriyle karışmasın diye gölge DOM içinde.
  * ============================================================================
  */
@@ -25,14 +25,18 @@
     if (!JBA) return;
 
     var PANO_YOLU = /^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/;
-    var KAPATILAN = 'jba_firin_kapatilan';
     var EN_COK_KART = 3;
+    var DILIM_SIRA = { 8: 0, 12: 1, 16: 2, 20: 3 };
+    var DILIM_AD = ['08:00-12:00', '12:00-16:00', '16:00-20:00', '20:00-24:00'];
 
     var etkin = false;
     var kap = null;
     var kok = null;
     var son = { liste: [] };
     var simZamanlayici = null;
+    /* Pişirme panelinin "Raf" sayısı API'de hangi alan: fırın sayfasında
+       panel her açıldığında ölçülüp kaydediliyor (firin-pisirme.js). */
+    var rafAlani = 'available';
 
     var STIL = [
         ':host { all: initial; }',
@@ -56,20 +60,18 @@
         '.baslik { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; line-height: 20px; }',
         '.sim { padding: 2px 8px; border-radius: 999px; background: #eef2ff; color: #4338ca; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; line-height: 14px; }',
         '.alt { margin: 2px 0 0; font-size: 12px; color: #667085; }',
-        '.kapat { flex: none; width: 32px; height: 32px; margin: -4px -4px 0 0; border: 0; border-radius: 999px; background: transparent; color: #667085; cursor: pointer; display: grid; place-items: center; }',
-        '.kapat:hover { background: #f4f6f9; color: #111827; }',
-        '.kapat svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }',
 
         '.liste { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }',
         '.ust, .daha, .git, .kart { flex: none; }',
         '.kart { display: flex; align-items: stretch; gap: 12px; padding: 12px; border-radius: 12px; border-left: 6px solid var(--kenar); background: var(--zemin); }',
-        '.kart.acil { --kenar: #ef4444; --zemin: #fef2f2; --hap: #fee2e2; --hap-yazi: #b42318; }',
-        '.kart.kritik { --kenar: #f59e0b; --zemin: #fffbeb; --hap: #fef3c7; --hap-yazi: #b45309; }',
+        '.kart.danger { --kenar: #ef4444; --zemin: #fef2f2; --hap: #fee2e2; --hap-yazi: #b42318; }',
+        '.kart.warning { --kenar: #f59e0b; --zemin: #fffbeb; --hap: #fef3c7; --hap-yazi: #b45309; }',
+        '.kart.info { --kenar: #3b82f6; --zemin: #eff6ff; --hap: #dbeafe; --hap-yazi: #1d4ed8; }',
         '.gorsel { flex: none; width: 56px; height: 56px; border-radius: 9px; background: #fff; object-fit: cover; }',
         '.orta { flex: 1; min-width: 0; }',
         '.ad { margin: 0; font-size: 13px; font-weight: 600; line-height: 18px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }',
         '.miktar { margin: 4px 0 0; font-size: 18px; font-weight: 700; line-height: 24px; color: #111827; font-variant-numeric: tabular-nums; }',
-        '.sebep { margin: 4px 0 0; display: flex; align-items: center; gap: 8px; font-size: 11px; color: #4b5563; }',
+        '.sebep { margin: 4px 0 0; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 11px; color: #4b5563; }',
         '.hap { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--hap); color: var(--hap-yazi); font-size: 10px; font-weight: 700; line-height: 14px; }',
         '.dilimler { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(17,24,39,.08); display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; text-align: center; color: #6b7280; }',
         '.dilimler b { display: block; font-size: 12px; font-weight: 600; color: #374151; font-variant-numeric: tabular-nums; }',
@@ -88,6 +90,8 @@
         '@media (prefers-reduced-motion: reduce) { .pano, .pano::before, .ikon i { animation: none; } .pano::before { opacity: .6; } }'
     ].join('\n');
 
+    var ETIKET = { 'urgent-prep': 'ACİL PİŞİR', danger: 'ACİL PİŞİR', warning: 'PİŞİRME GEREKLİ', info: 'HAZIRLIK YAP' };
+
     function kacir(t) {
         return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
             return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -99,19 +103,108 @@
         return Number.isFinite(n) ? Math.round(n) : 0;
     }
 
-    function imza(liste) {
-        return liste.map(function (u) { return u.ad + ':' + u.raf; }).sort().join('|');
+    // ==================================================================
+    // Hesap: panel verisi → pişirme panelinin listesi
+    // ==================================================================
+
+    function dilimSirasi(bas) {
+        var saat = Number(String(bas || '').slice(11, 13));
+        return Object.prototype.hasOwnProperty.call(DILIM_SIRA, saat) ? DILIM_SIRA[saat] : -1;
     }
 
-    function kapatildiMi(liste) {
-        try {
-            var k = sessionStorage.getItem(KAPATILAN);
-            if (!k) return false;
-            // Kapatılan listede olmayan yeni bir ürün geldiyse yine göster
-            var eski = k.split('|');
-            return liste.every(function (u) { return eski.indexOf(u.ad + ':' + u.raf) > -1; });
-        } catch (e) { return false; }
+    function rafDegeri(u) {
+        if (typeof u.raf !== 'number') return null;
+        return rafAlani === 'available+reserve' ? u.raf + (Number(u.rezerv) || 0) : u.raf;
     }
+
+    /* API cevabını pişirme panelinin ürün biçimine çevirir: dört dilimin
+       önerisi (Pişir N) ve şu anki dilimin raf/donuk sayısı. */
+    function urunlereCevir(dilimler, simdi) {
+        var suan = JBA.firinHesap.dilim(new Date(simdi).getHours()).index;
+        var ada = {};
+        var sira = [];
+        (dilimler || []).forEach(function (d) {
+            var i = dilimSirasi(d.bas);
+            if (i < 0) return;
+            (d.urunler || []).forEach(function (u) {
+                if (!u || typeof u.ad !== 'string' || !u.ad) return;
+                var p = ada[u.ad];
+                if (!p) {
+                    p = ada[u.ad] = { name: u.ad, imgSrc: u.gorsel || '', currentStock: 0, frozenStock: 0,
+                        recommendations: [0, 0, 0, 0], stokOkundu: false, _stokDilim: -1 };
+                    sira.push(u.ad);
+                }
+                p.recommendations[i] = Number(u.oneri) || 0;
+                var raf = rafDegeri(u);
+                // Stok önce şu anki dilimden; yoksa ilk bulunan dilimden
+                if (raf !== null && typeof u.donuk === 'number' && (p._stokDilim !== suan)) {
+                    if (!p.stokOkundu || i === suan) {
+                        p.currentStock = raf;
+                        p.frozenStock = u.donuk;
+                        p.stokOkundu = true;
+                        p._stokDilim = i;
+                    }
+                }
+            });
+        });
+        return sira.map(function (ad) { return ada[ad]; });
+    }
+
+    /* Panelde "N Adet Pişirilecek" yazan satırlar: donuktan pişen, adedi
+       sıfırdan büyük, fazla ya da taze üretim satırı olmayanlar. */
+    function pisecekler(urunler, simdi) {
+        var stoklu = urunler.filter(function (p) { return p.stokOkundu; });
+        return JBA.firinHesap.oneriler(stoklu, JBA.firinHesap.ayarlar(), simdi)
+            .filter(function (r) { return r.amountToCook > 0 && r.alertLevel !== 'surplus' && !r.displayKind; })
+            .map(function (r) {
+                return {
+                    ad: r.name, gorsel: r.imgSrc, raf: r.currentStock, donuk: r.frozenStock,
+                    oneri: r.currentTarget, pisir: r.amountToCook, seviye: r.alertLevel,
+                    sebep: r.reason, oneriler: r.recommendations.slice(0, 4)
+                };
+            });
+    }
+
+    /* Simülasyon: gerçek ürünlerden rastgele 1-4 tanesinin rafı boşaltılıyor,
+       hesap yine pişirme panelinin hesabı. */
+    function simUrunleri(urunler, simdi) {
+        var suan = JBA.firinHesap.dilim(new Date(simdi).getHours()).index;
+        var adaylar = urunler.filter(function (p) { return !JBA.firinHesap.ekmekMi(p.name); });
+        for (var i = adaylar.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var t = adaylar[i]; adaylar[i] = adaylar[j]; adaylar[j] = t;
+        }
+        var adet = 1 + Math.floor(Math.random() * Math.min(4, adaylar.length));
+        var secilen = {};
+        adaylar.slice(0, adet).forEach(function (p) { secilen[p.name] = true; });
+        return urunler.map(function (p) {
+            var k = JSON.parse(JSON.stringify(p));
+            if (!secilen[k.name]) { k.stokOkundu = false; return k; }
+            if (!k.recommendations[suan]) k.recommendations[suan] = 4 + Math.floor(Math.random() * 9);
+            k.currentStock = Math.random() < 0.5 ? 0 : Math.floor(k.recommendations[suan] / 4);
+            if (!(k.frozenStock > 0)) k.frozenStock = 6 + Math.floor(Math.random() * 35);
+            k.stokOkundu = true;
+            return k;
+        });
+    }
+
+    function hesapla(sonuc, sim) {
+        var simdi = Date.now();
+        var urunler = urunlereCevir(sonuc.dilimler, simdi);
+        var liste = pisecekler(sim ? simUrunleri(urunler, simdi) : urunler, simdi);
+        return {
+            ok: true,
+            liste: liste,
+            urunSayisi: urunler.length,
+            stokluSayisi: urunler.filter(function (p) { return p.stokOkundu; }).length,
+            dilimler: DILIM_AD,
+            simdiki: JBA.firinHesap.dilim(new Date(simdi).getHours()).index
+        };
+    }
+
+    // ==================================================================
+    // Çizim
+    // ==================================================================
 
     function kaldir() {
         clearTimeout(simZamanlayici);
@@ -123,9 +216,7 @@
 
     /** Pişirme panelindeki kartın küçüğü */
     function kartHtml(u, dilimler, simdiki) {
-        var raf = sayi(u.raf);
-        var oneri = sayi(u.oneri);
-        var acil = raf <= 0;
+        var seviye = u.seviye === 'urgent-prep' ? 'danger' : (ETIKET[u.seviye] ? u.seviye : 'warning');
         var gorsel = /^https:\/\//.test(u.gorsel || '')
             ? '<img class="gorsel" src="' + kacir(u.gorsel) + '" alt="">'
             : '<span class="gorsel"></span>';
@@ -134,15 +225,15 @@
             return '<div' + (i === simdiki ? ' class="su"' : '') + '><b>' + sayi(oneriler[i]) + '</b>' +
                 '<span>' + kacir(String(et).replace(/:00/g, '')) + '</span></div>';
         }).join('');
-        return '<li class="kart ' + (acil ? 'acil' : 'kritik') + '">' + gorsel +
+        return '<li class="kart ' + seviye + '">' + gorsel +
             '<div class="orta">' +
                 '<p class="ad" title="' + kacir(u.ad) + '">' + kacir(u.ad) + '</p>' +
                 '<p class="miktar">' + sayi(u.pisir) + ' Adet Pişirilecek</p>' +
-                '<p class="sebep"><span class="hap">' + (acil ? 'ACİL PİŞİR' : 'STOK KRİTİK') + '</span>' +
-                '<span>' + (acil ? 'Rafta yok, hedef ' + oneri : 'Rafta ' + raf + ', hedef ' + oneri) + '</span></p>' +
+                '<p class="sebep"><span class="hap">' + kacir(ETIKET[u.seviye] || 'PİŞİRME GEREKLİ') + '</span>' +
+                '<span>' + kacir(u.sebep || '') + '</span></p>' +
                 (dilimHtml ? '<div class="dilimler">' + dilimHtml + '</div>' : '') +
             '</div>' +
-            '<div class="sag"><div><span>MEVCUT</span><b>' + raf + '</b></div><div><span>DONUK</span><b>' + sayi(u.donuk) + '</b></div></div>' +
+            '<div class="sag"><div><span>MEVCUT</span><b>' + sayi(u.raf) + '</b></div><div><span>DONUK</span><b>' + sayi(u.donuk) + '</b></div></div>' +
         '</li>';
     }
 
@@ -151,14 +242,13 @@
         var liste = son.liste || [];
         kaldir();
         if (!etkin || !PANO_YOLU.test(location.pathname) || !liste.length) return;
-        if (!son.sim && kapatildiMi(liste)) return;
 
         kap = document.createElement('div');
         kap.id = 'jba-firin-uyari';
         kok = kap.attachShadow({ mode: 'closed' });
         document.documentElement.appendChild(kap);
 
-        var dilimler = Array.isArray(son.dilimler) ? son.dilimler : [];
+        var dilimler = Array.isArray(son.dilimler) ? son.dilimler : DILIM_AD;
         var simdiki = typeof son.simdiki === 'number' ? son.simdiki : -1;
         var goster = liste.slice(0, EN_COK_KART);
         var alt = (simdiki > -1 && dilimler[simdiki] ? dilimler[simdiki] + ' dilimi · ' : '') +
@@ -171,7 +261,6 @@
                     '<span class="ikon"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0v6H4z"/><path d="M8 18v-3M12 18v-4M16 18v-3"/></svg><i></i></span>' +
                     '<div class="metin"><p class="baslik">Pişirme Zamanı' + (son.sim ? '<span class="sim">Simülasyon</span>' : '') + '</p>' +
                     '<p class="alt">' + kacir(alt) + '</p></div>' +
-                    '<button type="button" class="kapat" aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>' +
                 '</div>' +
                 '<ul class="liste">' + goster.map(function (u) { return kartHtml(u, dilimler, simdiki); }).join('') + '</ul>' +
                 (liste.length > goster.length ? '<p class="daha">+' + (liste.length - goster.length) + ' ürün daha</p>' : '') +
@@ -179,19 +268,23 @@
                 (sure ? '<span class="sure" style="animation-duration:' + sure + 'ms"></span>' : '') +
             '</div>';
 
-        kok.querySelector('.kapat').addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (!son.sim) {
-                try { sessionStorage.setItem(KAPATILAN, imza(liste)); } catch (x) { /* sessiz */ }
-            }
-            kaldir();
-        });
         kok.querySelector('.pano').addEventListener('click', function () {
             try { chrome.runtime.sendMessage({ type: 'JBA_FIRIN_AC' }, function () { void chrome.runtime.lastError; }); }
             catch (e) { /* yetim bağlam */ }
         });
-        if (sure) simZamanlayici = setTimeout(kaldir, sure);
+        if (sure) {
+            simZamanlayici = setTimeout(function () {
+                // Simülasyon bitti: gerçek liste varsa o geri gelsin
+                var gercek = son.gercek;
+                kaldir();
+                if (gercek && gercek.liste && gercek.liste.length) ciz(gercek);
+            }, sure);
+        }
     }
+
+    // ==================================================================
+    // Sayfa köprüsü
+    // ==================================================================
 
     /* Sayfa köprüsüne sor, cevabı bekle (en fazla 20 sn) */
     var soruNo = 0;
@@ -217,21 +310,47 @@
         });
     }
 
+    function rafAlaniOku() {
+        try {
+            chrome.storage.local.get('jbaFirinRafAlani', function (r) {
+                void chrome.runtime.lastError;
+                var a = r && r.jbaFirinRafAlani && r.jbaFirinRafAlani.alan;
+                if (a === 'available' || a === 'available+reserve') rafAlani = a;
+            });
+        } catch (e) { /* yetim bağlam */ }
+    }
+
     try {
         chrome.runtime.onMessage.addListener(function (m, gonderen, cevapla) {
             if (m && m.type === 'JBA_FIRIN_SOR') {
-                if (!etkin) { cevapla({ ok: false, sebep: 'kapalı' }); return false; }
-                tahminSor().then(cevapla);
+                if (!etkin || !JBA.firinHesap) { cevapla({ ok: false, sebep: 'kapalı' }); return false; }
+                tahminSor().then(function (sonuc) {
+                    if (!sonuc || !sonuc.ok) { cevapla(sonuc || { ok: false }); return; }
+                    try { cevapla(hesapla(sonuc, !!m.sim)); }
+                    catch (e) { cevapla({ ok: false, sebep: 'hesap: ' + String(e && e.message || e).slice(0, 80) }); }
+                });
                 return true;
             }
             if (!m || m.type !== 'JBA_FIRIN_UYARI') return false;
             var liste = Array.isArray(m.liste) ? m.liste.filter(function (u) { return u && typeof u.ad === 'string'; }) : [];
-            // Gerçek liste boşaldıysa (pişirme yapıldı) kapatma kaydı da sıfırlansın
-            if (!liste.length && !m.sim) { try { sessionStorage.removeItem(KAPATILAN); } catch (e) { /* sessiz */ } }
-            ciz({ liste: liste, dilimler: m.dilimler, simdiki: m.simdiki, sim: !!m.sim, sure: m.sure });
+            var yeni = { liste: liste, dilimler: m.dilimler, simdiki: m.simdiki, sim: !!m.sim, sure: m.sure };
+            if (m.sim) {
+                // Gerçek uyarı varken simülasyon gösterilirse süre bitince gerçek geri gelir
+                yeni.gercek = son && !son.sim ? son : (son && son.gercek) || null;
+                ciz(yeni);
+                return false;
+            }
+            // Simülasyon ekrandayken gelen gerçek sonuç simülasyonu bölmez, sonrası için saklanır
+            if (son && son.sim && kap) { son.gercek = yeni; return false; }
+            ciz(yeni);
             return false;
         });
+        chrome.storage.onChanged.addListener(function (d, alan) {
+            if (alan === 'local' && d.jbaFirinRafAlani) rafAlaniOku();
+        });
     } catch (e) { /* yetim bağlam */ }
+
+    rafAlaniOku();
 
     JBA.kayit({
         kimlik: 'firinUyari',
@@ -244,7 +363,6 @@
             etkin = true;
             try { chrome.runtime.sendMessage({ type: 'JBA_FIRIN_PANO_HAZIR' }, function () { void chrome.runtime.lastError; }); }
             catch (e) { /* yetim bağlam */ }
-            // Simülasyon kartı geri dönüşte yeniden çıkmasın
             if (!son.sim) ciz(son);
         },
 

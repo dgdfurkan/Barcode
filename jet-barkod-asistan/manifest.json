@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jet Barkod Asistan",
-  "version": "0.30.0",
+  "version": "0.31.0",
   "description": "Jet Barkod araçlarının tamamı tek eklentide. Getir panellerinde kopyalama, sayım ve arama işlerini tek yerden yürütür.",
   "icons": {
     "16": "varliklar/ikon16.png",
@@ -69,6 +69,7 @@
         "moduller/toplu-kopyalama.js",
         "moduller/sayim-kopyalama.js",
         "moduller/hizli-bul.js",
+        "moduller/firin-hesap.js",
         "moduller/firin-pisirme.js",
         "moduller/firin-uyari.js",
         "moduller/raf-etiketi.js",

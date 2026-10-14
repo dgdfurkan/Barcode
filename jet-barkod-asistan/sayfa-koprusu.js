@@ -700,11 +700,11 @@
     // geliyor. Kontrol panelinde aynı isteği, panelin kendi sipariş
     // isteğinden kopyalanan başlıklarla atıyoruz: jeton sayfada kalıyor,
     // dışarı çıkmıyor. Yeni sekme açılmıyor, sayfa çizilmiyor.
-    // Sıklık sınırı burada da var: 50 sn içinde ikinci istek atılmaz,
+    // Sıklık sınırı burada da var: 10 sn içinde ikinci istek atılmaz,
     // son cevap döner.
     // ==================================================================
 
-    var FIRIN_ARA_MS = 50 * 1000;
+    var FIRIN_ARA_MS = 10 * 1000;
     var firinSon = null;
     var firinZaman = 0;
     var firinSuruyor = null;
@@ -746,6 +746,7 @@
                         oneri: Number(p.prediction) || 0,
                         raf: typeof p.available === 'number' ? p.available : null,
                         donuk: typeof p.frozen === 'number' ? p.frozen : null,
+                        rezerv: typeof p.reserve === 'number' ? p.reserve : null,
                         pisen: Number(p.cookedQuantity) || 0
                     };
                 })

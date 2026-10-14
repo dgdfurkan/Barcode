@@ -1,6 +1,23 @@
 /**
  * Raftaki Eksikler — premium: raftakiEksikler
  */
+/* EAN-13 yalnız kod gerçekten EAN ise (arama sayfasıyla aynı kural):
+   13 hane + doğru kontrol hanesi, ya da 12 haneli geçerli UPC-A (başına 0).
+   Geri kalan her kod Code128 ile birebir çiziliyor. */
+const ShelfMissingEan = {
+    tutuyor(d) {
+        if (!/^\d{13}$/.test(d)) return false;
+        let t = 0;
+        for (let i = 0; i < 12; i++) t += Number(d[i]) * (i % 2 === 0 ? 1 : 3);
+        return (10 - (t % 10)) % 10 === Number(d[12]);
+    },
+    normalize(s) {
+        if (/^\d{13}$/.test(s)) return this.tutuyor(s) ? s : null;
+        if (/^\d{12}$/.test(s) && this.tutuyor('0' + s)) return '0' + s;
+        return null;
+    }
+};
+
 class ShelfMissingApp {
     constructor() {
         this.shelves = [];
@@ -1387,10 +1404,11 @@ class ShelfMissingApp {
         box.querySelectorAll('.sm-preview-barcode-svg').forEach((svg, i) => {
             const code = codes[i];
             if (!code) return;
-            const digits = String(code).replace(/\D/g, '');
+            const ham = String(code).trim();
+            const ean = ShelfMissingEan.normalize(ham);
             try {
-                if (digits.length === 12 || digits.length === 13) {
-                    JsBarcode(svg, digits.length === 12 ? `0${digits}` : digits, {
+                if (ean) {
+                    JsBarcode(svg, ean, {
                         format: 'EAN13',
                         lineColor: '#0f172a',
                         width: 1.5,
@@ -1399,7 +1417,8 @@ class ShelfMissingApp {
                         margin: 2
                     });
                 } else {
-                    JsBarcode(svg, String(code), {
+                    // EAN değilse kodun kendisi birebir; rakam eklenmez, çıkarılmaz
+                    JsBarcode(svg, ham, {
                         format: 'CODE128',
                         lineColor: '#0f172a',
                         width: 1.4,

@@ -50,6 +50,8 @@ async function tur() {
         if (t.status !== 'complete') continue;
         chrome.tabs.sendMessage(t.id, { type: 'JBA_PANO_TIK' }).catch(() => { /* betik henüz yok */ });
     }
+    // Fırın bildirimi 15 sn'lik kontrolünü bu nabza bağlıyor (alarm en az 30 sn)
+    if (typeof globalThis.jbaFirinNabiz === 'function') globalThis.jbaFirinNabiz();
 }
 
 function basla() {

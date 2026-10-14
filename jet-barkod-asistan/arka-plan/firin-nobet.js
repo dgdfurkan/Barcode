@@ -7,120 +7,97 @@
  *
  * ÇÖZÜM
  * Kontrol panelinin siparişler ekranı açıkken, belli aralıklarla (varsayılan
- * 3 dk, Asistan simgesinden ayarlanır) panel sekmesine `JBA_FIRIN_SOR`
+ * 15 sn, Asistan simgesinden ayarlanır) panel sekmesine `JBA_FIRIN_SOR`
  * gidiyor. Sekmedeki sayfa köprüsü fırın sayfasının attığı isteğin aynısını
- * (`GET /heating-estimations`) panelin kendi başlıklarıyla atıyor; dilim
- * dilim pişirme önerisi ve o anki dilimde raf ile donuk stok geliyor.
- * Yeni sekme açılmıyor, jeton sayfadan çıkmıyor.
+ * (`GET /heating-estimations`) panelin kendi başlıklarıyla atıyor; sekmedeki
+ * bildirim modülü pişirme panelinin KENDİ hesabıyla (moduller/firin-hesap.js)
+ * neyin pişeceğini buluyor. Yeni sekme açılmıyor, jeton sayfadan çıkmıyor.
+ * Liste boşalınca (pişirme yapıldı) kart kendiliğinden kalkıyor.
  *
- * Bildirim yalnız şu ürünler için:
- *   - şu anki saat diliminde pişirme önerisi var,
- *   - rafta hiç yok ya da öneriye göre çok az (raf × 5 ≤ öneri; öneri 10, raf 1),
- *   - donukta var (donukta yoksa pişirilemez, göstermeye gerek yok),
- *   - taze üretim ekmek değil (o donuktan pişmiyor).
- * Pişirme yapılınca sonraki kontrolde liste boşalır, bildirim kapanır.
+ * ZAMANLAMA
+ * Chrome alarmı en az 30 sn. 15 sn için sipariş panosu nöbetçisinin
+ * (pano-nobet.js) 2 sn'lik nabzına bağlanıyor: her nabızda süre dolmuş mu
+ * diye bakılıyor. Alarm yalnız hizmet işçisi uyursa uyandırmak için.
+ * Dükkân 08:00'de açılıyor: 00:00-08:00 arası hiç istek atılmıyor.
  *
  * GETİR'İ YORMAMA
- *   - Yalnız siparişler ekranı açıkken; iki kontrol arası en az 1 dk
- *     (sayfa köprüsü de 50 sn içinde ikinci isteği atmıyor).
- *   - Seçilen sıklıkta tek bir GET; fırın ürünü satılınca 45 sn sonra
- *     ayrıca bir kez. Sonuç Asistan simgesinde "Son kontrol" olarak görünüyor.
- *   - Birden çok panel sekmesi açıksa yalnız biri soruluyor.
- *   - İstek başarısızsa (oturum yok vb.) 10 dk beklenir.
+ *   - Yalnız siparişler ekranı açıkken, tek GET; birden çok panel sekmesi
+ *     açıksa yalnız biri soruluyor. Sayfa köprüsü de 10 sn içinde ikinci
+ *     isteği atmıyor.
+ *   - Getir hata dönerse 2 dk beklenir.
+ *   - Sonuç Asistan simgesinde "Son kontrol" olarak görünüyor.
  * ============================================================================
  */
 
 const AYAR_ANAHTARI = 'jbaFirinNobet';
-const VARSAYILAN = { acik: true, dk: 3 };
+const VARSAYILAN = { acik: true, sn: 15 };
 const ALARM = 'jba-firin-nobet';
 const PANO = 'https://warehouse.getir.com/r/*/dashboard/orders*';
-const EN_AZ_ARA_MS = 60 * 1000;
-const HATA_BEKLEME_MS = 10 * 60 * 1000;
-const SATIS_GECIKMESI_MS = 45 * 1000;
+const EN_AZ_ARA_MS = 10 * 1000;
+const HATA_BEKLEME_MS = 2 * 60 * 1000;
+const SATIS_GECIKMESI_MS = 20 * 1000;
+const SIM_SURE_MS = 10 * 1000;
+const ACILIS_SAATI = 8;
 const FIRIN_URUNU = /f[ıi]r[ıi]n|unlu|simit|po[ğg]a[çc]a|b[öo]rek|kruvasan|croissant|pi[şs]i|açma|acma|kek\b|muffin|ekmek|baget|pide/i;
 
 let calisiyor = false;
 let sonKontrol = 0;
 let sonHata = 0;
 let satisZamanlayici = null;
-
+let ayar = Object.assign({}, VARSAYILAN);
+let geceTemizlendi = false;
 
 async function ayarOku() {
     try {
         const r = await chrome.storage.local.get(AYAR_ANAHTARI);
-        const a = Object.assign({}, VARSAYILAN, r && r[AYAR_ANAHTARI]);
-        // 0.29.0'daki "Simülasyon" seçeneği kalktı (artık tek seferlik düğme)
-        if (a.simule) { delete a.simule; a.dk = 3; }
-        return a;
+        const k = (r && r[AYAR_ANAHTARI]) || {};
+        // Eski kayıtlar dakika tutuyordu ({dk}); yeni varsayılan 15 sn
+        const sn = Number(k.sn) > 0 ? Number(k.sn) : VARSAYILAN.sn;
+        ayar = { acik: k.acik !== false, sn: Math.max(15, Math.min(600, sn)) };
     } catch (e) {
-        return Object.assign({}, VARSAYILAN);
+        ayar = Object.assign({}, VARSAYILAN);
     }
+    return ayar;
 }
 
 async function alarmKur() {
     const a = await ayarOku();
     await chrome.alarms.clear(ALARM);
-    if (!a.acik) return;
-    const dk = Math.max(1, Math.min(30, Number(a.dk) || 3));
-    chrome.alarms.create(ALARM, { periodInMinutes: dk });
+    // Uyandırıcı: nabız durursa (hizmet işçisi uyudu) en geç 30 sn'de bir
+    if (a.acik) chrome.alarms.create(ALARM, { periodInMinutes: 0.5 });
+    return a;
 }
 
-/** Panelin saatleri yerel ve saat dilimi eki yok ("2026-01-01T12:00:00") */
-function zaman(metin) {
-    const t = new Date(metin).getTime();
-    return Number.isFinite(t) ? t : NaN;
+/** Son kontrolün sonucu; Asistan simgesindeki pencere gösteriyor */
+function durumYaz(metin) {
+    chrome.storage.local.set({ jbaFirinDurum: { zaman: Date.now(), metin } }).catch(() => {});
 }
 
-/** Şu anın içinde olduğu dilim; yoksa (gece) null */
-function simdikiDilim(dilimler, simdi) {
-    return (dilimler || []).find((d) => zaman(d.bas) <= simdi && simdi < zaman(d.son)) || null;
+function sebepMetni(c) {
+    const s = c && c.sebep;
+    if (s === 'oturum') return 'Panel oturumu bekleniyor; birkaç saniye içinde yakalanır.';
+    if (s === 'kapalı') return 'Fırın bildirimi bu sekmede kapalı.';
+    if (s === 'zaman aşımı') return 'Panel cevap vermedi.';
+    if (s) return 'Fırın verisi okunamadı (' + s + ').';
+    return 'Panel sekmesi cevap vermedi; sekmeyi yenile.';
 }
 
-function ekmekMi(ad) {
-    return /^\s*(ekmek|ramazan\s+pidesi)\s*\(\s*\d+\s*(g|gr)\s*\)\s*$/i.test(ad || '');
-}
-
-function etiket(d) {
-    return String(d.bas).slice(11, 16) + '-' + String(d.son).slice(11, 16).replace('00:00', '24:00');
-}
-
-/**
- * Bildirimde gösterilecek ürünler: önerisi var, rafta yok ya da çok az,
- * donukta var. Kart pişirme panelindeki gibi çizildiği için her ürünle
- * dört dilimin önerisi ve pişirilecek adet de gidiyor.
- */
-function uyarilar(dilimler, dilim) {
-    if (!dilim) return [];
-    return (dilim.urunler || [])
-        .filter((u) => u && typeof u.ad === 'string' && typeof u.raf === 'number' && typeof u.donuk === 'number' && !ekmekMi(u.ad))
-        .map((u) => {
-            const oneri = Number(u.oneri) || 0;
-            const raf = Math.max(0, u.raf);
-            const donuk = Math.max(0, u.donuk);
-            return {
-                ad: u.ad,
-                gorsel: u.gorsel,
-                raf,
-                donuk,
-                oneri,
-                pisir: Math.max(0, Math.min(oneri - raf, donuk)),
-                oneriler: dilimler.map((d) => {
-                    const x = (d.urunler || []).find((y) => y && y.ad === u.ad);
-                    return x ? Number(x.oneri) || 0 : 0;
-                })
-            };
-        })
-        .filter((u) => u.oneri > 0 && u.donuk > 0 && u.pisir > 0 && (u.raf <= 0 || u.raf * 5 <= u.oneri))
-        .sort((a, b) => (a.raf - b.raf) || (b.oneri - a.oneri))
-        .slice(0, 12);
+function mesaiDisi() {
+    return new Date().getHours() < ACILIS_SAATI;
 }
 
 async function panolar() {
     try { return await chrome.tabs.query({ url: PANO }); } catch (e) { return []; }
 }
 
-async function yay(sekmeler, liste, ek) {
-    const mesaj = Object.assign({ type: 'JBA_FIRIN_UYARI', liste, zaman: Date.now() }, ek || {});
+async function yay(sekmeler, sonuc, ek) {
+    const mesaj = Object.assign({
+        type: 'JBA_FIRIN_UYARI',
+        liste: (sonuc && sonuc.liste) || [],
+        dilimler: sonuc && sonuc.dilimler,
+        simdiki: sonuc && sonuc.simdiki,
+        zaman: Date.now()
+    }, ek || {});
     for (const t of sekmeler) {
         chrome.tabs.sendMessage(t.id, mesaj).catch(() => {});
     }
@@ -132,101 +109,34 @@ function hedefSekme(sekmeler) {
     return hazir.find((t) => t.active) || hazir[0] || null;
 }
 
-/** Son kontrolün sonucu; Asistan simgesindeki pencere gösteriyor */
-function durumYaz(metin) {
-    chrome.storage.local.set({ jbaFirinDurum: { zaman: Date.now(), metin } }).catch(() => {});
-}
-
-function sebepMetni(c) {
-    const s = c && c.sebep;
-    if (s === 'oturum') return 'Panel oturumu bekleniyor (sayfayı bir kez yenile).';
-    if (s === 'kapalı') return 'Fırın bildirimi bu hesapta kapalı.';
-    if (s === 'zaman aşımı') return 'Panel cevap vermedi.';
-    if (s) return 'Fırın verisi okunamadı (' + s + ').';
-    return 'Panel sekmesi cevap vermedi; sekmeyi yenile.';
-}
-
-// ==================================================================
-// Simülasyon (Asistan simgesi > Simülasyonu Göster, tek sefer)
-//
-// Gerçek ürün listesi okunuyor (5 dk saklanıyor, art arda basınca Getir'e
-// yeniden istek gitmiyor), içinden rastgele 1-4 ürün seçilip raf düşürülüyor.
-// Kart gerçek kartın aynısı, üstünde "Simülasyon" yazıyor, 10 sn sonra
-// kendiliğinden kapanıyor. Gerçek uyarı durumuna dokunmuyor.
-// ==================================================================
-
-const SIM_VERI_MS = 5 * 60 * 1000;
-const SIM_SURE_MS = 10 * 1000;
-let simVeri = null;
-
-function rastgele(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
-
-function karistir(dizi) {
-    const d = dizi.slice();
-    for (let i = d.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [d[i], d[j]] = [d[j], d[i]];
-    }
-    return d;
-}
-
-function simSenaryo(dilimler, an) {
-    if (!dilimler || !dilimler.length) return null;
-    // Gece dilim yoksa ilk dilim varmış gibi
-    let i = dilimler.findIndex((d) => zaman(d.bas) <= an && an < zaman(d.son));
-    if (i < 0) i = 0;
-    const kopya = JSON.parse(JSON.stringify(dilimler));
-    const dilim = kopya[i];
-    const adaylar = (dilim.urunler || []).filter((u) => u && u.ad && !ekmekMi(u.ad));
-    if (!adaylar.length) return null;
-    const secilen = new Set(karistir(adaylar).slice(0, rastgele(1, Math.min(4, adaylar.length))).map((u) => u.ad));
-    dilim.urunler.forEach((u) => {
-        if (!secilen.has(u.ad)) { u.raf = typeof u.raf === 'number' ? Math.max(u.raf, 999) : 999; return; }
-        u.oneri = Math.max(Number(u.oneri) || 0, rastgele(4, 12));
-        u.raf = Math.random() < 0.5 ? 0 : Math.floor(u.oneri / 5);
-        u.donuk = typeof u.donuk === 'number' && u.donuk > 0 ? u.donuk : rastgele(6, 40);
-    });
-    return { dilimler: kopya, dilim, i };
-}
-
-async function simulasyon() {
-    const sekmeler = await panolar();
-    if (!sekmeler.length) return { ok: false, metin: 'Önce depo panelinde Siparişler ekranını aç.' };
-    const hedef = hedefSekme(sekmeler);
-    if (!hedef) return { ok: false, metin: 'Siparişler sekmesi henüz yüklenmedi.' };
-    if (!simVeri || Date.now() - simVeri.zaman > SIM_VERI_MS) {
-        let cevap = null;
-        try { cevap = await chrome.tabs.sendMessage(hedef.id, { type: 'JBA_FIRIN_SOR' }); } catch (e) { cevap = null; }
-        if (!cevap || !cevap.ok) return { ok: false, metin: sebepMetni(cevap) };
-        simVeri = { zaman: Date.now(), dilimler: cevap.dilimler || [] };
-    }
-    const sen = simSenaryo(simVeri.dilimler, Date.now());
-    if (!sen) return { ok: false, metin: 'Fırın listesinde ürün yok.' };
-    // Siparişler ekranı açık olmayan sekmede kart çıkmaz; öndeki sekmeyi de dahil et
-    await yay(sekmeler, uyarilar(sen.dilimler, sen.dilim), {
-        sim: true, sure: SIM_SURE_MS, dilimler: sen.dilimler.map(etiket), simdiki: sen.i
-    });
-    return { ok: true };
+async function hakVarMi() {
+    try {
+        const r = await chrome.storage.local.get('jbaAcikModuller');
+        const l = r && r.jbaAcikModuller;
+        return !Array.isArray(l) || l.indexOf('firinUyari') !== -1 || l.indexOf('firinPisirme') !== -1;
+    } catch (e) { return true; }
 }
 
 async function kontrol(sebep) {
     if (calisiyor) return;
-    const ayar = await ayarOku();
     if (!ayar.acik) return;
-    // Modül hesabında kapalıysa (fırın hakkı yok) hiç bakılmaz
-    try {
-        const r = await chrome.storage.local.get('jbaAcikModuller');
-        const l = r && r.jbaAcikModuller;
-        if (Array.isArray(l) && l.indexOf('firinUyari') === -1 && l.indexOf('firinPisirme') === -1) {
-            durumYaz('Fırın hakkı bu hesapta kapalı.');
-            return;
-        }
-    } catch (e) { /* liste yoksa açık say */ }
+    if (!(await hakVarMi())) { durumYaz('Fırın hakkı bu hesapta kapalı.'); return; }
     const sekmeler = await panolar();
-    if (!sekmeler.length) { if (sebep === 'periyot') durumYaz('Siparişler ekranı açık değil, beklemede.'); return; }
+    if (!sekmeler.length) return;
+
+    // 00:00-08:00: dükkân kapalı, istek yok; varsa kart kalkar
+    if (mesaiDisi()) {
+        if (!geceTemizlendi) {
+            geceTemizlendi = true;
+            await yay(sekmeler, null);
+            durumYaz('Mesai dışı; 08:00\'de başlar.');
+        }
+        return;
+    }
+    geceTemizlendi = false;
+
     const hedef = hedefSekme(sekmeler);
     if (!hedef) return;
-
     const simdi = Date.now();
     if (simdi - sonKontrol < EN_AZ_ARA_MS) return;
     if (simdi - sonHata < HATA_BEKLEME_MS) return;
@@ -236,28 +146,57 @@ async function kontrol(sebep) {
     try {
         const cevap = await chrome.tabs.sendMessage(hedef.id, { type: 'JBA_FIRIN_SOR' });
         if (!cevap || !cevap.ok) {
-            // Yalnız Getir'in hata döndüğü durum 10 dk bekletir; oturum henüz
+            // Yalnız Getir'in hata döndüğü durum bekletir; oturum henüz
             // yakalanmadıysa ya da sekme cevap vermediyse sonraki turda yine denenir
             if (cevap && /^(http|ağ)/.test(cevap.sebep || '')) sonHata = Date.now();
             durumYaz(sebepMetni(cevap));
             return;
         }
-        const an = Date.now();
-        const dilimler = cevap.dilimler || [];
-        const dilim = simdikiDilim(dilimler, an);
-        const liste = uyarilar(dilimler, dilim);
-        await yay(await panolar(), liste, {
-            dilimler: dilimler.map(etiket), simdiki: dilim ? dilimler.indexOf(dilim) : -1
-        });
-        durumYaz(!dilim ? 'Şu an pişirme dilimi yok (gece).'
-            : liste.length ? liste.length + ' ürün pişirilecek, bildirim gösterildi.'
-            : 'Pişirilecek ürün yok.');
+        await yay(await panolar(), cevap);
+        const n = (cevap.liste || []).length;
+        durumYaz(cevap.stokluSayisi === 0 && cevap.urunSayisi > 0
+            ? 'Stok sayıları gelmedi, bildirim gösterilemiyor.'
+            : n ? n + ' ürün pişirilecek, bildirim gösterildi.'
+            : 'Pişirilecek ürün yok (' + (cevap.stokluSayisi || 0) + ' ürün okundu).');
     } catch (e) {
         // Sekmede betik yok (yeni yüklendi, eski sürüm)
         durumYaz(sebepMetni(null));
     } finally {
         calisiyor = false;
     }
+}
+
+/** Sipariş panosu nöbetçisi her 2 sn'de bir çağırır */
+globalThis.jbaFirinNabiz = function () {
+    if (!ayar.acik || calisiyor) return;
+    if (Date.now() - sonKontrol < ayar.sn * 1000) return;
+    kontrol('periyot');
+};
+
+// ==================================================================
+// Simülasyon (Asistan simgesi > Simülasyonu Göster, tek sefer)
+//
+// Gerçek ürün listesi okunuyor; sekmedeki modül içinden rastgele 1-4
+// ürünün rafını boşaltıp pişirme panelinin hesabıyla listeyi çıkarıyor.
+// Kart gerçek kartın aynısı, üstünde "Simülasyon" yazıyor, 10 sn sonra
+// kapanıyor; gerçek bir uyarı varsa o geri geliyor.
+// ==================================================================
+
+async function simulasyon() {
+    const sekmeler = await panolar();
+    if (!sekmeler.length) return { ok: false, metin: 'Önce depo panelinde Siparişler ekranını aç.' };
+    const hedef = hedefSekme(sekmeler);
+    if (!hedef) return { ok: false, metin: 'Siparişler sekmesi henüz yüklenmedi.' };
+    let cevap = null;
+    try { cevap = await chrome.tabs.sendMessage(hedef.id, { type: 'JBA_FIRIN_SOR', sim: true }); } catch (e) { cevap = null; }
+    if (!cevap || !cevap.ok) {
+        return { ok: false, metin: sebepMetni(cevap) };
+    }
+    if (!(cevap.liste || []).length) {
+        return { ok: false, metin: cevap.urunSayisi ? 'Simülasyon üretilemedi, tekrar dene.' : 'Fırın listesi boş geldi (gece olabilir).' };
+    }
+    await yay(sekmeler, cevap, { sim: true, sure: SIM_SURE_MS });
+    return { ok: true };
 }
 
 /** Sipariş köprüsü yeni sipariş yazınca çağırır: fırın ürünü satıldıysa kısa süre sonra bak */
@@ -268,31 +207,28 @@ globalThis.jbaFirinSatis = function (urunler) {
     satisZamanlayici = setTimeout(() => kontrol('satis'), SATIS_GECIKMESI_MS);
 };
 
-chrome.alarms.onAlarm.addListener((a) => { if (a.name === ALARM) kontrol('periyot'); });
+chrome.alarms.onAlarm.addListener((a) => { if (a.name === ALARM) globalThis.jbaFirinNabiz(); });
 chrome.runtime.onStartup.addListener(alarmKur);
 chrome.runtime.onInstalled.addListener(alarmKur);
 chrome.storage.onChanged.addListener((d, alan) => {
-    if (alan === 'local' && d[AYAR_ANAHTARI]) {
-        alarmKur();
-        ayarOku().then((a) => {
-            if (!a.acik) {
-                panolar().then((s) => yay(s, []));
-                durumYaz('Kapalı.');
-                return;
-            }
-            // Sıklık değişti: hemen bir kez bak
-            sonKontrol = 0;
-            setTimeout(() => kontrol('ayar'), 1000);
-        });
-    }
+    if (alan !== 'local' || !d[AYAR_ANAHTARI]) return;
+    alarmKur().then((a) => {
+        if (!a.acik) {
+            panolar().then((s) => yay(s, null));
+            durumYaz('Kapalı.');
+            return;
+        }
+        // Sıklık değişti: hemen bir kez bak
+        sonKontrol = 0;
+        setTimeout(() => kontrol('ayar'), 1000);
+    });
 });
 
 chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
     if (!istek) return false;
-    // Kontrol paneli açıldı: biraz sonra bir kez bak
+    // Kontrol paneli açıldı: köprü panelin ilk isteklerini yakalasın, sonra bak
     if (istek.type === 'JBA_FIRIN_PANO_HAZIR') {
-        // Köprünün panelin ilk sipariş isteğini yakalamasına zaman tanı
-        setTimeout(() => kontrol('pano'), 10000);
+        setTimeout(() => { sonKontrol = 0; kontrol('pano'); }, 6000);
         return false;
     }
     // Asistan simgesindeki "Simülasyonu Göster"
