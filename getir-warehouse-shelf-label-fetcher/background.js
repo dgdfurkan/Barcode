@@ -801,8 +801,19 @@ async function handleExportShelfLabels(sendResponse, slowMode = false, slowModeD
       return;
     }
     
-    // İlk açık tab'ı kullan
-    const tab = warehouseTabs[0];
+    // Raf etiketi sayfası olan sekme (sipariş panosu da açık olabiliyor; ilk
+    // sekme o olursa çekme yanlış sayfada başlıyordu)
+    const tab = warehouseTabs.find((t) => /\/shelf-label\//.test(t.url || ''));
+    if (!tab) {
+      const uyari = 'Raf etiketi sayfası açık değil. Warehouse panelinde Stok > Stok Yönetimi > Raf Etiketi sayfasını açıp tekrar deneyin.';
+      sendProgressToAdmin('❌ ' + uyari);
+      for (const adminTab of adminTabs) {
+        chrome.tabs.sendMessage(adminTab.id, {
+          type: 'WAREHOUSE_SHELF_LABEL_RESPONSE', success: false, data: null, error: uyari, total: 0
+        }).catch(() => {});
+      }
+      return;
+    }
     console.log('✅ Warehouse tab bulundu:', tab.id, tab.url);
     
     sendProgressToAdmin('✅ Warehouse sitesi bulundu, raf etiketleri çekiliyor...');
