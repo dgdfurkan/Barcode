@@ -21,14 +21,21 @@ class BarcodeScanner {
         /** Doğrulama: büyük modal yerine minimal üst katman (#barcodeVerifyMiniOverlay) */
         this.verificationMiniUi = false;
         this._cameraVideoStageParent = null;
+        /** ZXing-C++ (WASM) motoru: js/barkod-motoru.js */
+        this.motor = null;
     }
 
     detectBestScanner() {
-        // 1. Barcode Detection API kontrolü (Chrome/Edge)
+        // 1. Barcode Detection API kontrolü (Android Chrome: açıdan bağımsız, donanım hızlı)
         if ('BarcodeDetector' in window) {
             return 'native'; // Chrome native API
         }
-        // 2. Html5-Qrcode kontrolü
+        // 2. ZXing-C++ motoru (iPhone ve BarcodeDetector'ı olmayan her yer).
+        //    html5-qrcode yalnız dik tutulan barkodu okuyordu; motor her açıda okuyor.
+        if (window.JBBarkodMotoru && window.JBBarkodMotoru.destekleniyor()) {
+            return 'motor';
+        }
+        // 3. Html5-Qrcode kontrolü
         if (window.Html5Qrcode) {
             return 'html5qrcode';
         }
@@ -89,17 +96,29 @@ class BarcodeScanner {
                 return; // Html5-Qrcode kendi stream'ini oluşturacak
             }
             
-            // Diğer tarayıcılar için biz stream oluşturuyoruz
-            // Request camera access (telefon için optimize edilmiş - esnek constraints)
+            // Çözücü kamera açılırken yüklensin (WASM ~1 MB, ilk açılışta)
+            if (this.scannerType === 'motor') {
+                window.JBBarkodMotoru.hazirla().catch(() => { /* scanWithMotor yedeğe düşer */ });
+            }
+
+            // Diğer tarayıcılar için biz stream oluşturuyoruz.
+            // 1080p isteniyor: uzaktaki / küçük barkodda çizgiler seçilsin. Olmazsa sade istek.
             let constraints = {
                 video: {
-                    facingMode: 'environment' // Use back camera on mobile
+                    facingMode: { ideal: 'environment' },
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
                 }
             };
 
-            // Önce basit constraints ile dene
             try {
-                this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (yuksekHata) {
+                    if (yuksekHata && (yuksekHata.name === 'NotAllowedError' || yuksekHata.name === 'PermissionDeniedError')) throw yuksekHata;
+                    constraints = { video: { facingMode: 'environment' } };
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                }
             } catch (error) {
                 // Eğer environment kamera bulunamazsa, herhangi bir kamerayı dene
                 if (error.name === 'OverconstrainedError' || error.name === 'NotFoundError') {
@@ -111,6 +130,17 @@ class BarcodeScanner {
                 } else {
                     throw error; // Diğer hataları yukarı fırlat
                 }
+            }
+
+            // Sürekli odak (destekleyen telefonda; iPhone zaten kendisi yapıyor)
+            try {
+                const iz = this.stream.getVideoTracks()[0];
+                const yetenek = iz && typeof iz.getCapabilities === 'function' ? iz.getCapabilities() : {};
+                if (yetenek && Array.isArray(yetenek.focusMode) && yetenek.focusMode.indexOf('continuous') !== -1) {
+                    await iz.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+                }
+            } catch (e) {
+                /* desteklenmiyor, sorun değil */
             }
 
             // Set video source
@@ -175,6 +205,9 @@ class BarcodeScanner {
         console.log('🎯 startScanLoop başlatılıyor, scannerType:', this.scannerType);
         
         switch(this.scannerType) {
+            case 'motor':
+                this.scanWithMotor();
+                break;
             case 'native':
                 console.log('📱 Native API kullanılıyor...');
                 const nativeResult = await this.scanWithNativeAPI();
@@ -212,6 +245,52 @@ class BarcodeScanner {
                 console.warn('⚠️ Hiçbir tarayıcı bulunamadı, ZXing yükleniyor...');
                 await this.loadZXingLibrary();
         }
+    }
+
+    /** ZXing-C++ motoru: yamuk, ters, bulanık barkod; çözüm ayrı işçide */
+    scanWithMotor() {
+        if (!this.scanning || !this.video) return false;
+        if (this.motor) this.motor.durdur();
+        const motor = window.JBBarkodMotoru.olustur(this.video, (kod, sonuc) => {
+            if (!this.scanning || this.motor !== motor) return;
+            this.handleBarcodeDetected(kod, sonuc);
+        });
+        this.motor = motor;
+        motor.baslat().catch((e) => {
+            console.warn('⚠️ Barkod motoru başlatılamadı, html5-qrcode kullanılacak:', e);
+            if (this.motor === motor) this.motor = null;
+            if (!this.scanning) return;
+            this.scannerType = 'html5qrcode';
+            this.scanWithHtml5Qrcode();
+        });
+        return true;
+    }
+
+    /**
+     * Okunan kod üründe kayıtlı biçimle eşleşmezse karşılığını dener.
+     * UPC-A 12 hane okunur ama ürün "0" ile 13 hane kayıtlı olabilir (ya da
+     * tersi). Ham kod bir ürüne denk geliyorsa hiç dokunulmaz.
+     */
+    _eslesenKod(kod) {
+        const cs = window.countingSystem;
+        if (!cs || typeof cs.findProductByBarcode !== 'function') return kod;
+        const k = String(kod || '').trim();
+        if (!/^\d{12,13}$/.test(k)) return k || kod;
+        try {
+            if (cs.findProductByBarcode(k)) return k;
+            const aday = k.length === 12 ? '0' + k : (k[0] === '0' ? k.slice(1) : null);
+            if (aday && cs.findProductByBarcode(aday)) return aday;
+        } catch (e) {
+            /* sessiz */
+        }
+        return k;
+    }
+
+    /** Kamera izini açık/kapalı: sayım paneli açıkken görüntü işlenmesin, pil gitmesin */
+    _kameraIzleri(acik) {
+        const akis = this.stream || (this.video && this.video.srcObject);
+        if (!akis || typeof akis.getVideoTracks !== 'function') return;
+        akis.getVideoTracks().forEach((t) => { t.enabled = !!acik; });
     }
 
     async scanWithNativeAPI() {
@@ -1107,6 +1186,7 @@ class BarcodeScanner {
 
     handleBarcodeDetected(code, result = null) {
         if (!code) return;
+        code = this._eslesenKod(code);
 
         if (typeof this.verificationCallback === 'function') {
             const cb = this.verificationCallback;
@@ -1670,6 +1750,12 @@ class BarcodeScanner {
      */
     pauseScanningKeepStream() {
         this.scanning = false;
+        // Çözüm döngüsü tamamen dursun; kamera izni ve akış yaşasın ama kare üretmesin
+        if (this.motor) this.motor.duraklat();
+        if (this.html5QrCodeInstance && typeof this.html5QrCodeInstance.pause === 'function') {
+            try { this.html5QrCodeInstance.pause(true); } catch (e) { /* sessiz */ }
+        }
+        this._kameraIzleri(false);
         this.hideBarcodeFrame();
         this.verificationMiniUi = false;
         this.showVerificationMiniOverlay(false);
@@ -1691,6 +1777,26 @@ class BarcodeScanner {
     }
 
     /**
+     * Sayım paneli kapanmaya başlarken çağrılır: kamera görüntüsü panelin
+     * arkasında hazır olsun, panel kayınca alttan canlı görüntü çıksın.
+     * Okuma başlamaz (resumeScanningAfterOverlay başlatır); panelin kapanış
+     * animasyonu sürerken yeni okuma yeni panel açmasın.
+     */
+    onizlemeyiGoster() {
+        if (!this.hasActiveCameraSession()) return;
+        this._kameraIzleri(true);
+        if (this.video && this.video.paused) {
+            try { const p = this.video.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* sessiz */ }
+        }
+        const modal = document.getElementById('cameraScannerModal');
+        if (this.verificationMiniUi) {
+            this.showVerificationMiniOverlay(true);
+        } else if (modal) {
+            modal.classList.remove('hidden');
+        }
+    }
+
+    /**
      * pauseScanningKeepStream sonrası: modalı gösterir, taramayı yeniden başlatır.
      * Stream hâlâ yaşıyorsa startScanning() çağırmaz (soğuk başlatma yok).
      */
@@ -1708,6 +1814,7 @@ class BarcodeScanner {
         }
 
         this.scanning = true;
+        this._kameraIzleri(true);
 
         if (this.video) {
             try {
@@ -1717,7 +1824,15 @@ class BarcodeScanner {
             }
         }
 
+        if (this.scannerType === 'motor' && this.motor) {
+            this.motor.surdur();
+            return;
+        }
+
         if (this.scannerType === 'html5qrcode' && this.html5QrCodeInstance) {
+            if (typeof this.html5QrCodeInstance.resume === 'function') {
+                try { this.html5QrCodeInstance.resume(); } catch (e) { /* zaten çalışıyor */ }
+            }
             return;
         }
 
@@ -1744,6 +1859,12 @@ class BarcodeScanner {
         this.verificationCallback = null;
         this.verificationMiniUi = false;
         this.showVerificationMiniOverlay(false);
+
+        // Motoru durdur (işçi sıcak kalır; sonraki açılış anında)
+        if (this.motor) {
+            this.motor.durdur();
+            this.motor = null;
+        }
 
         // Html5-Qrcode'u durdur
         if (this.html5QrCodeInstance) {

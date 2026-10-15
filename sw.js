@@ -30,7 +30,7 @@ const SURUM = 'jb-1';
 const SAYFA = SURUM + '-sayfa';
 const DOSYA = SURUM + '-dosya';
 const SAYFA_BEKLEME_MS = 4000;
-const DOSYA_UZANTILARI = /\.(js|css|woff2?|ttf|otf|png|jpe?g|webp|svg|gif|ico|json)$/i;
+const DOSYA_UZANTILARI = /\.(js|css|woff2?|ttf|otf|png|jpe?g|webp|svg|gif|ico|json|wasm)$/i;
 
 self.addEventListener('install', () => self.skipWaiting());
 

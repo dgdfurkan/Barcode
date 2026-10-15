@@ -14912,6 +14912,14 @@ class CountingSystem {
         if (bottomSheet) {
             bottomSheet.classList.remove('show');
             this.unlockCountingSheetScroll();
+
+            /* Kamera görüntüsü panel kayarken arkada hazır (z 100 < panel 110):
+               panel bitince kamera "bir anda" belirmiyor. Okuma yine aşağıda,
+               animasyon bitince başlıyor. */
+            if (resumeSeriSayarCamera && this.isSeriOkumaVeSayarakIlerle() && window.barcodeScanner &&
+                typeof window.barcodeScanner.onizlemeyiGoster === 'function') {
+                window.barcodeScanner.onizlemeyiGoster();
+            }
             
             // Wait for animation to complete before hiding
             setTimeout(() => {
