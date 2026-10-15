@@ -18,7 +18,7 @@
  * Chrome alarmı en az 30 sn. 15 sn için sipariş panosu nöbetçisinin
  * (pano-nobet.js) 2 sn'lik nabzına bağlanıyor: her nabızda süre dolmuş mu
  * diye bakılıyor. Alarm yalnız hizmet işçisi uyursa uyandırmak için.
- * Dükkân 08:00'de açılıyor: 00:00-08:00 arası hiç istek atılmıyor.
+ * Öneriler 08:00-23:00 arası: 23:00'ten sabah 08:00'e kadar hiç istek atılmıyor.
  *
  * GETİR'İ YORMAMA
  *   - Yalnız siparişler ekranı açıkken, tek GET; birden çok panel sekmesi
@@ -38,6 +38,7 @@ const HATA_BEKLEME_MS = 2 * 60 * 1000;
 const SATIS_GECIKMESI_MS = 20 * 1000;
 const SIM_SURE_MS = 20 * 1000;
 const ACILIS_SAATI = 8;
+const KAPANIS_SAATI = 23;
 const FIRIN_URUNU = /f[ıi]r[ıi]n|unlu|simit|po[ğg]a[çc]a|b[öo]rek|kruvasan|croissant|pi[şs]i|açma|acma|kek\b|muffin|ekmek|baget|pide/i;
 
 let calisiyor = false;
@@ -83,7 +84,8 @@ function sebepMetni(c) {
 }
 
 function mesaiDisi() {
-    return new Date().getHours() < ACILIS_SAATI;
+    const s = new Date().getHours();
+    return s < ACILIS_SAATI || s >= KAPANIS_SAATI;
 }
 
 async function panolar() {
@@ -96,6 +98,8 @@ async function yay(sekmeler, sonuc, ek) {
         liste: (sonuc && sonuc.liste) || [],
         dilimler: sonuc && sonuc.dilimler,
         simdiki: sonuc && sonuc.simdiki,
+        // Çarpıyla kapatılan kart bu kadar sonra yeniden gösterilir (seçilen sıklık)
+        aralikMs: ayar.sn * 1000,
         zaman: Date.now()
     }, ek || {});
     for (const t of sekmeler) {
@@ -124,7 +128,7 @@ async function kontrol(sebep) {
     const sekmeler = await panolar();
     if (!sekmeler.length) return;
 
-    // 00:00-08:00: dükkân kapalı, istek yok; varsa kart kalkar
+    // 23:00-08:00: öneri yok, istek yok; varsa kart kalkar
     if (mesaiDisi()) {
         if (!geceTemizlendi) {
             geceTemizlendi = true;

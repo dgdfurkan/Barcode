@@ -15,8 +15,9 @@
  *     Donukta stok yoksa gösterilmiyor (pişirilemez).
  *   - Taze üretim ekmek: rafta 10 ve altı kaldıysa.
  *
- * Kart kapatılamıyor: pişirme yapılıp panel verisi güncellenene kadar
- * duruyor. Bilinen durum için ürün başına 1-4 saat ertelenebiliyor
+ * Sağ üstteki çarpı kartı yalnız bir tur gizler: seçilen kontrol sıklığı
+ * (15 sn, 30 sn, 1 dk...) dolunca, pişirme hâlâ gerekiyorsa kart geri gelir.
+ * Kalıcı susturma yok; o ürün başına erteleme. Bilinen durum için ürün başına 1-4 saat ertelenebiliyor
  * (bu tarayıcıda, chrome.storage). Fırın sayfası yalnız düğmeyle açılıyor.
  * Simülasyon gerçek kartın aynısı (erteleme dahil, ama yalnız o gösterim için);
  * 20 sn sürüyor, sağ üstteki çarpıyla erken kapanıyor. Bu sırada gelen gerçek
@@ -43,6 +44,10 @@
     var kok = null;
     var son = { liste: [] };
     var simZamanlayici = null;
+    /* Çarpıyla gizleme: bitişe kadar kart çizilmez, gelen veri saklanır */
+    var gizliBitis = 0;
+    var gizliZamanlayici = null;
+    var aralikMs = 15000;
     /* Pişirme panelinin "Raf" sayısı API'de hangi alan: fırın sayfasında
        panel her açıldığında ölçülüp kaydediliyor (firin-pisirme.js). */
     var rafAlani = 'available';
@@ -381,7 +386,19 @@
             catch (x) { /* yetim bağlam */ }
             return;
         }
-        if (hedef.classList.contains('kapat')) { simBitir(); return; }
+        if (hedef.classList.contains('kapat')) {
+            if (son.sim) { simBitir(); return; }
+            // Bir tur gizle; seçilen sıklık dolunca son veriyle yeniden çiz
+            gizliBitis = Date.now() + aralikMs;
+            kaldir();
+            clearTimeout(gizliZamanlayici);
+            gizliZamanlayici = setTimeout(function () {
+                gizliZamanlayici = null;
+                gizliBitis = 0;
+                ciz(son);
+            }, aralikMs);
+            return;
+        }
         if (hedef.classList.contains('geri-al')) {
             if (son.sim) { son.simErtele = {}; ciz(son); return; }
             (son.liste || []).forEach(function (u) { delete ertele[u.ad]; });
@@ -416,6 +433,8 @@
             : tum.filter(function (u) { return !ertelenmisMi(u.ad, simdi); });
         var ertelenen = tum.length - liste.length;
         kaldir();
+        // Çarpıyla gizliyken çizilmez; veri `son`da bekler, süre dolunca çizilir
+        if (!son.sim && simdi < gizliBitis) return;
         // Simülasyonda her şey ertelendiyse simülasyon biter, bekleyen gerçek veri gelir
         if (son.sim && !liste.length) { simBitir(); return; }
         if (!etkin || !PANO_YOLU.test(location.pathname) || !liste.length) return;
@@ -441,7 +460,7 @@
                     '<span class="ikon"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0v6H4z"/><path d="M8 18v-3M12 18v-4M16 18v-3"/></svg><i></i></span>' +
                     '<div class="metin"><p class="baslik">Pişirme Zamanı' + (son.sim ? '<span class="sim">Simülasyon</span>' : '') + '</p>' +
                     '<p class="alt">' + kacir(alt) + '</p></div>' +
-                    (son.sim ? '<button type="button" class="kapat" aria-label="Simülasyonu kapat">' + IKON_X + '</button>' : '') +
+                    '<button type="button" class="kapat" aria-label="' + (son.sim ? 'Simülasyonu kapat' : 'Bildirimi şimdilik kapat') + '">' + IKON_X + '</button>' +
                 '</div>' +
                 '<ul class="liste">' + goster.map(function (u) { return kartHtml(u, dilimler, simdiki); }).join('') + '</ul>' +
                 (liste.length > goster.length ? '<p class="daha">+' + (liste.length - goster.length) + ' ürün daha</p>' : '') +
@@ -520,6 +539,7 @@
             if (!m || m.type !== 'JBA_FIRIN_UYARI') return false;
             var liste = Array.isArray(m.liste) ? m.liste.filter(function (u) { return u && typeof u.ad === 'string'; }) : [];
             var yeni = { liste: liste, dilimler: m.dilimler, simdiki: m.simdiki, sim: !!m.sim, sure: m.sure };
+            if (Number(m.aralikMs) >= 5000) aralikMs = Math.min(10 * 60 * 1000, Number(m.aralikMs));
             if (m.sim) {
                 // Gerçek uyarı varken simülasyon gösterilirse süre bitince gerçek geri gelir
                 yeni.gercek = son && !son.sim ? son : (son && son.gercek) || null;
