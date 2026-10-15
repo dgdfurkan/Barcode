@@ -153,11 +153,12 @@ async function kontrol(sebep) {
             return;
         }
         await yay(await panolar(), cevap);
-        const n = (cevap.liste || []).length;
+        const n = typeof cevap.gorunenSayisi === 'number' ? cevap.gorunenSayisi : (cevap.liste || []).length;
+        const ert = cevap.ertelenenSayisi ? ' ' + cevap.ertelenenSayisi + ' ürün ertelendi.' : '';
         durumYaz(cevap.stokluSayisi === 0 && cevap.urunSayisi > 0
             ? 'Stok sayıları gelmedi, bildirim gösterilemiyor.'
-            : n ? n + ' ürün pişirilecek, bildirim gösterildi.'
-            : 'Pişirilecek ürün yok (' + (cevap.stokluSayisi || 0) + ' ürün okundu).');
+            : n ? n + ' ürün için bildirim gösterildi.' + ert
+            : 'Acil pişirme yok (' + (cevap.stokluSayisi || 0) + ' ürün okundu).' + ert);
     } catch (e) {
         // Sekmede betik yok (yeni yüklendi, eski sürüm)
         durumYaz(sebepMetni(null));
