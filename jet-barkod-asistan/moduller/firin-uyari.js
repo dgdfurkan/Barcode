@@ -18,7 +18,9 @@
  * Kart kapatılamıyor: pişirme yapılıp panel verisi güncellenene kadar
  * duruyor. Bilinen durum için ürün başına 1-4 saat ertelenebiliyor
  * (bu tarayıcıda, chrome.storage). Fırın sayfası yalnız düğmeyle açılıyor.
- * Simülasyonda üstte "Simülasyon" yazıyor, 10 sn sonra kapanıyor.
+ * Simülasyon gerçek kartın aynısı (erteleme dahil, ama yalnız o gösterim için);
+ * 20 sn sürüyor, sağ üstteki çarpıyla erken kapanıyor. Bu sırada gelen gerçek
+ * veri bekletiliyor, simülasyon bitince çiziliyor.
  * Panelin stilleriyle karışmasın diye gölge DOM içinde.
  * ============================================================================
  */
@@ -74,6 +76,9 @@
         '.baslik { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; line-height: 20px; }',
         '.sim { padding: 2px 8px; border-radius: 999px; background: #eef2ff; color: #4338ca; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; line-height: 14px; }',
         '.alt { margin: 2px 0 0; font-size: 12px; color: #667085; }',
+        '.kapat { flex: none; width: 32px; height: 32px; margin: -4px -4px 0 0; border: 0; border-radius: 999px; background: transparent; color: #667085; cursor: pointer; display: grid; place-items: center; transition: background 160ms, color 160ms; }',
+        '.kapat:hover { background: rgba(17,24,39,.06); color: #111827; }',
+        '.kapat svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }',
 
         '.liste { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }',
         '.ust, .daha, .git, .kart, .ertelenen { flex: none; }',
@@ -130,7 +135,7 @@
 
     var ETIKET = {
         'urgent-prep': 'ACİL PİŞİR', danger: 'ACİL PİŞİR', warning: 'PİŞİRME GEREKLİ', info: 'HAZIRLIK YAP',
-        'ekmek-bitti': 'EKMEK BİTTİ', 'ekmek-az': 'EKMEK AZALDI'
+        'ekmek-az': 'STOK AZ'
     };
 
     function kacir(t) {
@@ -214,11 +219,15 @@
             var raf = Math.max(0, Number(p.currentStock) || 0);
             if (raf > EKMEK_SINIRI) return;
             var hedef = Number(p.recommendations[suan]) || 0;
+            var eksik = Math.max(0, hedef - raf);
+            // Yazı pişirme panelindeki ekmek satırının aynısı (firin-hesap.js, bread-taze)
             liste.push({
                 ad: p.name, gorsel: p.imgSrc, raf: raf, donuk: null, oneri: hedef,
-                pisir: Math.max(0, hedef - raf), ekmek: true,
-                seviye: raf === 0 ? 'ekmek-bitti' : 'ekmek-az',
-                sebep: 'Rafta ' + raf + (hedef ? ', dilim hedefi ' + hedef + '.' : ' kaldı.'),
+                pisir: eksik, ekmek: true,
+                seviye: eksik ? 'warning' : 'ekmek-az',
+                sebep: eksik
+                    ? 'Rafta ' + raf + ', dilim hedefi ' + hedef + '. ' + eksik + ' adet üretilmeli.'
+                    : 'Rafta ' + raf + ', dilim hedefi ' + hedef + '.',
                 oneriler: p.recommendations.slice(0, 4)
             });
         });
@@ -308,8 +317,8 @@
     }
 
     /** Pişirme panelindeki kartın küçüğü, altında erteleme satırı */
-    function kartHtml(u, dilimler, simdiki, sim) {
-        var seviye = u.seviye === 'urgent-prep' || u.seviye === 'ekmek-bitti' ? 'danger'
+    function kartHtml(u, dilimler, simdiki) {
+        var seviye = u.seviye === 'urgent-prep' ? 'danger'
             : u.seviye === 'ekmek-az' ? 'warning'
             : (ETIKET[u.seviye] ? u.seviye : 'warning');
         var gorsel = /^https:\/\//.test(u.gorsel || '')
@@ -320,13 +329,14 @@
             return '<div' + (i === simdiki ? ' class="su"' : '') + '><b>' + sayi(oneriler[i]) + '</b>' +
                 '<span>' + kacir(String(et).replace(/:00/g, '')) + '</span></div>';
         }).join('');
-        var miktar = u.ekmek
-            ? (u.pisir > 0 ? sayi(u.pisir) + ' Adet Üretilmeli' : sayi(u.raf) + ' Adet Kaldı')
+        // Panelde ekmek de "N Adet Pişirilecek"; eksik yoksa (hedef karşılanmış) kalan adet
+        var miktar = u.ekmek && !(u.pisir > 0)
+            ? sayi(u.raf) + ' Adet Kaldı'
             : sayi(u.pisir) + ' Adet Pişirilecek';
         var sag = '<div><span>MEVCUT</span><b>' + sayi(u.raf) + '</b></div>' +
             (u.ekmek ? '<div><span>HEDEF</span><b>' + sayi(u.oneri) + '</b></div>'
                      : '<div><span>DONUK</span><b>' + sayi(u.donuk) + '</b></div>');
-        var erteleHtml = sim ? '' :
+        var erteleHtml =
             '<div class="ertele" data-acik="0">' +
                 '<button type="button" class="ertele__ac" aria-expanded="false">' + IKON_SAAT + '<span>Ertele</span></button>' +
                 '<div class="ertele__secim" role="group" aria-label="Bu ürünün bildirimini ertele">' +
@@ -371,7 +381,9 @@
             catch (x) { /* yetim bağlam */ }
             return;
         }
+        if (hedef.classList.contains('kapat')) { simBitir(); return; }
         if (hedef.classList.contains('geri-al')) {
+            if (son.sim) { son.simErtele = {}; ciz(son); return; }
             (son.liste || []).forEach(function (u) { delete ertele[u.ad]; });
             erteleYaz();
             ciz(son);
@@ -388,6 +400,8 @@
         // data-ad kaçırılmış metin; listedeki asıl adı bul
         var u = (son.liste || []).filter(function (x) { return kacir(x.ad) === ad || x.ad === ad; })[0];
         if (!u) return;
+        // Simülasyonda erteleme yalnız o gösterim için; gerçek ürün gizlenmez
+        if (son.sim) { son.simErtele = son.simErtele || {}; son.simErtele[u.ad] = true; ciz(son); return; }
         ertele[u.ad] = Date.now() + saat * 3600 * 1000;
         erteleYaz();
         ciz(son);
@@ -397,9 +411,13 @@
         son = m || { liste: [] };
         var tum = son.liste || [];
         var simdi = Date.now();
-        var liste = son.sim ? tum : tum.filter(function (u) { return !ertelenmisMi(u.ad, simdi); });
+        var liste = son.sim
+            ? tum.filter(function (u) { return !(son.simErtele && son.simErtele[u.ad]); })
+            : tum.filter(function (u) { return !ertelenmisMi(u.ad, simdi); });
         var ertelenen = tum.length - liste.length;
         kaldir();
+        // Simülasyonda her şey ertelendiyse simülasyon biter, bekleyen gerçek veri gelir
+        if (son.sim && !liste.length) { simBitir(); return; }
         if (!etkin || !PANO_YOLU.test(location.pathname) || !liste.length) return;
 
         kap = document.createElement('div');
@@ -412,7 +430,10 @@
         var goster = liste.slice(0, EN_COK_KART);
         var alt = (simdiki > -1 && dilimler[simdiki] ? dilimler[simdiki] + ' dilimi · ' : '') +
             liste.length + ' ürün bekliyor';
-        var sure = son.sim ? Math.max(1000, Math.min(60000, sayi(son.sure) || 10000)) : 0;
+        var sure = son.sim ? Math.max(1000, Math.min(60000, sayi(son.sure) || 20000)) : 0;
+        // Yeniden çizimde (erteleme) süre baştan başlamasın, kaldığı yerden aksın
+        if (sure && !son.simBitis) son.simBitis = simdi + sure;
+        var kalan = sure ? Math.max(0, son.simBitis - simdi) : 0;
 
         kok.innerHTML = '<style>' + STIL + '</style>' +
             '<div class="pano" role="alert" aria-live="polite">' +
@@ -420,12 +441,13 @@
                     '<span class="ikon"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0v6H4z"/><path d="M8 18v-3M12 18v-4M16 18v-3"/></svg><i></i></span>' +
                     '<div class="metin"><p class="baslik">Pişirme Zamanı' + (son.sim ? '<span class="sim">Simülasyon</span>' : '') + '</p>' +
                     '<p class="alt">' + kacir(alt) + '</p></div>' +
+                    (son.sim ? '<button type="button" class="kapat" aria-label="Simülasyonu kapat">' + IKON_X + '</button>' : '') +
                 '</div>' +
-                '<ul class="liste">' + goster.map(function (u) { return kartHtml(u, dilimler, simdiki, son.sim); }).join('') + '</ul>' +
+                '<ul class="liste">' + goster.map(function (u) { return kartHtml(u, dilimler, simdiki); }).join('') + '</ul>' +
                 (liste.length > goster.length ? '<p class="daha">+' + (liste.length - goster.length) + ' ürün daha</p>' : '') +
                 (ertelenen ? '<p class="ertelenen"><span>' + ertelenen + ' ürün ertelendi</span><button type="button" class="geri-al">Geri Al</button></p>' : '') +
                 '<button type="button" class="git"><span>Fırın Sayfasını Aç</span><svg viewBox="0 0 20 20"><path d="M8 5h7v7M15 5l-9 9"/></svg></button>' +
-                (sure ? '<span class="sure" style="animation-duration:' + sure + 'ms"></span>' : '') +
+                (sure ? '<span class="sure" style="animation-duration:' + sure + 'ms;animation-delay:-' + (sure - kalan) + 'ms"></span>' : '') +
             '</div>';
 
         kok.querySelector('.pano').addEventListener('click', tiklama);
@@ -434,14 +456,16 @@
             var acik = kok.querySelector('.ertele[data-acik="1"]');
             if (acik) erteleAcKapa(acik, false);
         });
-        if (sure) {
-            simZamanlayici = setTimeout(function () {
-                // Simülasyon bitti: gerçek liste varsa o geri gelsin
-                var gercek = son.gercek;
-                kaldir();
-                if (gercek && gercek.liste && gercek.liste.length) ciz(gercek);
-            }, sure);
-        }
+        if (sure) simZamanlayici = setTimeout(simBitir, kalan);
+    }
+
+    /* Simülasyon bitti (süre doldu ya da çarpıya basıldı): bu sırada gelen
+       gerçek veri bekletiliyordu, şimdi o çiziliyor; akış normal sürüyor. */
+    function simBitir() {
+        var gercek = son && son.sim ? son.gercek : null;
+        kaldir();
+        son = gercek || { liste: [] };
+        if (gercek) ciz(gercek);
     }
 
     // ==================================================================

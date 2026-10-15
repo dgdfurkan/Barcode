@@ -208,7 +208,7 @@
         if (alan === 'local' && d.jbaFirinDurum) durumCiz(d.jbaFirinDurum.newValue);
     });
 
-    /* Simülasyon: tek sefer, gerçek ürünlerden rastgele eksik, kart 10 sn */
+    /* Simülasyon: tek sefer, gerçek ürünlerden rastgele eksik, kart 20 sn */
     var firinSim = document.getElementById('firinSim');
     if (firinSim) {
         firinSim.addEventListener('click', function () {

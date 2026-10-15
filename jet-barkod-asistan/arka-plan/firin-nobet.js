@@ -36,7 +36,7 @@ const PANO = 'https://warehouse.getir.com/r/*/dashboard/orders*';
 const EN_AZ_ARA_MS = 10 * 1000;
 const HATA_BEKLEME_MS = 2 * 60 * 1000;
 const SATIS_GECIKMESI_MS = 20 * 1000;
-const SIM_SURE_MS = 10 * 1000;
+const SIM_SURE_MS = 20 * 1000;
 const ACILIS_SAATI = 8;
 const FIRIN_URUNU = /f[ıi]r[ıi]n|unlu|simit|po[ğg]a[çc]a|b[öo]rek|kruvasan|croissant|pi[şs]i|açma|acma|kek\b|muffin|ekmek|baget|pide/i;
 
@@ -179,8 +179,8 @@ globalThis.jbaFirinNabiz = function () {
 //
 // Gerçek ürün listesi okunuyor; sekmedeki modül içinden rastgele 1-4
 // ürünün rafını boşaltıp pişirme panelinin hesabıyla listeyi çıkarıyor.
-// Kart gerçek kartın aynısı, üstünde "Simülasyon" yazıyor, 10 sn sonra
-// kapanıyor; gerçek bir uyarı varsa o geri geliyor.
+// Kart gerçek kartın aynısı, üstünde "Simülasyon" yazıyor, 20 sn sonra ya da
+// çarpıyla kapanıyor; bu sırada gelen gerçek veri sonra çiziliyor.
 // ==================================================================
 
 async function simulasyon() {
