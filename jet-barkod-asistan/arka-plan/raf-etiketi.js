@@ -835,8 +835,23 @@ async function handleExportShelfLabels(sendResponse, slowMode = false, slowModeD
     // Tab'da script çalıştır ve raf etiketlerini çek
     let results;
     try {
+      // İlerleme: sayfa içi çalışırken her 1,5 sn'de bir okunup admin panele iletiliyor
+      let sonIlerleme = 0;
+      const ilerlemeNobeti = setInterval(() => {
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: () => window.__jbRafIlerleme || null
+        }).then((r) => {
+          const v = r && r[0] && r[0].result;
+          if (v && v.zaman > sonIlerleme) { sonIlerleme = v.zaman; sendProgressToAdmin(v.mesaj); }
+        }).catch(() => {});
+      }, 1500);
+      try {
       results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
+        // Panelin kendi fetch'ini görmek için sayfa dünyasında (hızlı yol)
+        world: 'MAIN',
         args: [slowMode, slowModeDelay],
         func: function(slowModeParam, slowModeDelayParam) {
           return (async function(slowMode, slowModeDelay) {
@@ -1804,10 +1819,212 @@ async function handleExportShelfLabels(sendResponse, slowMode = false, slowModeD
               }
             }
             
+            // ==========================================================
+            // HIZLI YOL: panelin kendi isteği, tablo çizdirilmeden
+            //
+            // Tıklayarak gezmek yavaştı: panel isteğin cevabını ~0,5 sn'de
+            // alıyor ama 100 satırı çizerken sayfayı ~2 sn kilitliyor (ölçüldü);
+            // eski döngü de her sayfada satırların "oturmasını" bekliyordu.
+            // Panel her sayfada POST /warehouse-product-shelves/filter?offset&limit
+            // atıyor; cevap satırın tamamını taşıyor (kimlik, ad, görsel,
+            // barkodlar, raf) ve toplam ürün sayısını veriyor. Panelin attığı
+            // isteğin aynısı (başlıklar ve gövde panelin kendi isteğinden)
+            // yalnız offset değişerek sırayla atılıyor; istek sayısı tıklamayla
+            // aynı. Her kayıt eski tablo okuyucusundan (convertShelfLabelToProductFormat)
+            // geçiyor: çıktı biçimi birebir aynı. Kimlikler toplamla
+            // karşılaştırılıyor, eksik sayfa yeniden deneniyor: ürün atlanmaz.
+            // Bir şey ters giderse eski tıklama yöntemine düşülüyor.
+            // ==========================================================
+
+            const bekle = (ms) => new Promise((r) => setTimeout(r, ms));
+            const ilerle = (m) => {
+              try { window.__jbRafIlerleme = { mesaj: m, zaman: Date.now() }; } catch (e) { /* sessiz */ }
+              sendProgressMessage(m);
+            };
+
+            async function panelIsteginiYakala() {
+              const asil = window.fetch;
+              let bitti = false;
+              const yakalandi = new Promise((coz) => {
+                window.fetch = function (girdi, init) {
+                  try {
+                    const url = typeof girdi === 'string' ? girdi : (girdi && girdi.url) || '';
+                    if (!bitti && /\/warehouse-product-shelves\/filter/.test(url)) {
+                      bitti = true;
+                      const req = (typeof Request !== 'undefined' && girdi instanceof Request) ? girdi.clone() : null;
+                      const basliklar = {};
+                      const H = req ? req.headers : new Headers((init && init.headers) || {});
+                      H.forEach((v, k) => { if (k !== 'content-length') basliklar[k] = v; });
+                      const yontem = (req ? req.method : (init && init.method)) || 'POST';
+                      const govdeSoz = req ? req.text() : Promise.resolve(init && typeof init.body === 'string' ? init.body : '');
+                      govdeSoz.then((govde) => coz({ url, yontem, basliklar, govde, fetch: asil }), () => coz(null));
+                    }
+                  } catch (e) { /* sayfanın isteği etkilenmesin */ }
+                  return asil.apply(this, arguments);
+                };
+              });
+              try {
+                // Panelin isteği atması için sayfalamada bir düğmeye bas
+                const sinir = Date.now() + 8000;
+                let basildi = false;
+                while (!basildi && Date.now() < sinir) {
+                  const dugme = document.querySelector('.ant-pagination-next:not(.ant-pagination-disabled) button') ||
+                    document.querySelector('.ant-pagination-prev:not(.ant-pagination-disabled) button');
+                  if (dugme) { dugme.click(); basildi = true; break; }
+                  await bekle(100);
+                }
+                if (!basildi) return null;
+                return await Promise.race([yakalandi, bekle(10000).then(() => null)]);
+              } finally {
+                window.fetch = asil;
+              }
+            }
+
+            async function apiIleCek() {
+              ilerle('🔍 Panelin raf isteği yakalanıyor...');
+              const sablon = await panelIsteginiYakala();
+              if (!sablon || !/^https:\/\/[a-z0-9.-]+\.getirapi\.com\//.test(sablon.url)) return null;
+
+              const LIMIT = 100;
+              const temel = new URL(sablon.url);
+              const sayfaIste = async (offset) => {
+                const u = new URL(temel.href);
+                u.searchParams.set('offset', String(offset));
+                u.searchParams.set('limit', String(LIMIT));
+                for (let deneme = 0; deneme < 4; deneme++) {
+                  try {
+                    const r = await sablon.fetch.call(window, u.href, {
+                      method: sablon.yontem,
+                      headers: sablon.basliklar,
+                      body: sablon.yontem === 'GET' ? undefined : (sablon.govde || undefined),
+                      credentials: 'same-origin'
+                    });
+                    if (r.status === 401 || r.status === 403) return { oturum: true };
+                    if (r.ok) {
+                      const j = await r.json();
+                      const ps = j && j.data && j.data.productShelves;
+                      if (ps && Array.isArray(ps.data)) return ps;
+                    }
+                  } catch (e) { /* ağ hatası: yeniden dene */ }
+                  await bekle(500 * (deneme + 1));
+                }
+                return null;
+              };
+
+              const ilk = await sayfaIste(0);
+              if (!ilk || ilk.oturum || typeof ilk.total !== 'number') return null;
+              const toplam = ilk.total;
+              const sayfaSayisi = Math.max(1, Math.ceil(toplam / LIMIT));
+              const sayfalar = new Array(sayfaSayisi);
+              sayfalar[0] = ilk.data;
+              ilerle(`📊 ${toplam} ürün, ${sayfaSayisi} sayfa. Çekiliyor...`);
+
+              for (let i = 1; i < sayfaSayisi; i++) {
+                const ps = await sayfaIste(i * LIMIT);
+                if (ps && ps.oturum) return null;
+                if (ps) sayfalar[i] = ps.data;
+                if ((i + 1) % 5 === 0 || i === sayfaSayisi - 1) {
+                  ilerle(`📥 ${Math.round(((i + 1) / sayfaSayisi) * 100)}% · Sayfa ${i + 1}/${sayfaSayisi}`);
+                }
+                await bekle(120); // panel hızında, art arda yığılmasın
+              }
+
+              // Eksik ya da kısa sayfaları bir kez daha iste
+              for (let tur = 0; tur < 2; tur++) {
+                const eksikler = [];
+                for (let i = 0; i < sayfaSayisi; i++) {
+                  const beklenen = i === sayfaSayisi - 1 ? toplam - i * LIMIT : LIMIT;
+                  if (!sayfalar[i] || sayfalar[i].length < beklenen) eksikler.push(i);
+                }
+                if (!eksikler.length) break;
+                ilerle(`🔄 ${eksikler.length} sayfa yeniden isteniyor...`);
+                await bekle(1500);
+                for (const i of eksikler) {
+                  const ps = await sayfaIste(i * LIMIT);
+                  if (ps && !ps.oturum && ps.data && (!sayfalar[i] || ps.data.length > sayfalar[i].length)) sayfalar[i] = ps.data;
+                  await bekle(200);
+                }
+              }
+
+              // Satırları eski tablo okuyucusundan geçir. Görünmeyen belgede
+              // kuruluyor: <img> görselleri indirmez.
+              const belge = document.implementation.createHTMLDocument('');
+              const basliklar = (() => {
+                const th = [...document.querySelectorAll('.ant-table-container thead tr:last-child th')]
+                  .map((x, i) => x.textContent.trim() || `Column${i + 1}`);
+                return th.length >= 5 ? th : ['Barkodlar', 'Ürün Görseli', 'Ürün ID', 'Ürün Adı', 'Raf', 'Column6'];
+              })();
+              const goruldu = new Set();
+              const data = [];
+              const missingPages = [];
+              sayfalar.forEach((liste, i) => {
+                const beklenen = i === sayfaSayisi - 1 ? toplam - i * LIMIT : LIMIT;
+                if (!liste || liste.length < beklenen) missingPages.push(i + 1);
+                (liste || []).forEach((k) => {
+                  const p = k && k.product;
+                  if (!p || !p.id || goruldu.has(p.id)) return;
+                  goruldu.add(p.id);
+                  const tr = belge.createElement('tr');
+                  const hucre = () => tr.appendChild(belge.createElement('td'));
+                  const h0 = hucre();
+                  (p.barcodes || []).forEach((b) => {
+                    const t = belge.createElement('span');
+                    t.className = 'ant-tag ant-tag-blue';
+                    t.textContent = String(b);
+                    h0.appendChild(t);
+                  });
+                  const h1 = hucre();
+                  const pic = p.picURL && typeof p.picURL === 'object' ? (p.picURL.tr || p.picURL.en || '') : (p.picURL || '');
+                  if (pic) { const img = belge.createElement('img'); img.setAttribute('src', pic); h1.appendChild(img); }
+                  const h2 = hucre(); const s2 = belge.createElement('span'); s2.className = 'ant-tag'; s2.textContent = String(p.id); h2.appendChild(s2);
+                  const h3 = hucre(); const s3 = belge.createElement('span'); s3.className = 'ant-tag'; s3.textContent = String(p.fullName || ''); h3.appendChild(s3);
+                  const h4 = hucre(); h4.textContent = k.shelf ? String(k.shelf) : '-';
+                  hucre();
+                  const rowData = {};
+                  [...tr.querySelectorAll('td')].forEach((c, ci) => {
+                    const im = c.querySelector('img');
+                    rowData[basliklar[ci] || `Column${ci + 1}`] = im ? im.getAttribute('src') : c.textContent.trim();
+                  });
+                  const urun = convertShelfLabelToProductFormat(rowData, basliklar, tr);
+                  if (urun) data.push(urun);
+                });
+              });
+
+              const tamam = goruldu.size >= toplam && !missingPages.length;
+              ilerle(tamam
+                ? `✅ ${data.length} raf etiketi çekildi (panel toplamı ${toplam})`
+                : `⚠️ ${data.length}/${toplam} ürün çekildi, eksik sayfa: ${missingPages.join(', ') || '-'}`);
+              return {
+                success: true,
+                data,
+                total: data.length,
+                beklenen: toplam,
+                tamam,
+                missingPages,
+                yontem: 'api',
+                message: `${data.length} raf etiketi çekildi`
+              };
+            }
+
             // Ana fonksiyon
             try {
-              const result = await fetchAllShelfLabels();
-              return result;
+              // Aynı sekmede ikinci çekme başlamasın (çift tıklama, iki eklenti)
+              const kok = document.documentElement;
+              const kilit = Number(kok.getAttribute('data-jb-raf-kilit') || 0);
+              if (kilit && Date.now() - kilit < 10 * 60 * 1000) {
+                return { success: false, kilit: true, error: 'Çekme bu sekmede zaten sürüyor' };
+              }
+              kok.setAttribute('data-jb-raf-kilit', String(Date.now()));
+              try {
+                let hizli = null;
+                try { hizli = await apiIleCek(); } catch (e) { console.warn('Hızlı yol olmadı, tıklama yöntemine geçiliyor:', e); }
+                if (hizli) return hizli;
+                ilerle('↪️ Tıklama yöntemiyle çekiliyor...');
+                const result = await fetchAllShelfLabels();
+                return result;
+              } finally {
+                kok.removeAttribute('data-jb-raf-kilit');
+              }
             } catch (error) {
               console.error('❌ Hata:', error);
               return {
@@ -1818,6 +2035,9 @@ async function handleExportShelfLabels(sendResponse, slowMode = false, slowModeD
           })();
         }
       });
+      } finally {
+        clearInterval(ilerlemeNobeti);
+      }
       
       console.log('📊 Script sonucu alındı:', results ? 'Var' : 'Yok');
       
@@ -1830,6 +2050,11 @@ async function handleExportShelfLabels(sendResponse, slowMode = false, slowModeD
       
       if (results && results[0] && results[0].result) {
         const result = results[0].result;
+        // Aynı sekmede çekme zaten sürüyor: o bitince kendi cevabını yollar
+        if (result.kilit) {
+          console.log('⏳ Raf etiketi çekme bu sekmede zaten sürüyor, ikinci istek yok sayıldı');
+          return;
+        }
         if (result.success) {
           console.log(`✅ ${result.data.length} raf etiketi başarıyla çekildi`);
           
@@ -1844,6 +2069,9 @@ async function handleExportShelfLabels(sendResponse, slowMode = false, slowModeD
                 data: result.data,
                 total: result.total,
                 missingPages: result.missingPages || [],
+                beklenen: result.beklenen,
+                tamam: result.tamam,
+                yontem: result.yontem,
                 message: result.message
               }, (response) => {
                 if (chrome.runtime.lastError) {

@@ -1270,6 +1270,22 @@
                             // Verileri hafızada tut
                             this.fetchedShelfLabels = data;
                             this.missingPages = missingPages; // Eksik sayfaları da sakla
+
+                            /* Tamamlanınca products.json ve temp_products.js kendiliğinden
+                               iner. Eksik sayfa varsa ya da panel toplamı tutmuyorsa
+                               eksik dosya sessizce inmesin: sorulur. */
+                            const beklenen = typeof response.beklenen === 'number' ? response.beklenen : null;
+                            const eksikVar = missingPages.length > 0 || response.tamam === false ||
+                                (beklenen !== null && data.length < beklenen);
+                            if (resultsText && beklenen !== null) {
+                                resultsText.textContent = `Toplam ${data.length} raf etiketi çekildi (panel toplamı ${beklenen}). products.json ve temp_products.js indiriliyor.`;
+                            }
+                            if (data.length > 0 && (!eksikVar || confirm(
+                                `⚠️ Eksik veri var: ${data.length}${beklenen !== null ? '/' + beklenen : ''} ürün` +
+                                (missingPages.length ? `, eksik sayfalar: ${missingPages.join(', ')}` : '') +
+                                `.\n\nYine de products.json ve temp_products.js indirilsin mi?`))) {
+                                this.cekilenleriIndir(data);
+                            }
                             
                             resolve(data);
                         }
@@ -1317,6 +1333,44 @@
                 
                 throw error;
             }
+        }
+
+        /**
+         * Çekilen raf etiketlerinden products.json ve temp_products.js üretip
+         * ikisini de indirir. Biçim "Warehouse verisini products.json'a aktar"
+         * ve "Temp Products Güncelle" düğmelerininkiyle aynı.
+         */
+        cekilenleriIndir(liste) {
+            const urunler = (liste || []).map((product) => ({
+                id: product.id,
+                name: product.name,
+                category: product.category || 'Genel',
+                brand: product.brand || '',
+                description: product.description || product.name,
+                image: product.image || '',
+                barcodes: product.barcodes || [],
+                shelf: product.shelf || '-',
+                price: product.price || null,
+                stock: product.stock || null
+            }));
+            const veri = { products: urunler };
+            const indir = (icerik, tur, ad) => {
+                const blob = new Blob([icerik], { type: tur });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = ad;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
+            };
+            indir(JSON.stringify(veri, null, 2), 'application/json', 'products.json');
+            // Tarayıcı art arda iki indirmeyi tek seferde yutmasın
+            setTimeout(() => {
+                indir(`const PRODUCTS_DATA = ${JSON.stringify(veri, null, 2)};`, 'application/javascript', 'temp_products.js');
+            }, 600);
+            console.log(`✅ products.json ve temp_products.js indirildi (${urunler.length} ürün)`);
         }
 
         // Warehouse Extension ID'sini bul
