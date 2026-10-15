@@ -32,7 +32,7 @@
     <script src="../js/jb-db.js?v=20261014a"></script>
     <!-- QR Code Library - Using QRCode.js (more reliable) -->
     <script src="../js/vendor/qrcode.min.js?v=20260828i"></script>
-    <script src="../veri/temp_products.js?v=20261003a"></script>
+    <script src="../veri/temp_products.js?v=20261015a"></script>
     <script src="../js/getir-cdn-paste.js?v=20261012c"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
     <script src="../js/asistan-koprusu.js?v=20261014a"></script>
@@ -10843,7 +10843,7 @@
                 
                 // Update temp_products.js
                 const jsContent = `const PRODUCTS_DATA = ${JSON.stringify(data)};`;
-                await fetch('../veri/temp_products.js?v=20261003a', {
+                await fetch('../veri/temp_products.js?v=20261015a', {
                     method: 'PUT',
                     body: jsContent,
                     headers: { 'Content-Type': 'application/javascript' }
