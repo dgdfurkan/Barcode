@@ -149,8 +149,9 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
 - Satıştan Kaldırma: `sql_files/satistan_kaldirma.sql` çalıştırılacak ve `vps-api/kaldirma/` + `server.js`
   VPS'e atılıp servis yeniden başlatılacak. Çalışana kadar sayfa "sunucu güncellemesi bekleniyor" der,
   Asistan aktarımı aynı mesajla bekler. Telegram botu ve hesap bağlama sayım raporununki.
-- `vps-api/franchise-jeton.js` + `server.js` VPS'e atılıp servis yeniden başlatılacak. Asistan franchise
-  jetonunu buraya yazıyor; çalışana kadar telefondaki Stok düğmesi jetonu yalnız sayım sayfasından alır.
+- İtiraz Yazıcı: `sql_files/itiraz_yazici.sql` çalıştırılacak, `vps-api/itiraz/` + `vps-api/franchise-jeton.js` +
+  `server.js` VPS'e atılıp servis yeniden başlatılacak. Gemini anahtarı JWT_SECRET'tan türetilen anahtarla şifreleniyor;
+  JWT_SECRET değişirse kayıtlı anahtarlar çözülmez (kullanıcı yeniden girer). İstenirse `.env`'e `ITIRAZ_SIFRE` (64 hex) eklenir.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

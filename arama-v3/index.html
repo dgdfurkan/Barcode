@@ -35,7 +35,7 @@
     <script src="../veri/temp_products.js?v=20261015a"></script>
     <script src="../js/getir-cdn-paste.js?v=20261012c"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
-    <script src="../js/asistan-koprusu.js?v=20261017a"></script>
+    <script src="../js/asistan-koprusu.js?v=20261017b"></script>
     <script src="../js/eklenti-rehberi.js?v=20261014a"></script>
     <script src="../js/guest-access-config.js?v=20260828i"></script>
     <script src="../js/auth.js?v=20260919a"></script>
@@ -3863,7 +3863,7 @@
                 {
                     const headerRemovalBtn = document.getElementById('headerRemovalPageBtn');
                     const mobileRemovalBtn = document.getElementById('mobileRemovalPageBtn');
-                    if (window.premiumFeatures?.checkPremiumFeature('satistanKaldirma')) {
+                    if (window.premiumFeatures?.checkPremiumFeature('satistanKaldirma') || window.premiumFeatures?.checkPremiumFeature('itirazYazici')) {
                         show(headerRemovalBtn, mobileRemovalBtn);
                     } else {
                         if (headerRemovalBtn) headerRemovalBtn.classList.add('hidden');
@@ -8934,6 +8934,13 @@
                 ikon: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>',
                 storageKey: null
             },
+            'itirazYazici': {
+                renk: ['#4338ca', '#a5b4fc'],
+                name: 'İtiraz Yazıcı',
+                description: 'Depo değerlendirme kayıtlarına duruma uygun itiraz taslağı; geçmiş itirazlardan öğrenir, formu Asistan doldurur',
+                ikon: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>',
+                storageKey: null
+            },
 
             /*
              * ---- Chrome eklentileri ----
@@ -8978,6 +8985,7 @@
             lowStockAlert: { label: 'Düşük stok', run: () => window.location.replace('../dusuk-stok/') },
             siparisTakibi: { label: 'Siparişler', run: () => window.location.replace('../siparisler/') },
             satistanKaldirma: { label: 'Aç', run: () => window.location.replace('../kaldirma/') },
+            itirazYazici: { label: 'Aç', run: () => window.location.replace('../itiraz/') },
             keyboardShortcuts: { label: 'Kısayolları yönet', run: () => showKeyboardShortcutsModal() }
         };
 

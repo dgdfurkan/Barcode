@@ -30,6 +30,7 @@
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20261014a"></script>
+    <script src="../js/franchise-oturum.js?v=20261017a"></script>
     <!-- QR Code Library - Using QRCode.js (more reliable) -->
     <script src="../js/vendor/qrcode.min.js?v=20260828i"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -37,7 +38,7 @@
     <script src="../veri/temp_products.js?v=20261015a"></script>
     <script src="../js/getir-cdn-paste.js?v=20261012c"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
-    <script src="../js/asistan-koprusu.js?v=20261017a"></script>
+    <script src="../js/asistan-koprusu.js?v=20261017b"></script>
     <script src="../js/eklenti-rehberi.js?v=20261014a"></script>
     <script src="../js/guest-access-config.js?v=20260828i"></script>
     <script src="../js/auth.js?v=20260919a"></script>
@@ -885,51 +886,76 @@
         }
         .arama-adet.is-cok small { color: rgba(255, 255, 255, 0.8); font-size: 13px; }
 
-        /* Stok düğmesi: kartın sol üstünde, ×N rozetinin karşısında. Sakin
-           durur; sonuç gelince aynı yerde "Stok 12", rezerv varsa altında. */
+        /* Stok düğmesi: kartın sol üstünde, ×N rozetinin karşısında. Boşta
+           küçük buzlu bir hap; basınca aynı köşede küçük bir bilgi kartı olur:
+           STOK büyük, altında varsa Rezerv ve Sayımda. Sayılar sakin koyu,
+           yalnız stok 0 kırmızı; çok siparişte göz yormasın. */
         .arama-stok {
             position: absolute;
             top: 8px;
             left: 8px;
             z-index: 2;
             display: inline-flex;
-            flex-direction: column;
-            align-items: flex-start;
-            justify-content: center;
-            gap: 2px;
-            min-width: 44px;
-            min-height: 32px;
-            padding: 0 12px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.92);
+            align-items: center;
+            gap: 6px;
+            height: 32px;
+            padding: 0 12px 0 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.88);
+            -webkit-backdrop-filter: blur(8px) saturate(1.4);
+            backdrop-filter: blur(8px) saturate(1.4);
+            border: 1px solid rgba(16, 24, 40, 0.1);
             color: #475467;
-            border: 1px solid #d0d5dd;
             font: inherit;
             font-size: 12px;
-            font-weight: 700;
+            font-weight: 600;
             line-height: 1;
+            text-align: left;
             font-variant-numeric: tabular-nums;
-            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
             cursor: pointer;
-            transition: border-color 150ms ease-out, background-color 150ms ease-out;
+            transition: border-color 140ms ease-out, box-shadow 140ms ease-out, transform 100ms ease-out;
         }
         .arama-stok::before { content: ''; position: absolute; inset: -6px; }
-        .arama-stok:hover { border-color: #98a2b3; background: #ffffff; }
+        .arama-stok:hover { border-color: rgba(16, 24, 40, 0.22); color: #344054; box-shadow: 0 2px 6px rgba(16, 24, 40, 0.08); }
+        .arama-stok:active { transform: scale(0.97); }
         .arama-stok:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
-        .arama-stok__satir { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-        .arama-stok__satir svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-        .arama-stok b { font-size: 15px; font-weight: 800; color: #111827; }
-        .arama-stok__alt { font-size: 11px; font-weight: 600; color: #667085; white-space: nowrap; }
-        .arama-stok.is-dolu, .arama-stok.is-hata { padding: 6px 12px; }
-        .arama-stok.is-sifir { border-color: #fda29b; }
-        .arama-stok.is-sifir b { color: #d92d20; }
-        .arama-stok.is-hata { color: #b54708; border-color: #fedf89; }
+        .arama-stok > svg { flex: none; width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
         .arama-stok.is-yuk { cursor: progress; }
-        .arama-stok.is-yuk .arama-stok__satir { animation: aramaStokNabiz 900ms ease-in-out infinite alternate; }
-        @keyframes aramaStokNabiz { from { opacity: 1; } to { opacity: 0.35; } }
+        .arama-stok.is-yuk > svg { animation: aramaStokDon 800ms linear infinite; }
+        @keyframes aramaStokDon { to { transform: rotate(360deg); } }
+
+        .arama-stok.is-dolu,
+        .arama-stok.is-hata {
+            height: auto;
+            min-width: 104px;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 4px;
+            padding: 8px 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.94);
+            box-shadow: 0 4px 12px rgba(16, 24, 40, 0.1);
+            animation: aramaStokGir 160ms cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        @keyframes aramaStokGir { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+        .arama-stok__ana { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+        .arama-stok__etiket { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #667085; }
+        .arama-stok__sayi { font-size: 18px; font-weight: 800; line-height: 20px; color: #101828; }
+        .arama-stok.is-sifir .arama-stok__sayi { color: #d92d20; }
+        .arama-stok.is-sifir { border-color: rgba(217, 45, 32, 0.28); }
+        .arama-stok__ayrac { height: 1px; margin: 2px 0; background: rgba(16, 24, 40, 0.08); }
+        .arama-stok__satir { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 11px; font-weight: 600; line-height: 16px; color: #667085; white-space: nowrap; }
+        .arama-stok__satir b { font-weight: 700; color: #101828; }
+        .arama-stok__satir--sayim span { display: inline-flex; align-items: center; gap: 4px; }
+        .arama-stok__satir--sayim span::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: #6366f1; }
+        .arama-stok__satir--sayim b { color: #4338ca; }
+        .arama-stok.is-hata { border-color: rgba(181, 71, 8, 0.3); }
+        .arama-stok.is-hata .arama-stok__etiket { color: #b54708; }
+        .arama-stok__not { font-size: 11px; font-weight: 500; line-height: 16px; color: #667085; white-space: nowrap; }
         @media (prefers-reduced-motion: reduce) {
-            .arama-stok { transition: none; }
-            .arama-stok.is-yuk .arama-stok__satir { animation: none; opacity: 0.5; }
+            .arama-stok, .arama-stok.is-dolu, .arama-stok.is-hata { transition: none; animation: none; }
+            .arama-stok.is-yuk > svg { animation: none; opacity: 0.5; }
         }
 
         .product-card {
@@ -3987,7 +4013,7 @@
                 {
                     const headerRemovalBtn = document.getElementById('headerRemovalPageBtn');
                     const mobileRemovalBtn = document.getElementById('mobileRemovalPageBtn');
-                    if (window.premiumFeatures?.checkPremiumFeature('satistanKaldirma')) {
+                    if (window.premiumFeatures?.checkPremiumFeature('satistanKaldirma') || window.premiumFeatures?.checkPremiumFeature('itirazYazici')) {
                         show(headerRemovalBtn, mobileRemovalBtn);
                     } else {
                         if (headerRemovalBtn) headerRemovalBtn.classList.add('hidden');
@@ -6734,23 +6760,20 @@
         /*
          * Stok düğmesi (Ayarlar > Ürün yönetimi). Kartın sol üstüne basınca o
          * ürünün anlık stoğu franchise panelinin kendi stok isteğiyle alınır.
+         * Ürün açık sayım tablosunda varsa sayılan adet de "Sayımda" satırında.
          * Sonuç yalnız bu aramada durur; yeni arama düğmeleri sıfırlar.
          *
-         * Oturum: önce Asistan'ın yakaladığı jeton (bilgisayar), yoksa hesaba
-         * yazılmış jeton (telefon). Asistan, franchise panelinin herhangi bir
-         * sayfası açıkken jetonu hesaba kendisi yazar.
-         *
+         * Oturum: js/franchise-oturum.js (Asistan ya da hesaba yazılmış jeton).
          * İstek: art arda basılan düğmeler 200 ms içinde toplanıp TEK istekte
          * gider, iki istek arası en az 600 ms.
          */
         const STOK_URUN = /^[0-9a-f]{24}$/i;
-        const STOK_UC = 'https://franchise-api-gateway.getirapi.com/stocks?limit=100&offset=0';
         let stokSonuclari = new Map();
         let stokNesli = 0;
         let stokKuyruk = new Set();
         let stokZaman = null;
         let stokSonIstek = 0;
-        let stokOturumu = null;
+        let stokSayimTablosu = null;
 
         function stokDugmesiAcik() {
             try { return !!(window.userDataManager && window.userDataManager.getSettings().stokDugmesi); }
@@ -6764,22 +6787,39 @@
         }
 
         const STOK_IKON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5 8 2.5 13.5 5v6L8 13.5 2.5 11z"/><path d="M2.5 5 8 7.5 13.5 5M8 7.5v6"/></svg>';
+        const STOK_DONEN = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5a5.5 5.5 0 1 0 5.5 5.5"/></svg>';
+
+        function stokSayimSatiri(d) {
+            if (!d || !d.sayim) return '';
+            const v = d.sayim.sayilan == null ? 'Sırada' : d.sayim.sayilan;
+            return `<span class="arama-stok__satir arama-stok__satir--sayim"><span>Sayımda</span><b>${v}</b></span>`;
+        }
 
         function stokGorunum(d) {
-            if (!d) return { sinif: '', html: `<span class="arama-stok__satir">${STOK_IKON}Stok</span>`, etiket: 'Stoku göster' };
-            if (d.yuk) return { sinif: ' is-yuk', html: `<span class="arama-stok__satir">${STOK_IKON}Stok</span>`, etiket: 'Stok alınıyor' };
+            if (!d) return { sinif: '', html: `${STOK_IKON}<span>Stok</span>`, etiket: 'Stoku göster' };
+            if (d.yuk) return { sinif: ' is-yuk', html: `${STOK_DONEN}<span>Stok</span>`, etiket: 'Stok alınıyor' };
             if (d.hata) {
                 const m = d.hata === 'oturum' ? ['Oturum yok', 'Franchise panelini aç']
                     : d.hata === 'depo' ? ['Depo yok', 'Franchise panelini aç']
                     : ['Alınamadı', 'Tekrar dene'];
-                return { sinif: ' is-hata', html: `<span class="arama-stok__satir">${m[0]}</span><span class="arama-stok__alt">${m[1]}</span>`, etiket: m[0] + '. ' + m[1] };
+                return { sinif: ' is-hata', html: `<span class="arama-stok__etiket">${m[0]}</span><span class="arama-stok__not">${m[1]}</span>`, etiket: m[0] + '. ' + m[1] };
             }
-            if (d.yok) return { sinif: ' is-dolu is-sifir', html: '<span class="arama-stok__satir">Stok <b>0</b></span><span class="arama-stok__alt">Depoda kaydı yok</span>', etiket: 'Depoda kaydı yok' };
-            const rez = d.rezerv > 0 ? `<span class="arama-stok__alt">Rezerv ${d.rezerv}</span>` : '';
+            const sayim = stokSayimSatiri(d);
+            if (d.yok) {
+                return {
+                    sinif: ' is-dolu is-sifir',
+                    html: `<span class="arama-stok__ana"><span class="arama-stok__etiket">Stok</span><span class="arama-stok__sayi">0</span></span><span class="arama-stok__ayrac"></span><span class="arama-stok__not">Depoda kaydı yok</span>${sayim}`,
+                    etiket: 'Depoda kaydı yok'
+                };
+            }
+            const rez = d.rezerv > 0 ? `<span class="arama-stok__satir"><span>Rezerv</span><b>${d.rezerv}</b></span>` : '';
+            const alt = rez || sayim ? `<span class="arama-stok__ayrac"></span>${rez}${sayim}` : '';
             return {
                 sinif: ' is-dolu' + (d.stok <= 0 ? ' is-sifir' : ''),
-                html: `<span class="arama-stok__satir">Stok <b>${d.stok}</b></span>${rez}`,
-                etiket: `Stok ${d.stok}` + (d.rezerv > 0 ? `, rezerv ${d.rezerv}` : '') + '. Yenilemek için bas'
+                html: `<span class="arama-stok__ana"><span class="arama-stok__etiket">Stok</span><span class="arama-stok__sayi">${d.stok}</span></span>${alt}`,
+                etiket: `Stok ${d.stok}` + (d.rezerv > 0 ? `, rezerv ${d.rezerv}` : '')
+                    + (d.sayim ? (d.sayim.sayilan == null ? ', sayımda, sırada' : `, sayımda ${d.sayim.sayilan}`) : '')
+                    + '. Yenilemek için bas'
             };
         }
 
@@ -6802,106 +6842,58 @@
             });
         }
 
-        function stokBitisMs(bilgi) {
-            if (!bilgi || !bilgi.token) return 0;
-            let alan = 0;
-            const v = bilgi.tokenExpiry;
-            if (v != null && v !== '') {
-                const n = Number(v);
-                alan = Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : (Date.parse(String(v)) || 0);
-            }
-            let jwt = 0;
-            try {
-                const p = String(bilgi.token).replace(/^Bearer\s+/i, '').split('.')[1];
-                const y = JSON.parse(atob(p.replace(/-/g, '+').replace(/_/g, '/')));
-                if (Number.isFinite(y.exp)) jwt = y.exp * 1000;
-            } catch (e) { /* jwt değil */ }
-            return Math.max(alan, jwt);
-        }
-
-        async function stokOturumuAl(zorla) {
-            if (!zorla && stokOturumu && stokOturumu.bitis > Date.now() + 60000) return stokOturumu;
-            stokOturumu = null;
-            const adaylar = [];
-            const yardimci = window.getirExtensionHelper;
-            if (yardimci && typeof yardimci.getAPIInfo === 'function') {
-                try {
-                    adaylar.push(await Promise.race([
-                        yardimci.getAPIInfo(),
-                        new Promise((_, red) => setTimeout(() => red(new Error('zaman')), 2500))
-                    ]));
-                } catch (e) { /* Asistan yok ya da jeton yok */ }
-            }
-            const kim = window.userDataManager && window.userDataManager.currentUser && window.userDataManager.currentUser.username;
-            if (kim && window.jbDb) {
-                try {
-                    const { data } = await window.jbDb.from('users').select('api:counting_data->_api_info').eq('username', kim).maybeSingle();
-                    let b = data && data.api;
-                    if (typeof b === 'string') b = JSON.parse(b);
-                    if (b && typeof b === 'object') adaylar.push(b);
-                } catch (e) { /* okunamadı */ }
-            }
-            const simdi = Date.now();
-            let en = null;
-            let enBitis = 0;
-            let depo = null;
-            for (const a of adaylar) {
-                if (!a || typeof a.token !== 'string') continue;
-                const d = typeof a.warehouseId === 'string' && STOK_URUN.test(a.warehouseId) ? a.warehouseId : null;
-                const b = stokBitisMs(a);
-                if (b > simdi + 60000 && b > enBitis) { en = a; enBitis = b; if (d) depo = d; }
-                if (!depo && d) depo = d;
-            }
-            if (!en) { const h = new Error('oturum'); h.kod = 'oturum'; throw h; }
-            if (!depo) { const h = new Error('depo'); h.kod = 'depo'; throw h; }
-            let jeton = en.token.trim();
-            if (!/^Bearer /.test(jeton)) jeton = 'Bearer ' + jeton;
-            stokOturumu = { jeton, depo, bitis: enBitis };
-            return stokOturumu;
-        }
-
         async function stokCek(ids) {
-            for (let deneme = 0; deneme < 2; deneme++) {
-                const o = await stokOturumuAl(deneme > 0);
-                let r;
-                try {
-                    r = await fetch(STOK_UC, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: o.jeton },
-                        body: JSON.stringify({ warehouseIds: [o.depo], productIds: ids, sort: { available: -1 } })
-                    });
-                } catch (e) {
-                    const h = new Error('ag'); h.kod = 'ag'; throw h;
+            const fo = window.franchiseOturum;
+            if (!fo) { const h = new Error('oturum'); h.kod = 'oturum'; throw h; }
+            const o = await fo.al();
+            const r = await fo.istek('/stocks?limit=100&offset=0', {
+                method: 'POST',
+                govde: { warehouseIds: [o.depo], productIds: ids, sort: { available: -1 } }
+            });
+            if (!r.ok) { const h = new Error('sunucu'); h.kod = 'sunucu'; throw h; }
+            const j = await r.json().catch(() => null);
+            const harita = new Map();
+            for (const row of Array.isArray(j && j.data) ? j.data : []) {
+                const id = String(row.id || row._id || row.product || '');
+                const stok = Number(row.available ?? row.stock ?? row.quantity);
+                if (!id || !Number.isFinite(stok)) continue;
+                let rezerv = null;
+                for (const k of ['reserve', 'reservedStock', 'reserved', 'reservedQuantity', 'rezerveStock']) {
+                    if (row[k] != null && Number.isFinite(Number(row[k]))) { rezerv = Number(row[k]); break; }
                 }
-                if (r.status === 401 || r.status === 403) {
-                    stokOturumu = null;
-                    if (deneme === 0) continue;
-                    const h = new Error('oturum'); h.kod = 'oturum'; throw h;
-                }
-                if (!r.ok) { const h = new Error('sunucu'); h.kod = 'sunucu'; throw h; }
-                const j = await r.json().catch(() => null);
-                const harita = new Map();
-                for (const row of Array.isArray(j && j.data) ? j.data : []) {
-                    const id = String(row.id || row._id || row.product || '');
-                    let stok = row.available ?? row.stock ?? row.quantity;
-                    stok = Number(stok);
-                    if (!id || !Number.isFinite(stok)) continue;
-                    let rezerv = null;
-                    for (const k of ['reserve', 'reservedStock', 'reserved', 'reservedQuantity', 'rezerveStock']) {
-                        if (row[k] != null && Number.isFinite(Number(row[k]))) { rezerv = Number(row[k]); break; }
+                if (rezerv === null) {
+                    let top = 0; let var_ = false;
+                    for (const k of ['reservedForCorporateSales', 'reservedForDisposal', 'reservedForTransfer']) {
+                        if (row[k] != null && Number.isFinite(Number(row[k]))) { top += Number(row[k]); var_ = true; }
                     }
-                    if (rezerv === null) {
-                        let top = 0; let var_ = false;
-                        for (const k of ['reservedForCorporateSales', 'reservedForDisposal', 'reservedForTransfer']) {
-                            if (row[k] != null && Number.isFinite(Number(row[k]))) { top += Number(row[k]); var_ = true; }
-                        }
-                        if (var_) rezerv = top;
-                    }
-                    harita.set(id, { stok, rezerv: rezerv || 0 });
+                    if (var_) rezerv = top;
                 }
-                return harita;
+                harita.set(id, { stok, rezerv: rezerv || 0 });
             }
-            return new Map();
+            return harita;
+        }
+
+        /* Açık sayım tablosunda bu ürünler var mı. Hata sessiz: stok yine görünür. */
+        async function stokSayimBilgisi(ids) {
+            const sonuc = new Map();
+            const kim = window.userDataManager && window.userDataManager.currentUser && window.userDataManager.currentUser.username;
+            if (!kim || !window.jbDb) return sonuc;
+            try {
+                if (!stokSayimTablosu || Date.now() - stokSayimTablosu.zaman > 60000) {
+                    const { data } = await window.jbDb.from('users').select('tablo:counting_data->_currentTable').eq('username', kim).maybeSingle();
+                    stokSayimTablosu = { ad: typeof (data && data.tablo) === 'string' ? data.tablo : 'Ana Sayım', zaman: Date.now() };
+                }
+                const { data } = await window.jbDb.from('counting_items')
+                    .select('product_id, warehouse_stock')
+                    .eq('username', kim)
+                    .eq('table_name', stokSayimTablosu.ad)
+                    .in('product_id', ids);
+                (Array.isArray(data) ? data : []).forEach((r) => {
+                    const n = Number(r.warehouse_stock);
+                    sonuc.set(String(r.product_id), { sayilan: r.warehouse_stock == null || !Number.isFinite(n) ? null : n });
+                });
+            } catch (e) { /* sayım bilgisi yok */ }
+            return sonuc;
         }
 
         async function stokGonder() {
@@ -6915,9 +6907,16 @@
             stokSonIstek = Date.now();
             let harita = null;
             let hata = null;
+            const sayimSozu = stokSayimBilgisi(ids);
             try { harita = await stokCek(ids); } catch (e) { hata = e.kod || 'ag'; }
+            const sayim = await sayimSozu;
             if (nesil !== stokNesli) return;
-            ids.forEach((id) => stokDurumYaz(id, hata ? { hata } : (harita.get(id) || { yok: true })));
+            ids.forEach((id) => {
+                if (hata) { stokDurumYaz(id, { hata }); return; }
+                const d = Object.assign({}, harita.get(id) || { yok: true });
+                if (sayim.has(id)) d.sayim = sayim.get(id);
+                stokDurumYaz(id, d);
+            });
             if (stokKuyruk.size && !stokZaman) stokZaman = setTimeout(stokGonder, 200);
         }
 
@@ -9407,6 +9406,13 @@
                 ikon: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>',
                 storageKey: null
             },
+            'itirazYazici': {
+                renk: ['#4338ca', '#a5b4fc'],
+                name: 'İtiraz Yazıcı',
+                description: 'Depo değerlendirme kayıtlarına duruma uygun itiraz taslağı; geçmiş itirazlardan öğrenir, formu Asistan doldurur',
+                ikon: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>',
+                storageKey: null
+            },
 
             /*
              * ---- Chrome eklentileri ----
@@ -9451,6 +9457,7 @@
             lowStockAlert: { label: 'Düşük stok', run: () => window.location.replace('../dusuk-stok/') },
             siparisTakibi: { label: 'Siparişler', run: () => window.location.replace('../siparisler/') },
             satistanKaldirma: { label: 'Aç', run: () => window.location.replace('../kaldirma/') },
+            itirazYazici: { label: 'Aç', run: () => window.location.replace('../itiraz/') },
             keyboardShortcuts: { label: 'Kısayolları yönet', run: () => showKeyboardShortcutsModal() }
         };
 

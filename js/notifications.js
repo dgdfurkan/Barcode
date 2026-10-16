@@ -363,6 +363,7 @@ class NotificationSystem {
             'urunAjandasi': 'Ürün Ajandası',
             'siparisTakibi': 'Sipariş Takibi',
             'satistanKaldirma': 'Satıştan Kaldırma',
+            'itirazYazici': 'İtiraz Yazıcı',
             'raftakiEksikler': 'Raftaki Eksikler'
         };
         return featureNames[featureName] || featureName;

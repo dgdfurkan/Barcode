@@ -963,6 +963,11 @@ require('./kaldirma').kur(app, { pool, verifyToken, bearerOf });
 require('./franchise-jeton').kur(app, { pool, verifyToken, bearerOf });
 
 // =====================================================================
+// İtiraz Yazıcı: Depo Değerlendirme kayıtlarına Gemini ile itiraz taslağı
+// =====================================================================
+require('./itiraz').kur(app, { pool, verifyToken, bearerOf });
+
+// =====================================================================
 // Canlı kanal: sipariş ve sayım değişikliği cihazlara anında (vps-api/canli.js)
 // =====================================================================
 require('./canli').kur(app, {

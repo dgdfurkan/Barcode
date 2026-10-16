@@ -128,6 +128,23 @@
         }
         /* Satıştan Kaldırma sayfasındaki "Şimdi Güncelle": depo paneli bu
            bilgisayarda açıksa liste hemen aktarılır (arka-plan/kaldirma-nobet.js) */
+        /* İtiraz Yazıcı "Panelde Doldur": taslak franchise-v2 kaydına taşınır,
+           formu kullanıcı yerleştirir ve Kaydet'e kendisi basar (arka-plan/itiraz.js) */
+        if (d.type === 'JB_ITIRAZ_DOLDUR') {
+            arkaPlana({
+                type: 'JBA_ITIRAZ_DOLDUR',
+                kayitId: String(d.kayitId || '').slice(0, 40),
+                metin: String(d.metin || '').slice(0, 2000),
+                sebep: String(d.sebep || '').slice(0, 140)
+            }, function (y) {
+                gonder({
+                    type: 'JB_ITIRAZ_DOLDUR_SONUC',
+                    ok: !!(y && y.ok),
+                    metin: String((y && y.metin) || (y ? '' : 'Jet Barkod Asistan yanıt vermedi.')).slice(0, 200)
+                });
+            });
+            return;
+        }
         if (d.type === 'JB_KALDIRMA_TAZELE') {
             arkaPlana({ type: 'JBA_KALDIRMA_TAZELE' }, function (y) {
                 gonder({
