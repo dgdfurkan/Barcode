@@ -27,7 +27,7 @@
     var kok = null;
     var taslak = null;
     var mesgul = false;
-    var izci = null;
+    var yolBekcisi = null;
 
     var STIL = [
         ':host { all: initial; }',
@@ -235,12 +235,12 @@
             taslakOku();
             // Detaydan detaya geçişte modül yeniden başlamıyor; kart doğru kayıtta mı
             var son = location.pathname;
-            izci = setInterval(function () {
+            yolBekcisi = setInterval(function () {
                 if (location.pathname === son) return;
                 son = location.pathname;
                 ciz();
             }, 800);
         },
-        durdur: function () { etkin = false; clearInterval(izci); kaldir(); }
+        durdur: function () { etkin = false; clearInterval(yolBekcisi); kaldir(); }
     });
 })(window);
