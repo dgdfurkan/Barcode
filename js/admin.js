@@ -3764,12 +3764,18 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
             'satistanKaldirma': 'Satıştan Kaldırma',
             'itirazYazici': 'İtiraz Yazıcı',
             'raftakiEksikler': 'Raftaki Eksikler',
-            'bulkCopy': 'Toplu Kopyalama (Chrome)',
-            'getirStockBarcodesExtension': 'Getir Stok Barkodları (Chrome)',
-            'stokSenkron': 'Sayım Hazırlığı (Chrome)',
-            'siparisUrunArama': 'Sipariş İçi Ürün Arama (Chrome)',
-            'firinPisirme': 'Fırın Pişirme (Chrome)'
+            'bulkCopy': 'Toplu Yapıştırma (barkod ve görsel eşleme)'
         };
+
+        /* Eski tek tek Chrome eklentisi hakları artık listede yok; hepsi Jet
+           Barkod Asistan'ın içinde. Bunlardan biri açık kullanıcıda Asistan
+           işaretli görünür; kaydedince tek hakka geçmiş olur, hiçbir modül
+           kapanmaz (kayıt yalnız listedeki anahtarları yazıyor). */
+        const ESKI_ASISTAN_HAKLARI = ['getirStockBarcodesExtension', 'stokSenkron', 'siparisUrunArama', 'firinPisirme'];
+        const hakAcikMi = (f) => typeof f === 'boolean' ? f === true : (typeof f === 'object' && f !== null ? f.enabled === true : false);
+        if (!hakAcikMi(premiumFeatures.jetBarkodAsistan) && ESKI_ASISTAN_HAKLARI.some((k) => hakAcikMi(premiumFeatures[k]))) {
+            premiumFeatures = Object.assign({}, premiumFeatures, { jetBarkodAsistan: true });
+        }
         
         console.log('Premium haklar yükleniyor:', Object.keys(availableFeatures));
         
@@ -3867,7 +3873,7 @@ AdminPanel.prototype.getFeatureDescription = function(featureKey) {
         'jetBarkodAsistan': 'Bütün Chrome araçlarını tek eklentide toplayan yeni sürüm. Eski eklentiler yerinde kalır; bu hak açıkken kullanıcı tek eklentiyi kurup hepsini oradan kullanabilir',
         'autoPaste': 'Terminalden kopyalanan barkodları otomatik yapıştırır',
         'keyboardShortcuts': 'Klavye kısayolları ile hızlı erişim',
-        'bulkCopy': 'Warehouse listelerini tek tıkla kopyalar, uygulama barkod ve görselleri çözer (eski Görsel Link Arama hakkı da bunu açar)',
+        'bulkCopy': 'Depo panelinden kopyalanan sipariş tablosu Ürün Arama\'ya yapıştırılınca barkod ve görseller eşlenir (eski Görsel Link Arama hakkı da bunu açar)',
         'stokSayimi': 'Stok sayımı sayfası ve Getir franchise stok senkronizasyonu',
         'lowStockAlert': 'Stok hareketlerine göre eşiğin altına düşen ürünlerde sesli/görsel uyarı ve liste',
         'urunAjandasi': 'Müşteri eksik bildirimlerini takip — gönderim ajandası',
@@ -3875,10 +3881,6 @@ AdminPanel.prototype.getFeatureDescription = function(featureKey) {
         'satistanKaldirma': 'Depo panelindeki satıştan kaldırma listesini (fırın hariç) saatte bir aktarır; görsel rapor ve iptal bildirimi Telegram\'a',
         'itirazYazici': 'Depo değerlendirme kayıtlarına Gemini ile duruma uygun itiraz taslağı; formu Asistan doldurur, Kaydet kullanıcıda',
         'raftakiEksikler': 'Depo raflarında eksik ürün takibi — sepet ve cihazlar arası senkron',
-        'getirStockBarcodesExtension': 'Franchise sayfasında görsel URL’lerini kopyalayan Chrome eklentisi',
-        'stokSenkron': 'Franchise stok sayfasından toplu ürün seçip sayım tablosuna taşıyan Chrome eklentisi',
-        'siparisUrunArama': 'Warehouse sipariş sayfasında ürün arayıp siparişleri renklendiren Chrome eklentisi',
-        'firinPisirme': 'Fırın sekmesindeki pişirme akışını tek ekrana toplayan Chrome eklentisi'
     };
     return descriptions[featureKey] || '';
 };
