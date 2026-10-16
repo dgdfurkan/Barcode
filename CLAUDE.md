@@ -149,6 +149,8 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
 - Satıştan Kaldırma: `sql_files/satistan_kaldirma.sql` çalıştırılacak ve `vps-api/kaldirma/` + `server.js`
   VPS'e atılıp servis yeniden başlatılacak. Çalışana kadar sayfa "sunucu güncellemesi bekleniyor" der,
   Asistan aktarımı aynı mesajla bekler. Telegram botu ve hesap bağlama sayım raporununki.
+- `vps-api/franchise-jeton.js` + `server.js` VPS'e atılıp servis yeniden başlatılacak. Asistan franchise
+  jetonunu buraya yazıyor; çalışana kadar telefondaki Stok düğmesi jetonu yalnız sayım sayfasından alır.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

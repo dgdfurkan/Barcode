@@ -2096,11 +2096,11 @@
                             </svg>
                             <span>Siparişler</span>
                         </button>
-                        <button id="headerRemovalPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Satıştan Kaldırma">
+                        <button id="headerRemovalPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Yardımcılar">
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4h6v3"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h7v7H4zM13 6h7v7h-7zM4 15h7v5H4zM13 15h7v5h-7z"/>
                             </svg>
-                            <span>Satıştan Kaldırma</span>
+                            <span>Yardımcılar</span>
                         </button>
                         </nav>
                     </div>
@@ -2246,11 +2246,11 @@
                 </svg>
                 <span>Siparişler</span>
             </button>
-            <button id="mobileRemovalPageBtn" class="mobile-menu-item hidden" type="button" aria-label="Satıştan Kaldırma">
+            <button id="mobileRemovalPageBtn" class="mobile-menu-item hidden" type="button" aria-label="Yardımcılar">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4h6v3"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h7v7H4zM13 6h7v7h-7zM4 15h7v5H4zM13 15h7v5h-7z"/>
                 </svg>
-                <span>Satıştan Kaldırma</span>
+                <span>Yardımcılar</span>
             </button>
 
             <button id="mobileSettingsBtn" class="mobile-menu-item">
@@ -3309,14 +3309,14 @@
         const headerRemovalPageBtn = document.getElementById('headerRemovalPageBtn');
         if (headerRemovalPageBtn) {
             headerRemovalPageBtn.addEventListener('click', () => {
-                window.location.replace('../kaldirma/');
+                window.location.replace('../yardimcilar/');
             });
         }
         const mobileRemovalPageBtn = document.getElementById('mobileRemovalPageBtn');
         if (mobileRemovalPageBtn) {
             mobileRemovalPageBtn.addEventListener('click', () => {
                 closeMobileMenu();
-                window.location.replace('../kaldirma/');
+                window.location.replace('../yardimcilar/');
             });
         }
         const mobileOrdersPageBtn = document.getElementById('mobileOrdersPageBtn');
@@ -3858,7 +3858,7 @@
                     if (mobileOrdersBtn) mobileOrdersBtn.classList.add('hidden');
                 }
 
-                /* Satıştan Kaldırma: admin hakkı verdiyse görünür */
+                /* Yardımcılar: içindeki araçlardan birinin hakkı açıksa görünür */
                 {
                     const headerRemovalBtn = document.getElementById('headerRemovalPageBtn');
                     const mobileRemovalBtn = document.getElementById('mobileRemovalPageBtn');

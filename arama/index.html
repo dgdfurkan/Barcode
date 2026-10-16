@@ -885,6 +885,53 @@
         }
         .arama-adet.is-cok small { color: rgba(255, 255, 255, 0.8); font-size: 13px; }
 
+        /* Stok düğmesi: kartın sol üstünde, ×N rozetinin karşısında. Sakin
+           durur; sonuç gelince aynı yerde "Stok 12", rezerv varsa altında. */
+        .arama-stok {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            z-index: 2;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 2px;
+            min-width: 44px;
+            min-height: 32px;
+            padding: 0 12px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.92);
+            color: #475467;
+            border: 1px solid #d0d5dd;
+            font: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+            box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+            cursor: pointer;
+            transition: border-color 150ms ease-out, background-color 150ms ease-out;
+        }
+        .arama-stok::before { content: ''; position: absolute; inset: -6px; }
+        .arama-stok:hover { border-color: #98a2b3; background: #ffffff; }
+        .arama-stok:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+        .arama-stok__satir { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .arama-stok__satir svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+        .arama-stok b { font-size: 15px; font-weight: 800; color: #111827; }
+        .arama-stok__alt { font-size: 11px; font-weight: 600; color: #667085; white-space: nowrap; }
+        .arama-stok.is-dolu, .arama-stok.is-hata { padding: 6px 12px; }
+        .arama-stok.is-sifir { border-color: #fda29b; }
+        .arama-stok.is-sifir b { color: #d92d20; }
+        .arama-stok.is-hata { color: #b54708; border-color: #fedf89; }
+        .arama-stok.is-yuk { cursor: progress; }
+        .arama-stok.is-yuk .arama-stok__satir { animation: aramaStokNabiz 900ms ease-in-out infinite alternate; }
+        @keyframes aramaStokNabiz { from { opacity: 1; } to { opacity: 0.35; } }
+        @media (prefers-reduced-motion: reduce) {
+            .arama-stok { transition: none; }
+            .arama-stok.is-yuk .arama-stok__satir { animation: none; opacity: 0.5; }
+        }
+
         .product-card {
             background: white;
             border: 1px solid #e5e5e5;
@@ -2142,11 +2189,11 @@
                             </svg>
                             <span>Siparişler</span>
                         </button>
-                        <button id="headerRemovalPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Satıştan Kaldırma">
+                        <button id="headerRemovalPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Yardımcılar">
                             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4h6v3"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h7v7H4zM13 6h7v7h-7zM4 15h7v5H4zM13 15h7v5h-7z"/>
                             </svg>
-                            <span>Satıştan Kaldırma</span>
+                            <span>Yardımcılar</span>
                         </button>
                         </nav>
                     </div>
@@ -2292,11 +2339,11 @@
                 </svg>
                 <span>Siparişler</span>
             </button>
-            <button id="mobileRemovalPageBtn" class="mobile-menu-item hidden" type="button" aria-label="Satıştan Kaldırma">
+            <button id="mobileRemovalPageBtn" class="mobile-menu-item hidden" type="button" aria-label="Yardımcılar">
                 <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4h6v3"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h7v7H4zM13 6h7v7h-7zM4 15h7v5H4zM13 15h7v5h-7z"/>
                 </svg>
-                <span>Satıştan Kaldırma</span>
+                <span>Yardımcılar</span>
             </button>
 
             <button id="mobileSettingsBtn" class="mobile-menu-item">
@@ -2774,6 +2821,18 @@
                                 <div class="settings-row__actions">
                                     <label class="settings-switch">
                                         <input type="checkbox" id="showDefaultProducts" aria-label="Varsayılan ürünleri göster">
+                                        <span class="settings-switch__track"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="settings-row">
+                                <div class="settings-row__body">
+                                    <p class="settings-row__title">Stok Düğmesi</p>
+                                    <p class="settings-row__desc">Ürün kartının sol üstünde durur. Basınca o ürünün anlık stoğunu ve rezervini gösterir.</p>
+                                </div>
+                                <div class="settings-row__actions">
+                                    <label class="settings-switch">
+                                        <input type="checkbox" id="stokDugmesiAyar" aria-label="Stok düğmesini göster">
                                         <span class="settings-switch__track"></span>
                                     </label>
                                 </div>
@@ -3375,14 +3434,14 @@
         const headerRemovalPageBtn = document.getElementById('headerRemovalPageBtn');
         if (headerRemovalPageBtn) {
             headerRemovalPageBtn.addEventListener('click', () => {
-                window.location.replace('../kaldirma/');
+                window.location.replace('../yardimcilar/');
             });
         }
         const mobileRemovalPageBtn = document.getElementById('mobileRemovalPageBtn');
         if (mobileRemovalPageBtn) {
             mobileRemovalPageBtn.addEventListener('click', () => {
                 closeMobileMenu();
-                window.location.replace('../kaldirma/');
+                window.location.replace('../yardimcilar/');
             });
         }
         const mobileOrdersPageBtn = document.getElementById('mobileOrdersPageBtn');
@@ -3924,7 +3983,7 @@
                     if (mobileOrdersBtn) mobileOrdersBtn.classList.add('hidden');
                 }
 
-                /* Satıştan Kaldırma: admin hakkı verdiyse görünür */
+                /* Yardımcılar: içindeki araçlardan birinin hakkı açıksa görünür */
                 {
                     const headerRemovalBtn = document.getElementById('headerRemovalPageBtn');
                     const mobileRemovalBtn = document.getElementById('mobileRemovalPageBtn');
@@ -5181,6 +5240,7 @@
                     <div class="group bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col overflow-hidden ${isOutOfStock ? 'opacity-60' : ''}" data-product-id="${product.id}">
                         <!-- Image Area -->
                         <div class="h-48 p-2 bg-slate-50 flex items-center justify-center relative cursor-pointer" onclick="showImageModal('${productImage.replace(/'/g, "\\'")}', '${productName}')">
+                            ${stokDugmesi(product.id)}
                             ${adetRozeti(product.id)}
                             <img src="${productImage}" loading="lazy" decoding="async"
                                  alt="${product.name}" 
@@ -6671,6 +6731,214 @@
             return `<span class="arama-adet${n > 1 ? ' is-cok' : ''}" aria-label="${n} adet isteniyor"><small>×</small>${n}</span>`;
         }
 
+        /*
+         * Stok düğmesi (Ayarlar > Ürün yönetimi). Kartın sol üstüne basınca o
+         * ürünün anlık stoğu franchise panelinin kendi stok isteğiyle alınır.
+         * Sonuç yalnız bu aramada durur; yeni arama düğmeleri sıfırlar.
+         *
+         * Oturum: önce Asistan'ın yakaladığı jeton (bilgisayar), yoksa hesaba
+         * yazılmış jeton (telefon). Asistan, franchise panelinin herhangi bir
+         * sayfası açıkken jetonu hesaba kendisi yazar.
+         *
+         * İstek: art arda basılan düğmeler 200 ms içinde toplanıp TEK istekte
+         * gider, iki istek arası en az 600 ms.
+         */
+        const STOK_URUN = /^[0-9a-f]{24}$/i;
+        const STOK_UC = 'https://franchise-api-gateway.getirapi.com/stocks?limit=100&offset=0';
+        let stokSonuclari = new Map();
+        let stokNesli = 0;
+        let stokKuyruk = new Set();
+        let stokZaman = null;
+        let stokSonIstek = 0;
+        let stokOturumu = null;
+
+        function stokDugmesiAcik() {
+            try { return !!(window.userDataManager && window.userDataManager.getSettings().stokDugmesi); }
+            catch (e) { return false; }
+        }
+
+        function stokSifirla() {
+            stokSonuclari = new Map();
+            stokKuyruk = new Set();
+            stokNesli++;
+        }
+
+        const STOK_IKON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 5 8 2.5 13.5 5v6L8 13.5 2.5 11z"/><path d="M2.5 5 8 7.5 13.5 5M8 7.5v6"/></svg>';
+
+        function stokGorunum(d) {
+            if (!d) return { sinif: '', html: `<span class="arama-stok__satir">${STOK_IKON}Stok</span>`, etiket: 'Stoku göster' };
+            if (d.yuk) return { sinif: ' is-yuk', html: `<span class="arama-stok__satir">${STOK_IKON}Stok</span>`, etiket: 'Stok alınıyor' };
+            if (d.hata) {
+                const m = d.hata === 'oturum' ? ['Oturum yok', 'Franchise panelini aç']
+                    : d.hata === 'depo' ? ['Depo yok', 'Franchise panelini aç']
+                    : ['Alınamadı', 'Tekrar dene'];
+                return { sinif: ' is-hata', html: `<span class="arama-stok__satir">${m[0]}</span><span class="arama-stok__alt">${m[1]}</span>`, etiket: m[0] + '. ' + m[1] };
+            }
+            if (d.yok) return { sinif: ' is-dolu is-sifir', html: '<span class="arama-stok__satir">Stok <b>0</b></span><span class="arama-stok__alt">Depoda kaydı yok</span>', etiket: 'Depoda kaydı yok' };
+            const rez = d.rezerv > 0 ? `<span class="arama-stok__alt">Rezerv ${d.rezerv}</span>` : '';
+            return {
+                sinif: ' is-dolu' + (d.stok <= 0 ? ' is-sifir' : ''),
+                html: `<span class="arama-stok__satir">Stok <b>${d.stok}</b></span>${rez}`,
+                etiket: `Stok ${d.stok}` + (d.rezerv > 0 ? `, rezerv ${d.rezerv}` : '') + '. Yenilemek için bas'
+            };
+        }
+
+        function stokDugmesi(productId) {
+            const id = String(productId == null ? '' : productId);
+            if (!stokDugmesiAcik() || !STOK_URUN.test(id)) return '';
+            const g = stokGorunum(stokSonuclari.get(id));
+            return `<button type="button" class="arama-stok${g.sinif}" data-stok-id="${id}" aria-label="${g.etiket}" title="${g.etiket}">${g.html}</button>`;
+        }
+
+        function stokDurumYaz(id, d) {
+            stokSonuclari.set(id, d);
+            const g = stokGorunum(d);
+            document.querySelectorAll(`.arama-stok[data-stok-id="${id}"]`).forEach((b) => {
+                b.className = 'arama-stok' + g.sinif;
+                b.setAttribute('aria-label', g.etiket);
+                b.title = g.etiket;
+                b.setAttribute('aria-busy', d && d.yuk ? 'true' : 'false');
+                b.innerHTML = g.html;
+            });
+        }
+
+        function stokBitisMs(bilgi) {
+            if (!bilgi || !bilgi.token) return 0;
+            let alan = 0;
+            const v = bilgi.tokenExpiry;
+            if (v != null && v !== '') {
+                const n = Number(v);
+                alan = Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : (Date.parse(String(v)) || 0);
+            }
+            let jwt = 0;
+            try {
+                const p = String(bilgi.token).replace(/^Bearer\s+/i, '').split('.')[1];
+                const y = JSON.parse(atob(p.replace(/-/g, '+').replace(/_/g, '/')));
+                if (Number.isFinite(y.exp)) jwt = y.exp * 1000;
+            } catch (e) { /* jwt değil */ }
+            return Math.max(alan, jwt);
+        }
+
+        async function stokOturumuAl(zorla) {
+            if (!zorla && stokOturumu && stokOturumu.bitis > Date.now() + 60000) return stokOturumu;
+            stokOturumu = null;
+            const adaylar = [];
+            const yardimci = window.getirExtensionHelper;
+            if (yardimci && typeof yardimci.getAPIInfo === 'function') {
+                try {
+                    adaylar.push(await Promise.race([
+                        yardimci.getAPIInfo(),
+                        new Promise((_, red) => setTimeout(() => red(new Error('zaman')), 2500))
+                    ]));
+                } catch (e) { /* Asistan yok ya da jeton yok */ }
+            }
+            const kim = window.userDataManager && window.userDataManager.currentUser && window.userDataManager.currentUser.username;
+            if (kim && window.jbDb) {
+                try {
+                    const { data } = await window.jbDb.from('users').select('api:counting_data->_api_info').eq('username', kim).maybeSingle();
+                    let b = data && data.api;
+                    if (typeof b === 'string') b = JSON.parse(b);
+                    if (b && typeof b === 'object') adaylar.push(b);
+                } catch (e) { /* okunamadı */ }
+            }
+            const simdi = Date.now();
+            let en = null;
+            let enBitis = 0;
+            let depo = null;
+            for (const a of adaylar) {
+                if (!a || typeof a.token !== 'string') continue;
+                const d = typeof a.warehouseId === 'string' && STOK_URUN.test(a.warehouseId) ? a.warehouseId : null;
+                const b = stokBitisMs(a);
+                if (b > simdi + 60000 && b > enBitis) { en = a; enBitis = b; if (d) depo = d; }
+                if (!depo && d) depo = d;
+            }
+            if (!en) { const h = new Error('oturum'); h.kod = 'oturum'; throw h; }
+            if (!depo) { const h = new Error('depo'); h.kod = 'depo'; throw h; }
+            let jeton = en.token.trim();
+            if (!/^Bearer /.test(jeton)) jeton = 'Bearer ' + jeton;
+            stokOturumu = { jeton, depo, bitis: enBitis };
+            return stokOturumu;
+        }
+
+        async function stokCek(ids) {
+            for (let deneme = 0; deneme < 2; deneme++) {
+                const o = await stokOturumuAl(deneme > 0);
+                let r;
+                try {
+                    r = await fetch(STOK_UC, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: o.jeton },
+                        body: JSON.stringify({ warehouseIds: [o.depo], productIds: ids, sort: { available: -1 } })
+                    });
+                } catch (e) {
+                    const h = new Error('ag'); h.kod = 'ag'; throw h;
+                }
+                if (r.status === 401 || r.status === 403) {
+                    stokOturumu = null;
+                    if (deneme === 0) continue;
+                    const h = new Error('oturum'); h.kod = 'oturum'; throw h;
+                }
+                if (!r.ok) { const h = new Error('sunucu'); h.kod = 'sunucu'; throw h; }
+                const j = await r.json().catch(() => null);
+                const harita = new Map();
+                for (const row of Array.isArray(j && j.data) ? j.data : []) {
+                    const id = String(row.id || row._id || row.product || '');
+                    let stok = row.available ?? row.stock ?? row.quantity;
+                    stok = Number(stok);
+                    if (!id || !Number.isFinite(stok)) continue;
+                    let rezerv = null;
+                    for (const k of ['reserve', 'reservedStock', 'reserved', 'reservedQuantity', 'rezerveStock']) {
+                        if (row[k] != null && Number.isFinite(Number(row[k]))) { rezerv = Number(row[k]); break; }
+                    }
+                    if (rezerv === null) {
+                        let top = 0; let var_ = false;
+                        for (const k of ['reservedForCorporateSales', 'reservedForDisposal', 'reservedForTransfer']) {
+                            if (row[k] != null && Number.isFinite(Number(row[k]))) { top += Number(row[k]); var_ = true; }
+                        }
+                        if (var_) rezerv = top;
+                    }
+                    harita.set(id, { stok, rezerv: rezerv || 0 });
+                }
+                return harita;
+            }
+            return new Map();
+        }
+
+        async function stokGonder() {
+            stokZaman = null;
+            const nesil = stokNesli;
+            const ids = [...stokKuyruk].slice(0, 100);
+            ids.forEach((i) => stokKuyruk.delete(i));
+            if (!ids.length) return;
+            const bekle = stokSonIstek + 600 - Date.now();
+            if (bekle > 0) await new Promise((r) => setTimeout(r, bekle));
+            stokSonIstek = Date.now();
+            let harita = null;
+            let hata = null;
+            try { harita = await stokCek(ids); } catch (e) { hata = e.kod || 'ag'; }
+            if (nesil !== stokNesli) return;
+            ids.forEach((id) => stokDurumYaz(id, hata ? { hata } : (harita.get(id) || { yok: true })));
+            if (stokKuyruk.size && !stokZaman) stokZaman = setTimeout(stokGonder, 200);
+        }
+
+        function stokIste(id) {
+            const d = stokSonuclari.get(id);
+            if ((d && d.yuk) || stokKuyruk.has(id)) return;
+            stokKuyruk.add(id);
+            stokDurumYaz(id, { yuk: true });
+            if (!stokZaman) stokZaman = setTimeout(stokGonder, 200);
+        }
+
+        // Yakalama evresinde: görselin büyütme penceresi açılmasın
+        document.addEventListener('click', (e) => {
+            const b = e.target && e.target.closest ? e.target.closest('.arama-stok') : null;
+            if (!b) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const id = b.getAttribute('data-stok-id');
+            if (STOK_URUN.test(id || '')) stokIste(id);
+        }, true);
+
         function parseHtmlTableWithImages(htmlContent) {
             try {
                 // Clear previous map
@@ -7283,6 +7551,7 @@
                 parsedQuery = parseTableData(query);
             }
             // Adet rozetleri yalnız yapıştırılan listenin barkodlarıyla yapılan aramada
+            stokSifirla();
             aktifAdetler = sonYapistirmaAdetleri && adetAnahtari(parsedQuery) === sonYapistirmaAdetleri.sorgu
                 ? sonYapistirmaAdetleri.adet
                 : null;
@@ -10634,6 +10903,7 @@
             if (window.userDataManager && window.userDataManager.currentUser) {
                 const settings = window.userDataManager.getSettings();
                 document.getElementById('showDefaultProducts').checked = settings.showDefaultProducts;
+                document.getElementById('stokDugmesiAyar').checked = !!settings.stokDugmesi;
             }
             
             // Render premium features
@@ -11771,6 +12041,12 @@
                     await loadAntiGlareSetting();
                 }, 5 * 60 * 1000); // Every 5 minutes
             }
+
+            document.getElementById('stokDugmesiAyar').addEventListener('change', (e) => {
+                if (!window.userDataManager || !window.userDataManager.currentUser) return;
+                window.userDataManager.updateSettings({ stokDugmesi: e.target.checked });
+                if (searchInput.value.trim()) performSearch(searchInput.value);
+            });
 
             document.getElementById('showDefaultProducts').addEventListener('change', (e) => {
                 if (window.userDataManager && window.userDataManager.currentUser) {

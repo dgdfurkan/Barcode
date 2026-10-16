@@ -958,6 +958,11 @@ require('./sayim-raporu').kur(app, { pool, verifyToken, bearerOf });
 require('./kaldirma').kur(app, { pool, verifyToken, bearerOf });
 
 // =====================================================================
+// Franchise oturumu: Asistan jetonu hesaba yazar (telefon stok okuyabilsin)
+// =====================================================================
+require('./franchise-jeton').kur(app, { pool, verifyToken, bearerOf });
+
+// =====================================================================
 // Canlı kanal: sipariş ve sayım değişikliği cihazlara anında (vps-api/canli.js)
 // =====================================================================
 require('./canli').kur(app, {
