@@ -180,6 +180,10 @@ function yetkiTazele(zorla, isVar) {
     return tazelemeSozu;
 }
 
+/* Diğer arka plan işleri (satıştan kaldırma) aynı Jet Barkod oturumunu
+   kullanıyor; jeton yalnız kendi API'mize gidiyor. */
+globalThis.jbaYetkiAl = function (zorla) { return yetkiTazele(!!zorla, false); };
+
 try {
     chrome.alarms.create(YETKI_ALARMI, { periodInMinutes: 30 });
     chrome.alarms.onAlarm.addListener((alarm) => {

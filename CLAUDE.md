@@ -146,6 +146,9 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
 - `sql_files/sayim_gecmisi_paylasim.sql` çalıştırılacak. Sayım Geçmişi telefona gitsin ve herkese açık
   Döngü raporu (`/dongu/#anahtar`) açılsın diye. Çalışana kadar geçmiş yalnız o tarayıcıda, Paylaş düğmesi
   "sunucu güncellemesi bekleniyor" der.
+- Satıştan Kaldırma: `sql_files/satistan_kaldirma.sql` çalıştırılacak ve `vps-api/kaldirma/` + `server.js`
+  VPS'e atılıp servis yeniden başlatılacak. Çalışana kadar sayfa "sunucu güncellemesi bekleniyor" der,
+  Asistan aktarımı aynı mesajla bekler. Telegram botu ve hesap bağlama sayım raporununki.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

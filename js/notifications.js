@@ -362,6 +362,7 @@ class NotificationSystem {
             'lowStockAlert': 'Düşük Stok Uyarısı',
             'urunAjandasi': 'Ürün Ajandası',
             'siparisTakibi': 'Sipariş Takibi',
+            'satistanKaldirma': 'Satıştan Kaldırma',
             'raftakiEksikler': 'Raftaki Eksikler'
         };
         return featureNames[featureName] || featureName;

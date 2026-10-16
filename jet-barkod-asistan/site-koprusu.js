@@ -126,6 +126,18 @@
             });
             return;
         }
+        /* Satıştan Kaldırma sayfasındaki "Şimdi Güncelle": depo paneli bu
+           bilgisayarda açıksa liste hemen aktarılır (arka-plan/kaldirma-nobet.js) */
+        if (d.type === 'JB_KALDIRMA_TAZELE') {
+            arkaPlana({ type: 'JBA_KALDIRMA_TAZELE' }, function (y) {
+                gonder({
+                    type: 'JB_KALDIRMA_SONUC',
+                    ok: !!(y && y.ok),
+                    metin: String((y && y.metin) || (y ? '' : 'Jet Barkod Asistan yanıt vermedi.')).slice(0, 200)
+                });
+            });
+            return;
+        }
         if (d.type === 'JB_SAYIM_GECMISI_DURDUR') {
             arkaPlana({ type: 'JBA_SAYIM_GECMISI_DURDUR' }, function () {});
             return;

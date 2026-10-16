@@ -18,7 +18,8 @@
  * Chrome alarmı en az 30 sn. 15 sn için sipariş panosu nöbetçisinin
  * (pano-nobet.js) 2 sn'lik nabzına bağlanıyor: her nabızda süre dolmuş mu
  * diye bakılıyor. Alarm yalnız hizmet işçisi uyursa uyandırmak için.
- * Öneriler 08:00-23:00 arası: 23:00'ten sabah 08:00'e kadar hiç istek atılmıyor.
+ * Öneriler 08:00-23:00 arası. 23:30-23:59 arası 10 sn'de bir "Fırın Ürünlerini
+ * Çıkar" uyarısı (rafta stoğu olan, ekmek hariç). Diğer saatlerde istek yok.
  *
  * GETİR'İ YORMAMA
  *   - Yalnız siparişler ekranı açıkken, tek GET; birden çok panel sekmesi
@@ -88,6 +89,17 @@ function mesaiDisi() {
     return s < ACILIS_SAATI || s >= KAPANIS_SAATI;
 }
 
+/* 23:30-23:59 gün sonu: rafta kalan fırın ürünleri (ekmek hariç) çıkarılsın.
+   Bu aralıkta kontrol seçilen sıklıktan bağımsız 10 sn'de bir. */
+const CIKAR_SN = 10;
+function gunSonuMu() {
+    const d = new Date();
+    return d.getHours() === 23 && d.getMinutes() >= 30;
+}
+function aralikSn() {
+    return gunSonuMu() ? CIKAR_SN : ayar.sn;
+}
+
 async function panolar() {
     try { return await chrome.tabs.query({ url: PANO }); } catch (e) { return []; }
 }
@@ -99,7 +111,8 @@ async function yay(sekmeler, sonuc, ek) {
         dilimler: sonuc && sonuc.dilimler,
         simdiki: sonuc && sonuc.simdiki,
         // Çarpıyla kapatılan kart bu kadar sonra yeniden gösterilir (seçilen sıklık)
-        aralikMs: ayar.sn * 1000,
+        aralikMs: aralikSn() * 1000,
+        mod: sonuc && sonuc.mod,
         zaman: Date.now()
     }, ek || {});
     for (const t of sekmeler) {
@@ -128,8 +141,9 @@ async function kontrol(sebep) {
     const sekmeler = await panolar();
     if (!sekmeler.length) return;
 
-    // 23:00-08:00: öneri yok, istek yok; varsa kart kalkar
-    if (mesaiDisi()) {
+    // 23:00-08:00: öneri yok, istek yok; varsa kart kalkar (23:30 sonrası hariç)
+    const gunSonu = gunSonuMu();
+    if (mesaiDisi() && !gunSonu) {
         if (!geceTemizlendi) {
             geceTemizlendi = true;
             await yay(sekmeler, null);
@@ -148,7 +162,7 @@ async function kontrol(sebep) {
     calisiyor = true;
     sonKontrol = simdi;
     try {
-        const cevap = await chrome.tabs.sendMessage(hedef.id, { type: 'JBA_FIRIN_SOR' });
+        const cevap = await chrome.tabs.sendMessage(hedef.id, { type: 'JBA_FIRIN_SOR', mod: gunSonu ? 'cikar' : 'pisir' });
         if (!cevap || !cevap.ok) {
             // Yalnız Getir'in hata döndüğü durum bekletir; oturum henüz
             // yakalanmadıysa ya da sekme cevap vermediyse sonraki turda yine denenir
@@ -161,6 +175,7 @@ async function kontrol(sebep) {
         const ert = cevap.ertelenenSayisi ? ' ' + cevap.ertelenenSayisi + ' ürün ertelendi.' : '';
         durumYaz(cevap.stokluSayisi === 0 && cevap.urunSayisi > 0
             ? 'Stok sayıları gelmedi, bildirim gösterilemiyor.'
+            : gunSonu ? (n ? 'Gün sonu: ' + n + ' fırın ürünü rafta, çıkarma uyarısı gösterildi.' : 'Gün sonu: rafta fırın ürünü yok.')
             : n ? n + ' ürün için bildirim gösterildi.' + ert
             : 'Acil pişirme yok (' + (cevap.stokluSayisi || 0) + ' ürün okundu).' + ert);
     } catch (e) {
@@ -174,7 +189,7 @@ async function kontrol(sebep) {
 /** Sipariş panosu nöbetçisi her 2 sn'de bir çağırır */
 globalThis.jbaFirinNabiz = function () {
     if (!ayar.acik || calisiyor) return;
-    if (Date.now() - sonKontrol < ayar.sn * 1000) return;
+    if (Date.now() - sonKontrol < aralikSn() * 1000) return;
     kontrol('periyot');
 };
 

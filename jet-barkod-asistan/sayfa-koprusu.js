@@ -704,7 +704,7 @@
     // son cevap döner.
     // ==================================================================
 
-    var FIRIN_ARA_MS = 10 * 1000;
+    var FIRIN_ARA_MS = 8 * 1000;
     var firinSon = null;
     var firinZaman = 0;
     var firinSuruyor = null;
@@ -775,6 +775,134 @@
         return firinSuruyor;
     }
 
+    // ==================================================================
+    // Satıştan Kaldırma Listesi (arka-plan/kaldirma-nobet.js, saatte bir)
+    //
+    // Depo panelinin "Satıştan Kaldırma Listesi" sayfası
+    // POST /blocked-stocks/filter?offset&limit atıyor; gövde
+    // { createdAt: { startDate, endDate }, warehouses: [depo] }. Aynı istek
+    // panelin kendi başlıklarıyla, son N gün için sayfa sayfa atılıyor.
+    // Depo kimliği adres çubuğundan; koda gömülü kimlik yok. Fırın
+    // çıkışları (sebep "Fırın Ürünleri ...") hiç alınmıyor. Hasar fotoğrafı
+    // adresi süreli imzalı olduğu için taşınmıyor.
+    // ==================================================================
+
+    var KALDIRMA_ARA_MS = 30 * 1000;
+    var kaldirmaSon = null;
+    var kaldirmaZaman = 0;
+    var kaldirmaSuruyor = null;
+
+    function depoKimligi() {
+        var m = /^\/r\/([a-f0-9]{24})\//.exec(location.pathname);
+        return m ? m[1] : null;
+    }
+
+    function kisiAdi(p) {
+        if (!p || typeof p !== 'object') return '';
+        return String(p.name || p.fullName || p.username || '').slice(0, 80);
+    }
+
+    function firinCikisiMi(k) {
+        var r = k && k.reason;
+        if (!r) return false;
+        if (r.type === 199 || r.type === 403) return true;
+        return /f[ıi]r[ıi]n/i.test(String(r.values || ''));
+    }
+
+    function kaldirmaSade(k) {
+        var p = k.product || {};
+        var pic = p.picURL && typeof p.picURL === 'object' ? (p.picURL.tr || p.picURL.en || '') : (p.picURL || '');
+        var gecmis = Array.isArray(k.statusChangeLog) ? k.statusChangeLog : [];
+        return {
+            id: String(k.id || ''),
+            olusturma: k.createdAt || null,
+            guncelleme: k.updatedAt || null,
+            durum: typeof k.status === 'number' ? k.status : null,
+            sonucTipi: typeof k.conclusionType === 'number' ? k.conclusionType : null,
+            sebep: String((k.reason && k.reason.values) || '').slice(0, 200),
+            adet: Number(k.count) || 0,
+            birim: typeof p.stockUnitOfMeasurement === 'number' ? p.stockUnitOfMeasurement : null,
+            urun: {
+                id: String(p.id || ''),
+                ad: String(p.fullName || p.name || '').slice(0, 200),
+                gorsel: String(pic || ''),
+                barkod: Array.isArray(p.barcodes) && p.barcodes.length ? String(p.barcodes[0]) : ''
+            },
+            skt: k.expiryDate || null,
+            olusturan: gecmis.length ? kisiAdi(gecmis[0].picker) : '',
+            gecmis: gecmis.slice(0, 20).map(function (g) {
+                return { durum: g.status, zaman: g.occurredAt, kisi: kisiAdi(g.picker), sonucTipi: typeof g.conclusionType === 'number' ? g.conclusionType : null };
+            })
+        };
+    }
+
+    function kaldirmaListesi(gun) {
+        if (kaldirmaSuruyor) return kaldirmaSuruyor;
+        if (kaldirmaSon && Date.now() - kaldirmaZaman < KALDIRMA_ARA_MS) return Promise.resolve(kaldirmaSon);
+        var depo = depoKimligi();
+        if (!depo) return Promise.resolve({ ok: false, sebep: 'depo' });
+        if (!jetonVarMi() || !asilFetch) return Promise.resolve({ ok: false, sebep: 'oturum' });
+        var n = Math.max(1, Math.min(31, Number(gun) || 14));
+        var simdi = new Date();
+        var bas = new Date(simdi.getFullYear(), simdi.getMonth(), simdi.getDate() - (n - 1), 0, 0, 0, 0);
+        var son = new Date(simdi.getFullYear(), simdi.getMonth(), simdi.getDate(), 23, 59, 59, 999);
+        var govde = JSON.stringify({ createdAt: { startDate: bas.toISOString(), endDate: son.toISOString() }, warehouses: [depo] });
+        var basliklar = {};
+        Object.keys(panelBasliklari).forEach(function (k) { basliklar[k] = panelBasliklari[k]; });
+        basliklar['content-type'] = 'application/json';
+        var LIMIT = 100;
+        var gorulen = {};
+        var kayitlar = [];
+        var atlanan = 0;
+
+        function sayfa(offset, deneme) {
+            return asilFetch(TEMEL + '/blocked-stocks/filter?offset=' + offset + '&limit=' + LIMIT, {
+                method: 'POST', headers: basliklar, body: govde, credentials: 'include'
+            }).then(function (r) {
+                if (r.status === 401 || r.status === 403) throw new Error('oturum');
+                if (!r.ok) throw new Error('http ' + r.status);
+                return r.json();
+            }).catch(function (e) {
+                if (String(e && e.message) === 'oturum' || deneme >= 2) throw e;
+                return new Promise(function (coz) { setTimeout(coz, 800 * (deneme + 1)); })
+                    .then(function () { return sayfa(offset, deneme + 1); });
+            });
+        }
+
+        function devam(offset) {
+            return sayfa(offset, 0).then(function (j) {
+                var d = j && j.data;
+                var liste = d && Array.isArray(d.blockedStocks) ? d.blockedStocks : [];
+                var toplam = d && typeof d.total === 'number' ? d.total : liste.length;
+                liste.forEach(function (k) {
+                    if (!k || !k.id || gorulen[k.id]) return;
+                    gorulen[k.id] = true;
+                    if (firinCikisiMi(k)) { atlanan++; return; }
+                    kayitlar.push(kaldirmaSade(k));
+                });
+                var sonraki = offset + LIMIT;
+                // Sayfa dolu geldiyse ve toplam bitmediyse devam (azami 30 sayfa)
+                if (liste.length === LIMIT && sonraki < toplam && sonraki < 3000) {
+                    return new Promise(function (coz) { setTimeout(coz, ARA_MS); }).then(function () { return devam(sonraki); });
+                }
+                return { ok: true, kayitlar: kayitlar, toplam: toplam, firin: atlanan, gun: n };
+            });
+        }
+
+        kaldirmaSuruyor = devam(0)
+            .catch(function (e) {
+                var m = String(e && e.message || e);
+                return { ok: false, sebep: m === 'oturum' ? 'oturum' : (/^http/.test(m) ? m : 'ağ') };
+            })
+            .then(function (sonuc) {
+                kaldirmaSuruyor = null;
+                kaldirmaZaman = Date.now();
+                kaldirmaSon = sonuc;
+                return sonuc;
+            });
+        return kaldirmaSuruyor;
+    }
+
     setInterval(siparisleriDuyur, 2000);
     setTimeout(siparisleriDuyur, 3000);
 
@@ -794,6 +922,13 @@
            olduğu için kısılmıyor; duyuru her nabızda imzayla denetleniyor,
            değişiklik yoksa hiçbir şey gönderilmiyor. */
         if (d && d.type === 'JB_SIPARIS_TIK') { siparisleriDuyur(); return; }
+        if (d && d.type === 'JB_KALDIRMA_SOR') {
+            var kno = d.no;
+            kaldirmaListesi(d.gun).then(function (sonuc) {
+                gonder({ type: 'JB_KALDIRMA_LISTE', no: kno, sonuc: sonuc });
+            });
+            return;
+        }
         if (d && d.type === 'JB_FIRIN_TAHMIN_SOR') {
             var no = d.no;
             firinTahmini().then(function (sonuc) {

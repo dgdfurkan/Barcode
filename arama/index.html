@@ -37,7 +37,7 @@
     <script src="../veri/temp_products.js?v=20261015a"></script>
     <script src="../js/getir-cdn-paste.js?v=20261012c"></script>
     <script src="../js/barcode-inspector.js?v=20260828i"></script>
-    <script src="../js/asistan-koprusu.js?v=20261014a"></script>
+    <script src="../js/asistan-koprusu.js?v=20261017a"></script>
     <script src="../js/eklenti-rehberi.js?v=20261014a"></script>
     <script src="../js/guest-access-config.js?v=20260828i"></script>
     <script src="../js/auth.js?v=20260919a"></script>
@@ -52,7 +52,7 @@
     <script src="../js/premium-features.js?v=20260828i"></script>
     <script src="../js/ajanda-hatirlatici.js?v=20261002a"></script>
     <script src="../js/ajanda-zil.js?v=20261002a"></script>
-    <script src="../js/notifications.js?v=20260828i"></script>
+    <script src="../js/notifications.js?v=20261017a"></script>
     <script src="../js/feature-definitions.js?v=20260828i"></script>
     <script src="../js/feature-manager.js?v=20260828i"></script>
     <script src="../js/feature-checker.js?v=20260828i"></script>
@@ -2142,6 +2142,12 @@
                             </svg>
                             <span>Siparişler</span>
                         </button>
+                        <button id="headerRemovalPageBtn" class="premium-nav-chip hidden" type="button" aria-label="Satıştan Kaldırma">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4h6v3"/>
+                            </svg>
+                            <span>Satıştan Kaldırma</span>
+                        </button>
                         </nav>
                     </div>
 
@@ -2285,6 +2291,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9h6m-6 4h4"/>
                 </svg>
                 <span>Siparişler</span>
+            </button>
+            <button id="mobileRemovalPageBtn" class="mobile-menu-item hidden" type="button" aria-label="Satıştan Kaldırma">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4h6v3"/>
+                </svg>
+                <span>Satıştan Kaldırma</span>
             </button>
 
             <button id="mobileSettingsBtn" class="mobile-menu-item">
@@ -3360,6 +3372,19 @@
                 window.location.replace('../siparisler/');
             });
         }
+        const headerRemovalPageBtn = document.getElementById('headerRemovalPageBtn');
+        if (headerRemovalPageBtn) {
+            headerRemovalPageBtn.addEventListener('click', () => {
+                window.location.replace('../kaldirma/');
+            });
+        }
+        const mobileRemovalPageBtn = document.getElementById('mobileRemovalPageBtn');
+        if (mobileRemovalPageBtn) {
+            mobileRemovalPageBtn.addEventListener('click', () => {
+                closeMobileMenu();
+                window.location.replace('../kaldirma/');
+            });
+        }
         const mobileOrdersPageBtn = document.getElementById('mobileOrdersPageBtn');
         if (mobileOrdersPageBtn) {
             mobileOrdersPageBtn.addEventListener('click', () => {
@@ -3897,6 +3922,18 @@
                 } else {
                     if (headerOrdersBtn) headerOrdersBtn.classList.add('hidden');
                     if (mobileOrdersBtn) mobileOrdersBtn.classList.add('hidden');
+                }
+
+                /* Satıştan Kaldırma: admin hakkı verdiyse görünür */
+                {
+                    const headerRemovalBtn = document.getElementById('headerRemovalPageBtn');
+                    const mobileRemovalBtn = document.getElementById('mobileRemovalPageBtn');
+                    if (window.premiumFeatures?.checkPremiumFeature('satistanKaldirma')) {
+                        show(headerRemovalBtn, mobileRemovalBtn);
+                    } else {
+                        if (headerRemovalBtn) headerRemovalBtn.classList.add('hidden');
+                        if (mobileRemovalBtn) mobileRemovalBtn.classList.add('hidden');
+                    }
                 }
 
                 /* Ajanda hatırlatıcı zili (js/ajanda-zil.js): perde kalkmadan
@@ -9094,6 +9131,13 @@
                 ikon: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d="M6 4h9l4 4v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M14 4v5h5"/><path d="M8 13h8M8 16h5"/></svg>',
                 storageKey: null
             },
+            'satistanKaldirma': {
+                renk: ['#b42318', '#fda29b'],
+                name: 'Satıştan Kaldırma',
+                description: 'Depo panelindeki satıştan kaldırma listesi (fırın hariç); görsel rapor, iptal edilen kayıt Telegram\'a anında',
+                ikon: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>',
+                storageKey: null
+            },
 
             /*
              * ---- Chrome eklentileri ----
@@ -9137,6 +9181,7 @@
             stokSayimi: { label: 'Sayım sayfası', run: () => window.location.replace('../sayim/') },
             lowStockAlert: { label: 'Düşük stok', run: () => window.location.replace('../dusuk-stok/') },
             siparisTakibi: { label: 'Siparişler', run: () => window.location.replace('../siparisler/') },
+            satistanKaldirma: { label: 'Aç', run: () => window.location.replace('../kaldirma/') },
             keyboardShortcuts: { label: 'Kısayolları yönet', run: () => showKeyboardShortcutsModal() }
         };
 

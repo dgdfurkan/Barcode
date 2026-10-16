@@ -140,7 +140,8 @@
 
     var ETIKET = {
         'urgent-prep': 'ACİL PİŞİR', danger: 'ACİL PİŞİR', warning: 'PİŞİRME GEREKLİ', info: 'HAZIRLIK YAP',
-        'ekmek-az': 'STOK AZ'
+        'ekmek-az': 'STOK AZ',
+        cikar: 'RAFTAN ÇIKAR'
     };
 
     function kacir(t) {
@@ -268,10 +269,29 @@
         return (ertele[ad] || 0) > (simdi || Date.now());
     }
 
-    function hesapla(sonuc, sim) {
+    /* Gün sonu (23:30-23:59): rafta stoğu olan fırın ürünleri, ekmek hariç.
+       Satılmayacakları için raftan çıkarılmaları gerekiyor. */
+    function cikarilacaklar(urunler, simdi) {
+        var suan = JBA.firinHesap.dilim(new Date(simdi).getHours()).index;
+        return urunler
+            .filter(function (p) { return p.stokOkundu && !JBA.firinHesap.ekmekMi(p.name) && (Number(p.currentStock) || 0) > 0; })
+            .map(function (p) {
+                var raf = Math.round(Number(p.currentStock) || 0);
+                return {
+                    ad: p.name, gorsel: p.imgSrc, raf: raf, donuk: p.frozenStock, oneri: Number(p.recommendations[suan]) || 0,
+                    pisir: raf, seviye: 'cikar', cikar: true,
+                    sebep: 'Gün sonu: rafta ' + raf + ' adet var.', oneriler: p.recommendations.slice(0, 4)
+                };
+            })
+            .sort(function (a, b) { return b.raf - a.raf; });
+    }
+
+    function hesapla(sonuc, sim, mod) {
         var simdi = Date.now();
         var urunler = urunlereCevir(sonuc.dilimler, simdi);
-        var liste = bildirimListesi(sim ? simUrunleri(urunler, simdi) : urunler, simdi);
+        var cikar = mod === 'cikar' && !sim;
+        var liste = cikar ? cikarilacaklar(urunler, simdi)
+            : bildirimListesi(sim ? simUrunleri(urunler, simdi) : urunler, simdi);
         var ertelenen = sim ? 0 : liste.filter(function (u) { return ertelenmisMi(u.ad, simdi); }).length;
         return {
             ok: true,
@@ -281,7 +301,8 @@
             urunSayisi: urunler.length,
             stokluSayisi: urunler.filter(function (p) { return p.stokOkundu; }).length,
             dilimler: DILIM_AD,
-            simdiki: JBA.firinHesap.dilim(new Date(simdi).getHours()).index
+            simdiki: JBA.firinHesap.dilim(new Date(simdi).getHours()).index,
+            mod: cikar ? 'cikar' : 'pisir'
         };
     }
 
@@ -323,7 +344,7 @@
 
     /** Pişirme panelindeki kartın küçüğü, altında erteleme satırı */
     function kartHtml(u, dilimler, simdiki) {
-        var seviye = u.seviye === 'urgent-prep' ? 'danger'
+        var seviye = u.seviye === 'urgent-prep' || u.seviye === 'cikar' ? 'danger'
             : u.seviye === 'ekmek-az' ? 'warning'
             : (ETIKET[u.seviye] ? u.seviye : 'warning');
         var gorsel = /^https:\/\//.test(u.gorsel || '')
@@ -335,8 +356,8 @@
                 '<span>' + kacir(String(et).replace(/:00/g, '')) + '</span></div>';
         }).join('');
         // Panelde ekmek de "N Adet Pişirilecek"; eksik yoksa (hedef karşılanmış) kalan adet
-        var miktar = u.ekmek && !(u.pisir > 0)
-            ? sayi(u.raf) + ' Adet Kaldı'
+        var miktar = u.cikar ? sayi(u.raf) + ' Adet Çıkarılacak'
+            : u.ekmek && !(u.pisir > 0) ? sayi(u.raf) + ' Adet Kaldı'
             : sayi(u.pisir) + ' Adet Pişirilecek';
         var sag = '<div><span>MEVCUT</span><b>' + sayi(u.raf) + '</b></div>' +
             (u.ekmek ? '<div><span>HEDEF</span><b>' + sayi(u.oneri) + '</b></div>'
@@ -447,8 +468,9 @@
         var dilimler = Array.isArray(son.dilimler) ? son.dilimler : DILIM_AD;
         var simdiki = typeof son.simdiki === 'number' ? son.simdiki : -1;
         var goster = liste.slice(0, EN_COK_KART);
-        var alt = (simdiki > -1 && dilimler[simdiki] ? dilimler[simdiki] + ' dilimi · ' : '') +
-            liste.length + ' ürün bekliyor';
+        var cikarKipi = son.mod === 'cikar';
+        var alt = cikarKipi ? 'Gün sonu · ' + liste.length + ' fırın ürünü rafta'
+            : (simdiki > -1 && dilimler[simdiki] ? dilimler[simdiki] + ' dilimi · ' : '') + liste.length + ' ürün bekliyor';
         var sure = son.sim ? Math.max(1000, Math.min(60000, sayi(son.sure) || 20000)) : 0;
         // Yeniden çizimde (erteleme) süre baştan başlamasın, kaldığı yerden aksın
         if (sure && !son.simBitis) son.simBitis = simdi + sure;
@@ -458,7 +480,7 @@
             '<div class="pano" role="alert" aria-live="polite">' +
                 '<div class="ust">' +
                     '<span class="ikon"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 16 0v6H4z"/><path d="M8 18v-3M12 18v-4M16 18v-3"/></svg><i></i></span>' +
-                    '<div class="metin"><p class="baslik">Pişirme Zamanı' + (son.sim ? '<span class="sim">Simülasyon</span>' : '') + '</p>' +
+                    '<div class="metin"><p class="baslik">' + (cikarKipi ? 'Fırın Ürünlerini Çıkar' : 'Pişirme Zamanı') + (son.sim ? '<span class="sim">Simülasyon</span>' : '') + '</p>' +
                     '<p class="alt">' + kacir(alt) + '</p></div>' +
                     '<button type="button" class="kapat" aria-label="' + (son.sim ? 'Simülasyonu kapat' : 'Bildirimi şimdilik kapat') + '">' + IKON_X + '</button>' +
                 '</div>' +
@@ -531,14 +553,14 @@
                 if (!etkin || !JBA.firinHesap) { cevapla({ ok: false, sebep: 'kapalı' }); return false; }
                 tahminSor().then(function (sonuc) {
                     if (!sonuc || !sonuc.ok) { cevapla(sonuc || { ok: false }); return; }
-                    try { cevapla(hesapla(sonuc, !!m.sim)); }
+                    try { cevapla(hesapla(sonuc, !!m.sim, m.mod)); }
                     catch (e) { cevapla({ ok: false, sebep: 'hesap: ' + String(e && e.message || e).slice(0, 80) }); }
                 });
                 return true;
             }
             if (!m || m.type !== 'JBA_FIRIN_UYARI') return false;
             var liste = Array.isArray(m.liste) ? m.liste.filter(function (u) { return u && typeof u.ad === 'string'; }) : [];
-            var yeni = { liste: liste, dilimler: m.dilimler, simdiki: m.simdiki, sim: !!m.sim, sure: m.sure };
+            var yeni = { liste: liste, dilimler: m.dilimler, simdiki: m.simdiki, sim: !!m.sim, sure: m.sure, mod: m.mod };
             if (Number(m.aralikMs) >= 5000) aralikMs = Math.min(10 * 60 * 1000, Number(m.aralikMs));
             if (m.sim) {
                 // Gerçek uyarı varken simülasyon gösterilirse süre bitince gerçek geri gelir
