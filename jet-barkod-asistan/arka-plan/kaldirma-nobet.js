@@ -165,6 +165,18 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
         setTimeout(() => kaldirmaCalistir('pano'), 8000);
         return false;
     }
+    if (istek.type === 'JBA_KALDIRMA_FOTO') {
+        const id = String(istek.id || '');
+        if (!/^[a-f0-9]{24}$/.test(id)) { cevapla({ adresler: null }); return false; }
+        (async () => {
+            if (!(await kaldirmaHakVar())) return { adresler: null };
+            const sekme = await kaldirmaSekmesi();
+            if (!sekme) return { adresler: null, sebep: 'panel' };
+            try { return await chrome.tabs.sendMessage(sekme.id, { type: 'JBA_KALDIRMA_FOTO_SOR', id }); }
+            catch (e) { return { adresler: null }; }
+        })().then(cevapla, () => cevapla({ adresler: null }));
+        return true;
+    }
     if (istek.type === 'JBA_KALDIRMA_TAZELE') {
         kaldirmaCalistir('elle').then(cevapla, () => cevapla({ ok: false, metin: 'Aktarım çalışmadı.' }));
         return true;

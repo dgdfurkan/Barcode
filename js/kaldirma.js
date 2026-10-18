@@ -488,14 +488,51 @@
     /* Hasar fotoğrafları: panelin linkleri, doğrudan gösterilir. Linkler
        süreli; Asistan her saatlik aktarımda tazeler. Süresi dolmuşsa not düşülür. */
     var fotoAdresleri = {};
+    var tazeFoto = {};
+    var fotoSoruNo = 0;
+
+    function linkBitis(u) {
+        try { return Number(new URL(u).searchParams.get('Expires')) * 1000 || 0; } catch (e) { return 0; }
+    }
+
+    function asistanFoto(id) {
+        if (!(global.JetBarkodAsistan && global.JetBarkodAsistan.durum && global.JetBarkodAsistan.durum.kurulu)) return Promise.resolve(null);
+        return new Promise(function (coz) {
+            var no = 'kf' + (++fotoSoruNo);
+            var bitti = false;
+            function dinle(e) {
+                if (e.source !== global || e.origin !== location.origin) return;
+                var m = e.data;
+                if (!m || m.type !== 'JB_KALDIRMA_FOTO_SONUC' || m.no !== no) return;
+                bitir(Array.isArray(m.adresler) ? m.adresler : null);
+            }
+            function bitir(v) {
+                if (bitti) return;
+                bitti = true;
+                global.removeEventListener('message', dinle);
+                coz(v);
+            }
+            global.addEventListener('message', dinle);
+            setTimeout(function () { bitir(null); }, 12000);
+            global.postMessage({ type: 'JB_KALDIRMA_FOTO_ISTE', no: no, id: id }, location.origin);
+        });
+    }
     async function fotolariYukle() {
         var govde = el('kldDetayGovde');
         var dugmeler = govde.querySelectorAll('[data-foto]');
         var kayitlar = {};
         dugmeler.forEach(function (b) { kayitlar[b.getAttribute('data-foto').split('/')[0]] = true; });
         await Promise.all(Object.keys(kayitlar).map(async function (id) {
-            var c = await istek('/api/kaldirma/fotolar/' + id);
-            var liste = c.kod === 200 && c.j.ok && Array.isArray(c.j.adresler) ? c.j.adresler : [];
+            var liste = tazeFoto[id] && tazeFoto[id].bitis > Date.now() + 30000 ? tazeFoto[id].adresler : null;
+            if (!liste) {
+                var c = await istek('/api/kaldirma/fotolar/' + id);
+                liste = c.kod === 200 && c.j.ok && Array.isArray(c.j.adresler) ? c.j.adresler : [];
+                // Panel linkleri ~15 dk geçerli; süresi geçtiyse açık depo panelinden tazesini iste
+                if (!liste.length || linkBitis(liste[0]) < Date.now() + 30000) {
+                    var taze = await asistanFoto(id);
+                    if (taze && taze.length) { liste = taze; tazeFoto[id] = { adresler: taze, bitis: linkBitis(taze[0]) }; }
+                }
+            }
             liste.forEach(function (u, i) { if (/^https:\/\//.test(u)) fotoAdresleri[id + '/' + (i + 1)] = u; });
         }));
         dugmeler.forEach(function (b) {
@@ -506,7 +543,7 @@
             img.alt = '';
             img.decoding = 'async';
             img.referrerPolicy = 'no-referrer';
-            img.onerror = function () { b.classList.add('is-suresi'); b.innerHTML = '<span>Link süresi doldu</span>'; };
+            img.onerror = function () { b.classList.add('is-suresi'); b.innerHTML = '<span>Fotoğraf depo paneli açıkken görünür</span>'; };
             img.src = adres;
             b.innerHTML = '';
             b.appendChild(img);

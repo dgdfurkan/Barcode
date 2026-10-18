@@ -1013,6 +1013,19 @@
            olduğu için kısılmıyor; duyuru her nabızda imzayla denetleniyor,
            değişiklik yoksa hiçbir şey gönderilmiyor. */
         if (d && d.type === 'JB_SIPARIS_TIK') { siparisleriDuyur(); return; }
+        /* Jet Barkod'da detay açıldı, fotoğraf linkinin süresi geçmiş (panel
+           linkleri ~15 dk): tek kaydın detayı panelin kendi isteğiyle okunur. */
+        if (d && d.type === 'JB_KALDIRMA_FOTO_SOR' && /^[a-f0-9]{24}$/.test(String(d.id || ''))) {
+            var fno = d.no;
+            var fb = {};
+            Object.keys(panelBasliklari).forEach(function (h) { if (h.toLowerCase() !== 'content-type') fb[h] = panelBasliklari[h]; });
+            (jetonVarMi() && asilFetch ? detayIste(String(d.id), fb) : Promise.resolve(null))
+                .then(function (v) {
+                    var l = v && Array.isArray(v.damagedPicUrls) ? v.damagedPicUrls.filter(function (u) { return typeof u === 'string' && /^https:\/\//.test(u); }).slice(0, 4) : null;
+                    gonder({ type: 'JB_KALDIRMA_FOTO', no: fno, adresler: l });
+                }, function () { gonder({ type: 'JB_KALDIRMA_FOTO', no: fno, adresler: null }); });
+            return;
+        }
         if (d && d.type === 'JB_KALDIRMA_SOR') {
             var kno = d.no;
             kaldirmaListesi(d.gun).then(function (sonuc) {

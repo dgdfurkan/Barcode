@@ -41,6 +41,37 @@
         });
     }
 
+    function fotoSor(id) {
+        return new Promise(function (coz) {
+            var no = 'f' + Date.now() + '-' + (++soruNo);
+            var bitti = false;
+            function dinle(e) {
+                if (e.source !== window || e.origin !== location.origin) return;
+                var d = e.data;
+                if (!d || d.type !== 'JB_KALDIRMA_FOTO' || d.no !== no) return;
+                bitir(d.adresler || null);
+            }
+            function bitir(v) {
+                if (bitti) return;
+                bitti = true;
+                window.removeEventListener('message', dinle);
+                coz(v);
+            }
+            window.addEventListener('message', dinle);
+            setTimeout(function () { bitir(null); }, 10000);
+            window.postMessage({ type: 'JB_KALDIRMA_FOTO_SOR', no: no, id: id }, location.origin);
+        });
+    }
+
+    try {
+        chrome.runtime.onMessage.addListener(function (m, gonderen, cevapla) {
+            if (!m || m.type !== 'JBA_KALDIRMA_FOTO_SOR') return false;
+            if (!etkin) { cevapla({ adresler: null }); return false; }
+            fotoSor(String(m.id || '')).then(function (a) { cevapla({ adresler: a }); });
+            return true;
+        });
+    } catch (e) { /* yetim bağlam */ }
+
     try {
         chrome.runtime.onMessage.addListener(function (m, gonderen, cevapla) {
             if (!m || m.type !== 'JBA_KALDIRMA_SOR') return false;

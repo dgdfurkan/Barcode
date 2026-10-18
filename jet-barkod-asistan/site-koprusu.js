@@ -130,6 +130,17 @@
            bilgisayarda açıksa liste hemen aktarılır (arka-plan/kaldirma-nobet.js) */
         /* İtiraz Yazıcı "Panelde Doldur": taslak franchise-v2 kaydına taşınır,
            formu kullanıcı yerleştirir ve Kaydet'e kendisi basar (arka-plan/itiraz.js) */
+        /* Satıştan Kaldırma detayı: süresi geçmiş fotoğraf linkinin tazesi */
+        if (d.type === 'JB_KALDIRMA_FOTO_ISTE') {
+            var fno = String(d.no || '').slice(0, 40);
+            arkaPlana({ type: 'JBA_KALDIRMA_FOTO', id: String(d.id || '').slice(0, 40) }, function (y) {
+                var l = y && Array.isArray(y.adresler) ? y.adresler.filter(function (u) {
+                    return typeof u === 'string' && /^https:\/\/getir-stock\.s3\.[a-z0-9-]+\.amazonaws\.com\//.test(u);
+                }).slice(0, 4) : null;
+                gonder({ type: 'JB_KALDIRMA_FOTO_SONUC', no: fno, adresler: l, sebep: (y && y.sebep) || null });
+            });
+            return;
+        }
         if (d.type === 'JB_ITIRAZ_DOLDUR') {
             arkaPlana({
                 type: 'JBA_ITIRAZ_DOLDUR',
