@@ -485,23 +485,32 @@
         return Number.isFinite(t) ? new Date(t).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
     }
 
-    /* Hasar fotoğrafları oturumlu uçtan; adresler sayfa kapanınca bırakılır */
+    /* Hasar fotoğrafları: panelin linkleri, doğrudan gösterilir. Linkler
+       süreli; Asistan her saatlik aktarımda tazeler. Süresi dolmuşsa not düşülür. */
     var fotoAdresleri = {};
     async function fotolariYukle() {
-        var dugmeler = el('kldDetayGovde').querySelectorAll('[data-foto]');
-        for (var i = 0; i < dugmeler.length; i++) {
-            var b = dugmeler[i];
-            var anahtar = b.getAttribute('data-foto');
-            var adres = fotoAdresleri[anahtar];
-            if (!adres) {
-                try {
-                    var r = await global.jetbarkodAuth.apiFetch('/api/kaldirma/foto/' + anahtar);
-                    if (!r.ok) { b.classList.add('is-yok'); continue; }
-                    adres = fotoAdresleri[anahtar] = URL.createObjectURL(await r.blob());
-                } catch (e) { b.classList.add('is-yok'); continue; }
-            }
-            if (b.isConnected) b.innerHTML = '<img src="' + adres + '" alt="">';
-        }
+        var govde = el('kldDetayGovde');
+        var dugmeler = govde.querySelectorAll('[data-foto]');
+        var kayitlar = {};
+        dugmeler.forEach(function (b) { kayitlar[b.getAttribute('data-foto').split('/')[0]] = true; });
+        await Promise.all(Object.keys(kayitlar).map(async function (id) {
+            var c = await istek('/api/kaldirma/fotolar/' + id);
+            var liste = c.kod === 200 && c.j.ok && Array.isArray(c.j.adresler) ? c.j.adresler : [];
+            liste.forEach(function (u, i) { if (/^https:\/\//.test(u)) fotoAdresleri[id + '/' + (i + 1)] = u; });
+        }));
+        dugmeler.forEach(function (b) {
+            var adres = fotoAdresleri[b.getAttribute('data-foto')];
+            if (!b.isConnected) return;
+            if (!adres) { b.classList.add('is-yok'); return; }
+            var img = new Image();
+            img.alt = '';
+            img.decoding = 'async';
+            img.referrerPolicy = 'no-referrer';
+            img.onerror = function () { b.classList.add('is-suresi'); b.innerHTML = '<span>Link süresi doldu</span>'; };
+            img.src = adres;
+            b.innerHTML = '';
+            b.appendChild(img);
+        });
     }
 
     function fotoBuyut(anahtar) {
@@ -511,7 +520,8 @@
         k.className = 'kld-buyuk';
         k.setAttribute('role', 'dialog');
         k.setAttribute('aria-label', 'Hasar fotoğrafı');
-        k.innerHTML = '<img src="' + adres + '" alt=""><button type="button" class="kld-kapat" aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>';
+        k.innerHTML = '<img alt="" referrerpolicy="no-referrer"><button type="button" class="kld-kapat" aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>';
+        k.querySelector('img').src = adres;
         k.addEventListener('click', function () { k.remove(); });
         document.body.appendChild(k);
         k.querySelector('button').focus({ preventScroll: true });
@@ -689,7 +699,7 @@
         });
         el('kldDetayGovde').addEventListener('click', function (e) {
             var f = e.target.closest('[data-foto]');
-            if (f) { e.stopPropagation(); fotoBuyut(f.getAttribute('data-foto')); }
+            if (f && !f.classList.contains('is-suresi')) { e.stopPropagation(); fotoBuyut(f.getAttribute('data-foto')); }
         });
         el('kldDetay').addEventListener('click', function (e) {
             if (e.target.closest('[data-kapat]')) detayKapat();
