@@ -3,7 +3,7 @@
  * ============================================================================
  *
  * Depo panelinin "Satıştan Kaldırma Listesi" (fırın çıkışları hariç). Veriyi
- * Jet Barkod Asistan saatte bir aktarıyor; sayfa Jet Barkod API'sinden okuyor
+ * Jet Barkod Asistan 10 dakikada bir aktarıyor; sayfa Jet Barkod API'sinden okuyor
  * (GET /api/kaldirma/liste). Telefonda da aynı liste görünür.
  *
  * Görünümler
@@ -235,6 +235,7 @@
         }
         d.ilk = false;
         ciz();
+        otomatikTazele();
     }
 
     // ------------------------------------------------------------------
@@ -244,7 +245,7 @@
     function durumCiz() {
         var p = el('kldDurum');
         if (!p) return;
-        var taze = d.sonEsitleme && Date.now() - new Date(d.sonEsitleme).getTime() < 75 * 60 * 1000;
+        var taze = d.sonEsitleme && Date.now() - new Date(d.sonEsitleme).getTime() < 25 * 60 * 1000;
         p.className = 'kld-durum' + (d.sonEsitleme ? (taze ? ' kld-durum--taze' : ' kld-durum--bayat') : '');
         p.querySelector('span').textContent = d.sonEsitleme
             ? 'Son aktarım ' + saatYaz(d.sonEsitleme) + ' · ' + onceYaz(d.sonEsitleme)
@@ -409,7 +410,7 @@
         if (!d.kayitlar.length) {
             kap.innerHTML = bosDurum('Bu aralıkta kayıt yok',
                 d.sonEsitleme ? 'Depo panelinde bu tarihlerde satıştan kaldırılan ürün görünmüyor.'
-                    : 'Depo panelinin açık olduğu bilgisayarda Jet Barkod Asistan listeyi saatte bir aktarır.', IKON_BOS);
+                    : 'Depo panelinin açık olduğu bilgisayarda Jet Barkod Asistan listeyi 10 dakikada bir aktarır.', IKON_BOS);
             return;
         }
         if (!liste.length) { kap.innerHTML = bosDurum('Bu filtrede kayıt yok', 'Durum ya da sebep filtresini değiştir.', IKON_BOS); return; }
@@ -642,19 +643,82 @@
 
     var tazeleBekleyen = null;
 
-    function tazele() {
+    /* Güncelleme: Asistan depo panelinden okuyup yazar. Süre ölçülemediği
+       için önceki turların süresinden tahmin edilir; çubuk o sürede %92'ye
+       dolar, cevap gelince tamamlanır. */
+    var SURE_ANAHTAR = 'jb_kaldirma_sure';
+    var ilerleme = { bas: 0, tahmin: 0, saat: null, sessiz: false };
+
+    function tahminiSure() {
+        var v = 0;
+        try { v = Number(localStorage.getItem(SURE_ANAHTAR)) || 0; } catch (e) { v = 0; }
+        return Math.max(8000, Math.min(90000, v || 25000));
+    }
+
+    function ilerlemeAsamasi(oran) {
+        if (oran < 0.3) return 'Depo panelinden liste okunuyor';
+        if (oran < 0.75) return 'Red sebepleri ve fotoğraflar alınıyor';
+        return 'Jet Barkod\'a yazılıyor';
+    }
+
+    function ilerlemeBaslat(sessiz) {
+        var k = el('kldIlerleme');
+        ilerleme = { bas: Date.now(), tahmin: tahminiSure(), saat: null, sessiz: !!sessiz };
+        k.className = 'kld-ilerleme';
+        k.hidden = false;
+        var dolu = el('kldIlerlemeDolu');
+        dolu.style.transition = 'none';
+        dolu.style.transform = 'scaleX(0.03)';
+        void dolu.offsetWidth;
+        // Doğrusal: çubuk geçen süreyi dürüstçe göstersin, başta koşup sonda takılmasın
+        dolu.style.transition = 'transform ' + ilerleme.tahmin + 'ms linear';
+        dolu.style.transform = 'scaleX(0.92)';
+        var guncelle = function () {
+            var gecen = Date.now() - ilerleme.bas;
+            var kalan = Math.ceil((ilerleme.tahmin - gecen) / 1000);
+            el('kldIlerlemeMetin').textContent = ilerlemeAsamasi(gecen / ilerleme.tahmin);
+            el('kldIlerlemeSure').textContent = kalan > 0 ? 'yaklaşık ' + kalan + ' sn' : 'birazdan';
+        };
+        guncelle();
+        clearInterval(ilerleme.saat);
+        ilerleme.saat = setInterval(guncelle, 1000);
+    }
+
+    function ilerlemeBitir(ok, metin) {
+        var k = el('kldIlerleme');
+        clearInterval(ilerleme.saat);
+        if (k.hidden) return;
+        if (ok && ilerleme.bas) {
+            try { localStorage.setItem(SURE_ANAHTAR, String(Date.now() - ilerleme.bas)); } catch (e) { /* sessiz */ }
+        }
+        var dolu = el('kldIlerlemeDolu');
+        dolu.style.transition = 'transform 240ms cubic-bezier(0.22, 1, 0.36, 1)';
+        dolu.style.transform = 'scaleX(1)';
+        k.classList.add(ok ? 'is-bitti' : 'is-hata');
+        el('kldIlerlemeMetin').textContent = metin || (ok ? 'Güncellendi' : 'Güncellenemedi');
+        el('kldIlerlemeSure').textContent = '';
+        setTimeout(function () { k.hidden = true; }, ok ? 1400 : 4000);
+    }
+
+    function asistanVarMi() {
+        var a = global.JetBarkodAsistan && global.JetBarkodAsistan.durum;
+        return !!(a && a.kurulu);
+    }
+
+    function tazele(sessiz) {
         var dugme = el('kldTazele');
-        var asistan = global.JetBarkodAsistan && global.JetBarkodAsistan.durum;
-        if (!asistan || !asistan.kurulu) {
-            bildir('Bu cihazda Jet Barkod Asistan yok. Liste, depo panelinin açık olduğu bilgisayardan saatte bir gelir.', 'bilgi');
+        if (dugme.disabled) return;
+        if (!asistanVarMi()) {
+            if (!sessiz) bildir('Bu cihazda Jet Barkod Asistan yok. Liste, depo panelinin açık olduğu bilgisayardan 10 dakikada bir gelir.', 'bilgi');
             yukle(true);
             return;
         }
         mesgul(dugme, true, 'Güncelleniyor');
+        ilerlemeBaslat(sessiz);
         clearTimeout(tazeleBekleyen);
         tazeleBekleyen = setTimeout(function () {
             mesgul(dugme, false);
-            bildir('Jet Barkod Asistan yanıt vermedi.', 'hata');
+            ilerlemeBitir(false, 'Jet Barkod Asistan yanıt vermedi');
         }, 100000);
         global.postMessage({ type: 'JB_KALDIRMA_TAZELE' }, location.origin);
     }
@@ -665,9 +729,25 @@
         if (!m || m.type !== 'JB_KALDIRMA_SONUC') return;
         clearTimeout(tazeleBekleyen);
         mesgul(el('kldTazele'), false);
-        bildir(m.metin || (m.ok ? 'Güncellendi.' : 'Güncellenemedi.'), m.ok ? 'basari' : 'hata');
-        if (m.ok) yukle(true);
+        // "Az önce güncellendi": hata değil, liste zaten taze
+        var taze = !m.ok && /az önce/i.test(m.metin || '');
+        var ok = m.ok || taze;
+        var sessiz = ilerleme.sessiz;
+        ilerlemeBitir(ok, ok ? (taze ? 'Liste zaten güncel' : 'Güncellendi') : (m.metin || 'Güncellenemedi'));
+        if (!ok && !sessiz) bildir(m.metin || 'Güncellenemedi.', 'hata');
+        if (ok) { fotoAdresleri = {}; tazeFoto = {}; yukle(true); }
     });
+
+    /* Sayfa açılınca: bu bilgisayarda Asistan varsa ve son aktarım 10 dakikadan
+       eskiyse kendiliğinden güncellenir; düğmeye basmak gerekmez */
+    var otomatikYapildi = false;
+    function otomatikTazele() {
+        if (otomatikYapildi || !asistanVarMi() || d.ilk) return;
+        var son = d.sonEsitleme ? Date.parse(d.sonEsitleme) : 0;
+        if (son && Date.now() - son < 10 * 60 * 1000) { otomatikYapildi = true; return; }
+        otomatikYapildi = true;
+        tazele(true);
+    }
 
     // ------------------------------------------------------------------
     // Olaylar ve açılış
@@ -747,7 +827,7 @@
         });
         el('kldIndir').addEventListener('click', gorselIndir);
         el('kldTelegram').addEventListener('click', telegramaGonder);
-        el('kldTazele').addEventListener('click', tazele);
+        el('kldTazele').addEventListener('click', function () { tazele(false); });
         document.addEventListener('visibilitychange', function () { if (!document.hidden) yukle(true); });
         setInterval(function () { if (!document.hidden) yukle(true); }, YOKLAMA_MS);
         setInterval(durumCiz, 30000);
@@ -783,6 +863,7 @@
             if (ayar.gorunum === 'kayit' || ayar.gorunum === 'urun') d.gorunum = ayar.gorunum;
         } catch (e) { /* varsayılan */ }
         bolumGoster('kldIcerik');
+        if (global.JetBarkodAsistan && global.JetBarkodAsistan.dinle) global.JetBarkodAsistan.dinle(function () { otomatikTazele(); });
         segmentYaz();
         olaylariBagla();
         yukle();

@@ -118,8 +118,6 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 olusturan: metin(k.olusturan, 80),
                 gecmis,
                 ...ekAlanlar(k),
-                // Hasar fotoğrafı: panelin süreli linkleri, her aktarımda tazelenir
-                fotolar: (Array.isArray(k.fotoKaynak) ? k.fotoKaynak : []).filter(s3Mi).slice(0, 4),
             },
         };
     }
@@ -137,6 +135,10 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         if (nereye) e.nereye = nereye;
         const olu = k.oluGun == null ? null : tamsayi(k.oluGun);
         if (olu !== null && olu >= 0 && olu < 3650) e.oluGun = olu;
+        // Hasar fotoğrafı: panelin süreli linkleri, her aktarımda tazelenir. Boş gelirse
+        // yazılmaz; fotoğraf linki göndermeyen eski Asistan var olanı silmesin.
+        const fotolar = (Array.isArray(k.fotoKaynak) ? k.fotoKaynak : []).filter(s3Mi).slice(0, 4);
+        if (fotolar.length) e.fotolar = fotolar;
         if (k.red && typeof k.red === 'object') {
             const baslik = metin(k.red.baslik, 160);
             const aciklama = metin(k.red.aciklama, 400);

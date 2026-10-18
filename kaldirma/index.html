@@ -20,7 +20,7 @@
     <link rel="stylesheet" href="../css/motion.css?v=20260907a" />
     <link rel="stylesheet" href="../css/siparisler.css?v=20261014c" />
     <link rel="stylesheet" href="../css/urun-foto.css?v=20261018a" />
-    <link rel="stylesheet" href="../css/kaldirma.css?v=20261018c" />
+    <link rel="stylesheet" href="../css/kaldirma.css?v=20261018d" />
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20261014a"></script>
@@ -70,7 +70,7 @@
                 <div class="kld-baslik__metin">
                     <p class="kld-durum" id="kldDurum"><i></i><span>Yükleniyor</span></p>
                     <h1>Satıştan Kaldırma</h1>
-                    <p class="kld-baslik__not">Fırın çıkışları hariç. Depo panelinden saatte bir güncellenir.</p>
+                    <p class="kld-baslik__not">Fırın çıkışları hariç. Depo panelinden 10 dakikada bir güncellenir.</p>
                 </div>
                 <div class="kld-araclar" role="toolbar" aria-label="Rapor araçları">
                     <button type="button" class="kld-arac" id="kldTazele" title="Depo panelinden şimdi güncelle">
@@ -89,6 +89,15 @@
             </section>
 
             <div class="kld-uyari" id="kldUyari" role="status" hidden></div>
+
+            <div class="kld-ilerleme" id="kldIlerleme" role="status" aria-live="polite" hidden>
+                <div class="kld-ilerleme__ust">
+                    <span class="kld-ilerleme__cark" aria-hidden="true"></span>
+                    <b id="kldIlerlemeMetin">Depo panelinden okunuyor</b>
+                    <span class="kld-ilerleme__sure" id="kldIlerlemeSure"></span>
+                </div>
+                <div class="kld-ilerleme__cubuk"><i id="kldIlerlemeDolu"></i></div>
+            </div>
 
             <section class="kld-filtre" aria-label="Tarih aralığı">
                 <div class="kld-cipler" id="kldTarihler" role="radiogroup" aria-label="Tarih">
@@ -155,6 +164,6 @@
     </div>
 
     <script src="../js/urun-foto.js?v=20261018a"></script>
-    <script src="../js/kaldirma.js?v=20261018d"></script>
+    <script src="../js/kaldirma.js?v=20261018e"></script>
 </body>
 </html>

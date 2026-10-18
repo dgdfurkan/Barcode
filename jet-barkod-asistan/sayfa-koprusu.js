@@ -927,7 +927,7 @@
 
     function kaldirmaListesi(gun) {
         if (kaldirmaSuruyor) return kaldirmaSuruyor;
-        if (kaldirmaSon && Date.now() - kaldirmaZaman < KALDIRMA_ARA_MS) return Promise.resolve(kaldirmaSon);
+        if (kaldirmaSon && kaldirmaSon.gun === Math.max(1, Math.min(31, Number(gun) || 14)) && Date.now() - kaldirmaZaman < KALDIRMA_ARA_MS) return Promise.resolve(kaldirmaSon);
         var depo = depoKimligi();
         if (!depo) return Promise.resolve({ ok: false, sebep: 'depo' });
         if (!jetonVarMi() || !asilFetch) return Promise.resolve({ ok: false, sebep: 'oturum' });

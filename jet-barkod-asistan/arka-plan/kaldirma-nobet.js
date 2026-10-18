@@ -10,8 +10,12 @@
  * dönen kaydı sunucu Telegram'a bildirir.
  *
  * NE ZAMAN
- *   - Saatte bir (alarm). Panel açılınca, son aktarım bir saatten eskiyse
- *     birkaç saniye sonra bir kez.
+ *   - 10 dakikada bir hızlı tur: yalnız son 2 gün (tek liste isteği). Panelin
+ *     hasar fotoğrafı linkleri ~15 dk geçerli; son kayıtların fotoğrafı
+ *     sitede böylece hep açılır. Detay isteği yalnız yeni ya da durumu
+ *     değişen kayıtlar için.
+ *   - Saatte bir tam tur (son 14 gün). Panel açılınca, son aktarım bir
+ *     saatten eskiyse birkaç saniye sonra bir kez.
  *   - Jet Barkod'daki Satıştan Kaldırma sayfasında "Şimdi Güncelle"
  *     (en az 2 dk arayla).
  * Getir'e giden istek: 14 günlük liste, sayfa başına 100 kayıt, sayfalar
@@ -19,7 +23,11 @@
  * ============================================================================
  */
 
-const KALDIRMA_ALARM = 'jba-kaldirma';
+const KALDIRMA_ALARM = 'jba-kaldirma-10';
+const KALDIRMA_ESKI_ALARM = 'jba-kaldirma';
+const KALDIRMA_SON_TAM = 'jbaKaldirmaSonTam';
+const KALDIRMA_HIZLI_GUN = 2;
+const KALDIRMA_HIZLI_ARA_MS = 9 * 60 * 1000;
 const KALDIRMA_API = 'https://api.flowcobalt.com/api/kaldirma/yaz';
 const KALDIRMA_DURUM = 'jbaKaldirmaDurum';
 const KALDIRMA_SON = 'jbaKaldirmaSon';
@@ -109,12 +117,17 @@ async function kaldirmaCalistir(sebep) {
     if (sebep === 'elle' && simdi - kaldirmaSonDeneme < KALDIRMA_ELLE_ARA_MS) {
         return { ok: false, metin: 'Az önce güncellendi; biraz sonra tekrar deneyin.' };
     }
+    // Tam tur (14 gün) saatte bir ve elle; arada 10 dakikada bir hızlı tur (2 gün)
+    let gun = KALDIRMA_GUN;
+    let tam = true;
     if (sebep !== 'elle') {
         try {
-            const r = await chrome.storage.local.get(KALDIRMA_SON);
+            const r = await chrome.storage.local.get([KALDIRMA_SON, KALDIRMA_SON_TAM]);
             const son = Number(r && r[KALDIRMA_SON]) || 0;
-            if (simdi - son < KALDIRMA_ARALIK_MS - 5 * 60 * 1000) return { ok: true, metin: 'Güncel.' };
-        } catch (e) { /* okunamadı: devam */ }
+            const sonTam = Number(r && r[KALDIRMA_SON_TAM]) || 0;
+            if (simdi - son < KALDIRMA_HIZLI_ARA_MS) return { ok: true, metin: 'Güncel.' };
+            if (simdi - sonTam < KALDIRMA_ARALIK_MS - 5 * 60 * 1000) { gun = KALDIRMA_HIZLI_GUN; tam = false; }
+        } catch (e) { /* okunamadı: tam tur */ }
     }
     const sekme = await kaldirmaSekmesi();
     if (!sekme) {
@@ -127,7 +140,7 @@ async function kaldirmaCalistir(sebep) {
     kaldirmaSonDeneme = simdi;
     try {
         let cevap = null;
-        try { cevap = await chrome.tabs.sendMessage(sekme.id, { type: 'JBA_KALDIRMA_SOR', gun: KALDIRMA_GUN }); } catch (e) { cevap = null; }
+        try { cevap = await chrome.tabs.sendMessage(sekme.id, { type: 'JBA_KALDIRMA_SOR', gun }); } catch (e) { cevap = null; }
         if (!cevap || !cevap.ok) {
             const s = cevap && cevap.sebep;
             const metin = s === 'oturum' ? 'Depo paneli oturumu bekleniyor; paneli bir kez yenileyin.'
@@ -138,7 +151,7 @@ async function kaldirmaCalistir(sebep) {
         }
         const yazma = await kaldirmaYaz(cevap.kayitlar || []);
         if (!yazma.ok) { kaldirmaDurumYaz(false, yazma.metin); return yazma; }
-        await chrome.storage.local.set({ [KALDIRMA_SON]: Date.now() });
+        await chrome.storage.local.set(tam ? { [KALDIRMA_SON]: Date.now(), [KALDIRMA_SON_TAM]: Date.now() } : { [KALDIRMA_SON]: Date.now() });
         const metin = (cevap.kayitlar || []).length + ' kayıt aktarıldı' + (cevap.firin ? ' (' + cevap.firin + ' fırın çıkışı hariç)' : '') + '.';
         kaldirmaDurumYaz(true, metin);
         return { ok: true, metin, sayi: (cevap.kayitlar || []).length };
@@ -149,8 +162,9 @@ async function kaldirmaCalistir(sebep) {
 
 async function kaldirmaAlarmKur() {
     try {
+        await chrome.alarms.clear(KALDIRMA_ESKI_ALARM);
         const var_ = await chrome.alarms.get(KALDIRMA_ALARM);
-        if (!var_) chrome.alarms.create(KALDIRMA_ALARM, { periodInMinutes: 60, delayInMinutes: 1 });
+        if (!var_) chrome.alarms.create(KALDIRMA_ALARM, { periodInMinutes: 10, delayInMinutes: 1 });
     } catch (e) { /* sessiz */ }
 }
 
