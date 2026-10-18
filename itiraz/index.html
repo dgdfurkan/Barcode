@@ -19,7 +19,7 @@
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
     <link rel="stylesheet" href="../css/motion.css?v=20260907a" />
     <link rel="stylesheet" href="../css/siparisler.css?v=20261014c" />
-    <link rel="stylesheet" href="../css/itiraz.css?v=20261017a" />
+    <link rel="stylesheet" href="../css/itiraz.css?v=20261018a" />
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20261014a"></script>
@@ -90,30 +90,22 @@
                 <div class="itr-kutu"><span>Kabul Oranı</span><b id="itrOran">–</b></div>
             </section>
 
-            <div class="itr-segment" role="tablist" aria-label="Görünüm">
-                <button type="button" role="tab" data-sekme="bekleyen" aria-selected="true">İtiraz Bekleyen</button>
-                <button type="button" role="tab" data-sekme="sonuc" aria-selected="false">Sonuçlar</button>
-            </div>
+            <div class="itr-duzen">
+                <section class="itr-sol" aria-label="Kayıtlar">
+                    <div class="itr-segment" role="tablist" aria-label="Görünüm">
+                        <button type="button" role="tab" data-sekme="bekleyen" aria-selected="true">İtiraz Bekleyen</button>
+                        <button type="button" role="tab" data-sekme="sonuc" aria-selected="false">Sonuçlar</button>
+                    </div>
+                    <div id="itrListe" class="itr-liste" aria-live="polite"></div>
+                </section>
 
-            <section id="itrListe" class="itr-liste" aria-live="polite"></section>
+                <!-- Seçili kayıt: masaüstünde yanda, telefonda tam ekran -->
+                <section class="itr-sag" id="itrDetay" aria-label="Seçili kayıt">
+                    <div class="itr-sag__ic" id="itrDetayIc"></div>
+                </section>
+            </div>
         </div>
     </main>
-
-    <!-- Kayıt: bilgiler, taslaklar, düzenleme -->
-    <div class="itr-katman" id="itrDetay" hidden>
-        <div class="itr-katman__perde" data-kapat></div>
-        <div class="itr-panel" role="dialog" aria-modal="true" aria-labelledby="itrDetayAd">
-            <div class="itr-panel__ust">
-                <div class="itr-panel__metin">
-                    <span class="itr-cip" id="itrDetaySikayet"></span>
-                    <h3 id="itrDetayAd"></h3>
-                    <p id="itrDetayAlt"></p>
-                </div>
-                <button type="button" class="itr-kapat" data-kapat aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
-            </div>
-            <div class="itr-panel__govde" id="itrDetayGovde"></div>
-        </div>
-    </div>
 
     <!-- Ayarlar -->
     <div class="itr-katman" id="itrAyar" hidden>
@@ -153,6 +145,6 @@
         </div>
     </div>
 
-    <script src="../js/itiraz.js?v=20261017a"></script>
+    <script src="../js/itiraz.js?v=20261018a"></script>
 </body>
 </html>

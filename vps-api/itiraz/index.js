@@ -71,6 +71,18 @@ function hakAcik(pf) {
     return f === true || (f && typeof f === 'object' && f.enabled === true);
 }
 
+/** Model yanıtındaki JSON'u çıkarır: kod çiti, baş/son çöp metin tolere edilir. */
+function jsonCikar(yazi) {
+    const t = String(yazi || '').replace(/^\s*```(?:json)?/i, '').replace(/```\s*$/, '').trim();
+    try { return JSON.parse(t); } catch (e) { /* aşağıda */ }
+    const a = t.indexOf('{');
+    const b = t.lastIndexOf('}');
+    if (a !== -1 && b > a) {
+        try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { /* bozuk */ }
+    }
+    return null;
+}
+
 async function gemini(anahtar, govde) {
     let son = null;
     for (const model of MODELLER) {
@@ -86,19 +98,27 @@ async function gemini(anahtar, govde) {
             });
         } catch (e) {
             clearTimeout(zaman);
-            return { hata: 'gemini_ulasilamadi' };
+            son = { hata: 'gemini_ulasilamadi' };
+            continue;
         }
         clearTimeout(zaman);
-        if (r.status === 404) { son = { hata: 'model_yok' }; continue; }
         let j = null;
         try { j = await r.json(); } catch (e) { /* gövde yok */ }
         if (r.status === 400 && /API_KEY_INVALID|API key not valid/i.test(JSON.stringify(j || ''))) return { hata: 'anahtar_gecersiz' };
         if (r.status === 401 || r.status === 403) return { hata: 'anahtar_gecersiz' };
         if (r.status === 429) return { hata: 'gemini_kota' };
-        if (!r.ok) return { hata: 'gemini_hata' };
-        const parca = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-        const yazi = Array.isArray(parca) ? parca.map((p) => p.text || '').join('') : '';
-        try { return { veri: JSON.parse(yazi) }; } catch (e) { return { hata: 'gemini_bicim' }; }
+        if (!r.ok) {
+            console.warn('itiraz gemini:', model, r.status, String((j && j.error && j.error.message) || '').slice(0, 200));
+            son = { hata: r.status === 404 ? 'model_yok' : 'gemini_hata' };
+            continue;
+        }
+        const aday = j && j.candidates && j.candidates[0];
+        const parca = aday && aday.content && aday.content.parts;
+        const yazi = Array.isArray(parca) ? parca.filter((p) => !p.thought).map((p) => p.text || '').join('') : '';
+        const veri = jsonCikar(yazi);
+        if (veri && Array.isArray(veri.taslaklar) && veri.taslaklar.length) return { veri };
+        console.warn('itiraz gemini bicim:', model, (aday && aday.finishReason) || (j && j.promptFeedback && j.promptFeedback.blockReason) || '-', yazi.length);
+        son = { hata: 'gemini_bicim' };
     }
     return son || { hata: 'gemini_hata' };
 }
@@ -119,16 +139,39 @@ const TALIMAT = [
     'Metni okuyan kişi kaydı inceleyip itirazı kabul ya da reddeden bir operasyon çalışanı.',
     '',
     'KURALLAR',
-    '- Müşterinin şikâyetine ve notuna doğrudan cevap ver. Genel "eksiksiz hazırladık" cümlesi tek başına reddediliyor.',
+    '- KONU: Metin yalnız kayıttaki şikâyet türüne cevap verir. Şikâyet "Bayat/bozuk ürün" ise eksik üründen, "Eksik ürün" ise bozukluktan söz etme. Türler karışırsa itiraz reddedilir.',
+    '- ÜRÜN ADI: Ürünü kayıttaki tam adıyla, harfi harfine ve büyük-küçük harfleri değiştirmeden yaz (ör. "Salkım Domates (500 g)"). Kısaltma, küçük harfe çevirme, gramajı atma yok.',
+    '- Müşterinin notuna doğrudan cevap ver. Genel "eksiksiz hazırladık" cümlesi tek başına reddediliyor.',
     '- Yalnız verilen bilgileri ve işaretli depo olgularını kullan. Kamera kaydı, saat, kişi, sayı, ölçüm gibi verilmemiş hiçbir şey uydurma.',
     '- Doğal, sakin, kendinden emin yaz. Abartma, yalvarma, suçlama yok. "Saygılarımızla", "arz ederiz", "değerli ekip" gibi resmî kalıplar yok.',
-    '- Müşteriyi küçümseme; olası açıklamayı nazikçe söyle (poşette gözden kaçmış olabilir, benzer ürünle karışmış olabilir gibi).',
-    '- Kurye, toplayıcı ya da müşteri adı yazma. Emoji ve madde işareti yok. Uzun tire (—) kullanma.',
+    '- Müşteriyi küçümseme; olası açıklamayı nazikçe söyle.',
+    '- Kurye, toplayıcı ya da müşteri adı yazma. Emoji ve madde işareti yok. Uzun tire kullanma.',
     '- Her taslak 2 ile 4 cümle, en fazla 450 karakter, düzgün Türkçe.',
-    '- Üç taslak birbirinden gerçekten farklı açıdan yaklaşsın (ör. süreç ve kontrol, olası açıklama, ürünün niteliği).',
-    '- "sebep" alanına verilen sebep listesinden, metinle aynı şeyi söyleyen TEK bir sebebi harfi harfine yaz.',
+    '- Üç taslak birbirinden gerçekten farklı açıdan yaklaşsın.',
+    '- "sebep" alanına verilen sebep listesinden, metinle ve şikâyet türüyle aynı şeyi söyleyen TEK bir sebebi harfi harfine yaz.',
     '- Örneklerde kabul edilen itirazların yaklaşımını izle, reddedilenlerin hatasından kaçın, kullanıcının seçtiği metinlerin üslubuna yaklaş. Örnekleri kopyalama.',
+    '- Yanıt yalnız istenen JSON.',
 ].join('\n');
+
+/* Şikâyet türüne göre yön. Anahtar kelimeyle eşlenir; uymazsa genel yön. */
+const TUR_YONU = [
+    [/iptal/i, 'İPTAL SİPARİŞ: İptalin depodan kaynaklanmadığını, siparişin hazırlandığını anlat; kaydın açıklamasında yazan iptal gerekçesine cevap ver.'],
+    [/eksik|gelmedi/i, 'EKSİK ÜRÜN: Ürünün siparişe girdiğini ve poşete konduğunu anlat; küçük ürünse poşette gözden kaçmış ya da başka ürünün arasında kalmış olabileceğini nazikçe söyle. Sebep çoğunlukla "Gönderdiğim ürünlerde eksik yok". Bozukluk ya da tarih konusuna girme.'],
+    [/yanl[ıi]ş/i, 'YANLIŞ ÜRÜN: Gönderilen ürünün siparişteki ürünün aynısı olduğunu, ürünlerin barkod okutularak toplandığını anlat; müşteri benzer ürünle karıştırmış ya da farklı ürün istemiş olabilir. Sebep çoğunlukla "Gönderilen ürün yanlış değil" ya da "Müşteri kaynaklı hata".'],
+    [/bayat|bozuk|çürük|curuk|küf|kuf/i, 'BAYAT/BOZUK ÜRÜN: Ürünün satışa uygun, raf kontrolünden geçmiş halde gönderildiğini anlat. Kapalı ambalajlıysa içteki bozulmanın dışarıdan görülemeyeceğini söyle; taze ürünse (meyve, sebze) toplama sırasında görünür bir kusur olmadığını, taşıma ve bekleme sonrası değişmiş olabileceğini söyle. Eksik üründen söz etme. Sebep çoğunlukla "Kapalı ambalaj, bozukluğu tespit edilemez", "Gönderilen ürünün tarihi satışa uygun" ya da "Depo kaynaklı sorun değil".'],
+    [/tarih|skt|son kullanma/i, 'TARİHİ GEÇMİŞ: Ürünün son kullanma tarihinin gönderim günü geçerli olduğunu, raf tarih kontrollerinin düzenli yapıldığını anlat. Sebep çoğunlukla "Gönderilen ürünün tarihi satışa uygun".'],
+    [/hasar|ezik|k[ıi]r[ıi]k|patlak|ak[ıi]nt[ıi]/i, 'HASARLI ÜRÜN: Ürünün sağlam paketlendiğini, hasarın taşıma sırasında ya da sonrasında oluşmuş olabileceğini anlat. Sebep çoğunlukla "Depo kaynaklı sorun değil".'],
+    [/so[gğ]uk|s[ıi]cak|eri/i, 'SOĞUK ÜRÜN: Ürünün soğuk zincir korunarak, ayrı ve uygun şekilde gönderildiğini anlat. Sebep çoğunlukla "Soğuk ürün garantili satış yapmamaktayız" ya da "Depo kaynaklı sorun değil".'],
+];
+
+function turYonu(k) {
+    // Önce şikâyet türü, o tutmazsa açıklama ("İptal Sipariş" türü "eksik" açıklamasından önce gelir)
+    for (const metin of [k.sikayet, k.aciklama]) {
+        if (!metin) continue;
+        for (const [desen, yon] of TUR_YONU) if (desen.test(metin)) return yon;
+    }
+    return 'Kayıttaki şikâyete doğrudan cevap ver.';
+}
 
 const SEMA = {
     type: 'OBJECT',
@@ -298,14 +341,29 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                     [kim, JSON.stringify(kayitlar)]
                 );
             }
-            const r = await pool.query(
-                `SELECT kayit_id, secilen_metin, secilen_sebep FROM itiraz.kayitlar
-                  WHERE username = $1 AND kayit_id = ANY($2::text[]) AND secilen_metin IS NOT NULL`,
-                [kim, kayitlar.map((k) => k.id)]
-            );
+            const idler = kayitlar.map((k) => k.id);
+            let r;
+            try {
+                r = await pool.query(
+                    `SELECT kayit_id, secilen_metin, secilen_sebep, taslak FROM itiraz.kayitlar
+                      WHERE username = $1 AND kayit_id = ANY($2::text[]) AND (secilen_metin IS NOT NULL OR taslak IS NOT NULL)`,
+                    [kim, idler]
+                );
+            } catch (e) {
+                if (e.code !== '42703') throw e;
+                r = await pool.query(
+                    `SELECT kayit_id, secilen_metin, secilen_sebep, NULL::jsonb AS taslak FROM itiraz.kayitlar
+                      WHERE username = $1 AND kayit_id = ANY($2::text[]) AND secilen_metin IS NOT NULL`,
+                    [kim, idler]
+                );
+            }
             const secilenler = {};
-            r.rows.forEach((s) => { secilenler[s.kayit_id] = { metin: s.secilen_metin, sebep: s.secilen_sebep || '' }; });
-            res.json({ ok: true, secilenler });
+            const taslaklar = {};
+            r.rows.forEach((s) => {
+                if (s.secilen_metin) secilenler[s.kayit_id] = { metin: s.secilen_metin, sebep: s.secilen_sebep || '' };
+                if (s.taslak && Array.isArray(s.taslak.taslaklar)) taslaklar[s.kayit_id] = s.taslak;
+            });
+            res.json({ ok: true, secilenler, taslaklar });
         } catch (e) { hata(res, e, 'kayit yaz'); }
     });
 
@@ -353,7 +411,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const ornek = await pool.query(
                 `SELECT durum, sikayet, musteri_notu, itiraz_metni AS metin FROM itiraz.kayitlar
                   WHERE username = $1 AND kayit_id <> $2 AND durum IN (300, 400) AND itiraz_metni IS NOT NULL
-                  ORDER BY (sikayet = $3) DESC, kayit_tarihi DESC NULLS LAST LIMIT 12`,
+                    AND sikayet = $3
+                  ORDER BY kayit_tarihi DESC NULLS LAST LIMIT 12`,
                 [kim, id, k.sikayet || '']
             );
             const secilen = await pool.query(
@@ -368,11 +427,14 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const istem = [
                 'KAYIT',
                 '- Kriter: ' + (k.kriter || '-'),
-                '- Şikâyet: ' + (k.sikayet || '-'),
+                '- Şikâyet türü: ' + (k.sikayet || '-'),
                 k.aciklama && k.aciklama !== 'description' ? '- Açıklama: ' + k.aciklama : null,
-                '- Ürün: ' + (k.urun || '-'),
+                '- Ürünün tam adı (aynen yaz): ' + (k.urun || '-'),
                 '- Müşteri notu: ' + (k.musteri_notu || '(not yok)'),
                 ekNot ? '- Depo sorumlusunun ek bilgisi (doğru kabul et): ' + ekNot : null,
+                '',
+                'BU TÜR İÇİN YÖN',
+                turYonu(k),
                 '',
                 'İŞARETLİ DEPO OLGULARI (yalnız bunlar doğru kabul edilir)',
                 olgular.length ? olgular.map((o) => '- ' + o).join('\n') : '- (işaretli olgu yok; yalnız kayıttaki bilgiyi kullan)',
@@ -380,13 +442,13 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 'SEBEP LİSTESİ',
                 sebepler.map((s) => '- ' + s).join('\n'),
                 '',
-                'KABUL EDİLEN ESKİ İTİRAZLAR',
+                'KABUL EDİLEN ESKİ İTİRAZLAR (aynı şikâyet türü)',
                 kabul.length ? kabul.map(ornekSatiri).join('\n') : '- (henüz yok)',
                 '',
-                'REDDEDİLEN ESKİ İTİRAZLAR',
+                'REDDEDİLEN ESKİ İTİRAZLAR (aynı şikâyet türü)',
                 red.length ? red.map(ornekSatiri).join('\n') : '- (henüz yok)',
                 '',
-                'KULLANICININ SEÇİP DÜZENLEDİĞİ METİNLER (üslup)',
+                'KULLANICININ SEÇİP DÜZENLEDİĞİ METİNLER (yalnız üslup için; konuları farklı olabilir, içeriğini taşıma)',
                 secilen.rows.length ? secilen.rows.map(ornekSatiri).join('\n') : '- (henüz yok)',
                 '',
                 'Üç taslak yaz. "aci" alanı taslağın yaklaşımını 2 ile 4 kelimeyle anlatsın.',
@@ -396,11 +458,15 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 systemInstruction: { parts: [{ text: TALIMAT }] },
                 contents: [{ role: 'user', parts: [{ text: istem }] }],
                 generationConfig: {
-                    temperature: 0.9,
-                    maxOutputTokens: 4096,
+                    temperature: 0.8,
+                    maxOutputTokens: 8192,
                     responseMimeType: 'application/json',
                     responseSchema: SEMA,
                 },
+                safetySettings: [
+                    'HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH',
+                    'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                ].map((category) => ({ category, threshold: 'BLOCK_ONLY_HIGH' })),
             });
             if (sonuc.hata) {
                 const kod = sonuc.hata === 'anahtar_gecersiz' ? 400 : sonuc.hata === 'gemini_kota' ? 429 : 502;
@@ -413,6 +479,11 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 .slice(0, 3);
             if (!taslaklar.length) return res.status(502).json({ ok: false, error: 'gemini_bicim' });
             const sebep = sebepler.includes(v.sebep) ? v.sebep : '';
+            // Taslak sunucuda: telefon ve bilgisayar aynı taslağı görür
+            await pool.query(
+                'UPDATE itiraz.kayitlar SET taslak = $3::jsonb WHERE username = $1 AND kayit_id = $2',
+                [kim, id, JSON.stringify({ taslaklar, sebep, ekNot, zaman: new Date().toISOString() })]
+            ).catch((e) => { if (e.code !== '42703') console.warn('itiraz taslak yaz:', e.message); });
             res.json({ ok: true, sebep, taslaklar });
         } catch (e) { hata(res, e, 'yaz'); }
     });

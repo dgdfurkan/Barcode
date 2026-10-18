@@ -33,7 +33,10 @@ async function itirazDoldur(m) {
     const adres = 'https://franchise-v2.getir.com/dys/dds100/log/detail/' + kayitId;
     let sekmeler = [];
     try { sekmeler = await chrome.tabs.query({ url: 'https://franchise-v2.getir.com/*' }); } catch (e) { sekmeler = []; }
-    const sekme = sekmeler.find((t) => (t.url || '').indexOf('/log/detail/' + kayitId) !== -1) || sekmeler[0];
+    // Önce bu kaydın açık sekmesi, sonra Depo Değerlendirme sayfasındaki bir sekme;
+    // yoksa yeni sekme. Panelin başka bir sayfasında çalışan sekmeye dokunulmaz.
+    const sekme = sekmeler.find((t) => (t.url || '').indexOf('/log/detail/' + kayitId) !== -1)
+        || sekmeler.find((t) => /\/dds100\//.test(t.url || ''));
     try {
         if (sekme) {
             if ((sekme.url || '').indexOf('/log/detail/' + kayitId) === -1) await chrome.tabs.update(sekme.id, { url: adres, active: true });
@@ -45,7 +48,7 @@ async function itirazDoldur(m) {
     } catch (e) {
         return { ok: false, metin: 'Panel sekmesi açılamadı.' };
     }
-    return { ok: true, metin: 'Panel açıldı. Karttaki "Forma Yerleştir"e bas.' };
+    return { ok: true, metin: 'Panel açıldı; form dolduruluyor.' };
 }
 
 chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {

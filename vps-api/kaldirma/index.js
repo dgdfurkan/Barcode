@@ -25,6 +25,9 @@
  */
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 const telegram = require('../sayim-raporu/telegram');
 const gorsel = require('../sayim-raporu/gorsel');
 const { kartUret, DURUMLAR, SONUC_TIPLERI } = require('./kart');
@@ -80,6 +83,9 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     };
     const tamsayi = (v) => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : null);
     const httpsMi = (v) => typeof v === 'string' && /^https:\/\/[^\s"'<>]{4,1900}$/.test(v);
+    /* Hasar fotoğrafı: panelin verdiği süreli imzalı S3 adresi. Yalnız bu kova. */
+    const s3Mi = (v) => typeof v === 'string' && v.length < 3000 &&
+        /^https:\/\/getir-stock\.s3\.[a-z0-9-]+\.amazonaws\.com\/blocked-stock\/[^\s"'<>]+$/.test(v);
 
     function kayitDuzelt(k) {
         if (!k || typeof k !== 'object') return null;
@@ -113,10 +119,32 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 birim: tamsayi(k.birim),
                 skt: tarih(k.skt),
                 olusturan: metin(k.olusturan, 80),
-                hasarFoto: httpsMi(k.hasarFoto) ? k.hasarFoto : '',
                 gecmis,
+                ...ekAlanlar(k),
             },
+            fotoKaynak: (Array.isArray(k.fotoKaynak) ? k.fotoKaynak : []).filter(s3Mi).slice(0, 4),
         };
+    }
+
+    /* İsteğe bağlı alanlar: yalnız dolu gelirse yazılır. Upsert `veri || yeni`
+       birleştirdiği için detaydan bir kez gelen red sebebi sonraki saatlik
+       aktarımlarda (detay okunmadığında) silinmez. */
+    function ekAlanlar(k) {
+        const e = {};
+        const alt = metin(k.altNeden, 160);
+        if (alt) e.altNeden = alt;
+        const nereden = metin(k.nereden, 60);
+        if (nereden) e.nereden = nereden;
+        const nereye = metin(k.nereye, 60);
+        if (nereye) e.nereye = nereye;
+        const olu = k.oluGun == null ? null : tamsayi(k.oluGun);
+        if (olu !== null && olu >= 0 && olu < 3650) e.oluGun = olu;
+        if (k.red && typeof k.red === 'object') {
+            const baslik = metin(k.red.baslik, 160);
+            const aciklama = metin(k.red.aciklama, 400);
+            if (baslik || aciklama) e.red = { baslik, aciklama };
+        }
+        return e;
     }
 
     // -----------------------------------------------------------------
@@ -149,6 +177,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             u.ad || 'Ürün',
             'Adet: ' + (Number.isInteger(k.adet) ? k.adet : k.adet.toFixed(2)) + (k.sebep ? ' · ' + k.sebep : ''),
         ];
+        if (k.veri.altNeden) satirlar.push('Alt neden: ' + k.veri.altNeden);
+        if (k.veri.red && k.veri.red.baslik) satirlar.push('Red sebebi: ' + k.veri.red.baslik);
         if (k.veri.olusturan) satirlar.push('Oluşturan: ' + k.veri.olusturan);
         satirlar.push('Oluşturulma: ' + saat(k.olusturma));
         return satirlar.join('\n');
@@ -202,17 +232,20 @@ function kur(app, { pool, verifyToken, bearerOf }) {
 
         const istemci = await pool.connect();
         const bildirilecek = [];
+        const fotoIsleri = [];
         try {
             await istemci.query('BEGIN');
             const es = await istemci.query('SELECT 1 FROM kaldirma.esitleme WHERE username = $1 FOR UPDATE', [u]);
             const ilk = !es.rows.length;
             const onceki = new Map();
+            const fotoluKayit = new Set();
             if (kayitlar.length) {
                 const r = await istemci.query(
-                    'SELECT kayit_id, bildirilen_durum FROM kaldirma.kayitlar WHERE username = $1 AND kayit_id = ANY($2)',
+                    `SELECT kayit_id, bildirilen_durum, veri ? 'foto' AS foto_var FROM kaldirma.kayitlar
+                      WHERE username = $1 AND kayit_id = ANY($2)`,
                     [u, kayitlar.map((k) => k.id)]
                 );
-                r.rows.forEach((x) => onceki.set(x.kayit_id, x.bildirilen_durum));
+                r.rows.forEach((x) => { onceki.set(x.kayit_id, x.bildirilen_durum); if (x.foto_var) fotoluKayit.add(x.kayit_id); });
             }
             for (const k of kayitlar) {
                 const eski = onceki.has(k.id) ? onceki.get(k.id) : undefined;
@@ -229,10 +262,11 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
                      ON CONFLICT (username, kayit_id) DO UPDATE SET
                         guncelleme = EXCLUDED.guncelleme, durum = EXCLUDED.durum, sonuc_tipi = EXCLUDED.sonuc_tipi,
-                        sebep = EXCLUDED.sebep, adet = EXCLUDED.adet, veri = EXCLUDED.veri,
+                        sebep = EXCLUDED.sebep, adet = EXCLUDED.adet, veri = kaldirma.kayitlar.veri || EXCLUDED.veri,
                         bildirilen_durum = EXCLUDED.bildirilen_durum, son_gorulme = now()`,
                     [u, k.id, k.olusturma, k.guncelleme, k.durum, k.sonucTipi, k.sebep, k.adet, k.veri, bildirilen]
                 );
+                if (k.fotoKaynak.length && !fotoluKayit.has(k.id)) fotoIsleri.push({ u, id: k.id, adresler: k.fotoKaynak });
             }
             await istemci.query(
                 `INSERT INTO kaldirma.esitleme (username, son_sayi) VALUES ($1, $2)
@@ -251,6 +285,131 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         res.json({ ok: true, yazilan: kayitlar.length, bildirilecek: bildirilecek.length });
         // Yanıt döndükten sonra; Telegram yavaşsa Asistan beklemesin
         bildir(u, bildirilecek).catch((e) => console.warn('kaldirma bildir:', e && e.message));
+        fotoIsleri.forEach(fotoSirayaKoy);
+    });
+
+    // -----------------------------------------------------------------
+    // Hasar fotoğrafları
+    //
+    // Panelin verdiği adresler bir saat geçerli. Asistan kaydı yazınca
+    // fotoğraflar sırayla (tek tek) indirilip sunucuda saklanır; site
+    // yalnız oturumlu uçtan (GET /api/kaldirma/foto/:id/:n) okur.
+    // Klasör nokta ile başlıyor: genel depolama (/storage) noktalı yolu
+    // sunmuyor. Hesap klasörü adı HMAC; tahmin edilemez. 90 günde silinir.
+    // -----------------------------------------------------------------
+
+    const FOTO_KOK = path.resolve(process.env.STORAGE_ROOT || '/var/www/jetbarkod-storage', '.kaldirma-foto');
+    const FOTO_AZAMI = 6 * 1024 * 1024;
+    const FOTO_TUR = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+    const fotoKuyrugu = [];
+    const kuyruktaki = new Set();
+    let fotoCalisiyor = false;
+
+    function hesapKlasoru(u) {
+        const h = crypto.createHmac('sha256', process.env.JWT_SECRET || 'jetbarkod').update('kaldirma-foto:' + u).digest('hex');
+        return path.join(FOTO_KOK, h.slice(0, 32));
+    }
+
+    function adresGecerliMi(adres) {
+        try {
+            const bitis = Number(new URL(adres).searchParams.get('Expires'));
+            return !bitis || bitis * 1000 > Date.now() + 15000;
+        } catch (e) { return false; }
+    }
+
+    function fotoSirayaKoy(is) {
+        const anahtar = is.u + ':' + is.id;
+        if (kuyruktaki.has(anahtar) || fotoKuyrugu.length > 2000) return;
+        kuyruktaki.add(anahtar);
+        fotoKuyrugu.push(is);
+        fotoIsle();
+    }
+
+    async function fotoIndir(adres) {
+        const ctrl = new AbortController();
+        const zaman = setTimeout(() => ctrl.abort(), 20000);
+        try {
+            const r = await fetch(adres, { signal: ctrl.signal, redirect: 'error' });
+            if (!r.ok) return null;
+            const tur = String(r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+            if (!FOTO_TUR[tur]) return null;
+            const boy = Number(r.headers.get('content-length') || 0);
+            if (boy > FOTO_AZAMI) return null;
+            const veri = Buffer.from(await r.arrayBuffer());
+            if (!veri.length || veri.length > FOTO_AZAMI) return null;
+            return { veri, uzanti: FOTO_TUR[tur] };
+        } catch (e) {
+            return null;
+        } finally {
+            clearTimeout(zaman);
+        }
+    }
+
+    async function fotoIsle() {
+        if (fotoCalisiyor) return;
+        fotoCalisiyor = true;
+        try {
+            while (fotoKuyrugu.length) {
+                const is = fotoKuyrugu.shift();
+                kuyruktaki.delete(is.u + ':' + is.id);
+                const klasor = hesapKlasoru(is.u);
+                let sayi = 0;
+                for (let i = 0; i < is.adresler.length; i++) {
+                    if (!adresGecerliMi(is.adresler[i])) continue;
+                    const f = await fotoIndir(is.adresler[i]);
+                    if (!f) continue;
+                    try {
+                        fs.mkdirSync(klasor, { recursive: true, mode: 0o750 });
+                        Object.values(FOTO_TUR).forEach((uz) => { try { fs.unlinkSync(path.join(klasor, is.id + '-' + (sayi + 1) + uz)); } catch (e) { /* yok */ } });
+                        fs.writeFileSync(path.join(klasor, is.id + '-' + (sayi + 1) + f.uzanti), f.veri, { mode: 0o640 });
+                        sayi++;
+                    } catch (e) {
+                        console.warn('kaldirma foto yaz:', e.message);
+                    }
+                    await new Promise((r) => setTimeout(r, 250));
+                }
+                if (sayi) {
+                    await pool.query(
+                        `UPDATE kaldirma.kayitlar SET veri = veri || jsonb_build_object('foto', $3::int)
+                          WHERE username = $1 AND kayit_id = $2`,
+                        [is.u, is.id, sayi]
+                    ).catch((e) => console.warn('kaldirma foto kayit:', e.message));
+                }
+            }
+        } finally {
+            fotoCalisiyor = false;
+        }
+    }
+
+    function eskiFotolariSil() {
+        const sinir = Date.now() - 90 * GUN_MS;
+        let klasorler = [];
+        try { klasorler = fs.readdirSync(FOTO_KOK); } catch (e) { return; }
+        klasorler.forEach((k) => {
+            const yol = path.join(FOTO_KOK, k);
+            let dosyalar = [];
+            try { dosyalar = fs.readdirSync(yol); } catch (e) { return; }
+            dosyalar.forEach((f) => {
+                try { if (fs.statSync(path.join(yol, f)).mtimeMs < sinir) fs.unlinkSync(path.join(yol, f)); } catch (e) { /* geç */ }
+            });
+        });
+    }
+    setInterval(eskiFotolariSil, 12 * 3600 * 1000).unref();
+
+    app.get('/api/kaldirma/foto/:id/:n', uye, (req, res) => {
+        const id = String(req.params.id || '');
+        const n = Number(req.params.n);
+        if (!/^[a-f0-9]{24}$/.test(id) || !Number.isInteger(n) || n < 1 || n > 4) return res.status(400).json({ ok: false, error: 'gecersiz' });
+        const klasor = hesapKlasoru(req.auth.username);
+        for (const uz of Object.values(FOTO_TUR)) {
+            const dosya = path.join(klasor, id + '-' + n + uz);
+            if (fs.existsSync(dosya)) {
+                res.setHeader('Cache-Control', 'private, max-age=86400');
+                res.setHeader('X-Content-Type-Options', 'nosniff');
+                return res.sendFile(dosya);
+            }
+        }
+        res.status(404).json({ ok: false, error: 'yok' });
     });
 
     /** Tarih aralığı: YYYY-MM-DD, İstanbul günü. Azami 62 gün. */

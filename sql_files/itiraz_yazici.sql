@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS itiraz.kayitlar (
     son_gorulme     TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (username, kayit_id)
 );
+-- Son üretilen taslaklar (telefon ve bilgisayar aynı taslağı görsün)
+ALTER TABLE itiraz.kayitlar ADD COLUMN IF NOT EXISTS taslak JSONB;
 CREATE INDEX IF NOT EXISTS itiraz_kayitlar_tarih ON itiraz.kayitlar (username, kayit_tarihi DESC);
 
 -- Günlük yazdırma sayacı (kullanıcının kendi anahtarını korur)

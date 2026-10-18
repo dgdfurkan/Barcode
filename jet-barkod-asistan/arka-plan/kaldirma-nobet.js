@@ -26,6 +26,7 @@ const KALDIRMA_SON = 'jbaKaldirmaSon';
 const KALDIRMA_ARALIK_MS = 60 * 60 * 1000;
 const KALDIRMA_ELLE_ARA_MS = 2 * 60 * 1000;
 const KALDIRMA_PARCA = 150;
+const KALDIRMA_AZAMI_BAYT = 180 * 1024;
 const KALDIRMA_GUN = 14;
 
 let kaldirmaCalisiyor = false;
@@ -56,8 +57,20 @@ async function kaldirmaYaz(kayitlar) {
     let yetki = await al(false);
     if (!yetki) return { ok: false, metin: 'Jet Barkod oturumu yok; siteye bir kez girin.' };
     let bildirilecek = 0;
-    for (let i = 0; i < Math.max(1, kayitlar.length); i += KALDIRMA_PARCA) {
-        const parca = kayitlar.slice(i, i + KALDIRMA_PARCA);
+    // Parçalar hem sayıyla hem boyutla sınırlı: hasar fotoğrafı adresleri uzun,
+    // sunucu gövdesi 256 KB
+    const parcalar = [];
+    let parca0 = [];
+    let boy = 0;
+    kayitlar.forEach((k) => {
+        const b = JSON.stringify(k).length;
+        if (parca0.length && (parca0.length >= KALDIRMA_PARCA || boy + b > KALDIRMA_AZAMI_BAYT)) { parcalar.push(parca0); parca0 = []; boy = 0; }
+        parca0.push(k);
+        boy += b;
+    });
+    parcalar.push(parca0);
+    for (let i = 0; i < parcalar.length; i++) {
+        const parca = parcalar[i];
         let r = null;
         for (let deneme = 0; deneme < 2; deneme++) {
             try {
@@ -83,7 +96,7 @@ async function kaldirmaYaz(kayitlar) {
         if (r.status === 404) return { ok: false, metin: 'Sunucu güncellemesi bekleniyor.' };
         if (!r.ok) return { ok: false, metin: 'Sunucu hatası (' + r.status + ').' };
         bildirilecek += (j && j.bildirilecek) || 0;
-        if (i + KALDIRMA_PARCA < kayitlar.length) await new Promise((x) => setTimeout(x, 300));
+        if (i + 1 < parcalar.length) await new Promise((x) => setTimeout(x, 300));
     }
     return { ok: true, bildirilecek };
 }

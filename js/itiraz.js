@@ -58,12 +58,13 @@
         ayar: { anahtar: false, son4: '', olgular: [] },
         sunucu: 'bilinmiyor',
         secilenler: {},
+        sunucuTaslak: {},
         taslak: {},
+        secili: null,
         durum: 'yukleniyor',
         hataKod: null,
         sonOkuma: 0,
         asistan: false,
-        acikKayit: null,
         okuyor: false
     };
 
@@ -215,6 +216,7 @@
             var c = await postJson('/api/itiraz/kayitlar', { kayitlar: d.kayitlar.slice(i, i + 60).map(sunucuya) });
             if (c.kod !== 200 || !c.j.ok) return;
             Object.assign(d.secilenler, c.j.secilenler || {});
+            Object.assign(d.sunucuTaslak, c.j.taslaklar || {});
         }
         listeCiz();
     }
@@ -381,8 +383,8 @@
         return s;
     }
 
-    function bosKutu(ikon, baslik, metin, dugme, hata) {
-        return '<div class="itr-bos' + (hata ? ' is-hata' : '') + '"><span>' + ikon + '</span><strong>' + kacis(baslik) + '</strong><p>' + kacis(metin) + '</p>' +
+    function bosKutu(ikon, baslik, metin, dugme, hata, sade) {
+        return '<div class="itr-bos' + (hata ? ' is-hata' : '') + (sade ? ' is-sade' : '') + '"><span>' + ikon + '</span><strong>' + kacis(baslik) + '</strong><p>' + kacis(metin) + '</p>' +
             (dugme ? '<button type="button" class="itr-arac" data-yenile>' + kacis(dugme) + '</button>' : '') + '</div>';
     }
 
@@ -393,21 +395,23 @@
         return '<span class="itr-d itr-d--gecti">İtiraz Edilmedi</span>';
     }
 
+    function hazirMi(id) {
+        var t = d.taslak[id];
+        return !!((t && t.taslaklar.length) || d.secilenler[id] || (d.sunucuTaslak[id] && d.sunucuTaslak[id].taslaklar.length));
+    }
+
     function kartHtml(k) {
         var bekleyen = acikMi(k);
-        var hazir = bekleyen && (d.secilenler[k.id] || d.taslak[k.id])
-            ? '<span class="itr-hazir">' + IKON.kalem + 'Taslak hazır</span>' : '';
         var not = k.musteriNotu
             ? '<p class="itr-kayit__not">' + kacis(k.musteriNotu) + '</p>'
             : '<p class="itr-kayit__not is-bos">Müşteri not bırakmamış.</p>';
-        return '<button type="button" class="itr-kayit" data-kayit="' + k.id + '">' +
-            '<span class="itr-kayit__ust">' + (k.sikayet ? '<span class="itr-cip">' + kacis(k.sikayet) + '</span>' : '') + hazir + '</span>' +
-            '<span class="itr-kayit__sure">' + (bekleyen ? kalanCipi(k.sonTarih) : durumCipi(k)) + '</span>' +
+        return '<button type="button" class="itr-kayit" data-kayit="' + k.id + '" aria-current="' + (d.secili === k.id) + '">' +
+            '<span class="itr-kayit__ust">' + (k.sikayet ? '<span class="itr-cip">' + kacis(k.sikayet) + '</span>' : '<span></span>') +
+                (bekleyen ? kalanCipi(k.sonTarih) : durumCipi(k)) + '</span>' +
             '<p class="itr-kayit__urun">' + kacis(k.urun || k.kriter || 'Kayıt') + '</p>' +
             not +
             '<span class="itr-kayit__alt"><span>Kayıt ' + kacis(gunAy(k.kayitTarihi)) + '</span>' +
-            (k.siparisTarihi ? '<span>Sipariş ' + kacis(gunAy(k.siparisTarihi)) + '</span>' : '') +
-            (k.kriter ? '<span>' + kacis(k.kriter) + '</span>' : '') + '</span>' +
+            (bekleyen && hazirMi(k.id) ? '<span class="itr-hazir">' + IKON.kalem + 'Taslak hazır</span>' : '') + '</span>' +
             '</button>';
     }
 
@@ -430,175 +434,227 @@
             }).join('') + '</section>';
     }
 
+    function gorunenListe() {
+        if (d.sekme === 'bekleyen') {
+            return d.kayitlar.filter(acikMi).sort(function (a, b) { return Date.parse(a.sonTarih) - Date.parse(b.sonTarih); });
+        }
+        return d.kayitlar.filter(function (k) { return !acikMi(k); })
+            .sort(function (a, b) { return Date.parse(b.kayitTarihi) - Date.parse(a.kayitTarihi); });
+    }
+
     function listeCiz() {
         var kutu = el('itrListe');
-        if (d.durum === 'yukleniyor') { kutu.innerHTML = iskelet(); return; }
+        if (d.durum === 'yukleniyor') { kutu.innerHTML = iskelet(); detayCiz(); return; }
         if (d.durum === 'hata') {
             var m = panelHataMetni(d.hataKod);
             kutu.innerHTML = bosKutu(IKON.uyari, m[0], m[1], 'Tekrar Dene', true);
+            detayCiz();
             return;
         }
+        var liste = gorunenListe();
+        if (!telefonMu() && (!d.secili || !liste.some(function (k) { return k.id === d.secili; }))) d.secili = liste.length ? liste[0].id : null;
         if (d.sekme === 'bekleyen') {
-            var acik = d.kayitlar.filter(acikMi).sort(function (a, b) { return Date.parse(a.sonTarih) - Date.parse(b.sonTarih); });
-            kutu.innerHTML = acik.length ? acik.map(kartHtml).join('')
+            kutu.innerHTML = liste.length ? liste.map(kartHtml).join('')
                 : bosKutu(IKON.kutu, 'İtiraz bekleyen kayıt yok', 'Son ' + GUN + ' günde süresi dolmamış, itiraz edilmemiş kayıt bulunmuyor.');
-            return;
+        } else {
+            kutu.innerHTML = liste.length ? oranlarHtml(liste) + liste.map(kartHtml).join('')
+                : bosKutu(IKON.kutu, 'Henüz sonuç yok', 'İtirazların sonuçlandıkça burada görünür.');
         }
-        var sonuc = d.kayitlar.filter(function (k) { return !acikMi(k); })
-            .sort(function (a, b) { return Date.parse(b.kayitTarihi) - Date.parse(a.kayitTarihi); });
-        kutu.innerHTML = sonuc.length ? oranlarHtml(sonuc) + sonuc.map(kartHtml).join('')
-            : bosKutu(IKON.kutu, 'Henüz sonuç yok', 'İtirazların sonuçlandıkça burada görünür.');
+        // Kullanıcı metin yazarken yazma alanını yeniden çizme
+        var odak = document.activeElement;
+        if (odak && odak !== document.body && el('itrDetayIc').contains(odak) && /^(TEXTAREA|INPUT)$/.test(odak.tagName)) return;
+        detayCiz();
     }
 
     // ------------------------------------------------------------------
-    // Katman (detay ve ayarlar)
+    // Seçili kayıt
     // ------------------------------------------------------------------
 
-    var sonOdak = null;
-
-    function katmanAc(id) {
-        var k = el(id);
-        sonOdak = document.activeElement;
-        k.hidden = false;
-        document.body.classList.add('itr-kilit');
-        void k.offsetWidth; // geçiş için
-        k.classList.add('acik');
-        var kapat = k.querySelector('.itr-kapat');
-        if (kapat) kapat.focus({ preventScroll: true });
-    }
-
-    function katmanKapat(id) {
-        var k = el(id);
-        if (k.hidden) return;
-        k.classList.remove('acik');
-        var bitir = function () {
-            k.hidden = true;
-            if (el('itrDetay').hidden && el('itrAyar').hidden) document.body.classList.remove('itr-kilit');
-            if (sonOdak && sonOdak.focus) sonOdak.focus({ preventScroll: true });
-        };
-        var sure = parseFloat(getComputedStyle(k.querySelector('.itr-panel')).transitionDuration) || 0;
-        if (sure > 0) setTimeout(bitir, sure * 1000); else bitir();
-        if (id === 'itrDetay') d.acikKayit = null;
-    }
-
-    // ------------------------------------------------------------------
-    // Detay
-    // ------------------------------------------------------------------
+    var telefonSorgu = global.matchMedia ? global.matchMedia('(max-width: 959px)') : null;
+    function telefonMu() { return !!(telefonSorgu && telefonSorgu.matches); }
 
     function kayitBul(id) {
         for (var i = 0; i < d.kayitlar.length; i++) if (d.kayitlar[i].id === id) return d.kayitlar[i];
         return null;
     }
 
-    function detayAc(id) {
-        var k = kayitBul(id);
-        if (!k) return;
-        d.acikKayit = id;
-        el('itrDetaySikayet').textContent = k.sikayet || k.kriter || 'Kayıt';
-        el('itrDetayAd').textContent = k.urun || k.kriter || 'Kayıt';
-        el('itrDetayAlt').textContent = [
-            k.kriter,
-            k.kayitTarihi ? 'Kayıt ' + gunAy(k.kayitTarihi) : '',
-            acikMi(k) && k.sonTarih ? 'Son itiraz ' + gunAySaat(k.sonTarih) : ''
-        ].filter(Boolean).join(' · ');
-        detayCiz();
-        katmanAc('itrDetay');
-    }
-
     function sebepListesi() {
         return d.sebepler.length ? d.sebepler : YEDEK_SEBEPLER.map(function (ad) { return { id: '', ad: ad }; });
     }
 
-    function detayCiz() {
-        var k = kayitBul(d.acikKayit);
-        if (!k) return;
-        var g = el('itrDetayGovde');
-        var not = k.musteriNotu
-            ? '<p class="itr-alinti">' + kacis(k.musteriNotu) + '</p>'
-            : '<p class="itr-alinti is-bos">Müşteri not bırakmamış.</p>';
-        var ust = '<section class="itr-bolum"><h4>Müşteri Notu</h4>' + not + '</section>';
+    /* Kaydın yazma durumu. Sunucudaki son taslak ve seçilen metinden kurulur;
+       böylece telefon ile bilgisayar aynı taslağı görür. */
+    function taslakDurumu(id) {
+        if (d.taslak[id]) return d.taslak[id];
+        var srv = d.sunucuTaslak[id] || null;
+        var sec = d.secilenler[id] || null;
+        var t = { taslaklar: [], secili: 0, duzen: {}, sebep: '', oneri: '', ekNot: '', ekAcik: false, yaziyor: false, sebepAcik: false };
+        if (srv) {
+            t.taslaklar = Array.isArray(srv.taslaklar) ? srv.taslaklar.slice(0, 3) : [];
+            t.oneri = srv.sebep || '';
+            t.sebep = srv.sebep || '';
+            t.ekNot = srv.ekNot || '';
+            t.ekAcik = !!t.ekNot;
+        }
+        if (sec && sec.metin) {
+            if (sec.sebep) t.sebep = sec.sebep;
+            var i = t.taslaklar.findIndex(function (x) { return x.metin === sec.metin; });
+            if (i > -1) t.secili = i;
+            else if (t.taslaklar.length) t.duzen[0] = sec.metin;
+            else t.taslaklar = [{ aci: 'Son Seçtiğin', metin: sec.metin }];
+        }
+        d.taslak[id] = t;
+        return t;
+    }
 
-        if (!acikMi(k)) {
-            g.innerHTML = ust +
-                '<section class="itr-bolum"><h4>Sonuç</h4><div>' + durumCipi(k) + '</div></section>' +
+    function metinAl(t) {
+        if (!t || !t.taslaklar.length) return '';
+        return t.duzen[t.secili] != null ? t.duzen[t.secili] : ((t.taslaklar[t.secili] || {}).metin || '');
+    }
+
+    function sec(id) {
+        d.secili = id;
+        listeIsaretle();
+        detayCiz();
+        if (telefonMu()) {
+            el('itrDetay').classList.add('acik');
+            document.body.classList.add('itr-kilit');
+            el('itrDetayIc').scrollTop = 0;
+        } else {
+            el('itrDetayIc').scrollTop = 0;
+        }
+    }
+
+    function telefonKapat() {
+        el('itrDetay').classList.remove('acik');
+        document.body.classList.remove('itr-kilit');
+        var b = d.secili && document.querySelector('[data-kayit="' + d.secili + '"]');
+        if (b) b.focus({ preventScroll: true });
+    }
+
+    function listeIsaretle() {
+        document.querySelectorAll('#itrListe [data-kayit]').forEach(function (b) {
+            b.setAttribute('aria-current', String(b.getAttribute('data-kayit') === d.secili));
+        });
+    }
+
+    var IKON_GERI = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 4-6 6 6 6"/></svg>';
+    var IKON_ASAGI = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>';
+
+    function detayCiz() {
+        var ic = el('itrDetayIc');
+        var k = d.secili ? kayitBul(d.secili) : null;
+        if (!k) {
+            ic.innerHTML = d.durum === 'yukleniyor'
+                ? '<div class="itr-detay__govde"><span class="itr-iskelet" style="width:40%;height:18px"></span><span class="itr-iskelet" style="width:90%"></span><span class="itr-iskelet" style="width:70%"></span></div>'
+                : bosKutu(IKON.kalem, 'Kayıt seç', 'Soldaki listeden bir kayıt seç; itiraz metni burada yazılır.', null, false, true);
+            return;
+        }
+        var acik = acikMi(k);
+        var meta = [
+            k.kriter,
+            k.kayitTarihi ? 'Kayıt ' + gunAy(k.kayitTarihi) : '',
+            k.siparisTarihi ? 'Sipariş ' + gunAy(k.siparisTarihi) : '',
+            acik && k.sonTarih ? 'Son itiraz ' + gunAySaat(k.sonTarih) : ''
+        ].filter(Boolean).join(' · ');
+        var ust = '<header class="itr-detay__ust">' +
+            '<button type="button" class="itr-detay__geri" data-geri aria-label="Listeye dön">' + IKON_GERI + '</button>' +
+            '<div class="itr-detay__baslik">' +
+                '<span class="itr-kayit__ust" style="width:100%">' + (k.sikayet ? '<span class="itr-cip">' + kacis(k.sikayet) + '</span>' : '<span></span>') + (acik ? kalanCipi(k.sonTarih) : durumCipi(k)) + '</span>' +
+                '<h2>' + kacis(k.urun || k.kriter || 'Kayıt') + '</h2>' +
+                '<p>' + kacis(meta) + '</p>' +
+            '</div></header>';
+        var not = '<section><h3 class="itr-etiket">Müşteri Notu</h3>' + (k.musteriNotu
+            ? '<p class="itr-alinti">' + kacis(k.musteriNotu) + '</p>'
+            : '<p class="itr-alinti is-bos">Müşteri not bırakmamış.</p>') + '</section>';
+
+        if (!acik) {
+            ic.innerHTML = ust + '<div class="itr-detay__govde">' + not +
                 (k.itirazMetni
-                    ? '<section class="itr-bolum"><h4>İtiraz Metni' + (d.sebepAd[k.itirazSebepId] ? ' · ' + kacis(d.sebepAd[k.itirazSebepId]) : '') + '</h4>' +
+                    ? '<section><h3 class="itr-etiket">Gönderilen İtiraz' + (d.sebepAd[k.itirazSebepId] ? ' · ' + kacis(d.sebepAd[k.itirazSebepId]) : '') + '</h3>' +
                       '<p class="itr-alinti">' + kacis(k.itirazMetni) + '</p></section>'
-                    : '');
+                    : '<p class="itr-ipucu">Bu kayda itiraz edilmemiş.</p>') +
+                '</div>';
             return;
         }
 
-        var t = d.taslak[k.id] || null;
-        if (!t && d.secilenler[k.id]) {
-            t = d.taslak[k.id] = { taslaklar: [], secili: -1, metin: d.secilenler[k.id].metin, sebep: d.secilenler[k.id].sebep || '', oneri: '', ekNot: '', yaziyor: false, eski: true };
-        }
-
+        var t = taslakDurumu(k.id);
         var yazmaHazir = d.sunucu === 'hazir' && d.ayar.anahtar;
-        var yazBolumu = '<section class="itr-bolum">' +
-            '<h4>Bu Kayda Özel Bilgi</h4>' +
-            '<input type="text" class="itr-girdi" id="itrEkNot" maxlength="400" placeholder="İsteğe bağlı. Örn: sipariş iki poşete bölünmüştü" value="' + kacis((t && t.ekNot) || '') + '">' +
-            '</section>';
-
-        var taslakBolumu;
+        var yazici;
         if (!yazmaHazir) {
-            taslakBolumu = '<section class="itr-bolum"><p class="itr-ipucu">' +
-                (d.sunucu === 'bekleniyor' ? 'Sunucu güncellemesi bekleniyor; taslak yazma kurulum bitince açılır.'
-                    : 'Taslak yazmak için Gemini anahtarı gerekiyor.') + '</p>' +
-                (d.sunucu === 'bekleniyor' ? '' : '<button type="button" class="itr-arac" data-ayar-ac>Anahtar Ekle</button>') + '</section>';
-        } else if (t && t.yaziyor) {
-            var isk = '';
-            for (var i = 0; i < 3; i++) {
-                isk += '<div class="itr-taslak itr-taslak--iskelet" aria-hidden="true"><span class="itr-iskelet" style="width:30%"></span>' +
-                    '<span class="itr-iskelet" style="width:95%"></span><span class="itr-iskelet" style="width:80%"></span></div>';
-            }
-            taslakBolumu = '<section class="itr-bolum" aria-busy="true"><h4>Taslaklar yazılıyor</h4><div class="itr-taslaklar">' + isk + '</div></section>';
-        } else if (t && t.taslaklar.length) {
-            taslakBolumu = '<section class="itr-bolum"><h4>Taslaklar</h4><div class="itr-taslaklar" role="radiogroup" aria-label="Taslaklar">' +
-                t.taslaklar.map(function (x, i) {
-                    return '<button type="button" class="itr-taslak" role="radio" aria-checked="' + (t.secili === i) + '" data-taslak="' + i + '">' +
-                        '<span class="itr-taslak__aci"><i></i>' + kacis(x.aci || ('Taslak ' + (i + 1))) + '</span>' +
-                        '<span class="itr-taslak__metin">' + kacis(x.metin) + '</span></button>';
-                }).join('') + '</div>' +
-                '<button type="button" class="itr-arac" data-yaz>' + IKON.yildiz + 'Yeniden Yaz</button></section>';
+            yazici = '<div class="itr-yazici__bos"><span class="ikon">' + IKON.yildiz + '</span>' +
+                (d.sunucu === 'bekleniyor'
+                    ? '<strong>Sunucu güncellemesi bekleniyor</strong><p>Kurulum bitince taslak yazma burada açılır.</p>'
+                    : '<strong>Gemini anahtarı gerekiyor</strong><p>Taslakları senin anahtarınla yazıyoruz. Bir kez eklemen yeterli.</p><button type="button" class="itr-arac itr-arac--ana" data-ayar-ac>Anahtar Ekle</button>') +
+                '</div>';
+        } else if (t.yaziyor) {
+            yazici = '<div class="itr-yukleniyor" aria-busy="true">' +
+                '<span class="itr-iskelet" style="width:55%;height:28px;border-radius:9px"></span>' +
+                '<span class="itr-iskelet" style="width:96%"></span><span class="itr-iskelet" style="width:88%"></span><span class="itr-iskelet" style="width:72%"></span>' +
+                '<small>Üç taslak yazılıyor. Birkaç saniye sürer.</small></div>';
+        } else if (!t.taslaklar.length) {
+            yazici = '<div class="itr-yazici__bos"><span class="ikon">' + IKON.yildiz + '</span>' +
+                '<strong>Üç farklı taslak yazalım</strong>' +
+                '<p>Şikâyet türüne ve müşterinin notuna göre yazılır; kabul edilen eski itirazlarından öğrenir.</p>' +
+                '<button type="button" class="itr-arac itr-arac--ana" data-yaz>' + IKON.yildiz + 'Taslak Yaz</button></div>';
         } else {
-            taslakBolumu = '<section class="itr-bolum"><button type="button" class="itr-arac itr-arac--ana" data-yaz>' + IKON.yildiz + 'Taslak Yaz</button>' +
-                (t && t.eski ? '<p class="itr-ipucu">Aşağıda daha önce seçtiğin metin duruyor.</p>' : '') + '</section>';
+            var metin = metinAl(t);
+            yazici = '<div class="itr-sekmeler" role="tablist" aria-label="Taslaklar">' + t.taslaklar.map(function (x, i) {
+                    return '<button type="button" class="itr-sekme" role="tab" aria-selected="' + (t.secili === i) + '" data-taslak="' + i + '"><b>' + (i + 1) + '</b>' + kacis(x.aci || ('Taslak ' + (i + 1))) + '</button>';
+                }).join('') + '</div>' +
+                '<textarea class="itr-metin" id="itrMetin" maxlength="2000" aria-label="Gönderilecek itiraz metni">' + kacis(metin) + '</textarea>' +
+                '<div class="itr-yazici__alt"><button type="button" class="itr-kucuk" data-yaz>' + IKON.yildiz + 'Yeniden Yaz</button>' +
+                (t.duzen[t.secili] != null ? '<button type="button" class="itr-kucuk" data-geri-al>Taslağa Dön</button>' : '') +
+                '<span class="itr-sayac" id="itrSayac">' + metin.length + ' / 2000</span></div>';
         }
 
-        var duzen = '';
-        if (t && t.metin != null && (t.secili > -1 || t.eski || t.metin)) {
-            var oneri = t.oneri || '';
-            duzen = '<section class="itr-bolum"><h4>Gönderilecek Metin</h4>' +
-                '<textarea class="itr-metin" id="itrMetin" maxlength="2000" aria-label="Gönderilecek itiraz metni">' + kacis(t.metin) + '</textarea>' +
-                '<span class="itr-sayac" id="itrSayac">' + t.metin.length + ' / 2000</span></section>' +
-                '<section class="itr-bolum"><h4>İtiraz Sebebi</h4><div class="itr-sebepler" role="radiogroup" aria-label="İtiraz sebebi">' +
-                sebepListesi().map(function (s) {
-                    return '<button type="button" class="itr-sebep" role="radio" aria-checked="' + (t.sebep === s.ad) + '" data-sebep="' + kacis(s.ad) + '">' +
-                        kacis(s.ad) + (oneri === s.ad ? '<span class="itr-sebep__oneri">Öneri</span>' : '') + '</button>';
-                }).join('') + '</div></section>';
+        var ek = '';
+        if (yazmaHazir && !t.yaziyor) {
+            ek = '<div class="itr-ek">' + (t.ekAcik
+                ? '<label class="itr-etiket" for="itrEkNot">Bu Kayda Özel Bilgi</label><input type="text" class="itr-girdi" id="itrEkNot" maxlength="400" placeholder="Örn: sipariş iki poşete bölünmüştü" value="' + kacis(t.ekNot) + '"><p class="itr-ipucu">Taslak yazarken doğru kabul edilir.</p>'
+                : '<button type="button" class="itr-baglanti-dugme" data-ek-ac>+ Bu kayda özel bilgi ekle</button>') + '</div>';
+        }
+
+        var sebepBolumu = '';
+        if (t.taslaklar.length && !t.yaziyor) {
+            sebepBolumu = '<section><h3 class="itr-etiket">İtiraz Sebebi</h3>' +
+                '<button type="button" class="itr-sebep-sec" data-sebep-ac aria-expanded="' + t.sebepAcik + '">' +
+                    '<span' + (t.sebep ? '' : ' class="is-bos"') + '>' + kacis(t.sebep || 'Sebep seç') + '</span>' +
+                    (t.sebep && t.sebep === t.oneri ? '<small>Öneri</small>' : '') + IKON_ASAGI + '</button>' +
+                (t.sebepAcik ? '<div class="itr-sebepler" role="radiogroup" aria-label="İtiraz sebebi">' + sebepListesi().map(function (s) {
+                    return '<button type="button" class="itr-sebep" role="radio" aria-checked="' + (t.sebep === s.ad) + '" data-sebep="' + kacis(s.ad) + '"><i></i><span>' + kacis(s.ad) + '</span>' +
+                        (t.oneri === s.ad ? '<small>Öneri</small>' : '') + '</button>';
+                }).join('') + '</div>' : '') +
+                '</section>';
         }
 
         var eylem = '';
-        if (duzen) {
-            var asistanVar = d.asistan;
-            eylem = '<div class="itr-eylemler">' +
+        if (t.taslaklar.length && !t.yaziyor) {
+            eylem = '<div class="itr-eylemler"><div class="itr-eylemler__dugmeler">' +
                 '<button type="button" class="itr-arac" data-kopyala>' + IKON.kopya + 'Kopyala</button>' +
-                '<button type="button" class="itr-arac itr-arac--ana" data-doldur' + (asistanVar ? '' : ' disabled') + '>' + IKON.panel + 'Panelde Doldur</button>' +
+                '<button type="button" class="itr-arac itr-arac--ana" data-doldur' + (d.asistan ? '' : ' disabled') + '>' + IKON.panel + 'Panelde Doldur</button>' +
                 '</div>' +
-                (asistanVar ? '' : '<p class="itr-ipucu">Panelde doldurma bilgisayarda Jet Barkod Asistan ile çalışır. Telefonda metni kopyalayıp panele yapıştır.</p>') +
-                (d.hak === 0 ? '<p class="itr-ipucu">İtiraz hakkın 0 görünüyor; panel itirazı kabul etmeyebilir.</p>' : '');
+                (d.asistan
+                    ? '<p class="itr-ipucu">Panelde kaydı açar, sebebi ve metni forma yazar. Kaydet\'e sen basarsın.</p>'
+                    : '<p class="itr-ipucu">Panelde doldurma bilgisayarda Jet Barkod Asistan ile çalışır. Telefonda Kopyala ile panele yapıştır.</p>') +
+                (d.hak === 0 ? '<p class="itr-ipucu">İtiraz hakkın 0 görünüyor; panel itirazı kabul etmeyebilir.</p>' : '') +
+                '</div>';
         }
 
-        g.innerHTML = ust + yazBolumu + taslakBolumu + duzen + eylem;
+        ic.innerHTML = ust + '<div class="itr-detay__govde">' + not +
+            '<section><h3 class="itr-etiket">İtiraz Metni</h3><div class="itr-yazici">' + yazici + '</div></section>' +
+            ek + sebepBolumu + '</div>' + eylem;
     }
 
     async function taslakYaz() {
-        var k = kayitBul(d.acikKayit);
+        var k = kayitBul(d.secili);
         if (!k) return;
+        var t = taslakDurumu(k.id);
+        if (t.yaziyor) return;
         var ekNotEl = el('itrEkNot');
-        var t = d.taslak[k.id] = Object.assign(d.taslak[k.id] || { taslaklar: [], secili: -1, metin: null, sebep: '', oneri: '' }, {
-            yaziyor: true, ekNot: ekNotEl ? ekNotEl.value.trim() : ''
-        });
+        if (ekNotEl) t.ekNot = ekNotEl.value.trim();
+        t.yaziyor = true;
+        t.sebepAcik = false;
         detayCiz();
         var govde = { kayit_id: k.id, sebepler: sebepListesi().map(function (s) { return s.ad; }), ek_not: t.ekNot };
         var c = await postJson('/api/itiraz/yaz', govde);
@@ -610,47 +666,62 @@
         if (c.kod === 200 && c.j.ok && Array.isArray(c.j.taslaklar) && c.j.taslaklar.length) {
             t.taslaklar = c.j.taslaklar;
             t.secili = 0;
-            t.metin = t.taslaklar[0].metin;
+            t.duzen = {};
             t.oneri = c.j.sebep || '';
             if (t.oneri) t.sebep = t.oneri;
-            t.eski = false;
+            d.sunucuTaslak[k.id] = { taslaklar: t.taslaklar, sebep: t.oneri, ekNot: t.ekNot };
         } else {
             bildir(sunucuHataMetni(c), 'hata');
             if (c.j && c.j.error === 'anahtar_gecersiz') { d.ayar.anahtar = false; uyariCiz(); ayarCiz(); }
         }
-        if (d.acikKayit === k.id) detayCiz();
+        if (d.secili === k.id) detayCiz();
         listeCiz();
     }
 
-    function secimiKaydet(k, t) {
-        if (d.sunucu !== 'hazir' || !t.metin) return;
-        d.secilenler[k.id] = { metin: t.metin, sebep: t.sebep || '' };
-        postJson('/api/itiraz/sec', { kayit_id: k.id, metin: t.metin, sebep: t.sebep || '' });
+    /* Seçilen metin sunucuda: düzenleme bir buçuk saniye durunca, ya da
+       Kopyala / Panelde Doldur anında yazılır */
+    var kayitZaman = null;
+    function secimiKaydet(hemen) {
+        var k = kayitBul(d.secili);
+        var t = k && d.taslak[k.id];
+        if (!t || d.sunucu !== 'hazir') return;
+        var metin = metinAl(t);
+        if (!metin) return;
+        clearTimeout(kayitZaman);
+        var gonder = function () {
+            var onceki = d.secilenler[k.id];
+            if (onceki && onceki.metin === metin && onceki.sebep === (t.sebep || '')) return;
+            d.secilenler[k.id] = { metin: metin, sebep: t.sebep || '' };
+            postJson('/api/itiraz/sec', { kayit_id: k.id, metin: metin, sebep: t.sebep || '' });
+        };
+        if (hemen) gonder(); else kayitZaman = setTimeout(gonder, 1500);
     }
 
     async function kopyala() {
-        var k = kayitBul(d.acikKayit);
+        var k = kayitBul(d.secili);
         var t = k && d.taslak[k.id];
-        if (!t || !t.metin) return;
+        var metin = metinAl(t);
+        if (!metin) return;
         var ok = false;
-        try { await navigator.clipboard.writeText(t.metin); ok = true; } catch (e) {
+        try { await navigator.clipboard.writeText(metin); ok = true; } catch (e) {
             var alan = el('itrMetin');
             if (alan) { alan.select(); try { ok = document.execCommand('copy'); } catch (x) { ok = false; } }
         }
         bildir(ok ? 'Metin kopyalandı.' : 'Kopyalanamadı; metni seçip kopyala.', ok ? 'basari' : 'hata');
-        if (ok) secimiKaydet(k, t);
+        if (ok) secimiKaydet(true);
     }
 
     var dolduruyor = null;
     function panelDoldur() {
-        var k = kayitBul(d.acikKayit);
+        var k = kayitBul(d.secili);
         var t = k && d.taslak[k.id];
-        if (!t || !t.metin || !d.asistan) return;
-        if (!t.sebep) { bildir('Önce bir itiraz sebebi seç.'); return; }
-        secimiKaydet(k, t);
+        var metin = metinAl(t);
+        if (!metin || !d.asistan) return;
+        if (!t.sebep) { t.sebepAcik = true; detayCiz(); bildir('Önce bir itiraz sebebi seç.'); return; }
+        secimiKaydet(true);
         clearTimeout(dolduruyor);
         dolduruyor = setTimeout(function () { bildir('Jet Barkod Asistan yanıt vermedi.', 'hata'); }, 15000);
-        global.postMessage({ type: 'JB_ITIRAZ_DOLDUR', kayitId: k.id, metin: t.metin, sebep: t.sebep }, location.origin);
+        global.postMessage({ type: 'JB_ITIRAZ_DOLDUR', kayitId: k.id, metin: metin, sebep: t.sebep }, location.origin);
     }
 
     global.addEventListener('message', function (e) {
@@ -658,7 +729,7 @@
         var m = e.data;
         if (!m || m.type !== 'JB_ITIRAZ_DOLDUR_SONUC') return;
         clearTimeout(dolduruyor);
-        bildir(m.metin || (m.ok ? 'Panel açıldı.' : 'Panel açılamadı.'), m.ok ? 'basari' : 'hata');
+        bildir(m.ok ? 'Panel sekmesi açıldı; form dolduruluyor. Kontrol edip Kaydet\'e sen bas.' : (m.metin || 'Panel açılamadı.'), m.ok ? 'basari' : 'hata');
     });
 
     // ------------------------------------------------------------------
@@ -702,7 +773,7 @@
             d.anahtarDegisiyor = false;
             bildir('Anahtar kaydedildi.', 'basari');
             ayarCiz(); uyariCiz();
-            if (d.acikKayit) detayCiz();
+            detayCiz();
         } else {
             bildir(sunucuHataMetni(c), 'hata');
         }
@@ -727,6 +798,32 @@
     // Olaylar ve açılış
     // ------------------------------------------------------------------
 
+    // Ayarlar katmanı
+    var sonOdak = null;
+    function katmanAc(id) {
+        var k = el(id);
+        sonOdak = document.activeElement;
+        k.hidden = false;
+        document.body.classList.add('itr-kilit');
+        void k.offsetWidth; // geçiş için
+        k.classList.add('acik');
+        var kapat = k.querySelector('.itr-kapat');
+        if (kapat) kapat.focus({ preventScroll: true });
+    }
+
+    function katmanKapat(id) {
+        var k = el(id);
+        if (k.hidden) return;
+        k.classList.remove('acik');
+        var bitir = function () {
+            k.hidden = true;
+            if (!el('itrDetay').classList.contains('acik')) document.body.classList.remove('itr-kilit');
+            if (sonOdak && sonOdak.focus) sonOdak.focus({ preventScroll: true });
+        };
+        var sure = parseFloat(getComputedStyle(k.querySelector('.itr-panel')).transitionDuration) || 0;
+        if (sure > 0) setTimeout(bitir, sure * 1000); else bitir();
+    }
+
     function olaylariBagla() {
         el('itrYenile').addEventListener('click', function () { panelOku(true); });
         el('itrAyarAc').addEventListener('click', function () { katmanAc('itrAyar'); });
@@ -738,13 +835,14 @@
             document.querySelectorAll('.itr-segment [data-sekme]').forEach(function (x) {
                 x.setAttribute('aria-selected', String(x === b));
             });
+            if (!telefonMu()) d.secili = null;
             listeCiz();
         });
 
         el('itrListe').addEventListener('click', function (e) {
             if (e.target.closest('[data-yenile]')) { panelOku(true); return; }
             var b = e.target.closest('[data-kayit]');
-            if (b) detayAc(b.getAttribute('data-kayit'));
+            if (b) sec(b.getAttribute('data-kayit'));
         });
 
         document.addEventListener('click', function (e) {
@@ -756,42 +854,69 @@
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             if (!el('itrAyar').hidden) katmanKapat('itrAyar');
-            else if (!el('itrDetay').hidden) katmanKapat('itrDetay');
+            else if (el('itrDetay').classList.contains('acik')) telefonKapat();
         });
 
-        var govde = el('itrDetayGovde');
-        govde.addEventListener('click', function (e) {
-            var k = kayitBul(d.acikKayit);
+        if (telefonSorgu && telefonSorgu.addEventListener) {
+            telefonSorgu.addEventListener('change', function () {
+                if (!telefonMu()) { el('itrDetay').classList.remove('acik'); document.body.classList.remove('itr-kilit'); }
+                listeCiz();
+            });
+        }
+
+        var ic = el('itrDetayIc');
+        ic.addEventListener('click', function (e) {
+            var k = kayitBul(d.secili);
             var t = k && d.taslak[k.id];
+            if (e.target.closest('[data-geri]')) { telefonKapat(); return; }
             if (e.target.closest('[data-yaz]')) { taslakYaz(); return; }
             if (e.target.closest('[data-kopyala]')) { kopyala(); return; }
             if (e.target.closest('[data-doldur]')) { panelDoldur(); return; }
+            if (!t) return;
+            if (e.target.closest('[data-ek-ac]')) {
+                t.ekAcik = true;
+                detayCiz();
+                var g = el('itrEkNot');
+                if (g) g.focus();
+                return;
+            }
             var tb = e.target.closest('[data-taslak]');
-            if (tb && t) {
+            if (tb) {
                 t.secili = Number(tb.getAttribute('data-taslak'));
-                t.metin = t.taslaklar[t.secili].metin;
-                var ekNot = el('itrEkNot');
-                if (ekNot) t.ekNot = ekNot.value.trim();
+                detayCiz();
+                secimiKaydet(false);
+                return;
+            }
+            if (e.target.closest('[data-geri-al]')) {
+                delete t.duzen[t.secili];
+                detayCiz();
+                secimiKaydet(false);
+                return;
+            }
+            if (e.target.closest('[data-sebep-ac]')) {
+                t.sebepAcik = !t.sebepAcik;
                 detayCiz();
                 return;
             }
             var sb = e.target.closest('[data-sebep]');
-            if (sb && t) {
+            if (sb) {
                 t.sebep = sb.getAttribute('data-sebep');
-                govde.querySelectorAll('[data-sebep]').forEach(function (x) { x.setAttribute('aria-checked', String(x === sb)); });
+                t.sebepAcik = false;
+                detayCiz();
+                secimiKaydet(false);
             }
         });
-        govde.addEventListener('input', function (e) {
-            var k = kayitBul(d.acikKayit);
+        ic.addEventListener('input', function (e) {
+            var k = kayitBul(d.secili);
             if (!k) return;
+            var t = taslakDurumu(k.id);
             if (e.target.id === 'itrMetin') {
-                var t = d.taslak[k.id];
-                if (!t) return;
-                t.metin = e.target.value;
-                el('itrSayac').textContent = t.metin.length + ' / 2000';
+                t.duzen[t.secili] = e.target.value;
+                var sayac = el('itrSayac');
+                if (sayac) sayac.textContent = e.target.value.length + ' / 2000';
+                secimiKaydet(false);
             } else if (e.target.id === 'itrEkNot') {
-                d.taslak[k.id] = d.taslak[k.id] || { taslaklar: [], secili: -1, metin: null, sebep: '', oneri: '' };
-                d.taslak[k.id].ekNot = e.target.value;
+                t.ekNot = e.target.value;
             }
         });
 
@@ -802,7 +927,7 @@
             ayarCiz();
             el('itrAnahtarGirdi').focus();
         });
-        el('itrOlgular').addEventListener('change', function (e) {
+        el('itrOlgular').addEventListener('change', function () {
             var liste = JSON.parse(el('itrOlgular').dataset.liste || '[]');
             var secili = [];
             el('itrOlgular').querySelectorAll('input[data-olgu]').forEach(function (x) {
@@ -822,8 +947,14 @@
             olgulariKaydet();
         });
 
-        // Liste her dakika süreleri tazelesin (istek atmadan)
-        setInterval(function () { if (!document.hidden && d.durum === 'dolu') { ozetCiz(); listeCiz(); } }, 60000);
+        // Süreler her dakika tazelensin (istek atmadan); yazarken dokunma
+        setInterval(function () {
+            if (document.hidden || d.durum !== 'dolu') return;
+            ozetCiz();
+            var odak = document.activeElement;
+            if (odak && el('itrDetayIc').contains(odak)) return;
+            listeCiz();
+        }, 60000);
     }
 
     function bolumGoster(id) {
@@ -854,7 +985,7 @@
             global.JetBarkodAsistan.dinle(function (durum) {
                 var once = d.asistan;
                 d.asistan = !!(durum && durum.kurulu);
-                if (once !== d.asistan && d.acikKayit) detayCiz();
+                if (once !== d.asistan) detayCiz();
             });
         }
         ayarYukle();

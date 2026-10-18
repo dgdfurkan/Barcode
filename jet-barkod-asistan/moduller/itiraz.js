@@ -27,6 +27,8 @@
     var kok = null;
     var taslak = null;
     var mesgul = false;
+    var sonDurum = '';
+    var OTOMATIK_MS = 3 * 60 * 1000;
     var yolBekcisi = null;
 
     var STIL = [
@@ -121,7 +123,7 @@
                 '<p class="metin">' + kacir(taslak.metin) + '</p>' +
                 '<div class="dugmeler">' +
                     '<button type="button" class="dugme" data-is="kopyala">Kopyala</button>' +
-                    '<button type="button" class="dugme ana" data-is="yerlestir">Forma Yerleştir</button>' +
+                    '<button type="button" class="dugme ana" data-is="yerlestir">' + (taslak.yerlesti ? 'Tekrar Doldur' : 'Formu Doldur') + '</button>' +
                 '</div>' +
                 '<p class="durum" aria-live="polite"></p>' +
             '</div>';
@@ -134,6 +136,7 @@
         var is = b.getAttribute('data-is');
         if (is === 'kapat') {
             taslak = null;
+            sonDurum = '';
             try { chrome.storage.local.remove(ANAHTAR); } catch (x) { /* yetim bağlam */ }
             kaldir();
         } else if (is === 'kopyala') {
@@ -150,13 +153,16 @@
         if (mesgul || !taslak) return;
         mesgul = true;
         dugme.disabled = true;
-        durumYaz('Form açılıyor…');
+        durumYaz('Form açılıyor. Kaydet\'e basılmaz, son kontrol sende.');
         try {
             var modal = document.querySelector('.ant-modal textarea') ? document.querySelector('.ant-modal') : null;
             if (!modal) {
-                var ac = Array.prototype.find.call(document.querySelectorAll('button'), function (x) {
-                    return sade(x.textContent) === 'itiraz et' && !x.disabled;
-                });
+                // Sayfa yeni açıldıysa düğme birkaç saniye sonra geliyor
+                var ac = await bulBekle(function () {
+                    return Array.prototype.find.call(document.querySelectorAll('button'), function (x) {
+                        return sade(x.textContent) === 'itiraz et' && !x.disabled;
+                    }) || null;
+                }, 10000);
                 if (!ac) {
                     durumYaz('Bu kayıtta "İtiraz Et" düğmesi yok. Süre dolmuş ya da itiraz edilmiş olabilir.', 'kotu');
                     return;
@@ -198,8 +204,14 @@
             ta.focus();
 
             durumYaz(sebepTamam
-                ? 'Yerleştirildi. Kontrol edip panelde Kaydet\'e bas.'
-                : 'Metin yerleştirildi. Sebebi listeden sen seç, sonra Kaydet\'e bas.', sebepTamam ? 'iyi' : '');
+                ? 'Form dolduruldu. Kontrol edip panelde Kaydet\'e bas.'
+                : 'Metin yazıldı. Sebebi listeden sen seç, sonra Kaydet\'e bas.', sebepTamam ? 'iyi' : '');
+            sonDurum = kok ? kok.querySelector('.durum').textContent : '';
+            // Bir kez otomatik doldurulur; sayfa yenilense de tekrar açılmaz
+            if (!taslak.yerlesti) {
+                taslak.yerlesti = true;
+                try { chrome.storage.local.set({ [ANAHTAR]: taslak }); } catch (x) { /* yetim bağlam */ }
+            }
         } catch (x) {
             durumYaz('Form doldurulamadı. Metni kopyalayıp yapıştırabilirsin.', 'kotu');
         } finally {
@@ -214,6 +226,13 @@
                 var t = r && r[ANAHTAR];
                 taslak = t && t.kayitId && t.metin && Date.now() - (t.zaman || 0) < OMUR_MS ? t : null;
                 ciz();
+                if (sonDurum && kok) durumYaz(sonDurum, 'iyi');
+                // Jet Barkod'dan "Panelde Doldur" ile yeni geldiyse formu kendimiz açıp doldururuz.
+                // Kaydet'e basılmaz.
+                if (taslak && !taslak.yerlesti && Date.now() - (taslak.zaman || 0) < OTOMATIK_MS && kok && !mesgul) {
+                    var dugme = kok.querySelector('[data-is="yerlestir"]');
+                    if (dugme) yerlestir(dugme);
+                }
             });
         } catch (x) { /* yetim bağlam */ }
     }

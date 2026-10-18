@@ -829,11 +829,99 @@
                 barkod: Array.isArray(p.barcodes) && p.barcodes.length ? String(p.barcodes[0]) : ''
             },
             skt: k.expiryDate || null,
+            altNeden: String((k.subReason && k.subReason.values) || '').slice(0, 160),
+            nereden: String(k.fromLocationBarcode || '').slice(0, 60),
+            nereye: String(k.toLocationBarcode || '').slice(0, 60),
+            // Hasar fotoğrafı: süreli imzalı adres; sunucu bir kez indirip saklar
+            fotoKaynak: (Array.isArray(k.damagedPicUrls) ? k.damagedPicUrls : []).filter(function (u) {
+                return typeof u === 'string' && /^https:\/\//.test(u);
+            }).slice(0, 3),
             olusturan: gecmis.length ? kisiAdi(gecmis[0].picker) : '',
             gecmis: gecmis.slice(0, 20).map(function (g) {
                 return { durum: g.status, zaman: g.occurredAt, kisi: kisiAdi(g.picker), sonucTipi: typeof g.conclusionType === 'number' ? g.conclusionType : null };
             })
         };
+    }
+
+    // Detay (GET /blocked-stocks/<id>): listede olmayan red sebebi ve ürünün
+    // "satıştan kaldırılabileceği" gün sayısı (dead) yalnız burada. Panelin
+    // kendi detay isteği; kayıt başına bir kez (durum değişince yeniden),
+    // ürün başına bir kez. Tur başına en fazla 20 istek, 400 ms arayla.
+    var DETAY_ANAHTAR = 'jbKaldirmaDetay';
+    var DETAY_TUR = 20;
+
+    function detayDepoOku() {
+        try {
+            var d = JSON.parse(localStorage.getItem(DETAY_ANAHTAR) || 'null');
+            if (d && d.k && d.o) return d;
+        } catch (e) { /* bozuk */ }
+        return { k: {}, o: {} };
+    }
+
+    function detayDepoYaz(d) {
+        var sinir = Date.now() - 45 * 864e5;
+        Object.keys(d.k).forEach(function (id) { if ((d.k[id].t || 0) < sinir) delete d.k[id]; });
+        Object.keys(d.o).forEach(function (id) { if ((d.o[id].t || 0) < sinir) delete d.o[id]; });
+        try { localStorage.setItem(DETAY_ANAHTAR, JSON.stringify(d)); } catch (e) { /* dolu */ }
+    }
+
+    function detayIste(id, basliklar) {
+        return asilFetch(TEMEL + '/blocked-stocks/' + id, { method: 'GET', headers: basliklar, credentials: 'include' })
+            .then(function (r) {
+                if (r.status === 401 || r.status === 403) throw new Error('oturum');
+                return r.ok ? r.json() : null;
+            })
+            .then(function (j) { return j && j.data ? j.data : null; });
+    }
+
+    function kaldirmaZenginlestir(kayitlar, basliklar) {
+        var depo = detayDepoOku();
+        var redli = { 160: true, 700: true };
+        var is = [];
+        var urunIstenen = {};
+        kayitlar.forEach(function (k) {
+            var c = depo.k[k.id];
+            if (redli[k.durum] && (!c || c.s !== k.durum)) is.push({ id: k.id, oncelik: 0 });
+        });
+        kayitlar.forEach(function (k) {
+            var pid = k.urun && k.urun.id;
+            if (!pid || !k.skt || depo.o[pid] || urunIstenen[pid]) return;
+            urunIstenen[pid] = true;
+            is.push({ id: k.id, oncelik: 1 });
+        });
+        is.sort(function (a, b) { return a.oncelik - b.oncelik; });
+        is = is.slice(0, DETAY_TUR);
+        var temiz = {};
+        Object.keys(basliklar).forEach(function (h) { if (h.toLowerCase() !== 'content-type') temiz[h] = basliklar[h]; });
+
+        function sira(i) {
+            if (i >= is.length) return Promise.resolve();
+            return detayIste(is[i].id, temiz).then(function (v) {
+                if (v) {
+                    var rr = v.rejectReason || null;
+                    var baslik = rr && rr.value && (rr.value.tr || rr.value.en) || v.rejectDescription || '';
+                    var aciklama = rr && rr.description && (rr.description.tr || rr.description.en) || '';
+                    depo.k[v.id || is[i].id] = {
+                        s: v.status, t: Date.now(),
+                        red: baslik || aciklama ? { baslik: String(baslik).slice(0, 160), aciklama: String(aciklama).slice(0, 400) } : null
+                    };
+                    var pid = v.product && v.product.id;
+                    if (pid && typeof v.dead === 'number') depo.o[pid] = { g: v.dead, t: Date.now() };
+                }
+                return new Promise(function (coz) { setTimeout(coz, 400); }).then(function () { return sira(i + 1); });
+            });
+        }
+
+        return sira(0).catch(function () { /* oturum ya da ağ: elimizdekiyle devam */ }).then(function () {
+            detayDepoYaz(depo);
+            kayitlar.forEach(function (k) {
+                var c = depo.k[k.id];
+                if (c && c.red) k.red = c.red;
+                var pid = k.urun && k.urun.id;
+                if (pid && depo.o[pid]) k.oluGun = depo.o[pid].g;
+            });
+            return kayitlar;
+        });
     }
 
     function kaldirmaListesi(gun) {
@@ -885,7 +973,9 @@
                 if (liste.length === LIMIT && sonraki < toplam && sonraki < 3000) {
                     return new Promise(function (coz) { setTimeout(coz, ARA_MS); }).then(function () { return devam(sonraki); });
                 }
-                return { ok: true, kayitlar: kayitlar, toplam: toplam, firin: atlanan, gun: n };
+                return kaldirmaZenginlestir(kayitlar, basliklar).then(function () {
+                    return { ok: true, kayitlar: kayitlar, toplam: toplam, firin: atlanan, gun: n };
+                });
             });
         }
 
