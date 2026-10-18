@@ -846,9 +846,10 @@
     // Detay (GET /blocked-stocks/<id>): listede olmayan red sebebi ve ürünün
     // "satıştan kaldırılabileceği" gün sayısı (dead) yalnız burada. Panelin
     // kendi detay isteği; kayıt başına bir kez (durum değişince yeniden),
-    // ürün başına bir kez. Tur başına en fazla 20 istek, 400 ms arayla.
+    // ürün başına bir kez. Tur başına en fazla 60 istek, 400 ms arayla
+    // (ilk turlar dolunca saatte birkaç istek kalır).
     var DETAY_ANAHTAR = 'jbKaldirmaDetay';
-    var DETAY_TUR = 20;
+    var DETAY_TUR = 60;
 
     function detayDepoOku() {
         try {

@@ -285,6 +285,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         res.json({ ok: true, yazilan: kayitlar.length, bildirilecek: bildirilecek.length });
         // Yanıt döndükten sonra; Telegram yavaşsa Asistan beklemesin
         bildir(u, bildirilecek).catch((e) => console.warn('kaldirma bildir:', e && e.message));
+        if (fotoIsleri.length) console.log('kaldirma foto sirasi:', u, fotoIsleri.length);
         fotoIsleri.forEach(fotoSirayaKoy);
     });
 
@@ -300,7 +301,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
 
     const FOTO_KOK = path.resolve(process.env.STORAGE_ROOT || '/var/www/jetbarkod-storage', '.kaldirma-foto');
     const FOTO_AZAMI = 6 * 1024 * 1024;
-    const FOTO_TUR = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+    const FOTO_UZANTILAR = ['.jpg', '.png', '.webp'];
     const fotoKuyrugu = [];
     const kuyruktaki = new Set();
     let fotoCalisiyor = false;
@@ -325,20 +326,35 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         fotoIsle();
     }
 
+    /* Tür başlığa değil dosyanın ilk baytlarına göre: S3 çoğu zaman
+       "binary/octet-stream" gönderiyor. Yalnız JPEG, PNG, WEBP kabul. */
+    function fotoTuru(b) {
+        if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return '.jpg';
+        if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return '.png';
+        if (b.length > 12 && b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WEBP') return '.webp';
+        return null;
+    }
+
+    let fotoHataSayisi = 0;
+    function fotoHata(neden) {
+        if (fotoHataSayisi++ < 20) console.warn('kaldirma foto indirilemedi:', neden);
+    }
+
     async function fotoIndir(adres) {
         const ctrl = new AbortController();
         const zaman = setTimeout(() => ctrl.abort(), 20000);
         try {
             const r = await fetch(adres, { signal: ctrl.signal, redirect: 'error' });
-            if (!r.ok) return null;
-            const tur = String(r.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
-            if (!FOTO_TUR[tur]) return null;
+            if (!r.ok) { fotoHata('http ' + r.status); return null; }
             const boy = Number(r.headers.get('content-length') || 0);
-            if (boy > FOTO_AZAMI) return null;
+            if (boy > FOTO_AZAMI) { fotoHata('cok buyuk ' + boy); return null; }
             const veri = Buffer.from(await r.arrayBuffer());
-            if (!veri.length || veri.length > FOTO_AZAMI) return null;
-            return { veri, uzanti: FOTO_TUR[tur] };
+            if (!veri.length || veri.length > FOTO_AZAMI) { fotoHata('boyut ' + veri.length); return null; }
+            const uzanti = fotoTuru(veri);
+            if (!uzanti) { fotoHata('tur ' + String(r.headers.get('content-type') || '-').slice(0, 40)); return null; }
+            return { veri, uzanti };
         } catch (e) {
+            fotoHata(e && e.name === 'AbortError' ? 'zaman asimi' : String(e && e.message).slice(0, 80));
             return null;
         } finally {
             clearTimeout(zaman);
@@ -355,12 +371,12 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 const klasor = hesapKlasoru(is.u);
                 let sayi = 0;
                 for (let i = 0; i < is.adresler.length; i++) {
-                    if (!adresGecerliMi(is.adresler[i])) continue;
+                    if (!adresGecerliMi(is.adresler[i])) { fotoHata('adres suresi dolmus'); continue; }
                     const f = await fotoIndir(is.adresler[i]);
                     if (!f) continue;
                     try {
                         fs.mkdirSync(klasor, { recursive: true, mode: 0o750 });
-                        Object.values(FOTO_TUR).forEach((uz) => { try { fs.unlinkSync(path.join(klasor, is.id + '-' + (sayi + 1) + uz)); } catch (e) { /* yok */ } });
+                        FOTO_UZANTILAR.forEach((uz) => { try { fs.unlinkSync(path.join(klasor, is.id + '-' + (sayi + 1) + uz)); } catch (e) { /* yok */ } });
                         fs.writeFileSync(path.join(klasor, is.id + '-' + (sayi + 1) + f.uzanti), f.veri, { mode: 0o640 });
                         sayi++;
                     } catch (e) {
@@ -401,7 +417,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         const n = Number(req.params.n);
         if (!/^[a-f0-9]{24}$/.test(id) || !Number.isInteger(n) || n < 1 || n > 4) return res.status(400).json({ ok: false, error: 'gecersiz' });
         const klasor = hesapKlasoru(req.auth.username);
-        for (const uz of Object.values(FOTO_TUR)) {
+        for (const uz of FOTO_UZANTILAR) {
             const dosya = path.join(klasor, id + '-' + n + uz);
             if (fs.existsSync(dosya)) {
                 res.setHeader('Cache-Control', 'private, max-age=86400');
