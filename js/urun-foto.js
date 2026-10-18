@@ -6,6 +6,8 @@
  *  - Yakınlaştırma: tekerlek, çift tık, çift dokunma, iki parmak, + / - düğmeleri.
  *  - Yakınken sürükleyerek gezilir.
  *  - Kapatma: Esc, boşluğa basmak, sağ üstteki çarpı.
+ *  - Galeri (birden çok fotoğraf): sağ/sol ok, klavye okları, yana kaydırma,
+ *    alttaki küçük resimler. Yakınken kaydırma fotoğrafı gezer, geçiş yapmaz.
  *  - Açıkken arka sayfa kaymaz.
  *
  * Sayfalar eski adlarla çağırıyor: showImageModal(url, ad), closeImageModal().
@@ -88,11 +90,15 @@
                 '<div class="uf-sahne">' +
                     '<img class="uf-resim" alt="" decoding="async" draggable="false">' +
                     '<div class="uf-durum" data-uf="yukleniyor"><span class="uf-cark" aria-hidden="true"></span></div>' +
+                    '<button type="button" class="uf-ok uf-ok--sol" data-uf="onceki" aria-label="Önceki fotoğraf" hidden>' + ikon('<path d="M15 6l-6 6 6 6"/>') + '</button>' +
+                    '<button type="button" class="uf-ok uf-ok--sag" data-uf="sonraki" aria-label="Sonraki fotoğraf" hidden>' + ikon('<path d="M9 6l6 6-6 6"/>') + '</button>' +
+                    '<span class="uf-galeri-sayac" aria-live="polite" hidden></span>' +
                     '<div class="uf-durum" data-uf="hata" hidden>' +
                         ikon('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><path d="M4 4l16 16"/>') +
                         '<span>Görsel yüklenemedi</span>' +
                     '</div>' +
                 '</div>' +
+                '<div class="uf-kucukler" role="group" aria-label="Fotoğraflar" hidden></div>' +
                 '<div class="uf-arac">' +
                     '<button type="button" class="uf-dugme" data-uf="uzak" aria-label="Uzaklaştır">' + ikon('<path d="M5 12h14"/>') + '</button>' +
                     '<span class="uf-oran" aria-live="polite">%100</span>' +
@@ -123,6 +129,12 @@
             kopya: perde.querySelector('[data-uf="kopya"]'),
             barkodlar: [],
             barkodSira: 0,
+            galeri: [],
+            galeriSira: 0,
+            onceki: perde.querySelector('[data-uf="onceki"]'),
+            sonraki: perde.querySelector('[data-uf="sonraki"]'),
+            galeriSayac: perde.querySelector('.uf-galeri-sayac'),
+            kucukler: perde.querySelector('.uf-kucukler'),
             kapaninca: null,
             s: 1, x: 0, y: 0,
             isaretler: new Map(),
@@ -240,6 +252,7 @@
         }, { passive: false });
 
         sahne.addEventListener('dblclick', function (e) {
+            if (e.target.closest('.uf-ok')) return;
             if (d.sonIsaretTuru === 'touch') return; // dokunmada kendi çift dokunmamız var
             if (!d.resim.classList.contains('is-yuklendi')) return;
             ciftVurus(d, e.clientX, e.clientY);
@@ -247,6 +260,7 @@
 
         sahne.addEventListener('pointerdown', function (e) {
             d.sonIsaretTuru = e.pointerType;
+            if (e.target.closest('.uf-ok')) return; // ok düğmeleri kendi tıklamasını alsın
             if (!d.resim.classList.contains('is-yuklendi')) return;
             try { sahne.setPointerCapture(e.pointerId); } catch (err) {}
             d.isaretler.set(e.pointerId, { x: e.clientX, y: e.clientY, ilkX: e.clientX, ilkY: e.clientY });
@@ -290,6 +304,14 @@
             if (!s) return;
             var dx = e.clientX - s.x, dy = e.clientY - s.y;
             if (!s.oynadi && Math.abs(dx) + Math.abs(dy) > 4) s.oynadi = true;
+            // Galeri: yakın değilken yana kaydırma sonraki/önceki fotoğrafa geçer
+            if (d.s <= 1.001 && d.galeri.length > 1 && s.oynadi && (s.yana || Math.abs(dx) > Math.abs(dy))) {
+                s.yana = true;
+                s.sonDx = dx;
+                d.sahne.classList.remove('is-yumusak');
+                d.resim.style.transform = 'translate3d(' + dx + 'px,0,0)';
+                return;
+            }
             if (d.s > 1.001 && s.oynadi) {
                 sahne.classList.add('is-surukle');
                 d.x = s.dx + dx;
@@ -314,7 +336,13 @@
             }
 
             var oynadi = d.surukleme && d.surukleme.oynadi;
+            var yana = d.surukleme && d.surukleme.yana ? d.surukleme.sonDx || 0 : null;
             d.surukleme = null;
+            if (yana !== null) {
+                if (Math.abs(yana) > 56) galeriyeGit(d, d.galeriSira + (yana < 0 ? 1 : -1));
+                else uygula(d, true);
+                return;
+            }
 
             // Dokunmada çift dokunma
             if (e.type === 'pointerup' && e.pointerType === 'touch' && !oynadi) {
@@ -332,6 +360,13 @@
         sahne.addEventListener('pointercancel', birak);
 
         barkodBagla(d);
+
+        d.onceki.addEventListener('click', function () { galeriyeGit(d, d.galeriSira - 1); });
+        d.sonraki.addEventListener('click', function () { galeriyeGit(d, d.galeriSira + 1); });
+        d.kucukler.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-sira]');
+            if (b) galeriyeGit(d, Number(b.getAttribute('data-sira')));
+        });
 
         d.resim.addEventListener('load', function () {
             d.yukleniyor.hidden = true;
@@ -359,6 +394,11 @@
         if (e.key === '+' || e.key === '=') { e.preventDefault(); oranla(acik, acik.s * 1.5, null, null, true); return; }
         if (e.key === '-' || e.key === '_') { e.preventDefault(); oranla(acik, acik.s / 1.5, null, null, true); return; }
         if (e.key === '0') { e.preventDefault(); sifirla(acik, true); return; }
+        if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && acik.galeri.length > 1 && !acik.serit.contains(document.activeElement)) {
+            e.preventDefault();
+            galeriyeGit(acik, acik.galeriSira + (e.key === 'ArrowRight' ? 1 : -1));
+            return;
+        }
         if (e.key === 'Tab') {
             // Odak pencerenin dışına çıkmasın
             var odaklar = Array.prototype.filter.call(
@@ -470,6 +510,71 @@
         barkodSayaci(d);
     }
 
+    function resimYukle(d, url) {
+        d.resim.classList.remove('is-yuklendi');
+        d.yukleniyor.hidden = false;
+        d.hata.hidden = true;
+        d.s = 1; d.x = 0; d.y = 0;
+        d.isaretler.clear();
+        d.sikistirma = null;
+        d.surukleme = null;
+        uygula(d, false);
+        if (url) {
+            d.resim.src = String(url);
+            if (d.resim.complete && d.resim.naturalWidth > 0) {
+                d.yukleniyor.hidden = true;
+                d.resim.classList.add('is-yuklendi');
+            }
+        } else {
+            d.resim.removeAttribute('src');
+            d.yukleniyor.hidden = true;
+            d.hata.hidden = false;
+        }
+    }
+
+    function galeriDurumu(d) {
+        var n = d.galeri.length;
+        var cok = n > 1;
+        d.onceki.hidden = d.sonraki.hidden = d.galeriSayac.hidden = d.kucukler.hidden = !cok;
+        d.perde.classList.toggle('uf-perde--galerili', cok);
+        if (!cok) return;
+        d.onceki.disabled = d.galeriSira <= 0;
+        d.sonraki.disabled = d.galeriSira >= n - 1;
+        d.galeriSayac.textContent = (d.galeriSira + 1) + ' / ' + n;
+        var kucuk = d.kucukler.children;
+        for (var i = 0; i < kucuk.length; i++) {
+            kucuk[i].setAttribute('aria-current', String(i === d.galeriSira));
+        }
+        var secili = kucuk[d.galeriSira];
+        if (secili && secili.scrollIntoView) {
+            try { secili.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: hareketAzMi() ? 'auto' : 'smooth' }); } catch (e) { /* eski tarayıcı */ }
+        }
+    }
+
+    function galeriyeGit(d, i) {
+        if (i < 0 || i >= d.galeri.length || i === d.galeriSira) { uygula(d, true); return; }
+        d.galeriSira = i;
+        resimYukle(d, d.galeri[i]);
+        galeriDurumu(d);
+    }
+
+    function galeriYaz(d, liste, sira) {
+        d.galeri = (Array.isArray(liste) ? liste : []).filter(function (u) { return typeof u === 'string' && u; });
+        d.galeriSira = Math.max(0, Math.min(d.galeri.length - 1, Number(sira) || 0));
+        var h = '';
+        if (d.galeri.length > 1) {
+            for (var i = 0; i < d.galeri.length; i++) {
+                h += '<button type="button" class="uf-kucuk" data-sira="' + i + '" aria-label="Fotoğraf ' + (i + 1) + '"><img alt="" decoding="async" loading="lazy"></button>';
+            }
+        }
+        d.kucukler.innerHTML = h;
+        Array.prototype.forEach.call(d.kucukler.querySelectorAll('img'), function (img, i) {
+            img.referrerPolicy = 'no-referrer';
+            img.src = d.galeri[i];
+        });
+        galeriDurumu(d);
+    }
+
     /**
      * @param {string} url
      * @param {string} ad
@@ -477,6 +582,8 @@
      *   barkodlar  Adın altında kaydırılabilir şerit.
      *   arac       false: alttaki yakınlaştırma çubuğu gizli (kişi fotoğrafı).
      *   kapaninca  Pencere kapanınca bir kez çağrılır.
+     *   galeri     Birden çok fotoğraf: adres listesi. `url` boşsa galeri[sira] açılır.
+     *   sira       Galeride açılacak fotoğraf (0'dan).
      */
     function ac(url, ad, secenek) {
         secenek = secenek || {};
@@ -500,26 +607,8 @@
         d.perde.classList.toggle('uf-perde--aracsiz', secenek.arac === false);
         d.kapaninca = typeof secenek.kapaninca === 'function' ? secenek.kapaninca : null;
         d.resim.alt = ad ? String(ad) : '';
-        d.resim.classList.remove('is-yuklendi');
-        d.yukleniyor.hidden = false;
-        d.hata.hidden = true;
-        d.s = 1; d.x = 0; d.y = 0;
-        d.isaretler.clear();
-        d.sikistirma = null;
-        d.surukleme = null;
-        uygula(d, false);
-
-        if (url) {
-            d.resim.src = String(url);
-            if (d.resim.complete && d.resim.naturalWidth > 0) {
-                d.yukleniyor.hidden = true;
-                d.resim.classList.add('is-yuklendi');
-            }
-        } else {
-            d.resim.removeAttribute('src');
-            d.yukleniyor.hidden = true;
-            d.hata.hidden = false;
-        }
+        galeriYaz(d, secenek.galeri, secenek.sira);
+        resimYukle(d, url || d.galeri[d.galeriSira] || '');
 
         if (yeni) {
             d.oncekiOdak = document.activeElement;

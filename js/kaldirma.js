@@ -550,18 +550,17 @@
         });
     }
 
+    /* Ürün Arama'daki fotoğraf penceresi (js/urun-foto.js): yakınlaştırma,
+       birden çok fotoğrafta sağ/sol, kaydırma, küçük resimler */
     function fotoBuyut(anahtar) {
-        var adres = fotoAdresleri[anahtar];
-        if (!adres) return;
-        var k = document.createElement('div');
-        k.className = 'kld-buyuk';
-        k.setAttribute('role', 'dialog');
-        k.setAttribute('aria-label', 'Hasar fotoğrafı');
-        k.innerHTML = '<img alt="" referrerpolicy="no-referrer"><button type="button" class="kld-kapat" aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>';
-        k.querySelector('img').src = adres;
-        k.addEventListener('click', function () { k.remove(); });
-        document.body.appendChild(k);
-        k.querySelector('button').focus({ preventScroll: true });
+        var p = anahtar.split('/');
+        var id = p[0];
+        var liste = [];
+        for (var n = 1; n <= 4; n++) if (fotoAdresleri[id + '/' + n]) liste.push(fotoAdresleri[id + '/' + n]);
+        if (!liste.length) return;
+        var sira = Math.max(0, liste.indexOf(fotoAdresleri[anahtar]));
+        var ad = (el('kldDetayAd').textContent || 'Ürün') + ' · Hasarlı Görsel';
+        if (global.JBUrunFoto) global.JBUrunFoto.ac(null, ad, { galeri: liste, sira: sira });
     }
 
     function detayKapat() {
@@ -743,8 +742,8 @@
         });
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
-            var b = document.querySelector('.kld-buyuk');
-            if (b) b.remove(); else detayKapat();
+            if (global.JBUrunFoto && global.JBUrunFoto.acikMi()) return;
+            detayKapat();
         });
         el('kldIndir').addEventListener('click', gorselIndir);
         el('kldTelegram').addEventListener('click', telegramaGonder);
