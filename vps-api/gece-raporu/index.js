@@ -34,7 +34,69 @@ const telegram = require('../sayim-raporu/telegram');
 const gorsel = require('../sayim-raporu/gorsel');
 const kart = require('./kart');
 
+const { Resvg } = require('@resvg/resvg-js');
+
 const HAKLAR = ['satistanKaldirma', 'itirazYazici', 'stokSayimi', 'jetBarkodAsistan'];
+const KATALOG = 'https://jetbarkod.com.tr/products.json';
+const S3 = /^https:\/\/getir-stock\.s3\.[a-z0-9-]+\.amazonaws\.com\/blocked-stock\/[^\s"'<>]+$/;
+const BEKLEYEN = new Set([100, 150, 200, 300]);
+
+const sadeAd = (s) => String(s || '').toLocaleLowerCase('tr').replace(/\s+/g, ' ').trim();
+
+/* Jet Barkod'un kendi ürün kataloğu (herkese açık): ürün kimliği ve adıyla görsel.
+   12 saatte bir tazelenir; alınamazsa bir saat sonra yeniden denenir. */
+let katalog = { zaman: 0, id: new Map(), ad: new Map() };
+async function katalogAl() {
+    if (Date.now() - katalog.zaman < 12 * 3600 * 1000) return katalog;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 20000);
+    try {
+        const r = await fetch(KATALOG, { signal: ctrl.signal });
+        if (!r.ok) throw new Error('http ' + r.status);
+        const j = await r.json();
+        const liste = Array.isArray(j && j.products) ? j.products : [];
+        const id = new Map();
+        const ad = new Map();
+        liste.forEach((u) => {
+            if (!u || typeof u.image !== 'string' || !/^https:\/\//.test(u.image)) return;
+            if (KIMLIK.test(String(u.id || ''))) id.set(String(u.id), u.image);
+            if (u.name) ad.set(sadeAd(u.name), { id: String(u.id || ''), image: u.image });
+        });
+        katalog = { zaman: Date.now(), id, ad };
+    } catch (e) {
+        katalog.zaman = Date.now() - 11 * 3600 * 1000;
+    } finally {
+        clearTimeout(t);
+    }
+    return katalog;
+}
+
+/* Hasar fotoğrafı: panelin süreli linki; yalnız karta çizmek için indirilir,
+   diske yazılmaz. 360 px'e küçültülür. */
+async function hasarFotosu(adres) {
+    if (!S3.test(adres || '')) return null;
+    try {
+        const bitis = Number(new URL(adres).searchParams.get('Expires'));
+        if (bitis && bitis * 1000 < Date.now() + 5000) return null;
+    } catch (e) { return null; }
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10000);
+    try {
+        const r = await fetch(adres, { signal: ctrl.signal, redirect: 'error' });
+        if (!r.ok) return null;
+        const b = Buffer.from(await r.arrayBuffer());
+        if (!b.length || b.length > 8 * 1024 * 1024) return null;
+        const tur = b[0] === 0xff && b[1] === 0xd8 ? 'jpeg' : b[0] === 0x89 && b[1] === 0x50 ? 'png' : null;
+        if (!tur) return null;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360"><rect width="360" height="360" fill="#fff"/>` +
+            `<image href="data:image/${tur};base64,${b.toString('base64')}" width="360" height="360" preserveAspectRatio="xMidYMid slice"/></svg>`;
+        return new Resvg(svg, { font: { loadSystemFonts: false } }).render().asPng();
+    } catch (e) {
+        return null;
+    } finally {
+        clearTimeout(t);
+    }
+}
 const GUN_MS = 24 * 3600 * 1000;
 const KIMLIK = /^[0-9a-f]{24}$/;
 
@@ -104,11 +166,26 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         } catch (e) { return []; }
     }
 
+    /** Hesabın rapor seçimleri; kolonlar yoksa (eski kurulum) varsayılanlar */
+    async function ayarOku(u) {
+        try {
+            const r = await pool.query('SELECT acik, bekleyen, foto FROM gece.ayar WHERE username = $1', [u]);
+            const a = r.rows[0];
+            return { acik: a ? a.acik : true, bekleyen: !!(a && a.bekleyen), foto: !!(a && a.foto) };
+        } catch (e) {
+            if (!semaYok(e)) throw e;
+            try {
+                const r = await pool.query('SELECT acik FROM gece.ayar WHERE username = $1', [u]);
+                return { acik: r.rows[0] ? r.rows[0].acik : true, bekleyen: false, foto: false };
+            } catch (x) { return { acik: true, bekleyen: false, foto: false }; }
+        }
+    }
+
     // -----------------------------------------------------------------
     // Veri
     // -----------------------------------------------------------------
 
-    async function kaldirmaVerisi(u, bas, son) {
+    async function kaldirmaVerisi(u, bas, son, ayar = {}) {
         let r;
         try {
             r = await pool.query(
@@ -120,7 +197,16 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         } catch (e) { if (semaYok(e)) return []; throw e; }
         const tum = r.rows;
         const sonuc = [];
+        const bekleyen = [];
         for (const k of tum) {
+            const fotolar = ayar.foto && Array.isArray(k.veri && k.veri.fotolar) ? k.veri.fotolar.filter((x) => S3.test(x)).slice(0, 3) : [];
+            if (ayar.bekleyen && BEKLEYEN.has(k.durum)) {
+                bekleyen.push({
+                    urun: { id: k.veri.urun && k.veri.urun.id, ad: k.veri.urun && k.veri.urun.ad, gorsel: k.veri.urun && k.veri.urun.gorsel },
+                    adet: Number(k.adet) || 0, sebep: k.sebep || '', altNeden: k.veri.altNeden || '',
+                    durum: k.durum, bekliyor: true, zaman: k.olusturma, fotoAdres: fotolar,
+                });
+            }
             const gecmis = Array.isArray(k.veri && k.veri.gecmis) ? k.veri.gecmis : [];
             const olay = gecmis.filter((g) => g && (g.durum === 160 || g.durum === 700) && g.zaman &&
                 Date.parse(g.zaman) > bas.getTime() && Date.parse(g.zaman) <= son.getTime()).pop();
@@ -140,10 +226,13 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 durum: k.durum,
                 yeniden,
                 zaman: olay.zaman,
+                fotoAdres: fotolar,
             });
         }
         // Önce gerçek redler, sonra yeniden girilenler; her grupta en yeni üstte
-        return sonuc.sort((a, b) => (a.yeniden - b.yeniden) || (Date.parse(b.zaman) - Date.parse(a.zaman)));
+        sonuc.sort((a, b) => (a.yeniden - b.yeniden) || (Date.parse(b.zaman) - Date.parse(a.zaman)));
+        bekleyen.sort((a, b) => Date.parse(b.zaman) - Date.parse(a.zaman));
+        return { red: sonuc, bekleyen };
     }
 
     async function itirazVerisi(u, bas, son) {
@@ -151,7 +240,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         let b;
         try {
             b = await pool.query(
-                `SELECT urun, sikayet, musteri_notu, son_tarih, (secilen_metin IS NOT NULL) AS taslak
+                `SELECT urun, sikayet, musteri_notu, son_tarih, (secilen_metin IS NOT NULL) AS taslak, to_jsonb(itiraz.kayitlar)->>'urun_id' AS urun_id
                    FROM itiraz.kayitlar
                   WHERE username = $1 AND durum = 100 AND son_tarih > now()
                   ORDER BY son_tarih LIMIT 30`,
@@ -161,15 +250,15 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         let s = { rows: [] };
         try {
             s = await pool.query(
-                `SELECT urun, sikayet, durum, itiraz_metni FROM itiraz.kayitlar
+                `SELECT urun, sikayet, durum, itiraz_metni, to_jsonb(itiraz.kayitlar)->>'urun_id' AS urun_id FROM itiraz.kayitlar
                   WHERE username = $1 AND durum IN (300, 400) AND durum_degisti_at > $2 AND durum_degisti_at <= $3
                   ORDER BY durum_degisti_at DESC LIMIT 30`,
                 [u, bas, son]
             );
         } catch (e) { if (!semaYok(e)) throw e; }
         return {
-            bekleyen: b.rows.map((x) => ({ urun: x.urun, sikayet: x.sikayet, musteriNotu: x.musteri_notu, sonTarih: x.son_tarih, taslak: x.taslak })),
-            sonuc: s.rows.map((x) => ({ urun: x.urun, sikayet: x.sikayet, durum: x.durum, itirazMetni: x.itiraz_metni })),
+            bekleyen: b.rows.map((x) => ({ urun: x.urun, urunId: x.urun_id, sikayet: x.sikayet, musteriNotu: x.musteri_notu, sonTarih: x.son_tarih, taslak: x.taslak })),
+            sonuc: s.rows.map((x) => ({ urun: x.urun, urunId: x.urun_id, sikayet: x.sikayet, durum: x.durum, itirazMetni: x.itiraz_metni })),
         };
     }
 
@@ -205,11 +294,13 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     /** Raporun bütün kartları (PNG listesi) ve başlık */
     async function raporHazirla(u, son = new Date()) {
         const bas = new Date(son.getTime() - GUN_MS);
-        const [kaldirma, itiraz, sayim] = await Promise.all([
-            kaldirmaVerisi(u, bas, son),
+        const ayar = await ayarOku(u);
+        const [kd, itiraz, sayim] = await Promise.all([
+            kaldirmaVerisi(u, bas, son, ayar),
             itirazVerisi(u, bas, son),
             sayimVerisi(u, bas, son),
         ]);
+        const kaldirma = kd.red;
         const gun = istanbul(son.getTime()).gun;
         const gercekRed = kaldirma.filter((k) => !k.yeniden).length;
         const farkUrun = sayim.reduce((t, g) => t + g.farklar.length, 0);
@@ -226,24 +317,48 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             farkUrun,
             gunluk: gunluk.length ? { urun: gunluk.reduce((t, g) => t + g.urun, 0), fark: gunluk.reduce((t, g) => t + g.farklar.length, 0) } : null,
         })];
-        if (kaldirma.length) {
-            const urunler = [];
-            const gorulen = new Set();
-            kaldirma.forEach((k) => {
-                if (k.urun.id && /^https:\/\//.test(k.urun.gorsel || '') && !gorulen.has(k.urun.id)) {
-                    gorulen.add(k.urun.id);
-                    urunler.push({ id: k.urun.id, gorsel: k.urun.gorsel });
-                }
+        // Ürün görselleri: kaldırmada kaydın kendi görseli, itirazda katalogdan (kimlik ya da ad)
+        const urunler = [];
+        const gorulen = new Set();
+        const ekle = (id, adres) => {
+            if (id && KIMLIK.test(id) && /^https:\/\//.test(adres || '') && !gorulen.has(id)) { gorulen.add(id); urunler.push({ id, gorsel: adres }); }
+        };
+        kaldirma.concat(kd.bekleyen).forEach((k) => ekle(k.urun.id, k.urun.gorsel));
+        const itirazlar = itiraz.bekleyen.concat(itiraz.sonuc);
+        if (itirazlar.length) {
+            const kt = await katalogAl();
+            itirazlar.forEach((k) => {
+                let id = KIMLIK.test(String(k.urunId || '')) ? k.urunId : '';
+                let adres = id ? kt.id.get(id) : '';
+                if (!adres) { const x = kt.ad.get(sadeAd(k.urun)); if (x) { id = x.id; adres = x.image; } }
+                k.gorselId = id;
+                ekle(id, adres);
             });
-            const gorseller = urunler.length ? await gorsel.topluGetir(urunler.slice(0, 40), 20000) : new Map();
-            kartlar.push(...kart.kaldirmaKartlari(kaldirma, gorseller, gun));
         }
-        if (itiraz.bekleyen.length || itiraz.sonuc.length) kartlar.push(...kart.itirazKartlari(itiraz.bekleyen, itiraz.sonuc, gun));
+        const gorseller = urunler.length ? await gorsel.topluGetir(urunler.slice(0, 60), 25000) : new Map();
+
+        // Hasar fotoğrafları (seçiliyse): en çok 24, 25 sn içinde
+        if (ayar.foto) {
+            const bitis = Date.now() + 25000;
+            let sayi = 0;
+            for (const k of kaldirma.concat(kd.bekleyen)) {
+                k.fotolar = [];
+                for (const adres of k.fotoAdres || []) {
+                    if (sayi >= 24 || Date.now() > bitis) break;
+                    const f = await hasarFotosu(adres);
+                    if (f) { k.fotolar.push(f); sayi++; }
+                }
+            }
+        }
+
+        if (kaldirma.length || kd.bekleyen.length) kartlar.push(...kart.kaldirmaKartlari(kaldirma, gorseller, gun, kd.bekleyen));
+        if (itirazlar.length) kartlar.push(...kart.itirazKartlari(itiraz.bekleyen, itiraz.sonuc, gun, gorseller));
         if (sayim.length) kartlar.push(...kart.sayimKartlari(sayim, gun));
 
         const satir = [];
         satir.push('🌙 Gece Raporu · ' + new Date(son).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long' }));
         if (gercekRed) satir.push(gercekRed + ' satıştan kaldırma reddedildi');
+        if (kd.bekleyen.length) satir.push(kd.bekleyen.length + ' satıştan kaldırma bekliyor');
         if (itiraz.bekleyen.length) satir.push(itiraz.bekleyen.length + ' kayıt itiraz bekliyor');
         if (itiraz.sonuc.length) satir.push(itiraz.sonuc.length + ' itiraz sonuçlandı');
         if (farkUrun) satir.push(farkUrun + ' üründe sayım farkı');
@@ -359,11 +474,11 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         const u = req.auth.username;
         try {
             const [a, g, h] = await Promise.all([
-                pool.query('SELECT acik FROM gece.ayar WHERE username = $1', [u]),
+                ayarOku(u),
                 pool.query('SELECT gun::text AS gun, gonderildi, kart FROM gece.gonderim WHERE username = $1 ORDER BY gun DESC LIMIT 1', [u]),
                 alicilar(u),
             ]);
-            res.json({ ok: true, acik: a.rows[0] ? a.rows[0].acik : true, hesap: h.length, son: g.rows[0] || null });
+            res.json({ ok: true, acik: a.acik, bekleyen: a.bekleyen, foto: a.foto, hesap: h.length, son: g.rows[0] || null });
         } catch (e) {
             if (semaYok(e)) return res.status(503).json({ ok: false, error: 'kurulum_bekleniyor' });
             console.error('gece-raporu ayar:', e.message);
@@ -372,14 +487,33 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     });
 
     app.post('/api/gece-raporu/ayar', uye, async (req, res) => {
-        const acik = !!(req.body && req.body.acik);
+        const b = req.body || {};
+        const u = req.auth.username;
         try {
-            await pool.query(
-                `INSERT INTO gece.ayar (username, acik) VALUES ($1, $2)
-                 ON CONFLICT (username) DO UPDATE SET acik = EXCLUDED.acik, guncelleme = now()`,
-                [req.auth.username, acik]
-            );
-            res.json({ ok: true, acik });
+            // Yalnız gönderilen alanlar değişir
+            const eski = await ayarOku(u);
+            const yeni = {
+                acik: typeof b.acik === 'boolean' ? b.acik : eski.acik,
+                bekleyen: typeof b.bekleyen === 'boolean' ? b.bekleyen : eski.bekleyen,
+                foto: typeof b.foto === 'boolean' ? b.foto : eski.foto,
+            };
+            try {
+                await pool.query(
+                    `INSERT INTO gece.ayar (username, acik, bekleyen, foto) VALUES ($1, $2, $3, $4)
+                     ON CONFLICT (username) DO UPDATE SET acik = EXCLUDED.acik, bekleyen = EXCLUDED.bekleyen,
+                         foto = EXCLUDED.foto, guncelleme = now()`,
+                    [u, yeni.acik, yeni.bekleyen, yeni.foto]
+                );
+            } catch (e) {
+                if (e.code !== '42703') throw e;
+                if (typeof b.bekleyen === 'boolean' || typeof b.foto === 'boolean') return res.status(503).json({ ok: false, error: 'kurulum_bekleniyor' });
+                await pool.query(
+                    `INSERT INTO gece.ayar (username, acik) VALUES ($1, $2)
+                     ON CONFLICT (username) DO UPDATE SET acik = EXCLUDED.acik, guncelleme = now()`,
+                    [u, yeni.acik]
+                );
+            }
+            res.json({ ok: true, ...yeni });
         } catch (e) {
             if (semaYok(e)) return res.status(503).json({ ok: false, error: 'kurulum_bekleniyor' });
             console.error('gece-raporu ayar yaz:', e.message);

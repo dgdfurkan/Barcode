@@ -213,7 +213,13 @@
     function gunlukCiz(v) {
         if (!gunlukDurum) return;
         var bugun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date());
-        if (!v || v.gun !== bugun) { gunlukDurum.textContent = 'Bugün henüz eklenmedi.'; return; }
+        var ozet = document.getElementById('gunlukOzet');
+        if (!v || v.gun !== bugun) {
+            gunlukDurum.textContent = 'Bugün henüz eklenmedi.';
+            if (ozet) ozet.textContent = 'Bugün henüz eklenmedi';
+            return;
+        }
+        if (ozet) ozet.textContent = (v.durum === 'eklendi' ? 'Bugün eklendi · ' + (v.adet || 0) + ' ürün' : String(v.metin || '')) + ' · ' + saatYaz(v.zaman);
         gunlukDurum.textContent = '';
         var b = document.createElement('b');
         b.textContent = saatYaz(v.zaman);
@@ -262,31 +268,70 @@
     /* Gece raporu: ayar sunucuda (telefon ve bilgisayar aynı) */
     var geceAyar = document.getElementById('geceAyar');
     var geceDurum = document.getElementById('geceDurum');
+    var geceBekleyen = document.getElementById('geceBekleyen');
+    var geceFoto = document.getElementById('geceFoto');
+    var geceOzet = document.getElementById('geceOzet');
     function geceCiz(c) {
         if (!geceDurum) return;
         if (!c || !c.ok) {
             geceDurum.textContent = c && (c.kod === 404 || c.kod === 503) ? 'Sunucu güncellemesi bekleniyor.'
                 : c && c.kod === 401 ? 'Jet Barkod\'a bir kez giriş yap.' : 'Durum okunamadı.';
+            if (geceOzet) geceOzet.textContent = geceDurum.textContent;
             return;
         }
         geceAyar.checked = c.acik !== false;
         geceAyar.disabled = false;
+        geceBekleyen.checked = !!c.bekleyen;
+        geceFoto.checked = !!c.foto;
+        geceBekleyen.disabled = geceFoto.disabled = false;
+        if (geceOzet) {
+            geceOzet.textContent = c.acik === false ? 'Kapalı'
+                : 'Açık · 01:00' + (c.bekleyen ? ' · bekleyenler' : '') + (c.foto ? ' · fotoğraflar' : '');
+        }
         var m = !c.hesap ? 'Telegram bağlı değil.' : c.hesap + ' Telegram hesabına gider.';
         if (c.son && c.son.gonderildi) m += ' Son: ' + saatYaz(Date.parse(c.son.gonderildi)) + ' (' + c.son.gun.split('-').reverse().slice(0, 2).join('.') + ')';
         geceDurum.textContent = m;
     }
     if (geceAyar) {
         chrome.runtime.sendMessage({ type: 'JBA_GECE_AYAR' }, function (c) { void chrome.runtime.lastError; geceCiz(c); });
-        geceAyar.addEventListener('change', function () {
-            geceAyar.disabled = true;
-            chrome.runtime.sendMessage({ type: 'JBA_GECE_AYAR', acik: geceAyar.checked }, function (c) {
-                void chrome.runtime.lastError;
-                if (!c || !c.ok) geceAyar.checked = !geceAyar.checked;
-                geceAyar.disabled = false;
+        // Her kutu yalnız kendi alanını yazar; olmazsa geri alınır
+        [[geceAyar, 'acik'], [geceBekleyen, 'bekleyen'], [geceFoto, 'foto']].forEach(function (x) {
+            var kutu = x[0];
+            var alan = x[1];
+            kutu.addEventListener('change', function () {
+                kutu.disabled = true;
+                var m = { type: 'JBA_GECE_AYAR' };
+                m[alan] = kutu.checked;
+                chrome.runtime.sendMessage(m, function (c) {
+                    void chrome.runtime.lastError;
+                    if (!c || !c.ok) {
+                        kutu.checked = !kutu.checked;
+                        if (c && (c.kod === 503 || c.hata === 'kurulum_bekleniyor')) geceDurum.textContent = 'Sunucu güncellemesi bekleniyor.';
+                    } else {
+                        geceCiz(c);
+                    }
+                    kutu.disabled = false;
+                });
             });
         });
     }
     gunlukDugme('geceSimdi', { type: 'JBA_GECE_SIMDI' }, 'Gönderiliyor...', geceDurum);
+
+    /* Açılır kapanır bölümler: son durum hatırlanır */
+    Array.prototype.forEach.call(document.querySelectorAll('.kat__bas'), function (b) {
+        var govde = document.getElementById(b.getAttribute('aria-controls'));
+        var anahtar = 'jbaKapiKat_' + b.getAttribute('aria-controls');
+        var ac = function (acik) {
+            b.setAttribute('aria-expanded', String(acik));
+            govde.hidden = !acik;
+        };
+        try { ac(localStorage.getItem(anahtar) === '1'); } catch (e) { ac(false); }
+        b.addEventListener('click', function () {
+            var acik = b.getAttribute('aria-expanded') !== 'true';
+            ac(acik);
+            try { localStorage.setItem(anahtar, acik ? '1' : '0'); } catch (e) { /* sessiz */ }
+        });
+    });
     gunlukDugme('gunlukSimSabah', { type: 'JBA_GUNLUK_SIM', tur: 'sabah' }, 'Gösteriliyor...');
     gunlukDugme('gunlukSimGece', { type: 'JBA_GUNLUK_SIM', tur: 'gece' }, 'Gösteriliyor...');
 

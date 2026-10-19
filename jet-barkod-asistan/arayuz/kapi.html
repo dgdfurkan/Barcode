@@ -37,36 +37,44 @@
     <button type="button" class="eylem" id="firinSim">Simülasyonu Göster</button>
   </section>
 
-  <section class="ayar" aria-label="Günlük sayım">
-    <div class="ayar__metin">
-      <p class="ayar__ad">Günlük Sayım</p>
+  <section class="kat" id="katGunluk">
+    <button type="button" class="kat__bas" aria-expanded="false" aria-controls="katGunlukGovde">
+      <span class="kat__metin"><span class="ayar__ad">Günlük Sayım</span><span class="kat__ozet" id="gunlukOzet">Bugün henüz eklenmedi</span></span>
+      <svg class="kat__ok" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
+    </button>
+    <div class="kat__govde" id="katGunlukGovde" hidden>
       <p class="ayar__ozet">50'lik sayım her sabah 06:00'da sayım sayfasına kendiliğinden eklenir; sayfayı açmak gerekmez.</p>
-    </div>
-    <button type="button" class="eylem" id="gunlukEkle">Şimdi Ekle</button>
-  </section>
-  <section class="ayar ayar--alt ayar--secenek" aria-label="Günlük sayım ayarları">
-    <label class="secenek"><input type="checkbox" id="gunlukAyarEkle" checked><span>06:00'da sayımı ekle</span></label>
-    <label class="secenek"><input type="checkbox" id="gunlukAyarSabah" checked><span>08:00 kartı</span></label>
-    <label class="secenek"><input type="checkbox" id="gunlukAyarGece" checked><span>Gece uyarısı</span></label>
-  </section>
-  <section class="ayar ayar--alt" aria-label="Günlük sayım durumu">
-    <p class="ayar__durum" id="gunlukDurum">Bugün henüz eklenmedi.</p>
-    <div class="ayar__dugmeler">
-      <button type="button" class="eylem" id="gunlukSimSabah">08:00 Kartı</button>
-      <button type="button" class="eylem" id="gunlukSimGece">Gece Uyarısı</button>
+      <div class="kat__secenekler">
+        <label class="secenek"><input type="checkbox" id="gunlukAyarEkle" checked><span>06:00'da sayımı ekle</span></label>
+        <label class="secenek"><input type="checkbox" id="gunlukAyarSabah" checked><span>08:00 kartı</span></label>
+        <label class="secenek"><input type="checkbox" id="gunlukAyarGece" checked><span>Gece unutulan sayım uyarısı</span></label>
+      </div>
+      <p class="ayar__durum" id="gunlukDurum">Bugün henüz eklenmedi.</p>
+      <div class="kat__dugmeler">
+        <button type="button" class="eylem" id="gunlukEkle">Şimdi Ekle</button>
+        <button type="button" class="eylem" id="gunlukSimSabah">08:00 Kartı</button>
+        <button type="button" class="eylem" id="gunlukSimGece">Gece Uyarısı</button>
+      </div>
     </div>
   </section>
 
-  <section class="ayar" aria-label="Gece raporu">
-    <div class="ayar__metin">
-      <p class="ayar__ad">Gece Raporu</p>
+  <section class="kat" id="katGece">
+    <button type="button" class="kat__bas" aria-expanded="false" aria-controls="katGeceGovde">
+      <span class="kat__metin"><span class="ayar__ad">Gece Raporu</span><span class="kat__ozet" id="geceOzet">Okunuyor...</span></span>
+      <svg class="kat__ok" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
+    </button>
+    <div class="kat__govde" id="katGeceGovde" hidden>
       <p class="ayar__ozet">Her gece 01:00'de son 24 saat Telegram'a: reddedilen kaldırmalar, itirazlar, sayım farkları.</p>
+      <div class="kat__secenekler">
+        <label class="secenek"><input type="checkbox" id="geceAyar" checked disabled><span>Raporu gönder</span></label>
+        <label class="secenek"><input type="checkbox" id="geceBekleyen" disabled><span>Onay bekleyen kaldırmaları da ekle</span></label>
+        <label class="secenek"><input type="checkbox" id="geceFoto" disabled><span>Hasar fotoğraflarını da ekle</span></label>
+      </div>
+      <p class="ayar__durum" id="geceDurum">Okunuyor...</p>
+      <div class="kat__dugmeler">
+        <button type="button" class="eylem" id="geceSimdi">Test Gönder</button>
+      </div>
     </div>
-    <label class="secenek"><input type="checkbox" id="geceAyar" checked disabled><span>Açık</span></label>
-  </section>
-  <section class="ayar ayar--alt" aria-label="Gece raporu durumu">
-    <p class="ayar__durum" id="geceDurum">Okunuyor...</p>
-    <button type="button" class="eylem" id="geceSimdi">Şimdi Gönder</button>
   </section>
 
   <footer class="alt">

@@ -105,6 +105,7 @@ function grItirazSade(o) {
     aciklama: ac,
     musteriNotu: typeof fb.note === 'string' ? fb.note : '',
     urun: (veri.product && veri.product.fullName && veri.product.fullName.tr) || '',
+    urunId: veri.product && GR_KIMLIK.test(String(veri.product.id || '')) ? String(veri.product.id) : '',
     itirazMetni: typeof it.description === 'string' ? it.description : '',
     itirazSebepId: typeof it.reasonId === 'string' ? it.reasonId : '',
   };
@@ -220,8 +221,10 @@ chrome.runtime.onInstalled.addListener(grAlarmKur);
 chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
   if (!istek || typeof istek.type !== 'string') return false;
   if (istek.type === 'JBA_GECE_AYAR') {
-    const yaz = typeof istek.acik === 'boolean';
-    grApi('/api/gece-raporu/ayar', yaz ? { method: 'POST', govde: { acik: istek.acik } } : {})
+    const govde = {};
+    ['acik', 'bekleyen', 'foto'].forEach((k) => { if (typeof istek[k] === 'boolean') govde[k] = istek[k]; });
+    const yaz = Object.keys(govde).length > 0;
+    grApi('/api/gece-raporu/ayar', yaz ? { method: 'POST', govde } : {})
       .then((c) => cevapla(c.kod === 200 ? { ok: true, ...c.j } : { ok: false, kod: c.kod, hata: c.j && c.j.error }))
       .catch(() => cevapla({ ok: false }));
     return true;

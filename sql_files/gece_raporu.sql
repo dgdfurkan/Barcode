@@ -42,6 +42,13 @@ GRANT USAGE ON SCHEMA gece TO jetbarkod;
 GRANT SELECT, INSERT, UPDATE, DELETE ON gece.ayar     TO jetbarkod;
 GRANT SELECT, INSERT, UPDATE, DELETE ON gece.gonderim TO jetbarkod;
 
+-- Rapor içeriği seçimleri (Asistan penceresinden)
+ALTER TABLE gece.ayar ADD COLUMN IF NOT EXISTS bekleyen BOOLEAN NOT NULL DEFAULT false;  -- bekleyen kaldırmalar da
+ALTER TABLE gece.ayar ADD COLUMN IF NOT EXISTS foto     BOOLEAN NOT NULL DEFAULT false;  -- hasar fotoğrafları da
+
+-- İtiraz kaydının ürün kimliği (rapor kartında ürün görseli için)
+ALTER TABLE itiraz.kayitlar ADD COLUMN IF NOT EXISTS urun_id TEXT;
+
 -- İtirazın durumu ne zaman değişti (kabul / red geldiği an)
 ALTER TABLE itiraz.kayitlar ADD COLUMN IF NOT EXISTS durum_degisti_at TIMESTAMPTZ;
 

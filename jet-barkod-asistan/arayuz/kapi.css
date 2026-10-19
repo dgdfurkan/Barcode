@@ -248,14 +248,28 @@ body {
 }
 
 /* Günlük sayım: düğme yazısı değişince genişlik oynamasın */
-.ayar > #gunlukEkle { flex: none; width: 112px; text-align: center; }
-.ayar__dugmeler { flex: none; display: flex; flex-direction: column; gap: 6px; }
-.ayar--alt .ayar__dugmeler .eylem { width: 112px; }
 
 .ayar--secenek { flex-direction: column; align-items: flex-start; gap: 2px; }
 .secenek { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; font-size: 12px; color: var(--renk-yazi); cursor: pointer; }
 .secenek input { width: 16px; height: 16px; margin: 0; accent-color: var(--renk-vurgu); cursor: pointer; }
 
-.ayar > .secenek { flex: none; }
-.ayar > #geceSimdi { flex: none; }
-#geceSimdi { width: 112px; text-align: center; }
+
+/* ---------- Açılır kapanır bölümler (Günlük Sayım, Gece Raporu) ---------- */
+.kat { border-top: 1px solid var(--renk-cizgi); background: var(--renk-yumusak); }
+.kat__bas {
+    width: 100%; min-height: 52px; padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+    border: 0; background: transparent; color: var(--renk-yazi); font: inherit; text-align: left; cursor: pointer;
+}
+.kat__bas:hover { background: rgba(37, 99, 235, 0.04); }
+.kat__bas:focus-visible { outline: 2px solid var(--renk-vurgu); outline-offset: -2px; }
+.kat__metin { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.kat__ozet { font-size: 11px; line-height: 1.35; color: var(--renk-soluk); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kat__ok { flex: none; width: 16px; height: 16px; fill: none; stroke: var(--renk-soluk); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 160ms ease; }
+.kat__bas[aria-expanded="true"] .kat__ok { transform: rotate(180deg); }
+.kat__govde { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+.kat__govde[hidden] { display: none; }
+.kat__govde > .ayar__ozet { margin: 0; }
+.kat__secenekler { display: flex; flex-direction: column; gap: 2px; }
+.kat__dugmeler { display: flex; gap: 6px; }
+.kat__dugmeler .eylem { flex: 1 1 0; min-width: 0; min-height: 30px; text-align: center; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .kat__ok { transition: none; } }

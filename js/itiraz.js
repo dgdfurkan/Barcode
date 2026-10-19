@@ -145,6 +145,7 @@
             aciklama: ac,
             musteriNotu: typeof fb.note === 'string' ? fb.note : '',
             urun: (veri.product && veri.product.fullName && veri.product.fullName.tr) || '',
+            urunId: veri.product && /^[0-9a-f]{24}$/i.test(String(veri.product.id || '')) ? String(veri.product.id) : '',
             siparisTarihi: (veri.order && veri.order.date) || '',
             siparisId: veri.order && /^[0-9a-f]{24}$/i.test(String(veri.order.id || '')) ? String(veri.order.id) : '',
             siparisTur: Number.isFinite(parseInt(veri.domainType, 10)) ? parseInt(veri.domainType, 10) : null,
@@ -156,7 +157,7 @@
     function sunucuya(k) {
         return {
             id: k.id, durum: k.durum, kayitTarihi: k.kayitTarihi, sonTarih: k.sonTarih, kriter: k.kriter,
-            sikayet: k.sikayet, aciklama: k.aciklama, musteriNotu: k.musteriNotu, urun: k.urun,
+            sikayet: k.sikayet, aciklama: k.aciklama, musteriNotu: k.musteriNotu, urun: k.urun, urunId: k.urunId,
             itirazMetni: k.itirazMetni, itirazSebepId: k.itirazSebepId
         };
     }

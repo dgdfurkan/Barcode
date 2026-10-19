@@ -137,60 +137,122 @@ function ozetKarti(o) {
 }
 
 // ---------------------------------------------------------------------
-// Satıştan kaldırma: reddedilen ve iptal edilenler
+// Ortak: ürün görseli kutusu, kalan süre
 // ---------------------------------------------------------------------
 
-const KALDIRMA_SATIR = 196;
-
-/** k: { urun:{id,ad}, adet, sebep, altNeden, red:{baslik,aciklama}, durum, yeniden, zaman } */
-function kaldirmaKartlari(liste, gorseller, gun) {
-    const kartlar = [];
-    const sigan = Math.max(1, Math.floor((AZAMI_BOY - P - 100 - 34 - 104) / (KALDIRMA_SATIR + 16)));
-    for (let bas = 0; bas < liste.length; bas += sigan) {
-        const parca = liste.slice(bas, bas + sigan);
-        const p = [''];
-        let y = ust(p, 'Reddedilen Satıştan Kaldırmalar', 'Son 24 saatte reddedilen ya da iptal edilen kayıtlar', gunAd(gun).split(' ').slice(0, 2).join(' '));
-        y = bolumBasligi(p, y, 'KAYITLAR', liste.length);
-        parca.forEach((k, i) => {
-            const x = P;
-            const h = KALDIRMA_SATIR;
-            const sinir = k.yeniden ? R.cizgi : '#fda29b';
-            p.push(`<rect x="${x}" y="${y}" width="${IC}" height="${h}" rx="22" fill="${R.kart}" stroke="${sinir}"/>`);
-            const id = 'g' + bas + '_' + i;
-            p.push(`<clipPath id="${id}"><rect x="${x + 20}" y="${y + 20}" width="120" height="120" rx="16"/></clipPath>`);
-            const img = veriUri(gorseller.get(k.urun && k.urun.id));
-            if (img) p.push(`<image href="${img}" x="${x + 20}" y="${y + 20}" width="120" height="120" preserveAspectRatio="xMidYMid meet" clip-path="url(#${id})"/>`);
-            else p.push(`<rect x="${x + 20}" y="${y + 20}" width="120" height="120" rx="16" fill="${R.zemin}"/>`);
-            // adet rozeti görselin altında
-            const etiket = '×' + adetYaz(Number(k.adet) || 0);
-            const rG = genislik(OLCU.baslik, etiket, 20) + 24;
-            p.push(`<rect x="${x + 80 - rG / 2}" y="${y + 148}" width="${rG}" height="32" rx="16" fill="#111827"/>`);
-            p.push(yazi(x + 80, y + 171, etiket, { boy: 20, aile: 'Manrope', agirlik: 800, renk: '#ffffff', hiza: 'middle' }));
-
-            const mx = x + 164;
-            const mG = IC - 164 - 24;
-            const durumYazi = k.yeniden ? 'Yeniden girildi' : k.durum === 700 ? 'İptal edildi' : 'Reddedildi';
-            const dG = genislik(OLCU.govdeKalin, durumYazi, 16) + 24;
-            cip(p, x + IC - 20 - dG, y + 20, durumYazi, k.yeniden ? R.sonuk : R.kirmizi, k.yeniden ? R.zemin : R.kirmiziZemin, 16);
-            const ad = ikiSatir(OLCU.govdeKalin, (k.urun && k.urun.ad) || 'Ürün', 22, mG - dG - 16);
-            ad.forEach((s, j) => p.push(yazi(mx, y + 44 + j * 28, s, { boy: 22, agirlik: 600 })));
-            let ly = y + 44 + ad.length * 28 + 4;
-            const sebep = [k.sebep, k.altNeden].filter(Boolean).join(' · ');
-            if (sebep) { p.push(yazi(mx, ly, kirp(OLCU.govde, sebep, 18, mG), { boy: 18, renk: R.sonuk })); ly += 30; }
-            if (k.red && (k.red.baslik || k.red.aciklama)) {
-                p.push(yazi(mx, ly + 4, kirp(OLCU.govdeKalin, k.red.baslik || 'Red sebebi', 19, mG), { boy: 19, agirlik: 600, renk: R.kirmizi }));
-                if (k.red.aciklama) p.push(yazi(mx, ly + 30, kirp(OLCU.govde, k.red.aciklama, 17, mG), { boy: 17, renk: R.orta }));
-            }
-            if (k.zaman) p.push(yazi(x + IC - 20, y + h - 18, tarihSaat(k.zaman), { boy: 16, renk: R.sonuk, hiza: 'end' }));
-            y += h + 16;
-        });
-        const H = y + 104 - 16;
-        p[0] = `<rect width="${G}" height="${H}" fill="${R.zemin}"/>`;
-        const toplamSayfa = Math.ceil(liste.length / sigan);
-        alt(p, H, toplamSayfa > 1 ? (Math.floor(bas / sigan) + 1) + ' / ' + toplamSayfa : null);
-        kartlar.push(svgPng(p, H));
+let kirpSayac = 0;
+function urunGorseli(p, x, y, boy, buf, doldur) {
+    const id = 'kg' + (kirpSayac++);
+    p.push(`<clipPath id="${id}"><rect x="${x}" y="${y}" width="${boy}" height="${boy}" rx="16"/></clipPath>`);
+    const img = veriUri(buf);
+    if (img && doldur) {
+        // Fotoğraf: kutuyu doldurur (kırpılarak)
+        p.push(`<image href="${img}" x="${x}" y="${y}" width="${boy}" height="${boy}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`);
+        p.push(`<rect x="${x}" y="${y}" width="${boy}" height="${boy}" rx="16" fill="none" stroke="${R.cizgi}"/>`);
+    } else if (img) {
+        p.push(`<rect x="${x}" y="${y}" width="${boy}" height="${boy}" rx="16" fill="#ffffff" stroke="${R.cizgi}"/>`);
+        p.push(`<image href="${img}" x="${x + 6}" y="${y + 6}" width="${boy - 12}" height="${boy - 12}" preserveAspectRatio="xMidYMid meet" clip-path="url(#${id})"/>`);
+    } else {
+        p.push(`<rect x="${x}" y="${y}" width="${boy}" height="${boy}" rx="16" fill="${R.zemin}"/>`);
     }
-    return kartlar;
+}
+
+/** "5 sa 20 dk kaldı", "40 dk kaldı", "1 gün 3 sa kaldı" */
+function kalanYazi(iso) {
+    const ms = Date.parse(iso) - Date.now();
+    if (!Number.isFinite(ms)) return '';
+    if (ms <= 0) return 'Süre doldu';
+    const dk = Math.floor(ms / 60000);
+    const gun = Math.floor(dk / 1440);
+    const sa = Math.floor((dk % 1440) / 60);
+    const kdk = dk % 60;
+    if (gun) return gun + ' gün ' + (sa ? sa + ' sa ' : '') + 'kaldı';
+    if (sa) return sa + ' sa ' + (kdk ? kdk + ' dk ' : '') + 'kaldı';
+    return Math.max(1, kdk) + ' dk kaldı';
+}
+
+/** Satırları sayfalara böler; her sayfa ayrı kart. satir: {tur:'baslik'|'oge', h, ciz(p, y)} */
+function sayfala(satirlar, baslik, altBaslik, gun) {
+    const kartlar = [];
+    let p = null;
+    let y = 0;
+    const yeni = () => { p = ['']; y = ust(p, baslik, altBaslik, gunAd(gun).split(' ').slice(0, 2).join(' ')); };
+    const bitir = () => { const H = y + 104 - 16; p[0] = `<rect width="${G}" height="${H}" fill="${R.zemin}"/>`; kartlar.push({ p, H }); };
+    yeni();
+    satirlar.forEach((s, i) => {
+        // Başlık sayfanın son satırı olmasın
+        const sonraki = satirlar[i + 1];
+        const gerek = s.tur === 'baslik' && sonraki ? s.h + sonraki.h : s.h;
+        if (y + gerek + 104 > AZAMI_BOY && y > P + 120) { bitir(); yeni(); }
+        s.ciz(p, y);
+        y += s.h;
+    });
+    bitir();
+    return kartlar.map((k, i) => {
+        alt(k.p, k.H, kartlar.length > 1 ? (i + 1) + ' / ' + kartlar.length : null);
+        return svgPng(k.p, k.H);
+    });
+}
+
+// ---------------------------------------------------------------------
+// Satıştan kaldırma: reddedilen, iptal edilen ve (seçiliyse) bekleyenler
+// ---------------------------------------------------------------------
+
+const FOTO_BOY = 128;
+
+/**
+ * k: { urun:{id,ad}, adet, sebep, altNeden, red:{baslik,aciklama}, durum, yeniden, bekliyor, zaman, fotolar:[Buffer] }
+ */
+function kaldirmaKartlari(red, gorseller, gun, bekleyen = []) {
+    const satir = (k) => {
+        const fotolu = Array.isArray(k.fotolar) && k.fotolar.length;
+        const redli = k.red && (k.red.baslik || k.red.aciklama);
+        const h = 196 + (fotolu ? FOTO_BOY + 20 : 0) + 16;
+        return {
+            tur: 'oge', h,
+            ciz: (p, y) => {
+                const x = P;
+                const kutuH = h - 16;
+                const sinir = k.bekliyor ? '#fedf89' : k.yeniden ? R.cizgi : '#fda29b';
+                p.push(`<rect x="${x}" y="${y}" width="${IC}" height="${kutuH}" rx="22" fill="${R.kart}" stroke="${sinir}"/>`);
+                urunGorseli(p, x + 20, y + 20, 120, gorseller.get(k.urun && k.urun.id));
+                const etiket = '×' + adetYaz(Number(k.adet) || 0);
+                const rG = genislik(OLCU.baslik, etiket, 20) + 24;
+                p.push(`<rect x="${x + 80 - rG / 2}" y="${y + 148}" width="${rG}" height="32" rx="16" fill="#111827"/>`);
+                p.push(yazi(x + 80, y + 171, etiket, { boy: 20, aile: 'Manrope', agirlik: 800, renk: '#ffffff', hiza: 'middle' }));
+
+                const mx = x + 164;
+                const mG = IC - 164 - 24;
+                const durumYazi = k.bekliyor ? 'Bekliyor' : k.yeniden ? 'Yeniden girildi' : k.durum === 700 ? 'İptal edildi' : 'Reddedildi';
+                const renk = k.bekliyor ? R.sari : k.yeniden ? R.sonuk : R.kirmizi;
+                const zemin = k.bekliyor ? R.sariZemin : k.yeniden ? R.zemin : R.kirmiziZemin;
+                const dG = genislik(OLCU.govdeKalin, durumYazi, 16) + 24;
+                cip(p, x + IC - 20 - dG, y + 20, durumYazi, renk, zemin, 16);
+                const ad = ikiSatir(OLCU.govdeKalin, (k.urun && k.urun.ad) || 'Ürün', 22, mG - dG - 16);
+                ad.forEach((t, j) => p.push(yazi(mx, y + 44 + j * 28, t, { boy: 22, agirlik: 600 })));
+                let ly = y + 44 + ad.length * 28 + 4;
+                const sebep = [k.sebep, k.altNeden].filter(Boolean).join(' · ');
+                if (sebep) { p.push(yazi(mx, ly, kirp(OLCU.govde, sebep, 18, mG), { boy: 18, renk: R.sonuk })); ly += 30; }
+                if (redli) {
+                    p.push(yazi(mx, ly + 4, kirp(OLCU.govdeKalin, k.red.baslik || 'Red sebebi', 19, mG), { boy: 19, agirlik: 600, renk: R.kirmizi }));
+                    if (k.red.aciklama) p.push(yazi(mx, ly + 30, kirp(OLCU.govde, k.red.aciklama, 17, mG), { boy: 17, renk: R.orta }));
+                }
+                if (k.zaman) p.push(yazi(x + IC - 20, y + 196 - 18, (k.bekliyor ? 'Oluşturuldu ' : '') + tarihSaat(k.zaman), { boy: 16, renk: R.sonuk, hiza: 'end' }));
+                if (fotolu) {
+                    const fy = y + 196;
+                    p.push(yazi(x + 20, fy + 4, 'HASAR FOTOĞRAFLARI', { boy: 14, agirlik: 600, renk: R.sonuk, aralik: 1.2 }));
+                    k.fotolar.slice(0, 3).forEach((f, j) => urunGorseli(p, x + 20 + j * (FOTO_BOY + 12), fy + 14, FOTO_BOY, f, true));
+                }
+            },
+        };
+    };
+    const satirlar = [];
+    const baslik = (metin, n) => ({ tur: 'baslik', h: 34, ciz: (p, y) => bolumBasligi(p, y, metin, n) });
+    if (red.length) { satirlar.push(baslik('REDDEDİLEN VE İPTAL EDİLEN', red.length)); red.forEach((k) => satirlar.push(satir(k))); }
+    if (bekleyen.length) { satirlar.push(baslik('ONAY BEKLEYEN', bekleyen.length)); bekleyen.forEach((k) => satirlar.push(satir(k))); }
+    const altBaslik = bekleyen.length && red.length ? 'Son 24 saatte reddedilenler ve onay bekleyenler'
+        : bekleyen.length ? 'Onay bekleyen kayıtlar' : 'Son 24 saatte reddedilen ya da iptal edilen kayıtlar';
+    return sayfala(satirlar, 'Satıştan Kaldırma', altBaslik, gun);
 }
 
 // ---------------------------------------------------------------------
@@ -198,65 +260,50 @@ function kaldirmaKartlari(liste, gorseller, gun) {
 // ---------------------------------------------------------------------
 
 /**
- * bekleyen: [{urun, sikayet, musteriNotu, sonTarih, taslak}]
- * sonuc:    [{urun, sikayet, durum: 300|400, itirazMetni}]
+ * bekleyen: [{urun, gorselId, sikayet, musteriNotu, sonTarih, taslak}]
+ * sonuc:    [{urun, gorselId, sikayet, durum: 300|400, itirazMetni}]
  */
-function itirazKartlari(bekleyen, sonuc, gun) {
+function itirazKartlari(bekleyen, sonuc, gun, gorseller = new Map()) {
+    const GB = 96;
+    const metinX = P + 24 + GB + 20;
+    const metinG = IC - 24 - GB - 20 - 24;
     const satirlar = [];
-    if (bekleyen.length) satirlar.push({ tur: 'baslik', metin: 'İTİRAZ BEKLEYEN', sayi: bekleyen.length });
-    bekleyen.forEach((k) => satirlar.push({ tur: 'bekleyen', k, h: 132 }));
-    if (sonuc.length) satirlar.push({ tur: 'baslik', metin: 'SON 24 SAATTE SONUÇLANAN', sayi: sonuc.length });
-    sonuc.forEach((k) => {
-        const satir = k.itirazMetni ? ikiSatir(OLCU.govde, k.itirazMetni, 18, IC - 48).length : 0;
-        satirlar.push({ tur: 'sonuc', k, h: satir ? 100 + satir * 26 + 14 : 112 });
-    });
+    const baslik = (metin, n) => ({ tur: 'baslik', h: 34, ciz: (p, y) => bolumBasligi(p, y, metin, n) });
 
-    const kartlar = [];
-    let p = null;
-    let y = 0;
-    const yeniKart = () => {
-        p = [''];
-        y = ust(p, 'İtirazlar', 'Depo değerlendirme kayıtları', gunAd(gun).split(' ').slice(0, 2).join(' '));
-    };
-    const bitir = () => {
-        const H = y + 104 - 16;
-        p[0] = `<rect width="${G}" height="${H}" fill="${R.zemin}"/>`;
-        kartlar.push({ p, H });
-    };
-    yeniKart();
-    satirlar.forEach((s) => {
-        const h = s.tur === 'baslik' ? 34 : s.h + 16;
-        if (y + h + 104 > AZAMI_BOY) { bitir(); yeniKart(); }
-        if (s.tur === 'baslik') { y = bolumBasligi(p, y, s.metin, s.sayi); return; }
-        const k = s.k;
-        p.push(`<rect x="${P}" y="${y}" width="${IC}" height="${s.h}" rx="22" fill="${R.kart}" stroke="${R.cizgi}"/>`);
-        let x = P + 24;
-        if (s.tur === 'bekleyen') {
+    if (bekleyen.length) satirlar.push(baslik('İTİRAZ BEKLEYEN', bekleyen.length));
+    bekleyen.forEach((k) => {
+        const h = 152 + 16;
+        satirlar.push({ tur: 'oge', h, ciz: (p, y) => {
+            p.push(`<rect x="${P}" y="${y}" width="${IC}" height="${h - 16}" rx="22" fill="${R.kart}" stroke="${R.cizgi}"/>`);
+            urunGorseli(p, P + 24, y + 28, GB, gorseller.get(k.gorselId));
             const kalanSaat = (Date.parse(k.sonTarih) - Date.now()) / 3600000;
             const acil = kalanSaat < 12;
+            const kalan = kalanYazi(k.sonTarih);
+            const sG = genislik(OLCU.govdeKalin, kalan, 16) + 24;
+            cip(p, P + IC - 24 - sG, y + 20, kalan, acil ? R.kirmizi : R2.turuncu, acil ? R.kirmiziZemin : R2.turuncuZemin, 16);
+            let x = metinX;
             x += cip(p, x, y + 20, k.sikayet || 'Kayıt', R.orta, R.zemin, 16) + 10;
-            const son = 'Son: ' + tarihSaat(k.sonTarih);
-            const sG = genislik(OLCU.govdeKalin, son, 16) + 24;
-            cip(p, P + IC - 24 - sG, y + 20, son, acil ? R.kirmizi : R2.turuncu, acil ? R.kirmiziZemin : R2.turuncuZemin, 16);
             if (k.taslak) cip(p, x, y + 20, 'Taslak hazır', R2.mavi, R2.maviZemin, 16);
-            p.push(yazi(P + 24, y + 84, kirp(OLCU.govdeKalin, k.urun || 'Ürün', 22, IC - 48), { boy: 22, agirlik: 600 }));
-            p.push(yazi(P + 24, y + 114, kirp(OLCU.govde, k.musteriNotu ? '"' + k.musteriNotu + '"' : 'Müşteri not bırakmamış', 18, IC - 48), { boy: 18, renk: R.sonuk }));
-        } else {
+            p.push(yazi(metinX, y + 84, kirp(OLCU.govdeKalin, k.urun || 'Ürün', 22, metinG), { boy: 22, agirlik: 600 }));
+            p.push(yazi(metinX, y + 116, kirp(OLCU.govde, k.musteriNotu ? '"' + k.musteriNotu + '"' : 'Müşteri not bırakmamış', 18, metinG), { boy: 18, renk: R.sonuk }));
+        } });
+    });
+    if (sonuc.length) satirlar.push(baslik('SON 24 SAATTE SONUÇLANAN', sonuc.length));
+    sonuc.forEach((k) => {
+        const metinSatir = k.itirazMetni ? ikiSatir(OLCU.govde, k.itirazMetni, 18, metinG) : [];
+        const h = Math.max(152, 100 + metinSatir.length * 26 + 20) + 16;
+        satirlar.push({ tur: 'oge', h, ciz: (p, y) => {
+            p.push(`<rect x="${P}" y="${y}" width="${IC}" height="${h - 16}" rx="22" fill="${R.kart}" stroke="${R.cizgi}"/>`);
+            urunGorseli(p, P + 24, y + 28, GB, gorseller.get(k.gorselId));
             const kabul = k.durum === 300;
+            let x = metinX;
             x += cip(p, x, y + 20, kabul ? 'Kabul edildi' : 'Reddedildi', kabul ? '#067647' : R.kirmizi, kabul ? R2.yesilZemin : R.kirmiziZemin, 16) + 10;
             cip(p, x, y + 20, k.sikayet || 'Kayıt', R.orta, R.zemin, 16);
-            p.push(yazi(P + 24, y + 84, kirp(OLCU.govdeKalin, k.urun || 'Ürün', 22, IC - 48), { boy: 22, agirlik: 600 }));
-            if (k.itirazMetni) {
-                ikiSatir(OLCU.govde, k.itirazMetni, 18, IC - 48).forEach((t, j) => p.push(yazi(P + 24, y + 116 + j * 26, t, { boy: 18, renk: R.orta })));
-            }
-        }
-        y += s.h + 16;
+            p.push(yazi(metinX, y + 84, kirp(OLCU.govdeKalin, k.urun || 'Ürün', 22, metinG), { boy: 22, agirlik: 600 }));
+            metinSatir.forEach((t, j) => p.push(yazi(metinX, y + 116 + j * 26, t, { boy: 18, renk: R.orta })));
+        } });
     });
-    bitir();
-    return kartlar.map((k, i) => {
-        alt(k.p, k.H, kartlar.length > 1 ? (i + 1) + ' / ' + kartlar.length : null);
-        return svgPng(k.p, k.H);
-    });
+    return sayfala(satirlar, 'İtirazlar', 'Depo değerlendirme kayıtları', gun);
 }
 
 // ---------------------------------------------------------------------

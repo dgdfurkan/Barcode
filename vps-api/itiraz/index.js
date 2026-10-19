@@ -312,6 +312,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             aciklama: metin(k.aciklama, 400),
             musteriNotu: metin(k.musteriNotu, 1200),
             urun: metin(k.urun, 240),
+            urunId: /^[a-f0-9]{24}$/.test(metin(k.urunId, 40)) ? metin(k.urunId, 40) : '',
             itirazMetni: metin(k.itirazMetni, 2000),
             itirazSebepId: metin(k.itirazSebepId, 40),
         };
@@ -323,16 +324,17 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         const kim = req.auth.username;
         try {
             if (kayitlar.length) {
+                // zamanli: gece_raporu.sql çalışmış (durum_degisti_at ve urun_id var)
                 const yaz = (zamanli) => pool.query(
                     `INSERT INTO itiraz.kayitlar
                         (username, kayit_id, durum, kayit_tarihi, son_tarih, kriter, sikayet, aciklama,
-                         musteri_notu, urun, itiraz_metni, itiraz_sebep_id)
+                         musteri_notu, urun, itiraz_metni, itiraz_sebep_id` + (zamanli ? ', urun_id' : '') + `)
                      SELECT $1, x.id, x.durum, x."kayitTarihi"::timestamptz, x."sonTarih"::timestamptz, x.kriter,
                             x.sikayet, x.aciklama, x."musteriNotu", x.urun,
-                            NULLIF(x."itirazMetni", ''), NULLIF(x."itirazSebepId", '')
+                            NULLIF(x."itirazMetni", ''), NULLIF(x."itirazSebepId", '')` + (zamanli ? `, NULLIF(x."urunId", '')` : '') + `
                        FROM jsonb_to_recordset($2::jsonb) AS x(
                             id text, durum int, "kayitTarihi" text, "sonTarih" text, kriter text, sikayet text,
-                            aciklama text, "musteriNotu" text, urun text, "itirazMetni" text, "itirazSebepId" text)
+                            aciklama text, "musteriNotu" text, urun text, "itirazMetni" text, "itirazSebepId" text, "urunId" text)
                      ON CONFLICT (username, kayit_id) DO UPDATE SET
                         durum = EXCLUDED.durum, kayit_tarihi = EXCLUDED.kayit_tarihi, son_tarih = EXCLUDED.son_tarih,
                         kriter = EXCLUDED.kriter, sikayet = EXCLUDED.sikayet, aciklama = EXCLUDED.aciklama,
@@ -341,7 +343,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                         itiraz_sebep_id = COALESCE(EXCLUDED.itiraz_sebep_id, itiraz.kayitlar.itiraz_sebep_id),
                         son_gorulme = now()` + (zamanli ? `,
                         durum_degisti_at = CASE WHEN itiraz.kayitlar.durum <> EXCLUDED.durum THEN now()
-                                                ELSE itiraz.kayitlar.durum_degisti_at END` : ''),
+                                                ELSE itiraz.kayitlar.durum_degisti_at END,
+                        urun_id = COALESCE(EXCLUDED.urun_id, itiraz.kayitlar.urun_id)` : ''),
                     [kim, JSON.stringify(kayitlar)]
                 );
                 // durum_degisti_at gece_raporu.sql ile geliyor; o çalışmadıysa eski biçimle yaz
