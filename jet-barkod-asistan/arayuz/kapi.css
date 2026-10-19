@@ -246,3 +246,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
 }
+
+/* Günlük sayım: düğme yazısı değişince genişlik oynamasın */
+.ayar > #gunlukEkle { flex: none; width: 112px; text-align: center; }
+.ayar__dugmeler { flex: none; display: flex; flex-direction: column; gap: 6px; }
+.ayar--alt .ayar__dugmeler .eylem { width: 112px; }

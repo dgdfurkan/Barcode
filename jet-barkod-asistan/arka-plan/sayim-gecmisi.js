@@ -403,3 +403,17 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
   calistir(istek, cagiran).finally(() => { calisan = null; });
   return false;
 });
+
+/* Günlük sayım (arka-plan/gunluk-sayim.js) panel okuma yardımcılarını ortak kullanır.
+   Aynı anda tek iş: Sayım Geçmişi çalışıyorsa günlük sayım bekler. */
+globalThis.jbaSayimPanel = {
+  mesgulMu: () => !!calisan,
+  sekmeHazirBekle,
+  sayimListesi,
+  gorevListesi,
+  israrla,
+  listeYolu,
+  gorevYolu,
+  urunAdi,
+  bekle,
+};

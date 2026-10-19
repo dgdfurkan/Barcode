@@ -968,6 +968,11 @@ require('./franchise-jeton').kur(app, { pool, verifyToken, bearerOf });
 require('./itiraz').kur(app, { pool, verifyToken, bearerOf });
 
 // =====================================================================
+// Günlük sayım: 50'lik otomatik sayım kendiliğinden sayım sayfasına
+// =====================================================================
+require('./gunluk-sayim').kur(app, { pool, verifyToken, bearerOf });
+
+// =====================================================================
 // Canlı kanal: sipariş ve sayım değişikliği cihazlara anında (vps-api/canli.js)
 // =====================================================================
 require('./canli').kur(app, {

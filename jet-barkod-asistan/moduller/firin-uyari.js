@@ -334,9 +334,20 @@
     // Çizim
     // ==================================================================
 
+    /* Aynı köşedeki diğer kartlar (günlük sayım) fırın kartının altına dizilsin
+       diye kartın alt kenarı sayfaya yazılır: <html data-jba-firin-alt="px"> */
+    var boyGozcu = null;
+    function altKenariYaz() {
+        var p = kok && kok.querySelector('.pano');
+        if (p) document.documentElement.setAttribute('data-jba-firin-alt', String(Math.round(p.getBoundingClientRect().bottom)));
+        else document.documentElement.removeAttribute('data-jba-firin-alt');
+    }
+
     function kaldir() {
         clearTimeout(simZamanlayici);
         simZamanlayici = null;
+        if (boyGozcu) { boyGozcu.disconnect(); boyGozcu = null; }
+        document.documentElement.removeAttribute('data-jba-firin-alt');
         if (kap) kap.remove();
         kap = null;
         kok = null;
@@ -498,6 +509,11 @@
             if (acik) erteleAcKapa(acik, false);
         });
         if (sure) simZamanlayici = setTimeout(simBitir, kalan);
+        altKenariYaz();
+        if (window.ResizeObserver) {
+            boyGozcu = new ResizeObserver(altKenariYaz);
+            boyGozcu.observe(kok.querySelector('.pano'));
+        }
     }
 
     /* Simülasyon bitti (süre doldu ya da çarpıya basıldı): bu sırada gelen

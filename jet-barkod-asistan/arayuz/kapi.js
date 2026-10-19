@@ -208,6 +208,41 @@
         if (alan === 'local' && d.jbaFirinDurum) durumCiz(d.jbaFirinDurum.newValue);
     });
 
+    /* Günlük sayım: durum, elle ekleme, iki simülasyon */
+    var gunlukDurum = document.getElementById('gunlukDurum');
+    function gunlukCiz(v) {
+        if (!gunlukDurum) return;
+        var bugun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date());
+        if (!v || v.gun !== bugun) { gunlukDurum.textContent = 'Bugün henüz eklenmedi.'; return; }
+        gunlukDurum.textContent = '';
+        var b = document.createElement('b');
+        b.textContent = saatYaz(v.zaman);
+        gunlukDurum.appendChild(b);
+        gunlukDurum.appendChild(document.createTextNode(' · ' + String(v.metin || '')));
+    }
+    chrome.storage.local.get('jbaGunlukSayim', function (r) { gunlukCiz(r && r.jbaGunlukSayim); });
+    chrome.storage.onChanged.addListener(function (d, alan) {
+        if (alan === 'local' && d.jbaGunlukSayim) gunlukCiz(d.jbaGunlukSayim.newValue);
+    });
+    function gunlukDugme(id, mesaj, mesgulYazi) {
+        var b = document.getElementById(id);
+        if (!b) return;
+        var ilk = b.textContent;
+        b.addEventListener('click', function () {
+            b.disabled = true;
+            b.textContent = mesgulYazi;
+            chrome.runtime.sendMessage(mesaj, function (c) {
+                void chrome.runtime.lastError;
+                b.textContent = c && c.ok ? 'Tamam' : 'Olmadı';
+                if (gunlukDurum && c && c.metin) gunlukDurum.textContent = c.metin;
+                setTimeout(function () { b.disabled = false; b.textContent = ilk; }, 3000);
+            });
+        });
+    }
+    gunlukDugme('gunlukEkle', { type: 'JBA_GUNLUK_EKLE' }, 'Okunuyor...');
+    gunlukDugme('gunlukSimSabah', { type: 'JBA_GUNLUK_SIM', tur: 'sabah' }, 'Gösteriliyor...');
+    gunlukDugme('gunlukSimGece', { type: 'JBA_GUNLUK_SIM', tur: 'gece' }, 'Gösteriliyor...');
+
     /* Simülasyon: tek sefer, gerçek ürünlerden rastgele eksik, kart 20 sn */
     var firinSim = document.getElementById('firinSim');
     if (firinSim) {

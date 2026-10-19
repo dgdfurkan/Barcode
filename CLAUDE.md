@@ -152,6 +152,8 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
 - İtiraz Yazıcı: `sql_files/itiraz_yazici.sql` çalıştırılacak, `vps-api/itiraz/` + `vps-api/franchise-jeton.js` +
   `server.js` VPS'e atılıp servis yeniden başlatılacak. Gemini anahtarı JWT_SECRET'tan türetilen anahtarla şifreleniyor;
   JWT_SECRET değişirse kayıtlı anahtarlar çözülmez (kullanıcı yeniden girer). İstenirse `.env`'e `ITIRAZ_SIFRE` (64 hex) eklenir.
+- Günlük sayım: `sql_files/gunluk_sayim.sql` çalıştırılacak, `vps-api/gunluk-sayim.js` + `server.js` VPS'e atılıp servis
+  yeniden başlatılacak. Çalışana kadar Asistan 06:00'da listeyi yazamaz ("sunucu güncellemesi bekleniyor").
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

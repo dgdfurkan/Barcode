@@ -37,6 +37,21 @@
     <button type="button" class="eylem" id="firinSim">Simülasyonu Göster</button>
   </section>
 
+  <section class="ayar" aria-label="Günlük sayım">
+    <div class="ayar__metin">
+      <p class="ayar__ad">Günlük Sayım</p>
+      <p class="ayar__ozet">50'lik sayımı her sabah 06:00'da Jet Barkod'a ekler. 08:00'de haber verir, gece unutulan ürün varsa uyarır.</p>
+    </div>
+    <button type="button" class="eylem" id="gunlukEkle">Şimdi Ekle</button>
+  </section>
+  <section class="ayar ayar--alt" aria-label="Günlük sayım durumu">
+    <p class="ayar__durum" id="gunlukDurum">Bugün henüz eklenmedi.</p>
+    <div class="ayar__dugmeler">
+      <button type="button" class="eylem" id="gunlukSimSabah">08:00 Kartı</button>
+      <button type="button" class="eylem" id="gunlukSimGece">Gece Uyarısı</button>
+    </div>
+  </section>
+
   <footer class="alt">
     <span class="alt__surum" id="surum"></span>
     <a class="alt__bag" id="siteBag" href="https://jetbarkod.com.tr/arama/" target="_blank" rel="noopener">Jet Barkod'u aç</a>

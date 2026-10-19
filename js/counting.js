@@ -8819,6 +8819,11 @@ class CountingSystem {
 
     matchDailyImportRow(row) {
         if (!row || typeof row !== 'object') return null;
+        // Günlük sayım (Asistan): depo panelinin ürün kimliği en kesin eşleşme
+        if (row.productId) {
+            const byId = this.findProductByIdLoose(row.productId);
+            if (byId) return byId;
+        }
         if (Array.isArray(row.barcodes)) {
             for (const bc of row.barcodes) {
                 const p = this.findProductByBarcodeCode(bc);

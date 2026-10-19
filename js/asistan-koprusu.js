@@ -29,7 +29,7 @@
         jetBarkodAsistan: ['topluKopyalama', 'sayimKopyalama', 'stokBarkodlari',
                            'hizliBul', 'firinPisirme', 'firinUyari', 'dusukStok',
                            'sayimHazirligi', 'rafEtiketi', 'urunCekici', 'kaldirma',
-                           'itiraz'],
+                           'itiraz', 'gunlukSayim'],
         // Tek tek verilmiş eski haklar da kendi modülünü açmaya devam ediyor.
         bulkCopy: ['topluKopyalama', 'sayimKopyalama'],
         getirStockBarcodesExtension: ['stokBarkodlari'],
@@ -38,7 +38,8 @@
         lowStockAlert: ['dusukStok'],
         stokSenkron: ['sayimHazirligi'],
         satistanKaldirma: ['kaldirma'],
-        itirazYazici: ['itiraz']
+        itirazYazici: ['itiraz'],
+        stokSayimi: ['gunlukSayim']
     };
 
     var durum = { kurulu: false, surum: null, kimlik: null };
