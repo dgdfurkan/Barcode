@@ -142,6 +142,7 @@ const TALIMAT = [
     '- KONU: Metin yalnız kayıttaki şikâyet türüne cevap verir. Şikâyet "Bayat/bozuk ürün" ise eksik üründen, "Eksik ürün" ise bozukluktan söz etme. Türler karışırsa itiraz reddedilir.',
     '- ÜRÜN ADI: Ürünü kayıttaki tam adıyla, harfi harfine ve büyük-küçük harfleri değiştirmeden yaz (ör. "Salkım Domates (500 g)"). Kısaltma, küçük harfe çevirme, gramajı atma yok.',
     '- Müşterinin notuna doğrudan cevap ver. Genel "eksiksiz hazırladık" cümlesi tek başına reddediliyor.',
+    '- SİPARİŞ İÇERİĞİ verildiyse somut kanıt olarak kullan: şikâyet edilen ürünün siparişteki adedini ve siparişin kaç ürün olduğunu doğru yaz. Eksik üründe ürünün siparişe girip diğer ürünlerle birlikte poşetlendiğini, yanlış üründe siparişteki ürünün gönderildiğini, bayat/bozuk üründe teslim süresi kısaysa bunu söyle. Listede olmayan ürünü ya da adedi uydurma.',
     '- Yalnız verilen bilgileri ve işaretli depo olgularını kullan. Kamera kaydı, saat, kişi, sayı, ölçüm gibi verilmemiş hiçbir şey uydurma.',
     '- Doğal, sakin, kendinden emin yaz. Abartma, yalvarma, suçlama yok. "Saygılarımızla", "arz ederiz", "değerli ekip" gibi resmî kalıplar yok.',
     '- Müşteriyi küçümseme; olası açıklamayı nazikçe söyle.',
@@ -399,6 +400,12 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             ? [...new Set(b.sebepler.map((s) => metin(s, 140)).filter(Boolean))].slice(0, 25) : [];
         if (!sebepler.length) return res.status(400).json({ ok: false, error: 'sebep_listesi_yok' });
         const ekNot = metin(b.ek_not, 400);
+        // Panelin sipariş detayından yalnız ürünler ve teslim süresi (kişisel veri yok)
+        const sp = b.siparis && typeof b.siparis === 'object' ? b.siparis : null;
+        const siparisUrun = sp && Array.isArray(sp.urunler) ? sp.urunler.slice(0, 40).map((u) => ({
+            ad: metin(u && u.ad, 120), adet: Number.isFinite(Number(u && u.adet)) ? Math.max(0, Math.min(999, Number(u.adet))) : 0,
+        })).filter((u) => u.ad) : [];
+        const teslimDk = sp && Number.isFinite(Number(sp.teslimDk)) && Number(sp.teslimDk) > 0 && Number(sp.teslimDk) < 600 ? Math.round(Number(sp.teslimDk)) : null;
         if (!pencere('yaz:' + kim, 6, 60000)) return res.status(429).json({ ok: false, error: 'cok_istek' });
 
         try {
@@ -442,6 +449,10 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 '- Ürünün tam adı (aynen yaz): ' + (k.urun || '-'),
                 '- Müşteri notu: ' + (k.musteri_notu || '(not yok)'),
                 ekNot ? '- Depo sorumlusunun ek bilgisi (doğru kabul et): ' + ekNot : null,
+                siparisUrun.length ? '' : null,
+                siparisUrun.length ? 'SİPARİŞ İÇERİĞİ (panelden, doğru kabul et): ' + siparisUrun.length + ' ürün, ' +
+                    siparisUrun.reduce((t, u) => t + u.adet, 0) + ' adet' + (teslimDk ? ', ' + teslimDk + ' dakikada teslim edildi' : '') : null,
+                siparisUrun.length ? siparisUrun.map((u) => '- ' + u.ad + ' × ' + u.adet).join('\n') : null,
                 '',
                 'BU TÜR İÇİN YÖN',
                 turYonu(k),

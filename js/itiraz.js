@@ -146,6 +146,8 @@
             musteriNotu: typeof fb.note === 'string' ? fb.note : '',
             urun: (veri.product && veri.product.fullName && veri.product.fullName.tr) || '',
             siparisTarihi: (veri.order && veri.order.date) || '',
+            siparisId: veri.order && /^[0-9a-f]{24}$/i.test(String(veri.order.id || '')) ? String(veri.order.id) : '',
+            siparisTur: Number.isFinite(parseInt(veri.domainType, 10)) ? parseInt(veri.domainType, 10) : null,
             itirazMetni: typeof itiraz.description === 'string' ? itiraz.description : '',
             itirazSebepId: typeof itiraz.reasonId === 'string' ? itiraz.reasonId : ''
         };
@@ -512,6 +514,82 @@
         return t.duzen[t.secili] != null ? t.duzen[t.secili] : ((t.taslaklar[t.secili] || {}).metin || '');
     }
 
+    // ------------------------------------------------------------------
+    // Sipariş içeriği: panelin kendi "Sipariş Detayı" isteği (GET /orders/<id>)
+    // Yalnız ürünler, adetler ve süreler alınır; müşteri adı ve adresi hiç
+    // okunmaz, saklanmaz, sunucuya gitmez. Kayıt başına bir istek, bellekte.
+    // ------------------------------------------------------------------
+
+    var siparisler = {};
+
+    function sadeAd(s) { return String(s || '').toLocaleLowerCase('tr').replace(/\s+/g, ' ').trim(); }
+
+    function siparisAl(k) {
+        if (!k || !k.siparisId || !global.franchiseOturum) return Promise.resolve(null);
+        var v = siparisler[k.id];
+        if (v && v.sozu) return v.sozu;
+        if (v && (v.urunler || v.hata)) return Promise.resolve(v);
+        var kayit = siparisler[k.id] = { yukleniyor: true };
+        kayit.sozu = (async function () {
+            try {
+                var r = await global.franchiseOturum.istek('/orders/' + k.siparisId + (k.siparisTur != null ? '?domainType=' + k.siparisTur : ''));
+                if (!r.ok) throw new Error('http');
+                var j = await r.json();
+                var o = j && j.basket ? j : (j && j.data && j.data.basket ? j.data : j);
+                var urunler = (o && o.basket && Array.isArray(o.basket.products) ? o.basket.products : []).map(function (u) {
+                    var ad = u && u.name && typeof u.name === 'object' ? (u.name.tr || u.name.en || '') : (u && u.name) || '';
+                    return { ad: String(ad).slice(0, 120), adet: Number(u && u.count) || 0 };
+                }).filter(function (u) { return u.ad; });
+                var t = function (yol) { var x = o && o[yol] && o[yol].date; var ms = Date.parse(x); return Number.isFinite(ms) ? ms : null; };
+                var bas = t('checkout');
+                var teslim = t('deliver');
+                kayit.urunler = urunler;
+                kayit.kalem = urunler.length;
+                kayit.adet = urunler.reduce(function (a, u) { return a + u.adet; }, 0);
+                kayit.teslimDk = bas && teslim && teslim > bas ? Math.round((teslim - bas) / 60000) : null;
+            } catch (e) {
+                kayit.hata = true;
+                kayit.zaman = Date.now();
+            }
+            kayit.yukleniyor = false;
+            kayit.sozu = null;
+            return kayit;
+        })();
+        return kayit.sozu;
+    }
+
+    function siparisHtml(k) {
+        if (!k.siparisId) return '';
+        var v = siparisler[k.id];
+        var bas = '<section><h3 class="itr-etiket">Sipariş İçeriği</h3>';
+        if (!v || v.yukleniyor) return bas + '<div class="itr-siparis is-yuk"><span class="itr-iskelet" style="width:60%"></span><span class="itr-iskelet" style="width:85%"></span></div></section>';
+        if (v.hata || !v.urunler.length) return bas + '<p class="itr-ipucu">Sipariş içeriği okunamadı. Franchise panelini açık tutarsan tekrar denenir.</p></section>';
+        var hedef = sadeAd(k.urun);
+        var ozet = v.kalem + ' ürün · ' + v.adet + ' adet' + (v.teslimDk ? ' · ' + v.teslimDk + ' dk\'da teslim' : '');
+        var sirali = v.urunler.slice().sort(function (a, b) { return (sadeAd(b.ad) === hedef) - (sadeAd(a.ad) === hedef); });
+        return bas + '<div class="itr-siparis"><p class="itr-siparis__ozet">' + kacis(ozet) + '</p><ul class="itr-siparis__liste">' +
+            sirali.slice(0, 12).map(function (u) {
+                var bu = sadeAd(u.ad) === hedef;
+                return '<li' + (bu ? ' class="is-hedef"' : '') + '><span>' + kacis(u.ad) + '</span><b>×' + u.adet + '</b></li>';
+            }).join('') + '</ul>' +
+            (sirali.length > 12 ? '<p class="itr-ipucu">+' + (sirali.length - 12) + ' ürün daha</p>' : '') +
+            '</div></section>';
+    }
+
+    /* Seçili açık kaydın sipariş içeriği henüz yoksa iste; gelince detayı tazele */
+    function siparisTetikle(k) {
+        if (!k || !acikMi(k) || !k.siparisId) return;
+        var v = siparisler[k.id];
+        if (v && v.hata && Date.now() - (v.zaman || 0) > 60000) delete siparisler[k.id];
+        else if (v) return;
+        siparisAl(k).then(function () {
+            // Kullanıcı yazarken yazma alanını yeniden çizme
+            var odak = document.activeElement;
+            if (d.secili !== k.id || (odak && el('itrDetayIc').contains(odak) && /^(TEXTAREA|INPUT)$/.test(odak.tagName))) return;
+            detayCiz();
+        });
+    }
+
     function sec(id) {
         d.secili = id;
         listeIsaretle();
@@ -551,6 +629,7 @@
             return;
         }
         var acik = acikMi(k);
+        siparisTetikle(k);
         var meta = [
             k.kriter,
             k.kayitTarihi ? 'Kayıt ' + gunAy(k.kayitTarihi) : '',
@@ -641,7 +720,7 @@
                 '</div>';
         }
 
-        ic.innerHTML = ust + '<div class="itr-detay__govde">' + not +
+        ic.innerHTML = ust + '<div class="itr-detay__govde">' + not + siparisHtml(k) +
             '<section><h3 class="itr-etiket">İtiraz Metni</h3><div class="itr-yazici">' + yazici + '</div></section>' +
             ek + sebepBolumu + '</div>' + eylem;
     }
@@ -656,7 +735,12 @@
         t.yaziyor = true;
         t.sebepAcik = false;
         detayCiz();
+        // Sipariş içeriği taslağa girer (en çok 4 sn beklenir; gelmezse onsuz yazılır)
+        var sp = await Promise.race([siparisAl(k), bekle(4000).then(function () { return null; })]);
         var govde = { kayit_id: k.id, sebepler: sebepListesi().map(function (s) { return s.ad; }), ek_not: t.ekNot };
+        if (sp && sp.urunler && sp.urunler.length) {
+            govde.siparis = { urunler: sp.urunler.slice(0, 40), teslimDk: sp.teslimDk };
+        }
         var c = await postJson('/api/itiraz/yaz', govde);
         if (c.kod === 404 && c.j && c.j.error === 'kayit_yok') {
             await postJson('/api/itiraz/kayitlar', { kayitlar: [sunucuya(k)] });

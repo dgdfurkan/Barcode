@@ -119,6 +119,18 @@ button.itr-kayit:focus-visible { outline: 2px solid var(--mavi); outline-offset:
 .itr-alinti { margin: 0; padding: 12px 16px; border-left: 3px solid var(--cizgi-sert); border-radius: 0 12px 12px 0; background: var(--kagit); font-size: 13px; line-height: 20px; color: var(--yazi); white-space: pre-wrap; overflow-wrap: anywhere; }
 .itr-alinti.is-bos { color: var(--sonuk); font-style: italic; }
 
+/* Sipariş içeriği */
+.itr-siparis { padding: 12px 16px; border: 1px solid var(--cizgi); border-radius: 12px; display: flex; flex-direction: column; gap: 8px; }
+.itr-siparis.is-yuk { gap: 8px; }
+.itr-siparis__ozet { margin: 0; font-size: 12px; font-weight: 600; color: var(--sonuk); font-variant-numeric: tabular-nums; }
+.itr-siparis__liste { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.itr-siparis__liste li { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; padding: 4px 8px; border-radius: 6px; font-size: 13px; color: var(--yazi); }
+.itr-siparis__liste li + li { border-top: 1px solid var(--kagit); }
+.itr-siparis__liste li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.itr-siparis__liste li b { flex: none; font-size: 12px; color: var(--yazi-orta); font-variant-numeric: tabular-nums; }
+.itr-siparis__liste li.is-hedef { background: var(--sari-50); font-weight: 700; }
+.itr-siparis__liste li.is-hedef b { color: #b45309; }
+
 /* Yazma alanı */
 .itr-yazici { border: 1px solid var(--cizgi); border-radius: 12px; overflow: hidden; }
 .itr-yazici__bos { padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
