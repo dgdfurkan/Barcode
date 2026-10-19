@@ -140,7 +140,8 @@
     /** v: { tur: 'sabah'|'gece', gun, adet|kalan, sim } */
     function ciz(v) {
         kaldir();
-        if (!etkin || !PANO_YOLU.test(location.pathname)) return;
+        // Simülasyon deneme içindir: modülün hak listesi gelmemiş olsa da gösterilir
+        if ((!etkin && !v.sim) || !PANO_YOLU.test(location.pathname)) return false;
         kap = document.createElement('div');
         kap.id = 'jba-gunluk-sayim';
         kok = kap.attachShadow({ mode: 'closed' });
@@ -186,6 +187,7 @@
             simBitis = Date.now() + SIM_MS;
             simZaman = setTimeout(function () { kaldir(); tur(); }, SIM_MS);
         }
+        return true;
     }
 
     function sabahGosterildi(gun) {
@@ -220,9 +222,10 @@
     }
 
     try {
-        chrome.runtime.onMessage.addListener(function (m) {
-            if (!m || m.type !== 'JBA_GUNLUK_KART' || !etkin) return false;
-            ciz({ tur: m.tur === 'gece' ? 'gece' : 'sabah', gun: m.gun || saat().gun, adet: m.adet || 50, kalan: m.kalan || 3, sim: true });
+        chrome.runtime.onMessage.addListener(function (m, gonderen, cevapla) {
+            if (!m || m.type !== 'JBA_GUNLUK_KART') return false;
+            var oldu = ciz({ tur: m.tur === 'gece' ? 'gece' : 'sabah', gun: m.gun || saat().gun, adet: m.adet || 50, kalan: m.kalan || 3, sim: true });
+            cevapla({ ok: !!oldu, sebep: oldu ? null : 'sayfa' });
             return false;
         });
     } catch (e) { /* yetim bağlam */ }

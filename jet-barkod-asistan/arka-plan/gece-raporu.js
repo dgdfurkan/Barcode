@@ -47,7 +47,9 @@ async function grModulAcik(ad) {
   try {
     const r = await chrome.storage.local.get('jbaAcikModuller');
     const l = r && r.jbaAcikModuller;
-    return !Array.isArray(l) || l.indexOf(ad) !== -1;
+    if (!Array.isArray(l) || l.indexOf(ad) !== -1) return true;
+    // Günlük Sayım listeye sonradan eklendi; eski listede tam hak modülleri varsa açık say
+    return ad === 'gunlukSayim' && ['kaldirma', 'itiraz', 'sayimHazirligi'].some((m) => l.indexOf(m) !== -1);
   } catch (e) { return true; }
 }
 

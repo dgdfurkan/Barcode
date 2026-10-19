@@ -38,7 +38,7 @@ const { Resvg } = require('@resvg/resvg-js');
 
 const HAKLAR = ['satistanKaldirma', 'itirazYazici', 'stokSayimi', 'jetBarkodAsistan'];
 const KATALOG = 'https://jetbarkod.com.tr/products.json';
-const S3 = /^https:\/\/getir-stock\.s3\.[a-z0-9-]+\.amazonaws\.com\/blocked-stock\/[^\s"'<>]+$/;
+const S3 = /^https:\/\/getir-stock\.s3\.[a-z0-9-]+\.amazonaws\.com\/(?:blocked-stock|transfer)\/[^\s"'<>]+$/;
 const BEKLEYEN = new Set([100, 150, 200, 300]);
 
 const sadeAd = (s) => String(s || '').toLocaleLowerCase('tr').replace(/\s+/g, ' ').trim();

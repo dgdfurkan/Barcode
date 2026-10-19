@@ -82,7 +82,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     const httpsMi = (v) => typeof v === 'string' && /^https:\/\/[^\s"'<>]{4,1900}$/.test(v);
     /* Hasar fotoğrafı: panelin verdiği süreli imzalı S3 adresi. Yalnız bu kova. */
     const s3Mi = (v) => typeof v === 'string' && v.length < 3000 &&
-        /^https:\/\/getir-stock\.s3\.[a-z0-9-]+\.amazonaws\.com\/blocked-stock\/[^\s"'<>]+$/.test(v);
+        /^https:\/\/getir-stock\.s3\.[a-z0-9-]+\.amazonaws\.com\/(?:blocked-stock|transfer)\/[^\s"'<>]+$/.test(v);
 
     function kayitDuzelt(k) {
         if (!k || typeof k !== 'object') return null;

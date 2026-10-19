@@ -46,11 +46,19 @@ function gsDun(gun) {
   return d.toISOString().slice(0, 10);
 }
 
+/* Hak listesi siteden geliyor. Günlük Sayım eklenmeden önce kaydedilmiş bir
+   listede yoksa, Asistan'ın tam hakkını gösteren modüller varsa açık sayılır
+   (site bir sonraki açılışta listeyi zaten tazeler; sunucu hakkı ayrıca denetler). */
+function gsListedeAcik(l) {
+  if (!Array.isArray(l)) return true;
+  if (l.indexOf('gunlukSayim') !== -1) return true;
+  return ['kaldirma', 'itiraz', 'sayimHazirligi'].some((m) => l.indexOf(m) !== -1);
+}
+
 async function gsHakVar() {
   try {
     const r = await chrome.storage.local.get('jbaAcikModuller');
-    const l = r && r.jbaAcikModuller;
-    return !Array.isArray(l) || l.indexOf('gunlukSayim') !== -1;
+    return gsListedeAcik(r && r.jbaAcikModuller);
   } catch (e) { return true; }
 }
 
@@ -260,7 +268,10 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
         m.gun = gun;
         m.adet = d && d.gun === gun && d.adet ? d.adet : 50;
       }
-      try { await chrome.tabs.sendMessage(hedef.id, m); } catch (e) { return { ok: false, metin: 'Kontrol paneli sekmesini yenileyin.' }; }
+      let c = null;
+      try { c = await chrome.tabs.sendMessage(hedef.id, m); } catch (e) { c = null; }
+      if (!c) return { ok: false, metin: 'Kontrol paneli sekmesini bir kez yenileyin (F5), sonra tekrar deneyin.' };
+      if (!c.ok) return { ok: false, metin: 'Kontrol paneli sayfasında açın (Siparişler panosu).' };
       try { await chrome.tabs.update(hedef.id, { active: true }); await chrome.windows.update(hedef.windowId, { focused: true }); } catch (e) { /* sessiz */ }
       return { ok: true };
     })().then(cevapla, () => cevapla({ ok: false, metin: 'Gösterilemedi.' }));

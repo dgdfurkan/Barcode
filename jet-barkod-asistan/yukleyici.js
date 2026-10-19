@@ -37,6 +37,12 @@
                     if (Array.isArray(l) && l.indexOf('firinPisirme') !== -1 && l.indexOf('firinUyari') === -1) {
                         l = l.concat('firinUyari');
                     }
+                    /* Günlük Sayım sonradan eklendi: liste ondan önce kaydedildiyse tam
+                       hak modülleri olan hesapta site açılmayı beklemesin */
+                    if (Array.isArray(l) && l.indexOf('gunlukSayim') === -1 &&
+                        ['kaldirma', 'itiraz', 'sayimHazirligi'].some(function (m) { return l.indexOf(m) !== -1; })) {
+                        l = l.concat('gunlukSayim');
+                    }
                     coz(Array.isArray(l) ? l : null);
                 });
             } catch (e) {
