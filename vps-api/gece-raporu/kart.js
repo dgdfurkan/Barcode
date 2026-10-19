@@ -122,6 +122,13 @@ function ozetKarti(o) {
     });
     y += 2 * 176 + 20 + 32;
 
+    // İtirazlar en son ne zaman eşitlendi; 3 saatten eskiyse uyar (sayılar eski olabilir)
+    if (o.itirazSon && Date.now() - Date.parse(o.itirazSon) > 3 * 3600 * 1000) {
+        p.push(`<rect x="${P}" y="${y}" width="${IC}" height="72" rx="20" fill="${R.sariZemin}" stroke="#fedf89"/>`);
+        p.push(yazi(P + 28, y + 44, kirp(OLCU.govde, 'İtirazlar en son ' + tarihSaat(o.itirazSon) + '\'de güncellendi; franchise paneli kapalıydı.', 19, IC - 56), { boy: 19, renk: R.sari }));
+        y += 72 + 24;
+    }
+
     if (o.gunluk) {
         p.push(`<rect x="${P}" y="${y}" width="${IC}" height="88" rx="20" fill="${R2.maviZemin}"/>`);
         p.push(yazi(P + 28, y + 38, 'Günlük sayım', { boy: 19, agirlik: 600, renk: R2.mavi }));

@@ -121,8 +121,14 @@ async function grItirazEsitle(zorla) {
   let bilgi = null;
   try { bilgi = (await chrome.storage.local.get('getir_api_info')).getir_api_info; } catch (e) { bilgi = null; }
   const jeton = bilgi && typeof bilgi.token === 'string' ? bilgi.token : '';
-  const depo = bilgi && GR_KIMLIK.test(String(bilgi.warehouseId || '')) ? bilgi.warehouseId : null;
-  if (!jeton || !depo || grJwtBitis(jeton) < Date.now() + 60000) return { ok: false, metin: 'Franchise oturumu yok.' };
+  // Depo kimliği franchise oturumunda olmayabilir: açık depo paneli sekmesinden,
+  // o da yoksa en son görülenden (iki panelde aynı depo kimliği)
+  let depo = bilgi && GR_KIMLIK.test(String(bilgi.warehouseId || '')) ? bilgi.warehouseId : null;
+  if (!depo) { const yer = await grDepo(); if (yer) depo = yer.depo; }
+  if (!depo) { try { const v = (await chrome.storage.local.get('jbaSonDepo')).jbaSonDepo; if (GR_KIMLIK.test(String(v || ''))) depo = v; } catch (e) { /* yok */ } }
+  if (depo) { try { await chrome.storage.local.set({ jbaSonDepo: depo }); } catch (e) { /* sessiz */ } }
+  if (!jeton || grJwtBitis(jeton) < Date.now() + 60000) return { ok: false, metin: 'Franchise oturumu yok; franchise panelini bir kez açın.' };
+  if (!depo) return { ok: false, metin: 'Depo bilgisi yok; depo panelini bir kez açın.' };
 
   const bit = new Date(); bit.setHours(23, 59, 59, 999);
   const bas = new Date(); bas.setHours(0, 0, 0, 0); bas.setDate(bas.getDate() - 30);

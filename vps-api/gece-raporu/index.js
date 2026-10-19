@@ -159,7 +159,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     async function alicilar(username) {
         try {
             const r = await pool.query(
-                `SELECT id, chat_id FROM rapor.telegram_baglantilari WHERE username = $1 AND durum = 'aktif' ORDER BY baglandi_at`,
+                `SELECT id, chat_id, tg_ad, tg_kullanici_adi FROM rapor.telegram_baglantilari WHERE username = $1 AND durum = 'aktif' ORDER BY baglandi_at`,
                 [username]
             );
             return r.rows;
@@ -301,6 +301,11 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             sayimVerisi(u, bas, son),
         ]);
         const kaldirma = kd.red;
+        let itirazSon = null;
+        try {
+            const r = await pool.query('SELECT max(son_gorulme) AS son FROM itiraz.kayitlar WHERE username = $1', [u]);
+            itirazSon = r.rows[0] && r.rows[0].son;
+        } catch (e) { /* şema yok */ }
         const gun = istanbul(son.getTime()).gun;
         const gercekRed = kaldirma.filter((k) => !k.yeniden).length;
         const farkUrun = sayim.reduce((t, g) => t + g.farklar.length, 0);
@@ -312,6 +317,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             itirazBekleyen: itiraz.bekleyen.length,
             itirazKabul: itiraz.sonuc.filter((x) => x.durum === 300).length,
             itirazRed: itiraz.sonuc.filter((x) => x.durum === 400).length,
+            itirazSon,
             sayimSayisi: sayim.length,
             sayimUrun: sayim.reduce((t, g) => t + g.urun, 0),
             farkUrun,
@@ -470,15 +476,24 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     // Uçlar
     // -----------------------------------------------------------------
 
+    /** Pencerenin gösterdiği durum: ayarlar, bağlı Telegram hesapları (ad), son gönderim */
+    async function durumOku(u) {
+        const [a, g, h] = await Promise.all([
+            ayarOku(u),
+            pool.query('SELECT gun::text AS gun, gonderildi, kart FROM gece.gonderim WHERE username = $1 ORDER BY gun DESC LIMIT 1', [u]),
+            alicilar(u),
+        ]);
+        return {
+            ok: true, acik: a.acik, bekleyen: a.bekleyen, foto: a.foto, hesap: h.length,
+            hesaplar: h.map((x) => ({ ad: x.tg_ad || '', kullanici: x.tg_kullanici_adi || '' })),
+            son: g.rows[0] || null,
+        };
+    }
+
     app.get('/api/gece-raporu/ayar', uye, async (req, res) => {
         const u = req.auth.username;
         try {
-            const [a, g, h] = await Promise.all([
-                ayarOku(u),
-                pool.query('SELECT gun::text AS gun, gonderildi, kart FROM gece.gonderim WHERE username = $1 ORDER BY gun DESC LIMIT 1', [u]),
-                alicilar(u),
-            ]);
-            res.json({ ok: true, acik: a.acik, bekleyen: a.bekleyen, foto: a.foto, hesap: h.length, son: g.rows[0] || null });
+            res.json(await durumOku(u));
         } catch (e) {
             if (semaYok(e)) return res.status(503).json({ ok: false, error: 'kurulum_bekleniyor' });
             console.error('gece-raporu ayar:', e.message);
@@ -513,7 +528,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                     [u, yeni.acik]
                 );
             }
-            res.json({ ok: true, ...yeni });
+            res.json(await durumOku(u));
         } catch (e) {
             if (semaYok(e)) return res.status(503).json({ ok: false, error: 'kurulum_bekleniyor' });
             console.error('gece-raporu ayar yaz:', e.message);

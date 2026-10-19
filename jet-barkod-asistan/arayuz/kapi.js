@@ -288,7 +288,9 @@
             geceOzet.textContent = c.acik === false ? 'Kapalı'
                 : 'Açık · 01:00' + (c.bekleyen ? ' · bekleyenler' : '') + (c.foto ? ' · fotoğraflar' : '');
         }
-        var m = !c.hesap ? 'Telegram bağlı değil.' : c.hesap + ' Telegram hesabına gider.';
+        var adlar = (c.hesaplar || []).map(function (h) { return h.ad || (h.kullanici ? '@' + h.kullanici : ''); }).filter(Boolean);
+        var m = !c.hesap ? 'Telegram bağlı değil; sayım raporundan bağla.'
+            : 'Telegram: ' + (adlar.length ? adlar.join(', ') : c.hesap + ' hesap') + '.';
         if (c.son && c.son.gonderildi) m += ' Son: ' + saatYaz(Date.parse(c.son.gonderildi)) + ' (' + c.son.gun.split('-').reverse().slice(0, 2).join('.') + ')';
         geceDurum.textContent = m;
     }
