@@ -263,4 +263,7 @@ function kartUret(kayitlar, a, gorseller) {
     return r.render().asPng();
 }
 
-module.exports = { kartUret, DURUMLAR, SONUC_TIPLERI };
+/* Gece raporu (vps-api/gece-raporu/kart.js) aynı fontları ve çizim yardımcılarını kullanır */
+const araclar = { kacir, genislik, kirp, ikiSatir, yazi, veriUri, adetYaz, OLCU, LOGO, R, FONT_DOSYALARI };
+
+module.exports = { kartUret, DURUMLAR, SONUC_TIPLERI, araclar };

@@ -973,6 +973,11 @@ require('./itiraz').kur(app, { pool, verifyToken, bearerOf });
 require('./gunluk-sayim').kur(app, { pool, verifyToken, bearerOf });
 
 // =====================================================================
+// Gece raporu: 01:00'de son 24 saat Telegram'a (kaldırma redleri, itirazlar, sayım farkları)
+// =====================================================================
+require('./gece-raporu').kur(app, { pool, verifyToken, bearerOf });
+
+// =====================================================================
 // Canlı kanal: sipariş ve sayım değişikliği cihazlara anında (vps-api/canli.js)
 // =====================================================================
 require('./canli').kur(app, {

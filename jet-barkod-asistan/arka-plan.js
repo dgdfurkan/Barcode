@@ -18,6 +18,7 @@ import './arka-plan/kaldirma-nobet.js';
 import './arka-plan/franchise-jeton.js';
 import './arka-plan/itiraz.js';
 import './arka-plan/gunluk-sayim.js';
+import './arka-plan/gece-raporu.js';
 
 /**
  * Güncelleme sonrası açık panel sekmelerini tazele.

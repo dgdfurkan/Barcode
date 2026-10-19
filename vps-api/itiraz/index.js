@@ -191,6 +191,7 @@ const SEMA = {
 
 function kur(app, { pool, verifyToken, bearerOf }) {
     const sayac = new Map();
+    let durumZamaniVar = null;
 
     function pencere(anahtar, sinir, ms) {
         const simdi = Date.now();
@@ -321,7 +322,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         const kim = req.auth.username;
         try {
             if (kayitlar.length) {
-                await pool.query(
+                const yaz = (zamanli) => pool.query(
                     `INSERT INTO itiraz.kayitlar
                         (username, kayit_id, durum, kayit_tarihi, son_tarih, kriter, sikayet, aciklama,
                          musteri_notu, urun, itiraz_metni, itiraz_sebep_id)
@@ -337,9 +338,18 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                         musteri_notu = EXCLUDED.musteri_notu, urun = EXCLUDED.urun,
                         itiraz_metni = COALESCE(EXCLUDED.itiraz_metni, itiraz.kayitlar.itiraz_metni),
                         itiraz_sebep_id = COALESCE(EXCLUDED.itiraz_sebep_id, itiraz.kayitlar.itiraz_sebep_id),
-                        son_gorulme = now()`,
+                        son_gorulme = now()` + (zamanli ? `,
+                        durum_degisti_at = CASE WHEN itiraz.kayitlar.durum <> EXCLUDED.durum THEN now()
+                                                ELSE itiraz.kayitlar.durum_degisti_at END` : ''),
                     [kim, JSON.stringify(kayitlar)]
                 );
+                // durum_degisti_at gece_raporu.sql ile geliyor; o çalışmadıysa eski biçimle yaz
+                try { await yaz(durumZamaniVar !== false); }
+                catch (e) {
+                    if (e.code !== '42703' || durumZamaniVar === false) throw e;
+                    durumZamaniVar = false;
+                    await yaz(false);
+                }
             }
             const idler = kayitlar.map((k) => k.id);
             let r;

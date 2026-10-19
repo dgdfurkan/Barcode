@@ -59,6 +59,8 @@ function gorevYolu(depo, sayimId, isId, gorevId) {
 
 function olay(cagiran, veri) {
   if (!cagiran) return;
+  // Arka plandaki gece işi (gunluk-sayim.js) olayları doğrudan toplar
+  if (typeof cagiran === 'function') { try { cagiran(veri); } catch (e) { /* sessiz */ } return; }
   try {
     chrome.tabs.sendMessage(cagiran, { type: 'JBA_SAYIM_GECMISI_OLAY', ...veri }).catch(() => {});
   } catch (e) { /* çağıran sekme gitmiş */ }
@@ -267,8 +269,10 @@ async function calistir(istek, cagiran) {
   let kayitSayisi = 0;
   try {
     olay(cagiran, { tur: 'ilerleme', asama: 'acilis', mesaj: 'Depo paneli açılıyor' });
-    let pencere = null;
-    try { pencere = (await chrome.tabs.get(cagiran)).windowId; } catch (e) { /* yok */ }
+    let pencere = istek.pencere || null;
+    if (!pencere && typeof cagiran === 'number') {
+      try { pencere = (await chrome.tabs.get(cagiran)).windowId; } catch (e) { /* yok */ }
+    }
     // Sekme süzgeçsiz listede açılır: ilk sayfa adresi farklı olsun ki panel isteği yeniden atsın
     const tab = await chrome.tabs.create({
       url: `https://warehouse.getir.com/r/${depo}/stock/gstore-inventory-check/list`,
@@ -406,7 +410,26 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
 
 /* Günlük sayım (arka-plan/gunluk-sayim.js) panel okuma yardımcılarını ortak kullanır.
    Aynı anda tek iş: Sayım Geçmişi çalışıyorsa günlük sayım bekler. */
+/** Gece işi: aralıktaki tamamlanmış sayımların ürün sonuçlarını toplar. */
+async function sayimSonuclariniTopla({ depo, bas, bit, pencere }) {
+  if (calisan) return { ok: false, hata: 'Sayım geçmişi zaten alınıyor.' };
+  const kayitlar = [];
+  let son = null;
+  const topla = (v) => {
+    if (v.tur === 'parca' && Array.isArray(v.kayitlar)) kayitlar.push(...v.kayitlar);
+    else if (v.tur === 'bitti') son = v;
+  };
+  calisan = { durdur: false, cagiran: topla };
+  try {
+    await calistir({ warehouseId: depo, baslangic: bas, bitis: bit, otomatik: true, bilinen: {}, pencere }, topla);
+  } finally {
+    calisan = null;
+  }
+  return { ok: !!(son && son.ok), hata: son && son.hata, kayitlar };
+}
+
 globalThis.jbaSayimPanel = {
+  sonuclariTopla: sayimSonuclariniTopla,
   mesgulMu: () => !!calisan,
   sekmeHazirBekle,
   sayimListesi,

@@ -224,7 +224,7 @@
     chrome.storage.onChanged.addListener(function (d, alan) {
         if (alan === 'local' && d.jbaGunlukSayim) gunlukCiz(d.jbaGunlukSayim.newValue);
     });
-    function gunlukDugme(id, mesaj, mesgulYazi) {
+    function gunlukDugme(id, mesaj, mesgulYazi, durumEl) {
         var b = document.getElementById(id);
         if (!b) return;
         var ilk = b.textContent;
@@ -234,7 +234,8 @@
             chrome.runtime.sendMessage(mesaj, function (c) {
                 void chrome.runtime.lastError;
                 b.textContent = c && c.ok ? 'Tamam' : 'Olmadı';
-                if (gunlukDurum && c && c.metin) gunlukDurum.textContent = c.metin;
+                var hedef = durumEl || gunlukDurum;
+                if (hedef && c && c.metin) hedef.textContent = c.metin;
                 setTimeout(function () { b.disabled = false; b.textContent = ilk; }, 3000);
             });
         });
@@ -257,6 +258,35 @@
         });
     });
     gunlukDugme('gunlukEkle', { type: 'JBA_GUNLUK_EKLE' }, 'Okunuyor...');
+
+    /* Gece raporu: ayar sunucuda (telefon ve bilgisayar aynı) */
+    var geceAyar = document.getElementById('geceAyar');
+    var geceDurum = document.getElementById('geceDurum');
+    function geceCiz(c) {
+        if (!geceDurum) return;
+        if (!c || !c.ok) {
+            geceDurum.textContent = c && (c.kod === 404 || c.kod === 503) ? 'Sunucu güncellemesi bekleniyor.'
+                : c && c.kod === 401 ? 'Jet Barkod\'a bir kez giriş yap.' : 'Durum okunamadı.';
+            return;
+        }
+        geceAyar.checked = c.acik !== false;
+        geceAyar.disabled = false;
+        var m = !c.hesap ? 'Telegram bağlı değil.' : c.hesap + ' Telegram hesabına gider.';
+        if (c.son && c.son.gonderildi) m += ' Son: ' + saatYaz(Date.parse(c.son.gonderildi)) + ' (' + c.son.gun.split('-').reverse().slice(0, 2).join('.') + ')';
+        geceDurum.textContent = m;
+    }
+    if (geceAyar) {
+        chrome.runtime.sendMessage({ type: 'JBA_GECE_AYAR' }, function (c) { void chrome.runtime.lastError; geceCiz(c); });
+        geceAyar.addEventListener('change', function () {
+            geceAyar.disabled = true;
+            chrome.runtime.sendMessage({ type: 'JBA_GECE_AYAR', acik: geceAyar.checked }, function (c) {
+                void chrome.runtime.lastError;
+                if (!c || !c.ok) geceAyar.checked = !geceAyar.checked;
+                geceAyar.disabled = false;
+            });
+        });
+    }
+    gunlukDugme('geceSimdi', { type: 'JBA_GECE_SIMDI' }, 'Gönderiliyor...', geceDurum);
     gunlukDugme('gunlukSimSabah', { type: 'JBA_GUNLUK_SIM', tur: 'sabah' }, 'Gösteriliyor...');
     gunlukDugme('gunlukSimGece', { type: 'JBA_GUNLUK_SIM', tur: 'gece' }, 'Gösteriliyor...');
 
