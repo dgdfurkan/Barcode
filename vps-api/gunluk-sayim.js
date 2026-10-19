@@ -5,10 +5,15 @@
  * AKIŞ
  * 1. Jet Barkod Asistan 06:00'da depo panelinden günün otomatik sayımını okur,
  *    POST /api/gunluk-sayim ile ürün listesini bırakır.
- * 2. Sayım sayfası açılınca GET /api/gunluk-sayim?gun= ile listeyi görür;
- *    POST /api/gunluk-sayim/al ile kilidi alan TEK cihaz `Günlük|<gün>`
- *    tablosunu kurar, POST /api/gunluk-sayim/tamam ile bitirir. Kilit 3
- *    dakikada düşer (cihaz yarıda kapandıysa başkası kurar).
+ * 2. Tablo HEMEN burada kurulur; sayım sayfasını açmak gerekmez:
+ *    counting_items'a `Günlük|<gün>` satırları (adet boş) eklenir ve
+ *    users.counting_data._tableMeta'ya yalnız o tablonun anahtarı jsonb_set
+ *    ile yazılır (diğer tablolar okunmaz, ezilmez). Sayım sayfası tabloları
+ *    zaten counting_items'tan kuruyor; açık cihazlar anlık kanaldan alır.
+ *    Tablo önceden varsa (elle eklenmiş) dokunulmaz. Kullanıcı o günün
+ *    tablosunu silmişse (counting_data._silinenler) yeniden kurulmaz.
+ *    Sayım sayfasındaki js/gunluk-sayim-otomatik.js yalnız yedek: sunucu
+ *    kuramadıysa al/tamam kilidiyle tek cihaz kurar.
  * 3. Gece 00:00-01:00 Asistan GET /api/gunluk-sayim/durum?gun= ile kalan
  *    ürünü sorar: tablodaki adedi boş satırlar; tablo hiç kurulmadıysa
  *    listenin tamamı.
@@ -105,9 +110,71 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                     sayim_id = EXCLUDED.sayim_id`,
                 [req.auth.username, gun, sayimId, JSON.stringify(urunler)]
             );
-            res.json({ ok: true, adet: urunler.length });
+            const kurulum = await tabloKur(req.auth.username, gun, urunler);
+            res.json({ ok: true, adet: urunler.length, tablo: kurulum });
         } catch (e) { hata(res, e, 'yaz'); }
     });
+
+    /** `Günlük|<gün>` tablosunu doğrudan kurar. Dönüş: 'kuruldu' | 'vardi' | 'silinmis' */
+    async function tabloKur(username, gun, urunler) {
+        const ad = 'Günlük|' + gun;
+        const istemci = await pool.connect();
+        try {
+            await istemci.query('BEGIN');
+            // Aynı kullanıcı için eşzamanlı ikinci kurulum beklesin
+            const k = await istemci.query(
+                `SELECT uygulandi_at FROM gunluk.sayimlar WHERE username = $1 AND gun = $2 FOR UPDATE`,
+                [username, gun]
+            );
+            if (k.rows[0] && k.rows[0].uygulandi_at) { await istemci.query('COMMIT'); return 'vardi'; }
+            const durum = await istemci.query(
+                `SELECT (SELECT count(*) FROM counting_items WHERE username = $1::text AND table_name = $2::text)::int AS satir,
+                        (counting_data->'_silinenler'->>($2::text)) IS NOT NULL AS silinmis,
+                        jsonb_typeof(counting_data) AS tur
+                   FROM users WHERE username::text = $1::text`,
+                [username, ad]
+            );
+            const d = durum.rows[0] || {};
+            if (d.silinmis) { await istemci.query('COMMIT'); return 'silinmis'; }
+            if (d.satir > 0) {
+                await istemci.query(`UPDATE gunluk.sayimlar SET uygulandi_at = now() WHERE username = $1 AND gun = $2`, [username, gun]);
+                await istemci.query('COMMIT');
+                return 'vardi';
+            }
+            const simdi = new Date().toISOString();
+            const ekle = await istemci.query(
+                `INSERT INTO counting_items (username, table_name, product_id, history, updated_by, last_updated)
+                 SELECT $1, $2, x.e->>'id', '[]'::jsonb, 'jba-gunluk', now()
+                   FROM jsonb_array_elements($3::jsonb) WITH ORDINALITY AS x(e, sira)
+                  ORDER BY x.sira
+                 ON CONFLICT (username, table_name, product_id) DO NOTHING`,
+                [username, ad, JSON.stringify(urunler)]
+            );
+            if (d.tur === 'object' || d.tur == null) {
+                const meta = { createdAt: simdi, lastActivityAt: simdi, _productOrder: urunler.map((u) => u.id) };
+                await istemci.query(
+                    `UPDATE users SET counting_data = jsonb_set(
+                         jsonb_set(COALESCE(counting_data, '{}'::jsonb), '{_tableMeta}', COALESCE(counting_data->'_tableMeta', '{}'::jsonb), true),
+                         ARRAY['_tableMeta', $2::text], $3::jsonb, true)
+                      WHERE username = $1 AND (counting_data IS NULL OR jsonb_typeof(counting_data) = 'object')`,
+                    [username, ad, JSON.stringify(meta)]
+                );
+            }
+            await istemci.query(
+                `UPDATE gunluk.sayimlar SET uygulandi_at = now(), alan_cihaz = 'sunucu', eklenen = $3, atlanan = 0
+                  WHERE username = $1 AND gun = $2`,
+                [username, gun, ekle.rowCount]
+            );
+            await istemci.query('COMMIT');
+            return 'kuruldu';
+        } catch (e) {
+            await istemci.query('ROLLBACK').catch(() => {});
+            console.error('gunluk-sayim tablo kur:', e.message);
+            return 'hata';
+        } finally {
+            istemci.release();
+        }
+    }
 
     /** Sayım sayfası ve Asistan okur */
     app.get('/api/gunluk-sayim', uye, async (req, res) => {

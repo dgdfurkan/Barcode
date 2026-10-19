@@ -239,6 +239,23 @@
             });
         });
     }
+    /* Aç/kapa: her biri ayrı; varsayılan hepsi açık */
+    var GUNLUK_SECENEK = { gunlukAyarEkle: 'ekle', gunlukAyarSabah: 'sabah', gunlukAyarGece: 'gece' };
+    chrome.storage.local.get('jbaGunlukAyar', function (r) {
+        var a = (r && r.jbaGunlukAyar) || {};
+        Object.keys(GUNLUK_SECENEK).forEach(function (id) {
+            var k = document.getElementById(id);
+            if (!k) return;
+            k.checked = a[GUNLUK_SECENEK[id]] !== false;
+            k.addEventListener('change', function () {
+                chrome.storage.local.get('jbaGunlukAyar', function (r2) {
+                    var y = Object.assign({}, (r2 && r2.jbaGunlukAyar) || {});
+                    y[GUNLUK_SECENEK[id]] = k.checked;
+                    chrome.storage.local.set({ jbaGunlukAyar: y });
+                });
+            });
+        });
+    });
     gunlukDugme('gunlukEkle', { type: 'JBA_GUNLUK_EKLE' }, 'Okunuyor...');
     gunlukDugme('gunlukSimSabah', { type: 'JBA_GUNLUK_SIM', tur: 'sabah' }, 'Gösteriliyor...');
     gunlukDugme('gunlukSimGece', { type: 'JBA_GUNLUK_SIM', tur: 'gece' }, 'Gösteriliyor...');

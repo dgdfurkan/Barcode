@@ -22,6 +22,7 @@
 const GS_ALARM = 'jba-gunluk-sayim';
 const GS_DURUM = 'jbaGunlukSayim';          // { gun, durum: 'eklendi'|'yok'|'hata', adet, zaman, metin }
 const GS_GECE = 'jbaGunlukGece';            // { gun, kalan, toplam, zaman }
+const GS_AYAR = 'jbaGunlukAyar';            // { ekle, sabah, gece } varsayılan hepsi açık
 const GS_API = 'https://api.flowcobalt.com/api/gunluk-sayim';
 const GS_TEKRAR_MS = 20 * 60 * 1000;
 const GS_GECE_ARA_MS = 4 * 60 * 1000;
@@ -205,17 +206,22 @@ async function gsGeceDurumu(zorla) {
   return v;
 }
 
+async function gsAyar() {
+  try { return (await chrome.storage.local.get(GS_AYAR))[GS_AYAR] || {}; } catch (e) { return {}; }
+}
+
 async function gsTur() {
   if (!(await gsHakVar())) return;
+  const ayar = await gsAyar();
   const { gun, saat } = gsSaat();
-  if (saat >= 6 && saat < 8) {
+  if (ayar.ekle !== false && saat >= 6 && saat < 8) {
     let d = null;
     try { d = (await chrome.storage.local.get(GS_DURUM))[GS_DURUM]; } catch (e) { d = null; }
     const bugunEklendi = d && d.gun === gun && d.durum === 'eklendi';
     const yakinda = d && d.gun === gun && Date.now() - (d.zaman || 0) < GS_TEKRAR_MS;
     if (!bugunEklendi && !yakinda) await gsEkle('periyot');
   }
-  if (saat === 0) await gsGeceDurumu(false);
+  if (ayar.gece !== false && saat === 0) await gsGeceDurumu(false);
 }
 
 async function gsAlarmKur() {

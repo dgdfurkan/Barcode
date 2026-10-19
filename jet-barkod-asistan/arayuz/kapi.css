@@ -251,3 +251,7 @@ body {
 .ayar > #gunlukEkle { flex: none; width: 112px; text-align: center; }
 .ayar__dugmeler { flex: none; display: flex; flex-direction: column; gap: 6px; }
 .ayar--alt .ayar__dugmeler .eylem { width: 112px; }
+
+.ayar--secenek { flex-direction: column; align-items: flex-start; gap: 2px; }
+.secenek { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; font-size: 12px; color: var(--renk-yazi); cursor: pointer; }
+.secenek input { width: 16px; height: 16px; margin: 0; accent-color: var(--renk-vurgu); cursor: pointer; }

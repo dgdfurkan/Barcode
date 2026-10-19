@@ -199,7 +199,8 @@
     async function tur() {
         if (!etkin || simBitis > Date.now()) return;
         var z = saat();
-        if (z.saat === 8 && z.dakika < 10) {
+        var ayar = (await depolama(['jbaGunlukAyar'])).jbaGunlukAyar || {};
+        if (z.saat === 8 && z.dakika < 10 && ayar.sabah !== false) {
             var r = await depolama(['jbaGunlukSayim', KART_ANAHTAR]);
             var d = r.jbaGunlukSayim;
             var gosterildi = r[KART_ANAHTAR] && r[KART_ANAHTAR].sabah === z.gun;
@@ -207,7 +208,7 @@
                 if (cizili !== 'sabah') ciz({ tur: 'sabah', gun: z.gun, adet: d.adet || 0 });
                 return;
             }
-        } else if (z.saat === 0 && Date.now() >= geceGizliBitis) {
+        } else if (z.saat === 0 && ayar.gece !== false && Date.now() >= geceGizliBitis) {
             var c = await arkaPlana({ type: 'JBA_GUNLUK_GECE' });
             var g = c && c.durum;
             if (g && g.var && g.kalan > 0) {

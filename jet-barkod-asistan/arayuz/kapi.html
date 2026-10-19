@@ -40,9 +40,14 @@
   <section class="ayar" aria-label="Günlük sayım">
     <div class="ayar__metin">
       <p class="ayar__ad">Günlük Sayım</p>
-      <p class="ayar__ozet">50'lik sayımı her sabah 06:00'da Jet Barkod'a ekler. 08:00'de haber verir, gece unutulan ürün varsa uyarır.</p>
+      <p class="ayar__ozet">50'lik sayım her sabah 06:00'da sayım sayfasına kendiliğinden eklenir; sayfayı açmak gerekmez.</p>
     </div>
     <button type="button" class="eylem" id="gunlukEkle">Şimdi Ekle</button>
+  </section>
+  <section class="ayar ayar--alt ayar--secenek" aria-label="Günlük sayım ayarları">
+    <label class="secenek"><input type="checkbox" id="gunlukAyarEkle" checked><span>06:00'da sayımı ekle</span></label>
+    <label class="secenek"><input type="checkbox" id="gunlukAyarSabah" checked><span>08:00 kartı</span></label>
+    <label class="secenek"><input type="checkbox" id="gunlukAyarGece" checked><span>Gece uyarısı</span></label>
   </section>
   <section class="ayar ayar--alt" aria-label="Günlük sayım durumu">
     <p class="ayar__durum" id="gunlukDurum">Bugün henüz eklenmedi.</p>
