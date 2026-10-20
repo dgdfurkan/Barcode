@@ -149,13 +149,13 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
 - Satıştan Kaldırma: `sql_files/satistan_kaldirma.sql` çalıştırılacak ve `vps-api/kaldirma/` + `server.js`
   VPS'e atılıp servis yeniden başlatılacak. Çalışana kadar sayfa "sunucu güncellemesi bekleniyor" der,
   Asistan aktarımı aynı mesajla bekler. Telegram botu ve hesap bağlama sayım raporununki.
-- İtiraz Yazıcı: `sql_files/itiraz_yazici.sql` çalıştırılacak, `vps-api/itiraz/` + `vps-api/franchise-jeton.js` +
+- İtiraz Yazıcı: `sql_files/itiraz_yazici.sql` çalıştırılacak, `vps-api/itiraz/` + `vps-api/katalog.js` + `vps-api/franchise-jeton.js` +
   `server.js` VPS'e atılıp servis yeniden başlatılacak. Gemini anahtarı JWT_SECRET'tan türetilen anahtarla şifreleniyor;
   JWT_SECRET değişirse kayıtlı anahtarlar çözülmez (kullanıcı yeniden girer). İstenirse `.env`'e `ITIRAZ_SIFRE` (64 hex) eklenir.
 - Günlük sayım: `sql_files/gunluk_sayim.sql` çalıştırılacak, `vps-api/gunluk-sayim.js` + `server.js` VPS'e atılıp servis
   yeniden başlatılacak. Çalışana kadar Asistan 06:00'da listeyi yazamaz ("sunucu güncellemesi bekleniyor").
 - Gece raporu: `sql_files/gece_raporu.sql` çalıştırılacak (önce `sayim_gecmisi_paylasim.sql` ve `itiraz_yazici.sql`),
-  `vps-api/gece-raporu/` + `vps-api/kaldirma/kart.js` + `vps-api/itiraz/index.js` + `server.js` VPS'e atılacak.
+  `vps-api/gece-raporu/` + `vps-api/katalog.js` + `vps-api/kaldirma/kart.js` + `vps-api/itiraz/index.js` + `server.js` VPS'e atılacak.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

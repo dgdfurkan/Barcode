@@ -23,6 +23,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { katalogAl, sadeAd, KIMLIK: KATALOG_KIMLIK } = require('../katalog');
 
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
 const MODELLER = [process.env.ITIRAZ_MODEL || 'gemini-flash-latest', 'gemini-2.5-flash'];
@@ -143,12 +144,16 @@ const TALIMAT = [
     '- ÜRÜN ADI: Ürünü kayıttaki tam adıyla, harfi harfine ve büyük-küçük harfleri değiştirmeden yaz (ör. "Salkım Domates (500 g)"). Kısaltma, küçük harfe çevirme, gramajı atma yok.',
     '- Müşterinin notuna doğrudan cevap ver. Genel "eksiksiz hazırladık" cümlesi tek başına reddediliyor.',
     '- SİPARİŞ İÇERİĞİ verildiyse somut kanıt olarak kullan: şikâyet edilen ürünün siparişteki adedini ve siparişin kaç ürün olduğunu doğru yaz. Eksik üründe ürünün siparişe girip diğer ürünlerle birlikte poşetlendiğini, yanlış üründe siparişteki ürünün gönderildiğini, bayat/bozuk üründe teslim süresi kısaysa bunu söyle. Listede olmayan ürünü ya da adedi uydurma.',
-    '- Yalnız verilen bilgileri ve işaretli depo olgularını kullan. Kamera kaydı, saat, kişi, sayı, ölçüm gibi verilmemiş hiçbir şey uydurma.',
-    '- Doğal, sakin, kendinden emin yaz. Abartma, yalvarma, suçlama yok. "Saygılarımızla", "arz ederiz", "değerli ekip" gibi resmî kalıplar yok.',
-    '- Müşteriyi küçümseme; olası açıklamayı nazikçe söyle.',
+    '- Yalnız verilen bilgileri, işaretli depo olgularını ve "BU KAYITTA OLANLAR" maddelerini kullan. Kamera kaydı, kurye yönlendirmesi, müşteriyle görüşme, saat, kişi, sayı gibi verilmemiş hiçbir şey uydurma.',
+    '- "BU KAYITTA OLANLAR" verildiyse metnin omurgası odur: her maddeyi metne doğal bir cümleyle yerleştir, hiçbirini atlama, sırasını olayların akışına göre kur.',
+    '- AKIŞ: (1) şikâyete doğrudan cevap ve ürünün nasıl hazırlanıp gönderildiği, (2) somut kanıt (sipariş içeriği, kamera görüntüsü, ayrı poşet gibi), (3) varsa sonrasında olanlar (kuryenin adrese yönlendirilmesi, müşteriyle görüşme ve sonucu), (4) tek cümlelik talep: depo kaynaklı bir hata olmadığı için kaydın düzeltilmesini ya da gereğinin yapılmasını talep et, ardından "İyi çalışmalar dileriz." ile bitir.',
+    '- Örnek ton (kopyalama, yalnız üslup): "Ürünler bayi sahibi tarafından eksiksiz kontrol edilerek ve sayılarak hazırlanmıştır. İlgili siparişe ait kamera görüntüleri elimizde mevcuttur. Fırın ürünleri diğer ürünlerden ayrı olarak fırın kraft poşetinde teslim edilmektedir. Eksik ürün bildirimi tarafımıza ulaştığında kuryemiz adrese yönlendirilmiş, müşterimizin fırın ürünlerinin bulunduğu poşeti kapıdan almadığı fark edilmiştir. Bu durumda depo kaynaklı bir hata bulunmadığından gereğinin yapılmasını talep ederiz. İyi çalışmalar dileriz."',
+    '- Kurumsal, sakin, kendinden emin yaz; "-mıştır / -maktadır" kipleri uygundur. Abartma, yalvarma, suçlama yok. "Saygılarımızla", "arz ederiz", "değerli ekip" gibi kalıplar yok; kapanış yalnız "İyi çalışmalar dileriz."',
+    '- Müşteriyi küçümseme; müşteri hatası varsa olguya dayanarak nazikçe söyle.',
     '- Kurye, toplayıcı ya da müşteri adı yazma. Emoji ve madde işareti yok. Uzun tire kullanma.',
-    '- Her taslak 2 ile 4 cümle, en fazla 450 karakter, düzgün Türkçe.',
-    '- Üç taslak birbirinden gerçekten farklı açıdan yaklaşsın.',
+    '- Her taslak 3 ile 6 cümle, en fazla 700 karakter, düzgün Türkçe.',
+    '- Üç taslak aynı olguları kullanır ama farklı açıdan kurulur: biri kanıta, biri olayların akışına, biri kısa ve net talebe ağırlık versin.',
+    '- Ürün fırın ürünüyse ve olgularda ayrı fırın poşeti varsa, eksik şikâyetinde poşetin ayrı teslim edildiğini ve kapıda alınmamış olabileceğini kullan.',
     '- "sebep" alanına verilen sebep listesinden, metinle ve şikâyet türüyle aynı şeyi söyleyen TEK bir sebebi harfi harfine yaz.',
     '- Örneklerde kabul edilen itirazların yaklaşımını izle, reddedilenlerin hatasından kaçın, kullanıcının seçtiği metinlerin üslubuna yaklaş. Örnekleri kopyalama.',
     '- Yanıt yalnız istenen JSON.',
@@ -164,6 +169,8 @@ const TUR_YONU = [
     [/hasar|ezik|k[ıi]r[ıi]k|patlak|ak[ıi]nt[ıi]/i, 'HASARLI ÜRÜN: Ürünün sağlam paketlendiğini, hasarın taşıma sırasında ya da sonrasında oluşmuş olabileceğini anlat. Sebep çoğunlukla "Depo kaynaklı sorun değil".'],
     [/so[gğ]uk|s[ıi]cak|eri/i, 'SOĞUK ÜRÜN: Ürünün soğuk zincir korunarak, ayrı ve uygun şekilde gönderildiğini anlat. Sebep çoğunlukla "Soğuk ürün garantili satış yapmamaktayız" ya da "Depo kaynaklı sorun değil".'],
 ];
+
+const FIRIN = /ekme[kğ]|simit|po[gğ]a[cç]a|a[cç]ma\b|b[oö]rek|pide|lavaş|lavas|bazlama|kruvasan|croissant|[cç][oö]rek|baget|sandvi[cç]|pizza|kek\b|kurabiye|f[ıi]r[ıi]n/i;
 
 function turYonu(k) {
     // Önce şikâyet türü, o tutmazsa açıklama ("İptal Sipariş" türü "eksik" açıklamasından önce gelir)
@@ -403,6 +410,9 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             ? [...new Set(b.sebepler.map((s) => metin(s, 140)).filter(Boolean))].slice(0, 25) : [];
         if (!sebepler.length) return res.status(400).json({ ok: false, error: 'sebep_listesi_yok' });
         const ekNot = metin(b.ek_not, 400);
+        // Kayda özel olaylar (sayfadaki çipler): doğru kabul edilir
+        const olaylar = Array.isArray(b.olaylar)
+            ? [...new Set(b.olaylar.map((o) => metin(o, 200)).filter(Boolean))].slice(0, 10) : [];
         // Panelin sipariş detayından yalnız ürünler ve teslim süresi (kişisel veri yok)
         const sp = b.siparis && typeof b.siparis === 'object' ? b.siparis : null;
         const siparisUrun = sp && Array.isArray(sp.urunler) ? sp.urunler.slice(0, 40).map((u) => ({
@@ -451,7 +461,11 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 k.aciklama && k.aciklama !== 'description' ? '- Açıklama: ' + k.aciklama : null,
                 '- Ürünün tam adı (aynen yaz): ' + (k.urun || '-'),
                 '- Müşteri notu: ' + (k.musteri_notu || '(not yok)'),
+                FIRIN.test(k.urun || '') ? '- Ürün bir fırın ürünü.' : null,
                 ekNot ? '- Depo sorumlusunun ek bilgisi (doğru kabul et): ' + ekNot : null,
+                olaylar.length ? '' : null,
+                olaylar.length ? 'BU KAYITTA OLANLAR (depo sorumlusu işaretledi, doğru kabul et, hepsini kullan)' : null,
+                olaylar.length ? olaylar.map((o) => '- ' + o).join('\n') : null,
                 siparisUrun.length ? '' : null,
                 siparisUrun.length ? 'SİPARİŞ İÇERİĞİ (panelden, doğru kabul et): ' + siparisUrun.length + ' ürün, ' +
                     siparisUrun.reduce((t, u) => t + u.adet, 0) + ' adet' + (teslimDk ? ', ' + teslimDk + ' dakikada teslim edildi' : '') : null,
@@ -498,7 +512,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             }
             const v = sonuc.veri || {};
             const taslaklar = (Array.isArray(v.taslaklar) ? v.taslaklar : [])
-                .map((t) => ({ aci: metin(t && t.aci, 60), metin: metin(t && t.metin, 900).replace(/\s*\u2014\s*/g, ', ') }))
+                .map((t) => ({ aci: metin(t && t.aci, 60), metin: metin(t && t.metin, 1200).replace(/\s*\u2014\s*/g, ', ') }))
                 .filter((t) => t.metin)
                 .slice(0, 3);
             if (!taslaklar.length) return res.status(502).json({ ok: false, error: 'gemini_bicim' });
@@ -506,10 +520,29 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             // Taslak sunucuda: telefon ve bilgisayar aynı taslağı görür
             await pool.query(
                 'UPDATE itiraz.kayitlar SET taslak = $3::jsonb WHERE username = $1 AND kayit_id = $2',
-                [kim, id, JSON.stringify({ taslaklar, sebep, ekNot, zaman: new Date().toISOString() })]
+                [kim, id, JSON.stringify({ taslaklar, sebep, ekNot, olaylar, zaman: new Date().toISOString() })]
             ).catch((e) => { if (e.code !== '42703') console.warn('itiraz taslak yaz:', e.message); });
             res.json({ ok: true, sebep, taslaklar });
         } catch (e) { hata(res, e, 'yaz'); }
+    });
+
+    // -----------------------------------------------------------------
+    // Ürün görselleri: Jet Barkod kataloğundan kimlik ya da adla
+    // -----------------------------------------------------------------
+
+    app.post('/api/itiraz/gorseller', uye, async (req, res) => {
+        const liste = Array.isArray(req.body && req.body.urunler) ? req.body.urunler.slice(0, 120) : [];
+        if (!pencere('gorsel:' + req.auth.username, 20, 60000)) return res.status(429).json({ ok: false, error: 'cok_istek' });
+        try {
+            const kt = await katalogAl();
+            const gorseller = liste.map((u) => {
+                const id = metin(u && u.id, 40);
+                if (KATALOG_KIMLIK.test(id) && kt.id.has(id)) return kt.id.get(id);
+                const x = kt.ad.get(sadeAd(metin(u && u.ad, 200)));
+                return x ? x.image : null;
+            });
+            res.json({ ok: true, gorseller });
+        } catch (e) { hata(res, e, 'gorseller'); }
     });
 
     app.post('/api/itiraz/sec', uye, async (req, res) => {

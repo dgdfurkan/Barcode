@@ -45,6 +45,7 @@
         'Küçük ürünler ayrıca kontrol edilir, poşete en son konur.',
         'Kırılabilir ürünler (yumurta gibi) ayrı ve üstte taşınır.',
         'Soğuk ürünler ayrı poşette, soğuk zincir korunarak gönderilir.',
+        'Fırın ürünleri diğer ürünlerden ayrı, fırın kraft poşetinde teslim edilir.',
         'Raflardaki son kullanma tarihleri düzenli kontrol edilir.',
         'Kapalı ambalajlı ürünler açılmadan gönderilir.'
     ];
@@ -90,7 +91,11 @@
         kutu: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
         kopya: '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="2"/><path d="M4 13V5a1 1 0 0 1 1-1h8"/></svg>',
         panel: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 5h7v7M15 5l-9 9"/></svg>',
-        yildiz: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v3M10 14v3M3 10h3M14 10h3M5.5 5.5l2 2M12.5 12.5l2 2M5.5 14.5l2-2M12.5 7.5l2-2"/></svg>'
+        yildiz: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5c.5 3.2 2.3 5 5.5 5.5-3.2.5-5 2.3-5.5 5.5-.5-3.2-2.3-5-5.5-5.5 3.2-.5 5-2.3 5.5-5.5z"/></svg>',
+        not: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4h9A1.5 1.5 0 0 1 16 5.5v6a1.5 1.5 0 0 1-1.5 1.5H9l-3.5 3v-3h0A1.5 1.5 0 0 1 4 11.5z"/></svg>',
+        carpi: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8"/></svg>',
+        arti: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 5v10M5 10h10"/></svg>',
+        yenile: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3"/><path d="M16 3.8v3.6h-3.6"/></svg>'
     };
 
     // ------------------------------------------------------------------
@@ -112,16 +117,165 @@
         return new Date(t).toLocaleString(TR, { timeZone: BOLGE, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
     }
 
-    function kalanCipi(iso) {
+    function kalanCipi(iso, uzun) {
         var t = Date.parse(iso);
         if (!Number.isFinite(t)) return '';
         var ms = t - Date.now();
-        if (ms <= 0) return '<span class="itr-d itr-d--gecti">Süre doldu</span>';
+        if (ms <= 0) return '<span class="itr-d itr-d--gecti">Süre Doldu</span>';
         var saat = Math.floor(ms / 3600000);
-        var metin = saat < 1 ? '1 saatten az' : saat < 24 ? saat + ' saat kaldı'
-            : saat < 48 ? '1 gün ' + (saat - 24) + ' saat' : Math.floor(saat / 24) + ' gün kaldı';
+        var kisa = saat < 1 ? '1 sa altı' : saat < 24 ? saat + ' sa' : saat < 48 ? '1 gün ' + (saat - 24) + ' sa' : Math.floor(saat / 24) + ' gün';
+        var tam = saat < 1 ? '1 saatten az kaldı' : saat < 24 ? saat + ' saat kaldı'
+            : saat < 48 ? '1 gün ' + (saat - 24) + ' saat kaldı' : Math.floor(saat / 24) + ' gün kaldı';
         var sinif = saat < 12 ? 'acil' : saat < 36 ? 'yakin' : 'rahat';
-        return '<span class="itr-d itr-d--' + sinif + '">' + IKON.saat + metin + '</span>';
+        return '<span class="itr-d itr-d--' + sinif + '" title="' + tam + '">' + IKON.saat + (uzun ? tam : kisa) + '</span>';
+    }
+
+    // ------------------------------------------------------------------
+    // Ürün görselleri
+    // Önce panelin verdiği adres; yoksa Jet Barkod kataloğundan (sunucu,
+    // kimlik ya da adla). Sonuç tarayıcıda saklanır; bulunamayan üç gün
+    // sonra yeniden sorulur. Sunucu cevap vermezse oturum boyunca sorulmaz.
+    // ------------------------------------------------------------------
+
+    var GORSEL_ANAHTAR = 'jbItirazGorsel';
+    var GORSEL_ADRES = /^https:\/\/[a-z0-9.-]+\.getir\.com\/[^\s"'<>()\\]+$/i;
+    var GORSEL_YOK_MS = 3 * 24 * 3600 * 1000;
+    var gorselDepo = (function () {
+        try {
+            var o = JSON.parse(localStorage.getItem(GORSEL_ANAHTAR) || 'null');
+            if (o && typeof o === 'object' && !Array.isArray(o)) return o;
+        } catch (e) { /* bozuk */ }
+        return {};
+    })();
+    var gorselSirada = {};
+    var gorselZaman = null;
+    var gorselKapali = false;
+
+    function gecerliGorsel(u) { return typeof u === 'string' && GORSEL_ADRES.test(u) ? u : ''; }
+
+    /* Panel nesnesindeki görsel alanı: dize, { tr, en } ya da dizi */
+    function picAdresi(p) {
+        if (!p || typeof p !== 'object') return '';
+        var x = p.picURL || p.picUrl || p.picURLs || p.image || '';
+        if (Array.isArray(x)) x = x[0];
+        if (x && typeof x === 'object') x = x.tr || x.en || '';
+        if (Array.isArray(x)) x = x[0];
+        return gecerliGorsel(x);
+    }
+
+    function gorselAnahtari(id, ad) {
+        if (/^[a-f0-9]{24}$/i.test(String(id || ''))) return 'i:' + id;
+        var s = sadeAd(ad);
+        return s ? 'a:' + s.slice(0, 160) : '';
+    }
+
+    function gorselBul(id, ad, dogrudan) {
+        var g = gecerliGorsel(dogrudan);
+        if (g) return g;
+        var a = gorselAnahtari(id, ad);
+        if (!a) return '';
+        var v = gorselDepo[a];
+        if (v && v.u) return v.u;
+        if (v && Date.now() - (v.t || 0) < GORSEL_YOK_MS) return '';
+        if (!gorselKapali && d.sunucu === 'hazir') {
+            gorselSirada[a] = { id: /^i:/.test(a) ? String(id) : '', ad: String(ad || '').slice(0, 200) };
+            if (!gorselZaman) gorselZaman = setTimeout(gorselleriIste, 250);
+        }
+        return '';
+    }
+
+    async function gorselleriIste() {
+        gorselZaman = null;
+        var anahtarlar = Object.keys(gorselSirada).slice(0, 120);
+        if (!anahtarlar.length || gorselKapali) return;
+        var urunler = anahtarlar.map(function (a) { return gorselSirada[a]; });
+        anahtarlar.forEach(function (a) { delete gorselSirada[a]; });
+        var c = await postJson('/api/itiraz/gorseller', { urunler: urunler });
+        var liste = c.kod === 200 && c.j && Array.isArray(c.j.gorseller) ? c.j.gorseller : null;
+        if (!liste) { gorselKapali = true; return; }
+        var yeni = 0;
+        anahtarlar.forEach(function (a, i) {
+            var u = gecerliGorsel(liste[i]);
+            gorselDepo[a] = { u: u, t: Date.now() };
+            if (u) yeni++;
+        });
+        gorselSakla();
+        if (Object.keys(gorselSirada).length && !gorselZaman) gorselZaman = setTimeout(gorselleriIste, 1000);
+        if (yeni) listeCiz();
+    }
+
+    function gorselSakla() {
+        var anahtarlar = Object.keys(gorselDepo);
+        if (anahtarlar.length > 800) {
+            anahtarlar.sort(function (a, b) { return (gorselDepo[a].t || 0) - (gorselDepo[b].t || 0); })
+                .slice(0, anahtarlar.length - 800).forEach(function (a) { delete gorselDepo[a]; });
+        }
+        try { localStorage.setItem(GORSEL_ANAHTAR, JSON.stringify(gorselDepo)); } catch (e) { /* dolu */ }
+    }
+
+    var IKON_PAKET = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8 12 4l8 4v8l-8 4-8-4z"/><path d="m4 8 8 4 8-4M12 12v8"/></svg>';
+
+    /* boy: k (liste, 48), b (detay, 72), s (sipariş, 56) */
+    function resim(url, boy) {
+        return '<span class="itr-resim itr-resim--' + boy + (url ? '' : ' is-yok') + '">' + IKON_PAKET +
+            (url ? '<img src="' + kacis(url) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" data-urun-resim>' : '') +
+            '</span>';
+    }
+
+    // Açılamayan görsel yerine kutu simgesi kalır
+    document.addEventListener('error', function (e) {
+        var t = e.target;
+        if (!t || t.tagName !== 'IMG' || !t.hasAttribute('data-urun-resim')) return;
+        if (t.parentNode) t.parentNode.classList.add('is-yok');
+        t.remove();
+    }, true);
+
+    // ------------------------------------------------------------------
+    // Şikâyet türü ve kayda özel olaylar
+    // Olaylar sayfada çip; seçilenler taslağa "doğru kabul et" diye gider.
+    // ------------------------------------------------------------------
+
+    var TURLER = [
+        ['iptal', /iptal/i], ['eksik', /eksik|gelmedi/i], ['yanlis', /yanl[ıi]ş/i],
+        ['bozuk', /bayat|bozuk|çürük|curuk|küf|kuf/i], ['tarih', /tarih|skt|son kullanma/i],
+        ['hasar', /hasar|ezik|k[ıi]r[ıi]k|patlak|ak[ıi]nt[ıi]/i], ['soguk', /so[gğ]uk|s[ıi]cak|eri/i]
+    ];
+
+    function turBul(k) {
+        var metinler = [k.sikayet, k.aciklama];
+        for (var m = 0; m < metinler.length; m++) {
+            if (!metinler[m]) continue;
+            for (var i = 0; i < TURLER.length; i++) if (TURLER[i][1].test(metinler[m])) return TURLER[i][0];
+        }
+        return 'diger';
+    }
+
+    var OLAYLAR = [
+        { k: 'sayildi', ad: 'Bayi Kontrol Edip Saydı', metin: 'Ürünler bayi sahibi tarafından eksiksiz kontrol edilerek ve sayılarak hazırlandı.', tur: null },
+        { k: 'kamera', ad: 'Kamera Görüntüsü Var', metin: 'İlgili siparişe ait kamera görüntüleri elimizde mevcut.', tur: null },
+        { k: 'barkod', ad: 'Barkodla Toplandı', metin: 'Ürünler barkod okutularak toplandı.', tur: ['yanlis', 'eksik'] },
+        { k: 'firin', ad: 'Fırın Poşeti Ayrıydı', metin: 'Fırın ürünleri diğer ürünlerden ayrı olarak fırın kraft poşetinde teslim edildi.', tur: ['eksik'] },
+        { k: 'tarih', ad: 'Tarih Kontrol Edildi', metin: 'Ürünün son kullanma tarihi gönderim günü geçerliydi; raf tarih kontrolleri düzenli yapılıyor.', tur: ['tarih', 'bozuk'] },
+        { k: 'ambalaj', ad: 'Kapalı Ambalaj', metin: 'Ürün kapalı ambalajında, açılmadan gönderildi.', tur: ['bozuk', 'tarih', 'hasar'] },
+        { k: 'saglam', ad: 'Sağlam Paketlendi', metin: 'Ürün sağlam ve uygun şekilde paketlenerek gönderildi.', tur: ['hasar', 'bozuk'] },
+        { k: 'soguk', ad: 'Soğuk Zincir Korundu', metin: 'Ürün soğuk zincir korunarak ayrı poşette gönderildi.', tur: ['soguk'] },
+        { k: 'hazirdi', ad: 'Sipariş Hazırdı', metin: 'Sipariş eksiksiz hazırlanmış ve teslime hazırdı.', tur: ['iptal'] },
+        { k: 'kurye', ad: 'Kurye Adrese Gitti', metin: 'Bildirim tarafımıza ulaşınca kuryemiz adrese yönlendirildi.', tur: ['eksik', 'yanlis', 'bozuk', 'hasar'] },
+        { k: 'almadi', ad: 'Müşteri Poşeti Almamış', metin: 'Müşterinin poşetlerden birini kapıdan almadığı fark edildi.', tur: ['eksik'] },
+        { k: 'ozur', ad: 'Müşteri Hatasını Kabul Etti', metin: 'Müşteriyle iletişim kurulunca müşteri hatasını fark etti ve kuryemizden özür diledi.', tur: null },
+        { k: 'sonradan', ad: 'Sonradan Teslim Edildi', metin: 'Ürün müşteriye sonradan teslim edildi.', tur: ['eksik', 'yanlis'] }
+    ];
+
+    function olaylarFor(k) {
+        var tur = turBul(k);
+        return OLAYLAR.filter(function (o) { return !o.tur || tur === 'diger' || o.tur.indexOf(tur) !== -1; });
+    }
+
+    function olayMetinleri(t) {
+        return (t.olaylar || []).map(function (anahtar) {
+            for (var i = 0; i < OLAYLAR.length; i++) if (OLAYLAR[i].k === anahtar) return OLAYLAR[i].metin;
+            return '';
+        }).filter(Boolean);
     }
 
     // ------------------------------------------------------------------
@@ -146,6 +300,7 @@
             musteriNotu: typeof fb.note === 'string' ? fb.note : '',
             urun: (veri.product && veri.product.fullName && veri.product.fullName.tr) || '',
             urunId: veri.product && /^[0-9a-f]{24}$/i.test(String(veri.product.id || '')) ? String(veri.product.id) : '',
+            gorsel: picAdresi(veri.product),
             siparisTarihi: (veri.order && veri.order.date) || '',
             siparisId: veri.order && /^[0-9a-f]{24}$/i.test(String(veri.order.id || '')) ? String(veri.order.id) : '',
             siparisTur: Number.isFinite(parseInt(veri.domainType, 10)) ? parseInt(veri.domainType, 10) : null,
@@ -211,6 +366,8 @@
         }
         uyariCiz();
         ayarCiz();
+        // Panel listesi ayardan önce geldiyse sunucuya yazım atlanmıştı
+        if (d.durum === 'dolu') { listeCiz(); kayitlariSunucuyaYaz(); }
     }
 
     async function kayitlariSunucuyaYaz() {
@@ -376,12 +533,11 @@
 
     function iskelet() {
         var s = '';
-        for (var i = 0; i < 3; i++) {
+        for (var i = 0; i < 4; i++) {
             s += '<div class="itr-kayit itr-kayit--iskelet" aria-hidden="true">' +
-                '<span class="itr-iskelet" style="width:96px"></span>' +
-                '<span class="itr-iskelet" style="grid-column:1/-1;width:70%;height:16px"></span>' +
-                '<span class="itr-iskelet" style="grid-column:1/-1;width:90%"></span>' +
-                '<span class="itr-iskelet" style="grid-column:1/-1;width:40%"></span></div>';
+                '<span class="itr-resim itr-resim--k itr-iskelet"></span>' +
+                '<span class="itr-kayit__ic"><span class="itr-iskelet" style="width:80%"></span><span class="itr-iskelet" style="width:45%"></span></span>' +
+                '<span class="itr-iskelet" style="width:56px;height:24px;border-radius:999px"></span></div>';
         }
         return s;
     }
@@ -392,10 +548,10 @@
     }
 
     function durumCipi(k) {
-        if (k.durum === 300) return '<span class="itr-d itr-d--kabul">' + IKON.tik + 'Kabul Edildi</span>';
-        if (k.durum === 400) return '<span class="itr-d itr-d--red">Reddedildi</span>';
-        if (k.durum === 200) return '<span class="itr-d itr-d--bekliyor">' + IKON.saat + 'Sonuç Bekleniyor</span>';
-        return '<span class="itr-d itr-d--gecti">İtiraz Edilmedi</span>';
+        if (k.durum === 300) return '<span class="itr-d itr-d--kabul">' + IKON.tik + 'Kabul</span>';
+        if (k.durum === 400) return '<span class="itr-d itr-d--red">' + IKON.carpi + 'Red</span>';
+        if (k.durum === 200) return '<span class="itr-d itr-d--bekliyor">' + IKON.saat + 'Sonuç Bekliyor</span>';
+        return '<span class="itr-d itr-d--gecti">İtiraz Yok</span>';
     }
 
     function hazirMi(id) {
@@ -405,16 +561,19 @@
 
     function kartHtml(k) {
         var bekleyen = acikMi(k);
-        var not = k.musteriNotu
-            ? '<p class="itr-kayit__not">' + kacis(k.musteriNotu) + '</p>'
-            : '<p class="itr-kayit__not is-bos">Müşteri not bırakmamış.</p>';
+        var turAd = k.sikayet || k.kriter || '';
         return '<button type="button" class="itr-kayit" data-kayit="' + k.id + '" aria-current="' + (d.secili === k.id) + '">' +
-            '<span class="itr-kayit__ust">' + (k.sikayet ? '<span class="itr-cip">' + kacis(k.sikayet) + '</span>' : '<span></span>') +
-                (bekleyen ? kalanCipi(k.sonTarih) : durumCipi(k)) + '</span>' +
-            '<p class="itr-kayit__urun">' + kacis(k.urun || k.kriter || 'Kayıt') + '</p>' +
-            not +
-            '<span class="itr-kayit__alt"><span>Kayıt ' + kacis(gunAy(k.kayitTarihi)) + '</span>' +
-            (bekleyen && hazirMi(k.id) ? '<span class="itr-hazir">' + IKON.kalem + 'Taslak hazır</span>' : '') + '</span>' +
+            resim(gorselBul(k.urunId, k.urun, k.gorsel), 'k') +
+            '<span class="itr-kayit__ic">' +
+                '<span class="itr-kayit__urun">' + kacis(k.urun || k.kriter || 'Kayıt') + '</span>' +
+                '<span class="itr-kayit__alt">' +
+                    (turAd ? '<span>' + kacis(turAd) + '</span>' : '') +
+                    (k.musteriNotu ? '<span class="itr-kayit__ikon" title="Müşteri notu var">' + IKON.not + '<i class="itr-gizli">Müşteri notu var</i></span>' : '') +
+                    (bekleyen && hazirMi(k.id) ? '<span class="itr-hazir">' + IKON.kalem + 'Taslak</span>' : '') +
+                '</span>' +
+            '</span>' +
+            '<span class="itr-kayit__sag">' + (bekleyen ? kalanCipi(k.sonTarih) : durumCipi(k)) +
+                '<small>' + kacis(gunAy(k.kayitTarihi)) + '</small></span>' +
             '</button>';
     }
 
@@ -425,15 +584,21 @@
             var g = gruplar[k.sikayet || 'Diğer'] = gruplar[k.sikayet || 'Diğer'] || { k: 0, r: 0, b: 0 };
             if (k.durum === 300) g.k++; else if (k.durum === 400) g.r++; else g.b++;
         });
-        var adlar = Object.keys(gruplar);
+        var adlar = Object.keys(gruplar).sort(function (a, b) {
+            var x = gruplar[a], y = gruplar[b];
+            return (y.k + y.r + y.b) - (x.k + x.r + x.b);
+        });
         if (!adlar.length) return '';
-        return '<section class="itr-oranlar" aria-label="Şikâyete göre sonuç"><h2>Şikâyete Göre Sonuç</h2>' +
+        return '<section class="itr-oranlar" aria-label="Şikâyete göre sonuç">' +
+            '<div class="itr-oranlar__bas"><h2>Şikâyete Göre Sonuç</h2>' +
+                '<span class="itr-lejant"><i class="k"></i>Kabul<i class="r"></i>Red<i class="b"></i>Bekliyor</span></div>' +
             adlar.map(function (ad) {
                 var g = gruplar[ad];
                 var top = g.k + g.r + g.b;
                 var yuzde = function (n) { return (n * 100 / top).toFixed(1) + '%'; };
-                return '<div class="itr-oran"><span>' + kacis(ad) + '</span><b>' + g.k + ' kabul · ' + g.r + ' red' + (g.b ? ' · ' + g.b + ' bekliyor' : '') + '</b>' +
-                    '<span class="itr-oran__cubuk"><i class="k" style="width:' + yuzde(g.k) + '"></i><i class="r" style="width:' + yuzde(g.r) + '"></i><i class="b" style="width:' + yuzde(g.b) + '"></i></span></div>';
+                var oran = g.k + g.r ? '%' + Math.round(g.k * 100 / (g.k + g.r)) : '–';
+                return '<div class="itr-oran"><span>' + kacis(ad) + '</span><b title="' + g.k + ' kabul, ' + g.r + ' red' + (g.b ? ', ' + g.b + ' bekliyor' : '') + '">' + oran + '</b>' +
+                    '<span class="itr-oran__cubuk" aria-hidden="true"><i class="k" style="width:' + yuzde(g.k) + '"></i><i class="r" style="width:' + yuzde(g.r) + '"></i><i class="b" style="width:' + yuzde(g.b) + '"></i></span></div>';
             }).join('') + '</section>';
     }
 
@@ -447,6 +612,7 @@
 
     function listeCiz() {
         var kutu = el('itrListe');
+        sayaclariYaz();
         if (d.durum === 'yukleniyor') { kutu.innerHTML = iskelet(); detayCiz(); return; }
         if (d.durum === 'hata') {
             var m = panelHataMetni(d.hataKod);
@@ -458,15 +624,20 @@
         if (!telefonMu() && (!d.secili || !liste.some(function (k) { return k.id === d.secili; }))) d.secili = liste.length ? liste[0].id : null;
         if (d.sekme === 'bekleyen') {
             kutu.innerHTML = liste.length ? liste.map(kartHtml).join('')
-                : bosKutu(IKON.kutu, 'İtiraz bekleyen kayıt yok', 'Son ' + GUN + ' günde süresi dolmamış, itiraz edilmemiş kayıt bulunmuyor.');
+                : bosKutu(IKON.kutu, 'Bekleyen kayıt yok', 'Süresi dolmamış, itiraz edilmemiş kayıt kalmadı.');
         } else {
             kutu.innerHTML = liste.length ? oranlarHtml(liste) + liste.map(kartHtml).join('')
-                : bosKutu(IKON.kutu, 'Henüz sonuç yok', 'İtirazların sonuçlandıkça burada görünür.');
+                : bosKutu(IKON.kutu, 'Henüz sonuç yok', 'İtirazlar sonuçlandıkça burada görünür.');
         }
         // Kullanıcı metin yazarken yazma alanını yeniden çizme
         var odak = document.activeElement;
         if (odak && odak !== document.body && el('itrDetayIc').contains(odak) && /^(TEXTAREA|INPUT)$/.test(odak.tagName)) return;
         detayCiz();
+    }
+
+    function sayaclariYaz() {
+        var b = el('itrSayBekleyen');
+        if (b) b.textContent = d.durum === 'dolu' ? String(d.kayitlar.filter(acikMi).length) : '';
     }
 
     // ------------------------------------------------------------------
@@ -491,13 +662,17 @@
         if (d.taslak[id]) return d.taslak[id];
         var srv = d.sunucuTaslak[id] || null;
         var sec = d.secilenler[id] || null;
-        var t = { taslaklar: [], secili: 0, duzen: {}, sebep: '', oneri: '', ekNot: '', ekAcik: false, yaziyor: false, sebepAcik: false };
+        var t = { taslaklar: [], secili: 0, duzen: {}, sebep: '', oneri: '', ekNot: '', ekAcik: false, yaziyor: false, sebepAcik: false, olaylar: [], olayDegisti: false };
         if (srv) {
             t.taslaklar = Array.isArray(srv.taslaklar) ? srv.taslaklar.slice(0, 3) : [];
             t.oneri = srv.sebep || '';
             t.sebep = srv.sebep || '';
             t.ekNot = srv.ekNot || '';
             t.ekAcik = !!t.ekNot;
+            // Sunucuda olayların metni durur; çip anahtarına geri çevrilir
+            (Array.isArray(srv.olaylar) ? srv.olaylar : []).forEach(function (m) {
+                for (var i = 0; i < OLAYLAR.length; i++) if (OLAYLAR[i].metin === m && t.olaylar.indexOf(OLAYLAR[i].k) === -1) t.olaylar.push(OLAYLAR[i].k);
+            });
         }
         if (sec && sec.metin) {
             if (sec.sebep) t.sebep = sec.sebep;
@@ -539,7 +714,12 @@
                 var o = j && j.basket ? j : (j && j.data && j.data.basket ? j.data : j);
                 var urunler = (o && o.basket && Array.isArray(o.basket.products) ? o.basket.products : []).map(function (u) {
                     var ad = u && u.name && typeof u.name === 'object' ? (u.name.tr || u.name.en || '') : (u && u.name) || '';
-                    return { ad: String(ad).slice(0, 120), adet: Number(u && u.count) || 0 };
+                    var pid = u && (u.product && typeof u.product === 'object' ? (u.product.id || u.product._id) : (u.product || u.productId || u.id || u._id));
+                    return {
+                        ad: String(ad).slice(0, 120), adet: Number(u && u.count) || 0,
+                        id: /^[a-f0-9]{24}$/i.test(String(pid || '')) ? String(pid) : '',
+                        gorsel: picAdresi(u) || picAdresi(u && u.product)
+                    };
                 }).filter(function (u) { return u.ad; });
                 var t = function (yol) { var x = o && o[yol] && o[yol].date; var ms = Date.parse(x); return Number.isFinite(ms) ? ms : null; };
                 var bas = t('checkout');
@@ -562,19 +742,33 @@
     function siparisHtml(k) {
         if (!k.siparisId) return '';
         var v = siparisler[k.id];
-        var bas = '<section><h3 class="itr-etiket">Sipariş İçeriği</h3>';
-        if (!v || v.yukleniyor) return bas + '<div class="itr-siparis is-yuk"><span class="itr-iskelet" style="width:60%"></span><span class="itr-iskelet" style="width:85%"></span></div></section>';
-        if (v.hata || !v.urunler.length) return bas + '<p class="itr-ipucu">Sipariş içeriği okunamadı. Franchise panelini açık tutarsan tekrar denenir.</p></section>';
-        var hedef = sadeAd(k.urun);
-        var ozet = v.kalem + ' ürün · ' + v.adet + ' adet' + (v.teslimDk ? ' · ' + v.teslimDk + ' dk\'da teslim' : '');
-        var sirali = v.urunler.slice().sort(function (a, b) { return (sadeAd(b.ad) === hedef) - (sadeAd(a.ad) === hedef); });
-        return bas + '<div class="itr-siparis"><p class="itr-siparis__ozet">' + kacis(ozet) + '</p><ul class="itr-siparis__liste">' +
-            sirali.slice(0, 12).map(function (u) {
-                var bu = sadeAd(u.ad) === hedef;
-                return '<li' + (bu ? ' class="is-hedef"' : '') + '><span>' + kacis(u.ad) + '</span><b>×' + u.adet + '</b></li>';
-            }).join('') + '</ul>' +
-            (sirali.length > 12 ? '<p class="itr-ipucu">+' + (sirali.length - 12) + ' ürün daha</p>' : '') +
-            '</div></section>';
+        var bas = '<section class="itr-bolum"><div class="itr-bolum__bas"><h3 class="itr-etiket">Sipariş</h3>';
+        if (!v || v.yukleniyor) {
+            var bos = '';
+            for (var i = 0; i < 4; i++) bos += '<span class="itr-urun"><span class="itr-resim itr-resim--s itr-iskelet"></span><span class="itr-iskelet" style="width:80%"></span></span>';
+            return bas + '</div><div class="itr-urunler" aria-busy="true">' + bos + '</div></section>';
+        }
+        if (v.hata || !v.urunler.length) return bas + '</div><p class="itr-ipucu">Sipariş içeriği okunamadı. Franchise paneli açıkken tekrar denenir.</p></section>';
+        var hedefAd = sadeAd(k.urun);
+        // Panelde kayıttaki ad ile sipariş satırı bazen gramajla ayrışıyor
+        var hedef = function (ad) {
+            var x = sadeAd(ad);
+            return x === hedefAd || (x.length > 8 && hedefAd.length > 8 && (x.indexOf(hedefAd) === 0 || hedefAd.indexOf(x) === 0));
+        };
+        var ozet = v.kalem + ' ürün · ' + v.adet + ' adet' + (v.teslimDk ? ' · ' + v.teslimDk + ' dk' : '');
+        var sirali = v.urunler.slice().sort(function (a, b) { return hedef(b.ad) - hedef(a.ad); });
+        var GOSTER = 11;
+        return bas + '<span class="itr-bolum__not">' + kacis(ozet) + '</span></div>' +
+            '<ul class="itr-urunler">' + sirali.slice(0, GOSTER).map(function (u) {
+                var bu = hedef(u.ad);
+                return '<li class="itr-urun' + (bu ? ' is-hedef' : '') + '" title="' + kacis(u.ad) + '">' +
+                    '<span class="itr-urun__kap">' + resim(gorselBul(u.id, u.ad, u.gorsel), 's') +
+                        (u.adet > 1 ? '<b class="itr-urun__adet">×' + u.adet + '</b>' : '') +
+                        (bu ? '<i class="itr-urun__isaret">Şikâyet</i>' : '') + '</span>' +
+                    '<span class="itr-urun__ad">' + kacis(u.ad) + '</span></li>';
+            }).join('') +
+            (sirali.length > GOSTER ? '<li class="itr-urun itr-urun--fazla"><span class="itr-resim itr-resim--s">+' + (sirali.length - GOSTER) + '</span><span class="itr-urun__ad">ürün daha</span></li>' : '') +
+            '</ul></section>';
     }
 
     /* Seçili açık kaydın sipariş içeriği henüz yoksa iste; gelince detayı tazele */
@@ -625,34 +819,38 @@
         var k = d.secili ? kayitBul(d.secili) : null;
         if (!k) {
             ic.innerHTML = d.durum === 'yukleniyor'
-                ? '<div class="itr-detay__govde"><span class="itr-iskelet" style="width:40%;height:18px"></span><span class="itr-iskelet" style="width:90%"></span><span class="itr-iskelet" style="width:70%"></span></div>'
-                : bosKutu(IKON.kalem, 'Kayıt seç', 'Soldaki listeden bir kayıt seç; itiraz metni burada yazılır.', null, false, true);
+                ? '<div class="itr-detay__govde"><div class="itr-hero"><span class="itr-resim itr-resim--b itr-iskelet"></span><div class="itr-hero__metin"><span class="itr-iskelet" style="width:70%;height:16px"></span><span class="itr-iskelet" style="width:40%"></span></div></div></div>'
+                : '<div class="itr-detay__govde">' + bosKutu(IKON.kalem, 'Bir kayıt seç', 'Seçtiğin kaydın itiraz metni burada yazılır.', null, false, true) + '</div>';
             return;
         }
         var acik = acikMi(k);
         siparisTetikle(k);
-        var meta = [
-            k.kriter,
+        var tarihler = [
             k.kayitTarihi ? 'Kayıt ' + gunAy(k.kayitTarihi) : '',
             k.siparisTarihi ? 'Sipariş ' + gunAy(k.siparisTarihi) : '',
-            acik && k.sonTarih ? 'Son itiraz ' + gunAySaat(k.sonTarih) : ''
+            acik && k.sonTarih ? 'Son gün ' + gunAySaat(k.sonTarih) : ''
         ].filter(Boolean).join(' · ');
-        var ust = '<header class="itr-detay__ust">' +
-            '<button type="button" class="itr-detay__geri" data-geri aria-label="Listeye dön">' + IKON_GERI + '</button>' +
-            '<div class="itr-detay__baslik">' +
-                '<span class="itr-kayit__ust" style="width:100%">' + (k.sikayet ? '<span class="itr-cip">' + kacis(k.sikayet) + '</span>' : '<span></span>') + (acik ? kalanCipi(k.sonTarih) : durumCipi(k)) + '</span>' +
+
+        var ust = '<div class="itr-detay__cubuk">' +
+            '<button type="button" class="itr-detay__geri" data-geri aria-label="Listeye dön">' + IKON_GERI + '<span>Kayıtlar</span></button>' +
+            '</div>';
+        var hero = '<section class="itr-hero">' + resim(gorselBul(k.urunId, k.urun, k.gorsel), 'b') +
+            '<div class="itr-hero__metin">' +
                 '<h2>' + kacis(k.urun || k.kriter || 'Kayıt') + '</h2>' +
-                '<p>' + kacis(meta) + '</p>' +
-            '</div></header>';
-        var not = '<section><h3 class="itr-etiket">Müşteri Notu</h3>' + (k.musteriNotu
-            ? '<p class="itr-alinti">' + kacis(k.musteriNotu) + '</p>'
-            : '<p class="itr-alinti is-bos">Müşteri not bırakmamış.</p>') + '</section>';
+                '<div class="itr-hero__cipler">' + (k.sikayet ? '<span class="itr-cip">' + kacis(k.sikayet) + '</span>' : '') +
+                    (acik ? kalanCipi(k.sonTarih, true) : durumCipi(k)) + '</div>' +
+                (tarihler ? '<p class="itr-meta">' + kacis(tarihler) + '</p>' : '') +
+            '</div></section>';
+        var not = k.musteriNotu
+            ? '<section class="itr-not"><span class="itr-not__ikon">' + IKON.not + '</span><div><h3 class="itr-etiket">Müşteri Notu</h3><p>' + kacis(k.musteriNotu) + '</p></div></section>'
+            : '';
 
         if (!acik) {
-            ic.innerHTML = ust + '<div class="itr-detay__govde">' + not +
+            ic.innerHTML = ust + '<div class="itr-detay__govde">' + hero + not +
                 (k.itirazMetni
-                    ? '<section><h3 class="itr-etiket">Gönderilen İtiraz' + (d.sebepAd[k.itirazSebepId] ? ' · ' + kacis(d.sebepAd[k.itirazSebepId]) : '') + '</h3>' +
-                      '<p class="itr-alinti">' + kacis(k.itirazMetni) + '</p></section>'
+                    ? '<section class="itr-bolum"><div class="itr-bolum__bas"><h3 class="itr-etiket">Gönderilen İtiraz</h3>' +
+                      (d.sebepAd[k.itirazSebepId] ? '<span class="itr-bolum__not">' + kacis(d.sebepAd[k.itirazSebepId]) + '</span>' : '') + '</div>' +
+                      '<p class="itr-gonderilen">' + kacis(k.itirazMetni) + '</p></section>'
                     : '<p class="itr-ipucu">Bu kayda itiraz edilmemiş.</p>') +
                 '</div>';
             return;
@@ -660,47 +858,56 @@
 
         var t = taslakDurumu(k.id);
         var yazmaHazir = d.sunucu === 'hazir' && d.ayar.anahtar;
+
+        // Bu kayıtta olanlar: dokunarak seçilen çipler + serbest not
+        var olaylar = '';
+        if (yazmaHazir) {
+            olaylar = '<section class="itr-bolum"><div class="itr-bolum__bas"><h3 class="itr-etiket">Bu Kayıtta Olanlar</h3>' +
+                (t.olaylar.length ? '<span class="itr-bolum__not">' + t.olaylar.length + ' seçili</span>' : '') + '</div>' +
+                '<div class="itr-olaylar" role="group" aria-label="Bu kayıtta olanlar">' + olaylarFor(k).map(function (o) {
+                    var secili = t.olaylar.indexOf(o.k) !== -1;
+                    return '<button type="button" class="itr-olay" data-olay="' + o.k + '" aria-pressed="' + secili + '" title="' + kacis(o.metin) + '"><i>' + IKON.tik + '</i>' + kacis(o.ad) + '</button>';
+                }).join('') +
+                    '<button type="button" class="itr-olay itr-olay--not" data-ek-ac aria-pressed="' + !!(t.ekAcik || t.ekNot) + '"><i>' + IKON.arti + '</i>Not Ekle</button>' +
+                '</div>' +
+                (t.ekAcik || t.ekNot ? '<input type="text" class="itr-girdi" id="itrEkNot" maxlength="400" placeholder="Örn: sipariş iki poşete bölünmüştü" aria-label="Bu kayda özel not" value="' + kacis(t.ekNot) + '">' : '') +
+                '</section>';
+        }
+
         var yazici;
         if (!yazmaHazir) {
-            yazici = '<div class="itr-yazici__bos"><span class="ikon">' + IKON.yildiz + '</span>' +
+            yazici = '<div class="itr-yazici__bos"><span class="ikon">' + IKON.yildiz + '</span><div>' +
                 (d.sunucu === 'bekleniyor'
-                    ? '<strong>Sunucu güncellemesi bekleniyor</strong><p>Kurulum bitince taslak yazma burada açılır.</p>'
-                    : '<strong>Gemini anahtarı gerekiyor</strong><p>Taslakları senin anahtarınla yazıyoruz. Bir kez eklemen yeterli.</p><button type="button" class="itr-arac itr-arac--ana" data-ayar-ac>Anahtar Ekle</button>') +
+                    ? '<strong>Sunucu güncellemesi bekleniyor</strong><p>Kurulum bitince taslak yazma açılır.</p></div>'
+                    : '<strong>Gemini anahtarı gerekiyor</strong><p>Bir kez eklemen yeterli.</p></div><button type="button" class="itr-arac itr-arac--ana" data-ayar-ac>Anahtar Ekle</button>') +
                 '</div>';
         } else if (t.yaziyor) {
             yazici = '<div class="itr-yukleniyor" aria-busy="true">' +
-                '<span class="itr-iskelet" style="width:55%;height:28px;border-radius:9px"></span>' +
-                '<span class="itr-iskelet" style="width:96%"></span><span class="itr-iskelet" style="width:88%"></span><span class="itr-iskelet" style="width:72%"></span>' +
-                '<small>Üç taslak yazılıyor. Birkaç saniye sürer.</small></div>';
+                '<div class="itr-sekmeler" aria-hidden="true"><span class="itr-sekme itr-iskelet"></span><span class="itr-sekme itr-iskelet"></span><span class="itr-sekme itr-iskelet"></span></div>' +
+                '<div class="itr-yukleniyor__metin"><span class="itr-iskelet" style="width:96%"></span><span class="itr-iskelet" style="width:90%"></span><span class="itr-iskelet" style="width:94%"></span><span class="itr-iskelet" style="width:60%"></span></div>' +
+                '<p class="itr-yazici__durum">' + IKON.yildiz + 'Üç taslak yazılıyor</p></div>';
         } else if (!t.taslaklar.length) {
-            yazici = '<div class="itr-yazici__bos"><span class="ikon">' + IKON.yildiz + '</span>' +
-                '<strong>Üç farklı taslak yazalım</strong>' +
-                '<p>Şikâyet türüne ve müşterinin notuna göre yazılır; kabul edilen eski itirazlarından öğrenir.</p>' +
-                '<button type="button" class="itr-arac itr-arac--ana" data-yaz>' + IKON.yildiz + 'Taslak Yaz</button></div>';
+            yazici = '<button type="button" class="itr-yaz-dugme" data-yaz>' + IKON.yildiz + '<span><b>Taslak Yaz</b><small>' +
+                (t.olaylar.length || t.ekNot ? 'Seçtiklerinle ve sipariş içeriğiyle üç taslak' : 'Önce yukarıdan bu kayıtta olanları seçebilirsin') +
+                '</small></span></button>';
         } else {
             var metin = metinAl(t);
-            yazici = '<div class="itr-sekmeler" role="tablist" aria-label="Taslaklar">' + t.taslaklar.map(function (x, i) {
-                    return '<button type="button" class="itr-sekme" role="tab" aria-selected="' + (t.secili === i) + '" data-taslak="' + i + '"><b>' + (i + 1) + '</b>' + kacis(x.aci || ('Taslak ' + (i + 1))) + '</button>';
+            yazici = '<div class="itr-yazici"><div class="itr-sekmeler" role="tablist" aria-label="Taslaklar">' + t.taslaklar.map(function (x, i) {
+                    return '<button type="button" class="itr-sekme" role="tab" aria-selected="' + (t.secili === i) + '" data-taslak="' + i + '" title="' + kacis(x.aci || '') + '"><b>' + (i + 1) + '</b><span>' + kacis(x.aci || ('Taslak ' + (i + 1))) + '</span></button>';
                 }).join('') + '</div>' +
                 '<textarea class="itr-metin" id="itrMetin" maxlength="2000" aria-label="Gönderilecek itiraz metni">' + kacis(metin) + '</textarea>' +
-                '<div class="itr-yazici__alt"><button type="button" class="itr-kucuk" data-yaz>' + IKON.yildiz + 'Yeniden Yaz</button>' +
-                (t.duzen[t.secili] != null ? '<button type="button" class="itr-kucuk" data-geri-al>Taslağa Dön</button>' : '') +
-                '<span class="itr-sayac" id="itrSayac">' + metin.length + ' / 2000</span></div>';
-        }
-
-        var ek = '';
-        if (yazmaHazir && !t.yaziyor) {
-            ek = '<div class="itr-ek">' + (t.ekAcik
-                ? '<label class="itr-etiket" for="itrEkNot">Bu Kayda Özel Bilgi</label><input type="text" class="itr-girdi" id="itrEkNot" maxlength="400" placeholder="Örn: sipariş iki poşete bölünmüştü" value="' + kacis(t.ekNot) + '"><p class="itr-ipucu">Taslak yazarken doğru kabul edilir.</p>'
-                : '<button type="button" class="itr-baglanti-dugme" data-ek-ac>+ Bu kayda özel bilgi ekle</button>') + '</div>';
+                '<div class="itr-yazici__alt">' +
+                    '<button type="button" class="itr-kucuk' + (t.olayDegisti ? ' is-vurgu' : '') + '" data-yaz>' + IKON.yenile + (t.olayDegisti ? 'Seçimlerle Yeniden Yaz' : 'Yeniden Yaz') + '</button>' +
+                    (t.duzen[t.secili] != null ? '<button type="button" class="itr-kucuk" data-geri-al>Taslağa Dön</button>' : '') +
+                    '<span class="itr-sayac" id="itrSayac">' + metin.length + ' / 2000</span></div></div>';
         }
 
         var sebepBolumu = '';
         if (t.taslaklar.length && !t.yaziyor) {
-            sebepBolumu = '<section><h3 class="itr-etiket">İtiraz Sebebi</h3>' +
+            sebepBolumu = '<section class="itr-bolum"><div class="itr-bolum__bas"><h3 class="itr-etiket">İtiraz Sebebi</h3>' +
+                (t.sebep && t.sebep === t.oneri ? '<span class="itr-bolum__not">Önerilen</span>' : '') + '</div>' +
                 '<button type="button" class="itr-sebep-sec" data-sebep-ac aria-expanded="' + t.sebepAcik + '">' +
-                    '<span' + (t.sebep ? '' : ' class="is-bos"') + '>' + kacis(t.sebep || 'Sebep seç') + '</span>' +
-                    (t.sebep && t.sebep === t.oneri ? '<small>Öneri</small>' : '') + IKON_ASAGI + '</button>' +
+                    '<span' + (t.sebep ? '' : ' class="is-bos"') + '>' + kacis(t.sebep || 'Sebep seç') + '</span>' + IKON_ASAGI + '</button>' +
                 (t.sebepAcik ? '<div class="itr-sebepler" role="radiogroup" aria-label="İtiraz sebebi">' + sebepListesi().map(function (s) {
                     return '<button type="button" class="itr-sebep" role="radio" aria-checked="' + (t.sebep === s.ad) + '" data-sebep="' + kacis(s.ad) + '"><i></i><span>' + kacis(s.ad) + '</span>' +
                         (t.oneri === s.ad ? '<small>Öneri</small>' : '') + '</button>';
@@ -710,20 +917,18 @@
 
         var eylem = '';
         if (t.taslaklar.length && !t.yaziyor) {
-            eylem = '<div class="itr-eylemler"><div class="itr-eylemler__dugmeler">' +
+            var ipucu = !d.asistan ? 'Panelde doldurma bilgisayarda Jet Barkod Asistan ile çalışır; telefonda Kopyala.'
+                : d.hak === 0 ? 'İtiraz hakkın 0 görünüyor; panel kabul etmeyebilir.' : '';
+            eylem = '<div class="itr-eylemler">' + (ipucu ? '<p class="itr-ipucu">' + kacis(ipucu) + '</p>' : '') +
+                '<div class="itr-eylemler__dugmeler">' +
                 '<button type="button" class="itr-arac" data-kopyala>' + IKON.kopya + 'Kopyala</button>' +
-                '<button type="button" class="itr-arac itr-arac--ana" data-doldur' + (d.asistan ? '' : ' disabled') + '>' + IKON.panel + 'Panelde Doldur</button>' +
-                '</div>' +
-                (d.asistan
-                    ? '<p class="itr-ipucu">Panelde kaydı açar, sebebi ve metni forma yazar. Kaydet\'e sen basarsın.</p>'
-                    : '<p class="itr-ipucu">Panelde doldurma bilgisayarda Jet Barkod Asistan ile çalışır. Telefonda Kopyala ile panele yapıştır.</p>') +
-                (d.hak === 0 ? '<p class="itr-ipucu">İtiraz hakkın 0 görünüyor; panel itirazı kabul etmeyebilir.</p>' : '') +
-                '</div>';
+                '<button type="button" class="itr-arac itr-arac--ana" data-doldur' + (d.asistan ? '' : ' disabled') + ' title="Panelde kaydı açar, formu doldurur. Kaydet\'e sen basarsın.">' + IKON.panel + 'Panelde Doldur</button>' +
+                '</div></div>';
         }
 
-        ic.innerHTML = ust + '<div class="itr-detay__govde">' + not + siparisHtml(k) +
-            '<section><h3 class="itr-etiket">İtiraz Metni</h3><div class="itr-yazici">' + yazici + '</div></section>' +
-            ek + sebepBolumu + '</div>' + eylem;
+        ic.innerHTML = ust + '<div class="itr-detay__govde">' + hero + not + siparisHtml(k) + olaylar +
+            '<section class="itr-bolum"><div class="itr-bolum__bas"><h3 class="itr-etiket">İtiraz Metni</h3></div>' + yazici + '</section>' +
+            sebepBolumu + '</div>' + eylem;
     }
 
     async function taslakYaz() {
@@ -738,9 +943,9 @@
         detayCiz();
         // Sipariş içeriği taslağa girer (en çok 4 sn beklenir; gelmezse onsuz yazılır)
         var sp = await Promise.race([siparisAl(k), bekle(4000).then(function () { return null; })]);
-        var govde = { kayit_id: k.id, sebepler: sebepListesi().map(function (s) { return s.ad; }), ek_not: t.ekNot };
+        var govde = { kayit_id: k.id, sebepler: sebepListesi().map(function (s) { return s.ad; }), ek_not: t.ekNot, olaylar: olayMetinleri(t) };
         if (sp && sp.urunler && sp.urunler.length) {
-            govde.siparis = { urunler: sp.urunler.slice(0, 40), teslimDk: sp.teslimDk };
+            govde.siparis = { urunler: sp.urunler.slice(0, 40).map(function (u) { return { ad: u.ad, adet: u.adet }; }), teslimDk: sp.teslimDk };
         }
         var c = await postJson('/api/itiraz/yaz', govde);
         if (c.kod === 404 && c.j && c.j.error === 'kayit_yok') {
@@ -754,7 +959,8 @@
             t.duzen = {};
             t.oneri = c.j.sebep || '';
             if (t.oneri) t.sebep = t.oneri;
-            d.sunucuTaslak[k.id] = { taslaklar: t.taslaklar, sebep: t.oneri, ekNot: t.ekNot };
+            t.olayDegisti = false;
+            d.sunucuTaslak[k.id] = { taslaklar: t.taslaklar, sebep: t.oneri, ekNot: t.ekNot, olaylar: olayMetinleri(t) };
         } else {
             bildir(sunucuHataMetni(c), 'hata');
             if (c.j && c.j.error === 'anahtar_gecersiz') { d.ayar.anahtar = false; uyariCiz(); ayarCiz(); }
@@ -957,12 +1163,27 @@
             if (e.target.closest('[data-yaz]')) { taslakYaz(); return; }
             if (e.target.closest('[data-kopyala]')) { kopyala(); return; }
             if (e.target.closest('[data-doldur]')) { panelDoldur(); return; }
+            if (!t && k && acikMi(k)) t = taslakDurumu(k.id);
             if (!t) return;
             if (e.target.closest('[data-ek-ac]')) {
+                if (t.ekAcik && !t.ekNot) { t.ekAcik = false; detayCiz(); return; }
                 t.ekAcik = true;
                 detayCiz();
                 var g = el('itrEkNot');
                 if (g) g.focus();
+                return;
+            }
+            var ob = e.target.closest('[data-olay]');
+            if (ob) {
+                var anahtar = ob.getAttribute('data-olay');
+                var yer = t.olaylar.indexOf(anahtar);
+                if (yer === -1) t.olaylar.push(anahtar); else t.olaylar.splice(yer, 1);
+                if (t.taslaklar.length) t.olayDegisti = true;
+                var kaydirma = el('itrDetayIc').scrollTop;
+                detayCiz();
+                el('itrDetayIc').scrollTop = kaydirma;
+                var yeni = el('itrDetayIc').querySelector('[data-olay="' + anahtar + '"]');
+                if (yeni) yeni.focus({ preventScroll: true });
                 return;
             }
             var tb = e.target.closest('[data-taslak]');
@@ -1002,6 +1223,7 @@
                 secimiKaydet(false);
             } else if (e.target.id === 'itrEkNot') {
                 t.ekNot = e.target.value;
+                if (t.taslaklar.length) t.olayDegisti = true;
             }
         });
 
