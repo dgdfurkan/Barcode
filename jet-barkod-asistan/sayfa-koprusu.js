@@ -994,6 +994,144 @@
         return kaldirmaSuruyor;
     }
 
+    // ==================================================================
+    // Günlük sayım (arka-plan/gunluk-sayim.js, sabah)
+    //
+    // Depo panelinin sayım listesi isteği (POST /gstore-inventory-checks/filter,
+    // yalnız o gün) ve günün otomatik sayımının detayı (GET
+    // /gstore-inventory-checks/<id>) panelin kendi başlıklarıyla atılır. Yeni
+    // sekme açılmaz. Detayda ürün yoksa görev listesi (tasks/filter) sayfa
+    // sayfa okunur. Günde bir kez çalışır; 60 sn içinde ikinci istek atılmaz.
+    // Kişi adı (oluşturan) alınmaz; yalnız ürün kimliği ve adı döner.
+    // ==================================================================
+
+    var GUNLUK_ARA_MS = 60 * 1000;
+    var GUNLUK_KIMLIK = /^[a-f0-9]{24}$/;
+    var gunlukSon = null;
+    var gunlukZaman = 0;
+    var gunlukSuruyor = null;
+
+    function gunlukAd(o) {
+        if (!o || typeof o !== 'object') return '';
+        var a = o.productFullName || o.fullName || o.productName || o.name;
+        if (a && typeof a === 'object') a = a.tr || a.en;
+        return typeof a === 'string' ? a.slice(0, 200) : '';
+    }
+
+    /* Yanıtın biçimine bağlı kalmamak için ürün kimliği `productId` ya da
+       `product` alanlarından toplanır. Depo nesneleri gezilmez. */
+    function gunlukUrunleri(kok, liste, gorulen) {
+        function ekle(id, ad) {
+            id = String(id || '');
+            if (!GUNLUK_KIMLIK.test(id)) return;
+            if (!gorulen[id]) { gorulen[id] = { id: id, ad: ad || '' }; liste.push(gorulen[id]); }
+            else if (!gorulen[id].ad && ad) gorulen[id].ad = ad;
+        }
+        function gez(o, derin) {
+            if (!o || typeof o !== 'object' || derin > 7) return;
+            if (Array.isArray(o)) { for (var i = 0; i < o.length && i < 3000; i++) gez(o[i], derin + 1); return; }
+            if (typeof o.productId === 'string') ekle(o.productId, gunlukAd(o));
+            var p = o.product;
+            if (typeof p === 'string') ekle(p, gunlukAd(o));
+            else if (p && typeof p === 'object') ekle(p.id || p._id, gunlukAd(p) || gunlukAd(o));
+            Object.keys(o).forEach(function (k) {
+                if (k === 'warehouse' || k === 'warehouses' || k === 'createdBy') return;
+                gez(o[k], derin + 1);
+            });
+        }
+        gez(kok, 0);
+        return liste;
+    }
+
+    function gunlukSayimOku(gun) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(gun || ''))) return Promise.resolve({ ok: false, sebep: 'gün' });
+        if (gunlukSuruyor) return gunlukSuruyor;
+        if (gunlukSon && gunlukSon.gun === gun && Date.now() - gunlukZaman < GUNLUK_ARA_MS) return Promise.resolve(gunlukSon);
+        var depo = depoKimligi();
+        if (!depo) return Promise.resolve({ ok: false, sebep: 'depo' });
+        if (!jetonVarMi() || !asilFetch) return Promise.resolve({ ok: false, sebep: 'oturum' });
+        var basliklar = {};
+        Object.keys(panelBasliklari).forEach(function (k) { basliklar[k] = panelBasliklari[k]; });
+        var getBasliklar = {};
+        Object.keys(basliklar).forEach(function (k) { getBasliklar[k] = basliklar[k]; });
+        basliklar['content-type'] = 'application/json';
+
+        function iste(yol, govde) {
+            var secenek = govde === undefined
+                ? { method: 'GET', headers: getBasliklar, credentials: 'include' }
+                : { method: 'POST', headers: basliklar, body: JSON.stringify(govde), credentials: 'include' };
+            return asilFetch(TEMEL + yol, secenek).then(function (r) {
+                if (r.status === 401 || r.status === 403) throw new Error('oturum');
+                if (!r.ok) throw new Error('http ' + r.status);
+                return r.json();
+            });
+        }
+        function bekleMs(ms) { return new Promise(function (coz) { setTimeout(coz, ms); }); }
+
+        // Türkiye saati sabit +03:00; panelin gönderdiği aralığın aynısı
+        var aralik = {
+            startDate: new Date(gun + 'T00:00:00.000+03:00').toISOString(),
+            endDate: new Date(gun + 'T23:59:59.999+03:00').toISOString()
+        };
+        var sayim = null;
+
+        function gorevlerden(toplam) {
+            var liste = [];
+            var gorulen = {};
+            var LIMIT = 50;
+            function sayfa(offset) {
+                return iste('/gstore-inventory-checks/' + sayim.id + '/tasks/filter?offset=' + offset + '&limit=' + LIMIT, {})
+                    .then(function (j) {
+                        var d = j && j.data;
+                        var parca = d && Array.isArray(d.tasks) ? d.tasks : [];
+                        gunlukUrunleri(parca, liste, gorulen);
+                        var hepsi = Number(d && d.total) || toplam || 0;
+                        var sonraki = offset + LIMIT;
+                        if (parca.length === LIMIT && sonraki < hepsi && sonraki < 500) {
+                            return bekleMs(ARA_MS).then(function () { return sayfa(sonraki); });
+                        }
+                        return liste;
+                    });
+            }
+            return sayfa(0);
+        }
+
+        gunlukSuruyor = iste('/gstore-inventory-checks/filter?offset=0&limit=20', {
+            warehouseIds: [depo], populate: ['warehouses'], createdAt: aralik
+        }).then(function (j) {
+            var d = j && j.data;
+            var liste = d && Array.isArray(d.data) ? d.data : [];
+            var bas = Date.parse(aralik.startDate);
+            var son = Date.parse(aralik.endDate);
+            sayim = liste.filter(function (s) {
+                var t = Date.parse(s && s.createdAt);
+                return s && s.isAutoInventoryCheck === true && GUNLUK_KIMLIK.test(String(s.id || '')) && t >= bas && t <= son;
+            }).sort(function (a, b) { return Date.parse(b.createdAt) - Date.parse(a.createdAt); })[0] || null;
+            if (!sayim) return { ok: true, yok: true, gun: gun };
+            var toplam = Number(sayim.totalTaskCount) || 0;
+            return bekleMs(ARA_MS).then(function () {
+                return iste('/gstore-inventory-checks/' + sayim.id);
+            }).then(function (detay) {
+                var urunler = gunlukUrunleri(detay && detay.data, [], {});
+                if (urunler.length && (!toplam || urunler.length >= toplam)) return urunler;
+                return bekleMs(ARA_MS).then(function () { return gorevlerden(toplam); });
+            }).then(function (urunler) {
+                if (!urunler.length) return { ok: false, sebep: 'ürün yok', gun: gun };
+                if (toplam && urunler.length < toplam) return { ok: false, sebep: 'eksik ' + urunler.length + '/' + toplam, gun: gun };
+                return { ok: true, gun: gun, sayimId: String(sayim.id), toplam: toplam, urunler: urunler.slice(0, 500) };
+            });
+        }).catch(function (e) {
+            var m = String(e && e.message || e);
+            return { ok: false, sebep: m === 'oturum' ? 'oturum' : (/^http/.test(m) ? m : 'ağ'), gun: gun };
+        }).then(function (sonuc) {
+            gunlukSuruyor = null;
+            gunlukZaman = Date.now();
+            gunlukSon = sonuc;
+            return sonuc;
+        });
+        return gunlukSuruyor;
+    }
+
     setInterval(siparisleriDuyur, 2000);
     setTimeout(siparisleriDuyur, 3000);
 
@@ -1024,6 +1162,13 @@
                     var l = v && Array.isArray(v.damagedPicUrls) ? v.damagedPicUrls.filter(function (u) { return typeof u === 'string' && /^https:\/\//.test(u); }).slice(0, 4) : null;
                     gonder({ type: 'JB_KALDIRMA_FOTO', no: fno, adresler: l });
                 }, function () { gonder({ type: 'JB_KALDIRMA_FOTO', no: fno, adresler: null }); });
+            return;
+        }
+        if (d && d.type === 'JB_GUNLUK_SOR') {
+            var gno = d.no;
+            gunlukSayimOku(String(d.gun || '')).then(function (sonuc) {
+                gonder({ type: 'JB_GUNLUK_SONUC', no: gno, sonuc: sonuc });
+            });
             return;
         }
         if (d && d.type === 'JB_KALDIRMA_SOR') {

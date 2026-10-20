@@ -2,20 +2,24 @@
  * Günlük sayım: 50'lik otomatik sayım kendiliğinden Jet Barkod'a
  * ============================================================================
  *
- * SABAH (06:00-07:59, İstanbul)
- *   Depo paneli açık bilgisayarda, günün otomatik sayımı (isAutoInventoryCheck)
- *   depo panelinden okunur: Sayım Geçmişi'nin yöntemi (öne çıkmayan sekmede
- *   panelin kendi istekleri, iş bitince sekme kapanır). Ürün listesi Jet Barkod
- *   API'sine (/api/gunluk-sayim) bırakılır; sayım sayfası `Günlük|<gün>`
- *   tablosunu oradan kendisi kurar. Panel sayımı henüz üretmediyse 08:00'e
- *   kadar 20 dakikada bir yeniden bakılır. Hafta sonu sayım yoksa sessiz geçer.
+ * SABAH (06:00'dan gün sonuna, İstanbul)
+ *   Depo paneli açık bilgisayarda günün otomatik sayımı (isAutoInventoryCheck)
+ *   açık panel sekmesinden okunur: sayfa köprüsü panelin kendi başlıklarıyla
+ *   sayım listesini ve sayımın detayını ister, yeni sekme açılmaz. Bu
+ *   olmazsa (sekme eski Asistan'la açık, oturum yok) Sayım Geçmişi'nin
+ *   yöntemine düşülür (öne çıkmayan sekme, iş bitince kapanır).
+ *   Ürün listesi Jet Barkod API'sine (/api/gunluk-sayim) bırakılır; sayım
+ *   sayfası `Günlük|<gün>` tablosunu oradan kendisi kurar.
+ *   Panel sayımı henüz üretmediyse 08:00'e kadar 20 dakikada, sonra saatte
+ *   bir yeniden bakılır. Bilgisayar geç açılırsa panel açılınca hemen alınır.
+ *   Hafta sonu sayım yoksa sessiz geçer.
  *
  * GECE (00:00-00:59)
  *   Dünkü tabloda sayılmamış ürün sayısı Jet Barkod'dan sorulur (Getir'e istek
  *   yok); kontrol panelindeki kart (moduller/gunluk-sayim.js) bunu gösterir.
  *
- * Getir'e giden yük: günde bir sayım listesi + bir görev listesi (birkaç sayfa).
- * Görev listesinde ürün kimliği yoksa yalnız eksikler için görev detayı.
+ * Getir'e giden yük: günde bir sayım listesi + bir sayım detayı (gerekirse
+ * görev listesi). Liste bulununca o gün bir daha istek atılmaz.
  * ============================================================================
  */
 
@@ -25,6 +29,9 @@ const GS_GECE = 'jbaGunlukGece';            // { gun, kalan, toplam, zaman }
 const GS_AYAR = 'jbaGunlukAyar';            // { ekle, sabah, gece } varsayılan hepsi açık
 const GS_API = 'https://api.flowcobalt.com/api/gunluk-sayim';
 const GS_TEKRAR_MS = 20 * 60 * 1000;
+const GS_GEC_TEKRAR_MS = 60 * 60 * 1000;
+const GS_SITE = 'https://jetbarkod.com.tr/sayim/?gunluk=';
+const GS_GUN = /^\d{4}-\d{2}-\d{2}$/;
 const GS_GECE_ARA_MS = 4 * 60 * 1000;
 const GS_KIMLIK = /^[0-9a-f]{24}$/;
 
@@ -38,6 +45,12 @@ function gsSaat(t = Date.now()) {
     hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).formatToParts(new Date(t)).forEach((x) => { p[x.type] = x.value; });
   return { gun: `${p.year}-${p.month}-${p.day}`, saat: Number(p.hour), dakika: Number(p.minute) };
+}
+
+/** Gece uyarısının günü: 00:00-00:59 arası dün, gün içinde bugün */
+function gsUyariGunu() {
+  const { gun, saat } = gsSaat();
+  return saat === 0 ? gsDun(gun) : gun;
 }
 
 function gsDun(gun) {
@@ -60,6 +73,30 @@ async function gsHakVar() {
     const r = await chrome.storage.local.get('jbaAcikModuller');
     return gsListedeAcik(r && r.jbaAcikModuller);
   } catch (e) { return true; }
+}
+
+/** Yüklenmiş, uyutulmamış panel sekmesi; kontrol paneli öncelikli */
+async function gsPanelSekmesi() {
+  let sekmeler = [];
+  try { sekmeler = await chrome.tabs.query({ url: 'https://warehouse.getir.com/r/*' }); } catch (e) { return null; }
+  const hazir = sekmeler.filter((t) => t.status === 'complete' && !t.discarded && /\/r\/[0-9a-f]{24}\//.test(t.url || ''));
+  return hazir.find((t) => /\/dashboard\//.test(t.url || '')) || hazir.find((t) => t.active) || hazir[0] || null;
+}
+
+/** Açık panel sekmesinden, yeni sekme açmadan. null: bu yol kullanılamadı */
+async function gsSekmesiz(gun) {
+  const tab = await gsPanelSekmesi();
+  if (!tab) return null;
+  let c = null;
+  try { c = await chrome.tabs.sendMessage(tab.id, { type: 'JBA_GUNLUK_OKU', gun }); } catch (e) { c = null; }
+  if (!c) return null;
+  if (c.ok && c.yok) return { ok: true, yok: true };
+  if (!c.ok) { console.warn('[JBA] Günlük sayım sekmesiz okunamadı:', c.sebep || '?'); return null; }
+  const urunler = (Array.isArray(c.urunler) ? c.urunler : [])
+    .filter((u) => u && GS_KIMLIK.test(String(u.id || '')))
+    .map((u) => ({ id: String(u.id), ad: String(u.ad || '').slice(0, 200) }));
+  if (!urunler.length || !GS_KIMLIK.test(String(c.sayimId || ''))) return null;
+  return { ok: true, sayimId: String(c.sayimId), urunler };
 }
 
 async function gsDepo() {
@@ -114,16 +151,52 @@ function gsGorevUrunu(g) {
  * sebep: 'periyot' | 'elle'
  */
 async function gsEkle(sebep) {
-  const P = globalThis.jbaSayimPanel;
-  if (!P) return { ok: false, metin: 'Asistan hazır değil.' };
   if (gsCalisiyor) return { ok: false, metin: 'Zaten okunuyor.' };
-  if (P.mesgulMu()) return { ok: false, metin: 'Sayım Geçmişi okunuyor; biraz sonra tekrar denenecek.' };
   if (!(await gsHakVar())) return { ok: false, metin: 'Günlük sayım bu hesapta kapalı.' };
-  const yer = await gsDepo();
-  if (!yer) return { ok: false, metin: 'Depo paneli açık değil.' };
-
   const { gun } = gsSaat();
   gsCalisiyor = true;
+  try {
+    let oku = await gsSekmesiz(gun);
+    if (!oku) oku = await gsSekmeyle(gun);
+    if (!oku.ok) {
+      // Panel kapalıyken durum yazılmaz; panel açılınca hemen denenir
+      if (!oku.sessiz) await gsDurumYaz({ gun, durum: 'hata', metin: oku.metin });
+      return { ok: false, metin: oku.metin };
+    }
+    if (oku.yok) {
+      const m = 'Bugünün otomatik sayımı panelde henüz yok.';
+      await gsDurumYaz({ gun, durum: 'yok', metin: m });
+      return { ok: true, metin: m };
+    }
+    const urunler = oku.urunler;
+    const c = await gsApi('', { method: 'POST', govde: { gun, sayimId: oku.sayimId, urunler } });
+    if (c.kod === 200 && c.j.ok) {
+      await gsDurumYaz({ gun, durum: 'eklendi', adet: urunler.length, metin: urunler.length + ' ürün eklendi.' });
+      return { ok: true, metin: urunler.length + ' ürün eklendi.', adet: urunler.length };
+    }
+    const m = c.kod === 503 || c.kod === 404 ? 'Sunucu güncellemesi bekleniyor.'
+      : c.kod === 401 ? 'Jet Barkod oturumu yok; siteye bir kez girin.' : 'Jet Barkod\'a yazılamadı (' + c.kod + ').';
+    await gsDurumYaz({ gun, durum: 'hata', metin: m });
+    return { ok: false, metin: m };
+  } catch (e) {
+    const m = (e && e.message) || 'Günlük sayım alınamadı.';
+    await gsDurumYaz({ gun, durum: 'hata', metin: m });
+    return { ok: false, metin: m };
+  } finally {
+    gsCalisiyor = false;
+  }
+}
+
+/**
+ * Yedek yol: Sayım Geçmişi'nin yöntemi (öne çıkmayan sekmede panelin kendi
+ * istekleri). Dönen: { ok, yok?, sayimId?, urunler?, metin?, sessiz? }
+ */
+async function gsSekmeyle(gun) {
+  const P = globalThis.jbaSayimPanel;
+  if (!P) return { ok: false, metin: 'Asistan hazır değil.' };
+  if (P.mesgulMu()) return { ok: false, sessiz: true, metin: 'Sayım Geçmişi okunuyor; biraz sonra tekrar denenecek.' };
+  const yer = await gsDepo();
+  if (!yer) return { ok: false, sessiz: true, metin: 'Depo paneli açık değil.' };
   let tabId = null;
   try {
     const tab = await chrome.tabs.create({
@@ -133,29 +206,19 @@ async function gsEkle(sebep) {
     });
     tabId = tab.id;
     const hazir = await P.sekmeHazirBekle(tabId);
-    if (!hazir.ok) { await gsDurumYaz({ gun, durum: 'hata', metin: hazir.hata }); return { ok: false, metin: hazir.hata }; }
+    if (!hazir.ok) return { ok: false, metin: hazir.hata };
     await P.bekle(800);
 
     const liste = await P.sayimListesi(tabId, yer.depo, gun, gun);
-    if (!liste.ok) {
-      const m = liste.hata || 'Sayım listesi alınamadı.';
-      await gsDurumYaz({ gun, durum: 'hata', metin: m });
-      return { ok: false, metin: m };
-    }
+    if (!liste.ok) return { ok: false, metin: liste.hata || 'Sayım listesi alınamadı.' };
     // Günün otomatik sayımı; birden çoksa en yenisi
     const oto = liste.sayimlar
       .filter((s) => s && s.isAutoInventoryCheck === true && gsSaat(Date.parse(s.createdAt)).gun === gun)
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-    if (!oto) {
-      await gsDurumYaz({ gun, durum: 'yok', metin: 'Bugünün otomatik sayımı panelde henüz yok.' });
-      return { ok: true, metin: 'Bugünün otomatik sayımı panelde henüz yok.' };
-    }
+    if (!oto) return { ok: true, yok: true };
 
     const gl = await P.gorevListesi(tabId, yer.depo, oto);
-    if (!gl.ok || !gl.gorevler.length) {
-      await gsDurumYaz({ gun, durum: 'hata', metin: 'Sayımın ürün listesi okunamadı.' });
-      return { ok: false, metin: 'Sayımın ürün listesi okunamadı.' };
-    }
+    if (!gl.ok || !gl.gorevler.length) return { ok: false, metin: 'Sayımın ürün listesi okunamadı.' };
 
     const urunler = [];
     const eksik = [];
@@ -173,43 +236,28 @@ async function gsEkle(sebep) {
         if (GS_KIMLIK.test(id || '')) urunler.push({ id, ad: P.urunAdi(v) || '' });
       }
     }
-    if (!urunler.length) {
-      await gsDurumYaz({ gun, durum: 'hata', metin: 'Sayımdaki ürünler tanınamadı.' });
-      return { ok: false, metin: 'Sayımdaki ürünler tanınamadı.' };
-    }
-
-    const c = await gsApi('', { method: 'POST', govde: { gun, sayimId: oto.id, urunler } });
-    if (c.kod === 200 && c.j.ok) {
-      await gsDurumYaz({ gun, durum: 'eklendi', adet: urunler.length, metin: urunler.length + ' ürün eklendi.' });
-      return { ok: true, metin: urunler.length + ' ürün eklendi.', adet: urunler.length };
-    }
-    const m = c.kod === 503 || c.kod === 404 ? 'Sunucu güncellemesi bekleniyor.'
-      : c.kod === 401 ? 'Jet Barkod oturumu yok; siteye bir kez girin.' : 'Jet Barkod\'a yazılamadı (' + c.kod + ').';
-    await gsDurumYaz({ gun, durum: 'hata', metin: m });
-    return { ok: false, metin: m };
+    if (!urunler.length) return { ok: false, metin: 'Sayımdaki ürünler tanınamadı.' };
+    return { ok: true, sayimId: String(oto.id), urunler };
   } catch (e) {
-    const m = (e && e.message) || 'Günlük sayım alınamadı.';
-    await gsDurumYaz({ gun, durum: 'hata', metin: m });
-    return { ok: false, metin: m };
+    return { ok: false, metin: (e && e.message) || 'Günlük sayım alınamadı.' };
   } finally {
-    gsCalisiyor = false;
     if (tabId) { try { await chrome.tabs.remove(tabId); } catch (e) { /* kapalı */ } }
   }
 }
 
 /** Gece: dünkü tabloda kalan ürün (Jet Barkod'dan) */
 async function gsGeceDurumu(zorla) {
-  const { gun, saat } = gsSaat();
+  const { saat } = gsSaat();
   if (saat !== 0 && !zorla) return null;
-  const dun = gsDun(gun);
+  const hedef = gsUyariGunu();
   try {
     const r = await chrome.storage.local.get(GS_GECE);
     const v = r && r[GS_GECE];
-    if (!zorla && v && v.gun === dun && Date.now() - (v.zaman || 0) < GS_GECE_ARA_MS) return v;
+    if (!zorla && v && v.gun === hedef && Date.now() - (v.zaman || 0) < GS_GECE_ARA_MS) return v;
   } catch (e) { /* yok */ }
-  const c = await gsApi('/durum?gun=' + dun);
+  const c = await gsApi('/durum?gun=' + hedef);
   if (c.kod !== 200 || !c.j.ok) return null;
-  const v = { gun: dun, kalan: Number(c.j.kalan) || 0, toplam: Number(c.j.toplam) || 0, var: !!c.j.var, zaman: Date.now() };
+  const v = { gun: hedef, kalan: Number(c.j.kalan) || 0, toplam: Number(c.j.toplam) || 0, var: !!c.j.var, zaman: Date.now() };
   try { await chrome.storage.local.set({ [GS_GECE]: v }); } catch (e) { /* sessiz */ }
   return v;
 }
@@ -222,11 +270,12 @@ async function gsTur() {
   if (!(await gsHakVar())) return;
   const ayar = await gsAyar();
   const { gun, saat } = gsSaat();
-  if (ayar.ekle !== false && saat >= 6 && saat < 8) {
+  if (ayar.ekle !== false && saat >= 6) {
     let d = null;
     try { d = (await chrome.storage.local.get(GS_DURUM))[GS_DURUM]; } catch (e) { d = null; }
     const bugunEklendi = d && d.gun === gun && d.durum === 'eklendi';
-    const yakinda = d && d.gun === gun && Date.now() - (d.zaman || 0) < GS_TEKRAR_MS;
+    const ara = saat < 8 ? GS_TEKRAR_MS : GS_GEC_TEKRAR_MS;
+    const yakinda = d && d.gun === gun && Date.now() - (d.zaman || 0) < ara;
     if (!bugunEklendi && !yakinda) await gsEkle('periyot');
   }
   if (ayar.gece !== false && saat === 0) await gsGeceDurumu(false);
@@ -260,7 +309,7 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
       const m = { type: 'JBA_GUNLUK_KART', tur: istek.tur === 'gece' ? 'gece' : 'sabah' };
       if (m.tur === 'gece') {
         const v = await gsGeceDurumu(true).catch(() => null);
-        m.gun = gsDun(gun);
+        m.gun = gsUyariGunu();
         m.kalan = v && v.kalan > 0 ? v.kalan : 3;
       } else {
         let d = null;
@@ -276,6 +325,26 @@ chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
       return { ok: true };
     })().then(cevapla, () => cevapla({ ok: false, metin: 'Gösterilemedi.' }));
     return true;
+  }
+  // Kart "Sayıma Başla": tarayıcıda, kartın penceresinde yeni sekme.
+  // Sayfadan window.open yüklü Jet Barkod uygulamasının penceresine düşüyordu.
+  if (istek.type === 'JBA_SAYIM_SEKMESI') {
+    const gun = String(istek.gun || '');
+    const tab = gonderen && gonderen.tab;
+    if (!GS_GUN.test(gun) || !tab || !/^https:\/\/warehouse\.getir\.com\//.test(tab.url || '')) { cevapla({ ok: false }); return false; }
+    const secenek = { url: GS_SITE + gun, active: true };
+    if (tab.windowId != null) secenek.windowId = tab.windowId;
+    if (typeof tab.index === 'number') secenek.index = tab.index + 1;
+    if (tab.id != null) secenek.openerTabId = tab.id;
+    chrome.tabs.create(secenek)
+      .catch(() => chrome.tabs.create({ url: GS_SITE + gun, active: true }))
+      .then(() => cevapla({ ok: true }), () => cevapla({ ok: false }));
+    return true;
+  }
+  // Panel açıldı (bilgisayar geç açıldı ya da sekme yenilendi): eksikse hemen
+  if (istek.type === 'JBA_GUNLUK_PANO_HAZIR') {
+    setTimeout(() => { gsTur().catch(() => {}); }, 8000);
+    return false;
   }
   if (istek.type === 'JBA_GUNLUK_GECE') {
     gsGeceDurumu(false).then((v) => cevapla({ ok: true, durum: v }), () => cevapla({ ok: false }));

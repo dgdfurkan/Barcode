@@ -3,16 +3,19 @@
  * ============================================================================
  *
  * Sağ üstte, fırın kartının altında küçük ve sakin bir kart:
- *   SABAH 08:00-08:09  "Günlük sayım hazır · 50 ürün": Sayıma Başla Jet
- *                      Barkod sayım sayfasını o günün tablosuyla açar. Günde
- *                      bir kez; basılınca ya da çarpıyla bir daha gelmez,
- *                      basılmazsa 08:10'da kaybolur.
+ *   SABAH 08:00-11:59  "Günlük Sayım Hazır · 50 ürün": Sayıma Başla Jet
+ *                      Barkod sayım sayfasını o günün tablosuyla tarayıcıda
+ *                      yeni sekmede açar. Günde bir kez; basılınca ya da
+ *                      çarpıyla bir daha gelmez, basılmazsa 10 dakikada
+ *                      kaybolur. Liste 08:00'den sonra eklendiyse o an gelir.
  *   GECE 00:00-00:59   Dünkü günlük sayımda sayılmamış ürün varsa uyarı.
  *                      Çarpı 10 dakika gizler. Sayım bitince ya da 01:00'de
  *                      kaybolur.
  * Simülasyon (Asistan penceresi): gerçeğin aynısı, 20 sn, çarpı kapatır.
  *
- * Veri arka plandan (arka-plan/gunluk-sayim.js); burası Getir'e istek atmaz.
+ * Kartların verisi arka plandan (arka-plan/gunluk-sayim.js). Sabahki ürün
+ * listesi istenince (`JBA_GUNLUK_OKU`) sayfa köprüsü panelin kendi
+ * başlıklarıyla okur; yeni sekme açılmaz.
  * ============================================================================
  */
 (function (global) {
@@ -23,8 +26,9 @@
 
     var PANO_YOLU = /^\/r\/[a-f0-9]{24}\/dashboard\/orders\/?$/;
     var SITE = 'https://jetbarkod.com.tr/sayim/?gunluk=';
-    var KART_ANAHTAR = 'jbaGunlukKart';   // { sabah: 'YYYY-MM-DD' } gösterildi
+    var KART_ANAHTAR = 'jbaGunlukKart';   // { sabah: 'YYYY-MM-DD' kapandı, ilk: { gun, t } ilk görünüş }
     var SIM_MS = 20000;
+    var SABAH_SURE_MS = 10 * 60 * 1000;
     var GECE_GIZLE_MS = 10 * 60 * 1000;
 
     var etkin = false;
@@ -150,7 +154,7 @@
         kok = kap.attachShadow({ mode: 'closed' });
         document.documentElement.appendChild(kap);
         var gece = v.tur === 'gece';
-        var baslik = gece ? 'Günlük sayım bitmedi' : 'Günlük sayım hazır';
+        var baslik = gece ? 'Günlük Sayım Bitmedi' : 'Günlük Sayım Hazır';
         var alt = gece
             ? kacir(gunYazi(v.gun)) + ' sayımında <b>' + v.kalan + ' ürün</b> sayılmadı'
             : kacir(gunYazi(v.gun)) + ' · <b>' + v.adet + ' ürün</b> Jet Barkod\'a eklendi';
@@ -175,7 +179,7 @@
             var b = e.target.closest('[data-is]');
             var is = b ? b.getAttribute('data-is') : 'git';
             if (is === 'git') {
-                try { window.open(SITE + encodeURIComponent(v.gun), '_blank', 'noopener'); } catch (x) { /* engellendi */ }
+                sayimiAc(v.gun);
                 if (!v.sim && !gece) sabahGosterildi(v.gun);
                 kaldir();
             } else if (is === 'kapat') {
@@ -193,6 +197,25 @@
         return true;
     }
 
+    /* Sayım sayfası arka plandan, bu pencerede yeni sekme olarak açılır.
+       `window.open` yüklü Jet Barkod uygulaması varsa sayfayı uygulama
+       penceresinde açıyordu. Arka plana ulaşılamazsa (Asistan güncellenmiş,
+       sayfa yenilenmemiş) yine de açılsın diye window.open'a düşer. */
+    function sayimiAc(gun) {
+        var adres = SITE + encodeURIComponent(gun);
+        var dustu = false;
+        function dus() {
+            if (dustu) return;
+            dustu = true;
+            try { window.open(adres, '_blank', 'noopener'); } catch (x) { /* engellendi */ }
+        }
+        try {
+            chrome.runtime.sendMessage({ type: 'JBA_SAYIM_SEKMESI', gun: gun }, function (c) {
+                if (chrome.runtime.lastError || !c || !c.ok) dus();
+            });
+        } catch (e) { dus(); }
+    }
+
     function sabahGosterildi(gun) {
         try { chrome.storage.local.set({ [KART_ANAHTAR]: { sabah: gun } }); } catch (e) { /* yetim bağlam */ }
     }
@@ -205,11 +228,18 @@
         if (!etkin || simBitis > Date.now()) return;
         var z = saat();
         var ayar = (await depolama(['jbaGunlukAyar'])).jbaGunlukAyar || {};
-        if (z.saat === 8 && z.dakika < 10 && ayar.sabah !== false) {
+        if (z.saat >= 8 && z.saat < 12 && ayar.sabah !== false) {
             var r = await depolama(['jbaGunlukSayim', KART_ANAHTAR]);
             var d = r.jbaGunlukSayim;
-            var gosterildi = r[KART_ANAHTAR] && r[KART_ANAHTAR].sabah === z.gun;
-            if (d && d.gun === z.gun && d.durum === 'eklendi' && !gosterildi) {
+            var k = r[KART_ANAHTAR] || {};
+            var kapandi = k.sabah === z.gun;
+            if (d && d.gun === z.gun && d.durum === 'eklendi' && !kapandi) {
+                // İlk görünüşten 10 dakika sonra kendiliğinden kapanır
+                var ilk = k.ilk && k.ilk.gun === z.gun ? Number(k.ilk.t) || 0 : 0;
+                if (ilk && Date.now() - ilk > SABAH_SURE_MS) { sabahGosterildi(z.gun); if (cizili) kaldir(); return; }
+                if (!ilk) {
+                    try { chrome.storage.local.set({ [KART_ANAHTAR]: { ilk: { gun: z.gun, t: Date.now() } } }); } catch (e) { /* yetim bağlam */ }
+                }
                 if (cizili !== 'sabah') ciz({ tur: 'sabah', gun: z.gun, adet: d.adet || 0 });
                 return;
             }
@@ -223,6 +253,48 @@
         }
         if (cizili) kaldir();
     }
+
+    // ------------------------------------------------------------------
+    // Sabahki ürün listesi: arka plan sorar, sayfa köprüsü panelin kendi
+    // başlıklarıyla okur. Depo panelinin her sayfasında çalışır (kartın
+    // yalnız kontrol panelinde çizilmesinden bağımsız).
+    // ------------------------------------------------------------------
+
+    var soruNo = 0;
+
+    function listeOku(gun) {
+        return new Promise(function (coz) {
+            var no = 'g' + Date.now() + '-' + (++soruNo);
+            var bitti = false;
+            function dinle(e) {
+                if (e.source !== window || e.origin !== location.origin) return;
+                var d = e.data;
+                if (!d || d.type !== 'JB_GUNLUK_SONUC' || d.no !== no) return;
+                bitir(d.sonuc || { ok: false });
+            }
+            function bitir(v) {
+                if (bitti) return;
+                bitti = true;
+                window.removeEventListener('message', dinle);
+                coz(v);
+            }
+            window.addEventListener('message', dinle);
+            setTimeout(function () { bitir({ ok: false, sebep: 'zaman aşımı' }); }, 45000);
+            window.postMessage({ type: 'JB_GUNLUK_SOR', no: no, gun: gun }, location.origin);
+        });
+    }
+
+    try {
+        chrome.runtime.onMessage.addListener(function (m, gonderen, cevapla) {
+            if (!m || m.type !== 'JBA_GUNLUK_OKU') return false;
+            if (!/^\/r\/[a-f0-9]{24}\//.test(location.pathname) || !/^\d{4}-\d{2}-\d{2}$/.test(String(m.gun || ''))) {
+                cevapla({ ok: false, sebep: 'sayfa' });
+                return false;
+            }
+            listeOku(String(m.gun)).then(cevapla);
+            return true;
+        });
+    } catch (e) { /* yetim bağlam */ }
 
     try {
         chrome.runtime.onMessage.addListener(function (m, gonderen, cevapla) {
@@ -241,6 +313,9 @@
         yol: function (yol) { return PANO_YOLU.test(yol); },
         baslat: function () {
             etkin = true;
+            // Bilgisayar 06:00'dan sonra açıldıysa liste hemen alınsın
+            try { chrome.runtime.sendMessage({ type: 'JBA_GUNLUK_PANO_HAZIR' }, function () { void chrome.runtime.lastError; }); }
+            catch (e) { /* yetim bağlam */ }
             tur();
             clearInterval(zamanlayici);
             zamanlayici = setInterval(tur, 20000);
