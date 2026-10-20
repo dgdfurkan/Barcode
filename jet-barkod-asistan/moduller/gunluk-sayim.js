@@ -45,6 +45,9 @@
         '  box-shadow: 0 16px 40px rgba(16,24,40,.14), 0 0 0 1px rgba(17,24,39,.06);',
         '  display: flex; flex-direction: column; gap: 12px; animation: gir 220ms cubic-bezier(.22,1,.36,1); }',
         '.kart *, .kart *::before { box-sizing: border-box; }',
+        '.kart { cursor: pointer; transition: box-shadow 160ms; }',
+        '.kart:hover { box-shadow: 0 20px 48px rgba(16,24,40,.18), 0 0 0 1px rgba(37,99,235,.28); }',
+        '.kart.gece:hover { box-shadow: 0 20px 48px rgba(16,24,40,.18), 0 0 0 1px rgba(217,119,6,.35); }',
         '@keyframes gir { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }',
         'button { font-family: inherit; cursor: pointer; }',
         'button:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }',
@@ -167,10 +170,10 @@
         konumGozcu = new MutationObserver(konumla);
         konumGozcu.observe(document.documentElement, { attributes: true, attributeFilter: ['data-jba-firin-alt'] });
 
+        // Kartın tamamı "Sayıma Başla" gibi çalışır; yalnız çarpı kapatır
         kok.querySelector('.kart').addEventListener('click', function (e) {
             var b = e.target.closest('[data-is]');
-            if (!b) return;
-            var is = b.getAttribute('data-is');
+            var is = b ? b.getAttribute('data-is') : 'git';
             if (is === 'git') {
                 try { window.open(SITE + encodeURIComponent(v.gun), '_blank', 'noopener'); } catch (x) { /* engellendi */ }
                 if (!v.sim && !gece) sabahGosterildi(v.gun);

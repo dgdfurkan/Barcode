@@ -23,6 +23,18 @@
     var calisiyor = false;
     var biten = {};
 
+    /* Adreste ?gunluk=YYYY-MM-DD varsa sayım sayfası açılırken Günlük sekmesi ve
+       o gün seçili başlasın: sayfanın kendi kurulumundan ÖNCE yazılır */
+    (function () {
+        try {
+            var g = new URLSearchParams(location.search).get('gunluk');
+            if (g && GUN.test(g)) {
+                sessionStorage.setItem('sayimSubTab', 'daily');
+                sessionStorage.setItem('sayimDailySelectedIso', g);
+            }
+        } catch (e) { /* gizli pencere */ }
+    })();
+
     function bugun() {
         return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date());
     }
@@ -89,6 +101,30 @@
         return 'kuruldu';
     }
 
+    function bekle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+    /* Kontrol panelindeki karttan gelindi: o günün tablosu seçili gelsin.
+       Sayfa açılışta cihazın son tablosunu geri yükleyebiliyor; seçim
+       2 saniye boyunca kararlı kalana kadar (en çok 15 sn) korunur. */
+    async function tabloyuAc(cs, gun) {
+        var ad = cs.DAILY_TABLE_PREFIX + gun;
+        var kararli = 0;
+        for (var i = 0; i < 30 && kararli < 4; i++) {
+            if (cs.hasDailyTableForIso(gun)) {
+                if (cs.currentTableName !== ad && !cs._importInProgress) {
+                    try { await cs.switchTable(ad); } catch (e) { /* bir sonraki turda */ }
+                }
+                kararli = cs.currentTableName === ad ? kararli + 1 : 0;
+            }
+            if (kararli < 4) await bekle(500);
+        }
+        if (cs.currentTableName === ad) {
+            try { global.scrollTo({ top: 0, behavior: 'auto' }); } catch (e) { /* eski tarayıcı */ }
+        } else if (cs.showToast) {
+            cs.showToast('O günün sayım tablosu bulunamadı.', 'warning', 4000);
+        }
+    }
+
     async function tur(istenen) {
         if (calisiyor) return;
         calisiyor = true;
@@ -100,10 +136,7 @@
             for (var i = 0; i < gunler.length; i++) {
                 try { await kur(cs, gunler[i], gunler[i] === istenen); } catch (e) { /* bir sonraki turda tekrar */ }
             }
-            if (istenen && cs.hasDailyTableForIso(istenen)) {
-                var ad = cs.DAILY_TABLE_PREFIX + istenen;
-                if (cs.currentTableName !== ad) await cs.switchTable(ad);
-            }
+            if (istenen) await tabloyuAc(cs, istenen);
         } finally {
             calisiyor = false;
         }
