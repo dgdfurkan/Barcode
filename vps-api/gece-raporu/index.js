@@ -34,11 +34,10 @@ const telegram = require('../sayim-raporu/telegram');
 const gorsel = require('../sayim-raporu/gorsel');
 const kart = require('./kart');
 
-const { Resvg } = require('@resvg/resvg-js');
+const { S3, hasarFotosu, albumGonder } = require('./paylas');
 
 const HAKLAR = ['satistanKaldirma', 'itirazYazici', 'stokSayimi', 'jetBarkodAsistan'];
 const KATALOG = 'https://jetbarkod.com.tr/products.json';
-const S3 = /^https:\/\/getir-stock\.s3\.[a-z0-9-]+\.amazonaws\.com\/(?:blocked-stock|transfer)\/[^\s"'<>]+$/;
 const BEKLEYEN = new Set([100, 150, 200, 300]);
 
 const sadeAd = (s) => String(s || '').toLocaleLowerCase('tr').replace(/\s+/g, ' ').trim();
@@ -71,32 +70,6 @@ async function katalogAl() {
     return katalog;
 }
 
-/* Hasar fotoğrafı: panelin süreli linki; yalnız karta çizmek için indirilir,
-   diske yazılmaz. 360 px'e küçültülür. */
-async function hasarFotosu(adres) {
-    if (!S3.test(adres || '')) return null;
-    try {
-        const bitis = Number(new URL(adres).searchParams.get('Expires'));
-        if (bitis && bitis * 1000 < Date.now() + 5000) return null;
-    } catch (e) { return null; }
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 10000);
-    try {
-        const r = await fetch(adres, { signal: ctrl.signal, redirect: 'error' });
-        if (!r.ok) return null;
-        const b = Buffer.from(await r.arrayBuffer());
-        if (!b.length || b.length > 8 * 1024 * 1024) return null;
-        const tur = b[0] === 0xff && b[1] === 0xd8 ? 'jpeg' : b[0] === 0x89 && b[1] === 0x50 ? 'png' : null;
-        if (!tur) return null;
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360"><rect width="360" height="360" fill="#fff"/>` +
-            `<image href="data:image/${tur};base64,${b.toString('base64')}" width="360" height="360" preserveAspectRatio="xMidYMid slice"/></svg>`;
-        return new Resvg(svg, { font: { loadSystemFonts: false } }).render().asPng();
-    } catch (e) {
-        return null;
-    } finally {
-        clearTimeout(t);
-    }
-}
 const GUN_MS = 24 * 3600 * 1000;
 const KIMLIK = /^[0-9a-f]{24}$/;
 
@@ -383,50 +356,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     async function gonder(u, rapor) {
         const hedefler = await alicilar(u);
         if (!hedefler.length) return { giden: 0, hata: 'baglanti_yok' };
-        let giden = 0;
-        let kimlikler = null;
-        for (const h of hedefler) {
-            try {
-                if (rapor.kartlar.length === 1) {
-                    if (kimlikler) {
-                        await telegram.cagir('sendPhoto', { chat_id: h.chat_id, photo: kimlikler[0], caption: rapor.baslik });
-                    } else {
-                        const form = new FormData();
-                        form.append('chat_id', String(h.chat_id));
-                        form.append('caption', rapor.baslik);
-                        form.append('photo', new Blob([rapor.kartlar[0]], { type: 'image/png' }), 'gece-raporu.png');
-                        const s = await telegram.cagir('sendPhoto', form, 60000);
-                        const f = Array.isArray(s && s.photo) ? s.photo[s.photo.length - 1] : null;
-                        if (f && f.file_id) kimlikler = [f.file_id];
-                    }
-                } else if (kimlikler) {
-                    await telegram.cagir('sendMediaGroup', {
-                        chat_id: h.chat_id,
-                        media: kimlikler.map((id, i) => ({ type: 'photo', media: id, ...(i === 0 ? { caption: rapor.baslik } : {}) })),
-                    }, 60000);
-                } else {
-                    const form = new FormData();
-                    form.append('chat_id', String(h.chat_id));
-                    form.append('media', JSON.stringify(rapor.kartlar.map((_, i) => ({
-                        type: 'photo', media: 'attach://kart' + i, ...(i === 0 ? { caption: rapor.baslik } : {}),
-                    }))));
-                    rapor.kartlar.forEach((png, i) => form.append('kart' + i, new Blob([png], { type: 'image/png' }), 'kart' + i + '.png'));
-                    const s = await telegram.cagir('sendMediaGroup', form, 90000);
-                    if (Array.isArray(s) && s.length === rapor.kartlar.length) {
-                        const ids = s.map((m) => Array.isArray(m.photo) && m.photo.length ? m.photo[m.photo.length - 1].file_id : null);
-                        if (ids.every(Boolean)) kimlikler = ids;
-                    }
-                }
-                giden++;
-            } catch (e) {
-                console.warn('gece-raporu gonder:', telegram.temizle(e && e.message));
-                if (e instanceof telegram.TelegramHatasi && e.kod === 403) {
-                    await pool.query(`UPDATE rapor.telegram_baglantilari SET durum = 'engelli' WHERE id = $1`, [h.id]).catch(() => {});
-                }
-            }
-            await new Promise((r) => setTimeout(r, 500));
-        }
-        return { giden };
+        return albumGonder(pool, hedefler, rapor.kartlar, rapor.baslik, 'gece-raporu');
     }
 
     // -----------------------------------------------------------------

@@ -616,19 +616,164 @@
         setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
     }
 
-    async function telegramaGonder() {
-        var dugme = el('kldTelegram');
+    // ------------------------------------------------------------------
+    // Telegram'a gönder paneli: ne gideceği seçilir (telefonda alttan açılır)
+    // ------------------------------------------------------------------
+
+    var GONDER_AYAR = 'jb_kaldirma_gonder';
+    var gonder = {
+        secim: { ozet: true, red: true, bekleyen: true, tamam: false, foto: false },
+        sebepler: null,      // null: hepsi
+        hesaplar: null,      // bağlı Telegram hesap adları (bir kez okunur)
+        gonderiyor: false
+    };
+    try {
+        var kayitli = JSON.parse(localStorage.getItem(GONDER_AYAR) || 'null');
+        if (kayitli && kayitli.secim) Object.keys(gonder.secim).forEach(function (k) {
+            if (typeof kayitli.secim[k] === 'boolean') gonder.secim[k] = kayitli.secim[k];
+        });
+    } catch (e) { /* varsayılan */ }
+
+    var SECIMLER = [
+        { k: 'ozet', ad: 'Özet kartı', not: 'Ürünler, adetler ve sebepler tek kartta' },
+        { k: 'red', ad: 'Reddedilen ve iptal edilenler', not: 'Red sebebi ve açıklamasıyla' },
+        { k: 'bekleyen', ad: 'Onay bekleyenler', not: 'Henüz sonuçlanmamış kayıtlar' },
+        { k: 'tamam', ad: 'Tamamlananlar', not: 'Onaylanıp bitenler' },
+        { k: 'foto', ad: 'Hasar fotoğrafları', not: 'Seçilen kayıtların altına, en çok 3 fotoğraf' }
+    ];
+
+    function gonderGrubu(k) {
+        var s = kayitSinifi(k);
+        if (s === 'iptal' || s === 'red' || s === 'yeniden') return 'red';
+        if (s === 'biten') return 'tamam';
+        return 'bekleyen';
+    }
+
+    function gonderSebepUyar(k) {
+        return !gonder.sebepler || gonder.sebepler.indexOf(k.sebep || 'Sebep yok') !== -1;
+    }
+
+    function gonderSayilari() {
+        var n = { red: 0, bekleyen: 0, tamam: 0, foto: 0, toplam: 0 };
+        d.kayitlar.forEach(function (k) {
+            if (!gonderSebepUyar(k)) return;
+            n.toplam++;
+            var g = gonderGrubu(k);
+            n[g]++;
+            if (Number(k.foto) > 0 && gonder.secim[g]) n.foto++;
+        });
+        return n;
+    }
+
+    function gonderCiz() {
+        var n = gonderSayilari();
+        el('kldGonderSecim').innerHTML = SECIMLER.map(function (x) {
+            var sayi = x.k === 'ozet' ? null : n[x.k];
+            var bos = sayi === 0;
+            return '<label class="kld-secim' + (bos ? ' is-bos' : '') + '">' +
+                '<span class="kld-secim__metin"><b>' + kacir(x.ad) + '</b><small>' + kacir(x.not) + '</small></span>' +
+                (sayi == null ? '' : '<span class="kld-secim__sayi">' + sayi + '</span>') +
+                '<span class="kld-anahtar"><input type="checkbox" data-secim="' + x.k + '"' + (gonder.secim[x.k] ? ' checked' : '') + '><i></i></span>' +
+            '</label>';
+        }).join('');
+
+        var sebepler = {};
+        d.kayitlar.forEach(function (k) { var s = k.sebep || 'Sebep yok'; sebepler[s] = (sebepler[s] || 0) + 1; });
+        var adlar = Object.keys(sebepler).sort(function (a, b) { return sebepler[b] - sebepler[a]; });
+        if (gonder.sebepler) gonder.sebepler = gonder.sebepler.filter(function (s) { return sebepler[s]; });
+        el('kldGonderCipler').innerHTML = adlar.map(function (s) {
+            var secili = !gonder.sebepler || gonder.sebepler.indexOf(s) !== -1;
+            return '<button type="button" class="kld-gonder__cip" aria-pressed="' + secili + '" data-sebep-sec="' + kacir(s) + '">' +
+                kacir(s) + '<b>' + sebepler[s] + '</b></button>';
+        }).join('') || '<p class="kld-gonder__ozet">Bu aralıkta kayıt yok.</p>';
+        el('kldGonderTumu').hidden = !gonder.sebepler;
+
+        // Kaç kart gideceği: özet 1 + liste kartları (fotoğraflı satır daha uzun)
+        var satir = ['red', 'bekleyen', 'tamam'].reduce(function (t, g) { return t + (gonder.secim[g] ? Math.min(40, n[g]) : 0); }, 0);
+        var kartBasina = gonder.secim.foto ? 5 : 9;
+        var ozetVar = gonder.secim.ozet && n.toplam > 0;
+        var kart = (ozetVar ? 1 : 0) + Math.ceil(satir / kartBasina);
+        var ozet = el('kldGonderOzet');
+        var bagli = gonder.hesaplar && gonder.hesaplar.length;
+        if (gonder.hesaplar && !bagli) {
+            ozet.textContent = 'Telegram bağlı değil. Gönder\'e basınca bağlama açılır.';
+            ozet.className = 'kld-gonder__ozet is-uyari';
+        } else if (!kart) {
+            ozet.textContent = 'Gönderilecek bir şey seçilmedi.';
+            ozet.className = 'kld-gonder__ozet is-uyari';
+        } else {
+            ozet.textContent = '≈ ' + Math.min(10, kart) + ' kart' + (satir ? ' · ' + satir + ' kayıt' : '') + (kart > 10 ? ' · İlk 10 kart gider; aralığı daraltabilirsin' : '');
+            ozet.className = 'kld-gonder__ozet' + (kart > 10 ? ' is-uyari' : '');
+        }
+        el('kldGonderBtn').disabled = gonder.gonderiyor || (!kart && !(gonder.hesaplar && !bagli));
+    }
+
+    function gonderAltYaz() {
         var a = aralikHesapla(d.aralik);
+        var tarih = a.bas === a.son ? gunEtiketi(a.bas) : gunEtiketi(a.bas) + ' - ' + gunEtiketi(a.son);
+        var kim = gonder.hesaplar == null ? '' : gonder.hesaplar.length ? ' · ' + gonder.hesaplar.join(', ') : ' · Telegram bağlı değil';
+        el('kldGonderAlt').textContent = tarih + kim;
+    }
+
+    async function telegramaGonder() {
+        var k = el('kldGonder');
+        sonOdak = document.activeElement;
+        gonderAltYaz();
+        gonderCiz();
+        k.hidden = false;
+        document.body.classList.add('kld-kilit');
+        void k.offsetWidth; // geçiş için
+        k.classList.add('acik');
+        var kapat = k.querySelector('.kld-kapat');
+        if (kapat) kapat.focus({ preventScroll: true });
+        if (gonder.hesaplar == null) {
+            var c = await istek('/api/rapor/durum');
+            var liste = c.kod === 200 && c.j && Array.isArray(c.j.hesaplar) ? c.j.hesaplar : null;
+            if (liste) {
+                gonder.hesaplar = liste.filter(function (h) { return h.durum !== 'engelli'; })
+                    .map(function (h) { return h.ad || (h.kullaniciAdi ? '@' + h.kullaniciAdi : 'Telegram'); });
+            }
+            gonderAltYaz();
+            gonderCiz();
+        }
+    }
+
+    function gonderKapat() {
+        var k = el('kldGonder');
+        if (k.hidden) return;
+        k.classList.remove('acik');
+        if (el('kldDetay').hidden) document.body.classList.remove('kld-kilit');
+        setTimeout(function () { k.hidden = true; }, 220);
+        if (sonOdak && sonOdak.focus) sonOdak.focus({ preventScroll: true });
+    }
+
+    async function gonderGonder() {
+        if (gonder.gonderiyor) return;
+        if (gonder.hesaplar && !gonder.hesaplar.length) { gonderKapat(); telegramBagla(); return; }
+        var a = aralikHesapla(d.aralik);
+        var dugme = el('kldGonderBtn');
+        gonder.gonderiyor = true;
         mesgul(dugme, true, 'Gönderiliyor');
         var c = await istek('/api/kaldirma/rapor', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ bas: a.bas, son: a.son })
+            body: JSON.stringify({ bas: a.bas, son: a.son, secim: Object.assign({}, gonder.secim, { sebepler: gonder.sebepler }) })
         });
+        gonder.gonderiyor = false;
         mesgul(dugme, false);
-        if (c.kod === 200 && c.j.ok) { bildir('Rapor Telegram\'a gönderildi.', 'basari'); return; }
-        if (c.j && c.j.error === 'baglanti_yok') { telegramBagla(); return; }
+        gonderCiz();
+        if (c.kod === 200 && c.j.ok) {
+            gonderKapat();
+            bildir((c.j.kart || 1) + ' kart Telegram\'a gönderildi.', 'basari');
+            return;
+        }
+        if (c.j && c.j.error === 'baglanti_yok') { gonderKapat(); telegramBagla(); return; }
+        if (c.j && c.j.error === 'bos') { bildir('Seçime uyan kayıt yok.', 'bilgi'); return; }
         bildir(hataMetni(c), 'hata');
+    }
+
+    function gonderAyarYaz() {
+        try { localStorage.setItem(GONDER_AYAR, JSON.stringify({ secim: gonder.secim })); } catch (e) { /* sessiz */ }
     }
 
     async function telegramBagla() {
@@ -820,9 +965,34 @@
         el('kldDetay').addEventListener('click', function (e) {
             if (e.target.closest('[data-kapat]')) detayKapat();
         });
+        el('kldGonder').addEventListener('click', function (e) {
+            if (e.target.closest('[data-kapat]')) { gonderKapat(); return; }
+            var cip = e.target.closest('[data-sebep-sec]');
+            if (cip) {
+                var ad = cip.getAttribute('data-sebep-sec');
+                var hepsi = [];
+                d.kayitlar.forEach(function (k) { var s = k.sebep || 'Sebep yok'; if (hepsi.indexOf(s) === -1) hepsi.push(s); });
+                var secili = gonder.sebepler ? gonder.sebepler.slice() : hepsi.slice();
+                var i = secili.indexOf(ad);
+                if (i === -1) secili.push(ad); else secili.splice(i, 1);
+                gonder.sebepler = secili.length === hepsi.length ? null : secili;
+                gonderCiz();
+                return;
+            }
+            if (e.target.closest('#kldGonderTumu')) { gonder.sebepler = null; gonderCiz(); return; }
+            if (e.target.closest('#kldGonderBtn')) gonderGonder();
+        });
+        el('kldGonder').addEventListener('change', function (e) {
+            var k = e.target.getAttribute && e.target.getAttribute('data-secim');
+            if (!k) return;
+            gonder.secim[k] = e.target.checked;
+            gonderAyarYaz();
+            gonderCiz();
+        });
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Escape') return;
             if (global.JBUrunFoto && global.JBUrunFoto.acikMi()) return;
+            if (!el('kldGonder').hidden) { gonderKapat(); return; }
             detayKapat();
         });
         el('kldIndir').addEventListener('click', gorselIndir);

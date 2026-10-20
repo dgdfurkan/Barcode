@@ -27,7 +27,10 @@
 
 const telegram = require('../sayim-raporu/telegram');
 const gorsel = require('../sayim-raporu/gorsel');
-const { kartUret, DURUMLAR, SONUC_TIPLERI } = require('./kart');
+const { kartUret, DURUMLAR, SONUC_TIPLERI, araclar } = require('./kart');
+// Kayıt kartları ve albüm gönderimi gece raporuyla ortak
+const geceKart = require('../gece-raporu/kart');
+const { hasarFotosu, albumGonder } = require('../gece-raporu/paylas');
 
 const BILINEN = new Set(Object.keys(DURUMLAR).map(Number));
 const BILDIRILEN = new Set([700]);
@@ -317,7 +320,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         return { b: new Date(b).toISOString(), s: new Date(s).toISOString(), bas, son };
     }
 
-    async function kayitlarOku(username, a) {
+    async function kayitlarOku(username, a, tam) {
         const r = await pool.query(
             `SELECT kayit_id, olusturma, guncelleme, durum, sonuc_tipi, sebep, adet, veri
              FROM kaldirma.kayitlar
@@ -334,9 +337,88 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             sebep: x.sebep || '',
             adet: Number(x.adet) || 0,
             ...x.veri,
-            fotolar: undefined,
+            // Liste hafif kalsın: süreli linkler yalnız rapor için (tam)
+            fotolar: tam ? (Array.isArray(x.veri && x.veri.fotolar) ? x.veri.fotolar : []) : undefined,
             foto: Array.isArray(x.veri && x.veri.fotolar) ? x.veri.fotolar.length : 0,
         }));
+    }
+
+    // -----------------------------------------------------------------
+    // Seçimli Telegram raporu (sayfadaki "Telegram'a Gönder" paneli)
+    // -----------------------------------------------------------------
+
+    const RED = new Set([160, 700]);
+    const TAMAM = new Set([210, 350, 500, 600]);
+
+    /** Gövdedeki seçim; yoksa eski davranış (yalnız özet kartı) */
+    function secimOku(v) {
+        if (!v || typeof v !== 'object') return { ozet: true, red: false, bekleyen: false, tamam: false, foto: false, sebepler: null };
+        const b = (x, varsayilan) => (typeof x === 'boolean' ? x : varsayilan);
+        return {
+            ozet: b(v.ozet, true), red: b(v.red, true), bekleyen: b(v.bekleyen, true), tamam: b(v.tamam, false), foto: b(v.foto, false),
+            sebepler: Array.isArray(v.sebepler) ? v.sebepler.slice(0, 40).map((x) => metin(x, 200)) : null,
+        };
+    }
+
+    async function seciliRapor(username, a, secim) {
+        const tum = (await kayitlarOku(username, a, true))
+            .filter((k) => !secim.sebepler || secim.sebepler.includes(k.sebep || 'Sebep yok'));
+        // Yeniden girilen iptal: depo kendisi düzeltmiş (sayfadaki kuralın aynısı)
+        const urunAnahtar = (k) => (k.urun && (k.urun.id || k.urun.ad)) || k.id;
+        tum.forEach((k) => {
+            k._yeniden = k.durum === 700 && tum.some((x) => x !== k && x.durum !== 700 && urunAnahtar(x) === urunAnahtar(k) &&
+                Date.parse(x.olusturma) > Date.parse(k.olusturma) && Date.parse(x.olusturma) - Date.parse(k.olusturma) < 7 * GUN_MS);
+        });
+        const satir = (k, ek) => ({
+            urun: { id: k.urun && k.urun.id, ad: k.urun && k.urun.ad, gorsel: k.urun && k.urun.gorsel },
+            adet: Number(k.adet) || 0, sebep: k.sebep || '', altNeden: k.altNeden || '', red: k.red || null,
+            durum: k.durum, zaman: k.olusturma, fotoAdres: secim.foto ? (k.fotolar || []).slice(0, 3) : [], ...ek,
+        });
+        const gruplar = {
+            red: secim.red ? tum.filter((k) => RED.has(k.durum)).map((k) => satir(k, { yeniden: k._yeniden })) : [],
+            bekleyen: secim.bekleyen ? tum.filter((k) => !RED.has(k.durum) && !TAMAM.has(k.durum)).map((k) => satir(k, { bekliyor: true })) : [],
+            tamam: secim.tamam ? tum.filter((k) => TAMAM.has(k.durum)).map((k) => satir(k, { tamam: true })) : [],
+        };
+        // Reddedilenlerde gerçek redler önce; her grupta en fazla 40 kayıt
+        gruplar.red.sort((x, y) => (x.yeniden - y.yeniden) || (Date.parse(y.zaman) - Date.parse(x.zaman)));
+        Object.keys(gruplar).forEach((g) => { gruplar[g] = gruplar[g].slice(0, 40); });
+        const listeVar = gruplar.red.length + gruplar.bekleyen.length + gruplar.tamam.length > 0;
+
+        // Özet kartı seçilen gruplardaki kayıtlarla; grup seçilmediyse aralığın tamamı
+        const grupSecili = secim.red || secim.bekleyen || secim.tamam;
+        const ozetKayit = grupSecili
+            ? tum.filter((k) => (secim.red && RED.has(k.durum)) || (secim.tamam && TAMAM.has(k.durum)) || (secim.bekleyen && !RED.has(k.durum) && !TAMAM.has(k.durum)))
+            : tum;
+
+        const urunler = [];
+        const gorulen = new Set();
+        ozetKayit.concat(...Object.values(gruplar)).forEach((k) => {
+            const u = k.urun || {};
+            if (u.id && u.gorsel && !gorulen.has(u.id)) { gorulen.add(u.id); urunler.push({ id: u.id, gorsel: u.gorsel }); }
+        });
+        const gorseller = urunler.length ? await gorsel.topluGetir(urunler.slice(0, 80), 25000) : new Map();
+
+        if (secim.foto) {
+            const bitis = Date.now() + 25000;
+            let sayi = 0;
+            for (const k of [...gruplar.red, ...gruplar.bekleyen, ...gruplar.tamam]) {
+                k.fotolar = [];
+                for (const adres of k.fotoAdres) {
+                    if (sayi >= 30 || Date.now() > bitis) break;
+                    const f = await hasarFotosu(adres);
+                    if (f) { k.fotolar.push(f); sayi++; }
+                }
+            }
+        }
+
+        const kartlar = [];
+        if (secim.ozet && ozetKayit.length) kartlar.push(kartUret(ozetKayit, a, gorseller));
+        if (listeVar) {
+            kartlar.push(...geceKart.kaldirmaKartlari(gruplar.red, gorseller, a.son, gruplar.bekleyen, {
+                tamam: gruplar.tamam, etiket: araclar.tarihEtiketi(a), altBaslik: 'Seçilen kayıtlar',
+            }));
+        }
+        return { kartlar, gruplar, ozetSayi: ozetKayit.length };
     }
 
     app.get('/api/kaldirma/liste', uye, async (req, res) => {
@@ -405,37 +487,21 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         const hedefler = await alicilar(req.auth.username);
         if (!hedefler.length) return res.status(409).json({ ok: false, error: 'baglanti_yok' });
         if (!raporSiniri(req.auth.username, res)) return;
+        const secim = secimOku(req.body && req.body.secim);
         try {
-            const { png, kayitlar } = await kartHazirla(req.auth.username, a);
-            const adetToplam = kayitlar.reduce((t, k) => t + (Number(k.adet) || 0), 0);
-            const baslik = 'Satıştan Kaldırma · ' + (a.bas === a.son ? a.bas.split('-').reverse().join('.') :
-                a.bas.split('-').reverse().join('.') + ' - ' + a.son.split('-').reverse().join('.')) +
-                '\n' + kayitlar.length + ' kayıt · ' + (Number.isInteger(adetToplam) ? adetToplam : adetToplam.toFixed(2)) + ' adet';
-            let giden = 0;
-            let fotoId = '';
-            for (const h of hedefler) {
-                try {
-                    if (fotoId) {
-                        await telegram.cagir('sendPhoto', { chat_id: h.chat_id, photo: fotoId, caption: baslik });
-                    } else {
-                        const form = new FormData();
-                        form.append('chat_id', String(h.chat_id));
-                        form.append('caption', baslik);
-                        form.append('photo', new Blob([png], { type: 'image/png' }), 'satistan-kaldirma.png');
-                        const s = await telegram.cagir('sendPhoto', form, 60000);
-                        const foto = Array.isArray(s && s.photo) ? s.photo[s.photo.length - 1] : null;
-                        if (foto && foto.file_id) fotoId = foto.file_id;
-                    }
-                    giden++;
-                } catch (e) {
-                    console.warn('kaldirma rapor:', telegram.temizle(e && e.message));
-                    if (e instanceof telegram.TelegramHatasi && e.kod === 403) {
-                        await pool.query(`UPDATE rapor.telegram_baglantilari SET durum = 'engelli' WHERE id = $1`, [h.id]).catch(() => {});
-                    }
-                }
-            }
-            if (!giden) return res.status(502).json({ ok: false, error: 'gonderilemedi' });
-            res.json({ ok: true, giden });
+            const r = await seciliRapor(req.auth.username, a, secim);
+            if (!r.kartlar.length) return res.status(400).json({ ok: false, error: 'bos' });
+            const tarih = a.bas === a.son ? a.bas.split('-').reverse().join('.')
+                : a.bas.split('-').reverse().join('.') + ' - ' + a.son.split('-').reverse().join('.');
+            const satirlar = ['Satıştan Kaldırma · ' + tarih];
+            if (r.gruplar.red.length) satirlar.push(r.gruplar.red.length + ' reddedilen / iptal');
+            if (r.gruplar.bekleyen.length) satirlar.push(r.gruplar.bekleyen.length + ' onay bekleyen');
+            if (r.gruplar.tamam.length) satirlar.push(r.gruplar.tamam.length + ' tamamlanan');
+            if (satirlar.length === 1) satirlar.push(r.ozetSayi + ' kayıt');
+            if (r.kartlar.length > 10) satirlar.push('İlk 10 kart gönderildi; aralığı daraltabilirsin.');
+            const s = await albumGonder(pool, hedefler, r.kartlar, satirlar.join('\n'), 'satistan-kaldirma');
+            if (!s.giden) return res.status(502).json({ ok: false, error: 'gonderilemedi' });
+            res.json({ ok: true, giden: s.giden, kart: Math.min(10, r.kartlar.length) });
         } catch (e) {
             const tabloYok = /does not exist/.test(e.message);
             if (!tabloYok) console.error('kaldirma rapor:', e.message);

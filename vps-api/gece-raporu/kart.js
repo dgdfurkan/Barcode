@@ -179,11 +179,11 @@ function kalanYazi(iso) {
 }
 
 /** Satırları sayfalara böler; her sayfa ayrı kart. satir: {tur:'baslik'|'oge', h, ciz(p, y)} */
-function sayfala(satirlar, baslik, altBaslik, gun) {
+function sayfala(satirlar, baslik, altBaslik, gun, etiket) {
     const kartlar = [];
     let p = null;
     let y = 0;
-    const yeni = () => { p = ['']; y = ust(p, baslik, altBaslik, gunAd(gun).split(' ').slice(0, 2).join(' ')); };
+    const yeni = () => { p = ['']; y = ust(p, baslik, altBaslik, etiket || gunAd(gun).split(' ').slice(0, 2).join(' ')); };
     const bitir = () => { const H = y + 104 - 16; p[0] = `<rect width="${G}" height="${H}" fill="${R.zemin}"/>`; kartlar.push({ p, H }); };
     yeni();
     satirlar.forEach((s, i) => {
@@ -210,7 +210,8 @@ const FOTO_BOY = 128;
 /**
  * k: { urun:{id,ad}, adet, sebep, altNeden, red:{baslik,aciklama}, durum, yeniden, bekliyor, zaman, fotolar:[Buffer] }
  */
-function kaldirmaKartlari(red, gorseller, gun, bekleyen = []) {
+function kaldirmaKartlari(red, gorseller, gun, bekleyen = [], secenek = {}) {
+    const tamam = Array.isArray(secenek.tamam) ? secenek.tamam : [];
     const satir = (k) => {
         const fotolu = Array.isArray(k.fotolar) && k.fotolar.length;
         const redli = k.red && (k.red.baslik || k.red.aciklama);
@@ -220,7 +221,7 @@ function kaldirmaKartlari(red, gorseller, gun, bekleyen = []) {
             ciz: (p, y) => {
                 const x = P;
                 const kutuH = h - 16;
-                const sinir = k.bekliyor ? '#fedf89' : k.yeniden ? R.cizgi : '#fda29b';
+                const sinir = k.tamam ? '#abefc6' : k.bekliyor ? '#fedf89' : k.yeniden ? R.cizgi : '#fda29b';
                 p.push(`<rect x="${x}" y="${y}" width="${IC}" height="${kutuH}" rx="22" fill="${R.kart}" stroke="${sinir}"/>`);
                 urunGorseli(p, x + 20, y + 20, 120, gorseller.get(k.urun && k.urun.id));
                 const etiket = '×' + adetYaz(Number(k.adet) || 0);
@@ -230,9 +231,9 @@ function kaldirmaKartlari(red, gorseller, gun, bekleyen = []) {
 
                 const mx = x + 164;
                 const mG = IC - 164 - 24;
-                const durumYazi = k.bekliyor ? 'Bekliyor' : k.yeniden ? 'Yeniden girildi' : k.durum === 700 ? 'İptal edildi' : 'Reddedildi';
-                const renk = k.bekliyor ? R.sari : k.yeniden ? R.sonuk : R.kirmizi;
-                const zemin = k.bekliyor ? R.sariZemin : k.yeniden ? R.zemin : R.kirmiziZemin;
+                const durumYazi = k.tamam ? 'Tamamlandı' : k.bekliyor ? 'Bekliyor' : k.yeniden ? 'Yeniden girildi' : k.durum === 700 ? 'İptal edildi' : 'Reddedildi';
+                const renk = k.tamam ? '#067647' : k.bekliyor ? R.sari : k.yeniden ? R.sonuk : R.kirmizi;
+                const zemin = k.tamam ? R2.yesilZemin : k.bekliyor ? R.sariZemin : k.yeniden ? R.zemin : R.kirmiziZemin;
                 const dG = genislik(OLCU.govdeKalin, durumYazi, 16) + 24;
                 cip(p, x + IC - 20 - dG, y + 20, durumYazi, renk, zemin, 16);
                 const ad = ikiSatir(OLCU.govdeKalin, (k.urun && k.urun.ad) || 'Ürün', 22, mG - dG - 16);
@@ -244,7 +245,7 @@ function kaldirmaKartlari(red, gorseller, gun, bekleyen = []) {
                     p.push(yazi(mx, ly + 4, kirp(OLCU.govdeKalin, k.red.baslik || 'Red sebebi', 19, mG), { boy: 19, agirlik: 600, renk: R.kirmizi }));
                     if (k.red.aciklama) p.push(yazi(mx, ly + 30, kirp(OLCU.govde, k.red.aciklama, 17, mG), { boy: 17, renk: R.orta }));
                 }
-                if (k.zaman) p.push(yazi(x + IC - 20, y + 196 - 18, (k.bekliyor ? 'Oluşturuldu ' : '') + tarihSaat(k.zaman), { boy: 16, renk: R.sonuk, hiza: 'end' }));
+                if (k.zaman) p.push(yazi(x + IC - 20, y + 196 - 18, (k.bekliyor || k.tamam ? 'Oluşturuldu ' : '') + tarihSaat(k.zaman), { boy: 16, renk: R.sonuk, hiza: 'end' }));
                 if (fotolu) {
                     const fy = y + 196;
                     p.push(yazi(x + 20, fy + 4, 'HASAR FOTOĞRAFLARI', { boy: 14, agirlik: 600, renk: R.sonuk, aralik: 1.2 }));
@@ -257,9 +258,10 @@ function kaldirmaKartlari(red, gorseller, gun, bekleyen = []) {
     const baslik = (metin, n) => ({ tur: 'baslik', h: 34, ciz: (p, y) => bolumBasligi(p, y, metin, n) });
     if (red.length) { satirlar.push(baslik('REDDEDİLEN VE İPTAL EDİLEN', red.length)); red.forEach((k) => satirlar.push(satir(k))); }
     if (bekleyen.length) { satirlar.push(baslik('ONAY BEKLEYEN', bekleyen.length)); bekleyen.forEach((k) => satirlar.push(satir(k))); }
-    const altBaslik = bekleyen.length && red.length ? 'Son 24 saatte reddedilenler ve onay bekleyenler'
-        : bekleyen.length ? 'Onay bekleyen kayıtlar' : 'Son 24 saatte reddedilen ya da iptal edilen kayıtlar';
-    return sayfala(satirlar, 'Satıştan Kaldırma', altBaslik, gun);
+    if (tamam.length) { satirlar.push(baslik('TAMAMLANAN', tamam.length)); tamam.forEach((k) => satirlar.push(satir(k))); }
+    const altBaslik = secenek.altBaslik || (bekleyen.length && red.length ? 'Son 24 saatte reddedilenler ve onay bekleyenler'
+        : bekleyen.length ? 'Onay bekleyen kayıtlar' : 'Son 24 saatte reddedilen ya da iptal edilen kayıtlar');
+    return sayfala(satirlar, 'Satıştan Kaldırma', altBaslik, gun, secenek.etiket);
 }
 
 // ---------------------------------------------------------------------

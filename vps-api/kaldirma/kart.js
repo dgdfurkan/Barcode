@@ -264,6 +264,6 @@ function kartUret(kayitlar, a, gorseller) {
 }
 
 /* Gece raporu (vps-api/gece-raporu/kart.js) aynı fontları ve çizim yardımcılarını kullanır */
-const araclar = { kacir, genislik, kirp, ikiSatir, yazi, veriUri, adetYaz, OLCU, LOGO, R, FONT_DOSYALARI };
+const araclar = { kacir, genislik, kirp, ikiSatir, yazi, veriUri, adetYaz, OLCU, LOGO, R, FONT_DOSYALARI, tarihEtiketi };
 
 module.exports = { kartUret, DURUMLAR, SONUC_TIPLERI, araclar };

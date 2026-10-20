@@ -20,7 +20,7 @@
     <link rel="stylesheet" href="../css/motion.css?v=20260907a" />
     <link rel="stylesheet" href="../css/siparisler.css?v=20261014c" />
     <link rel="stylesheet" href="../css/urun-foto.css?v=20261018a" />
-    <link rel="stylesheet" href="../css/kaldirma.css?v=20261018d" />
+    <link rel="stylesheet" href="../css/kaldirma.css?v=20261021a" />
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20261014a"></script>
@@ -163,7 +163,45 @@
         </div>
     </div>
 
+    <!-- Telegram'a gönder: ne gideceği burada seçilir -->
+    <div class="kld-katman" id="kldGonder" hidden>
+        <div class="kld-katman__perde" data-kapat></div>
+        <div class="kld-panel kld-gonder" role="dialog" aria-modal="true" aria-labelledby="kldGonderBaslik">
+            <div class="kld-panel__ust">
+                <span class="kld-gonder__ikon" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="m17 3.5-14 5.4 5 1.8L10 16l7-12.5z"/><path d="m8 10.7 4.2-3.1"/></svg></span>
+                <div class="kld-panel__metin">
+                    <h3 id="kldGonderBaslik">Telegram'a Gönder</h3>
+                    <p id="kldGonderAlt"></p>
+                </div>
+                <button type="button" class="kld-kapat" data-kapat aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
+            </div>
+            <div class="kld-panel__govde">
+                <section class="kld-gonder__bolum" aria-labelledby="kldGonderNe">
+                    <h4 id="kldGonderNe">Neler Gitsin</h4>
+                    <div class="kld-secimler" id="kldGonderSecim"></div>
+                </section>
+                <section class="kld-gonder__bolum" aria-labelledby="kldGonderSebep">
+                    <div class="kld-gonder__bas">
+                        <h4 id="kldGonderSebep">Sebepler</h4>
+                        <button type="button" class="kld-gonder__tumu" id="kldGonderTumu">Tümünü Seç</button>
+                    </div>
+                    <div class="kld-gonder__cipler" id="kldGonderCipler"></div>
+                </section>
+            </div>
+            <div class="kld-gonder__alt">
+                <p class="kld-gonder__ozet" id="kldGonderOzet" aria-live="polite"></p>
+                <div class="kld-gonder__dugmeler">
+                    <button type="button" class="kld-arac" data-kapat>Vazgeç</button>
+                    <button type="button" class="kld-arac kld-arac--ana" id="kldGonderBtn">
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m17 3.5-14 5.4 5 1.8L10 16l7-12.5z"/><path d="m8 10.7 4.2-3.1"/></svg>
+                        <span>Gönder</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="../js/urun-foto.js?v=20261018a"></script>
-    <script src="../js/kaldirma.js?v=20261018e"></script>
+    <script src="../js/kaldirma.js?v=20261021a"></script>
 </body>
 </html>
