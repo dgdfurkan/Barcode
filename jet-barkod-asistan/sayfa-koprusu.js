@@ -1132,6 +1132,60 @@
         return gunlukSuruyor;
     }
 
+    /* Gece uyarısı: günün otomatik sayımı panelde ne durumda. Yalnız sayım
+       listesi isteği (detay yok); kalan = toplam görev − tamamlanan.
+       5 dk içinde ikinci istek atılmaz. */
+    var GUNLUK_OZET_ARA_MS = 5 * 60 * 1000;
+    var gunlukOzetSon = {};
+    var gunlukOzetSuruyor = {};
+
+    function gunlukOzetOku(gun, zorla) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(gun || ''))) return Promise.resolve({ ok: false, sebep: 'gün' });
+        if (gunlukOzetSuruyor[gun]) return gunlukOzetSuruyor[gun];
+        var son = gunlukOzetSon[gun];
+        if (son && Date.now() - son.zaman < (zorla ? 30 * 1000 : GUNLUK_OZET_ARA_MS)) return Promise.resolve(son.sonuc);
+        var depo = depoKimligi();
+        if (!depo) return Promise.resolve({ ok: false, sebep: 'depo' });
+        if (!jetonVarMi() || !asilFetch) return Promise.resolve({ ok: false, sebep: 'oturum' });
+        var basliklar = {};
+        Object.keys(panelBasliklari).forEach(function (k) { basliklar[k] = panelBasliklari[k]; });
+        basliklar['content-type'] = 'application/json';
+        var aralik = {
+            startDate: new Date(gun + 'T00:00:00.000+03:00').toISOString(),
+            endDate: new Date(gun + 'T23:59:59.999+03:00').toISOString()
+        };
+        gunlukOzetSuruyor[gun] = asilFetch(TEMEL + '/gstore-inventory-checks/filter?offset=0&limit=20', {
+            method: 'POST', headers: basliklar, credentials: 'include',
+            body: JSON.stringify({ warehouseIds: [depo], populate: ['warehouses'], createdAt: aralik })
+        }).then(function (r) {
+            if (r.status === 401 || r.status === 403) throw new Error('oturum');
+            if (!r.ok) throw new Error('http ' + r.status);
+            return r.json();
+        }).then(function (j) {
+            var d = j && j.data;
+            var liste = d && Array.isArray(d.data) ? d.data : [];
+            var bas = Date.parse(aralik.startDate);
+            var bit = Date.parse(aralik.endDate);
+            var s = liste.filter(function (x) {
+                var t = Date.parse(x && x.createdAt);
+                return x && x.isAutoInventoryCheck === true && t >= bas && t <= bit;
+            }).sort(function (a, b) { return Date.parse(b.createdAt) - Date.parse(a.createdAt); })[0];
+            if (!s) return { ok: true, yok: true, gun: gun };
+            var toplam = Math.max(0, Number(s.totalTaskCount) || 0);
+            var tamam = Math.max(0, Math.min(toplam, Number(s.completedTaskCount) || 0));
+            var bitti = Number(s.status) === 600 || (toplam > 0 && tamam >= toplam);
+            return { ok: true, gun: gun, toplam: toplam, tamam: tamam, kalan: bitti ? 0 : toplam - tamam, bitti: bitti };
+        }).catch(function (e) {
+            var m = String(e && e.message || e);
+            return { ok: false, sebep: m === 'oturum' ? 'oturum' : (/^http/.test(m) ? m : 'ağ'), gun: gun };
+        }).then(function (sonuc) {
+            delete gunlukOzetSuruyor[gun];
+            gunlukOzetSon[gun] = { zaman: Date.now(), sonuc: sonuc };
+            return sonuc;
+        });
+        return gunlukOzetSuruyor[gun];
+    }
+
     setInterval(siparisleriDuyur, 2000);
     setTimeout(siparisleriDuyur, 3000);
 
@@ -1162,6 +1216,13 @@
                     var l = v && Array.isArray(v.damagedPicUrls) ? v.damagedPicUrls.filter(function (u) { return typeof u === 'string' && /^https:\/\//.test(u); }).slice(0, 4) : null;
                     gonder({ type: 'JB_KALDIRMA_FOTO', no: fno, adresler: l });
                 }, function () { gonder({ type: 'JB_KALDIRMA_FOTO', no: fno, adresler: null }); });
+            return;
+        }
+        if (d && d.type === 'JB_GUNLUK_OZET_SOR') {
+            var ono = d.no;
+            gunlukOzetOku(String(d.gun || ''), d.zorla === true).then(function (sonuc) {
+                gonder({ type: 'JB_GUNLUK_OZET', no: ono, sonuc: sonuc });
+            });
             return;
         }
         if (d && d.type === 'JB_GUNLUK_SOR') {

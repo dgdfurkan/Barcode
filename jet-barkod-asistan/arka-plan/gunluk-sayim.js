@@ -15,8 +15,10 @@
  *   Hafta sonu sayım yoksa sessiz geçer.
  *
  * GECE (00:00-00:59)
- *   Dünkü tabloda sayılmamış ürün sayısı Jet Barkod'dan sorulur (Getir'e istek
- *   yok); kontrol panelindeki kart (moduller/gunluk-sayim.js) bunu gösterir.
+ *   Dünkü otomatik sayımın depo panelindeki durumu okunur (sayım listesi
+ *   isteği, açık panel sekmesinden, 5 dakikada bir): kalan = toplam görev −
+ *   tamamlanan. Ölçü Jet Barkod'daki tablo değil, paneldeki sayımdır.
+ *   Kontrol panelindeki kart (moduller/gunluk-sayim.js) bunu gösterir.
  *
  * Getir'e giden yük: günde bir sayım listesi + bir sayım detayı (gerekirse
  * görev listesi). Liste bulununca o gün bir daha istek atılmaz.
@@ -32,7 +34,8 @@ const GS_TEKRAR_MS = 20 * 60 * 1000;
 const GS_GEC_TEKRAR_MS = 60 * 60 * 1000;
 const GS_SITE = 'https://jetbarkod.com.tr/sayim/?gunluk=';
 const GS_GUN = /^\d{4}-\d{2}-\d{2}$/;
-const GS_GECE_ARA_MS = 4 * 60 * 1000;
+const GS_GECE_ARA_MS = 5 * 60 * 1000;
+const GS_GECE_ESKI_MS = 15 * 60 * 1000;
 const GS_KIMLIK = /^[0-9a-f]{24}$/;
 
 let gsCalisiyor = false;
@@ -265,9 +268,22 @@ async function gsGeceDurumu(zorla) {
     const v = r && r[GS_GECE];
     if (!zorla && v && v.gun === hedef && Date.now() - (v.zaman || 0) < GS_GECE_ARA_MS) return v;
   } catch (e) { /* yok */ }
-  const c = await gsApi('/durum?gun=' + hedef);
-  if (c.kod !== 200 || !c.j.ok) return null;
-  const v = { gun: hedef, kalan: Number(c.j.kalan) || 0, toplam: Number(c.j.toplam) || 0, var: !!c.j.var, zaman: Date.now() };
+  let onceki = null;
+  try { onceki = (await chrome.storage.local.get(GS_GECE))[GS_GECE] || null; } catch (e) { onceki = null; }
+  // Depo panelinin sayım listesi (sayfa köprüsü, panelin kendi başlıklarıyla)
+  const tab = await gsPanelSekmesi();
+  let c = null;
+  if (tab) {
+    try { c = await chrome.tabs.sendMessage(tab.id, { type: 'JBA_GUNLUK_OZET', gun: hedef, zorla: !!zorla }); } catch (e) { c = null; }
+  }
+  if (!c || !c.ok) {
+    // Okunamadı (panel kapalı, sekme eski Asistan'la açık): yakın zamanlı bilinen durum, yoksa uyarı yok
+    if (onceki && onceki.gun === hedef && Date.now() - (onceki.zaman || 0) < GS_GECE_ESKI_MS) return onceki;
+    return null;
+  }
+  const v = c.yok
+    ? { gun: hedef, kalan: 0, toplam: 0, var: false, zaman: Date.now(), kaynak: 'panel' }
+    : { gun: hedef, kalan: Number(c.kalan) || 0, toplam: Number(c.toplam) || 0, tamam: Number(c.tamam) || 0, var: true, zaman: Date.now(), kaynak: 'panel' };
   try { await chrome.storage.local.set({ [GS_GECE]: v }); } catch (e) { /* sessiz */ }
   return v;
 }

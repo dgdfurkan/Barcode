@@ -8,7 +8,8 @@
  *                      yeni sekmede açar. Günde bir kez; basılınca ya da
  *                      çarpıyla bir daha gelmez, basılmazsa 10 dakikada
  *                      kaybolur. Liste 08:00'den sonra eklendiyse o an gelir.
- *   GECE 00:00-00:59   Dünkü günlük sayımda sayılmamış ürün varsa uyarı.
+ *   GECE 00:00-00:59   Dünkü otomatik sayım depo panelinde bitmediyse uyarı;
+ *                      kalan ürün panelin sayım listesinden (toplam − yapılan).
  *                      Çarpı 10 dakika gizler. Sayım bitince ya da 01:00'de
  *                      kaybolur.
  * Simülasyon (Asistan penceresi): gerçeğin aynısı, 20 sn, çarpı kapatır.
@@ -283,6 +284,41 @@
             window.postMessage({ type: 'JB_GUNLUK_SOR', no: no, gun: gun }, location.origin);
         });
     }
+
+    /* Gece uyarısı için günün otomatik sayımının paneldeki durumu */
+    function ozetOku(gun, zorla) {
+        return new Promise(function (coz) {
+            var no = 'o' + Date.now() + '-' + (++soruNo);
+            var bitti = false;
+            function dinle(e) {
+                if (e.source !== window || e.origin !== location.origin) return;
+                var d = e.data;
+                if (!d || d.type !== 'JB_GUNLUK_OZET' || d.no !== no) return;
+                bitir(d.sonuc || { ok: false });
+            }
+            function bitir(v) {
+                if (bitti) return;
+                bitti = true;
+                window.removeEventListener('message', dinle);
+                coz(v);
+            }
+            window.addEventListener('message', dinle);
+            setTimeout(function () { bitir({ ok: false, sebep: 'zaman aşımı' }); }, 15000);
+            window.postMessage({ type: 'JB_GUNLUK_OZET_SOR', no: no, gun: gun, zorla: !!zorla }, location.origin);
+        });
+    }
+
+    try {
+        chrome.runtime.onMessage.addListener(function (m, gonderen, cevapla) {
+            if (!m || m.type !== 'JBA_GUNLUK_OZET') return false;
+            if (!/^\/r\/[a-f0-9]{24}\//.test(location.pathname) || !/^\d{4}-\d{2}-\d{2}$/.test(String(m.gun || ''))) {
+                cevapla({ ok: false, sebep: 'sayfa' });
+                return false;
+            }
+            ozetOku(String(m.gun), m.zorla === true).then(cevapla);
+            return true;
+        });
+    } catch (e) { /* yetim bağlam */ }
 
     try {
         chrome.runtime.onMessage.addListener(function (m, gonderen, cevapla) {
