@@ -67,13 +67,26 @@
         });
     }
 
+    /**
+     * O günün tablosunu bu sayfada görünür yapar.
+     *  - Sunucuda satırlar varsa (Asistan eklerken sunucu kurdu ama bu sayfa
+     *    eski veriyle açık ya da tablo metası başka cihazca ezildi) tablo
+     *    yeniden YAZILMAZ: boş tablo açılıp satırlar sunucudan okunur. Başka
+     *    cihazda sayılmış adetler böylece korunur.
+     *  - Sunucuda satır yoksa sayfanın kendi içe aktarma yoluyla kurulur.
+     *  - Kullanıcı tabloyu liste eklendikten SONRA sildiyse kurulmaz; karttan
+     *    (?gunluk=) gelindiyse kullanıcı açıkça istiyor, kurulur.
+     */
     async function kur(cs, gun, acikKalsin) {
         if (biten[gun]) return 'var';
         if (cs.hasDailyTableForIso(gun)) { biten[gun] = true; return 'var'; }
         var c = await api('?gun=' + gun);
         var k = c && c.ok && c.kayit;
         if (!k || !Array.isArray(k.urunler) || !k.urunler.length) return 'yok';
-        if (k.uygulandi) { biten[gun] = true; return 'var'; }
+        var ad = cs.DAILY_TABLE_PREFIX + gun;
+        var silinme = Math.max(Number(cs._silinenler && cs._silinenler[ad]) || 0, Number(k.silinme) || 0);
+        var eklendi = Date.parse(k.eklendi) || 0;
+        if (silinme && silinme > eklendi && !acikKalsin) { biten[gun] = true; return 'silinmis'; }
         var kilit = await api('/al', { gun: gun, cihaz: cs.deviceId || null });
         if (!kilit || !kilit.alindi) return 'baskasi';
         // Kilidi aldık; o arada başka cihaz eşitlediyse tablo yine var olabilir
@@ -82,20 +95,39 @@
             biten[gun] = true;
             return 'var';
         }
+        var urunler = (Array.isArray(kilit.urunler) && kilit.urunler.length ? kilit.urunler : k.urunler)
+            .filter(function (u) { return u && /^[a-f0-9]{24}$/.test(String(u.id || '')); });
         var onceki = cs.currentTableName;
         var sonuc = { added: 0, skipped: 0 };
+        var sunucudaVar = Number(k.satir) > 0;
         try {
             await cs.ensureDailyTableForDate(gun, { forImport: true });
-            sonuc = await cs.applyImportedRows(kilit.urunler.map(function (u) {
-                return { productId: u.id, name: u.ad };
-            })) || sonuc;
+            if (sunucudaVar) {
+                // Sıra Asistan listesinin sırası; satırlar sunucudan
+                var sira = urunler.map(function (u) { return u.id; });
+                var slot = cs.cachedFullData && cs.cachedFullData._tables && cs.cachedFullData._tables[ad];
+                if (slot) slot._productOrder = sira.slice();
+                if (cs.currentTableName === ad && cs.countingData) cs.countingData._productOrder = sira.slice();
+                await cs.refreshCurrentTableFromDb();
+                if (typeof cs._scheduleMetaSave === 'function') cs._scheduleMetaSave(250);
+                if (cs.currentTableName === ad) {
+                    if (typeof cs.renderTable === 'function') cs.renderTable();
+                    if (typeof cs.updateStatistics === 'function') cs.updateStatistics();
+                }
+                sonuc.added = Number(k.satir) || 0;
+            } else {
+                sonuc = await cs.applyImportedRows(urunler.map(function (u) {
+                    return { productId: u.id, name: u.ad };
+                })) || sonuc;
+            }
         } finally {
             // Kullanıcı başka tablodaysa oraya dön
             if (!acikKalsin && onceki && onceki !== cs.currentTableName && !cs.isDailyTableName(onceki)) {
                 try { await cs.switchTable(onceki); } catch (e) { /* tablo silinmiş olabilir */ }
             }
         }
-        await api('/tamam', { gun: gun, eklenen: sonuc.added || 0, atlanan: sonuc.skipped || 0 });
+        if (!sunucudaVar) await api('/tamam', { gun: gun, eklenen: sonuc.added || 0, atlanan: sonuc.skipped || 0 });
+        else await api('/tamam', { gun: gun, eklenen: sonuc.added || 0, atlanan: 0 });
         biten[gun] = true;
         if (cs.showToast) cs.showToast('Günlük sayım eklendi · ' + (sonuc.added || 0) + ' ürün' + (sonuc.skipped ? ' · ' + sonuc.skipped + ' ürün katalogda yok' : ''), 'success', 5000);
         return 'kuruldu';

@@ -97,25 +97,34 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             ad: metin(u && u.ad, 200),
         })).filter((u) => KIMLIK.test(u.id) && !gorulen.has(u.id) && gorulen.add(u.id));
         if (!urunler.length) return res.status(400).json({ ok: false, error: 'urun_yok' });
+        // "Şimdi Ekle": kullanıcı istedi; o gün tablo silinmiş olsa da yeniden kurulur
+        const elle = b.elle === true;
         try {
-            // Aynı sayım yeniden gelirse kurulum bilgisi korunur; başka bir sayım gelirse sıfırlanır
+            // Aynı sayım yeniden gelirse kurulum bilgisi korunur; başka bir sayım ya da
+            // elle ekleme gelirse eklenme zamanı yenilenir (silinmiş tablo yeniden kurulur)
             await pool.query(
                 `INSERT INTO gunluk.sayimlar (username, gun, sayim_id, urunler) VALUES ($1, $2, $3, $4::jsonb)
                  ON CONFLICT (username, gun) DO UPDATE SET
                     urunler = EXCLUDED.urunler,
-                    eklendi_at = CASE WHEN gunluk.sayimlar.sayim_id = EXCLUDED.sayim_id THEN gunluk.sayimlar.eklendi_at ELSE now() END,
+                    eklendi_at = CASE WHEN gunluk.sayimlar.sayim_id = EXCLUDED.sayim_id AND NOT $5::boolean THEN gunluk.sayimlar.eklendi_at ELSE now() END,
                     alindi_at = CASE WHEN gunluk.sayimlar.sayim_id = EXCLUDED.sayim_id THEN gunluk.sayimlar.alindi_at ELSE NULL END,
                     alan_cihaz = CASE WHEN gunluk.sayimlar.sayim_id = EXCLUDED.sayim_id THEN gunluk.sayimlar.alan_cihaz ELSE NULL END,
                     uygulandi_at = CASE WHEN gunluk.sayimlar.sayim_id = EXCLUDED.sayim_id THEN gunluk.sayimlar.uygulandi_at ELSE NULL END,
                     sayim_id = EXCLUDED.sayim_id`,
-                [req.auth.username, gun, sayimId, JSON.stringify(urunler)]
+                [req.auth.username, gun, sayimId, JSON.stringify(urunler), elle]
             );
             const kurulum = await tabloKur(req.auth.username, gun, urunler);
             res.json({ ok: true, adet: urunler.length, tablo: kurulum });
         } catch (e) { hata(res, e, 'yaz'); }
     });
 
-    /** `Günlük|<gün>` tablosunu doğrudan kurar. Dönüş: 'kuruldu' | 'vardi' | 'silinmis' */
+    /**
+     * `Günlük|<gün>` tablosunu doğrudan kurar. Dönüş: 'kuruldu' | 'vardi' | 'silinmis' | 'hata'
+     * Karar counting_items'taki gerçek satırlara göre verilir; "uygulandı" işareti
+     * tek başına yetmez (tablo sonradan silinmiş olabilir). Kullanıcı tabloyu
+     * listenin eklenmesinden SONRA sildiyse kurulmaz; elle eklemede eklenme
+     * zamanı yenilendiği için kurulur.
+     */
     async function tabloKur(username, gun, urunler) {
         const ad = 'Günlük|' + gun;
         const istemci = await pool.connect();
@@ -123,19 +132,21 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             await istemci.query('BEGIN');
             // Aynı kullanıcı için eşzamanlı ikinci kurulum beklesin
             const k = await istemci.query(
-                `SELECT uygulandi_at FROM gunluk.sayimlar WHERE username = $1 AND gun = $2 FOR UPDATE`,
+                `SELECT (extract(epoch FROM eklendi_at) * 1000)::bigint AS eklendi FROM gunluk.sayimlar
+                  WHERE username = $1 AND gun = $2 FOR UPDATE`,
                 [username, gun]
             );
-            if (k.rows[0] && k.rows[0].uygulandi_at) { await istemci.query('COMMIT'); return 'vardi'; }
+            const eklendi = Number(k.rows[0] && k.rows[0].eklendi) || 0;
             const durum = await istemci.query(
                 `SELECT (SELECT count(*) FROM counting_items WHERE username = $1::text AND table_name = $2::text)::int AS satir,
-                        (counting_data->'_silinenler'->>($2::text)) IS NOT NULL AS silinmis,
+                        CASE WHEN jsonb_typeof(counting_data) = 'object' THEN counting_data->'_silinenler'->>($2::text) END AS silinme,
                         jsonb_typeof(counting_data) AS tur
                    FROM users WHERE username::text = $1::text`,
                 [username, ad]
             );
             const d = durum.rows[0] || {};
-            if (d.silinmis) { await istemci.query('COMMIT'); return 'silinmis'; }
+            const silinme = Number(d.silinme) || 0;
+            if (!(d.satir > 0) && silinme && silinme > eklendi) { await istemci.query('COMMIT'); return 'silinmis'; }
             if (d.satir > 0) {
                 await istemci.query(`UPDATE gunluk.sayimlar SET uygulandi_at = now() WHERE username = $1 AND gun = $2`, [username, gun]);
                 await istemci.query('COMMIT');
@@ -152,10 +163,11 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             );
             if (d.tur === 'object' || d.tur == null) {
                 const meta = { createdAt: simdi, lastActivityAt: simdi, _productOrder: urunler.map((u) => u.id) };
+                // Eski silme kaydı da kalkar; açık sayfalar tabloyu yeni oluşma zamanıyla tanır
                 await istemci.query(
                     `UPDATE users SET counting_data = jsonb_set(
                          jsonb_set(COALESCE(counting_data, '{}'::jsonb), '{_tableMeta}', COALESCE(counting_data->'_tableMeta', '{}'::jsonb), true),
-                         ARRAY['_tableMeta', $2::text], $3::jsonb, true)
+                         ARRAY['_tableMeta', $2::text], $3::jsonb, true) #- ARRAY['_silinenler', $2::text]
                       WHERE username = $1 AND (counting_data IS NULL OR jsonb_typeof(counting_data) = 'object')`,
                     [username, ad, JSON.stringify(meta)]
                 );
@@ -181,15 +193,21 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         const gun = metin(req.query.gun, 10);
         if (!GUN.test(gun)) return res.status(400).json({ ok: false, error: 'gecersiz' });
         try {
+            const ad = 'Günlük|' + gun;
             const r = await pool.query(
-                `SELECT gun::text AS gun, sayim_id, urunler, eklendi_at, uygulandi_at, eklenen, atlanan
-                   FROM gunluk.sayimlar WHERE username = $1 AND gun = $2`,
-                [req.auth.username, gun]
+                `SELECT s.gun::text AS gun, s.sayim_id, s.urunler, s.eklendi_at, s.uygulandi_at, s.eklenen, s.atlanan,
+                        (SELECT count(*) FROM counting_items c WHERE c.username = $1::text AND c.table_name = $3::text)::int AS satir,
+                        (SELECT CASE WHEN jsonb_typeof(u.counting_data) = 'object' THEN u.counting_data->'_silinenler'->>($3::text) END
+                           FROM users u WHERE u.username::text = $1::text) AS silinme
+                   FROM gunluk.sayimlar s WHERE s.username::text = $1::text AND s.gun = $2`,
+                [req.auth.username, gun, ad]
             );
             const k = r.rows[0];
+            // satir: sunucudaki tablo satırı; sayfa tabloyu görmüyorsa yeniden yazmaz, içeri alır
             res.json({ ok: true, kayit: k ? {
                 gun: k.gun, sayimId: k.sayim_id, urunler: k.urunler || [], eklendi: k.eklendi_at,
-                uygulandi: k.uygulandi_at, eklenen: k.eklenen, atlanan: k.atlanan,
+                uygulandi: k.satir > 0 ? k.uygulandi_at : null, eklenen: k.eklenen, atlanan: k.atlanan,
+                satir: k.satir, silinme: Number(k.silinme) || null,
             } : null });
         } catch (e) { hata(res, e, 'oku'); }
     });
@@ -202,7 +220,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         try {
             const r = await pool.query(
                 `UPDATE gunluk.sayimlar SET alindi_at = now(), alan_cihaz = $3
-                  WHERE username = $1 AND gun = $2 AND uygulandi_at IS NULL
+                  WHERE username = $1 AND gun = $2
                     AND (alindi_at IS NULL OR alindi_at < now() - ($4 || ' milliseconds')::interval)
                   RETURNING urunler`,
                 [req.auth.username, gun, cihaz, String(KILIT_MS)]
@@ -233,7 +251,13 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         const u = req.auth.username;
         try {
             const [k, t] = await Promise.all([
-                pool.query('SELECT jsonb_array_length(urunler) AS adet FROM gunluk.sayimlar WHERE username = $1 AND gun = $2', [u, gun]),
+                pool.query(
+                    `SELECT jsonb_array_length(s.urunler) AS adet, (extract(epoch FROM s.eklendi_at) * 1000)::bigint AS eklendi,
+                            (SELECT CASE WHEN jsonb_typeof(x.counting_data) = 'object' THEN x.counting_data->'_silinenler'->>($3::text) END
+                               FROM users x WHERE x.username::text = $1::text) AS silinme
+                       FROM gunluk.sayimlar s WHERE s.username::text = $1::text AND s.gun = $2`,
+                    [u, gun, 'Günlük|' + gun]
+                ),
                 pool.query(
                     `SELECT count(*)::int AS toplam, count(*) FILTER (WHERE warehouse_stock IS NULL)::int AS kalan
                        FROM counting_items WHERE username = $1 AND table_name = $2`,
@@ -243,6 +267,9 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const liste = k.rows[0] ? Number(k.rows[0].adet) || 0 : 0;
             const toplam = t.rows[0].toplam;
             if (toplam) return res.json({ ok: true, var: true, tablo: true, toplam, kalan: t.rows[0].kalan });
+            // Kullanıcı tabloyu liste eklendikten sonra sildiyse uyarı yok
+            const sil = k.rows[0] ? Number(k.rows[0].silinme) || 0 : 0;
+            if (sil && sil > (Number(k.rows[0].eklendi) || 0)) return res.json({ ok: true, var: false, tablo: false, silindi: true, toplam: 0, kalan: 0 });
             // Tablo hiç kurulmadı: liste varsa hepsi kaldı
             res.json({ ok: true, var: liste > 0, tablo: false, toplam: liste, kalan: liste });
         } catch (e) { hata(res, e, 'durum'); }

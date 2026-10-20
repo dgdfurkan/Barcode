@@ -169,10 +169,20 @@ async function gsEkle(sebep) {
       return { ok: true, metin: m };
     }
     const urunler = oku.urunler;
-    const c = await gsApi('', { method: 'POST', govde: { gun, sayimId: oku.sayimId, urunler } });
+    const c = await gsApi('', { method: 'POST', govde: { gun, sayimId: oku.sayimId, urunler, elle: sebep === 'elle' } });
     if (c.kod === 200 && c.j.ok) {
-      await gsDurumYaz({ gun, durum: 'eklendi', adet: urunler.length, metin: urunler.length + ' ürün eklendi.' });
-      return { ok: true, metin: urunler.length + ' ürün eklendi.', adet: urunler.length };
+      // Sunucunun tablo kurulumu: kuruldu | vardi | silinmis | hata (eski sunucu yazmaz)
+      const tablo = c.j.tablo;
+      if (tablo === 'silinmis') {
+        const m = 'Bugünün tablosu silinmiş; yeniden kurmak için Şimdi Ekle\'ye basın.';
+        await gsDurumYaz({ gun, durum: 'silinmis', metin: m });
+        return { ok: false, metin: m };
+      }
+      const m = tablo === 'vardi' ? 'Tablo zaten var · ' + urunler.length + ' ürün.'
+        : tablo === 'hata' ? urunler.length + ' ürün alındı; tablo sayım sayfası açılınca kurulur.'
+        : urunler.length + ' ürün eklendi.';
+      await gsDurumYaz({ gun, durum: 'eklendi', adet: urunler.length, metin: m });
+      return { ok: true, metin: m, adet: urunler.length };
     }
     const m = c.kod === 503 || c.kod === 404 ? 'Sunucu güncellemesi bekleniyor.'
       : c.kod === 401 ? 'Jet Barkod oturumu yok; siteye bir kez girin.' : 'Jet Barkod\'a yazılamadı (' + c.kod + ').';
@@ -273,7 +283,8 @@ async function gsTur() {
   if (ayar.ekle !== false && saat >= 6) {
     let d = null;
     try { d = (await chrome.storage.local.get(GS_DURUM))[GS_DURUM]; } catch (e) { d = null; }
-    const bugunEklendi = d && d.gun === gun && d.durum === 'eklendi';
+    // Kullanıcı bugünün tablosunu sildiyse o gün kendiliğinden yeniden denenmez
+    const bugunEklendi = d && d.gun === gun && (d.durum === 'eklendi' || d.durum === 'silinmis');
     const ara = saat < 8 ? GS_TEKRAR_MS : GS_GEC_TEKRAR_MS;
     const yakinda = d && d.gun === gun && Date.now() - (d.zaman || 0) < ara;
     if (!bugunEklendi && !yakinda) await gsEkle('periyot');
