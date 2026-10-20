@@ -117,7 +117,12 @@ function istanbul(t = Date.now()) {
     return { gun: `${p.year}-${p.month}-${p.day}`, saat: Number(p.hour), dakika: Number(p.minute) };
 }
 
-const semaYok = (e) => e && (e.code === '3F000' || e.code === '42P01' || e.code === '42703');
+function semaYok(e) {
+    const yok = !!(e && (e.code === '3F000' || e.code === '42P01' || e.code === '42703'));
+    // Kurulum eksikliği beklenen bir durum ama sorgu hatası da aynı kodu verebiliyor: günlüğe yaz
+    if (yok) console.warn('gece-raporu sorgu atlandı:', e.code, String(e.message || '').slice(0, 160));
+    return yok;
+}
 
 function kur(app, { pool, verifyToken, bearerOf }) {
     const sayac = new Map();
@@ -240,9 +245,10 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         let b;
         try {
             b = await pool.query(
-                `SELECT urun, sikayet, musteri_notu, son_tarih, (secilen_metin IS NOT NULL) AS taslak, to_jsonb(itiraz.kayitlar)->>'urun_id' AS urun_id
-                   FROM itiraz.kayitlar
-                  WHERE username = $1 AND durum = 100 AND son_tarih > now()
+                `SELECT k.urun, k.sikayet, k.musteri_notu, k.son_tarih, (k.secilen_metin IS NOT NULL) AS taslak,
+                        to_jsonb(k)->>'urun_id' AS urun_id
+                   FROM itiraz.kayitlar k
+                  WHERE k.username = $1 AND k.durum = 100 AND k.son_tarih > now()
                   ORDER BY son_tarih LIMIT 30`,
                 [u]
             );
@@ -250,8 +256,9 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         let s = { rows: [] };
         try {
             s = await pool.query(
-                `SELECT urun, sikayet, durum, itiraz_metni, to_jsonb(itiraz.kayitlar)->>'urun_id' AS urun_id FROM itiraz.kayitlar
-                  WHERE username = $1 AND durum IN (300, 400) AND durum_degisti_at > $2 AND durum_degisti_at <= $3
+                `SELECT k.urun, k.sikayet, k.durum, k.itiraz_metni, to_jsonb(k)->>'urun_id' AS urun_id
+                   FROM itiraz.kayitlar k
+                  WHERE k.username = $1 AND k.durum IN (300, 400) AND k.durum_degisti_at > $2 AND k.durum_degisti_at <= $3
                   ORDER BY durum_degisti_at DESC LIMIT 30`,
                 [u, bas, son]
             );
