@@ -486,10 +486,8 @@
         return Number.isFinite(t) ? new Date(t).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
     }
 
-    /* Hasar fotoğrafları: sunucu Asistan'ın getirdiği taze linkten fotoğrafı bir kez
-       indirip saklıyor (vps-api/kaldirma/foto-depo.js); saklananlar Jet Barkod'un
-       imzalı, 6 saatlik adresiyle gelir, Getir'e hiç gidilmez.
-       Saklanmamış ve panel linki (~15 dk) taze değilse sırayla:
+    /* Hasar fotoğrafları: panelin süreli (~15 dk) imzalı linkleri, doğrudan gösterilir.
+       Link taze değilse sırayla:
          1. Bu cihazdaki Asistan depo panelinden tazesini alır (anında).
          2. Olmazsa (telefon, paneli kapalı cihaz) istek sunucuya bırakılır; depo
             paneli açık bilgisayardaki Asistan 30 sn içinde panelden alıp yazar.
@@ -499,17 +497,6 @@
     var tazeFoto = {};
     var fotoSoruNo = 0;
     var UZAK_BEKLEME_MS = 75000;
-
-    /* Sunucu saklanan fotoğrafı göreli adresle verir (/api/kaldirma/hasar/..) */
-    function tamAdres(u) {
-        if (typeof u !== 'string') return '';
-        if (u.indexOf('/api/') === 0) {
-            var a = global.jetbarkodAuth;
-            var kok = a && typeof a.apiBase === 'function' ? a.apiBase() : '';
-            return kok ? kok + u : '';
-        }
-        return u;
-    }
 
     function linkBitis(u) {
         try { return Number(new URL(u).searchParams.get('Expires')) * 1000 || 0; } catch (e) { return 0; }
@@ -553,7 +540,7 @@
             await bekle(3000);
             if (!el('kldDetay') || el('kldDetay').hidden) return null; // pencere kapandı
             var r = await istek('/api/kaldirma/fotolar/' + id);
-            var l = r.kod === 200 && r.j.ok && Array.isArray(r.j.adresler) ? r.j.adresler.map(tamAdres).filter(Boolean) : [];
+            var l = r.kod === 200 && r.j.ok && Array.isArray(r.j.adresler) ? r.j.adresler : [];
             if (tazeMi(l)) return l;
         }
         return null;
@@ -562,7 +549,7 @@
     async function fotoListesi(id, zorla) {
         if (!zorla && tazeFoto[id] && tazeFoto[id].bitis > Date.now() + 30000) return tazeFoto[id].adresler;
         var c = await istek('/api/kaldirma/fotolar/' + id);
-        var liste = c.kod === 200 && c.j.ok && Array.isArray(c.j.adresler) ? c.j.adresler.map(tamAdres).filter(Boolean) : [];
+        var liste = c.kod === 200 && c.j.ok && Array.isArray(c.j.adresler) ? c.j.adresler : [];
         if (!tazeMi(liste)) liste = (await asistanFoto(id)) || [];
         if (!tazeMi(liste)) liste = (await uzaktanFoto(id)) || [];
         if (tazeMi(liste)) tazeFoto[id] = { adresler: liste, bitis: linkBitis(liste[0]) };

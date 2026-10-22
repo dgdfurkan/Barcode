@@ -1,8 +1,8 @@
 /**
  * Satıştan Kaldırma ve gece raporunun ortak parçaları
  *
- *   hasarFotosu  Hasar fotoğrafını saklanan kopyadan ya da panelin süreli
- *                linkinden alır, karta çizmek için 360 px'e küçültür.
+ *   hasarFotosu  Panelin süreli hasar fotoğrafı linkini yalnız karta çizmek için
+ *                indirir (diske yazılmaz), 360 px'e küçültür.
  *   albumGonder  Kartları Telegram'a gönderir: tek kartsa fotoğraf, çoksa albüm
  *                (en çok 10). İlk alıcıdan sonra aynı dosya kimlikleriyle.
  */
@@ -14,15 +14,21 @@ const telegram = require('../sayim-raporu/telegram');
 /* Hasar fotoğrafı: blocked-stock/ (satıştan kaldırma) ya da transfer/ (merkez depodan hasarlı) */
 const S3 = /^https:\/\/getir-stock\.s3\.[a-z0-9-]+\.amazonaws\.com\/(?:blocked-stock|transfer)\/[^\s"'<>]+$/;
 
-/* Hasar fotoğrafı: önce saklanan kopya (kaldirma/foto-depo.js), yoksa panelin
-   süreli linki (indirilip saklanır). Karta çizmek için 360 px'e küçültülür. */
+/* Hasar fotoğrafı: panelin süreli linki; yalnız karta çizmek için indirilir,
+   diske yazılmaz. 360 px'e küçültülür. */
 async function hasarFotosu(adres) {
     if (!S3.test(adres || '')) return null;
     try {
-        // Saklanan fotoğraf (kaldirma/foto-depo.js): link süresi geçmiş olsa da diskten;
-        // saklanmamışsa link tazeyse indirilip saklanır
-        const b = await fotoDepo().indir(adres);
-        if (!b) return null;
+        const bitis = Number(new URL(adres).searchParams.get('Expires'));
+        if (bitis && bitis * 1000 < Date.now() + 5000) return null;
+    } catch (e) { return null; }
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10000);
+    try {
+        const r = await fetch(adres, { signal: ctrl.signal, redirect: 'error' });
+        if (!r.ok) return null;
+        const b = Buffer.from(await r.arrayBuffer());
+        if (!b.length || b.length > 8 * 1024 * 1024) return null;
         const tur = b[0] === 0xff && b[1] === 0xd8 ? 'jpeg' : b[0] === 0x89 && b[1] === 0x50 ? 'png' : null;
         if (!tur) return null;
         const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360"><rect width="360" height="360" fill="#fff"/>` +
@@ -30,14 +36,9 @@ async function hasarFotosu(adres) {
         return new Resvg(svg, { font: { loadSystemFonts: false } }).render().asPng();
     } catch (e) {
         return null;
+    } finally {
+        clearTimeout(t);
     }
-}
-
-// Döngüsel yüklemeden kaçınmak için ilk kullanımda
-let fotoDepoModul = null;
-function fotoDepo() {
-    if (!fotoDepoModul) fotoDepoModul = require('../kaldirma/foto-depo');
-    return fotoDepoModul;
 }
 
 /** Önizleme için kartı küçültür (varsayılan 720 px); hata olursa olduğu gibi */

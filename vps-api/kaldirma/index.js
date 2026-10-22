@@ -18,11 +18,6 @@
  * Telegram botu ve hesap bağlama sayım raporununki (vps-api/sayim-raporu):
  * kullanıcı bir kez bağladıysa burada da geçerli.
  *
- * HASAR FOTOĞRAFLARI (foto-depo.js)
- *   Panelin linkleri ~15 dk geçerli. Asistan taze linkleri yazınca sunucu
- *   saklanmamış fotoğrafları bir kez indirir (HASAR_DIZIN, herkese açık
- *   değil); sayfa ve raporlar sonra hep buradan, imzalı süreli adresle.
- *
  * SINIRLAR (kullanıcı başına)
  * - yaz: dakikada 6 (Asistan saatte bir yazar; elle tazeleme de buraya düşer)
  * - rapor/görsel: iki istek arası 15 sn, saatte 40
@@ -38,7 +33,6 @@ const geceKart = require('../gece-raporu/kart');
 const { hasarFotosu, albumGonder, kucult } = require('../gece-raporu/paylas');
 
 const ta = require('../telegram-ayar');
-const fotoDepo = require('./foto-depo');
 
 const BILINEN = new Set(Object.keys(DURUMLAR).map(Number));
 const BITMIS_DURUM = new Set([210, 350, 500, 600]);
@@ -313,8 +307,6 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             istemci.release();
         }
         res.json({ ok: true, yazilan: kayitlar.length, bildirilecek: bildirilecek.length });
-        // Hasar fotoğrafları: linkler şu an taze; saklanmamış olanlar bir kez indirilir
-        fotoDepo.sirayaAl(kayitlar.flatMap((k) => (k.veri && Array.isArray(k.veri.fotolar) ? k.veri.fotolar : [])));
         // Yanıt döndükten sonra; Telegram yavaşsa Asistan beklemesin
         bildir(u, bildirilecek, an).catch((e) => console.warn('kaldirma bildir:', e && e.message));
     });
@@ -333,35 +325,12 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 [req.auth.username, id]
             );
             const liste = r.rows[0] && Array.isArray(r.rows[0].fotolar) ? r.rows[0].fotolar.filter(s3Mi) : [];
-            // Saklanan fotoğraf Jet Barkod'dan (süreli imzalı, 6 saat); saklanmamışsa panelin linki
-            const adresler = liste.map((u) => {
-                const a = fotoDepo.anahtar(u);
-                return a && fotoDepo.varMi(a) ? fotoDepo.imzaliAdres(a, '') : u;
-            });
-            // Panel linki tazeyse ve saklanmamışsa hemen indir (bir sonraki bakışta buradan)
-            fotoDepo.sirayaAl(liste);
             res.setHeader('Cache-Control', 'no-store');
-            res.json({ ok: true, adresler });
+            res.json({ ok: true, adresler: liste });
         } catch (e) {
             console.error('kaldirma fotolar:', e.message);
             res.status(500).json({ ok: false, error: 'server_error' });
         }
-    });
-
-    /* Saklanan hasar fotoğrafı: oturumsuz (img etiketi başlık taşıyamaz), ama
-       yalnız imzalı ve süresi geçmemiş adresle. İmzayı yalnız kaydın sahibi alır. */
-    app.get('/api/kaldirma/hasar/:anahtar', async (req, res) => {
-        const a = String(req.params.anahtar || '');
-        if (!fotoDepo.imzaDogru(a, req.query.Expires, req.query.imza)) return res.status(403).end();
-        const b = await fotoDepo.oku(a);
-        const tur = fotoDepo.tur(b);
-        if (!b || !tur) return res.status(404).end();
-        res.setHeader('Content-Type', tur);
-        res.setHeader('Cache-Control', 'private, max-age=21600, immutable');
-        res.setHeader('X-Content-Type-Options', 'nosniff');
-        res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
-        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-        res.end(b);
     });
 
     // -----------------------------------------------------------------
@@ -427,8 +396,6 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                   WHERE username = $1 AND kayit_id = $2`,
                 [u, id, JSON.stringify(adresler)]
             );
-            // Sayfa beklerken okuyacak: önce saklansın (en çok 4 dosya)
-            if (r.rowCount) await Promise.all(adresler.map((x) => fotoDepo.indir(x).catch(() => null)));
             res.json({ ok: true, yazilan: r.rowCount });
         } catch (e) {
             console.error('kaldirma foto yaz:', e.message);
