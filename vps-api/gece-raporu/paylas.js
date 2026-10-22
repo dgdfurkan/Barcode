@@ -41,6 +41,19 @@ async function hasarFotosu(adres) {
     }
 }
 
+/** Önizleme için kartı küçültür (varsayılan 720 px); hata olursa olduğu gibi */
+function kucult(png, genislik = 720) {
+    try {
+        // Boy kartın kendi oranından: PNG başlığındaki genişlik ve yükseklik
+        const g = png.readUInt32BE(16);
+        const y = png.readUInt32BE(20);
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${g}" height="${y}" viewBox="0 0 ${g} ${y}"><image href="data:image/png;base64,${png.toString('base64')}" width="${g}" height="${y}"/></svg>`;
+        return new Resvg(svg, { fitTo: { mode: 'width', value: genislik }, font: { loadSystemFonts: false } }).render().asPng();
+    } catch (e) {
+        return png;
+    }
+}
+
 async function albumGonder(pool, hedefler, kartlar, baslik, ad) {
     const liste = kartlar.slice(0, 10);
     let giden = 0;
@@ -89,4 +102,4 @@ async function albumGonder(pool, hedefler, kartlar, baslik, ad) {
     return { giden };
 }
 
-module.exports = { S3, hasarFotosu, albumGonder };
+module.exports = { kucult, S3, hasarFotosu, albumGonder };

@@ -19,7 +19,7 @@
     <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
     <link rel="stylesheet" href="../css/motion.css?v=20260907a" />
     <link rel="stylesheet" href="../css/siparisler.css?v=20261014c" />
-    <link rel="stylesheet" href="../css/yardimcilar.css?v=20261017a" />
+    <link rel="stylesheet" href="../css/yardimcilar.css?v=20261022a" />
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20261014a"></script>
@@ -56,12 +56,13 @@
         <div id="yrdIcerik" class="sip-icerik" hidden>
             <section class="yrd-baslik">
                 <h1>Yardımcılar</h1>
-                <p>Günlük işi kısaltan küçük araçlar. Hesabında açık olanlar kullanılabilir.</p>
+                <p>Günlük işi kısaltan araçlar. Hesabında açık olanlar kullanılabilir.</p>
             </section>
-            <section class="yrd-liste" id="yrdListe" aria-label="Araçlar"></section>
+            <div class="yrd-tg" id="yrdTelegram" aria-live="polite" hidden></div>
+            <div class="yrd-liste" id="yrdListe"></div>
         </div>
     </main>
 
-    <script src="../js/yardimcilar.js?v=20261017b"></script>
+    <script src="../js/yardimcilar.js?v=20261022a"></script>
 </body>
 </html>

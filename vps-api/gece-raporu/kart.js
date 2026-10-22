@@ -75,9 +75,9 @@ function cip(p, x, y, metin, renk, zemin, boy = 17) {
     return w;
 }
 
-function alt(p, H, sayfa) {
+function alt(p, H, sayfa, etiket) {
     p.push(`<rect x="${P}" y="${H - 80}" width="${IC}" height="2" fill="${R.cizgi}"/>`);
-    p.push(yazi(P, H - 38, 'Jet Barkod · Gece Raporu', { boy: 19, agirlik: 600, renk: R.sonuk }));
+    p.push(yazi(P, H - 38, 'Jet Barkod · ' + (etiket || 'Gece Raporu'), { boy: 19, agirlik: 600, renk: R.sonuk }));
     p.push(yazi(G - P, H - 38, sayfa || 'jetbarkod.com.tr', { boy: 19, renk: R.sonuk, hiza: 'end' }));
 }
 
@@ -93,14 +93,14 @@ function ozetKarti(o) {
     const p = [];
     const H0 = 1080;
     p.push(`<rect width="${G}" height="${H0}" fill="${R.zemin}"/>`);
-    let y = ust(p, 'Gece Raporu', 'Son 24 saat · ' + tarihSaat(o.pencere.bas) + ' - ' + tarihSaat(o.pencere.son), gunAd(o.gun).split(' ').slice(0, 2).join(' '));
+    let y = ust(p, o.baslik || 'Gece Raporu', (o.pencereYazi || 'Son 24 saat') + ' · ' + tarihSaat(o.pencere.bas) + ' - ' + tarihSaat(o.pencere.son), gunAd(o.gun).split(' ').slice(0, 2).join(' '));
 
     const temiz = !o.kaldirmaRed && !o.itirazBekleyen && !(o.itirazKabul + o.itirazRed) && !o.farkUrun;
     if (temiz) {
         p.push(`<rect x="${P}" y="${y}" width="${IC}" height="200" rx="24" fill="${R2.yesilZemin}" stroke="#abefc6"/>`);
         p.push(`<circle cx="${P + 76}" cy="${y + 100}" r="36" fill="${R.yesil}"/>`);
         p.push(`<path d="M${P + 58} ${y + 101} l12 12 l24 -26" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`);
-        p.push(yazi(P + 136, y + 92, 'Temiz gece', { boy: 36, aile: 'Manrope', agirlik: 800, renk: '#067647' }));
+        p.push(yazi(P + 136, y + 92, o.gece === false ? 'Her şey yolunda' : 'Temiz gece', { boy: 36, aile: 'Manrope', agirlik: 800, renk: '#067647' }));
         p.push(yazi(P + 136, y + 132, 'Reddedilen kaldırma, bekleyen itiraz ve sayım farkı yok.', { boy: 21, renk: R.orta }));
         y += 200 + 32;
     }
@@ -134,12 +134,20 @@ function ozetKarti(o) {
         p.push(yazi(P + 28, y + 38, 'Günlük sayım', { boy: 19, agirlik: 600, renk: R2.mavi }));
         const m = o.gunluk.urun + ' ürün sayıldı · ' + (o.gunluk.fark ? o.gunluk.fark + ' üründe fark var' : 'fark yok');
         p.push(yazi(P + 28, y + 66, m, { boy: 21, renk: R.yazi }));
+        // Depo panelindeki durum: kaç görev tamamlandı
+        const pn = o.gunluk.panel;
+        if (pn && pn.toplam) {
+            const bitti = pn.bitti || pn.tamam >= pn.toplam;
+            const etiket = bitti ? 'Panelde tamamlandı' : 'Panelde ' + pn.tamam + ' / ' + pn.toplam;
+            const eG = genislik(OLCU.govdeKalin, etiket, 17) + 24;
+            cip(p, G - P - 28 - eG, y + 28, etiket, bitti ? '#067647' : R2.turuncu, bitti ? R2.yesilZemin : R2.turuncuZemin, 17);
+        }
         y += 88 + 32;
     }
 
     const H = Math.max(y + 104, 760);
     p[0] = `<rect width="${G}" height="${H}" fill="${R.zemin}"/>`;
-    alt(p, H);
+    alt(p, H, null, o.baslik);
     return svgPng(p, H);
 }
 
@@ -179,7 +187,7 @@ function kalanYazi(iso) {
 }
 
 /** Satırları sayfalara böler; her sayfa ayrı kart. satir: {tur:'baslik'|'oge', h, ciz(p, y)} */
-function sayfala(satirlar, baslik, altBaslik, gun, etiket) {
+function sayfala(satirlar, baslik, altBaslik, gun, etiket, altEtiket) {
     const kartlar = [];
     let p = null;
     let y = 0;
@@ -196,7 +204,7 @@ function sayfala(satirlar, baslik, altBaslik, gun, etiket) {
     });
     bitir();
     return kartlar.map((k, i) => {
-        alt(k.p, k.H, kartlar.length > 1 ? (i + 1) + ' / ' + kartlar.length : null);
+        alt(k.p, k.H, kartlar.length > 1 ? (i + 1) + ' / ' + kartlar.length : null, altEtiket);
         return svgPng(k.p, k.H);
     });
 }
@@ -261,7 +269,7 @@ function kaldirmaKartlari(red, gorseller, gun, bekleyen = [], secenek = {}) {
     if (tamam.length) { satirlar.push(baslik('TAMAMLANAN', tamam.length)); tamam.forEach((k) => satirlar.push(satir(k))); }
     const altBaslik = secenek.altBaslik || (bekleyen.length && red.length ? 'Son 24 saatte reddedilenler ve onay bekleyenler'
         : bekleyen.length ? 'Onay bekleyen kayıtlar' : 'Son 24 saatte reddedilen ya da iptal edilen kayıtlar');
-    return sayfala(satirlar, 'Satıştan Kaldırma', altBaslik, gun, secenek.etiket);
+    return sayfala(satirlar, 'Satıştan Kaldırma', altBaslik, gun, secenek.etiket, secenek.altEtiket);
 }
 
 // ---------------------------------------------------------------------
@@ -272,7 +280,9 @@ function kaldirmaKartlari(red, gorseller, gun, bekleyen = [], secenek = {}) {
  * bekleyen: [{urun, gorselId, sikayet, musteriNotu, sonTarih, taslak}]
  * sonuc:    [{urun, gorselId, sikayet, durum: 300|400, itirazMetni}]
  */
-function itirazKartlari(bekleyen, sonuc, gun, gorseller = new Map()) {
+function itirazKartlari(bekleyen, sonuc, gun, gorseller = new Map(), secenek = {}) {
+    const notGoster = secenek.not !== false;
+    const metinGoster = secenek.metin !== false;
     const GB = 96;
     const metinX = P + 24 + GB + 20;
     const metinG = IC - 24 - GB - 20 - 24;
@@ -281,7 +291,7 @@ function itirazKartlari(bekleyen, sonuc, gun, gorseller = new Map()) {
 
     if (bekleyen.length) satirlar.push(baslik('İTİRAZ BEKLEYEN', bekleyen.length));
     bekleyen.forEach((k) => {
-        const h = 152 + 16;
+        const h = (notGoster ? 152 : 128) + 16;
         satirlar.push({ tur: 'oge', h, ciz: (p, y) => {
             p.push(`<rect x="${P}" y="${y}" width="${IC}" height="${h - 16}" rx="22" fill="${R.kart}" stroke="${R.cizgi}"/>`);
             urunGorseli(p, P + 24, y + 28, GB, gorseller.get(k.gorselId));
@@ -294,13 +304,13 @@ function itirazKartlari(bekleyen, sonuc, gun, gorseller = new Map()) {
             x += cip(p, x, y + 20, k.sikayet || 'Kayıt', R.orta, R.zemin, 16) + 10;
             if (k.taslak) cip(p, x, y + 20, 'Taslak hazır', R2.mavi, R2.maviZemin, 16);
             p.push(yazi(metinX, y + 84, kirp(OLCU.govdeKalin, k.urun || 'Ürün', 22, metinG), { boy: 22, agirlik: 600 }));
-            p.push(yazi(metinX, y + 116, kirp(OLCU.govde, k.musteriNotu ? '"' + k.musteriNotu + '"' : 'Müşteri not bırakmamış', 18, metinG), { boy: 18, renk: R.sonuk }));
+            if (notGoster) p.push(yazi(metinX, y + 116, kirp(OLCU.govde, k.musteriNotu ? '"' + k.musteriNotu + '"' : 'Müşteri not bırakmamış', 18, metinG), { boy: 18, renk: R.sonuk }));
         } });
     });
-    if (sonuc.length) satirlar.push(baslik('SON 24 SAATTE SONUÇLANAN', sonuc.length));
+    if (sonuc.length) satirlar.push(baslik(secenek.sonucBaslik || 'SON 24 SAATTE SONUÇLANAN', sonuc.length));
     sonuc.forEach((k) => {
-        const metinSatir = k.itirazMetni ? ikiSatir(OLCU.govde, k.itirazMetni, 18, metinG) : [];
-        const h = Math.max(152, 100 + metinSatir.length * 26 + 20) + 16;
+        const metinSatir = metinGoster && k.itirazMetni ? ikiSatir(OLCU.govde, k.itirazMetni, 18, metinG) : [];
+        const h = Math.max(metinGoster ? 152 : 128, 100 + metinSatir.length * 26 + 20) + 16;
         satirlar.push({ tur: 'oge', h, ciz: (p, y) => {
             p.push(`<rect x="${P}" y="${y}" width="${IC}" height="${h - 16}" rx="22" fill="${R.kart}" stroke="${R.cizgi}"/>`);
             urunGorseli(p, P + 24, y + 28, GB, gorseller.get(k.gorselId));
@@ -312,33 +322,43 @@ function itirazKartlari(bekleyen, sonuc, gun, gorseller = new Map()) {
             metinSatir.forEach((t, j) => p.push(yazi(metinX, y + 116 + j * 26, t, { boy: 18, renk: R.orta })));
         } });
     });
-    return sayfala(satirlar, 'İtirazlar', 'Depo değerlendirme kayıtları', gun);
+    return sayfala(satirlar, 'İtirazlar', 'Depo değerlendirme kayıtları', gun, null, secenek.altEtiket);
 }
 
 // ---------------------------------------------------------------------
 // Sayım farkları
 // ---------------------------------------------------------------------
 
-/** gruplar: [{ad, zaman, urun, farklar: [{ad, sistem, fiziksel, fark}]}] */
-function sayimKartlari(gruplar, gun) {
+/**
+ * gruplar: [{ad, otomatik, urun, bas, bit, panel, farklar, satirlar: [{ad, sistem, fiziksel, fark}]}]
+ * secenek: { saatler (başlama/bitiş), liste: 'fark' | 'hepsi', altBaslik, altEtiket }
+ */
+function sayimKartlari(gruplar, gun, secenek = {}) {
+    const hepsi = secenek.liste === 'hepsi';
+    const saatGoster = secenek.saatler !== false;
+    const saat = (iso) => (iso ? new Date(iso).toLocaleTimeString('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' }) : '');
     const satirlar = [];
     gruplar.forEach((gr) => {
-        satirlar.push({ tur: 'grup', gr });
-        if (!gr.farklar.length) satirlar.push({ tur: 'farksiz' });
+        const ek = [];
+        if (saatGoster && gr.bas) ek.push('Başladı ' + saat(gr.bas) + (gr.bit ? ' · Bitti ' + saat(gr.bit) : ''));
+        satirlar.push({ tur: ek.length ? 'grupUzun' : 'grup', gr, ek: ek.join('') });
+        const liste = hepsi && Array.isArray(gr.satirlar) ? gr.satirlar : gr.farklar;
+        if (!gr.farklar.length && !hepsi) satirlar.push({ tur: 'farksiz' });
         else {
             satirlar.push({ tur: 'kolon' });
-            gr.farklar.forEach((f) => satirlar.push({ tur: 'fark', f }));
+            liste.forEach((f) => satirlar.push({ tur: 'fark', f }));
+            if (hepsi && !gr.farklar.length) satirlar.push({ tur: 'farksiz' });
         }
         satirlar.push({ tur: 'bosluk' });
     });
-    const yuk = { grup: 64, farksiz: 56, kolon: 36, fark: 52, bosluk: 20 };
+    const yuk = { grup: 64, grupUzun: 92, farksiz: 56, kolon: 36, fark: 52, bosluk: 20 };
     const kartlar = [];
     let p = null;
     let y = 0;
     const kolonX = { sistem: G - P - 300, sayilan: G - P - 170, fark: G - P - 24 };
     const yeniKart = () => {
         p = [''];
-        y = ust(p, 'Sayım Farkları', 'Son 24 saatte tamamlanan sayımlar', gunAd(gun).split(' ').slice(0, 2).join(' '));
+        y = ust(p, hepsi ? 'Sayımlar' : 'Sayım Farkları', secenek.altBaslik || 'Son 24 saatte tamamlanan sayımlar', gunAd(gun).split(' ').slice(0, 2).join(' '));
     };
     const bitir = () => {
         const H = y + 104;
@@ -349,12 +369,21 @@ function sayimKartlari(gruplar, gun) {
     satirlar.forEach((s) => {
         const h = yuk[s.tur];
         if (y + h + 104 > AZAMI_BOY) { bitir(); yeniKart(); }
-        if (s.tur === 'grup') {
+        if (s.tur === 'grup' || s.tur === 'grupUzun') {
             const gr = s.gr;
-            p.push(`<rect x="${P}" y="${y}" width="${IC}" height="52" rx="16" fill="${gr.otomatik ? R2.maviZemin : R.kart}" stroke="${gr.otomatik ? '#c7d7fe' : R.cizgi}"/>`);
+            const kH = s.tur === 'grupUzun' ? 80 : 52;
+            p.push(`<rect x="${P}" y="${y}" width="${IC}" height="${kH}" rx="16" fill="${gr.otomatik ? R2.maviZemin : R.kart}" stroke="${gr.otomatik ? '#c7d7fe' : R.cizgi}"/>`);
             p.push(yazi(P + 20, y + 34, gr.ad, { boy: 20, agirlik: 600, renk: gr.otomatik ? R2.mavi : R.yazi }));
             const m = gr.urun + ' ürün · ' + (gr.farklar.length ? gr.farklar.length + ' fark' : 'farksız');
             p.push(yazi(G - P - 20, y + 34, m, { boy: 18, renk: R.sonuk, hiza: 'end' }));
+            if (s.tur === 'grupUzun') {
+                p.push(yazi(P + 20, y + 64, s.ek, { boy: 17, renk: R.orta }));
+                const pn = gr.panel;
+                if (pn && pn.toplam) {
+                    const bitti = pn.bitti || pn.tamam >= pn.toplam;
+                    p.push(yazi(G - P - 20, y + 64, bitti ? 'Panelde tamamlandı' : 'Panelde ' + pn.tamam + ' / ' + pn.toplam, { boy: 17, agirlik: 600, renk: bitti ? '#067647' : R2.turuncu, hiza: 'end' }));
+                }
+            }
         } else if (s.tur === 'farksiz') {
             p.push(yazi(P + 20, y + 34, 'Bütün ürünler sistemle aynı sayıldı.', { boy: 19, renk: '#067647' }));
         } else if (s.tur === 'kolon') {
@@ -369,13 +398,14 @@ function sayimKartlari(gruplar, gun) {
             p.push(yazi(kolonX.sistem, y + 29, adetYaz(f.sistem), { boy: 19, renk: R.orta, hiza: 'end' }));
             p.push(yazi(kolonX.sayilan, y + 29, adetYaz(f.fiziksel), { boy: 19, agirlik: 600, hiza: 'end' }));
             const art = f.fark > 0;
-            p.push(yazi(kolonX.fark, y + 29, (art ? '+' : '−') + adetYaz(Math.abs(f.fark)), { boy: 20, aile: 'Manrope', agirlik: 800, renk: art ? '#067647' : R.kirmizi, hiza: 'end' }));
+            if (!f.fark) p.push(yazi(kolonX.fark, y + 29, '0', { boy: 20, aile: 'Manrope', agirlik: 800, renk: R.sonuk, hiza: 'end' }));
+            else p.push(yazi(kolonX.fark, y + 29, (art ? '+' : '−') + adetYaz(Math.abs(f.fark)), { boy: 20, aile: 'Manrope', agirlik: 800, renk: art ? '#067647' : R.kirmizi, hiza: 'end' }));
         }
         y += h;
     });
     bitir();
     return kartlar.map((k, i) => {
-        alt(k.p, k.H, kartlar.length > 1 ? (i + 1) + ' / ' + kartlar.length : null);
+        alt(k.p, k.H, kartlar.length > 1 ? (i + 1) + ' / ' + kartlar.length : null, secenek.altEtiket);
         return svgPng(k.p, k.H);
     });
 }

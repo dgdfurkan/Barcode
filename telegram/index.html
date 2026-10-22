@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <script src="../js/jb-diyalog.js?v=20260901b"></script>
+    <script src="../js/console-quiet.js?v=20260828i"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e293b">
+    <link rel="manifest" href="../manifest.json">
+    <title>Telegram Raporları - Jet Barkod</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../assets/logo.png?v=2">
+    <link rel="apple-touch-icon" sizes="180x180" href="../assets/logo.png?v=2">
+    <link rel="stylesheet" href="../css/main.css?v=20260828i" />
+    <link rel="stylesheet" href="../css/tailwind.css?v=20260828i" />
+    <link rel="stylesheet" href="../css/tw-app.css?v=20260828i" />
+    <link rel="stylesheet" href="../css/jb-diyalog.css?v=20260901a" />
+    <link rel="stylesheet" href="../css/bildirim.css?v=20260901a" />
+    <link rel="stylesheet" href="../css/motion.css?v=20260907a" />
+    <link rel="stylesheet" href="../css/siparisler.css?v=20261014c" />
+    <link rel="stylesheet" href="../css/urun-foto.css?v=20261018a" />
+    <link rel="stylesheet" href="../css/telegram.css?v=20261022a" />
+    <script src="../js/auth-token.js?v=20261007a"></script>
+    <script src="../js/db-config.js?v=20260828i"></script>
+    <script src="../js/jb-db.js?v=20261014a"></script>
+    <script src="../js/auth.js?v=20260919a"></script>
+    <script src="../js/oturum-yeri.js?v=20260902a"></script>
+    <script src="../js/user-manager.js?v=20260919b"></script>
+    <script src="../js/premium-features.js?v=20260828i"></script>
+</head>
+<body class="min-h-screen sip-kok">
+    <header class="sip-ust">
+        <div class="sip-ust__ic">
+            <a class="sip-marka" href="../arama/" aria-label="Jet Barkod ana sayfa">
+                <span class="sip-marka__im"><img src="../assets/logo.png" alt=""></span>
+                <span><strong>Jet Barkod</strong><small>Telegram Raporları</small></span>
+            </a>
+            <nav class="sip-ust__yol" aria-label="Ürün alanları">
+                <a href="../yardimcilar/"><svg viewBox="0 0 20 20"><path d="M3.5 4.5h5v5h-5zM11.5 4.5h5v5h-5zM3.5 12h5v3.5h-5zM11.5 12h5v3.5h-5z"/></svg><span>Yardımcılar</span></a>
+                <span class="sip-hesap" id="headerUserName"></span>
+            </nav>
+        </div>
+    </header>
+
+    <main class="sip-sayfa tg">
+        <div id="tgGiris" class="sip-icerik" hidden>
+            <div class="sip-kapi">
+                <span><svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg></span>
+                <strong>Giriş yapman gerekiyor</strong>
+                <p>Telegram raporları depo hesabına bağlı çalışıyor.</p>
+                <a href="/" class="sip-kapi__dugme">Giriş yap</a>
+            </div>
+        </div>
+
+        <div id="tgYetkiYok" class="sip-icerik" hidden>
+            <div class="sip-kapi">
+                <span class="sari"><svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z"/></svg></span>
+                <strong>Telegram raporları hesabında açık değil</strong>
+                <p>Satıştan Kaldırma, İtiraz Yazıcı ya da Stok Sayımı açık hesaplarda kullanılır.</p>
+                <a href="../yardimcilar/" class="sip-kapi__dugme">Yardımcılara dön</a>
+            </div>
+        </div>
+
+        <div id="tgIcerik" class="sip-icerik" hidden>
+            <section class="tg-baslik">
+                <div>
+                    <h1>Telegram Raporları</h1>
+                    <p>Telegram'a giden görselleri buradan ayarla, göndermeden önce gör.</p>
+                </div>
+                <div class="tg-hesap" id="tgHesap" aria-live="polite"></div>
+            </section>
+
+            <div class="tg-uyari" id="tgUyari" role="status" hidden></div>
+
+            <div class="tg-sekmeler" role="tablist" aria-label="Rapor türü" id="tgSekmeler">
+                <button type="button" role="tab" data-sekme="gece" aria-selected="true">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8z"/></svg>Zamanlı Rapor
+                </button>
+                <button type="button" role="tab" data-sekme="anlik" aria-selected="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5a4.5 4.5 0 0 0-4.5 4.5v3l-1.5 2.5h12L14.5 11V8A4.5 4.5 0 0 0 10 3.5zM8.5 16a1.5 1.5 0 0 0 3 0"/></svg>Anlık Bildirim
+                </button>
+                <button type="button" role="tab" data-sekme="gonder" aria-selected="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m3.5 9.5 13-6-4 13-2.5-5.5z"/><path d="m10 11 6.5-7.5"/></svg>Elle Gönderim
+                </button>
+            </div>
+
+            <div class="tg-gorunum" role="tablist" aria-label="Görünüm" id="tgGorunum">
+                <button type="button" role="tab" data-gorunum="ayar" aria-selected="true">Ayarlar</button>
+                <button type="button" role="tab" data-gorunum="onizleme" aria-selected="false">Önizleme</button>
+            </div>
+
+            <div class="tg-duzen" id="tgDuzen" data-gorunum="ayar">
+                <section class="tg-ayarlar" id="tgAyarlar" aria-label="Ayarlar"></section>
+
+                <section class="tg-onizleme" aria-label="Önizleme">
+                    <div class="tg-onizleme__ust">
+                        <h2>Önizleme</h2>
+                        <div class="tg-veri" role="radiogroup" aria-label="Önizleme verisi" id="tgVeri">
+                            <button type="button" role="radio" data-veri="gercek" aria-checked="true">Gerçek Veri</button>
+                            <button type="button" role="radio" data-veri="ornek" aria-checked="false">Örnek Veri</button>
+                        </div>
+                    </div>
+                    <div class="tg-sohbet" id="tgSohbet">
+                        <div class="tg-sohbet__ust">
+                            <span class="tg-sohbet__im"><img src="../assets/logo.png" alt=""></span>
+                            <span><b>Jet Barkod</b><small id="tgSohbetAlt">bot</small></span>
+                            <span class="tg-sohbet__durum" id="tgOnizlemeDurum" aria-live="polite"></span>
+                        </div>
+                        <div class="tg-sohbet__govde" id="tgOnizleme"></div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <div class="tg-cubuk" id="tgCubuk" hidden>
+        <div class="tg-cubuk__ic">
+            <p class="tg-cubuk__durum" id="tgKayitDurum" aria-live="polite"></p>
+            <div class="tg-cubuk__dugmeler">
+                <button type="button" class="tg-dugme tg-dugme--sade" id="tgVarsayilan">Varsayılana Dön</button>
+                <button type="button" class="tg-dugme" id="tgTest">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m3.5 9.5 13-6-4 13-2.5-5.5z"/></svg><span>Kendime Gönder</span>
+                </button>
+                <button type="button" class="tg-dugme tg-dugme--ana" id="tgKaydet" disabled>Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/urun-foto.js?v=20261018a"></script>
+    <script src="../js/telegram.js?v=20261022a"></script>
+</body>
+</html>

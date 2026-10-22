@@ -156,6 +156,9 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
   yeniden başlatılacak. Çalışana kadar Asistan 06:00'da listeyi yazamaz ("sunucu güncellemesi bekleniyor").
 - Gece raporu: `sql_files/gece_raporu.sql` çalıştırılacak (önce `sayim_gecmisi_paylasim.sql` ve `itiraz_yazici.sql`),
   `vps-api/gece-raporu/` + `vps-api/katalog.js` + `vps-api/kaldirma/kart.js` + `vps-api/itiraz/index.js` + `server.js` VPS'e atılacak.
+- Telegram Raporları (`/telegram/`): `sql_files/telegram_ayar.sql` çalıştırılacak (önce `gece_raporu.sql`),
+  `vps-api/telegram-ayar.js` + `vps-api/katalog.js` + `vps-api/gece-raporu/` + `vps-api/kaldirma/` VPS'e atılacak.
+  Çalışana kadar sayfa açılır ama yalnız açık/kapalı, bekleyen ve fotoğraf saklanır; rapor yalnız 01:00'de gider.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

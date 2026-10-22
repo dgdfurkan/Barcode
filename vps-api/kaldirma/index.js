@@ -6,9 +6,9 @@
  * 1. Jet Barkod Asistan depo panelinin "Satıştan Kaldırma Listesi"ni saatte
  *    bir okur (son 14 gün, fırın çıkışları hariç) ve POST /api/kaldirma/yaz
  *    ile buraya bırakır. Satırlar hesap + Getir kayıt kimliğiyle tutulur.
- * 2. Durumu İptal Edildi'ye (700) ya da bilinmeyen bir koda (panelin
- *    "reddedildi" gibi listede olmayan durumları) dönen kayıt, kullanıcının
- *    bağladığı Telegram hesaplarına anında bildirilir. Her durum bir kez.
+ * 2. Durumu değişen kayıt, hesabın anlık bildirim ayarına göre (Telegram
+ *    Raporları sayfası: iptal, red, tamamlanan; varsayılan yalnız iptal)
+ *    bağlı Telegram hesaplarına anında bildirilir. Her durum bir kez.
  *    Hesabın İLK eşitlemesinde geçmiş kayıtlar bildirilmez (eski iptaller
  *    yığılmasın), yalnız işaretlenir.
  * 3. Site sayfası (/kaldirma/) GET /api/kaldirma/liste ile okur. "Rapor"
@@ -30,10 +30,43 @@ const gorsel = require('../sayim-raporu/gorsel');
 const { kartUret, DURUMLAR, SONUC_TIPLERI, araclar } = require('./kart');
 // Kayıt kartları ve albüm gönderimi gece raporuyla ortak
 const geceKart = require('../gece-raporu/kart');
-const { hasarFotosu, albumGonder } = require('../gece-raporu/paylas');
+const { hasarFotosu, albumGonder, kucult } = require('../gece-raporu/paylas');
+
+const ta = require('../telegram-ayar');
 
 const BILINEN = new Set(Object.keys(DURUMLAR).map(Number));
-const BILDIRILEN = new Set([700]);
+const BITMIS_DURUM = new Set([210, 350, 500, 600]);
+
+/** Anlık bildirim sınıfı: iptal | red | tamam | bilinmeyen (panelde listede olmayan kod) | null */
+function bildirimSinifi(durum) {
+    if (durum === 700) return 'iptal';
+    if (durum === 160) return 'red';
+    if (BITMIS_DURUM.has(durum)) return 'tamam';
+    if (!BILINEN.has(durum)) return 'bilinmeyen';
+    return null;
+}
+
+const saatYaz = (iso) => new Date(iso).toLocaleString('tr-TR', {
+    timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+});
+
+/** Anlık bildirimin yazısı. an: ayar.anlik (olusturan gösterilsin mi) */
+function bildirimMetni(k, an = {}) {
+    const ad = DURUMLAR[k.durum] || ('Bilinmeyen durum (' + k.durum + ')');
+    const u = (k.veri && k.veri.urun) || {};
+    const adet = Number(k.adet) || 0;
+    const satirlar = [
+        (BITMIS_DURUM.has(k.durum) ? '✅' : '⚠️') + ' Satıştan kaldırma: ' + ad.toLocaleUpperCase('tr-TR'),
+        '',
+        u.ad || 'Ürün',
+        'Adet: ' + (Number.isInteger(adet) ? adet : adet.toFixed(2)) + (k.sebep ? ' · ' + k.sebep : ''),
+    ];
+    if (k.veri && k.veri.altNeden) satirlar.push('Alt neden: ' + k.veri.altNeden);
+    if (k.veri && k.veri.red && k.veri.red.baslik) satirlar.push('Red sebebi: ' + k.veri.red.baslik);
+    if (an.olusturan !== false && k.veri && k.veri.olusturan) satirlar.push('Oluşturan: ' + k.veri.olusturan);
+    if (k.olusturma) satirlar.push('Oluşturulma: ' + saatYaz(k.olusturma));
+    return satirlar.join('\n');
+}
 const AZAMI_KAYIT = 3000;
 const GUN_MS = 24 * 3600 * 1000;
 
@@ -167,35 +200,15 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         }
     }
 
-    const saat = (iso) => new Date(iso).toLocaleString('tr-TR', {
-        timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
-    });
-
-    function bildirimMetni(k) {
-        const ad = DURUMLAR[k.durum] || ('Bilinmeyen durum (' + k.durum + ')');
-        const u = k.veri.urun;
-        const satirlar = [
-            '⚠️ Satıştan kaldırma: ' + ad.toLocaleUpperCase('tr-TR'),
-            '',
-            u.ad || 'Ürün',
-            'Adet: ' + (Number.isInteger(k.adet) ? k.adet : k.adet.toFixed(2)) + (k.sebep ? ' · ' + k.sebep : ''),
-        ];
-        if (k.veri.altNeden) satirlar.push('Alt neden: ' + k.veri.altNeden);
-        if (k.veri.red && k.veri.red.baslik) satirlar.push('Red sebebi: ' + k.veri.red.baslik);
-        if (k.veri.olusturan) satirlar.push('Oluşturan: ' + k.veri.olusturan);
-        satirlar.push('Oluşturulma: ' + saat(k.olusturma));
-        return satirlar.join('\n');
-    }
-
-    async function bildir(username, kayitlar) {
+    async function bildir(username, kayitlar, an) {
         if (!kayitlar.length || !telegram.hazirMi()) return;
         const hedefler = await alicilar(username);
         if (!hedefler.length) return;
         for (const k of kayitlar) {
-            const yazi = bildirimMetni(k);
+            const yazi = bildirimMetni(k, an);
             for (const h of hedefler) {
                 try {
-                    if (k.veri.urun.gorsel) {
+                    if (an.gorsel !== false && k.veri.urun.gorsel) {
                         try {
                             await telegram.cagir('sendPhoto', { chat_id: h.chat_id, photo: k.veri.urun.gorsel, caption: yazi });
                             continue;
@@ -216,8 +229,14 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         }
     }
 
-    function bildirilmeliMi(durum) {
-        return BILDIRILEN.has(durum) || !BILINEN.has(durum);
+    /** Bu durum değişikliği hesabın anlık bildirim ayarına göre bildirilir mi */
+    function bildirilmeliMi(durum, onceki, an) {
+        const sinif = bildirimSinifi(durum);
+        if (!sinif) return false;
+        // Tamamlanan bir kayıt 210'dan 600'e geçerse ikinci kez bildirilmez
+        if (sinif === 'tamam' && BITMIS_DURUM.has(onceki)) return false;
+        if (sinif === 'bilinmeyen') return an.red || an.iptal;
+        return an[sinif] === true;
     }
 
     // -----------------------------------------------------------------
@@ -232,6 +251,9 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         if (!ham) return res.status(400).json({ ok: false, error: 'gecersiz' });
         if (ham.length > AZAMI_KAYIT) return res.status(413).json({ ok: false, error: 'cok_buyuk' });
         const kayitlar = ham.map(kayitDuzelt).filter(Boolean);
+        // Anlık bildirim ayarı (Telegram Raporları sayfası); okunamazsa yalnız iptaller
+        let an = { iptal: true, red: false, tamam: false, gorsel: true, olusturan: true };
+        try { an = (await ta.ayarOku(pool, u)).ayar.anlik; } catch (e) { /* varsayılan */ }
 
         const istemci = await pool.connect();
         const bildirilecek = [];
@@ -250,9 +272,12 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             for (const k of kayitlar) {
                 const eski = onceki.has(k.id) ? onceki.get(k.id) : undefined;
                 let bildirilen = eski === undefined ? null : eski;
-                if (bildirilmeliMi(k.durum) && bildirilen !== k.durum) {
-                    // İlk eşitlemede geçmiş bildirilmez; sonrasında 3 günden eski yeni kayıt da
-                    const taze = Date.now() - Date.parse(k.olusturma) < 3 * GUN_MS || eski !== undefined;
+                if (bildirilen !== k.durum && bildirilmeliMi(k.durum, bildirilen, an)) {
+                    // İlk eşitlemede geçmiş bildirilmez. Sonrasında yalnız son 2 günde durumu
+                    // değişen kayıt: ayar sonradan açılırsa eski kayıtlar topluca gelmesin.
+                    const degisme = Date.parse(k.guncelleme) || Date.parse(k.olusturma);
+                    const taze = Number.isFinite(degisme) ? Date.now() - degisme < 2 * GUN_MS
+                        : Date.now() - Date.parse(k.olusturma) < 3 * GUN_MS || eski !== undefined;
                     if (!ilk && taze) bildirilecek.push(k);
                     bildirilen = k.durum;
                 }
@@ -283,7 +308,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         }
         res.json({ ok: true, yazilan: kayitlar.length, bildirilecek: bildirilecek.length });
         // Yanıt döndükten sonra; Telegram yavaşsa Asistan beklemesin
-        bildir(u, bildirilecek).catch((e) => console.warn('kaldirma bildir:', e && e.message));
+        bildir(u, bildirilecek, an).catch((e) => console.warn('kaldirma bildir:', e && e.message));
     });
 
     // -----------------------------------------------------------------
@@ -463,6 +488,29 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         return true;
     }
 
+    /* Telegram Raporları sayfası: "Telegram'a Gönder" varsayılanlarının önizlemesi.
+       Son 7 günün kayıtlarıyla, gönderilecek kartların aynısı (720 px). */
+    app.post('/api/kaldirma/onizleme', uye, async (req, res) => {
+        const u = req.auth.username;
+        if (!pencere('onizleme:' + u, 10, 60000)) return res.status(429).json({ ok: false, error: 'cok_istek' });
+        const gun = (t) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date(t));
+        const a = aralik({ bas: gun(Date.now() - 6 * GUN_MS), son: gun(Date.now()) });
+        const b = req.body || {};
+        const secim = secimOku({ ...(b.secim && typeof b.secim === 'object' ? b.secim : {}), sebepler: null });
+        try {
+            const r = await seciliRapor(u, a, secim);
+            res.json({
+                ok: true,
+                kartlar: r.kartlar.slice(0, 10).map((k) => 'data:image/png;base64,' + kucult(k).toString('base64')),
+                gruplar: { red: r.gruplar.red.length, bekleyen: r.gruplar.bekleyen.length, tamam: r.gruplar.tamam.length },
+            });
+        } catch (e) {
+            const tabloYok = /does not exist/.test(e.message);
+            if (!tabloYok) console.error('kaldirma onizleme:', e.message);
+            res.status(tabloYok ? 503 : 500).json({ ok: false, error: tabloYok ? 'kurulum_bekleniyor' : 'server_error' });
+        }
+    });
+
     /** PNG indir (galeriye kaydetmek için) */
     app.get('/api/kaldirma/kart', uye, async (req, res) => {
         const a = aralik(req.query || {});
@@ -510,4 +558,4 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     });
 }
 
-module.exports = { kur };
+module.exports = { kur, bildirimMetni };

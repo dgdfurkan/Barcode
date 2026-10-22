@@ -284,9 +284,16 @@
         geceBekleyen.checked = !!c.bekleyen;
         geceFoto.checked = !!c.foto;
         geceBekleyen.disabled = geceFoto.disabled = false;
+        var saatler = (Array.isArray(c.saatler) && c.saatler.length ? c.saatler : [60]).map(function (dk) {
+            return String(Math.floor(dk / 60)).padStart(2, '0') + ':' + String(dk % 60).padStart(2, '0');
+        });
         if (geceOzet) {
             geceOzet.textContent = c.acik === false ? 'Kapalı'
-                : 'Açık · 01:00' + (c.bekleyen ? ' · bekleyenler' : '') + (c.foto ? ' · fotoğraflar' : '');
+                : 'Açık · ' + saatler.join(', ') + (c.bekleyen ? ' · bekleyenler' : '') + (c.foto ? ' · fotoğraflar' : '');
+        }
+        // Arka plan rapor saatlerinden önce veriyi tazeler
+        if (Array.isArray(c.saatler)) {
+            try { chrome.storage.local.set({ jbaRaporSaatleri: { saatler: c.saatler, zaman: Date.now() } }); } catch (e) { /* sessiz */ }
         }
         var adlar = (c.hesaplar || []).map(function (h) { return h.ad || (h.kullanici ? '@' + h.kullanici : ''); }).filter(Boolean);
         var m = !c.hesap ? 'Telegram bağlı değil; sayım raporundan bağla.'
@@ -318,6 +325,13 @@
         });
     }
     gunlukDugme('geceSimdi', { type: 'JBA_GECE_SIMDI' }, 'Gönderiliyor...', geceDurum);
+    var geceAyrinti = document.getElementById('geceAyrinti');
+    if (geceAyrinti) {
+        geceAyrinti.addEventListener('click', function () {
+            try { chrome.tabs.create({ url: 'https://jetbarkod.com.tr/telegram/' }); } catch (e) { /* sessiz */ }
+            try { window.close(); } catch (e) { /* sessiz */ }
+        });
+    }
 
     /* Açılır kapanır bölümler: son durum hatırlanır */
     Array.prototype.forEach.call(document.querySelectorAll('.kat__bas'), function (b) {

@@ -27,7 +27,7 @@ async function yukle() {
         liste.forEach((u) => {
             if (!u || typeof u.image !== 'string' || !/^https:\/\//.test(u.image)) return;
             if (KIMLIK.test(String(u.id || ''))) id.set(String(u.id), u.image);
-            if (u.name) ad.set(sadeAd(u.name), { id: String(u.id || ''), image: u.image });
+            if (u.name) ad.set(sadeAd(u.name), { id: String(u.id || ''), image: u.image, ad: String(u.name).slice(0, 200) });
         });
         katalog = { zaman: Date.now(), id, ad };
     } catch (e) {

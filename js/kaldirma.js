@@ -625,7 +625,8 @@
         secim: { ozet: true, red: true, bekleyen: true, tamam: false, foto: false },
         sebepler: null,      // null: hepsi
         hesaplar: null,      // bağlı Telegram hesap adları (bir kez okunur)
-        gonderiyor: false
+        gonderiyor: false,
+        sunucu: null         // Telegram Raporları sayfasındaki açılış seçimi (bir kez okunur)
     };
     try {
         var kayitli = JSON.parse(localStorage.getItem(GONDER_AYAR) || 'null');
@@ -726,6 +727,20 @@
         k.classList.add('acik');
         var kapat = k.querySelector('.kld-kapat');
         if (kapat) kapat.focus({ preventScroll: true });
+        // Açılış seçimi sunucuda (Telegram Raporları sayfası): telefon ve bilgisayar aynı
+        if (gonder.sunucu == null) {
+            gonder.sunucu = false;
+            istek('/api/telegram-ayar').then(function (c) {
+                var s = c.kod === 200 && c.j && c.j.ayar && c.j.ayar.kaldirmaGonder;
+                if (!s) return;
+                gonder.sunucu = Object.assign({}, s);
+                if (!gonder.yerelDegisti) {
+                    Object.keys(gonder.secim).forEach(function (k) { if (typeof s[k] === 'boolean') gonder.secim[k] = s[k]; });
+                    gonderAyarYaz();
+                    gonderCiz();
+                }
+            });
+        }
         if (gonder.hesaplar == null) {
             var c = await istek('/api/rapor/durum');
             var liste = c.kod === 200 && c.j && Array.isArray(c.j.hesaplar) ? c.j.hesaplar : null;
@@ -765,6 +780,15 @@
         if (c.kod === 200 && c.j.ok) {
             gonderKapat();
             bildir((c.j.kart || 1) + ' kart Telegram\'a gönderildi.', 'basari');
+            // Gönderilen seçim bir sonraki açılışın seçimi olur (her cihazda)
+            var sv = gonder.sunucu;
+            if (sv && Object.keys(gonder.secim).some(function (k) { return sv[k] !== gonder.secim[k]; })) {
+                gonder.sunucu = Object.assign({}, gonder.secim);
+                istek('/api/telegram-ayar', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ayar: { kaldirmaGonder: gonder.secim } })
+                });
+            }
             return;
         }
         if (c.j && c.j.error === 'baglanti_yok') { gonderKapat(); telegramBagla(); return; }
@@ -772,7 +796,8 @@
         bildir(hataMetni(c), 'hata');
     }
 
-    function gonderAyarYaz() {
+    function gonderAyarYaz(kullanici) {
+        if (kullanici) gonder.yerelDegisti = true;
         try { localStorage.setItem(GONDER_AYAR, JSON.stringify({ secim: gonder.secim })); } catch (e) { /* sessiz */ }
     }
 
@@ -986,7 +1011,7 @@
             var k = e.target.getAttribute && e.target.getAttribute('data-secim');
             if (!k) return;
             gonder.secim[k] = e.target.checked;
-            gonderAyarYaz();
+            gonderAyarYaz(true);
             gonderCiz();
         });
         document.addEventListener('keydown', function (e) {

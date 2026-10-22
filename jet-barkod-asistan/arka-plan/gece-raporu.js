@@ -1,5 +1,5 @@
 /**
- * Gece raporu için veri tazeliği (rapor sunucuda, 01:00'de Telegram'a)
+ * Telegram raporu için veri tazeliği (rapor sunucuda, hesabın seçtiği saatlerde)
  * ============================================================================
  *
  * İTİRAZLAR (2 saatte bir, ayrıca 00:40'ta)
@@ -8,10 +8,16 @@
  *   (/api/itiraz/kayitlar) yazılır. Panelin kendi isteği; 1-2 sayfa.
  *   Böylece rapor İtiraz Yazıcı sayfası açılmadan da güncel olur.
  *
- * SAYIM SONUÇLARI (00:30-00:55, günde bir)
+ * SAYIM SONUÇLARI (her rapor saatinden 30-5 dk önce, saat başına bir kez)
  *   Depo paneli açık bilgisayarda dün ve bugünün tamamlanmış sayımları
  *   Sayım Geçmişi'nin yöntemiyle okunur (öne çıkmayan sekme, iş bitince
- *   kapanır) ve /api/sayim-gecmisi/yaz ile bırakılır.
+ *   kapanır) ve /api/sayim-gecmisi/yaz ile bırakılır. Aynı anda günlük
+ *   sayımın paneldeki durumu (toplam / tamamlanan) sekme açmadan okunup
+ *   /api/gece-raporu/gunluk-durum ile bırakılır.
+ *
+ * RAPOR SAATLERİ
+ *   Sunucudan (GET /api/gece-raporu/ayar) 6 saatte bir ve Asistan penceresi
+ *   açıldıkça alınır; bilinmiyorsa 01:00.
  *
  * ASİSTAN PENCERESİ
  *   JBA_GECE_AYAR (oku/yaz) ve JBA_GECE_SIMDI (raporu şimdi gönder).
@@ -22,7 +28,9 @@ const GR_ALARM = 'jba-gece-raporu';
 const GR_API = 'https://api.flowcobalt.com';
 const GR_DDS = 'https://franchise-api-gateway.getirapi.com/dds100/logs/filter';
 const GR_ITIRAZ_SON = 'jbaItirazEsitlemeSon';
-const GR_SAYIM_SON = 'jbaGeceSayimSon';     // { gun, zaman, adet, ok }
+const GR_SAYIM_SON = 'jbaGeceSayimSon';     // { anahtar: 'gün:dakika', zaman, ok, metin }
+const GR_SAATLER = 'jbaRaporSaatleri';      // { saatler: [dakika], zaman }
+const GR_SAAT_ARA_MS = 6 * 60 * 60 * 1000;
 const GR_ITIRAZ_ARA_MS = 2 * 60 * 60 * 1000;
 const GR_KIMLIK = /^[0-9a-f]{24}$/;
 
@@ -190,26 +198,75 @@ async function grSayimOku() {
   return { ok: true, metin: yazilan + ' sayım sonucu aktarıldı.', adet: yazilan };
 }
 
+/** Rapor saatleri (gün içinde dakika); 6 saatte bir sunucudan tazelenir */
+async function grSaatler() {
+  let v = null;
+  try { v = (await chrome.storage.local.get(GR_SAATLER))[GR_SAATLER]; } catch (e) { v = null; }
+  if (!v || Date.now() - (v.zaman || 0) > GR_SAAT_ARA_MS) {
+    const c = await grApi('/api/gece-raporu/ayar').catch(() => null);
+    if (c && c.kod === 200 && c.j && Array.isArray(c.j.saatler)) {
+      v = { saatler: c.j.saatler, zaman: Date.now() };
+      try { await chrome.storage.local.set({ [GR_SAATLER]: v }); } catch (e) { /* sessiz */ }
+    } else if (v) {
+      // Okunamadı: eldekini kullan, bir saat sonra yeniden dene
+      try { await chrome.storage.local.set({ [GR_SAATLER]: { ...v, zaman: Date.now() - GR_SAAT_ARA_MS + 3600000 } }); } catch (e) { /* sessiz */ }
+    }
+  }
+  const l = v && Array.isArray(v.saatler) ? v.saatler.filter((n) => Number.isInteger(n) && n >= 0 && n < 1440) : [];
+  return l.length ? l : [60];
+}
+
+/** Şu an hangi rapor saatine kaç dakika var (en yakın gelecekteki) */
+function grSiradaki(saatler) {
+  const z = grSaat();
+  const simdi = z.saat * 60 + z.dakika;
+  let en = null;
+  for (const s of saatler) {
+    const kalan = (s - simdi + 1440) % 1440;
+    if (!en || kalan < en.kalan) en = { dakika: s, kalan };
+  }
+  return en;
+}
+
+/** Günlük sayımın paneldeki durumu (bugün ve dün): sekme açmadan, panelin kendi oturumuyla */
+async function grGunlukDurumYaz() {
+  let sekmeler = [];
+  try { sekmeler = await chrome.tabs.query({ url: 'https://warehouse.getir.com/r/*' }); } catch (e) { return; }
+  const tab = sekmeler.filter((t) => t.status === 'complete' && !t.discarded).find((t) => /\/dashboard\//.test(t.url || ''))
+    || sekmeler.find((t) => t.status === 'complete' && !t.discarded);
+  if (!tab) return;
+  const { gun } = grSaat();
+  for (const g of [grDun(gun), gun]) {
+    let c = null;
+    try { c = await chrome.tabs.sendMessage(tab.id, { type: 'JBA_GUNLUK_OZET', gun: g }); } catch (e) { c = null; }
+    if (!c || !c.ok || c.yok || !(c.toplam > 0)) continue;
+    await grApi('/api/gece-raporu/gunluk-durum', { method: 'POST', govde: { gun: g, toplam: c.toplam, tamam: c.tamam, bitti: !!c.bitti } }).catch(() => {});
+  }
+}
+
 async function grTur() {
   if (grCalisiyor) return;
   grCalisiyor = true;
   try {
-    const z = grSaat();
-    // Sayım sonuçları: 00:30-00:55, günde bir (rapor 01:00'de)
-    if (z.saat === 0 && z.dakika >= 30 && z.dakika < 56 && await grModulAcik('gunlukSayim')) {
+    const saatler = await grSaatler();
+    const sira = grSiradaki(saatler);
+    // Sayım sonuçları: her rapor saatinden 30-5 dk önce, o saat için bir kez
+    if (sira && sira.kalan >= 5 && sira.kalan <= 30 && await grModulAcik('gunlukSayim')) {
+      const anahtar = grSaat(Date.now() + sira.kalan * 60000).gun + ':' + sira.dakika;
       let son = null;
       try { son = (await chrome.storage.local.get(GR_SAYIM_SON))[GR_SAYIM_SON]; } catch (e) { son = null; }
-      if (!son || son.gun !== z.gun || (!son.ok && Date.now() - son.zaman > 10 * 60 * 1000)) {
+      if (!son || son.anahtar !== anahtar || (!son.ok && Date.now() - son.zaman > 10 * 60 * 1000)) {
+        await grGunlukDurumYaz().catch(() => {});
         const s = await grSayimOku().catch((e) => ({ ok: false, metin: e && e.message }));
-        try { await chrome.storage.local.set({ [GR_SAYIM_SON]: { gun: z.gun, zaman: Date.now(), ok: !!s.ok, metin: s.metin } }); } catch (e) { /* sessiz */ }
+        try { await chrome.storage.local.set({ [GR_SAYIM_SON]: { anahtar, zaman: Date.now(), ok: !!s.ok, metin: s.metin } }); } catch (e) { /* sessiz */ }
       }
     }
-    // İtirazlar: 2 saatte bir; 00:40'tan sonra rapordan önce bir kez daha
-    const geceOncesi = z.saat === 0 && z.dakika >= 40;
+    // İtirazlar: 2 saatte bir; rapordan önceki 20 dakikada bir kez daha
+    const raporOncesi = sira && sira.kalan <= 20;
     let son = 0;
     try { son = Number((await chrome.storage.local.get(GR_ITIRAZ_SON))[GR_ITIRAZ_SON]) || 0; } catch (e) { son = 0; }
-    const bugun0040 = geceOncesi && Date.now() - son > 15 * 60 * 1000;
-    await grItirazEsitle(bugun0040).catch(() => {});
+    const zorla = raporOncesi && Date.now() - son > 15 * 60 * 1000;
+    await grItirazEsitle(zorla).catch(() => {});
   } finally {
     grCalisiyor = false;
   }
