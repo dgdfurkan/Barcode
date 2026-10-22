@@ -260,6 +260,9 @@ body.kld-kilit { overflow: hidden; }
 .kld-foto__yer { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, var(--kagit) 0%, #eceff4 50%, var(--kagit) 100%); background-size: 200% 100%; animation: kld-iskelet 1.2s ease-in-out infinite; }
 .kld-foto.is-yok { display: none; }
 .kld-foto.is-suresi { display: grid; place-items: center; padding: 8px; cursor: default; font-size: 11px; line-height: 16px; color: var(--sonuk); text-align: center; }
+.kld-foto[data-tekrar] { cursor: pointer; }
+.kld-foto[data-tekrar] b { color: var(--mavi-koyu); font-weight: 700; }
+.kld-foto[data-tekrar]:hover { border-color: var(--mavi); }
 
 /* ---------- Telefon ---------- */
 @media (max-width: 720px) {

@@ -333,6 +333,76 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         }
     });
 
+    // -----------------------------------------------------------------
+    // Uzaktan fotoğraf tazeleme
+    // Panelin hasar fotoğrafı linkleri ~15 dk geçerli; yenisi yalnız panelin
+    // kendi oturumuyla alınabiliyor. Telefon (ya da paneli kapalı cihaz)
+    // süresi geçmiş fotoğrafı burada ister; depo paneli açık bilgisayardaki
+    // Asistan 30 sn'de bir sorar, panelin kendi isteğiyle taze linki alıp
+    // yazar. Sayfa yeni linki GET /fotolar/:id ile okur.
+    // İstekler bellekte, 90 sn yaşar; hesap başına en çok 20.
+    // -----------------------------------------------------------------
+
+    const fotoIstekleri = new Map(); // username -> Map(kayit_id -> zaman)
+    const FOTO_ISTEK_MS = 90 * 1000;
+
+    function fotoIstekListesi(u) {
+        const m = fotoIstekleri.get(u);
+        if (!m) return [];
+        const sinir = Date.now() - FOTO_ISTEK_MS;
+        for (const [id, t] of m) if (t < sinir) m.delete(id);
+        if (!m.size) { fotoIstekleri.delete(u); return []; }
+        return [...m.keys()];
+    }
+
+    app.post('/api/kaldirma/foto-iste', uye, async (req, res) => {
+        const u = req.auth.username;
+        const id = String((req.body && req.body.id) || '');
+        if (!/^[a-f0-9]{24}$/.test(id)) return res.status(400).json({ ok: false, error: 'gecersiz' });
+        if (!pencere('foto-iste:' + u, 30, 60000)) return res.status(429).json({ ok: false, error: 'cok_sik' });
+        try {
+            const r = await pool.query('SELECT 1 FROM kaldirma.kayitlar WHERE username = $1 AND kayit_id = $2', [u, id]);
+            if (!r.rows.length) return res.status(404).json({ ok: false, error: 'kayit_yok' });
+            let m = fotoIstekleri.get(u);
+            if (!m) { m = new Map(); fotoIstekleri.set(u, m); }
+            if (m.size >= 20 && !m.has(id)) fotoIstekListesi(u);
+            if (m.size < 20 || m.has(id)) m.set(id, Date.now());
+            if (fotoIstekleri.size > 5000) fotoIstekleri.clear();
+            res.json({ ok: true });
+        } catch (e) {
+            console.error('kaldirma foto iste:', e.message);
+            res.status(500).json({ ok: false, error: 'server_error' });
+        }
+    });
+
+    /** Asistan: bekleyen fotoğraf istekleri (en çok 10) */
+    app.get('/api/kaldirma/foto-istekleri', uye, (req, res) => {
+        res.setHeader('Cache-Control', 'no-store');
+        res.json({ ok: true, idler: fotoIstekListesi(req.auth.username).slice(0, 10) });
+    });
+
+    /** Asistan: panelden alınan taze linkler */
+    app.post('/api/kaldirma/fotolar/:id', uye, async (req, res) => {
+        const u = req.auth.username;
+        const id = String(req.params.id || '');
+        if (!/^[a-f0-9]{24}$/.test(id)) return res.status(400).json({ ok: false, error: 'gecersiz' });
+        const adresler = (Array.isArray(req.body && req.body.adresler) ? req.body.adresler : []).filter(s3Mi).slice(0, 4);
+        const m = fotoIstekleri.get(u);
+        if (m) m.delete(id);
+        if (!adresler.length) return res.json({ ok: true, yazilan: 0 });
+        try {
+            const r = await pool.query(
+                `UPDATE kaldirma.kayitlar SET veri = jsonb_set(COALESCE(veri, '{}'::jsonb), '{fotolar}', $3::jsonb, true)
+                  WHERE username = $1 AND kayit_id = $2`,
+                [u, id, JSON.stringify(adresler)]
+            );
+            res.json({ ok: true, yazilan: r.rowCount });
+        } catch (e) {
+            console.error('kaldirma foto yaz:', e.message);
+            res.status(500).json({ ok: false, error: 'server_error' });
+        }
+    });
+
     /** Tarih aralığı: YYYY-MM-DD, İstanbul günü. Azami 62 gün. */
     function aralik(q) {
         const g = (s) => (/^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) ? String(s) : null);

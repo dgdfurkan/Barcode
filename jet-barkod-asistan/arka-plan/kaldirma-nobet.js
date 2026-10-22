@@ -160,15 +160,73 @@ async function kaldirmaCalistir(sebep) {
     }
 }
 
+// ---------------------------------------------------------------------
+// Uzaktan fotoğraf tazeleme: başka cihaz (telefon) süresi geçmiş hasar
+// fotoğrafını istediyse, depo paneli bu bilgisayarda açıkken 30 sn'de bir
+// Jet Barkod'a sorulur; istek varsa panelin kendi isteğiyle taze link alınıp
+// yazılır. Panel kapalıysa hiç sorulmaz. Getir'e yalnız istek varken gider.
+// ---------------------------------------------------------------------
+
+const KALDIRMA_FOTO_ALARM = 'jba-kaldirma-foto';
+const KALDIRMA_KOK = 'https://api.flowcobalt.com';
+let kaldirmaFotoCalisiyor = false;
+
+async function kaldirmaApi(yol, govde) {
+    const al = globalThis.jbaYetkiAl;
+    if (typeof al !== 'function') return null;
+    let yetki = await al(false);
+    if (!yetki) return null;
+    for (let deneme = 0; deneme < 2; deneme++) {
+        let r = null;
+        try {
+            r = await fetch(KALDIRMA_KOK + yol, {
+                method: govde ? 'POST' : 'GET',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + yetki.token },
+                body: govde ? JSON.stringify(govde) : undefined,
+            });
+        } catch (e) { return null; }
+        if (r.status === 401 && deneme === 0) { yetki = await al(true); if (!yetki) return null; continue; }
+        if (!r.ok) return null;
+        try { return await r.json(); } catch (e) { return null; }
+    }
+    return null;
+}
+
+async function kaldirmaFotoTuru() {
+    if (kaldirmaFotoCalisiyor) return;
+    kaldirmaFotoCalisiyor = true;
+    try {
+        if (!(await kaldirmaHakVar())) return;
+        const sekme = await kaldirmaSekmesi();
+        if (!sekme) return;
+        const j = await kaldirmaApi('/api/kaldirma/foto-istekleri');
+        const idler = j && Array.isArray(j.idler) ? j.idler.filter((x) => /^[a-f0-9]{24}$/.test(x)).slice(0, 10) : [];
+        for (const id of idler) {
+            let c = null;
+            try { c = await chrome.tabs.sendMessage(sekme.id, { type: 'JBA_KALDIRMA_FOTO_SOR', id }); } catch (e) { c = null; }
+            const adresler = c && Array.isArray(c.adresler) ? c.adresler : [];
+            await kaldirmaApi('/api/kaldirma/fotolar/' + id, { adresler });
+            await new Promise((x) => setTimeout(x, 300));
+        }
+    } finally {
+        kaldirmaFotoCalisiyor = false;
+    }
+}
+
 async function kaldirmaAlarmKur() {
     try {
         await chrome.alarms.clear(KALDIRMA_ESKI_ALARM);
         const var_ = await chrome.alarms.get(KALDIRMA_ALARM);
         if (!var_) chrome.alarms.create(KALDIRMA_ALARM, { periodInMinutes: 10, delayInMinutes: 1 });
+        const foto = await chrome.alarms.get(KALDIRMA_FOTO_ALARM);
+        if (!foto) chrome.alarms.create(KALDIRMA_FOTO_ALARM, { periodInMinutes: 0.5, delayInMinutes: 0.5 });
     } catch (e) { /* sessiz */ }
 }
 
-chrome.alarms.onAlarm.addListener((a) => { if (a.name === KALDIRMA_ALARM) kaldirmaCalistir('periyot'); });
+chrome.alarms.onAlarm.addListener((a) => {
+    if (a.name === KALDIRMA_ALARM) kaldirmaCalistir('periyot');
+    else if (a.name === KALDIRMA_FOTO_ALARM) kaldirmaFotoTuru().catch(() => {});
+});
 chrome.runtime.onStartup.addListener(kaldirmaAlarmKur);
 chrome.runtime.onInstalled.addListener(kaldirmaAlarmKur);
 

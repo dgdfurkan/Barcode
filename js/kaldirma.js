@@ -486,15 +486,23 @@
         return Number.isFinite(t) ? new Date(t).toLocaleDateString('tr-TR', { timeZone: 'Europe/Istanbul', day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
     }
 
-    /* Hasar fotoğrafları: panelin linkleri, doğrudan gösterilir. Linkler
-       süreli; Asistan her saatlik aktarımda tazeler. Süresi dolmuşsa not düşülür. */
+    /* Hasar fotoğrafları: panelin süreli (~15 dk) imzalı linkleri, doğrudan gösterilir.
+       Link taze değilse sırayla:
+         1. Bu cihazdaki Asistan depo panelinden tazesini alır (anında).
+         2. Olmazsa (telefon, paneli kapalı cihaz) istek sunucuya bırakılır; depo
+            paneli açık bilgisayardaki Asistan 30 sn içinde panelden alıp yazar.
+            Beklerken karede iskelet durur, sonuç 3 sn arayla en çok 75 sn sorulur.
+       Alınamazsa karede "Tekrar Dene" çıkar. Kare boyu hiç değişmez. */
     var fotoAdresleri = {};
     var tazeFoto = {};
     var fotoSoruNo = 0;
+    var UZAK_BEKLEME_MS = 75000;
 
     function linkBitis(u) {
         try { return Number(new URL(u).searchParams.get('Expires')) * 1000 || 0; } catch (e) { return 0; }
     }
+
+    function tazeMi(liste) { return !!(liste && liste.length && linkBitis(liste[0]) > Date.now() + 30000); }
 
     function asistanFoto(id) {
         if (!(global.JetBarkodAsistan && global.JetBarkodAsistan.durum && global.JetBarkodAsistan.durum.kurulu)) return Promise.resolve(null);
@@ -518,37 +526,77 @@
             global.postMessage({ type: 'JB_KALDIRMA_FOTO_ISTE', no: no, id: id }, location.origin);
         });
     }
-    async function fotolariYukle() {
+
+    var bekle = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+    /** Sunucu üzerinden, depo paneli açık bilgisayardaki Asistan'dan taze link */
+    async function uzaktanFoto(id) {
+        var c = await istek('/api/kaldirma/foto-iste', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id })
+        });
+        if (c.kod !== 200) return null;
+        var bitis = Date.now() + UZAK_BEKLEME_MS;
+        while (Date.now() < bitis) {
+            await bekle(3000);
+            if (!el('kldDetay') || el('kldDetay').hidden) return null; // pencere kapandı
+            var r = await istek('/api/kaldirma/fotolar/' + id);
+            var l = r.kod === 200 && r.j.ok && Array.isArray(r.j.adresler) ? r.j.adresler : [];
+            if (tazeMi(l)) return l;
+        }
+        return null;
+    }
+
+    async function fotoListesi(id, zorla) {
+        if (!zorla && tazeFoto[id] && tazeFoto[id].bitis > Date.now() + 30000) return tazeFoto[id].adresler;
+        var c = await istek('/api/kaldirma/fotolar/' + id);
+        var liste = c.kod === 200 && c.j.ok && Array.isArray(c.j.adresler) ? c.j.adresler : [];
+        if (!tazeMi(liste)) liste = (await asistanFoto(id)) || [];
+        if (!tazeMi(liste)) liste = (await uzaktanFoto(id)) || [];
+        if (tazeMi(liste)) tazeFoto[id] = { adresler: liste, bitis: linkBitis(liste[0]) };
+        return liste;
+    }
+
+    function fotoKareCiz(b, durum, adres) {
+        if (!b.isConnected) return;
+        b.classList.remove('is-suresi', 'is-yok');
+        b.removeAttribute('data-tekrar');
+        if (durum === 'bekliyor') { b.innerHTML = '<span class="kld-foto__yer"></span>'; return; }
+        if (durum === 'yok') { b.classList.add('is-yok'); return; }
+        if (durum === 'alinamadi') {
+            b.classList.add('is-suresi');
+            b.setAttribute('data-tekrar', '1');
+            b.innerHTML = '<span>Alınamadı<br><b>Tekrar Dene</b></span>';
+            return;
+        }
+        var img = new Image();
+        img.alt = '';
+        img.decoding = 'async';
+        img.referrerPolicy = 'no-referrer';
+        img.onerror = function () { fotoKareCiz(b, 'alinamadi'); };
+        img.src = adres;
+        b.innerHTML = '';
+        b.appendChild(img);
+    }
+
+    async function fotolariYukle(yalnizId) {
         var govde = el('kldDetayGovde');
-        var dugmeler = govde.querySelectorAll('[data-foto]');
+        var dugmeler = Array.prototype.slice.call(govde.querySelectorAll('[data-foto]'))
+            .filter(function (b) { return !yalnizId || b.getAttribute('data-foto').split('/')[0] === yalnizId; });
         var kayitlar = {};
         dugmeler.forEach(function (b) { kayitlar[b.getAttribute('data-foto').split('/')[0]] = true; });
         await Promise.all(Object.keys(kayitlar).map(async function (id) {
-            var liste = tazeFoto[id] && tazeFoto[id].bitis > Date.now() + 30000 ? tazeFoto[id].adresler : null;
-            if (!liste) {
-                var c = await istek('/api/kaldirma/fotolar/' + id);
-                liste = c.kod === 200 && c.j.ok && Array.isArray(c.j.adresler) ? c.j.adresler : [];
-                // Panel linkleri ~15 dk geçerli; süresi geçtiyse açık depo panelinden tazesini iste
-                if (!liste.length || linkBitis(liste[0]) < Date.now() + 30000) {
-                    var taze = await asistanFoto(id);
-                    if (taze && taze.length) { liste = taze; tazeFoto[id] = { adresler: taze, bitis: linkBitis(taze[0]) }; }
-                }
-            }
+            var kareler = dugmeler.filter(function (b) { return b.getAttribute('data-foto').split('/')[0] === id; });
+            kareler.forEach(function (b) { fotoKareCiz(b, 'bekliyor'); });
+            var liste = await fotoListesi(id, !!yalnizId);
             liste.forEach(function (u, i) { if (/^https:\/\//.test(u)) fotoAdresleri[id + '/' + (i + 1)] = u; });
+            var taze = tazeMi(liste);
+            kareler.forEach(function (b) {
+                var adres = fotoAdresleri[b.getAttribute('data-foto')];
+                if (taze && adres) fotoKareCiz(b, 'hazir', adres);
+                else if (taze && !adres) fotoKareCiz(b, 'yok');
+                else fotoKareCiz(b, 'alinamadi');
+            });
         }));
-        dugmeler.forEach(function (b) {
-            var adres = fotoAdresleri[b.getAttribute('data-foto')];
-            if (!b.isConnected) return;
-            if (!adres) { b.classList.add('is-yok'); return; }
-            var img = new Image();
-            img.alt = '';
-            img.decoding = 'async';
-            img.referrerPolicy = 'no-referrer';
-            img.onerror = function () { b.classList.add('is-suresi'); b.innerHTML = '<span>Fotoğraf depo paneli açıkken görünür</span>'; };
-            img.src = adres;
-            b.innerHTML = '';
-            b.appendChild(img);
-        });
     }
 
     /* Ürün Arama'daki fotoğraf penceresi (js/urun-foto.js): yakınlaştırma,
@@ -985,7 +1033,10 @@
         });
         el('kldDetayGovde').addEventListener('click', function (e) {
             var f = e.target.closest('[data-foto]');
-            if (f && !f.classList.contains('is-suresi')) { e.stopPropagation(); fotoBuyut(f.getAttribute('data-foto')); }
+            if (!f) return;
+            e.stopPropagation();
+            if (f.hasAttribute('data-tekrar')) { fotolariYukle(f.getAttribute('data-foto').split('/')[0]); return; }
+            if (!f.classList.contains('is-suresi')) fotoBuyut(f.getAttribute('data-foto'));
         });
         el('kldDetay').addEventListener('click', function (e) {
             if (e.target.closest('[data-kapat]')) detayKapat();
