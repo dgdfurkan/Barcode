@@ -108,7 +108,7 @@
 .tg-saat-ekle:hover { border-color: var(--mavi); color: var(--mavi-koyu); }
 
 /* ---------- Önizleme ---------- */
-.tg-onizleme { position: sticky; top: 88px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.tg-onizleme { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .tg-onizleme__ust { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .tg-onizleme__ust h2 { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sonuk); }
 .tg-veri { display: inline-flex; padding: 4px; gap: 4px; border-radius: 9px; background: #e9edf3; }
@@ -116,7 +116,7 @@
 .tg-veri button[aria-checked="true"] { background: var(--yuzey); color: var(--yazi); box-shadow: var(--golge-s); }
 
 /* Telegram sohbet görünümü */
-.tg-sohbet { border-radius: 16px; overflow: hidden; border: 1px solid var(--cizgi); background: #dfe7ef; box-shadow: var(--golge-o); }
+.tg-sohbet { flex: 1; min-height: 0; display: flex; flex-direction: column; border-radius: 16px; overflow: hidden; border: 1px solid var(--cizgi); background: #dfe7ef; box-shadow: var(--golge-o); }
 .tg-sohbet__ust { height: 56px; padding: 0 16px; display: flex; align-items: center; gap: 12px; background: var(--yuzey); border-bottom: 1px solid var(--cizgi); }
 .tg-sohbet__im { flex: none; width: 36px; height: 36px; border-radius: 999px; overflow: hidden; background: var(--kagit); display: grid; place-items: center; }
 .tg-sohbet__im img { width: 28px; height: 28px; object-fit: contain; }
@@ -126,7 +126,8 @@
 .tg-sohbet__durum { flex: none; display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--sonuk); }
 .tg-sohbet__durum.is-yukleniyor::before { content: ''; width: 12px; height: 12px; border-radius: 999px; border: 2px solid var(--mavi-100); border-top-color: var(--mavi); animation: tg-don 800ms linear infinite; }
 @keyframes tg-don { to { transform: rotate(360deg); } }
-.tg-sohbet__govde { height: min(720px, calc(100dvh - 240px)); min-height: 360px; overflow-y: auto; overscroll-behavior: contain; padding: 16px 12px; display: flex; flex-direction: column; gap: 12px; }
+.tg-sohbet__ust { flex: none; }
+.tg-sohbet__govde { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 12px; display: flex; flex-direction: column; gap: 12px; }
 /* Esnek kutuda öğeler sığmak için küçülmesin: yoksa kartlar kırpılır, kaydırma oluşmaz */
 .tg-sohbet__govde > * { flex-shrink: 0; }
 
@@ -170,6 +171,20 @@
 .tg-dugme--sade { border-color: transparent; background: transparent; color: var(--sonuk); }
 .tg-dugme:disabled { cursor: not-allowed; opacity: 0.5; }
 
+/* ---------- Masaüstü: iki bölmeli düzen ----------
+   Sayfa kaymaz. Başlık ve sekmeler üstte, altında ayarlar ve önizleme üst
+   çubuk ile alt eylem çubuğu arasına tam sığar; ikisi de kendi alanında kayar.
+   Önizleme böylece hep bütünüyle görünür. --tg-ust: üst çubuğun boyu (JS ölçer).
+   84 = alt eylem çubuğu (69) + 15 boşluk. */
+@media (min-width: 960px) {
+    .tg { padding-bottom: 0; }
+    #tgIcerik { height: calc(100dvh - var(--tg-ust, 70px) - 24px - 84px - env(safe-area-inset-bottom)); min-height: 520px; display: flex; flex-direction: column; }
+    .tg-duzen { flex: 1; min-height: 0; align-items: stretch; }
+    .tg-ayarlar { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 2px 8px 16px 2px; margin: -2px -8px 0 -2px; }
+    .tg-onizleme { min-height: 0; }
+    .tg-sohbet { flex: 1; min-height: 0; }
+}
+
 /* Bildirim şeridi alt çubuğun üstünde dursun */
 body:has(.tg-cubuk:not([hidden])) .jbd-serit { bottom: calc(84px + env(safe-area-inset-bottom)) !important; }
 
@@ -181,8 +196,10 @@ body:has(.tg-cubuk:not([hidden])) .jbd-serit { bottom: calc(84px + env(safe-area
     .tg-gorunum button[aria-selected="true"] { background: var(--yuzey); color: var(--yazi); box-shadow: var(--golge-s); }
     .tg-duzen[data-gorunum="ayar"] .tg-onizleme { display: none; }
     .tg-duzen[data-gorunum="onizleme"] .tg-ayarlar { display: none; }
-    .tg-onizleme { position: static; }
-    .tg-sohbet__govde { height: calc(100dvh - 330px); min-height: 420px; }
+    /* Telefon: iç kaydırma yok, önizleme sayfayla birlikte kayar */
+    .tg-onizleme { position: static; height: auto; min-height: 0; }
+    .tg-sohbet { flex: none; }
+    .tg-sohbet__govde { flex: none; min-height: 360px; overflow: visible; }
 }
 @media (max-width: 640px) {
     .tg { padding-top: 16px; }

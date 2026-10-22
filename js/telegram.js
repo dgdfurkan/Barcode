@@ -659,6 +659,13 @@
             if (q === 'anlik' || q === 'gonder') d.sekme = q;
         } catch (e) { /* adres okunamadı */ }
         el('tgCubuk').hidden = false;
+        // İki bölmeli masaüstü düzeni üst çubuğun boyunu bilmeli
+        var ustOlc = function () {
+            var u = document.querySelector('.sip-ust');
+            if (u) document.documentElement.style.setProperty('--tg-ust', Math.round(u.getBoundingClientRect().height) + 'px');
+        };
+        ustOlc();
+        global.addEventListener('resize', ustOlc);
         olaylariBagla();
         hesapCiz();
         uyariCiz();
