@@ -6,8 +6,11 @@
  * (Depo İşleri, Bildirimler). Hesapta açık olan araç tıklanır, kapalı olan
  * kilitli görünür. En üstte Telegram bağlantı şeridi.
  *
+ * Sayfa hemen açılır: Telegram şeridi ve kartlar önce aynı boyda iskelet,
+ * veri gelince içleri dolar. Şerit hiçbir durumda sonradan eklenmez ya da
+ * kaldırılmaz (kayma olmasın); hak yoksa ya da okunamazsa bunu yazar.
  * Canlı durum satırları yalnız ucuz Jet Barkod çağrılarından gelir; depo
- * paneline istek gitmez. Okunamazsa satır sessizce boş kalır.
+ * paneline istek gitmez. Okunamazsa satır boş kalır (yeri ayrılmış).
  * Yeni araç eklemek için GRUPLAR'a bir satır yeterli.
  * ============================================================================
  */
@@ -129,22 +132,53 @@
     /** Telegram şeridi ve Telegram Raporları kartının durumu */
     async function telegramDurumu(p) {
         var serit = el('yrdTelegram');
-        if (!acikMi({ haklar: TELEGRAM_HAKLARI }, p)) { serit.hidden = true; return; }
+        if (!acikMi({ haklar: TELEGRAM_HAKLARI }, p)) {
+            seritYaz(serit, 'kapali', 'Telegram raporları kapalı', 'Satıştan Kaldırma, İtiraz Yazıcı ya da Stok Sayımı açık hesaplarda.', '<span class="yrd-tg__dugme is-pasif">Kapalı</span>');
+            return;
+        }
         var c = await istek('/api/telegram-ayar');
-        if (c.kod !== 200 || !c.j.ok) { serit.hidden = true; return; }
+        if (c.kod !== 200 || !c.j.ok) {
+            seritYaz(serit, 'hata', 'Telegram durumu okunamadı', c.kod === 404 || c.kod === 503 ? 'Sunucu güncellemesi bekleniyor.' : 'Ayarlar sayfasından bakabilirsin.', '<a class="yrd-tg__dugme" href="../telegram/">Ayarla</a>');
+            return;
+        }
         var j = c.j;
         var adlar = (j.hesaplar || []).map(function (h) { return h.ad || (h.kullanici ? '@' + h.kullanici : ''); }).filter(Boolean);
         var gece = j.ayar && j.ayar.gece;
         var saatler = gece && gece.acik ? (gece.saatler || [60]).map(saatYazi).join(', ') : '';
         var bagli = (j.hesaplar || []).length > 0;
-        serit.innerHTML = '<span class="yrd-tg__ikon">' + IKON_TG + '</span>' +
-            '<span class="yrd-tg__metin"><strong>' + (bagli ? 'Telegram bağlı' : 'Telegram bağlı değil') + '</strong>' +
-            '<span>' + kacis(bagli ? (adlar.join(', ') || j.hesaplar.length + ' hesap') + (saatler ? ' · Rapor ' + saatler : ' · Zamanlı rapor kapalı')
-                : 'Raporlar ve anlık bildirimler için bir kez bağla.') + '</span></span>' +
-            (bagli ? '<a class="yrd-tg__dugme" href="../telegram/">Ayarla</a>' : '<button type="button" class="yrd-tg__dugme yrd-tg__dugme--ana" id="yrdBagla">Bağla</button>');
-        serit.classList.toggle('is-yok', !bagli);
-        serit.hidden = false;
+        seritYaz(serit, bagli ? 'bagli' : 'yok', bagli ? 'Telegram bağlı' : 'Telegram bağlı değil',
+            bagli ? (adlar.join(', ') || j.hesaplar.length + ' hesap') + (saatler ? ' · Rapor ' + saatler : ' · Zamanlı rapor kapalı')
+                : 'Raporlar ve anlık bildirimler için bir kez bağla.',
+            bagli ? '<a class="yrd-tg__dugme" href="../telegram/">Ayarla</a>' : '<button type="button" class="yrd-tg__dugme yrd-tg__dugme--ana" id="yrdBagla">Bağla</button>');
         canliYaz('telegram', saatler ? 'Sonraki rapor ' + siradaki(gece.saatler) : bagli ? 'Zamanlı rapor kapalı' : 'Telegram bağlı değil', saatler ? '' : 'uyari');
+    }
+
+    /** Şeridin içi; kutu hep aynı yapıda (ikon, iki satır, düğme): boy değişmez */
+    function seritYaz(serit, durum, baslik, alt, dugme) {
+        serit.innerHTML = '<span class="yrd-tg__ikon">' + IKON_TG + '</span>' +
+            '<span class="yrd-tg__metin"><strong>' + kacis(baslik) + '</strong><span>' + kacis(alt) + '</span></span>' + dugme;
+        serit.className = 'yrd-tg is-' + durum;
+        serit.removeAttribute('aria-busy');
+    }
+
+    function seritIskelet() {
+        return '<span class="yrd-tg__ikon yrd-iskelet"></span>' +
+            '<span class="yrd-tg__metin"><span class="yrd-iskelet" style="width:120px;height:14px"></span><span class="yrd-iskelet" style="width:200px;max-width:100%;height:12px"></span></span>' +
+            '<span class="yrd-tg__dugme yrd-iskelet" aria-hidden="true"></span>';
+    }
+
+    /** Kart iskeleti: gerçek kartla aynı kutu (yrd-kart min-height) */
+    function kartIskelet() {
+        return '<div class="yrd-kart yrd-kart--iskelet" aria-hidden="true"><span class="yrd-kart__ikon yrd-iskelet"></span>' +
+            '<span class="yrd-kart__metin"><span class="yrd-iskelet" style="width:55%;height:16px"></span>' +
+            '<span class="yrd-iskelet" style="width:90%;height:12px"></span><span class="yrd-iskelet" style="width:70%;height:12px"></span></span></div>';
+    }
+
+    function listeHtml(kart) {
+        return GRUPLAR.map(function (g) {
+            return '<section class="yrd-grup" aria-label="' + kacis(g.ad) + '"><h2>' + kacis(g.ad) + '</h2>' +
+                '<div class="yrd-grup__liste">' + g.araclar.map(kart).join('') + '</div></section>';
+        }).join('');
     }
 
     function siradaki(saatler) {
@@ -186,12 +220,14 @@
         if (!o || !o.username) { el('yrdGiris').hidden = false; return; }
         var ad = el('headerUserName');
         if (ad) ad.textContent = o.username;
-        var p = await haklariYukle();
-        el('yrdListe').innerHTML = GRUPLAR.map(function (g) {
-            return '<section class="yrd-grup" aria-label="' + kacis(g.ad) + '"><h2>' + kacis(g.ad) + '</h2>' +
-                '<div class="yrd-grup__liste">' + g.araclar.map(function (a) { return kartCiz(a, p); }).join('') + '</div></section>';
-        }).join('');
+        // Sayfa hemen açılır; haklar ve durumlar gelene kadar aynı boyda iskelet
+        var serit = el('yrdTelegram');
+        serit.innerHTML = seritIskelet();
+        serit.setAttribute('aria-busy', 'true');
+        el('yrdListe').innerHTML = listeHtml(kartIskelet);
         el('yrdIcerik').hidden = false;
+        var p = await haklariYukle();
+        el('yrdListe').innerHTML = listeHtml(function (a) { return kartCiz(a, p); });
         document.addEventListener('click', function (e) { if (e.target.closest('#yrdBagla')) telegramBagla(); });
         // Canlı satırlar arkada; sayfa onları beklemez
         telegramDurumu(p);

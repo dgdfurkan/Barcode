@@ -391,7 +391,7 @@
 
     function albumHtml(kartlar, yazi, saat) {
         return '<div class="tg-mesaj"><div class="tg-album">' + kartlar.map(function (k, i) {
-            return '<button type="button" data-kart="' + i + '" aria-label="Kart ' + (i + 1) + ' büyüt"><img src="' + k + '" alt="" loading="lazy" decoding="async">' +
+            return '<button type="button" data-kart="' + i + '" aria-label="Kart ' + (i + 1) + ' büyüt"><img src="' + k + '" alt="">' +
                 (kartlar.length > 1 ? '<span>' + (i + 1) + ' / ' + kartlar.length + '</span>' : '') + '</button>';
         }).join('') + '</div>' +
             (yazi ? '<p class="tg-mesaj__yazi">' + kacis(yazi) + '</p>' : '') +
@@ -419,7 +419,7 @@
         if (d.sekme === 'anlik') {
             var m = j.mesajlar || [];
             kutu.innerHTML = m.length ? m.map(function (x) {
-                return '<div class="tg-mesaj">' + (x.gorsel ? '<img class="tg-mesaj__resim" src="' + kacis(x.gorsel) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '') +
+                return '<div class="tg-mesaj">' + (x.gorsel ? '<img class="tg-mesaj__resim" src="' + kacis(x.gorsel) + '" alt="" referrerpolicy="no-referrer">' : '') +
                     '<p class="tg-mesaj__yazi">' + kacis(x.metin) + '</p><span class="tg-mesaj__saat">' + (x.ornek ? 'örnek · ' : '') + simdiSaat() + '</span></div>';
             }).join('') : bosHtml('Anlık bildirim kapalı', 'Hiçbir durum seçili değil; bildirim gelmez.');
         } else {
