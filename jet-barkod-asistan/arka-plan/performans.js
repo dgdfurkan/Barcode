@@ -1,5 +1,5 @@
 /**
- * Performans raporu: DPS ve kurye performansı, seçilen saatlerde Telegram'a
+ * Performans raporları: DPS ve Kurye CDI, her biri kendi saatlerinde Telegram'a
  * ============================================================================
  *
  * AYAR (Jet Barkod > Yardımcılar > Telegram Raporları > Performans)
@@ -9,7 +9,7 @@
  *   Bugünün seçili saati geldiyse dünün verisi franchise panelinin kendi
  *   istekleriyle okunur (sayim-hazirligi.js'in yakaladığı jeton):
  *     GET  /wps/criteria          Depo Performans Sistemi (DPS)
- *     POST /courier/v2/metrics    Kurye Performansı (10'ar, sayfalar arası 400 ms)
+ *     POST /courier/v2/metrics    Kurye Performansı (100'er; tek istek)
  *   Dünün sipariş toplamı eşiğin altındaysa veri henüz tamamlanmamıştır
  *   (yalnız gece yarısından sonraki birkaç sipariş görünür): erteleme
  *   süresi kadar sonra yeniden denenir, en çok seçilen kez. Son denemede de
@@ -26,7 +26,7 @@ const PF_ALARM = 'jba-performans';
 const PF_API = 'https://api.flowcobalt.com';
 const PF_GETIR = 'https://franchise-api-gateway.getirapi.com';
 const PF_AYAR = 'jbaPerformansAyar';      // { pf, zaman }
-const PF_DURUM = 'jbaPerformansDurum';    // { 'YYYY-MM-DD:dakika': { deneme, sonraki, bitti, hata } }
+const PF_DURUM = 'jbaPerformansDurum';    // { 'dps|kurye:YYYY-MM-DD:dakika': { deneme, sonraki, bitti, hata } }
 const PF_AYAR_MS = 15 * 60 * 1000;
 const PF_KIMLIK = /^[0-9a-f]{24}$/;
 // Panelin Kurye Performansı sayfasının istediği ölçü grupları
@@ -121,15 +121,16 @@ async function pfVeri(o, gun, parca) {
   const veri = { bas: gun, son: gun };
   if (parca.kurye) {
     const liste = [];
-    for (let s = 0; s < 10; s++) {
+    // 100'erli: bir depoda kurye sayısı 100'ü geçmez, liste tek istekte gelir
+    for (let s = 0; s < 5; s++) {
       if (s) await new Promise((r) => setTimeout(r, 400));
       const j = await pfGetir(o, '/courier/v2/metrics', {
         startDate: gun + 'T00:00:00.000Z', endDate: gun + 'T23:59:59.999Z', courierIds: [], warehouseIds: [o.depo],
-        metricGroups: PF_METRIK, vehicleTypes: [], limit: 10, offset: s * 10,
+        metricGroups: PF_METRIK, vehicleTypes: [], limit: 100, offset: s * 100,
       });
       const parcaL = Array.isArray(j && j.data) ? j.data : [];
       liste.push(...parcaL);
-      if (parcaL.length < 10 || liste.length >= (Number(j && j.total_count) || 0)) break;
+      if (parcaL.length < 100 || liste.length >= (Number(j && j.total_count) || 0)) break;
     }
     veri.kurye = liste;
   }
@@ -147,101 +148,101 @@ async function pfDurumOku() {
 async function pfDurumYaz(d) {
   // İki günden eski kayıtlar silinir
   const sinir = pfDun(pfDun(pfSaat().gun));
-  Object.keys(d).forEach((k) => { if (k.slice(0, 10) < sinir) delete d[k]; });
+  Object.keys(d).forEach((k) => { const g = (k.split(':')[1] || ''); if (!g || g < sinir) delete d[k]; });
   try { await chrome.storage.local.set({ [PF_DURUM]: d }); } catch (e) { /* sessiz */ }
 }
 
+/**
+ * Her raporun (DPS, Kurye CDI) bugünkü ilk bitmemiş saati. Aynı turda ikisi
+ * de gelmişse veri bir kez okunur, erteleme notu tek mesaj olur.
+ */
 async function pfTur() {
   if (pfCalisiyor) return;
   pfCalisiyor = true;
   try {
     const pf = await pfAyar();
-    if (!pf || !pf.acik || !Array.isArray(pf.saatler) || !pf.saatler.length) return;
+    if (!pf || !pf.kontrol) return;
     const z = pfSaat();
     const durum = await pfDurumOku();
-    // Bugünün geçmiş saatlerinden ilk bitmeyeni
-    const dakika = pf.saatler.filter((s) => Number.isInteger(s) && s <= z.dk).sort((a, b) => a - b)
-      .find((s) => !(durum[z.gun + ':' + s] && durum[z.gun + ':' + s].bitti));
-    if (dakika == null) return;
-    const anahtar = z.gun + ':' + dakika;
-    const st = durum[anahtar] || { deneme: 0, sonraki: 0, hata: 0 };
-    if (st.sonraki && Date.now() < st.sonraki) return;
+    const simdi = Date.now();
+    const sirada = [];
+    for (const rapor of ['dps', 'kurye']) {
+      const r = pf[rapor];
+      if (!r || !r.acik || !Array.isArray(r.saatler)) continue;
+      const saat = r.saatler.filter((s) => Number.isInteger(s) && s <= z.dk).sort((a, b) => a - b)
+        .find((s) => !(durum[rapor + ':' + z.gun + ':' + s] && durum[rapor + ':' + z.gun + ':' + s].bitti));
+      if (saat == null) continue;
+      const anahtar = rapor + ':' + z.gun + ':' + saat;
+      const st = durum[anahtar] || { deneme: 0, sonraki: 0, hata: 0 };
+      if (st.sonraki && simdi < st.sonraki) continue;
+      sirada.push({ rapor, dakika: saat, anahtar, st });
+    }
+    if (!sirada.length) return;
 
+    const k = pf.kontrol;
+    const esik = Number(k.esik) || 0;
+    const kez = Number(k.erteleme && k.erteleme.kez) || 0;
+    const araDk = Number(k.erteleme && k.erteleme.dakika) || 30;
     const hedefGun = pfDun(z.gun);
-    const esik = Number(pf.esik) || 0;
-    const kez = Number(pf.erteleme && pf.erteleme.kez) || 0;
-    const araDk = Number(pf.erteleme && pf.erteleme.dakika) || 30;
+    const kaydet = async () => { sirada.forEach((x) => { durum[x.anahtar] = x.st; }); await pfDurumYaz(durum); };
 
-    const ertele = async (sebep, siparis) => {
-      if (st.deneme < kez) {
-        st.deneme += 1;
-        st.sonraki = Date.now() + araDk * 60000;
-        durum[anahtar] = st;
-        await pfDurumYaz(durum);
-        await pfApi('/api/performans/ertele', { deneme: st.deneme, kez, siparis, sonrakiDk: araDk, sebep });
-        return true;
+    /* Veri yok ya da eksik: erteleme hakkı olanlar ertelenir (tek not), olmayanlar
+       ayara göre eksik gönderilir ya da o gün vazgeçilir. Dönen: gönderilecekler */
+    const ertele = async (sebep, siparis, sonDenemedeGonder) => {
+      const ertelenen = sirada.filter((x) => x.st.deneme < kez);
+      const biten = sirada.filter((x) => x.st.deneme >= kez);
+      ertelenen.forEach((x) => { x.st.deneme += 1; x.st.sonraki = Date.now() + araDk * 60000; });
+      const gidecek = sonDenemedeGonder ? biten : [];
+      const vazgecilen = sonDenemedeGonder ? [] : biten;
+      vazgecilen.forEach((x) => { x.st.bitti = true; });
+      await kaydet();
+      if (ertelenen.length) {
+        await pfApi('/api/performans/ertele', { rapor: ertelenen.length > 1 ? 'ikisi' : ertelenen[0].rapor, deneme: ertelenen[0].st.deneme, kez, siparis, sonrakiDk: araDk, sebep });
       }
-      return false;
+      if (vazgecilen.length) {
+        await pfApi('/api/performans/ertele', { rapor: vazgecilen.length > 1 ? 'ikisi' : vazgecilen[0].rapor, vazgecildi: true, sebep, siparis });
+      }
+      return gidecek;
     };
 
     const o = await pfOturum();
-    if (!o) {
-      if (await ertele('oturum', null)) return;
-      st.bitti = true; durum[anahtar] = st; await pfDurumYaz(durum);
-      await pfApi('/api/performans/ertele', { vazgecildi: true, sebep: 'oturum' });
-      return;
-    }
+    if (!o) { await ertele('oturum', null, false); return; }
 
-    // Önce kurye verisi (hazır mı ölçüsü); DPS yalnız gönderilecekse istenir
-    let veri;
+    let kurye = null;
     try {
-      veri = await pfVeri(o, hedefGun, { dps: false, kurye: pf.kurye || esik > 0 });
+      kurye = (await pfVeri(o, hedefGun, { dps: false, kurye: true })).kurye;
     } catch (e) {
-      if (e && e.kod === 'oturum') {
-        if (await ertele('oturum', null)) return;
-        st.bitti = true; durum[anahtar] = st; await pfDurumYaz(durum);
-        await pfApi('/api/performans/ertele', { vazgecildi: true, sebep: 'oturum' });
-        return;
-      }
-      // Ağ ya da panel hatası: bir sonraki turda yeniden (en çok 3 kez)
-      st.hata = (st.hata || 0) + 1;
-      if (st.hata >= 3) st.bitti = true;
-      durum[anahtar] = st; await pfDurumYaz(durum);
+      if (e && e.kod === 'oturum') { await ertele('oturum', null, false); return; }
+      sirada.forEach((x) => { x.st.hata = (x.st.hata || 0) + 1; if (x.st.hata >= 3) x.st.bitti = true; });
+      await kaydet();
       return;
     }
 
-    const siparis = (veri.kurye || []).reduce((t, k) => t + (Number(k && k.order_count) || 0), 0);
+    const siparis = kurye.reduce((t, x) => t + (Number(x && x.order_count) || 0), 0);
+    let gidecek = sirada;
     let eksik = null;
     if (esik > 0 && siparis < esik) {
-      if (await ertele('veri', siparis)) return;
-      if (!pf.sonDenemedeGonder) {
-        st.bitti = true; durum[anahtar] = st; await pfDurumYaz(durum);
-        await pfApi('/api/performans/ertele', { vazgecildi: true, sebep: 'veri', siparis });
-        return;
-      }
+      gidecek = await ertele('veri', siparis, !!k.sonDenemedeGonder);
       eksik = siparis;
+      if (!gidecek.length) return;
     }
-    if (!pf.kurye) delete veri.kurye;
-    if (pf.dps) {
+
+    let dps = null;
+    if (gidecek.some((x) => x.rapor === 'dps')) {
       try {
-        const d = await pfVeri(o, hedefGun, { dps: true, kurye: false });
-        veri.dps = d.dps;
+        dps = (await pfVeri(o, hedefGun, { dps: true, kurye: false })).dps;
       } catch (e) {
-        st.hata = (st.hata || 0) + 1;
-        if (st.hata >= 3) st.bitti = true;
-        durum[anahtar] = st; await pfDurumYaz(durum);
-        return;
+        gidecek.filter((x) => x.rapor === 'dps').forEach((x) => { x.st.hata = (x.st.hata || 0) + 1; if (x.st.hata >= 3) x.st.bitti = true; });
+        gidecek = gidecek.filter((x) => x.rapor !== 'dps');
       }
     }
-    const c = await pfApi('/api/performans/gonder', { veri, otomatik: { gun: z.gun, dakika, ...(eksik != null ? { eksik } : {}) } });
-    if (c.kod === 200 || c.kod === 409 || c.kod === 400) {
-      st.bitti = true;
-    } else {
-      st.hata = (st.hata || 0) + 1;
-      if (st.hata >= 3) st.bitti = true;
+    for (const x of gidecek) {
+      const veri = { bas: hedefGun, son: hedefGun, ...(x.rapor === 'dps' ? { dps } : { kurye }) };
+      const c = await pfApi('/api/performans/gonder', { rapor: x.rapor, veri, otomatik: { gun: z.gun, dakika: x.dakika, ...(eksik != null ? { eksik } : {}) } });
+      if (c.kod === 200 || c.kod === 409 || c.kod === 400) x.st.bitti = true;
+      else { x.st.hata = (x.st.hata || 0) + 1; if (x.st.hata >= 3) x.st.bitti = true; }
     }
-    durum[anahtar] = st;
-    await pfDurumYaz(durum);
+    await kaydet();
   } finally {
     pfCalisiyor = false;
   }

@@ -102,4 +102,46 @@ async function albumGonder(pool, hedefler, kartlar, baslik, ad) {
     return { giden };
 }
 
-module.exports = { kucult, S3, hasarFotosu, albumGonder };
+/**
+ * Kartları tam kalite dosya (belge) olarak gönderir: Telegram fotoğrafı
+ * küçültüyor, dosya özgün çözünürlükte kalır (yakınlaştırınca bozulmaz).
+ * Sessiz gider (bildirim sesi yok); ilk alıcıdan sonra dosya kimliğiyle.
+ */
+async function belgeGonder(pool, hedefler, kartlar, ad) {
+    const liste = kartlar.slice(0, 10);
+    let giden = 0;
+    let kimlikler = null;
+    for (const h of hedefler) {
+        try {
+            if (kimlikler) {
+                if (kimlikler.length === 1) await telegram.cagir('sendDocument', { chat_id: h.chat_id, document: kimlikler[0], disable_notification: true });
+                else await telegram.cagir('sendMediaGroup', { chat_id: h.chat_id, media: kimlikler.map((id) => ({ type: 'document', media: id })), disable_notification: true }, 60000);
+            } else if (liste.length === 1) {
+                const form = new FormData();
+                form.append('chat_id', String(h.chat_id));
+                form.append('disable_notification', 'true');
+                form.append('document', new Blob([liste[0]], { type: 'image/png' }), ad + '.png');
+                const s = await telegram.cagir('sendDocument', form, 90000);
+                if (s && s.document && s.document.file_id) kimlikler = [s.document.file_id];
+            } else {
+                const form = new FormData();
+                form.append('chat_id', String(h.chat_id));
+                form.append('disable_notification', 'true');
+                form.append('media', JSON.stringify(liste.map((_, i) => ({ type: 'document', media: 'attach://belge' + i }))));
+                liste.forEach((png, i) => form.append('belge' + i, new Blob([png], { type: 'image/png' }), ad + '-' + (i + 1) + '.png'));
+                const s = await telegram.cagir('sendMediaGroup', form, 120000);
+                if (Array.isArray(s) && s.length === liste.length) {
+                    const ids = s.map((m) => m.document && m.document.file_id);
+                    if (ids.every(Boolean)) kimlikler = ids;
+                }
+            }
+            giden++;
+        } catch (e) {
+            console.warn(ad + ' belge:', telegram.temizle(e && e.message));
+        }
+        await new Promise((r) => setTimeout(r, 500));
+    }
+    return { giden };
+}
+
+module.exports = { kucult, S3, hasarFotosu, albumGonder, belgeGonder };

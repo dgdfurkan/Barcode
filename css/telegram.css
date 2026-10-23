@@ -116,9 +116,33 @@
     font: inherit; font-size: 13px; color: var(--yazi); font-variant-numeric: tabular-nums; }
 .tg-tarih input:focus { outline: 2px solid var(--mavi-100); border-color: var(--mavi); }
 
+/* Sıralı seçim listesi (Kurye CDI sütunları, özet kutuları) */
+.tg-sutunlar { margin: 4px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.tg-sutunlar li { min-height: 52px; padding: 4px 4px 4px 12px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--cizgi); border-radius: 12px; background: var(--yuzey); }
+.tg-sutun__sira { flex: none; width: 24px; height: 24px; border-radius: 999px; display: grid; place-items: center; background: var(--kagit); font-size: 11px; font-weight: 700; color: var(--sonuk); font-variant-numeric: tabular-nums; }
+.tg-sutun__ad { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--yazi); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tg-sutun__grup { flex: none; height: 24px; padding: 0 8px; border-radius: 6px; display: inline-flex; align-items: center; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+.tg-sutunlar button { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 9px; background: transparent; color: var(--sonuk); }
+.tg-sutunlar button:hover:not(:disabled) { background: var(--kagit); color: var(--yazi); }
+.tg-sutunlar button:disabled { opacity: 0.3; cursor: default; }
+.tg-sutunlar button svg { width: 16px; height: 16px; stroke-width: 2; }
+.tg-cip--ekle i { border-style: dashed; color: var(--sonuk); }
+.tg-baglanti { align-self: flex-start; min-height: 40px; margin-top: 4px; padding: 0; border: 0; background: none; font-size: 12px; font-weight: 700; color: var(--mavi-koyu) !important; }
+.tg-girdi { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--cizgi-sert); border-radius: 9px; background: var(--yuzey); font: inherit; font-size: 13px; color: var(--yazi); }
+.tg-girdi:focus { outline: 2px solid var(--mavi-100); border-color: var(--mavi); }
+
+/* Önizlemeyi Güncelle: değişiklik varken öne çıkar */
+.tg-guncelle { margin-left: auto; min-height: 32px; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--cizgi-sert); border-radius: 9px; background: var(--yuzey);
+    font-size: 12px; font-weight: 700; color: var(--sonuk); white-space: nowrap;
+    transition: background var(--motion-fast) var(--motion-ease-standard), color var(--motion-fast) var(--motion-ease-standard), border-color var(--motion-fast) var(--motion-ease-standard); }
+.tg-guncelle svg { width: 14px; height: 14px; }
+.tg-guncelle:disabled { cursor: default; opacity: 0.7; }
+.tg-guncelle.is-vurgu { background: var(--mavi); border-color: var(--mavi); color: #fff !important; opacity: 1; }
+.tg-guncelle.is-vurgu:hover { background: var(--mavi-koyu); }
+
 /* ---------- Önizleme ---------- */
 .tg-onizleme { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-.tg-onizleme__ust { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tg-onizleme__ust { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tg-onizleme__ust h2 { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sonuk); }
 .tg-veri { display: inline-flex; padding: 4px; gap: 4px; border-radius: 9px; background: #e9edf3; }
 .tg-veri button { min-height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; font-size: 12px; font-weight: 600; color: var(--sonuk); }
@@ -228,10 +252,11 @@ body:has(.tg-cubuk:not([hidden])) .jbd-serit { bottom: calc(84px + env(safe-area
     body:has(.tg-cubuk:not([hidden])) .jbd-serit { bottom: calc(108px + env(safe-area-inset-bottom)) !important; }
 }
 @media (pointer: coarse) {
-    .tg-cip, .tg-segment button, .tg-saat, .tg-saat-ekle { min-height: 44px; }
+    .tg-cip, .tg-segment button, .tg-saat, .tg-saat-ekle, .tg-guncelle { min-height: 44px; }
+    .tg-sutunlar button { width: 44px; height: 44px; }
     .tg-saat button { width: 40px; height: 40px; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .tg-sekmeler button, .tg-anahtar i, .tg-anahtar i::after, .tg-segment button, .tg-cip, .tg-dugme, .tg-mesaj { transition: none; }
+    .tg-sekmeler button, .tg-anahtar i, .tg-anahtar i::after, .tg-segment button, .tg-cip, .tg-dugme, .tg-mesaj, .tg-guncelle { transition: none; }
     .tg-iskelet, .tg-sohbet__durum.is-yukleniyor::before { animation: none; }
 }

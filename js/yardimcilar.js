@@ -56,12 +56,21 @@
                     ikon: '<path d="m3.5 11.5 16-7-3 15-5.5-4.5z"/><path d="m11 15 8.5-10.5"/>'
                 },
                 {
-                    kimlik: 'performans',
+                    kimlik: 'kuryeCdi',
                     haklar: TELEGRAM_HAKLARI,
-                    ad: 'Performans Raporu',
-                    ozet: 'DPS ve kurye performansı seçtiğin saatlerde ya da tarihlerde Telegram\'a.',
-                    adres: '../telegram/?sekme=performans',
+                    ad: 'Kurye CDI Raporu',
+                    ozet: 'Kuryelerin günlük ya da haftalık CDI tablosu, tek görsel olarak Telegram\'a.',
+                    adres: '../telegram/?sekme=kurye',
                     renk: 'mor',
+                    ikon: '<circle cx="7" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M10 17h5M12 7h4l2.5 10M7 13.5 9.5 9H15"/>'
+                },
+                {
+                    kimlik: 'dps',
+                    haklar: TELEGRAM_HAKLARI,
+                    ad: 'DPS Raporu',
+                    ozet: 'Depo Performans Sistemi: Bayi, Kurye ve Picker DPS, kriterleriyle Telegram\'a.',
+                    adres: '../telegram/?sekme=dps',
+                    renk: 'mavi',
                     ikon: '<path d="M4 20h16M6.5 16v-5M11 16V7M15.5 16v-6M20 16V9"/>'
                 }
             ]
@@ -161,7 +170,10 @@
             bagli ? '<a class="yrd-tg__dugme" href="../telegram/">Ayarla</a>' : '<button type="button" class="yrd-tg__dugme yrd-tg__dugme--ana" id="yrdBagla">Bağla</button>');
         canliYaz('telegram', saatler ? 'Sonraki rapor ' + siradaki(gece.saatler) : bagli ? 'Zamanlı rapor kapalı' : 'Telegram bağlı değil', saatler ? '' : 'uyari');
         var pf = j.ayar && j.ayar.performans;
-        if (pf) canliYaz('performans', pf.acik ? 'Her gün ' + (pf.saatler || [600]).map(saatYazi).join(', ') : 'Zamanlı gönderim kapalı · elle gönderilebilir', pf.acik ? '' : 'uyari');
+        [['kuryeCdi', pf && pf.kurye], ['dps', pf && pf.dps]].forEach(function (x) {
+            var r = x[1];
+            if (r) canliYaz(x[0], r.acik ? 'Her gün ' + (r.saatler || [600]).map(saatYazi).join(', ') : 'Zamanlı gönderim kapalı · elle gönderilebilir', r.acik ? '' : 'uyari');
+        });
     }
 
     /** Şeridin içi; kutu hep aynı yapıda (ikon, iki satır, düğme): boy değişmez */

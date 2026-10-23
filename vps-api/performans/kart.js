@@ -1,221 +1,272 @@
 /**
- * Performans raporu kartları (1080 px genişlik, boy içeriğe göre)
+ * Performans raporu kartları: yatay, tek sayfa, yüksek çözünürlük
  * ============================================================================
  *
- *   dpsKarti      Depo Performans Sistemi: Bayi, Kurye ve Picker DPS (harf
- *                 notuyla), kriter tablosu (ağırlık, performans %, puan) ve
- *                 denetimler. Adlar panelin sayfasındakiyle aynı.
- *   kuryeKartlari Kurye Performansı: özet ve kurye başına seçilen ölçüler.
- *                 Uzun liste ~2200 px'lik kartlara bölünür.
+ * Tasarım 1920 birim genişlikte, 3840 px'e çizilir (yazılar vektör: telefonda
+ * yakınlaştırınca bozulmaz). Telegram fotoğrafları küçülttüğü için istenirse
+ * aynı kart tam kalite dosya olarak da gider (paylas.belgeGonder).
+ *
+ *   dpsKarti    Depo Performans Sistemi: solda Bayi / Kurye / Picker DPS ve
+ *               denetimler, sağda panelin kriter tablosu.
+ *   kuryeKarti  Kurye CDI: tek tablo, kurye başına bir satır. Sütunlar
+ *               kullanıcının seçtiği sırada (sutunlar.js), üstte renkli grup
+ *               bandı. Kurye ve sütun sayısı ne olursa olsun tek görsel:
+ *               sütunlar genişliğe, satırlar kurye sayısına göre sıkışır.
  *
  * Kurye fotoğrafı yalnız çizim için bellekte (diske yazılmaz).
- * Yazı tipleri, logo ve çizim yardımcıları Satıştan Kaldırma kartından.
  * ============================================================================
  */
 'use strict';
 
 const { Resvg } = require('@resvg/resvg-js');
 const { araclar } = require('../kaldirma/kart');
+const { GRUPLAR, SUTUN, sutunlariDuzelt, OZETLER, ozetDuzelt } = require('./sutunlar');
 
-const { kacir, genislik, kirp, yazi, veriUri, OLCU, LOGO, R, FONT_DOSYALARI } = araclar;
+const { genislik, kirp, ikiSatir, yazi, veriUri, OLCU, LOGO, FONT_DOSYALARI } = araclar;
 
-const G = 1080;
-const P = 56;
-const IC = G - 2 * P;
-const AZAMI_BOY = 2200;
-const RK = {
-    ...R,
-    mavi: '#2357e8', maviZemin: '#eef4ff', yesilYazi: '#067647', yesilZemin: '#ecfdf3',
-    turuncu: '#b54708', turuncuZemin: '#fffaeb', kirmiziZemin: '#fef3f2', mor: '#6941c6', morZemin: '#f4f3ff',
+// Varsayılan tasarım genişliği; çok sütunlu kurye kartında genişler (yatay kalır)
+const TASARIM = 1920;
+const P = 64;
+const OLCEK = 2;            // çıktı = tasarım × 2 (1920 → 3840 px)
+const EN_DAR_KOLON = 116;   // kurye tablosunda bir sütunun en az genişliği
+let W = TASARIM;
+let IC = W - 2 * P;
+function genislikKur(w) { W = w; IC = W - 2 * P; }
+
+const C = {
+    zemin: '#f5f7fa', kart: '#ffffff', cizgi: '#e2e8f0', cizgiAcik: '#eef2f6',
+    yazi: '#0f172a', orta: '#334155', sonuk: '#64748b', soluk: '#94a3b8',
+    mavi: '#2357e8', maviZemin: '#eef4ff', maviCizgi: '#c7d7fe',
+    yesil: '#047857', yesilZemin: '#ecfdf5', kirmizi: '#be123c', kirmiziZemin: '#fff1f2',
+    turuncu: '#b45309', turuncuZemin: '#fffbeb', mor: '#5b21b6', morZemin: '#f5f3ff',
 };
 
-const ondalik = (n, basamak = 2) => (n == null || !Number.isFinite(n) ? '-' : n.toLocaleString('tr-TR', { minimumFractionDigits: basamak, maximumFractionDigits: basamak }));
-const yuzde = (n) => (n == null || !Number.isFinite(n) ? '-' : '%' + n.toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
-const dakika = (n) => (n == null || !Number.isFinite(n) ? '-' : n.toLocaleString('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' dk');
+// Sıra rozetleri: abartısız altın, gümüş, bronz
+const SIRA_RENK = {
+    1: { zemin: '#f8ecc4', yazi: '#7a5c00', cizgi: '#e9cf7a' },
+    2: { zemin: '#e9edf2', yazi: '#4b5565', cizgi: '#c9d1dc' },
+    3: { zemin: '#f3e1d3', yazi: '#7c4321', cizgi: '#deb89b' },
+};
 
-/** Puan rengi: panelin yeşil/sarı/kırmızı ayrımı */
-function puanRengi(p) {
-    if (p == null) return RK.sonuk;
-    if (p >= 95) return RK.yesilYazi;
-    if (p >= 85) return RK.turuncu;
-    return RK.kirmizi;
+const TR_AY = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const TR_GUN = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+
+const sayiYaz = (n, basamak = 1) => (n == null || !Number.isFinite(n) ? '-'
+    : n.toLocaleString('tr-TR', { minimumFractionDigits: Math.abs(n) >= 100 ? 0 : basamak, maximumFractionDigits: Math.abs(n) >= 100 ? 0 : basamak }));
+const ondalik = (n, b = 2) => sayiYaz(n, b);
+
+function gunParca(g) {
+    const [y, m, d] = String(g).split('-').map(Number);
+    return { y, m, d, t: new Date(Date.UTC(y, m - 1, d, 12)) };
 }
 
-function harfRengi(h) {
-    if (!h) return { renk: RK.sonuk, zemin: RK.zemin };
-    if (/^A/.test(h)) return { renk: RK.yesilYazi, zemin: RK.yesilZemin };
-    if (/^B/.test(h)) return { renk: RK.mavi, zemin: RK.maviZemin };
-    if (/^C/.test(h)) return { renk: RK.turuncu, zemin: RK.turuncuZemin };
-    return { renk: RK.kirmizi, zemin: RK.kirmiziZemin };
-}
-
+/** Tarih: "22 Ekim 2026" ya da "16 - 22 Ekim 2026" / "28 Eylül - 4 Ekim 2026" */
 function tarihAraligi(bas, son) {
-    const ad = (g, yil) => {
-        const [y, m, d] = String(g).split('-').map(Number);
-        return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('tr-TR', { timeZone: 'UTC', day: 'numeric', month: 'long', ...(yil ? { year: 'numeric' } : {}) });
-    };
-    return bas === son ? ad(bas, true) : ad(bas, false) + ' - ' + ad(son, true);
+    const a = gunParca(bas);
+    const b = gunParca(son);
+    if (bas === son) return b.d + ' ' + TR_AY[b.m - 1] + ' ' + b.y;
+    if (a.y === b.y && a.m === b.m) return a.d + ' - ' + b.d + ' ' + TR_AY[b.m - 1] + ' ' + b.y;
+    if (a.y === b.y) return a.d + ' ' + TR_AY[a.m - 1] + ' - ' + b.d + ' ' + TR_AY[b.m - 1] + ' ' + b.y;
+    return a.d + ' ' + TR_AY[a.m - 1] + ' ' + a.y + ' - ' + b.d + ' ' + TR_AY[b.m - 1] + ' ' + b.y;
 }
 
-function gunEtiketi(bas, son) {
-    const [y, m, d] = String(son).split('-').map(Number);
-    const t = new Date(Date.UTC(y, m - 1, d, 12));
-    if (bas === son) return t.toLocaleDateString('tr-TR', { timeZone: 'UTC', day: 'numeric', month: 'long' });
-    const [y0, m0, d0] = String(bas).split('-').map(Number);
-    return d0 + (m0 === m ? '' : '.' + m0) + '-' + t.toLocaleDateString('tr-TR', { timeZone: 'UTC', day: 'numeric', month: 'short' }) + (y0 !== y ? ' ' + y : '');
+function gunSayisi(bas, son) { return Math.round((gunParca(son).t - gunParca(bas).t) / 864e5) + 1; }
+
+/** Tarihin altındaki açıklama: gün adı ya da dönem uzunluğu */
+function tarihAlti(bas, son) {
+    if (bas === son) return TR_GUN[gunParca(bas).t.getUTCDay()];
+    const n = gunSayisi(bas, son);
+    return n + ' günlük dönem';
+}
+
+/** Dönem adı: Günlük / Haftalık / Aylık / N Günlük */
+function donemAdi(bas, son) {
+    const n = gunSayisi(bas, son);
+    if (n === 1) return 'Günlük';
+    if (n === 7) return 'Haftalık';
+    if (n >= 28 && n <= 31 && gunParca(bas).d === 1) return 'Aylık';
+    return n + ' Günlük';
 }
 
 function svgPng(parcalar, H) {
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${G}" height="${H}" viewBox="0 0 ${G} ${H}">${parcalar.join('')}</svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parcalar.join('')}</svg>`;
     return new Resvg(svg, {
-        fitTo: { mode: 'width', value: G },
+        fitTo: { mode: 'width', value: W * OLCEK },
         font: { fontFiles: FONT_DOSYALARI, loadSystemFonts: false, defaultFontFamily: 'DM Sans' },
     }).render().asPng();
 }
 
-function ust(p, baslik, alt, etiket) {
-    const y = P;
-    p.push(`<rect x="${P}" y="${y}" width="64" height="64" rx="18" fill="#ffffff" stroke="${RK.cizgi}"/>`);
-    p.push(`<image href="${LOGO}" x="${P + 6}" y="${y + 6}" width="52" height="52"/>`);
-    const eG = etiket ? genislik(OLCU.govdeKalin, etiket, 20) + 36 : 0;
-    p.push(yazi(P + 84, y + 30, kirp(OLCU.baslik, baslik, 30, IC - 84 - eG - 16), { boy: 30, aile: 'Manrope', agirlik: 800 }));
-    p.push(yazi(P + 84, y + 58, kirp(OLCU.govde, alt, 19, IC - 84 - eG - 16), { boy: 19, renk: RK.sonuk }));
-    if (etiket) {
-        p.push(`<rect x="${G - P - eG}" y="${y + 12}" width="${eG}" height="40" rx="20" fill="#ffffff" stroke="${RK.cizgi}"/>`);
-        p.push(yazi(G - P - eG / 2, y + 39, etiket, { boy: 20, agirlik: 600, hiza: 'middle' }));
-    }
-    return y + 64 + 36;
+/** Üst bant: solda logo, etiket ve başlık; sağda büyük tarih. Dönen y: içeriğin başı */
+function ustBant(p, { etiket, baslik, bas, son }) {
+    const y = 56;
+    p.push(`<rect x="${P}" y="${y}" width="88" height="88" rx="24" fill="#ffffff" stroke="${C.cizgi}"/>`);
+    p.push(`<image href="${LOGO}" x="${P + 8}" y="${y + 8}" width="72" height="72"/>`);
+    // Sağda tarih (ön planda)
+    const tarih = tarihAraligi(bas, son);
+    const tarihBoy = genislik(OLCU.baslik, tarih, 56) > 820 ? 44 : 56;
+    p.push(yazi(W - P, y + 52, tarih, { boy: tarihBoy, aile: 'Manrope', agirlik: 800, renk: C.yazi, hiza: 'end' }));
+    const alt = tarihAlti(bas, son);
+    const altG = genislik(OLCU.govdeKalin, alt, 20) + 32;
+    p.push(`<rect x="${W - P - altG}" y="${y + 66}" width="${altG}" height="36" rx="18" fill="${C.maviZemin}"/>`);
+    p.push(yazi(W - P - altG / 2, y + 91, alt, { boy: 20, agirlik: 600, renk: C.mavi, hiza: 'middle' }));
+    // Solda etiket ve başlık
+    const solX = P + 112;
+    const solG = W - P - Math.max(genislik(OLCU.baslik, tarih, tarihBoy), altG) - 48 - solX;
+    p.push(yazi(solX, y + 30, etiket, { boy: 18, agirlik: 700, renk: C.mavi, aralik: 2.4 }));
+    p.push(yazi(solX, y + 82, kirp(OLCU.baslik, baslik, 48, solG), { boy: 48, aile: 'Manrope', agirlik: 800, renk: C.yazi }));
+    p.push(`<rect x="${P}" y="${y + 128}" width="${IC}" height="2" fill="${C.cizgi}"/>`);
+    return y + 128 + 32;
 }
 
-function alt(p, H, sayfa) {
-    p.push(`<rect x="${P}" y="${H - 80}" width="${IC}" height="2" fill="${RK.cizgi}"/>`);
-    p.push(yazi(P, H - 38, 'Jet Barkod · Performans Raporu', { boy: 19, agirlik: 600, renk: RK.sonuk }));
-    p.push(yazi(G - P, H - 38, sayfa || 'jetbarkod.com.tr', { boy: 19, renk: RK.sonuk, hiza: 'end' }));
+function altBant(p, H, sol, sag) {
+    p.push(`<rect x="${P}" y="${H - 72}" width="${IC}" height="2" fill="${C.cizgi}"/>`);
+    p.push(yazi(P, H - 30, sol, { boy: 20, agirlik: 600, renk: C.sonuk }));
+    p.push(yazi(W - P, H - 30, sag, { boy: 20, renk: C.sonuk, hiza: 'end' }));
 }
 
-function harfRozeti(p, x, y, harf, boy = 22) {
+function harfRenk(h) {
+    const v = String(h || '').trim();
+    if (v === 'A++') return { zemin: '#047857', yazi: '#ffffff' };
+    if (v === 'A+') return { zemin: '#059669', yazi: '#ffffff' };
+    if (/^A/.test(v)) return { zemin: '#34d399', yazi: '#064e3b' };
+    if (/^B/.test(v)) return { zemin: '#93c5fd', yazi: '#1e3a8a' };
+    if (/^C/.test(v)) return { zemin: '#fbbf24', yazi: '#451a03' };
+    if (/^[DE]/.test(v)) return { zemin: '#cbd5e1', yazi: '#334155' };
+    if (v === 'F') return { zemin: '#e11d48', yazi: '#ffffff' };
+    return { zemin: C.cizgiAcik, yazi: C.sonuk };
+}
+
+function harfRozeti(p, cx, cy, harf, boy) {
     const h = harf || '-';
-    const r = harfRengi(harf);
-    const w = Math.max(boy * 2.2, genislik(OLCU.baslik, h, boy) + 24);
-    p.push(`<rect x="${x}" y="${y}" width="${w}" height="${boy + 18}" rx="${(boy + 18) / 2}" fill="${r.zemin}"/>`);
-    p.push(yazi(x + w / 2, y + boy + 4, h, { boy, aile: 'Manrope', agirlik: 800, renk: r.renk, hiza: 'middle' }));
-    return w;
+    const r = harfRenk(harf);
+    const w = Math.max(boy * 2.4, genislik(OLCU.baslik, h, boy) + boy * 1.1);
+    const hh = boy + boy * 0.75;
+    p.push(`<rect x="${cx - w / 2}" y="${cy - hh / 2}" width="${w}" height="${hh}" rx="${hh / 2}" fill="${r.zemin}"/>`);
+    p.push(yazi(cx, cy + boy * 0.36, h, { boy, aile: 'Manrope', agirlik: 800, renk: r.yazi, hiza: 'middle' }));
 }
 
-function uyariSeridi(p, y, metin) {
-    p.push(`<rect x="${P}" y="${y}" width="${IC}" height="64" rx="18" fill="${RK.turuncuZemin}" stroke="#fedf89"/>`);
-    p.push(yazi(P + 24, y + 40, kirp(OLCU.govde, metin, 19, IC - 48), { boy: 19, renk: RK.turuncu }));
-    return y + 64 + 24;
+function puanRenk(n, iyi = 85, kotu = 75) {
+    if (n == null || !Number.isFinite(n)) return { renk: C.soluk, agirlik: 400 };
+    if (n >= iyi) return { renk: C.yesil, agirlik: 800 };
+    if (n < kotu) return { renk: C.kirmizi, agirlik: 800 };
+    return { renk: C.orta, agirlik: 600 };
 }
 
 // ---------------------------------------------------------------------
 // DPS
 // ---------------------------------------------------------------------
 
-/**
- * d: veriDuzelt().dps ; secenek: { kurye, depocu, denetim (bool), bas, son, uyari }
- */
-function dpsKarti(d, secenek = {}) {
+/** d: veriDuzelt().dps ; s: { kurye, depocu, denetim, bas, son, uyari } */
+function dpsKarti(d, s = {}) {
+    genislikKur(TASARIM);
     const p = [''];
-    let y = ust(p, 'Depo Performans Sistemi', 'DPS · ' + tarihAraligi(secenek.bas, secenek.son) + (d.depoAd ? ' · ' + d.depoAd : ''), gunEtiketi(secenek.bas, secenek.son));
-    if (secenek.uyari) y = uyariSeridi(p, y, secenek.uyari);
+    let y = ustBant(p, { etiket: 'DEPO PERFORMANS SİSTEMİ', baslik: d.depoAd ? d.depoAd + ' · DPS' : 'Depo Puanı (DPS)', bas: s.bas, son: s.son });
+    if (s.uyari) {
+        p.push(`<rect x="${P}" y="${y}" width="${IC}" height="64" rx="18" fill="${C.turuncuZemin}" stroke="#fcd34d"/>`);
+        p.push(yazi(P + 28, y + 41, kirp(OLCU.govde, s.uyari, 22, IC - 56), { boy: 22, renk: C.turuncu }));
+        y += 64 + 24;
+    }
+    const ustY = y;
 
-    // Üç özet: Bayi, Kurye, Picker DPS
-    const kutular = [['BAYİ DPS', d.bayi], ['KURYE DPS', d.kurye], ['PICKER DPS', d.depocu]];
-    const kG = Math.floor((IC - 2 * 20) / 3);
-    kutular.forEach(([ad, o], i) => {
-        const x = P + i * (kG + 20);
-        const ana = i === 0;
-        p.push(`<rect x="${x}" y="${y}" width="${kG}" height="176" rx="24" fill="${ana ? RK.maviZemin : RK.kart}" stroke="${ana ? '#c7d7fe' : RK.cizgi}"/>`);
-        p.push(yazi(x + 28, y + 44, ad, { boy: 17, agirlik: 600, renk: ana ? RK.mavi : RK.sonuk, aralik: 1.4 }));
-        p.push(yazi(x + 28, y + 118, ondalik(o.puan), { boy: 54, aile: 'Manrope', agirlik: 800, renk: RK.yazi }));
-        harfRozeti(p, x + 28, y + 132, o.harf, 18);
-    });
-    y += 176 + 32;
-
-    // Kriter tablosu (panelin tablosu): Ağırlık | Kurye perf/puan | Depocu perf/puan
-    const kurye = secenek.kurye !== false;
-    const depocu = secenek.depocu !== false;
-    const kolon = [];
-    let sag = G - P - 24;
-    const ekle = (ad, deger, renkli, sade) => { kolon.unshift({ ad, deger, renkli, sade, x: sag }); sag -= 128; };
-    if (depocu) { ekle('PUAN', (k) => k.depocu && k.depocu.puan, true); ekle('PERF. %', (k) => k.depocu && k.depocu.perf, false); }
-    if (kurye) { ekle('PUAN', (k) => k.kurye && k.kurye.puan, true); ekle('PERF. %', (k) => k.kurye && k.kurye.perf, false); }
-    ekle('AĞIRLIK %', (k) => k.agirlik, false, true);
-    const adG = sag + 128 - 24 - (P + 24) - 16;
-
-    // Grup başlıkları
-    p.push(`<rect x="${P}" y="${y}" width="${IC}" height="${(d.kriterler.length + 2) * 52 + 12}" rx="24" fill="${RK.kart}" stroke="${RK.cizgi}"/>`);
-    let ty = y + 40;
-    p.push(yazi(P + 24, ty, 'KRİTER', { boy: 15, agirlik: 600, renk: RK.sonuk, aralik: 1.2 }));
-    const grupAd = [];
-    if (kurye) grupAd.push({ ad: 'KURYE', x1: kolon[kolon.length - (depocu ? 4 : 2)].x, x2: kolon[kolon.length - (depocu ? 3 : 1)].x });
-    if (depocu) grupAd.push({ ad: 'DEPOCU', x1: kolon[kolon.length - 2].x, x2: kolon[kolon.length - 1].x });
-    grupAd.forEach((g) => p.push(yazi((g.x1 + g.x2) / 2 - 40, ty, g.ad, { boy: 15, agirlik: 700, renk: RK.mavi, aralik: 1.2, hiza: 'middle' })));
-    ty += 34;
-    kolon.forEach((c) => p.push(yazi(c.x, ty, c.ad, { boy: 13, agirlik: 600, renk: RK.sonuk, hiza: 'end', aralik: 0.8 })));
-    ty += 8;
-    d.kriterler.forEach((k, i) => {
-        if (i % 2 === 0) p.push(`<rect x="${P + 8}" y="${ty + 4}" width="${IC - 16}" height="48" rx="12" fill="${RK.zemin}"/>`);
-        const satirY = ty + 36;
-        p.push(yazi(P + 24, satirY, kirp(OLCU.govde, k.ad, 20, adG), { boy: 20, renk: RK.yazi }));
-        kolon.forEach((c) => {
-            const v = c.deger(k);
-            // Ağırlık panelde olduğu gibi: 25, 7,5
-            const metinV = v == null ? '-' : c.sade ? v.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : ondalik(v);
-            p.push(yazi(c.x, satirY, metinV, { boy: 20, aile: c.renkli ? 'Manrope' : 'DM Sans', agirlik: c.renkli ? 800 : 400, renk: c.renkli ? puanRengi(v) : RK.orta, hiza: 'end' }));
-        });
-        ty += 52;
-    });
-    y += (d.kriterler.length + 2) * 52 + 12 + 24;
-
-    if (secenek.denetim !== false) {
+    // Sol sütun: Bayi DPS büyük, altında Kurye ve Picker DPS, en altta denetimler
+    const SOL = 560;
+    const kutu = (x, ky, w, h, ad, o, buyuk) => {
+        p.push(`<rect x="${x}" y="${ky}" width="${w}" height="${h}" rx="28" fill="${buyuk ? C.maviZemin : C.kart}" stroke="${buyuk ? C.maviCizgi : C.cizgi}"/>`);
+        p.push(yazi(x + 32, ky + 48, ad, { boy: buyuk ? 22 : 19, agirlik: 700, renk: buyuk ? C.mavi : C.sonuk, aralik: 1.6 }));
+        const boy = buyuk ? 104 : 64;
+        p.push(yazi(x + 32, ky + (buyuk ? 166 : 124), ondalik(o.puan), { boy, aile: 'Manrope', agirlik: 800, renk: C.yazi }));
+        harfRozeti(p, x + w - 32 - (buyuk ? 52 : 38), ky + (buyuk ? 60 : 44), o.harf, buyuk ? 34 : 24);
+    };
+    kutu(P, y, SOL, 216, 'BAYİ DPS', d.bayi, true);
+    const yarim = (SOL - 20) / 2;
+    kutu(P, y + 236, yarim, 160, 'KURYE DPS', d.kurye, false);
+    kutu(P + yarim + 20, y + 236, yarim, 160, 'PICKER DPS', d.depocu, false);
+    let solAlt = y + 236 + 160;
+    if (s.denetim !== false) {
         const dn = d.denetim || {};
         const parca = [['Denetim', dn.bayi], ['Filo Denetimi', dn.filo], ['Kalite Denetimi', dn.kalite]];
-        const dG = Math.floor((IC - 2 * 16) / 3);
+        const dG = (SOL - 2 * 16) / 3;
         parca.forEach(([ad, v], i) => {
             const x = P + i * (dG + 16);
-            p.push(`<rect x="${x}" y="${y}" width="${dG}" height="88" rx="20" fill="${RK.kart}" stroke="${RK.cizgi}"/>`);
-            p.push(yazi(x + 24, y + 36, ad, { boy: 17, agirlik: 600, renk: RK.sonuk }));
-            p.push(yazi(x + 24, y + 70, v == null ? '-' : ondalik(v), { boy: 26, aile: 'Manrope', agirlik: 800, renk: RK.yazi }));
+            p.push(`<rect x="${x}" y="${solAlt + 20}" width="${dG}" height="104" rx="22" fill="${C.kart}" stroke="${C.cizgi}"/>`);
+            p.push(yazi(x + 22, solAlt + 58, ad, { boy: 18, agirlik: 600, renk: C.sonuk }));
+            p.push(yazi(x + 22, solAlt + 104, v == null ? '-' : ondalik(v), { boy: 32, aile: 'Manrope', agirlik: 800, renk: C.yazi }));
         });
-        y += 88 + 24;
+        solAlt += 20 + 104;
     }
 
-    const H = y + 104 - 16;
-    p[0] = `<rect width="${G}" height="${H}" fill="${RK.zemin}"/>`;
-    alt(p, H);
+    // Sağ: kriter tablosu (panelin tablosu)
+    const TX = P + SOL + 32;
+    const TG = W - P - TX;
+    const kurye = s.kurye !== false;
+    const depocu = s.depocu !== false;
+    const kolonlar = [{ ad: 'Kriter Ağırlığı %', grup: 'bayi', deger: (k) => k.agirlik, sade: true }];
+    if (kurye) kolonlar.push({ ad: 'Performans %', grup: 'kurye', deger: (k) => k.kurye && k.kurye.perf }, { ad: 'Puan', grup: 'kurye', deger: (k) => k.kurye && k.kurye.puan, puan: true });
+    if (depocu) kolonlar.push({ ad: 'Performans %', grup: 'depocu', deger: (k) => k.depocu && k.depocu.perf }, { ad: 'Puan', grup: 'depocu', deger: (k) => k.depocu && k.depocu.puan, puan: true });
+    const ADG = 380;
+    const kG = (TG - ADG) / kolonlar.length;
+    const SATIR = 60;
+    const BANT = 48;
+    const BASLIK = 56;
+    const tabloH = BANT + BASLIK + d.kriterler.length * SATIR + 16;
+    p.push(`<rect x="${TX}" y="${y}" width="${TG}" height="${tabloH}" rx="28" fill="${C.kart}" stroke="${C.cizgi}"/>`);
+    // Grup bandı
+    const gruplar = [['bayi', 'BAYİ PERFORMANSI', C.mavi, C.maviZemin, 'BAYİ'], ['kurye', 'KURYE PERFORMANSI', '#047857', '#d1fae5', 'KURYE'], ['depocu', 'DEPOCU PERFORMANSI', '#5b21b6', '#ede9fe', 'DEPOCU']];
+    let gx = TX + ADG;
+    p.push(yazi(TX + 32, y + 33, 'KRİTER', { boy: 17, agirlik: 700, renk: C.sonuk, aralik: 1.6 }));
+    gruplar.forEach(([g, ad, renk, zemin, kisa]) => {
+        const n = kolonlar.filter((k) => k.grup === g).length;
+        if (!n) return;
+        const w = n * kG;
+        const metin = genislik(OLCU.govdeKalin, ad, 16) + 24 <= w - 24 ? ad : kisa;
+        p.push(`<rect x="${gx + 6}" y="${y + 10}" width="${w - 12}" height="${BANT - 14}" rx="12" fill="${zemin}"/>`);
+        p.push(yazi(gx + w / 2, y + 33, metin, { boy: 16, agirlik: 700, renk, hiza: 'middle', aralik: 1.2 }));
+        gx += w;
+    });
+    let ty = y + BANT;
+    kolonlar.forEach((k, i) => p.push(yazi(TX + ADG + i * kG + kG / 2, ty + 34, k.ad, { boy: 17, agirlik: 600, renk: C.sonuk, hiza: 'middle' })));
+    ty += BASLIK;
+    d.kriterler.forEach((k, i) => {
+        if (i % 2 === 0) p.push(`<rect x="${TX + 10}" y="${ty}" width="${TG - 20}" height="${SATIR}" rx="14" fill="${C.zemin}"/>`);
+        p.push(yazi(TX + 32, ty + 39, kirp(OLCU.govde, k.ad, 24, ADG - 48), { boy: 24, renk: C.yazi }));
+        kolonlar.forEach((kol, j) => {
+            const v = kol.deger(k);
+            const metin = v == null ? '-' : kol.sade ? v.toLocaleString('tr-TR', { maximumFractionDigits: 2 }) : ondalik(v);
+            const r = kol.puan ? puanRenk(v, 95, 85) : { renk: v == null ? C.soluk : C.orta, agirlik: 400 };
+            p.push(yazi(TX + ADG + j * kG + kG / 2, ty + 39, metin, { boy: 24, aile: kol.puan ? 'Manrope' : 'DM Sans', agirlik: r.agirlik, renk: r.renk, hiza: 'middle' }));
+        });
+        ty += SATIR;
+    });
+    const govdeAlt = Math.max(solAlt, y + tabloH);
+    const H = govdeAlt + 40 + 72 + 24;
+    p[0] = `<rect width="${W}" height="${H}" fill="${C.zemin}"/>`;
+    altBant(p, H, 'Jet Barkod · DPS Raporu', 'jetbarkod.com.tr');
     return svgPng(p, H);
 }
 
 // ---------------------------------------------------------------------
-// Kurye
+// Kurye CDI
 // ---------------------------------------------------------------------
 
-const ALANLAR = [
-    ['birlesen', 'Birleşen', (k) => (k.birlesen == null ? '-' : String(k.birlesen)), () => RK.yazi],
-    ['ortTeslimat', 'Ort. Teslimat', (k) => dakika(k.ortTeslimat), () => RK.yazi],
-    ['yoldaSure', 'Yolda Geçen', (k) => dakika(k.yoldaSure), () => RK.yazi],
-    ['ulasmaTeslim', 'Ulaşma-Teslim', (k) => dakika(k.ulasmaTeslim), () => RK.yazi],
-    ['donusSure', 'Depoya Dönüş', (k) => dakika(k.donusSure), () => RK.yazi],
-    ['yoldaPuan', 'Yolda Puanı', (k) => yuzde(k.yoldaPuan), (k) => puanRengi(k.yoldaPuan)],
-    ['teslimatPuan', 'Teslimat Puanı', (k) => yuzde(k.teslimatPuan), (k) => puanRengi(k.teslimatPuan)],
-    ['donusPuan', 'Dönüş Puanı', (k) => yuzde(k.donusPuan), (k) => (k.donusPuan == null ? RK.sonuk : k.donusPuan >= 70 ? RK.yesilYazi : k.donusPuan >= 50 ? RK.turuncu : RK.kirmizi)],
-    ['cdiPuan', 'CDI Puanı', (k) => yuzde(k.cdiPuan), (k) => puanRengi(k.cdiPuan)],
-    ['problemli', 'Problemli', (k) => (k.problemli == null ? '-' : String(k.problemli)), (k) => (k.problemli ? RK.kirmizi : RK.yazi)],
-];
+const HARF_SIRA = ['A++', 'A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'E', 'F'];
+const harfSira = (h) => { const i = HARF_SIRA.indexOf(String(h || '').trim()); return i === -1 ? 99 : i; };
 
-const HARF_SIRA = ['A++', 'A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F'];
-
+/** Sıralama: not (harf, sonra CDI, sonra sipariş) | cdi | siparis | ad */
 function sirala(liste, siralama) {
     const l = liste.slice();
+    const cdi = (k) => (k.d.cdiPuan == null ? -1 : k.d.cdiPuan);
     if (siralama === 'ad') return l.sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
-    if (siralama === 'teslimat') return l.sort((a, b) => (a.ortTeslimat == null) - (b.ortTeslimat == null) || (a.ortTeslimat - b.ortTeslimat) || b.siparis - a.siparis);
-    if (siralama === 'not') {
-        const s = (h) => { const i = HARF_SIRA.indexOf(h); return i === -1 ? 99 : i; };
-        return l.sort((a, b) => s(a.harf) - s(b.harf) || b.siparis - a.siparis);
-    }
-    return l.sort((a, b) => b.siparis - a.siparis || a.ad.localeCompare(b.ad, 'tr'));
+    if (siralama === 'siparis') return l.sort((a, b) => b.siparis - a.siparis || cdi(b) - cdi(a));
+    if (siralama === 'cdi') return l.sort((a, b) => cdi(b) - cdi(a) || harfSira(a.d.harf) - harfSira(b.d.harf) || b.siparis - a.siparis);
+    return l.sort((a, b) => harfSira(a.d.harf) - harfSira(b.d.harf) || cdi(b) - cdi(a) || b.siparis - a.siparis);
+}
+
+function hucreMetni(tanim, v) {
+    if (v == null || v === '') return '-';
+    if (tanim.bicim === 'sayi') return String(Math.round(v));
+    if (tanim.bicim === 'yuzde') return '%' + sayiYaz(v, 1);
+    if (tanim.bicim === 'dk') return sayiYaz(v, 1);
+    return String(v);
 }
 
 function kuryeFoto(p, x, y, boy, buf, ad) {
@@ -223,100 +274,164 @@ function kuryeFoto(p, x, y, boy, buf, ad) {
     const img = veriUri(buf);
     if (img) {
         p.push(`<clipPath id="${id}"><circle cx="${x + boy / 2}" cy="${y + boy / 2}" r="${boy / 2}"/></clipPath>`);
-        p.push(`<circle cx="${x + boy / 2}" cy="${y + boy / 2}" r="${boy / 2}" fill="${RK.zemin}"/>`);
+        p.push(`<circle cx="${x + boy / 2}" cy="${y + boy / 2}" r="${boy / 2}" fill="${C.cizgiAcik}"/>`);
         p.push(`<image href="${img}" x="${x}" y="${y}" width="${boy}" height="${boy}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${id})"/>`);
+        p.push(`<circle cx="${x + boy / 2}" cy="${y + boy / 2}" r="${boy / 2 - 1}" fill="none" stroke="${C.cizgi}" stroke-width="2"/>`);
     } else {
-        const bas = String(ad || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((s) => s[0].toLocaleUpperCase('tr')).join('');
-        p.push(`<circle cx="${x + boy / 2}" cy="${y + boy / 2}" r="${boy / 2}" fill="${RK.morZemin}"/>`);
-        p.push(yazi(x + boy / 2, y + boy / 2 + 9, bas, { boy: 24, aile: 'Manrope', agirlik: 800, renk: RK.mor, hiza: 'middle' }));
+        const bas = String(ad || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((t) => t[0].toLocaleUpperCase('tr')).join('');
+        p.push(`<circle cx="${x + boy / 2}" cy="${y + boy / 2}" r="${boy / 2}" fill="${C.morZemin}"/>`);
+        p.push(yazi(x + boy / 2, y + boy / 2 + boy * 0.17, bas, { boy: boy * 0.4, aile: 'Manrope', agirlik: 800, renk: C.mor, hiza: 'middle' }));
     }
+}
+
+/** Özet kutusunun değeri ve rengi. Ortalamalar sipariş ağırlıklı (Genel CDI dahil); Ort. CDI kurye başına düz ortalama. */
+function ozetDegeri(k, kuryeler) {
+    const top = (f) => kuryeler.reduce((t, x) => t + (x.d[f] || 0), 0);
+    const agirlikli = (f) => {
+        const l = kuryeler.filter((x) => x.d[f] != null && x.siparis);
+        const pay = l.reduce((t, x) => t + x.siparis, 0);
+        return pay ? l.reduce((t, x) => t + x.d[f] * x.siparis, 0) / pay : null;
+    };
+    if (k === 'toplamSiparis') return [String(kuryeler.reduce((t, x) => t + x.siparis, 0)), C.yazi];
+    if (k === 'kurye') return [String(kuryeler.length), C.yazi];
+    if (k === 'ortTeslimat') { const v = agirlikli('ortTeslimat'); return [v == null ? '-' : sayiYaz(v, 1) + ' dk', C.yazi]; }
+    if (k === 'ortCdi') {
+        const l = kuryeler.filter((x) => x.d.cdiPuan != null);
+        const v = l.length ? l.reduce((t, x) => t + x.d.cdiPuan, 0) / l.length : null;
+        return [v == null ? '-' : '%' + sayiYaz(v, 1), puanRenk(v).renk];
+    }
+    if (k === 'genelCdi') { const v = agirlikli('cdiPuan'); return [v == null ? '-' : '%' + sayiYaz(v, 1), puanRenk(v).renk]; }
+    if (k === 'teslimatPuan' || k === 'donusPuan') { const v = agirlikli(k); return [v == null ? '-' : '%' + sayiYaz(v, 1), puanRenk(v).renk]; }
+    if (k === 'app') { const n = kuryeler.filter((x) => String(x.d.harf || '').trim() === 'A++').length; return [String(n), n ? C.yesil : C.yazi]; }
+    if (k === 'problemli') { const n = top('problemli'); return [String(n), n ? C.kirmizi : C.yazi]; }
+    return [String(top(k)), C.yazi];
 }
 
 /**
- * liste: veriDuzelt().kurye ; secenek: { siralama, foto, alanlar, bas, son, uyari, fotolar: Map(id -> Buffer) }
+ * liste: veriDuzelt().kurye ; s: { baslik, siralama, enAzSiparis, foto, sutunlar, bas, son, uyari, fotolar: Map }
  */
-function kuryeKartlari(liste, secenek = {}) {
-    const secili = ALANLAR.filter(([k]) => !secenek.alanlar || secenek.alanlar[k] !== false);
-    const sutun = 4;
-    const satirSayisi = Math.max(1, Math.ceil(secili.length / sutun));
-    // Kutu: üst bilgi 108 + ölçü satırları (56) + alt boşluk 14; satırlar arası 16
-    const SATIR_H = 108 + satirSayisi * 56 + 14 + 16;
-    const kuryeler = sirala(liste.filter((k) => k.siparis > 0 || k.toplamSiparis > 0), secenek.siralama);
-    const toplam = kuryeler.reduce((t, k) => t + k.siparis, 0);
-    const agirlikli = kuryeler.filter((k) => k.ortTeslimat != null && k.siparis);
-    const ortalama = agirlikli.length ? agirlikli.reduce((t, k) => t + k.ortTeslimat * k.siparis, 0) / agirlikli.reduce((t, k) => t + k.siparis, 0) : null;
-    const problemli = kuryeler.reduce((t, k) => t + (k.problemli || 0), 0);
-    const fotolar = secenek.fotolar || new Map();
+function kuryeKarti(liste, s = {}) {
+    const sutunlar = sutunlariDuzelt(s.sutunlar).map((k) => SUTUN.get(k));
+    const enAz = Number(s.enAzSiparis) || 0;
+    const kuryeler = sirala(liste.filter((k) => k.siparis >= Math.max(enAz, 0) && (enAz > 0 || k.siparis > 0 || k.toplamSiparis > 0)), s.siralama);
+    const fotolar = s.fotolar || new Map();
+    const n = Math.max(kuryeler.length, 1);
+    // Çok sütun seçildiyse kart genişler: her sütun en az EN_DAR_KOLON (yatay, tek parça)
+    const adG0 = sutunlar.length > 14 ? 380 : 460;
+    genislikKur(Math.max(TASARIM, Math.ceil(2 * P + adG0 + sutunlar.length * EN_DAR_KOLON)));
 
-    const kartlar = [];
-    let p = null;
-    let y = 0;
-    const yeni = (ilk) => {
-        p = [''];
-        y = ust(p, 'Kurye Performansı', tarihAraligi(secenek.bas, secenek.son) + ' · ' + kuryeler.length + ' kurye', gunEtiketi(secenek.bas, secenek.son));
-        if (ilk && secenek.uyari) y = uyariSeridi(p, y, secenek.uyari);
-        if (ilk) {
-            const ozet = [['TOPLAM SİPARİŞ', String(toplam)], ['KURYE', String(kuryeler.length)], ['ORT. TESLİMAT', ortalama == null ? '-' : dakika(ortalama)], ['PROBLEMLİ', String(problemli)]];
-            const kG = Math.floor((IC - 3 * 16) / 4);
-            ozet.forEach(([ad, v], i) => {
-                const x = P + i * (kG + 16);
-                p.push(`<rect x="${x}" y="${y}" width="${kG}" height="120" rx="22" fill="${i === 0 ? RK.maviZemin : RK.kart}" stroke="${i === 0 ? '#c7d7fe' : RK.cizgi}"/>`);
-                p.push(yazi(x + 22, y + 38, ad, { boy: 15, agirlik: 600, renk: i === 0 ? RK.mavi : RK.sonuk, aralik: 1.2 }));
-                p.push(yazi(x + 22, y + 90, v, { boy: 38, aile: 'Manrope', agirlik: 800, renk: i === 3 && problemli ? RK.kirmizi : RK.yazi }));
-            });
-            y += 120 + 28;
-        }
-    };
-    const bitir = () => { const H = y + 104 - 16; p[0] = `<rect width="${G}" height="${H}" fill="${RK.zemin}"/>`; kartlar.push({ p, H }); };
-    yeni(true);
-    if (!kuryeler.length) {
-        p.push(`<rect x="${P}" y="${y}" width="${IC}" height="120" rx="24" fill="${RK.kart}" stroke="${RK.cizgi}"/>`);
-        p.push(yazi(P + 28, y + 70, 'Bu tarihlerde sipariş taşıyan kurye görünmüyor.', { boy: 21, renk: RK.sonuk }));
-        y += 120 + 24;
+    const p = [''];
+    let y = ustBant(p, { etiket: 'KURYE PERFORMANSI · ' + donemAdi(s.bas, s.son).toLocaleUpperCase('tr') + ' CDI', baslik: s.baslik || 'Kurye CDI Tablosu', bas: s.bas, son: s.son });
+    if (s.uyari) {
+        p.push(`<rect x="${P}" y="${y}" width="${IC}" height="64" rx="18" fill="${C.turuncuZemin}" stroke="#fcd34d"/>`);
+        p.push(yazi(P + 28, y + 41, kirp(OLCU.govde, s.uyari, 22, IC - 56), { boy: 22, renk: C.turuncu }));
+        y += 64 + 24;
     }
-    kuryeler.forEach((k) => {
-        if (y + SATIR_H + 104 > AZAMI_BOY && y > P + 160) { bitir(); yeni(false); }
-        const x = P;
-        const kutuH = SATIR_H - 16;
-        p.push(`<rect x="${x}" y="${y}" width="${IC}" height="${kutuH}" rx="22" fill="${RK.kart}" stroke="${RK.cizgi}"/>`);
-        const FOTO = 64;
-        let mx = x + 24;
-        if (secenek.foto !== false) { kuryeFoto(p, x + 24, y + 22, FOTO, fotolar.get(k.id), k.ad); mx += FOTO + 18; }
-        // Sağda sipariş sayısı
-        const sipYazi = String(k.siparis);
-        const sipG = genislik(OLCU.baslik, sipYazi, 40);
-        p.push(yazi(G - P - 24, y + 58, sipYazi, { boy: 40, aile: 'Manrope', agirlik: 800, renk: RK.yazi, hiza: 'end' }));
-        p.push(yazi(G - P - 24, y + 84, 'sipariş', { boy: 16, renk: RK.sonuk, hiza: 'end' }));
-        const adG = G - P - 24 - Math.max(sipG, 60) - 24 - mx - 110;
-        p.push(yazi(mx, y + 50, kirp(OLCU.govdeKalin, k.ad, 24, adG), { boy: 24, agirlik: 600 }));
-        const adW = Math.min(adG, genislik(OLCU.govdeKalin, kirp(OLCU.govdeKalin, k.ad, 24, adG), 24));
-        harfRozeti(p, mx + adW + 14, y + 25, k.harf, 16);
-        p.push(yazi(mx, y + 80, (k.ilk != null ? k.ilk + ' ilk sipariş' : '') + (k.toplamSiparis && k.toplamSiparis !== k.siparis ? ' · toplam ' + k.toplamSiparis : ''), { boy: 16, renk: RK.sonuk }));
-        // Ölçüler: 4 sütunlu ızgara
-        const gx = x + 24;
-        const gG = IC - 48;
-        const hucre = Math.floor(gG / sutun);
-        secili.forEach(([, ad, deger, renk], i) => {
-            const cx = gx + (i % sutun) * hucre;
-            const cy = y + 108 + Math.floor(i / sutun) * 56;
-            p.push(`<rect x="${cx}" y="${cy}" width="${hucre - 10}" height="46" rx="12" fill="${RK.zemin}"/>`);
-            p.push(yazi(cx + 14, cy + 29, ad, { boy: 15, renk: RK.sonuk }));
-            p.push(yazi(cx + hucre - 24, cy + 30, deger(k), { boy: 18, aile: 'Manrope', agirlik: 800, renk: renk(k), hiza: 'end' }));
+
+    // Özet şeridi: seçilen kutular seçilen sırayla (en çok 6)
+    const ozetler = ozetDuzelt(s.ozet).map((k) => [k, OZETLER.find((o) => o.anahtar === k)]);
+    const oG = (IC - (ozetler.length - 1) * 16) / ozetler.length;
+    ozetler.forEach(([k, o], i) => {
+        const [deger, renk] = ozetDegeri(k, kuryeler);
+        const x = P + i * (oG + 16);
+        p.push(`<rect x="${x}" y="${y}" width="${oG}" height="104" rx="22" fill="${i === 0 ? C.maviZemin : C.kart}" stroke="${i === 0 ? C.maviCizgi : C.cizgi}"/>`);
+        p.push(yazi(x + 24, y + 36, kirp(OLCU.govdeKalin, o.ad.toLocaleUpperCase('tr'), 16, oG - 40), { boy: 16, agirlik: 700, renk: i === 0 ? C.mavi : C.sonuk, aralik: 1.4 }));
+        let boy = 38;
+        while (boy > 22 && genislik(OLCU.baslik, deger, boy) > oG - 48) boy--;
+        p.push(yazi(x + 24, y + 84, deger, { boy, aile: 'Manrope', agirlik: 800, renk }));
+    });
+    y += 104 + 28;
+
+    // Tablo ölçüleri: sütunlar genişliğe, satırlar kurye sayısına göre
+    const ADG = adG0;
+    const kG = (IC - ADG) / Math.max(sutunlar.length, 1);
+    const SATIR = n > 24 ? 60 : n > 16 ? 68 : 80;
+    const BANT = 44;
+    const BASLIK = 72;
+    const degerBoy = Math.max(18, Math.min(28, Math.floor(kG * 0.3)));
+    const baslikBoy = kG < 96 ? 15 : 17;
+    const tabloH = BANT + BASLIK + n * SATIR + 12;
+    p.push(`<rect x="${P}" y="${y}" width="${IC}" height="${tabloH}" rx="28" fill="${C.kart}" stroke="${C.cizgi}"/>`);
+
+    // Sütun zeminleri (grup rengi) ve üst bant: art arda aynı grup tek bant
+    const kumeler = [];
+    sutunlar.forEach((t, i) => {
+        const son = kumeler[kumeler.length - 1];
+        if (son && son.grup === t.grup) son.n++;
+        else kumeler.push({ grup: t.grup, bas: i, n: 1 });
+    });
+    p.push(yazi(P + 32, y + 30, 'KURYE', { boy: 16, agirlik: 700, renk: C.sonuk, aralik: 1.6 }));
+    kumeler.forEach((k) => {
+        const g = GRUPLAR[k.grup];
+        const x = P + ADG + k.bas * kG;
+        const w = k.n * kG;
+        p.push(`<rect x="${x + 3}" y="${y + BANT}" width="${w - 6}" height="${tabloH - BANT - 10}" rx="14" fill="${g.hucre}"/>`);
+        p.push(`<rect x="${x + 3}" y="${y + 8}" width="${w - 6}" height="${BANT - 12}" rx="10" fill="${g.zemin}"/>`);
+        const bant = genislik(OLCU.govdeKalin, g.ad, 15) + 20 <= w - 16 ? g.ad : g.kisa;
+        p.push(yazi(x + w / 2, y + 30, kirp(OLCU.govdeKalin, bant, 15, w - 16), { boy: 15, agirlik: 700, renk: g.renk, hiza: 'middle', aralik: 1.2 }));
+    });
+    // Sütun başlıkları (en çok iki satır)
+    let ty = y + BANT;
+    sutunlar.forEach((t, i) => {
+        const cx = P + ADG + i * kG + kG / 2;
+        const satirlar = ikiSatir(OLCU.govdeKalin, t.ad, baslikBoy, kG - 12);
+        const bas = satirlar.length > 1 ? ty + 30 : ty + 42;
+        satirlar.forEach((m, j) => p.push(yazi(cx, bas + j * (baslikBoy + 4), m, { boy: baslikBoy, agirlik: 600, renk: C.orta, hiza: 'middle' })));
+    });
+    ty += BASLIK;
+    p.push(`<rect x="${P + 16}" y="${ty - 2}" width="${IC - 32}" height="2" fill="${C.cizgi}"/>`);
+
+    if (!kuryeler.length) {
+        p.push(yazi(W / 2, ty + SATIR / 2 + 9, 'Bu tarihlerde sipariş taşıyan kurye görünmüyor.', { boy: 24, renk: C.sonuk, hiza: 'middle' }));
+    }
+    const fotoBoy = Math.round(SATIR * 0.66);
+    kuryeler.forEach((k, i) => {
+        const sy = ty + i * SATIR;
+        if (i) p.push(`<rect x="${P + 16}" y="${sy}" width="${IC - 32}" height="1" fill="${C.cizgiAcik}"/>`);
+        const orta = sy + SATIR / 2;
+        // Sıra rozeti
+        const sira = i + 1;
+        const sr = SIRA_RENK[sira];
+        const rx = P + 24;
+        const rBoy = Math.round(SATIR * 0.5);
+        if (sr) {
+            p.push(`<circle cx="${rx + rBoy / 2}" cy="${orta}" r="${rBoy / 2}" fill="${sr.zemin}" stroke="${sr.cizgi}" stroke-width="2"/>`);
+            p.push(yazi(rx + rBoy / 2, orta + rBoy * 0.18, String(sira), { boy: Math.round(rBoy * 0.5), aile: 'Manrope', agirlik: 800, renk: sr.yazi, hiza: 'middle' }));
+        } else {
+            p.push(yazi(rx + rBoy / 2, orta + rBoy * 0.18, String(sira), { boy: Math.round(rBoy * 0.5), aile: 'Manrope', agirlik: 800, renk: C.soluk, hiza: 'middle' }));
+        }
+        let ax = rx + rBoy + 18;
+        if (s.foto !== false) { kuryeFoto(p, ax, orta - fotoBoy / 2, fotoBoy, fotolar.get(k.id), k.ad); ax += fotoBoy + 16; }
+        const adBoy = SATIR >= 80 ? 24 : 21;
+        p.push(yazi(ax, orta + adBoy * 0.36, kirp(OLCU.govdeKalin, k.ad, adBoy, P + ADG - 16 - ax), { boy: adBoy, agirlik: 600, renk: C.yazi }));
+        // Değerler
+        sutunlar.forEach((t, j) => {
+            const cx = P + ADG + j * kG + kG / 2;
+            const v = k.d[t.anahtar];
+            if (t.bicim === 'harf') { harfRozeti(p, cx, orta, v, Math.round(degerBoy * 0.85)); return; }
+            let r = { renk: v == null ? C.soluk : C.yazi, agirlik: 600 };
+            if (t.renk === 'puan') r = puanRenk(v);
+            if (t.renk === 'problem') r = v == null ? { renk: C.soluk, agirlik: 400 } : v > 0 ? { renk: C.kirmizi, agirlik: 800 } : { renk: C.yesil, agirlik: 700 };
+            const metin = hucreMetni(t, v);
+            // Sığmazsa kesilmez, küçülür
+            let boy = degerBoy;
+            while (boy > 14 && genislik(OLCU.baslik, metin, boy) > kG - 14) boy--;
+            p.push(yazi(cx, orta + boy * 0.36, metin, { boy, aile: 'Manrope', agirlik: r.agirlik, renk: r.renk, hiza: 'middle' }));
         });
-        y += SATIR_H;
     });
-    bitir();
-    return kartlar.map((kk, i) => {
-        alt(kk.p, kk.H, kartlar.length > 1 ? (i + 1) + ' / ' + kartlar.length : null);
-        return svgPng(kk.p, kk.H);
-    });
+
+    const H = y + tabloH + 40 + 72 + 24;
+    p[0] = `<rect width="${W}" height="${H}" fill="${C.zemin}"/>`;
+    const siraAd = { not: 'CDI notu', cdi: 'CDI puanı', siparis: 'sipariş sayısı', ad: 'ad' }[s.siralama] || 'CDI notu';
+    altBant(p, H, 'Jet Barkod · Kurye CDI', 'Sıralama: ' + siraAd + (enAz > 1 ? ' · en az ' + enAz + ' sipariş' : '') + ' · jetbarkod.com.tr');
+    return svgPng(p, H);
 }
 
-/** Kurye fotoğrafları: yalnız bellekte, 128 px; diske yazılmaz. 8 sn içinde gelenler. */
+/** Kurye fotoğrafları: yalnız bellekte, özgün boyutuyla (keskin kalsın); diske yazılmaz */
 async function kuryeFotolari(liste, butceMs = 8000) {
     const sonuc = new Map();
     const bitis = Date.now() + butceMs;
-    const kuyruk = liste.filter((k) => k.foto).slice(0, 60);
+    const kuyruk = liste.filter((k) => k.foto).slice(0, 80);
     let sira = 0;
     async function isci() {
         while (sira < kuyruk.length && Date.now() < bitis) {
@@ -327,12 +442,9 @@ async function kuryeFotolari(liste, butceMs = 8000) {
                 const r = await fetch(k.foto, { signal: ctrl.signal, redirect: 'error' });
                 if (!r.ok) continue;
                 const b = Buffer.from(await r.arrayBuffer());
-                if (!b.length || b.length > 2 * 1024 * 1024) continue;
-                const tur = b[0] === 0xff && b[1] === 0xd8 ? 'jpeg' : b[0] === 0x89 && b[1] === 0x50 ? 'png' : null;
-                if (!tur) continue;
-                const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="#fff"/>` +
-                    `<image href="data:image/${tur};base64,${b.toString('base64')}" width="128" height="128" preserveAspectRatio="xMidYMid slice"/></svg>`;
-                sonuc.set(k.id, new Resvg(svg, { font: { loadSystemFonts: false } }).render().asPng());
+                if (!b.length || b.length > 1536 * 1024) continue;
+                if (!((b[0] === 0xff && b[1] === 0xd8) || (b[0] === 0x89 && b[1] === 0x50))) continue;
+                sonuc.set(k.id, b);
             } catch (e) { /* fotoğrafsız */ } finally { clearTimeout(t); }
         }
     }
@@ -340,4 +452,4 @@ async function kuryeFotolari(liste, butceMs = 8000) {
     return sonuc;
 }
 
-module.exports = { dpsKarti, kuryeKartlari, kuryeFotolari, tarihAraligi, ondalik, kacir };
+module.exports = { dpsKarti, kuryeKarti, kuryeFotolari, tarihAraligi, donemAdi, ondalik };

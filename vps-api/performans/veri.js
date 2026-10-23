@@ -12,6 +12,8 @@
  */
 'use strict';
 
+const { SUTUNLAR } = require('./sutunlar');
+
 /* Panelin "Depo Performans Sistemi" sayfasındaki adlar */
 const KRITER_AD = {
     RED_BASKET: 'Kırmızı Sepet',
@@ -92,7 +94,7 @@ function dpsDuzelt(ham) {
 
 const KURYE_FOTO = /^https:\/\/cdn\.getir\.com\/person\/[A-Za-z0-9._-]+\.(?:png|jpe?g)(?:\?[0-9]+)?$/;
 
-/** /courier/v2/metrics data dizisi → kurye listesi (en çok 80) */
+/** /courier/v2/metrics data dizisi → kurye listesi (en çok 80). Ölçüler sütun kataloğundan (d). */
 function kuryeDuzelt(ham) {
     const liste = Array.isArray(ham) ? ham : [];
     const gorulen = new Set();
@@ -102,24 +104,18 @@ function kuryeDuzelt(ham) {
         const id = metin(k.id, 40);
         if (!/^[a-f0-9]{24}$/.test(id) || gorulen.has(id)) continue;
         gorulen.add(id);
+        const d = {};
+        for (const t of SUTUNLAR) {
+            const v = k[t.alan];
+            d[t.anahtar] = t.bicim === 'harf' ? harfMi(v) : t.bicim === 'sayi' ? tam(v) : sayi(v);
+        }
         sonuc.push({
             id,
             ad: metin(k.name, 80) || 'Kurye',
             foto: typeof k.image_url === 'string' && KURYE_FOTO.test(k.image_url) ? k.image_url : '',
-            siparis: tam(k.order_count) || 0,
-            toplamSiparis: tam(k.total_order_count) || 0,
-            ilk: tam(k.first_order_count),
-            birlesen: tam(k.batched_order_count),
-            ortTeslimat: sayi(k.avg_delivery_duration),
-            yoldaSure: sayi(k.onway_to_reach_duration),
-            ulasmaTeslim: sayi(k.reach_to_deliver_duration),
-            donusSure: sayi(k.return_duration),
-            yoldaPuan: sayi(k.onway_score),
-            teslimatPuan: sayi(k.deliver_score),
-            donusPuan: sayi(k.return_score),
-            cdiPuan: sayi(k.cdi_order_score),
-            problemli: tam(k.problematic_order_count),
-            harf: harfMi(k.cdi_letter_grade),
+            siparis: d.siparis || 0,
+            toplamSiparis: d.toplamSiparis || 0,
+            d,
         });
         if (sonuc.length >= 80) break;
     }

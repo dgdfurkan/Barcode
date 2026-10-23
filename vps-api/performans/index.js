@@ -15,9 +15,10 @@
  *   telegram-ayar.js içinde `performans` (saatler, eşik, erteleme, bölümler).
  *
  * UÇLAR
- *   GET  /api/performans/ayar       Asistan: zamanlama ayarı
- *   POST /api/performans/onizleme   { veri | ornek, ayar? } → kartlar (720 px)
- *   POST /api/performans/gonder     { veri, ayar?, otomatik?: { gun, dakika, eksik } }
+ *   GET  /api/performans/ayar       Asistan: zamanlama ayarı (+ sütun kataloğu)
+ *   POST /api/performans/onizleme   { rapor: dps|kurye, veri | ornek, ayar? } → kart (1600 px)
+ *   POST /api/performans/gonder     { rapor, veri, ayar?, otomatik?: { gun, dakika, eksik } }
+ *                                   Fotoğraf + istenirse tam kalite dosya (3840 px)
  *   POST /api/performans/ertele     Asistan: "veri gelmedi, X dk sonra" bildirimi
  * ============================================================================
  */
@@ -25,14 +26,16 @@
 
 const telegram = require('../sayim-raporu/telegram');
 const ta = require('../telegram-ayar');
-const { albumGonder, kucult } = require('../gece-raporu/paylas');
+const { albumGonder, belgeGonder, kucult } = require('../gece-raporu/paylas');
 const { veriDuzelt } = require('./veri');
+const { katalog } = require('./sutunlar');
 const kart = require('./kart');
 
 const HAKLAR = ['satistanKaldirma', 'itirazYazici', 'stokSayimi', 'jetBarkodAsistan'];
 const GUN_MS = 24 * 3600 * 1000;
-// gece.gonderim'de zamanlı rapor saatleriyle çakışmasın: dakika + 10000
-const GONDERIM_KAYMA = 10000;
+// gece.gonderim'de zamanlı rapor saatleriyle çakışmasın: DPS dakika + 10000, Kurye dakika + 12000
+const GONDERIM_KAYMA = { dps: 10000, kurye: 12000 };
+const RAPORLAR = new Set(['dps', 'kurye']);
 
 function hakAcik(pf) {
     if (!pf || typeof pf !== 'object') return false;
@@ -96,71 +99,67 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         return A.performans;
     }
 
-    /** Kartlar ve Telegram yazısı. pf: ayar.performans */
-    async function raporHazirla(v, pf, ek = {}) {
-        const kartlar = [];
-        const uyari = ek.eksik ? 'Veri eksik olabilir: bu tarihte yalnız ' + ek.eksik + ' sipariş görünüyor.' : null;
-        if (pf.dps && v.dps) {
-            kartlar.push(kart.dpsKarti(v.dps, { ...pf.dpsAyrinti, bas: v.bas, son: v.son, uyari }));
-        }
-        if (pf.kurye && v.kurye) {
-            const ka = pf.kuryeAyrinti;
-            const fotolar = ka.foto ? await kart.kuryeFotolari(v.kurye, ek.onizleme ? 6000 : 10000) : new Map();
-            kartlar.push(...kart.kuryeKartlari(v.kurye, { ...ka, bas: v.bas, son: v.son, fotolar, uyari: pf.dps && v.dps ? null : uyari }));
-        }
-        const satir = ['📊 Performans · ' + kart.tarihAraligi(v.bas, v.son)];
-        if (v.dps && pf.dps) {
+    /** Tek raporun kartı ve Telegram yazısı. pf: ayar.performans, rapor: dps | kurye */
+    async function raporHazirla(v, pf, rapor, ek = {}) {
+        const uyari = ek.eksik != null ? 'Veri eksik olabilir: bu tarihte yalnız ' + ek.eksik + ' sipariş görünüyor.' : null;
+        const tarih = kart.tarihAraligi(v.bas, v.son);
+        if (rapor === 'dps') {
+            if (!v.dps) return { kartlar: [], baslik: '' };
+            const d = v.dps;
             const f = (o) => kart.ondalik(o.puan) + (o.harf ? ' (' + o.harf + ')' : '');
-            satir.push('Bayi DPS ' + f(v.dps.bayi) + ' · Kurye ' + f(v.dps.kurye) + ' · Picker ' + f(v.dps.depocu));
+            return {
+                kartlar: [kart.dpsKarti(d, { ...pf.dps, bas: v.bas, son: v.son, uyari })],
+                baslik: ['🏬 DPS · ' + tarih, 'Bayi ' + f(d.bayi) + ' · Kurye ' + f(d.kurye) + ' · Picker ' + f(d.depocu), uyari ? '⚠️ ' + uyari : null].filter(Boolean).join('\n'),
+                tamKalite: pf.dps.tamKalite, ad: 'dps-' + v.bas + (v.son !== v.bas ? '_' + v.son : ''),
+            };
         }
-        if (v.kurye && pf.kurye) {
-            const aktif = v.kurye.filter((k) => k.siparis > 0);
-            satir.push(aktif.length + ' kurye · ' + aktif.reduce((t, k) => t + k.siparis, 0) + ' sipariş');
-        }
-        if (uyari) satir.push('⚠️ ' + uyari);
-        return { kartlar: kartlar.slice(0, 10), baslik: satir.join('\n') };
+        if (!v.kurye) return { kartlar: [], baslik: '' };
+        const ka = pf.kurye;
+        const fotolar = ka.foto ? await kart.kuryeFotolari(v.kurye, ek.onizleme ? 6000 : 10000) : new Map();
+        const aktif = v.kurye.filter((k) => k.siparis >= Math.max(1, ka.enAzSiparis));
+        return {
+            kartlar: [kart.kuryeKarti(v.kurye, { ...ka, bas: v.bas, son: v.son, fotolar, uyari })],
+            baslik: ['🛵 Kurye CDI · ' + tarih, aktif.length + ' kurye · ' + aktif.reduce((t, k) => t + k.siparis, 0) + ' sipariş', uyari ? '⚠️ ' + uyari : null].filter(Boolean).join('\n'),
+            tamKalite: ka.tamKalite, ad: 'kurye-cdi-' + v.bas + (v.son !== v.bas ? '_' + v.son : ''),
+        };
     }
 
-    /** Önizleme için kurgusal veri (adlar ve sayılar uydurma) */
+    /** Önizleme için kurgusal veri (adlar ve sayılar uydurma), panel yanıtı biçiminde */
     function ornekVeri() {
-        const dun = new Date(Date.now() - GUN_MS);
-        const gun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(dun);
-        const k = (ad, siparis, harf, teslim, cdi, ek = {}) => ({
-            id: Math.random().toString(16).slice(2).padEnd(24, '0').slice(0, 24), ad, foto: '', siparis, toplamSiparis: siparis, ilk: Math.round(siparis * 0.7),
-            birlesen: Math.round(siparis * 0.25), ortTeslimat: teslim, yoldaSure: teslim * 0.35, ulasmaTeslim: 2.4, donusSure: 5.2,
-            yoldaPuan: 8.4, teslimatPuan: 97.6, donusPuan: 61.2, cdiPuan: cdi, problemli: 0, harf, ...ek,
+        const dun = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date(Date.now() - GUN_MS));
+        const alt = (k, p, perf, w) => ({ subCriterionPoint_75: p, subCriterionPerformancePercentage_75: perf, subCriterionTranslationKey_75: k, subCriterionWeight_75: w });
+        const dps = [{
+            warehouseName: 'Örnek Depo',
+            warehouseDpsPoints: { point: 94.62, letterGrade: 'A', criterionPoints: [{ subCriterionPoints: [
+                alt('RED_BASKET', 100, 0, 25), alt('PICKER_ASSIGN_DURATION', 82.4, 21.3, 3), alt('PROBLEMATIC_ORDER', 88.1, 0.62, 25), alt('COUNTING_PERFORMANCE', 100, null, 7.5),
+                alt('BAKERY_PERFORMANCE', 91.2, null, 10), alt('NEW_IN_WH_DURATION', 100, 0.84, 7), alt('COURIER_DISCIPLINE_INDEX', 100, null, 15), alt('ACCEPTANCE_OF_GOODS', 100, 100, 7.5)] },
+            { criterionPoint: 0, criterionTranslationKey: 'FLEET_AUDITS' }, { criterionPoint: 0, criterionTranslationKey: 'QA_AUDITS' }] },
+            courierDpsPoints: { point: 95.8, letterGrade: 'A+', criterionPoints: [{ subCriterionPoints: [alt('RED_BASKET', 100, 0, 44.44), alt('PROBLEMATIC_ORDER', 88.1, 0.62, 28.89), alt('COURIER_DISCIPLINE_INDEX', 100, null, 26.67)] }, { criterionPoint: 0, criterionTranslationKey: 'FLEET_AUDITS' }] },
+            pickerDpsPoints: { point: 93.41, letterGrade: 'A', criterionPoints: [{ subCriterionPoints: [alt('PICKER_ASSIGN_DURATION', 82.4, 21.3, 6.86), alt('PROBLEMATIC_ORDER', 88.1, 0.62, 20), alt('COUNTING_PERFORMANCE', 100, null, 17.14), alt('BAKERY_PERFORMANCE', 91.2, null, 22.86), alt('NEW_IN_WH_DURATION', 100, 0.84, 16), alt('ACCEPTANCE_OF_GOODS', 100, 100, 17.14)] }, { criterionPoint: 0, criterionTranslationKey: 'QA_AUDITS' }] },
+        }];
+        const k = (i, ad, sip, harf, cdi, teslim, donus, prob, sure) => ({
+            id: String(i).repeat(24).slice(0, 24), name: ad, image_url: '', order_count: sip, total_order_count: sip + (i % 3), first_order_count: Math.round(sip * 0.72),
+            batched_order_count: Math.round(sip * 0.26), artisan_order_count: i % 4 === 0 ? 1 : 0, getir_finance_order_count: 0,
+            onway_score: (4 + i * 1.7).toFixed(1) + '%', deliver_score: teslim, return_score: donus, cdi_order_score: cdi, problematic_order_count: prob,
+            avg_delivery_duration: sure, onway_to_reach_duration: '4.6', reach_to_deliver_duration: '2.3', return_duration: '5.4',
+            picker_assign_to_prepare_duration: '1.0', waste_time_in_preparation_min: '0.3', cdi_letter_grade: harf,
+            cdi_realized_handover_to_depart_duration: '1.0', cdi_realized_onway_to_reach_duration: '3.0', cdi_realized_reach_to_deliver_duration_in_minute: '3.0', cdi_realized_deliver_to_return_duration: '2.8',
         });
-        const kriter = (anahtar, ad, agirlik, bayiPuan, kurye, depocu) => ({ anahtar, ad, agirlik, bayiPuan, kurye, depocu });
-        return {
-            bas: gun, son: gun,
-            dps: {
-                depoAd: 'Örnek Depo',
-                bayi: { puan: 94.62, harf: 'A' }, kurye: { puan: 95.8, harf: 'A+' }, depocu: { puan: 93.41, harf: 'A' },
-                kriterler: [
-                    kriter('RED_BASKET', 'Kırmızı Sepet', 25, 100, { perf: 0, puan: 100 }, null),
-                    kriter('PICKER_ASSIGN_DURATION', 'Toplayıcı Bekliyor', 3, 82.4, null, { perf: 21.3, puan: 82.4 }),
-                    kriter('PROBLEMATIC_ORDER', 'Sorunsuz Teslimat', 25, 88.1, { perf: 0.62, puan: 88.1 }, { perf: 0.62, puan: 88.1 }),
-                    kriter('COUNTING_PERFORMANCE', 'Sayım Performansı', 7.5, 100, null, { perf: null, puan: 100 }),
-                    kriter('BAKERY_PERFORMANCE', 'Fırın Bulunurluk', 10, 91.2, null, { perf: null, puan: 91.2 }),
-                    kriter('NEW_IN_WH_DURATION', 'Depo İçi Süre', 7, 100, null, { perf: 0.84, puan: 100 }),
-                    kriter('COURIER_DISCIPLINE_INDEX', 'Kurye Disiplin İndeksi', 15, 100, { perf: null, puan: 100 }, null),
-                    kriter('ACCEPTANCE_OF_GOODS', 'Mal Kabul', 7.5, 100, null, { perf: 100, puan: 100 }),
-                ],
-                denetim: { bayi: 0, filo: 0, kalite: 0 },
-            },
-            kurye: [
-                k('Ali Yılmaz', 48, 'A++', 13.2, 98.1), k('Can Demir', 41, 'A+', 14.6, 95.4, { problemli: 1 }),
-                k('Ece Kaya', 36, 'A++', 12.8, 99.0), k('Mert Şahin', 29, 'A', 16.9, 91.7, { donusPuan: 44.8 }),
-                k('Selin Arslan', 22, 'B', 18.4, 84.2, { teslimatPuan: 81.5 }), k('Deniz Koç', 6, 'F', 21.3, 39.9, { teslimatPuan: 55.5, donusPuan: 21.6 }),
-            ],
-        };
+        const kurye = [
+            k(1, 'Ali Yılmaz', 54, 'A++', '97.3%', '99.4%', '51.6%', 0, '15.3'), k(2, 'Can Demir', 33, 'A+', '91.5%', '99.7%', '63.3%', 0, '13.3'),
+            k(3, 'Ece Kaya', 32, 'A++', null, '96.7%', '65.5%', 0, '16.9'), k(4, 'Mert Şahin', 29, 'A+', '94.6%', '99.8%', '53.6%', 1, '16.3'),
+            k(5, 'Selin Arslan', 28, 'A++', '96.4%', '98.8%', '72.3%', 0, '13.2'), k(6, 'Deniz Koç', 21, 'A++', '95.1%', '72.5%', '60.1%', 0, '15.7'),
+            k(7, 'Ozan Çelik', 17, 'A', '93.9%', '98.0%', '51.2%', 0, '15.1'), k(8, 'Burak Aydın', 14, 'A++', '100.0%', '97.4%', '93.0%', 0, '11.1'),
+            k(9, 'Gizem Öztürk', 4, 'F', '39.9%', '55.5%', '21.6%', 0, '21.3'),
+        ];
+        return veriDuzelt({ bas: dun, son: dun, dps, kurye });
     }
 
     app.get('/api/performans/ayar', uye, async (req, res) => {
         try {
             const pf = await ayarAl(req.auth.username);
             res.setHeader('Cache-Control', 'no-store');
-            res.json({ ok: true, performans: pf, hesap: (await alicilar(req.auth.username)).length });
+            res.json({ ok: true, performans: pf, hesap: (await alicilar(req.auth.username)).length, katalog: katalog() });
         } catch (e) {
             console.error('performans ayar:', e.message);
             res.status(500).json({ ok: false, error: 'server_error' });
@@ -171,12 +170,15 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         const u = req.auth.username;
         const b = req.body || {};
         if (!pencere('onizleme:' + u, 15, 60000)) return res.status(429).json({ ok: false, error: 'cok_istek' });
+        const rapor = RAPORLAR.has(b.rapor) ? b.rapor : null;
+        if (!rapor) return res.status(400).json({ ok: false, error: 'rapor' });
         const v = b.ornek ? ornekVeri() : veriDuzelt(b.veri);
         if (!v) return res.status(400).json({ ok: false, error: 'veri' });
         try {
             const pf = await ayarAl(u, b.ayar && { performans: b.ayar });
-            const r = await raporHazirla(v, pf, { onizleme: true });
-            res.json({ ok: true, baslik: r.baslik, kartlar: r.kartlar.map((k) => 'data:image/png;base64,' + kucult(k).toString('base64')) });
+            const r = await raporHazirla(v, pf, rapor, { onizleme: true });
+            // Önizleme 1600 px: yakınlaştırınca da okunur
+            res.json({ ok: true, baslik: r.baslik, kartlar: r.kartlar.map((k) => 'data:image/png;base64,' + kucult(k, 1600).toString('base64')) });
         } catch (e) {
             console.error('performans onizleme:', e.message);
             res.status(500).json({ ok: false, error: 'server_error' });
@@ -190,7 +192,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         try {
             const r = await pool.query(
                 'INSERT INTO gece.gonderim (username, gun, dakika) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING 1',
-                [u, gun, GONDERIM_KAYMA + dakika]
+                [u, gun, dakika]
             );
             return r.rows.length > 0;
         } catch (e) {
@@ -208,10 +210,13 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         const b = req.body || {};
         if (!telegram.hazirMi()) return res.status(503).json({ ok: false, error: 'bot_hazir_degil' });
         const oto = b.otomatik && typeof b.otomatik === 'object' ? b.otomatik : null;
+        if (!RAPORLAR.has(b.rapor)) return res.status(400).json({ ok: false, error: 'rapor' });
         if (!oto) {
             if (!pencere('gonder-ara:' + u, 1, 30000)) return res.status(429).json({ ok: false, error: 'cok_sik', bekleSn: 30 });
             if (!pencere('gonder-gun:' + u, 30, GUN_MS)) return res.status(429).json({ ok: false, error: 'gunluk_sinir' });
         }
+        const rapor = RAPORLAR.has(b.rapor) ? b.rapor : null;
+        if (!rapor) return res.status(400).json({ ok: false, error: 'rapor' });
         const v = veriDuzelt(b.veri);
         if (!v) return res.status(400).json({ ok: false, error: 'veri' });
         try {
@@ -221,14 +226,16 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             if (oto) {
                 const gun = typeof oto.gun === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(oto.gun) ? oto.gun : null;
                 const dakika = Number.isInteger(oto.dakika) && oto.dakika >= 0 && oto.dakika < 1440 ? oto.dakika : null;
-                if (!gun || dakika == null || !pf.saatler.includes(dakika)) return res.status(400).json({ ok: false, error: 'zaman' });
-                if (!(await isaretle(u, gun, dakika))) return res.json({ ok: true, zatenGitti: true });
+                if (!gun || dakika == null || !pf[rapor].saatler.includes(dakika)) return res.status(400).json({ ok: false, error: 'zaman' });
+                if (!(await isaretle(u, gun, GONDERIM_KAYMA[rapor] + dakika))) return res.json({ ok: true, zatenGitti: true });
             }
             const eksik = oto && Number.isInteger(oto.eksik) && oto.eksik >= 0 ? oto.eksik : null;
-            const r = await raporHazirla(v, pf, { eksik });
+            const r = await raporHazirla(v, pf, rapor, { eksik });
             if (!r.kartlar.length) return res.status(409).json({ ok: false, error: 'bos' });
-            const s = await albumGonder(pool, hedefler, r.kartlar, r.baslik, 'performans');
+            const s = await albumGonder(pool, hedefler, r.kartlar, r.baslik, r.ad);
             if (!s.giden) return res.status(502).json({ ok: false, error: 'gonderilemedi' });
+            // Tam kalite: aynı kart dosya olarak (Telegram fotoğrafı küçültüyor)
+            if (r.tamKalite) await belgeGonder(pool, hedefler, r.kartlar, r.ad).catch(() => null);
             res.json({ ok: true, kart: r.kartlar.length, giden: s.giden });
         } catch (e) {
             console.error('performans gonder:', e.message);
@@ -243,7 +250,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         if (!pencere('ertele:' + u, 12, 3600 * 1000)) return res.status(429).json({ ok: false, error: 'cok_sik' });
         try {
             const pf = await ayarAl(u);
-            if (!pf.ertelemeBildir || !telegram.hazirMi()) return res.json({ ok: true, bildirildi: false });
+            if (!pf.kontrol.ertelemeBildir || !telegram.hazirMi()) return res.json({ ok: true, bildirildi: false });
+            const raporAd = b.rapor === 'dps' ? 'DPS raporu' : b.rapor === 'kurye' ? 'Kurye CDI raporu' : b.rapor === 'ikisi' ? 'DPS ve Kurye CDI raporları' : 'Performans raporu';
             const hedefler = await alicilar(u);
             const n = (x, alt, ust) => (Number.isInteger(x) && x >= alt && x <= ust ? x : null);
             const deneme = n(b.deneme, 1, 20);
@@ -253,8 +261,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const sebep = b.sebep === 'oturum' ? 'Franchise oturumu bulunamadı; franchise panelini bir kez aç.'
                 : 'Dünün verisi henüz tamamlanmadı' + (siparis != null ? ' (' + siparis + ' sipariş görünüyor)' : '') + '.';
             const metin = b.vazgecildi
-                ? '⏹️ Performans raporu bugün gönderilmedi.\n' + sebep
-                : '⏳ Performans raporu ertelendi.\n' + sebep + (sonraki ? '\n' + sonraki + ' dk sonra tekrar denenecek' : '') + (deneme && kez ? ' (' + deneme + '/' + kez + ').' : '.');
+                ? '⏹️ ' + raporAd + ' bugün gönderilmedi.\n' + sebep
+                : '⏳ ' + raporAd + ' ertelendi.\n' + sebep + (sonraki ? '\n' + sonraki + ' dk sonra tekrar denenecek' : '') + (deneme && kez ? ' (' + deneme + '/' + kez + ').' : '.');
             let giden = 0;
             for (const h of hedefler) {
                 try { await telegram.mesaj(h.chat_id, metin); giden++; } catch (e) { /* sessiz */ }

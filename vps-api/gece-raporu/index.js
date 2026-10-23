@@ -671,6 +671,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             ]);
             res.json({
                 ok: true, ayar: o.ayar, kurulum: o.kurulum, varsayilan: ta.duzelt({}),
+                performansKatalog: require('../performans/sutunlar').katalog(),
                 hesaplar: h.map((x) => ({ ad: x.tg_ad || '', kullanici: x.tg_kullanici_adi || '' })),
                 son: g.rows[0] || null,
                 sebepler: sb.rows.map((x) => ({ ad: x.sebep, adet: x.adet })),

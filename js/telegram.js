@@ -7,9 +7,10 @@
  *   Anlık Bildirim  ayar.anlik: satıştan kaldırma durum değişince giden mesaj
  *   Elle Gönderim   ayar.kaldirmaGonder: Satıştan Kaldırma sayfasındaki
  *                   "Telegram'a Gönder" panelinin açılış seçimi
- *   Performans      ayar.performans: DPS ve Kurye Performansı; zamanlı
- *                   gönderimi Asistan yapar (arka-plan/performans.js), elle
- *                   gönderim bu tarayıcıdaki franchise oturumuyla
+ *   DPS, Kurye CDI  ayar.performans.dps / .kurye: ayrı raporlar, ayrı saatler;
+ *                   veri kontrolü (.kontrol) ortak. Zamanlı gönderimi Asistan
+ *                   yapar (arka-plan/performans.js), elle gönderim ve önizleme
+ *                   bu tarayıcıdaki franchise oturumuyla
  *
  * ÖNİZLEME
  *   Sunucu Telegram'a gidecek kartların aynısını çizer (720 px). Ayar
@@ -98,7 +99,25 @@
     function degisti() {
         ayarCiz();
         cubukCiz();
-        onizlemeZamanla();
+        onizlemeBayatla();
+    }
+
+    /* Düzenlerken önizleme kendiliğinden yenilenmez (her tıkta istek gitmesin,
+       tarih aralığının yarısında Getir'e gidilmesin). Önizleme soluklaşır,
+       "Önizlemeyi Güncelle" öne çıkar; kullanıcı basınca yenilenir. */
+    function onizlemeBayatla() {
+        d.onizleme.bayat = onizlemeAnahtari() !== d.onizleme.goster;
+        guncelleDugmesi();
+        el('tgOnizleme').classList.toggle('is-eski', d.onizleme.bayat || d.onizleme.yukleniyor);
+    }
+
+    function guncelleDugmesi() {
+        var b = el('tgGuncelle');
+        if (!b) return;
+        var bayat = !!d.onizleme.bayat && !d.onizleme.yukleniyor;
+        b.disabled = !bayat;
+        b.classList.toggle('is-vurgu', bayat);
+        b.querySelector('span').textContent = d.onizleme.yukleniyor ? 'Güncelleniyor' : bayat ? 'Önizlemeyi Güncelle' : 'Güncel';
     }
 
     // ------------------------------------------------------------------
@@ -290,6 +309,8 @@
     var PF_VERI_MS = 10 * 60 * 1000;
     var pfVeriOnbellek = {};
 
+    function pfSekmesi() { return d.sekme === 'dps' || d.sekme === 'kurye'; }
+
     function gunYaz(t) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date(t)); }
     function pfDun() { return gunYaz(Date.now() - 864e5); }
 
@@ -306,7 +327,7 @@
             d.pf.bas = d.pf.son.slice(0, 8) + '01';
         }
         ayarCiz();
-        onizlemeZamanla(true);
+        onizlemeBayatla();
     }
 
     function pfTarihKoy(alan, deger) {
@@ -318,7 +339,7 @@
             if (alan === 'bas') d.pf.son = gunYaz(Date.parse(d.pf.bas) + 62 * 864e5); else d.pf.bas = gunYaz(Date.parse(d.pf.son) - 62 * 864e5);
         }
         ayarCiz();
-        onizlemeZamanla(true);
+        onizlemeBayatla();
     }
 
     function aralikYazi(bas, son) {
@@ -326,36 +347,59 @@
         return bas === son ? f(bas) : f(bas) + ' - ' + f(son);
     }
 
-    /** Seçili aralığın verisi: { bas, son, dps, kurye } ; hata.kod: 'oturum' | 'depo' | 'ag' */
-    async function performansVerisi() {
-        var anahtar = d.pf.bas + '|' + d.pf.son;
+    /** Seçili aralığın verisi (yalnız istenen rapor için): { bas, son, dps | kurye } */
+    async function performansVerisi(rapor) {
+        var anahtar = rapor + '|' + d.pf.bas + '|' + d.pf.son;
         var o = pfVeriOnbellek[anahtar];
         if (o && Date.now() - o.zaman < PF_VERI_MS) return o.veri;
         if (!global.franchiseOturum) { var h0 = new Error('oturum'); h0.kod = 'oturum'; throw h0; }
         var oturum = await global.franchiseOturum.al();
         var depo = oturum.depo;
-        var kurye = [];
-        for (var s = 0; s < 10; s++) {
-            if (s) await new Promise(function (r) { setTimeout(r, 400); });
-            var r = await global.franchiseOturum.istek('/courier/v2/metrics', {
-                method: 'POST',
-                govde: {
-                    startDate: d.pf.bas + 'T00:00:00.000Z', endDate: d.pf.son + 'T23:59:59.999Z', courierIds: [], warehouseIds: [depo],
-                    metricGroups: PF_METRIK, vehicleTypes: [], limit: 10, offset: s * 10
-                }
-            });
-            if (!r.ok) { var h = new Error('panel'); h.kod = 'panel'; throw h; }
-            var j = await r.json();
-            var parca = Array.isArray(j && j.data) ? j.data : [];
-            kurye = kurye.concat(parca);
-            if (parca.length < 10 || kurye.length >= (Number(j && j.total_count) || 0)) break;
+        var veri = { bas: d.pf.bas, son: d.pf.son };
+        if (rapor === 'kurye') {
+            var kurye = [];
+            // 100'erli: liste tek istekte gelir
+            for (var s = 0; s < 5; s++) {
+                if (s) await new Promise(function (r) { setTimeout(r, 400); });
+                var r = await global.franchiseOturum.istek('/courier/v2/metrics', {
+                    method: 'POST',
+                    govde: {
+                        startDate: d.pf.bas + 'T00:00:00.000Z', endDate: d.pf.son + 'T23:59:59.999Z', courierIds: [], warehouseIds: [depo],
+                        metricGroups: PF_METRIK, vehicleTypes: [], limit: 100, offset: s * 100
+                    }
+                });
+                if (!r.ok) { var h = new Error('panel'); h.kod = 'panel'; throw h; }
+                var j = await r.json();
+                var parca = Array.isArray(j && j.data) ? j.data : [];
+                kurye = kurye.concat(parca);
+                if (parca.length < 100 || kurye.length >= (Number(j && j.total_count) || 0)) break;
+            }
+            veri.kurye = kurye;
+        } else {
+            var rd = await global.franchiseOturum.istek('/wps/criteria?startDate=' + d.pf.bas + '&endDate=' + d.pf.son + '&warehouseId=' + depo + '&isRanked=false');
+            if (!rd.ok) { var h2 = new Error('panel'); h2.kod = 'panel'; throw h2; }
+            veri.dps = await rd.json();
         }
-        await new Promise(function (r) { setTimeout(r, 400); });
-        var rd = await global.franchiseOturum.istek('/wps/criteria?startDate=' + d.pf.bas + '&endDate=' + d.pf.son + '&warehouseId=' + depo + '&isRanked=false');
-        if (!rd.ok) { var h2 = new Error('panel'); h2.kod = 'panel'; throw h2; }
-        var veri = { bas: d.pf.bas, son: d.pf.son, dps: await rd.json(), kurye: kurye };
         pfVeriOnbellek[anahtar] = { zaman: Date.now(), veri: veri };
         return veri;
+    }
+
+    function listeIslem(b) {
+        var t = siraliTanim(b.getAttribute('data-liste'));
+        if (!t) return;
+        if (b.hasAttribute('data-varsayilan-liste')) { koy(t.yol, t.varsayilan.slice()); return; }
+        var l = (al(t.yol) || t.varsayilan).slice();
+        var k = b.getAttribute('data-tasi') || b.getAttribute('data-cikar') || b.getAttribute('data-ekle');
+        var i = l.indexOf(k);
+        if (b.hasAttribute('data-ekle')) { if (i === -1 && l.length < t.enCok) l.push(k); }
+        else if (b.hasAttribute('data-cikar')) { if (i > -1 && l.length > 1) l.splice(i, 1); }
+        else {
+            var j = i + Number(b.getAttribute('data-yon'));
+            if (i < 0 || j < 0 || j >= l.length) return;
+            l.splice(i, 1);
+            l.splice(j, 0, k);
+        }
+        koy(t.yol, l);
     }
 
     function pfHataMetni(e) {
@@ -366,38 +410,33 @@
         return 'Panele ulaşılamadı. İnternet bağlantını kontrol et.';
     }
 
-    function performansHtml() {
-        var acik = !!al('performans.acik');
-        var esikYok = !al('performans.esik');
-        var alan = function (k, ad) { return cip('performans.kuryeAyrinti.alanlar.' + k, ad, !al('performans.kurye')); };
+    /** Zamanlı gönderim kartı (rapor: dps | kurye) */
+    function pfZamanKarti(rapor, baslik) {
+        var acik = !!al('performans.' + rapor + '.acik');
+        return kartHtml({
+            ikon: IKON.saat, baslik: 'Zamanlı Gönderim', anahtar: 'performans.' + rapor + '.acik',
+            aciklama: acik ? 'Her gün seçtiğin saatlerde dünün ' + baslik + ' verisi. Depo bilgisayarında Jet Barkod Asistan açık olmalı.' : 'Kapalı. Aşağıdan istediğin tarihleri elle gönderebilirsin.',
+            govde: '<div class="tg-satir tg-satir--dikey"><span class="tg-satir__metin"><b>Saatler</b><small>Gün içinde en çok ' + EN_COK_SAAT + ' saat.</small></span>' + saatlerHtml('performans.' + rapor + '.saatler') + '</div>'
+        });
+    }
+
+    /** Veri kontrolü: DPS ve Kurye CDI için ortak */
+    function pfKontrolKarti() {
+        var esikYok = !al('performans.kontrol.esik');
+        return kartHtml({
+            ikon: IKON.uyari, baslik: 'Veri Kontrolü', aciklama: 'DPS ve Kurye CDI için ortak. Dünün verisi gelmeden gönderilmesin diye.',
+            govde: satirSegment('En Az Sipariş', 'Dünün siparişi bundan azsa veri henüz gelmemiştir, ertelenir', 'performans.kontrol.esik', [[0, 'Kapalı'], [100, '100'], [150, '150'], [200, '200'], [250, '250']]) +
+                satirSegment('Erteleme Süresi', null, 'performans.kontrol.erteleme.dakika', [[15, '15 dk'], [30, '30 dk'], [60, '1 saat']], esikYok) +
+                satirSegment('En Çok Erteleme', null, 'performans.kontrol.erteleme.kez', [[1, '1'], [2, '2'], [4, '4'], [6, '6'], [8, '8']], esikYok) +
+                satirAnahtar('Ertelemeyi Bildir', 'Her ertelemede Telegram\'a kısa not düşer', 'performans.kontrol.ertelemeBildir', esikYok) +
+                satirAnahtar('Son Denemede Yine Gönder', 'Kapalıysa veri gelmezse o gün gönderilmez', 'performans.kontrol.sonDenemedeGonder', esikYok)
+        });
+    }
+
+    function pfElleKarti() {
         var dun = pfDun();
         return kartHtml({
-            ikon: IKON.saat, baslik: 'Zamanlı Gönderim', anahtar: 'performans.acik',
-            aciklama: acik ? 'Her gün seçtiğin saatlerde dünün verisi. Depo bilgisayarında Jet Barkod Asistan açık olmalı.' : 'Kapalı. Aşağıdan istediğin tarihleri elle gönderebilirsin.',
-            govde: '<div class="tg-satir tg-satir--dikey"><span class="tg-satir__metin"><b>Saatler</b><small>Gün içinde en çok ' + EN_COK_SAAT + ' saat.</small></span>' + saatlerHtml('performans.saatler') + '</div>' +
-                satirSegment('Veri Kontrolü', 'Dünün siparişi bundan azsa veri henüz gelmemiştir, ertelenir', 'performans.esik', [[0, 'Kapalı'], [100, '100'], [150, '150'], [200, '200'], [250, '250']]) +
-                satirSegment('Erteleme Süresi', null, 'performans.erteleme.dakika', [[15, '15 dk'], [30, '30 dk'], [60, '1 saat']], esikYok) +
-                satirSegment('En Çok Erteleme', null, 'performans.erteleme.kez', [[1, '1'], [2, '2'], [4, '4'], [6, '6'], [8, '8']], esikYok) +
-                satirAnahtar('Ertelemeyi Bildir', 'Her ertelemede Telegram\'a kısa not düşer', 'performans.ertelemeBildir', esikYok) +
-                satirAnahtar('Son Denemede Yine Gönder', 'Kapalıysa veri gelmezse o gün gönderilmez', 'performans.sonDenemedeGonder', esikYok)
-        }) +
-        kartHtml({
-            ikon: IKON.ozet, baslik: 'Depo Performans Sistemi', aciklama: 'Bayi, Kurye ve Picker DPS; kriterler panelin tablosundaki gibi.', anahtar: 'performans.dps',
-            govde: satirAnahtar('Kurye Sütunları', 'Performans % ve puan', 'performans.dpsAyrinti.kurye') +
-                satirAnahtar('Depocu Sütunları', 'Performans % ve puan', 'performans.dpsAyrinti.depocu') +
-                satirAnahtar('Denetimler', 'Filo ve kalite denetimi', 'performans.dpsAyrinti.denetim')
-        }) +
-        kartHtml({
-            ikon: IKON.gonder, baslik: 'Kurye Performansı', aciklama: 'Kurye başına sipariş, süreler, puanlar ve CDI harf notu.', anahtar: 'performans.kurye',
-            govde: satirSegment('Sıralama', null, 'performans.kuryeAyrinti.siralama', [['siparis', 'Sipariş'], ['not', 'CDI Notu'], ['teslimat', 'Teslimat'], ['ad', 'Ad']]) +
-                satirAnahtar('Kurye Fotoğrafı', 'Panelin profil fotoğrafı', 'performans.kuryeAyrinti.foto') +
-                '<p class="tg-alt-baslik">Ölçüler</p><div class="tg-cipler">' +
-                alan('birlesen', 'Birleşen') + alan('ortTeslimat', 'Ort. Teslimat') + alan('yoldaSure', 'Yolda Geçen') + alan('ulasmaTeslim', 'Ulaşma-Teslim') +
-                alan('donusSure', 'Depoya Dönüş') + alan('yoldaPuan', 'Yolda Puanı') + alan('teslimatPuan', 'Teslimat Puanı') + alan('donusPuan', 'Dönüş Puanı') +
-                alan('cdiPuan', 'CDI Puanı') + alan('problemli', 'Problemli') + '</div>'
-        }) +
-        kartHtml({
-            ikon: IKON.mesaj, baslik: 'Elle Gönder', aciklama: 'Önizleme ve "Kendime Gönder" bu tarihlerle. Getir\'den veri yalnız tarih değişince istenir.',
+            ikon: IKON.mesaj, baslik: 'Tarih Aralığı', aciklama: 'Önizleme ve "Kendime Gönder" bu tarihlerle. Getir\'den veri yalnız tarih değişince istenir.',
             govde: '<div class="tg-satir tg-satir--dikey"><div class="tg-tarih">' +
                 '<label><span>Başlangıç</span><input type="date" data-pf-tarih="bas" data-odak="pf-bas" value="' + d.pf.bas + '" max="' + d.pf.son + '"></label>' +
                 '<label><span>Bitiş</span><input type="date" data-pf-tarih="son" data-odak="pf-son" value="' + d.pf.son + '" min="' + d.pf.bas + '" max="' + gunYaz(Date.now()) + '"></label></div>' +
@@ -408,10 +447,78 @@
         });
     }
 
+    function dpsHtml() {
+        return pfZamanKarti('dps', 'DPS') + pfKontrolKarti() +
+            kartHtml({
+                ikon: IKON.ozet, baslik: 'Kart İçeriği', aciklama: 'Bayi, Kurye ve Picker DPS; kriterler panelin tablosundaki gibi.',
+                govde: satirAnahtar('Kurye Sütunları', 'Performans % ve puan', 'performans.dps.kurye') +
+                    satirAnahtar('Depocu Sütunları', 'Performans % ve puan', 'performans.dps.depocu') +
+                    satirAnahtar('Denetimler', 'Filo ve kalite denetimi', 'performans.dps.denetim') +
+                    satirAnahtar('Tam Kalite Dosya', 'Görsel ayrıca dosya olarak gider; yakınlaştırınca bozulmaz', 'performans.dps.tamKalite')
+            }) + pfElleKarti();
+    }
+
+    /* Sıralı seçim listesi (Kurye CDI sütunları ve özet kutuları): seçilenler
+       sırasıyla yukarı/aşağı/çıkar, altta eklenebilecekler. */
+    function siraliTanim(tur) {
+        var kat = d.pfKatalog;
+        if (!kat) return null;
+        return tur === 'ozet'
+            ? { yol: 'performans.kurye.ozet', ogeler: kat.ozetler, varsayilan: kat.ozetVarsayilan, enCok: kat.enCokOzet || 6 }
+            : { yol: 'performans.kurye.sutunlar', ogeler: kat.sutunlar, varsayilan: kat.varsayilan, enCok: 99 };
+    }
+
+    function siraliHtml(tur) {
+        var t = siraliTanim(tur);
+        if (!t) return '';
+        var kat = d.pfKatalog;
+        var adi = {};
+        t.ogeler.forEach(function (x) { adi[x.anahtar] = x; });
+        var secili = (al(t.yol) || t.varsayilan).filter(function (k) { return adi[k]; });
+        var grupHtml = function (o) {
+            if (!o.grup) return '';
+            var g = kat.gruplar[o.grup] || {};
+            return '<span class="tg-sutun__grup" style="background:' + g.zemin + ';color:' + g.renk + '">' + kacis(g.ad || '') + '</span>';
+        };
+        var ok = function (k, yon, ad, pasif) {
+            return '<button type="button" data-liste="' + tur + '" data-tasi="' + k + '" data-yon="' + yon + '" data-odak="' + tur + (yon < 0 ? '-y:' : '-a:') + k + '" aria-label="' + kacis(ad) + (yon < 0 ? ' yukarı' : ' aşağı') + '"' + (pasif ? ' disabled' : '') + '>' +
+                '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="' + (yon < 0 ? 'm5 12 5-5 5 5' : 'm5 8 5 5 5-5') + '"/></svg></button>';
+        };
+        var liste = '<ol class="tg-sutunlar">' + secili.map(function (k, i) {
+            var o = adi[k];
+            return '<li><span class="tg-sutun__sira">' + (i + 1) + '</span><span class="tg-sutun__ad">' + kacis(o.ad) + '</span>' + grupHtml(o) +
+                ok(k, -1, o.ad, i === 0) + ok(k, 1, o.ad, i === secili.length - 1) +
+                '<button type="button" data-liste="' + tur + '" data-cikar="' + k + '" data-odak="' + tur + '-c:' + k + '" aria-label="' + kacis(o.ad) + ' çıkar"' + (secili.length === 1 ? ' disabled' : '') + '>' + IKON.carpi + '</button></li>';
+        }).join('') + '</ol>';
+        var kalan = t.ogeler.filter(function (x) { return secili.indexOf(x.anahtar) === -1; });
+        var dolu = secili.length >= t.enCok;
+        return liste + (kalan.length ? '<p class="tg-alt-baslik">Eklenebilecekler' + (dolu ? ' · en çok ' + t.enCok : '') + '</p><div class="tg-cipler">' + kalan.map(function (x) {
+            return '<button type="button" class="tg-cip tg-cip--ekle" data-liste="' + tur + '" data-ekle="' + x.anahtar + '" data-odak="' + tur + '-e:' + x.anahtar + '"' + (dolu ? ' disabled' : '') + '><i>' + IKON.arti + '</i>' + kacis(x.ad) + '</button>';
+        }).join('') + '</div>' : '') +
+            '<button type="button" class="tg-baglanti" data-liste="' + tur + '" data-varsayilan-liste data-odak="' + tur + '-v">Varsayılana Dön</button>';
+    }
+
+    function kuryeHtml() {
+        var baslik = al('performans.kurye.baslik') || '';
+        return pfZamanKarti('kurye', 'kurye CDI') + pfKontrolKarti() +
+            kartHtml({
+                ikon: IKON.gonder, baslik: 'Kart Görünümü', aciklama: 'Yatay, tek sayfa: bütün kuryeler tek görselde.',
+                govde: '<div class="tg-satir tg-satir--dikey"><span class="tg-satir__metin"><b>Kart Başlığı</b><small>Boş bırakılırsa "Kurye CDI Tablosu" yazar. Örneğin depo adı.</small></span>' +
+                    '<input type="text" class="tg-girdi" maxlength="40" data-metin-yol="performans.kurye.baslik" data-odak="pf-baslik" placeholder="Kurye CDI Tablosu" value="' + kacis(baslik) + '"></div>' +
+                    satirSegment('Sıralama', 'Sıra numarası (1, 2, 3...) buna göre', 'performans.kurye.siralama', [['not', 'CDI Notu'], ['cdi', 'CDI Puanı'], ['siparis', 'Sipariş'], ['ad', 'Ad']]) +
+                    satirSegment('En Az Sipariş', 'Bundan az sipariş alan kurye listede görünmez', 'performans.kurye.enAzSiparis', [[0, 'Hepsi'], [1, '1'], [5, '5'], [10, '10']]) +
+                    satirAnahtar('Kurye Fotoğrafı', 'Panelin profil fotoğrafı', 'performans.kurye.foto') +
+                    satirAnahtar('Tam Kalite Dosya', 'Görsel ayrıca dosya olarak gider; yakınlaştırınca bozulmaz', 'performans.kurye.tamKalite')
+            }) +
+            kartHtml({ ikon: IKON.ozet, baslik: 'Özet Kutuları', aciklama: 'Tablonun üstündeki kutular, soldan sağa bu sırayla (en çok 6).', govde: siraliHtml('ozet') }) +
+            kartHtml({ ikon: IKON.ozet, baslik: 'Sütunlar ve Sırası', aciklama: 'Kartta soldan sağa bu sırayla. Aynı gruptaki art arda sütunlar tek renkli bantta birleşir.', govde: siraliHtml('sutun') }) +
+            pfElleKarti();
+    }
+
     function ayarCiz() {
         var kutu = el('tgAyarlar');
         var odak = document.activeElement && document.activeElement.getAttribute ? document.activeElement.getAttribute('data-odak') : null;
-        kutu.innerHTML = d.sekme === 'anlik' ? anlikHtml() : d.sekme === 'gonder' ? gonderHtml() : d.sekme === 'performans' ? performansHtml() : geceHtml();
+        kutu.innerHTML = d.sekme === 'anlik' ? anlikHtml() : d.sekme === 'gonder' ? gonderHtml() : d.sekme === 'dps' ? dpsHtml() : d.sekme === 'kurye' ? kuryeHtml() : geceHtml();
         if (odak) {
             var hedef = kutu.querySelector('[data-odak="' + odak.replace(/"/g, '\\"') + '"]');
             if (hedef) hedef.focus({ preventScroll: true });
@@ -468,8 +575,8 @@
     // ------------------------------------------------------------------
 
     function onizlemeAnahtari() {
-        if (d.sekme === 'performans') {
-            return 'performans|' + (d.veri === 'ornek' ? 'o' : d.pf.bas + '|' + d.pf.son) + '|' + JSON.stringify(d.ayar.performans);
+        if (pfSekmesi()) {
+            return d.sekme + '|' + (d.veri === 'ornek' ? 'o' : d.pf.bas + '|' + d.pf.son) + '|' + JSON.stringify(d.ayar.performans[d.sekme]);
         }
         var parca = d.sekme === 'anlik' ? d.ayar.anlik : d.sekme === 'gonder' ? d.ayar.kaldirmaGonder : d.ayar.gece;
         return d.sekme + '|' + (d.sekme === 'gonder' ? 'g' : d.veri) + '|' + JSON.stringify(parca);
@@ -487,15 +594,16 @@
         if (o.sonuc[anahtar] && o.sonuc[anahtar].ok) { o.goster = anahtar; onizlemeCiz(); return; }
         var no = ++o.no;
         o.yukleniyor = true;
+        guncelleDugmesi();
         onizlemeCiz();
         var c;
-        if (d.sekme === 'performans') {
+        if (pfSekmesi()) {
             if (d.veri === 'ornek') {
-                c = await istek('/api/performans/onizleme', { ornek: true, ayar: d.ayar.performans });
+                c = await istek('/api/performans/onizleme', { rapor: d.sekme, ornek: true, ayar: d.ayar.performans });
             } else {
                 var pv = null;
-                try { pv = await performansVerisi(); } catch (e) { c = { kod: -1, j: {}, metin: pfHataMetni(e) }; }
-                if (pv) c = await istek('/api/performans/onizleme', { veri: pv, ayar: d.ayar.performans });
+                try { pv = await performansVerisi(d.sekme); } catch (e) { c = { kod: -1, j: {}, metin: pfHataMetni(e) }; }
+                if (pv) c = await istek('/api/performans/onizleme', { rapor: d.sekme, veri: pv, ayar: d.ayar.performans });
             }
         } else if (d.sekme === 'gonder') {
             c = await istek('/api/kaldirma/onizleme', { secim: d.ayar.kaldirmaGonder });
@@ -550,14 +658,15 @@
         durum.classList.toggle('is-yukleniyor', !!o.yukleniyor);
         el('tgVeri').hidden = d.sekme === 'gonder';
         el('tgSohbetAlt').textContent = d.sekme === 'gonder' ? 'son 7 günün kayıtlarıyla' : d.veri === 'ornek' ? 'örnek veriyle'
-            : d.sekme === 'performans' ? aralikYazi(d.pf.bas, d.pf.son) + ' verisiyle' : 'gerçek verinle';
+            : pfSekmesi() ? aralikYazi(d.pf.bas, d.pf.son) + ' verisiyle' : 'gerçek verinle';
 
         var anahtar = onizlemeAnahtari();
         var s = o.sonuc[o.goster];
         // Yeni sonuç gelene kadar eskisi soluk durur: yerleşim zıplamaz
-        kutu.classList.toggle('is-eski', !!(o.yukleniyor && s));
+        kutu.classList.toggle('is-eski', !!((o.yukleniyor || o.bayat) && s));
         if (!s) { if (o.yukleniyor) kutu.innerHTML = iskeletHtml(); return; }
-        if (o.goster !== anahtar && !o.yukleniyor) { onizlemeZamanla(true); }
+        o.bayat = o.goster !== anahtar;
+        guncelleDugmesi();
         if (!s.ok) { kutu.innerHTML = bosHtml('Önizleme alınamadı', s.metin, true); return; }
         var j = s.j;
         var kaydir = kutu.scrollTop;
@@ -572,16 +681,17 @@
             if (!kartlar.length) {
                 kutu.innerHTML = d.sekme === 'gonder'
                     ? bosHtml('Gönderilecek kart yok', 'Son 7 günde seçili gruplarda kayıt yok.')
-                    : d.sekme === 'performans' ? bosHtml('Gönderilecek kart yok', 'DPS ve Kurye Performansı ikisi de kapalı.')
+                    : pfSekmesi() ? bosHtml('Gönderilecek kart yok', d.sekme === 'kurye' ? 'Bu tarihlerde sipariş taşıyan kurye görünmüyor.' : 'Bu tarihler için DPS verisi gelmedi.')
                     : bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? 'Bu ayarla rapor aralığında içerik yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.' : 'Bütün bölümler kapalı.');
             } else {
                 var saatler = (d.ayar.gece.saatler || [60]).map(saatYazi);
                 var yazi = d.sekme === 'gonder'
                     ? 'Satıştan Kaldırma · son 7 gün' + (j.gruplar ? '\n' + [j.gruplar.red ? j.gruplar.red + ' reddedilen / iptal' : '', j.gruplar.bekleyen ? j.gruplar.bekleyen + ' onay bekleyen' : '', j.gruplar.tamam ? j.gruplar.tamam + ' tamamlanan' : ''].filter(Boolean).join('\n') : '')
                     : j.baslik;
-                var pfSaatler = d.sekme === 'performans' ? (d.ayar.performans.saatler || [600]).map(saatYazi) : null;
+                var pr = pfSekmesi() ? d.ayar.performans[d.sekme] : null;
+                var pfSaatler = pr ? (pr.saatler || [600]).map(saatYazi) : null;
                 kutu.innerHTML = (d.sekme === 'gece' ? '<span class="tg-etiket">' + kacis(saatler.join(' · ')) + '</span>'
-                    : pfSaatler && d.ayar.performans.acik ? '<span class="tg-etiket">' + kacis(pfSaatler.join(' · ')) + '</span>' : '') +
+                    : pfSaatler && pr.acik ? '<span class="tg-etiket">' + kacis(pfSaatler.join(' · ')) + '</span>' : '') +
                     albumHtml(kartlar, yazi, d.sekme === 'gece' ? saatler[0] : simdiSaat());
             }
         }
@@ -622,7 +732,7 @@
         d.gonderiyor = true;
         cubukCiz();
         var c;
-        if (d.sekme === 'performans') {
+        if (pfSekmesi()) {
             if (d.veri === 'ornek') {
                 d.gonderiyor = false;
                 cubukCiz();
@@ -630,8 +740,8 @@
                 return;
             }
             var pv = null;
-            try { pv = await performansVerisi(); } catch (e) { d.gonderiyor = false; cubukCiz(); bildir(pfHataMetni(e), 'hata'); return; }
-            c = await istek('/api/performans/gonder', { veri: pv, ayar: d.ayar.performans });
+            try { pv = await performansVerisi(d.sekme); } catch (e) { d.gonderiyor = false; cubukCiz(); bildir(pfHataMetni(e), 'hata'); return; }
+            c = await istek('/api/performans/gonder', { rapor: d.sekme, veri: pv, ayar: d.ayar.performans });
         } else if (d.sekme === 'gonder') {
             var a = sonYediGun();
             c = await istek('/api/kaldirma/rapor', { bas: a.bas, son: a.son, secim: d.ayar.kaldirmaGonder });
@@ -646,15 +756,22 @@
     }
 
     async function varsayilanaDon() {
-        var alan = d.sekme === 'anlik' ? 'anlik' : d.sekme === 'gonder' ? 'kaldirmaGonder' : d.sekme === 'performans' ? 'performans' : 'gece';
+        var alan = d.sekme === 'anlik' ? 'anlik' : d.sekme === 'gonder' ? 'kaldirmaGonder' : 'gece';
         var onay = global.JBDiyalog && global.JBDiyalog.onay
             ? await global.JBDiyalog.onay('Bu sekmedeki seçimler ilk hâline döner. Kaydetmeden önce önizlemede görebilirsin.', { baslik: 'Varsayılana dönülsün mü?', onayYazi: 'Varsayılana Dön' })
             : global.confirm('Varsayılana dönülsün mü?');
         if (!onay) return;
-        var saatler = d.ayar[alan] && d.ayar[alan].saatler;
-        d.ayar[alan] = kopya(d.varsayilan[alan]);
+        // DPS ve Kurye CDI yalnız kendi bölümünü sıfırlar; saatler ve açık/kapalı korunur
+        var kok = pfSekmesi() ? d.ayar.performans : d.ayar;
+        var vkok = pfSekmesi() ? d.varsayilan.performans : d.varsayilan;
+        if (pfSekmesi()) alan = d.sekme;
+        var saatler = kok[alan] && kok[alan].saatler;
+        var acikti = kok[alan] && kok[alan].acik;
+        kok[alan] = kopya(vkok[alan]);
         // Saatler varsayılana dönmez: kullanıcının en sık değiştirmeyeceği seçim
-        if (saatler) d.ayar[alan].saatler = saatler;
+        if (saatler) kok[alan].saatler = saatler;
+        if (pfSekmesi() && typeof acikti === 'boolean') kok[alan].acik = acikti;
+        if (alan === 'kurye' && d.pfKatalog) { kok.kurye.sutunlar = d.pfKatalog.varsayilan.slice(); kok.kurye.ozet = d.pfKatalog.ozetVarsayilan.slice(); }
         degisti();
     }
 
@@ -697,6 +814,7 @@
             document.querySelectorAll('#tgGorunum [data-gorunum]').forEach(function (x) { x.setAttribute('aria-selected', String(x === b)); });
             try { global.scrollTo({ top: 0, behavior: 'auto' }); } catch (x) { /* eski tarayıcı */ }
         });
+        el('tgGuncelle').addEventListener('click', function () { onizlemeZamanla(true); });
         el('tgVeri').addEventListener('click', function (e) {
             var b = e.target.closest('[data-veri]');
             if (!b || b.getAttribute('data-veri') === d.veri) return;
@@ -718,6 +836,7 @@
                 return;
             }
             if (t.matches('input[data-pf-tarih]')) { pfTarihKoy(t.getAttribute('data-pf-tarih'), t.value); }
+            if (t.matches('input[data-metin-yol]')) koy(t.getAttribute('data-metin-yol'), t.value.replace(/\s+/g, ' ').trim().slice(0, 40));
         });
         ayarlar.addEventListener('click', function (e) {
             var s = e.target.closest('[data-seg-yol]');
@@ -739,6 +858,8 @@
             }
             var hz = e.target.closest('[data-pf-hazir]');
             if (hz) { pfHazirAralik(hz.getAttribute('data-pf-hazir')); return; }
+            var ls = e.target.closest('[data-liste]');
+            if (ls && !ls.disabled) { listeIslem(ls); return; }
             if (e.target.closest('[data-sebep-hepsi]')) {
                 if (al('gece.kaldirma.sebepler')) koy('gece.kaldirma.sebepler', null);
                 return;
@@ -820,9 +941,17 @@
         });
         try {
             var q = new URLSearchParams(location.search).get('sekme');
-            if (q === 'anlik' || q === 'gonder' || q === 'performans') d.sekme = q;
+            if (q === 'anlik' || q === 'gonder' || q === 'dps' || q === 'kurye') d.sekme = q;
+            else if (q === 'performans') d.sekme = 'kurye';
         } catch (e) { /* adres okunamadı */ }
         d.pf.bas = d.pf.son = pfDun();
+        d.pfKatalog = c.j.performansKatalog || null;
+        if (d.pfKatalog) {
+            ['sutunlar', 'ozet'].forEach(function (a) {
+                var v = a === 'ozet' ? d.pfKatalog.ozetVarsayilan : d.pfKatalog.varsayilan;
+                if (!Array.isArray(d.ayar.performans.kurye[a])) { d.ayar.performans.kurye[a] = v.slice(); d.kayitli.performans.kurye[a] = v.slice(); }
+            });
+        }
         el('tgCubuk').hidden = false;
         // İki bölmeli masaüstü düzeni üst çubuğun boyunu bilmeli
         var ustOlc = function () {

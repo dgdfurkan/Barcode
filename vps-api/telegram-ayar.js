@@ -36,23 +36,12 @@ const VARSAYILAN = Object.freeze({
     },
     anlik: { iptal: true, red: false, tamam: false, gorsel: true, olusturan: true },
     kaldirmaGonder: { ozet: true, red: true, bekleyen: true, tamam: false, foto: false },
-    /* Performans raporu (DPS ve kurye): dünün verisi seçilen saatlerde. Veri henüz
-       tamamlanmadıysa (dünkü sipariş toplamı eşiğin altında) ertelenir. */
+    /* Performans raporları: DPS ve Kurye CDI ayrı ayrı (ayrı saat, ayrı mesaj).
+       Veri kontrolü ortak: dünün sipariş toplamı eşiğin altındaysa ertelenir. */
     performans: {
-        acik: false,
-        saatler: [600],
-        dps: true,
-        kurye: true,
-        esik: 150,
-        erteleme: { dakika: 30, kez: 4 },
-        ertelemeBildir: true,
-        sonDenemedeGonder: true,
-        dpsAyrinti: { kurye: true, depocu: true, denetim: true },
-        kuryeAyrinti: {
-            siralama: 'siparis', foto: true,
-            alanlar: { birlesen: true, ortTeslimat: true, yoldaSure: true, ulasmaTeslim: false, donusSure: false,
-                yoldaPuan: false, teslimatPuan: true, donusPuan: true, cdiPuan: true, problemli: true },
-        },
+        kontrol: { esik: 150, erteleme: { dakika: 30, kez: 4 }, ertelemeBildir: true, sonDenemedeGonder: true },
+        dps: { acik: false, saatler: [600], kurye: true, depocu: true, denetim: true, tamKalite: true },
+        kurye: { acik: false, saatler: [600], baslik: '', siralama: 'not', enAzSiparis: 1, foto: true, tamKalite: true, sutunlar: null, ozet: null },
     },
 });
 
@@ -60,8 +49,9 @@ const SINIRLAR = new Set([10, 20, 40]);
 const ESIK = new Set([0, 50, 100, 150, 200, 250]);
 const ERTELEME_DK = new Set([15, 30, 60]);
 const ERTELEME_KEZ = new Set([0, 1, 2, 3, 4, 6, 8]);
-const KURYE_SIRA = new Set(['siparis', 'not', 'teslimat', 'ad']);
-const KURYE_ALAN = ['birlesen', 'ortTeslimat', 'yoldaSure', 'ulasmaTeslim', 'donusSure', 'yoldaPuan', 'teslimatPuan', 'donusPuan', 'cdiPuan', 'problemli'];
+const KURYE_SIRA = new Set(['not', 'cdi', 'siparis', 'ad']);
+const EN_AZ_SIPARIS = new Set([0, 1, 5, 10]);
+const { sutunlariDuzelt, ozetDuzelt } = require('./performans/sutunlar');
 const ESIKLER = new Set([0, 1, 2, 5, 10]);
 const BEKLEYEN_ITIRAZ = new Set(['hepsi', 'acil', 'yok']);
 const LISTE = new Set(['fark', 'hepsi']);
@@ -95,10 +85,10 @@ function duzelt(ham) {
     const a = nesne(h.anlik);
     const kg = nesne(h.kaldirmaGonder);
     const pf = nesne(h.performans);
-    const pe = nesne(pf.erteleme);
-    const pda = nesne(pf.dpsAyrinti);
-    const pka = nesne(pf.kuryeAyrinti);
-    const pkal = nesne(pka.alanlar);
+    const pk = nesne(pf.kontrol);
+    const pe = nesne(pk.erteleme);
+    const pd = nesne(pf.dps);
+    const pc = nesne(pf.kurye);
     const VP = V.performans;
     const sonuc = {
         gece: {
@@ -138,27 +128,34 @@ function duzelt(ham) {
             tamam: mantik(kg.tamam, false), foto: mantik(kg.foto, false),
         },
         performans: {
-            acik: mantik(pf.acik, false),
-            saatler: saatleriDuzelt(pf.saatler, VP.saatler),
-            dps: mantik(pf.dps, true),
-            kurye: mantik(pf.kurye, true),
-            esik: ESIK.has(Number(pf.esik)) ? Number(pf.esik) : VP.esik,
-            erteleme: {
-                dakika: ERTELEME_DK.has(Number(pe.dakika)) ? Number(pe.dakika) : VP.erteleme.dakika,
-                kez: ERTELEME_KEZ.has(Number(pe.kez)) ? Number(pe.kez) : VP.erteleme.kez,
+            kontrol: {
+                esik: ESIK.has(Number(pk.esik)) ? Number(pk.esik) : VP.kontrol.esik,
+                erteleme: {
+                    dakika: ERTELEME_DK.has(Number(pe.dakika)) ? Number(pe.dakika) : VP.kontrol.erteleme.dakika,
+                    kez: ERTELEME_KEZ.has(Number(pe.kez)) ? Number(pe.kez) : VP.kontrol.erteleme.kez,
+                },
+                ertelemeBildir: mantik(pk.ertelemeBildir, true),
+                sonDenemedeGonder: mantik(pk.sonDenemedeGonder, true),
             },
-            ertelemeBildir: mantik(pf.ertelemeBildir, true),
-            sonDenemedeGonder: mantik(pf.sonDenemedeGonder, true),
-            dpsAyrinti: { kurye: mantik(pda.kurye, true), depocu: mantik(pda.depocu, true), denetim: mantik(pda.denetim, true) },
-            kuryeAyrinti: {
-                siralama: KURYE_SIRA.has(pka.siralama) ? pka.siralama : 'siparis',
-                foto: mantik(pka.foto, true),
-                alanlar: KURYE_ALAN.reduce((o, k) => { o[k] = mantik(pkal[k], VP.kuryeAyrinti.alanlar[k]); return o; }, {}),
+            dps: {
+                acik: mantik(pd.acik, false),
+                saatler: saatleriDuzelt(pd.saatler, VP.dps.saatler),
+                kurye: mantik(pd.kurye, true), depocu: mantik(pd.depocu, true), denetim: mantik(pd.denetim, true),
+                tamKalite: mantik(pd.tamKalite, true),
+            },
+            kurye: {
+                acik: mantik(pc.acik, false),
+                saatler: saatleriDuzelt(pc.saatler, VP.kurye.saatler),
+                baslik: typeof pc.baslik === 'string' ? pc.baslik.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40) : '',
+                siralama: KURYE_SIRA.has(pc.siralama) ? pc.siralama : 'not',
+                enAzSiparis: EN_AZ_SIPARIS.has(Number(pc.enAzSiparis)) ? Number(pc.enAzSiparis) : 1,
+                foto: mantik(pc.foto, true),
+                tamKalite: mantik(pc.tamKalite, true),
+                sutunlar: sutunlariDuzelt(pc.sutunlar),
+                ozet: ozetDuzelt(pc.ozet),
             },
         },
     };
-    // Performans raporunda en az bir bölüm
-    if (!sonuc.performans.dps && !sonuc.performans.kurye) sonuc.performans.dps = true;
     // Boş rapor olmasın: hiçbir bölüm seçilmediyse özet açık
     const b = sonuc.gece.bolumler;
     if (!b.ozet && !b.kaldirma && !b.itiraz && !b.sayim) b.ozet = true;
