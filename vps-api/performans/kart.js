@@ -250,15 +250,54 @@ function dpsKarti(d, s = {}) {
 
 const HARF_SIRA = ['A++', 'A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'E', 'F'];
 const harfSira = (h) => { const i = HARF_SIRA.indexOf(String(h || '').trim()); return i === -1 ? 99 : i; };
+/* Notun alt sınırı (CDI %). Aynı rapordaki kuryelerden öğrenilemezse bu kullanılır. */
+const HARF_ESIK = { 'A++': 95, 'A+': 90, 'A': 85, 'A-': 82, 'B+': 80, 'B': 75, 'B-': 72, 'C+': 70, 'C': 65, 'C-': 62, 'D+': 60, 'D': 55, 'D-': 52, 'E': 45, 'F': 0 };
 
-/** Sıralama: not (harf, sonra CDI, sonra sipariş) | cdi | siparis | ad */
+/**
+ * Panel bazen CDI'ı boş, bazen notu boş bırakır. Sıralama için eksik olan
+ * diğerinden tahmin edilir (kartta yine "-" görünür, yalnız sırası doğru olur):
+ *   not var, CDI yok  → o notun alt sınırı (A++ → %95); notunun en altına düşer
+ *   CDI var, not yok  → CDI'ın düştüğü en iyi not
+ * Eşikler önce aynı rapordaki notu ve CDI'ı belli kuryelerden (o notun en düşük
+ * CDI'ı) alınır, yoksa HARF_ESIK. İkisi de yoksa kurye en sona.
+ */
+function siraOlcusu(liste) {
+    const esik = { ...HARF_ESIK };
+    const gorulen = {};
+    liste.forEach((k) => {
+        const h = String(k.d.harf || '').trim();
+        if (k.d.cdiPuan == null || !(h in esik)) return;
+        gorulen[h] = Math.min(gorulen[h] == null ? Infinity : gorulen[h], k.d.cdiPuan);
+    });
+    Object.assign(esik, gorulen);
+    const harfBul = (v) => HARF_SIRA.find((h) => v >= esik[h]) || 'F';
+    const m = new Map();
+    liste.forEach((k) => {
+        const h = String(k.d.harf || '').trim();
+        const harfVar = harfSira(h) !== 99;
+        const cdiVar = k.d.cdiPuan != null;
+        const harf = harfVar ? h : cdiVar ? harfBul(k.d.cdiPuan) : null;
+        const cdi = cdiVar ? k.d.cdiPuan : harfVar ? HARF_ESIK[h] : null;
+        m.set(k, {
+            sira: harf == null ? 99 : harfSira(harf),
+            cdi: cdi == null ? -1 : cdi,
+            gercek: (harfVar ? 1 : 0) + (cdiVar ? 1 : 0),
+        });
+    });
+    return m;
+}
+
+/** Sıralama: not (harf, sonra CDI, sonra sipariş) | cdi | siparis | ad. Eksik CDI/not tahminle (siraOlcusu). */
 function sirala(liste, siralama) {
     const l = liste.slice();
-    const cdi = (k) => (k.d.cdiPuan == null ? -1 : k.d.cdiPuan);
     if (siralama === 'ad') return l.sort((a, b) => a.ad.localeCompare(b.ad, 'tr'));
-    if (siralama === 'siparis') return l.sort((a, b) => b.siparis - a.siparis || cdi(b) - cdi(a));
-    if (siralama === 'cdi') return l.sort((a, b) => cdi(b) - cdi(a) || harfSira(a.d.harf) - harfSira(b.d.harf) || b.siparis - a.siparis);
-    return l.sort((a, b) => harfSira(a.d.harf) - harfSira(b.d.harf) || cdi(b) - cdi(a) || b.siparis - a.siparis);
+    const o = siraOlcusu(l);
+    const A = (k) => o.get(k);
+    // Eşitlikte bilgisi tam olan önce
+    const gercek = (a, b) => A(b).gercek - A(a).gercek;
+    if (siralama === 'siparis') return l.sort((a, b) => b.siparis - a.siparis || A(b).cdi - A(a).cdi);
+    if (siralama === 'cdi') return l.sort((a, b) => A(b).cdi - A(a).cdi || A(a).sira - A(b).sira || gercek(a, b) || b.siparis - a.siparis);
+    return l.sort((a, b) => A(a).sira - A(b).sira || A(b).cdi - A(a).cdi || gercek(a, b) || b.siparis - a.siparis);
 }
 
 function hucreMetni(tanim, v) {
