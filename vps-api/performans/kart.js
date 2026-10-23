@@ -256,20 +256,29 @@ const HARF_ESIK = { 'A++': 95, 'A+': 90, 'A': 85, 'A-': 82, 'B+': 80, 'B': 75, '
 /**
  * Panel bazen CDI'ı boş, bazen notu boş bırakır. Sıralama için eksik olan
  * diğerinden tahmin edilir (kartta yine "-" görünür, yalnız sırası doğru olur):
- *   not var, CDI yok  → o notun alt sınırı (A++ → %95); notunun en altına düşer
+ *   not var, CDI yok  → o notun alt sınırı (A++ → %95); notunun en altına düşer, alttaki notun üstünde kalır
  *   CDI var, not yok  → CDI'ın düştüğü en iyi not
  * Eşikler önce aynı rapordaki notu ve CDI'ı belli kuryelerden (o notun en düşük
  * CDI'ı) alınır, yoksa HARF_ESIK. İkisi de yoksa kurye en sona.
  */
 function siraOlcusu(liste) {
-    const esik = { ...HARF_ESIK };
-    const gorulen = {};
+    // Raporda notu ve CDI'ı belli kuryelerden her notun en düşük ve en yüksek CDI'ı
+    const enAz = {};
+    const enCok = {};
     liste.forEach((k) => {
         const h = String(k.d.harf || '').trim();
-        if (k.d.cdiPuan == null || !(h in esik)) return;
-        gorulen[h] = Math.min(gorulen[h] == null ? Infinity : gorulen[h], k.d.cdiPuan);
+        if (k.d.cdiPuan == null || !(h in HARF_ESIK)) return;
+        enAz[h] = Math.min(enAz[h] == null ? Infinity : enAz[h], k.d.cdiPuan);
+        enCok[h] = Math.max(enCok[h] == null ? -Infinity : enCok[h], k.d.cdiPuan);
     });
-    Object.assign(esik, gorulen);
+    // Notun alt sınırı: rapordan biliniyorsa o; bilinmiyorsa sabit tablo, ama
+    // daha kötü notlarda görülen en yüksek CDI'ın altına asla inmez (A+ hiçbir A'nın altına düşmez)
+    const esik = {};
+    for (let i = HARF_SIRA.length - 1, taban = -Infinity; i >= 0; i--) {
+        const h = HARF_SIRA[i];
+        esik[h] = Math.max(enAz[h] != null ? enAz[h] : HARF_ESIK[h], taban);
+        if (enCok[h] != null) taban = Math.max(taban, enCok[h]);
+    }
     const harfBul = (v) => HARF_SIRA.find((h) => v >= esik[h]) || 'F';
     const m = new Map();
     liste.forEach((k) => {
@@ -277,7 +286,7 @@ function siraOlcusu(liste) {
         const harfVar = harfSira(h) !== 99;
         const cdiVar = k.d.cdiPuan != null;
         const harf = harfVar ? h : cdiVar ? harfBul(k.d.cdiPuan) : null;
-        const cdi = cdiVar ? k.d.cdiPuan : harfVar ? HARF_ESIK[h] : null;
+        const cdi = cdiVar ? k.d.cdiPuan : harfVar ? esik[h] : null;
         m.set(k, {
             sira: harf == null ? 99 : harfSira(harf),
             cdi: cdi == null ? -1 : cdi,
