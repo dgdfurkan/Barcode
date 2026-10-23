@@ -159,6 +159,8 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
 - Telegram Raporları (`/telegram/`): `sql_files/telegram_ayar.sql` çalıştırılacak (önce `gece_raporu.sql`),
   `vps-api/telegram-ayar.js` + `vps-api/katalog.js` + `vps-api/gece-raporu/` + `vps-api/kaldirma/` VPS'e atılacak.
   Çalışana kadar sayfa açılır ama yalnız açık/kapalı, bekleyen ve fotoğraf saklanır; rapor yalnız 01:00'de gider.
+- Performans raporu (DPS + kurye, Telegram Raporları > Performans): `vps-api/performans/` + `vps-api/telegram-ayar.js` +
+  `server.js` VPS'e atılacak. Ayar `telegram_ayar.sql` ile kalıcı olur; çalışana kadar zamanlı gönderim ayarı saklanmaz, elle gönderim çalışır.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

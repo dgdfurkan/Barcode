@@ -977,6 +977,9 @@ require('./gunluk-sayim').kur(app, { pool, verifyToken, bearerOf });
 // =====================================================================
 require('./gece-raporu').kur(app, { pool, verifyToken, bearerOf });
 
+// Performans raporu: DPS ve kurye performansı Telegram'a (veri kullanıcının tarayıcısından)
+require('./performans').kur(app, { pool, verifyToken, bearerOf });
+
 // =====================================================================
 // Canlı kanal: sipariş ve sayım değişikliği cihazlara anında (vps-api/canli.js)
 // =====================================================================

@@ -585,7 +585,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     async function durumOku(u) {
         const [o, g, h] = await Promise.all([
             ta.ayarOku(pool, u),
-            pool.query('SELECT gun::text AS gun, gonderildi, kart FROM gece.gonderim WHERE username = $1 ORDER BY gonderildi DESC LIMIT 1', [u]),
+            pool.query('SELECT gun::text AS gun, gonderildi, kart FROM gece.gonderim WHERE username = $1 AND kart IS NOT NULL ORDER BY gonderildi DESC LIMIT 1', [u]),
             alicilar(u),
         ]);
         const e = ta.eskiKolonlar(o.ayar);
@@ -661,7 +661,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const [o, h, g, sb] = await Promise.all([
                 ta.ayarOku(pool, u),
                 alicilar(u),
-                pool.query('SELECT gun::text AS gun, gonderildi, kart FROM gece.gonderim WHERE username = $1 ORDER BY gonderildi DESC LIMIT 1', [u])
+                pool.query('SELECT gun::text AS gun, gonderildi, kart FROM gece.gonderim WHERE username = $1 AND kart IS NOT NULL ORDER BY gonderildi DESC LIMIT 1', [u])
                     .catch(() => ({ rows: [] })),
                 pool.query(
                     `SELECT COALESCE(NULLIF(sebep, ''), 'Sebep yok') AS sebep, count(*)::int AS adet FROM kaldirma.kayitlar
