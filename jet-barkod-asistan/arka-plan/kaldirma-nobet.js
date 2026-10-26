@@ -200,7 +200,7 @@ async function kaldirmaFotoTuru() {
         const sekme = await kaldirmaSekmesi();
         if (!sekme) return;
         const j = await kaldirmaApi('/api/kaldirma/foto-istekleri');
-        const idler = j && Array.isArray(j.idler) ? j.idler.filter((x) => /^[a-f0-9]{24}$/.test(x)).slice(0, 10) : [];
+        const idler = j && Array.isArray(j.idler) ? j.idler.filter((x) => /^[a-f0-9]{24}$/.test(x)).slice(0, 20) : [];
         for (const id of idler) {
             let c = null;
             try { c = await chrome.tabs.sendMessage(sekme.id, { type: 'JBA_KALDIRMA_FOTO_SOR', id }); } catch (e) { c = null; }

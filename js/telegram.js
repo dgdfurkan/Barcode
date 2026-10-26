@@ -663,6 +663,21 @@
         o.durum = null;
         o.sonuc[anahtar] = c.kod === 200 && c.j.ok ? { ok: true, j: c.j } : { ok: false, metin: c.metin || hataMetni(c) };
         o.goster = anahtar;
+        // Hasar fotoğraflarının linki süresi geçmişse depo panelindeki Asistan tazeler
+        // (30 sn'de bir sorar): önizleme 35 sn sonra kendiliğinden yenilenir, en çok 4 kez.
+        if (o.fotoAnahtar !== anahtar) { o.fotoAnahtar = anahtar; o.fotoDeneme = 0; }
+        var bekleyenFoto = c.kod === 200 && c.j && c.j.fotoTazeleniyor;
+        if (bekleyenFoto && o.fotoDeneme < 4) {
+            o.fotoDeneme++;
+            o.durum = bekleyenFoto + ' kaydın fotoğrafı depo panelinden alınıyor';
+            setTimeout(function () {
+                if (onizlemeAnahtari() !== anahtar || o.yukleniyor) return;
+                delete o.sonuc[anahtar];
+                onizlemeAl();
+            }, 35000);
+        } else if (bekleyenFoto) {
+            o.durum = 'Bazı fotoğraflar alınamadı: depo paneli açık bir bilgisayar gerekli';
+        }
         onizlemeCiz();
     }
 

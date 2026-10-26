@@ -70,6 +70,73 @@ function bildirimMetni(k, an = {}) {
 const AZAMI_KAYIT = 3000;
 const GUN_MS = 24 * 3600 * 1000;
 
+/* Uzaktan fotoğraf tazeleme kuyruğu: username -> Map(kayit_id -> zaman) */
+const fotoIstekleri = new Map();
+const FOTO_ISTEK_MS = 90 * 1000;
+const FOTO_ISTEK_AZAMI = 60;
+
+function fotoIstekListesi(u) {
+    const m = fotoIstekleri.get(u);
+    if (!m) return [];
+    const sinir = Date.now() - FOTO_ISTEK_MS;
+    for (const [id, t] of m) if (t < sinir) m.delete(id);
+    if (!m.size) { fotoIstekleri.delete(u); return []; }
+    return [...m.keys()];
+}
+
+/** Süresi geçmiş fotoğrafları kuyruğa koyar; depo paneli açık Asistan 30 sn içinde tazeler */
+function fotoIsteToplu(u, idler) {
+    let m = fotoIstekleri.get(u);
+    if (!m) { m = new Map(); fotoIstekleri.set(u, m); }
+    fotoIstekListesi(u);
+    if (!fotoIstekleri.has(u)) fotoIstekleri.set(u, m);
+    idler.filter((id) => /^[a-f0-9]{24}$/.test(String(id))).forEach((id) => {
+        if (m.size < FOTO_ISTEK_AZAMI || m.has(id)) m.set(id, Date.now());
+    });
+    if (fotoIstekleri.size > 5000) fotoIstekleri.clear();
+}
+
+/** Linkin süresi (S3 v2 imzası, Expires) en az payMs daha geçerli mi */
+function linkTaze(adres, payMs = 60000) {
+    try {
+        const e = Number(new URL(adres).searchParams.get('Expires'));
+        return !e || e * 1000 > Date.now() + payMs;
+    } catch (x) { return false; }
+}
+
+/**
+ * Rapora girecek hasar fotoğraflarının linkleri: süresi geçenler kuyruğa
+ * konur, Asistan tazeleyene kadar en çok bekleMs beklenir (4 sn'de bir
+ * veritabanına bakılır). kayitlar: [{ id, fotoAdres: [link] }] yerinde
+ * güncellenir. Dönüş: hâlâ süresi geçmiş kayıt sayısı.
+ */
+async function fotolariTazele(pool, u, kayitlar, bekleMs) {
+    const eski = () => kayitlar.filter((k) => k.id && (k.fotoAdres || []).length && !k.fotoAdres.every((a) => linkTaze(a)));
+    let kalan = eski();
+    if (!kalan.length) return 0;
+    fotoIsteToplu(u, kalan.map((k) => k.id));
+    const bitis = Date.now() + (bekleMs || 0);
+    let son = 0;
+    while (kalan.length && Date.now() < bitis) {
+        await new Promise((x) => setTimeout(x, 4000));
+        try {
+            const r = await pool.query(
+                `SELECT kayit_id, veri->'fotolar' AS fotolar FROM kaldirma.kayitlar WHERE username = $1 AND kayit_id = ANY($2::text[])`,
+                [u, kalan.map((k) => k.id)]
+            );
+            const m = new Map(r.rows.map((x) => [x.kayit_id, Array.isArray(x.fotolar) ? x.fotolar : []]));
+            kalan.forEach((k) => {
+                const yeni = (m.get(k.id) || []).slice(0, k.fotoAdres.length || 3);
+                if (yeni.length && yeni.every((a) => linkTaze(a))) k.fotoAdres = yeni;
+            });
+        } catch (e) { break; }
+        kalan = eski();
+        // Kuyruk 90 sn yaşar: uzun beklemede tazele
+        if (kalan.length && Date.now() - son > 30000) { son = Date.now(); fotoIsteToplu(u, kalan.map((k) => k.id)); }
+    }
+    return kalan.length;
+}
+
 function kur(app, { pool, verifyToken, bearerOf }) {
     const sayac = new Map();
 
@@ -340,20 +407,9 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     // süresi geçmiş fotoğrafı burada ister; depo paneli açık bilgisayardaki
     // Asistan 30 sn'de bir sorar, panelin kendi isteğiyle taze linki alıp
     // yazar. Sayfa yeni linki GET /fotolar/:id ile okur.
-    // İstekler bellekte, 90 sn yaşar; hesap başına en çok 20.
+    // İstekler bellekte, 90 sn yaşar; hesap başına en çok FOTO_ISTEK_AZAMI.
+    // Telegram raporu da (gece-raporu) süresi geçenleri buraya bırakır.
     // -----------------------------------------------------------------
-
-    const fotoIstekleri = new Map(); // username -> Map(kayit_id -> zaman)
-    const FOTO_ISTEK_MS = 90 * 1000;
-
-    function fotoIstekListesi(u) {
-        const m = fotoIstekleri.get(u);
-        if (!m) return [];
-        const sinir = Date.now() - FOTO_ISTEK_MS;
-        for (const [id, t] of m) if (t < sinir) m.delete(id);
-        if (!m.size) { fotoIstekleri.delete(u); return []; }
-        return [...m.keys()];
-    }
 
     app.post('/api/kaldirma/foto-iste', uye, async (req, res) => {
         const u = req.auth.username;
@@ -363,11 +419,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         try {
             const r = await pool.query('SELECT 1 FROM kaldirma.kayitlar WHERE username = $1 AND kayit_id = $2', [u, id]);
             if (!r.rows.length) return res.status(404).json({ ok: false, error: 'kayit_yok' });
-            let m = fotoIstekleri.get(u);
-            if (!m) { m = new Map(); fotoIstekleri.set(u, m); }
-            if (m.size >= 20 && !m.has(id)) fotoIstekListesi(u);
-            if (m.size < 20 || m.has(id)) m.set(id, Date.now());
-            if (fotoIstekleri.size > 5000) fotoIstekleri.clear();
+            fotoIsteToplu(u, [id]);
             res.json({ ok: true });
         } catch (e) {
             console.error('kaldirma foto iste:', e.message);
@@ -378,7 +430,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     /** Asistan: bekleyen fotoğraf istekleri (en çok 10) */
     app.get('/api/kaldirma/foto-istekleri', uye, (req, res) => {
         res.setHeader('Cache-Control', 'no-store');
-        res.json({ ok: true, idler: fotoIstekListesi(req.auth.username).slice(0, 10) });
+        res.json({ ok: true, idler: fotoIstekListesi(req.auth.username).slice(0, 20) });
     });
 
     /** Asistan: panelden alınan taze linkler */
@@ -455,7 +507,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         };
     }
 
-    async function seciliRapor(username, a, secim) {
+    /** fotoBekleMs: süresi geçmiş hasar fotoğrafları için Asistan'ı bekleme süresi (önizlemede 0) */
+    async function seciliRapor(username, a, secim, fotoBekleMs = 0) {
         const tum = (await kayitlarOku(username, a, true))
             .filter((k) => !secim.sebepler || secim.sebepler.includes(k.sebep || 'Sebep yok'));
         // Yeniden girilen iptal: depo kendisi düzeltmiş (sayfadaki kuralın aynısı)
@@ -465,6 +518,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 Date.parse(x.olusturma) > Date.parse(k.olusturma) && Date.parse(x.olusturma) - Date.parse(k.olusturma) < 7 * GUN_MS);
         });
         const satir = (k, ek) => ({
+            id: k.id,
             urun: { id: k.urun && k.urun.id, ad: k.urun && k.urun.ad, gorsel: k.urun && k.urun.gorsel },
             adet: Number(k.adet) || 0, sebep: k.sebep || '', altNeden: k.altNeden || '', red: k.red || null,
             durum: k.durum, zaman: k.olusturma, fotoAdres: secim.foto ? (k.fotolar || []).slice(0, 3) : [], ...ek,
@@ -493,8 +547,11 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         });
         const gorseller = urunler.length ? await gorsel.topluGetir(urunler.slice(0, 80), 25000) : new Map();
 
+        let fotoTazeleniyor = 0;
         if (secim.foto) {
-            const bitis = Date.now() + 25000;
+            // Panelin linkleri ~15 dk geçerli: süresi geçenler depo panelinden tazelenir
+            fotoTazeleniyor = await fotolariTazele(pool, username, [...gruplar.red, ...gruplar.bekleyen, ...gruplar.tamam], fotoBekleMs);
+            const bitis = Date.now() + (fotoBekleMs ? 18000 : 25000);
             let sayi = 0;
             for (const k of [...gruplar.red, ...gruplar.bekleyen, ...gruplar.tamam]) {
                 k.fotolar = [];
@@ -513,7 +570,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 tamam: gruplar.tamam, etiket: araclar.tarihEtiketi(a), altBaslik: 'Seçilen kayıtlar',
             }));
         }
-        return { kartlar, gruplar, ozetSayi: ozetKayit.length };
+        return { kartlar, gruplar, ozetSayi: ozetKayit.length, fotoTazeleniyor };
     }
 
     app.get('/api/kaldirma/liste', uye, async (req, res) => {
@@ -573,6 +630,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 ok: true,
                 kartlar: r.kartlar.slice(0, 10).map((k) => 'data:image/png;base64,' + kucult(k).toString('base64')),
                 gruplar: { red: r.gruplar.red.length, bekleyen: r.gruplar.bekleyen.length, tamam: r.gruplar.tamam.length },
+                fotoTazeleniyor: r.fotoTazeleniyor,
             });
         } catch (e) {
             const tabloYok = /does not exist/.test(e.message);
@@ -607,7 +665,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         if (!raporSiniri(req.auth.username, res)) return;
         const secim = secimOku(req.body && req.body.secim);
         try {
-            const r = await seciliRapor(req.auth.username, a, secim);
+            // Süresi geçmiş fotoğraflar için en çok 35 sn (Asistan 30 sn'de bir sorar; istek 60 sn'yi geçmesin)
+            const r = await seciliRapor(req.auth.username, a, secim, 35000);
             if (!r.kartlar.length) return res.status(400).json({ ok: false, error: 'bos' });
             const tarih = a.bas === a.son ? a.bas.split('-').reverse().join('.')
                 : a.bas.split('-').reverse().join('.') + ' - ' + a.son.split('-').reverse().join('.');
@@ -628,4 +687,4 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     });
 }
 
-module.exports = { kur, bildirimMetni };
+module.exports = { kur, bildirimMetni, fotoIsteToplu, fotolariTazele, linkTaze };

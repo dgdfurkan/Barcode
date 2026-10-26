@@ -174,7 +174,8 @@ function kaldirmaKartlari(v, s = {}) {
     const g = s.gruplar || { red: true, bekleyen: true, tamam: true };
     const gorseller = s.gorseller || new Map();
     const tum = [].concat(v.red || [], v.bekleyen || [], v.tamam || []);
-    const fotolu = tum.some((k) => Array.isArray(k.fotolar) && k.fotolar.length);
+    // Fotoğrafı istenen ama gelmeyen kayıt da (fotoNot) fotoğraf sütununu açar: yeri ve sebebi görünür
+    const fotolu = tum.some((k) => (Array.isArray(k.fotolar) && k.fotolar.length) || k.fotoNot);
 
     // Sütunlar (satır kartının sol kenarına göre)
     const ekG = fotolu ? 0 : 290;
@@ -219,6 +220,12 @@ function kaldirmaKartlari(v, s = {}) {
             p.push(yazi(x + K.zaman, y + 62, gun, { boy: 20, agirlik: 600, renk: C.orta }));
             p.push(yazi(x + K.zaman, y + 92, saat, { boy: 20, renk: C.sonuk }));
             (k.fotolar || []).slice(0, 3).forEach((f, j) => gorselKutu(p, x + K.foto + j * (FOTO + 11), y + 24, FOTO, f, { doldur: true, rx: 14 }));
+            if (!(k.fotolar || []).length && k.fotoNot) {
+                const fw = 3 * FOTO + 22;
+                p.push(`<rect x="${x + K.foto}" y="${y + 24}" width="${fw}" height="${FOTO}" rx="14" fill="${C.zemin}" stroke="${C.cizgi}" stroke-dasharray="6 6"/>`);
+                p.push(yazi(x + K.foto + fw / 2, y + 24 + FOTO / 2 - 4, 'Hasar fotoğrafı', { boy: 17, agirlik: 600, renk: C.sonuk, hiza: 'middle' }));
+                p.push(yazi(x + K.foto + fw / 2, y + 24 + FOTO / 2 + 20, k.fotoNot, { boy: 16, renk: C.soluk, hiza: 'middle' }));
+            }
         },
     });
 
