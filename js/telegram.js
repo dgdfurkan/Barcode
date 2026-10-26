@@ -48,6 +48,8 @@
         bot: true,
         onizleme: { no: 0, zaman: null, sonuc: {}, yukleniyor: false },
         pf: { bas: null, son: null },
+        // Satıştan Kaldırma önizleme ve Kendime Gönder aralığı; son24: zamanlı raporun penceresi
+        kr: { tur: 'son24', bas: null, son: null },
         kaydediyor: false,
         gonderiyor: false
     };
@@ -277,8 +279,59 @@
         '<p class="tg-not">Satıştan kaldırma ve itirazlar kendi sekmelerinde, kendi saatleriyle gider.</p>';
     }
 
+    /* Satıştan Kaldırma: önizleme ve "Kendime Gönder" için tarih aralığı */
+    function krHazir(tur) {
+        var bugun = gunYaz(Date.now());
+        var k = d.kr;
+        k.tur = tur;
+        if (tur === 'bugun') { k.bas = k.son = bugun; }
+        else if (tur === 'dun') { k.bas = k.son = pfDun(); }
+        else if (tur === 'hafta') { k.bas = gunYaz(Date.now() - 6 * 864e5); k.son = bugun; }
+        else if (tur === 'ay') { k.bas = bugun.slice(0, 8) + '01'; k.son = bugun; }
+        else if (tur === 'gecenAy') {
+            var b = new Date(bugun.slice(0, 8) + '01T12:00:00Z');
+            b.setUTCDate(0);
+            k.son = b.toISOString().slice(0, 10);
+            k.bas = k.son.slice(0, 8) + '01';
+        } else { k.tur = 'son24'; }
+        ayarCiz();
+        onizlemeBayatla();
+    }
+
+    function krTarihKoy(alan, deger) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(deger || ''))) return;
+        var k = d.kr;
+        if (k.tur === 'son24') { k.bas = k.son = gunYaz(Date.now()); }
+        k.tur = 'ozel';
+        k[alan] = deger;
+        if (k.bas > k.son) { if (alan === 'bas') k.son = deger; else k.bas = deger; }
+        if (Date.parse(k.son) - Date.parse(k.bas) > 62 * 864e5) {
+            if (alan === 'bas') k.son = gunYaz(Date.parse(k.bas) + 62 * 864e5); else k.bas = gunYaz(Date.parse(k.son) - 62 * 864e5);
+        }
+        ayarCiz();
+        onizlemeBayatla();
+    }
+
+    /** Sunucuya giden aralık; son 24 saatte null */
+    function krAralik() { return d.kr.tur === 'son24' ? null : { bas: d.kr.bas, son: d.kr.son }; }
+
+    function krKarti() {
+        var k = d.kr;
+        var bugun = gunYaz(Date.now());
+        var bas = k.tur === 'son24' ? bugun : k.bas;
+        var son = k.tur === 'son24' ? bugun : k.son;
+        return kartHtml({
+            ikon: IKON.mesaj, baslik: 'Tarih Aralığı', aciklama: 'Önizleme ve "Kendime Gönder" bu aralıkla. Zamanlı rapor her zaman bir öncekinden bu yana olanları gönderir.',
+            govde: '<div class="tg-satir tg-satir--dikey"><div class="tg-cipler">' + [['son24', 'Son 24 Saat'], ['bugun', 'Bugün'], ['dun', 'Dün'], ['hafta', 'Son 7 Gün'], ['ay', 'Bu Ay'], ['gecenAy', 'Geçen Ay']].map(function (x) {
+                    return '<button type="button" class="tg-cip" data-kr-hazir="' + x[0] + '" data-odak="kr-hazir:' + x[0] + '" aria-pressed="' + (k.tur === x[0]) + '"><i>' + IKON.tik + '</i>' + x[1] + '</button>';
+                }).join('') + '</div>' +
+                '<div class="tg-tarih"><label><span>Başlangıç</span><input type="date" data-kr-tarih="bas" data-odak="kr-bas" value="' + bas + '" max="' + son + '"></label>' +
+                '<label><span>Bitiş</span><input type="date" data-kr-tarih="son" data-odak="kr-son" value="' + son + '" min="' + bas + '" max="' + bugun + '"></label></div></div>'
+        });
+    }
+
     function kaldirmaHtml() {
-        return zamanKarti('kaldirmaRapor', 'Her gün seçtiğin saatlerde. Her rapor bir öncekinden bu yana olanları içerir; onay bekleyenler o anki hâliyle.') +
+        return krKarti() + zamanKarti('kaldirmaRapor', 'Her gün seçtiğin saatlerde. Her rapor bir öncekinden bu yana olanları içerir; onay bekleyenler o anki hâliyle.') +
         kartHtml({
             ikon: IKON.kaldirma, baslik: 'Gruplar', aciklama: 'Her grup ayrı açılır; hasar fotoğrafı grup başına seçilir.',
             govde: grupSatiri('Reddedilen ve İptal Edilen', 'Rapor aralığında reddedilen ya da iptal edilenler', 'kaldirmaRapor.red') +
@@ -619,7 +672,8 @@
             return d.sekme + '|' + (d.veri === 'ornek' ? 'o' : d.pf.bas + '|' + d.pf.son) + '|' + JSON.stringify(d.ayar.performans[d.sekme]);
         }
         var parca = d.sekme === 'anlik' ? d.ayar.anlik : d.sekme === 'gonder' ? d.ayar.kaldirmaGonder : d.ayar[BOLUM[d.sekme] || 'gece'];
-        return d.sekme + '|' + (d.sekme === 'gonder' ? 'g' : d.veri) + '|' + JSON.stringify(parca);
+        var ar = d.sekme === 'kaldirma' && d.veri === 'gercek' ? JSON.stringify(krAralik()) : '';
+        return d.sekme + '|' + (d.sekme === 'gonder' ? 'g' : d.veri) + '|' + ar + '|' + JSON.stringify(parca);
     }
 
     var zamanlayici = null;
@@ -649,7 +703,10 @@
             c = await istek('/api/kaldirma/onizleme', { secim: d.ayar.kaldirmaGonder });
         } else {
             if (d.sekme === 'itiraz' && d.veri === 'gercek') await siparisleriTazele();
-            c = await istek('/api/telegram-ayar/onizleme', { rapor: d.sekme === 'anlik' ? 'anlik' : BOLUM[d.sekme] ? d.sekme : 'gece', veri: d.veri, ayar: sekmeAyari() });
+            c = await istek('/api/telegram-ayar/onizleme', {
+                rapor: d.sekme === 'anlik' ? 'anlik' : BOLUM[d.sekme] ? d.sekme : 'gece', veri: d.veri, ayar: sekmeAyari(),
+                aralik: d.sekme === 'kaldirma' ? krAralik() : undefined
+            });
         }
         if (no !== o.no) return; // daha yeni bir istek var
         o.yukleniyor = false;
@@ -745,7 +802,8 @@
         durum.classList.toggle('is-yukleniyor', !!o.yukleniyor);
         el('tgVeri').hidden = d.sekme === 'gonder';
         el('tgSohbetAlt').textContent = d.sekme === 'gonder' ? 'son 7 günün kayıtlarıyla' : d.veri === 'ornek' ? 'örnek veriyle'
-            : pfSekmesi() ? aralikYazi(d.pf.bas, d.pf.son) + ' verisiyle' : 'gerçek verinle';
+            : pfSekmesi() ? aralikYazi(d.pf.bas, d.pf.son) + ' verisiyle'
+            : d.sekme === 'kaldirma' && krAralik() ? aralikYazi(d.kr.bas, d.kr.son) + ' verisiyle' : 'gerçek verinle';
 
         var anahtar = onizlemeAnahtari();
         var s = o.sonuc[o.goster];
@@ -769,7 +827,7 @@
                 kutu.innerHTML = d.sekme === 'gonder'
                     ? bosHtml('Gönderilecek kart yok', 'Son 7 günde seçili gruplarda kayıt yok.')
                     : pfSekmesi() ? bosHtml('Gönderilecek kart yok', d.sekme === 'kurye' ? 'Bu tarihlerde sipariş taşıyan kurye görünmüyor.' : 'Bu tarihler için DPS verisi gelmedi.')
-                    : d.sekme === 'kaldirma' ? bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? 'Son 24 saatte seçili gruplarda kayıt yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.' : 'Bütün gruplar kapalı.')
+                    : d.sekme === 'kaldirma' ? bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? (krAralik() ? 'Seçilen tarihlerde seçili gruplarda kayıt yok. Aralığı genişletebilir ya da Örnek Veri ile görünümü inceleyebilirsin.' : 'Son 24 saatte seçili gruplarda kayıt yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.') : 'Bütün gruplar kapalı.')
                     : d.sekme === 'itiraz' ? bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? 'İtiraz bekleyen ya da son 24 saatte sonuçlanan kayıt yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.' : 'Bekleyenler ve sonuçlananlar kapalı.')
                     : bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? 'Bu ayarla rapor aralığında içerik yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.' : 'Bütün bölümler kapalı.');
             } else {
@@ -837,7 +895,10 @@
             c = await istek('/api/kaldirma/rapor', { bas: a.bas, son: a.son, secim: d.ayar.kaldirmaGonder });
         } else {
             if (d.sekme === 'itiraz') { siparisSon = 0; await siparisleriTazele(); }
-            c = await istek('/api/telegram-ayar/test', { rapor: d.sekme === 'anlik' ? 'anlik' : BOLUM[d.sekme] ? d.sekme : 'gece', ayar: sekmeAyari() });
+            c = await istek('/api/telegram-ayar/test', {
+                rapor: d.sekme === 'anlik' ? 'anlik' : BOLUM[d.sekme] ? d.sekme : 'gece', ayar: sekmeAyari(),
+                aralik: d.sekme === 'kaldirma' ? krAralik() : undefined
+            });
         }
         d.gonderiyor = false;
         cubukCiz();
@@ -929,6 +990,7 @@
                 return;
             }
             if (t.matches('input[data-pf-tarih]')) { pfTarihKoy(t.getAttribute('data-pf-tarih'), t.value); }
+            if (t.matches('input[data-kr-tarih]')) { krTarihKoy(t.getAttribute('data-kr-tarih'), t.value); }
             if (t.matches('input[data-metin-yol]')) koy(t.getAttribute('data-metin-yol'), t.value.replace(/\s+/g, ' ').trim().slice(0, 40));
         });
         ayarlar.addEventListener('click', function (e) {
@@ -949,6 +1011,8 @@
                 if (l.length) koy(syol, l);
                 return;
             }
+            var kh = e.target.closest('[data-kr-hazir]');
+            if (kh) { krHazir(kh.getAttribute('data-kr-hazir')); return; }
             var hz = e.target.closest('[data-pf-hazir]');
             if (hz) { pfHazirAralik(hz.getAttribute('data-pf-hazir')); return; }
             var ls = e.target.closest('[data-liste]');

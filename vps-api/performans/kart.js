@@ -508,4 +508,4 @@ const yatay = {
     genislik: () => W,
 };
 
-module.exports = { dpsKarti, kuryeKarti, kuryeFotolari, tarihAraligi, donemAdi, ondalik, yatay };
+module.exports = { dpsKarti, kuryeKarti, kuryeFotolari, tarihAraligi, tarihAlti, donemAdi, ondalik, yatay };

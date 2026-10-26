@@ -83,6 +83,22 @@ const GUN_MS = 24 * 3600 * 1000;
 /* gece.gonderim.dakika kayması (performans: 10000 / 12000) */
 const KAYMA = { kaldirma: 14000, itiraz: 16000 };
 const RAPOR_TURU = new Set(['gece', 'anlik', 'kaldirma', 'itiraz']);
+
+/**
+ * Sayfadan gelen tarih aralığı (İstanbul günleri, en çok 62 gün):
+ * { bas: 'YYYY-MM-DD', son: 'YYYY-MM-DD' } → { basGun, sonGun, bas: Date, son: Date } | null
+ */
+function aralikOku(v) {
+    const g = (x) => (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) ? x : null);
+    if (!v || typeof v !== 'object') return null;
+    const basGun = g(v.bas);
+    const sonGun = g(v.son) || basGun;
+    if (!basGun || !sonGun || sonGun < basGun) return null;
+    const bas = new Date(basGun + 'T00:00:00.000+03:00');
+    const son = new Date(Math.min(Date.parse(sonGun + 'T23:59:59.999+03:00'), Date.now()));
+    if (!(bas < son) || son - bas > 63 * GUN_MS) return null;
+    return { basGun, sonGun, bas, son };
+}
 const KIMLIK = /^[0-9a-f]{24}$/;
 
 function hakAcik(pf) {
@@ -172,7 +188,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
      *   tamam    pencerede tamamlanan (210, 350, 500, 600)
      * Fotoğraf yalnız fotoğrafı seçili grupta taşınır.
      */
-    async function kaldirmaVerisi(u, bas, son, gk) {
+    /** aralikli: sayfada tarih aralığı seçildi; onay bekleyenler de o aralıkta oluşturulanlar */
+    async function kaldirmaVerisi(u, bas, son, gk, aralikli) {
         const bos = { red: [], bekleyen: [], tamam: [] };
         if (!gk.red.goster && !gk.bekleyen.goster && !gk.tamam.goster) return bos;
         let r;
@@ -194,7 +211,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         for (const k of tum) {
             if (!k.veri || !sebepUygun(k)) continue;
             const ortak = { id: k.kayit_id, urun: urunOf(k), adet: Number(k.adet) || 0, sebep: k.sebep || '', altNeden: k.veri.altNeden || '', durum: k.durum };
-            if (gk.bekleyen.goster && BEKLEYEN.has(k.durum)) {
+            const aralikta = !aralikli || (Date.parse(k.olusturma) >= bas.getTime() && Date.parse(k.olusturma) <= son.getTime());
+            if (gk.bekleyen.goster && BEKLEYEN.has(k.durum) && aralikta) {
                 sonuc.bekleyen.push({ ...ortak, bekliyor: true, zaman: k.olusturma, fotoAdres: fotoAl(k, gk.bekleyen.foto) });
             }
             if (gk.red.goster) {
@@ -433,13 +451,17 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     async function kaldirmaRaporu(u, son = new Date(), secenek = {}) {
         const A = secenek.ayar || await ayarOku(u);
         const K = A.kaldirmaRapor;
-        const bas = secenek.bas || new Date(son.getTime() - GUN_MS);
+        // Sayfada seçilen tarih aralığı (önizleme ve Kendime Gönder); yoksa son 24 saat ya da son gönderimden bu yana
+        const ar = secenek.aralik || null;
+        if (ar) son = ar.son;
+        const bas = ar ? ar.bas : secenek.bas || new Date(son.getTime() - GUN_MS);
         const o = secenek.ornek ? await ornekVeri(A) : null;
-        const kd = o ? o.kd : await kaldirmaVerisi(u, bas, son, K);
+        const kd = o ? o.kd : await kaldirmaVerisi(u, bas, son, K, !!ar);
         if (!kd.red.length && !kd.bekleyen.length && !kd.tamam.length) return { kartlar: [], baslik: '' };
-        const alt = pencereMetni(bas, son);
+        const alt = ar ? performansKart.tarihAlti(ar.basGun, ar.sonGun) : pencereMetni(bas, son);
+        const tarih = ar ? performansKart.tarihAraligi(ar.basGun, ar.sonGun) : uzunGun(son);
         const { kartlar, fotoTazeleniyor } = await kaldirmaCiz(kd, K, {
-            u, onizleme: secenek.onizleme, ornek: !!o, gorseller: o && o.gorseller, tarih: uzunGun(son), alt,
+            u, onizleme: secenek.onizleme, ornek: !!o, gorseller: o && o.gorseller, tarih, alt,
             fotoBekleMs: secenek.fotoBekleMs != null ? secenek.fotoBekleMs : secenek.onizleme ? 0 : 100000,
         });
         const red = kd.red.filter((k) => !k.yeniden);
@@ -451,8 +473,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         if (kd.tamam.length) parca.push(kd.tamam.length + ' tamamlandı');
         return {
             kartlar: kartlar.slice(0, 10),
-            baslik: ['🗑️ Satıştan Kaldırma · ' + kisaGun(son) + ' · ' + alt.toLocaleLowerCase('tr'), parca.join(' · ')].filter(Boolean).join('\n'),
-            tamKalite: K.tamKalite, ad: 'satistan-kaldirma-' + istanbul(son.getTime()).gun, fotoTazeleniyor,
+            baslik: ['🗑️ Satıştan Kaldırma · ' + (ar ? tarih : kisaGun(son) + ' · ' + alt.toLocaleLowerCase('tr')), parca.join(' · ')].filter(Boolean).join('\n'),
+            tamKalite: K.tamKalite, ad: 'satistan-kaldirma-' + (ar ? ar.basGun + (ar.sonGun !== ar.basGun ? '_' + ar.sonGun : '') : istanbul(son.getTime()).gun), fotoTazeleniyor,
         };
     }
 
@@ -929,7 +951,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const o = await ta.ayarOku(pool, u);
             const A = b.ayar && typeof b.ayar === 'object' ? ta.duzelt(ta.birlestir(o.ayar, b.ayar)) : o.ayar;
             const bolum = { anlik: A.anlik, kaldirma: A.kaldirmaRapor, itiraz: A.itirazRapor, gece: A.gece }[tur];
-            const anahtar = u + '|' + tur + '|' + (ornek ? 'o' : 'g') + '|' + JSON.stringify(bolum);
+            const aralik = tur === 'kaldirma' ? aralikOku(b.aralik) : null;
+            const anahtar = u + '|' + tur + '|' + (ornek ? 'o' : 'g') + '|' + (aralik ? aralik.basGun + '_' + aralik.sonGun : '') + '|' + JSON.stringify(bolum);
             const eski = onizlemeOnbellek.get(anahtar);
             if (eski && Date.now() - eski.zaman < ONIZLEME_MS) return res.json(eski.sonuc);
             if (!pencere('onizleme:' + u, 15, 60000)) return res.status(429).json({ ok: false, error: 'cok_istek' });
@@ -940,7 +963,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             } else {
                 const dakika = bolum.saatler[0];
                 const hazirla = tur === 'kaldirma' ? kaldirmaRaporu : tur === 'itiraz' ? itirazRaporu : raporHazirla;
-                const rapor = await hazirla(u, new Date(), { ayar: A, onizleme: true, ornek, dakika });
+                const rapor = await hazirla(u, new Date(), { ayar: A, onizleme: true, ornek, dakika, aralik });
                 // Yatay kartlar geniş: önizlemede 1600 px (yazılar okunsun)
                 const en = tur === 'gece' ? 720 : 1600;
                 sonuc = {
@@ -1041,7 +1064,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const hazirla = tur === 'kaldirma' ? kaldirmaRaporu : tur === 'itiraz' ? itirazRaporu : raporHazirla;
             const bolum = { kaldirma: A.kaldirmaRapor, itiraz: A.itirazRapor, gece: A.gece }[tur];
             // Süresi geçmiş hasar fotoğrafları için en çok 35 sn (Asistan 30 sn'de bir sorar; istek 60 sn'yi geçmesin)
-            const rapor = await hazirla(u, new Date(), { ayar: A, dakika: bolum.saatler[0], fotoBekleMs: 35000 });
+            const aralik = tur === 'kaldirma' ? aralikOku(b.aralik) : null;
+            const rapor = await hazirla(u, new Date(), { ayar: A, dakika: bolum.saatler[0], fotoBekleMs: 35000, aralik });
             rapor.baslik = '🧪 Deneme\n' + rapor.baslik;
             const s = await gonder(u, rapor);
             if (s.bos) return res.status(409).json({ ok: false, error: 'bos' });
