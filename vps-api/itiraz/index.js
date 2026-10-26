@@ -336,7 +336,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     /* Sipariş kolonları itiraz_rapor.sql ile geliyor; yoksa sessizce atlanır */
     let siparisKolonu = null;
     const SIPARIS_EKSIK = `SELECT kayit_id AS id, siparis_id AS "siparisId", siparis_tur AS "siparisTur" FROM itiraz.kayitlar
-                            WHERE username = $1 AND siparis_id IS NOT NULL AND siparis IS NULL
+                            WHERE username = $1 AND siparis_id IS NOT NULL
+                              AND (siparis IS NULL OR COALESCE(siparis->>'surum', '1') <> '2')
                               AND (siparis_deneme IS NULL OR siparis_deneme < now() - interval '1 hour')
                               AND ((durum = 100 AND son_tarih > now()) OR durum_degisti_at > now() - interval '2 days')`;
 

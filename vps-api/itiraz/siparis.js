@@ -47,6 +47,8 @@ function siparisDuzelt(v) {
         tarih: Number.isFinite(t) ? new Date(t).toISOString() : null,
         kurye: kisi(v.kurye),
         toplayici: kisi(v.toplayici),
+        // 2: kişiler panelin doğru alanından (courier.courier); eskiler yeniden okunur
+        surum: v.surum === 2 ? 2 : 1,
     };
 }
 

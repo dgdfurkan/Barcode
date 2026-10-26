@@ -171,8 +171,10 @@ async function grSiparisOzeti(jeton, id, tur) {
     urunler,
     teslimDk: bas && teslim && teslim > bas ? Math.round((teslim - bas) / 60000) : null,
     tarih: bas ? new Date(bas).toISOString() : null,
-    kurye: grKisi(o && o.courier),
-    toplayici: grKisi(o && o.picker),
+    // Panel: kurye courier.courier, toplayıcı picking.picker altında
+    kurye: grKisi(o && o.courier && o.courier.courier) || grKisi(o && o.courier),
+    toplayici: grKisi(o && o.picking && o.picking.picker) || grKisi(o && o.picker),
+    surum: 2,
   };
 }
 

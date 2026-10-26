@@ -366,7 +366,8 @@ function kuryeKarti(liste, s = {}) {
     const fotolar = s.fotolar || new Map();
     const n = Math.max(kuryeler.length, 1);
     // Çok sütun seçildiyse kart genişler: her sütun en az EN_DAR_KOLON (yatay, tek parça)
-    const adG0 = sutunlar.length > 14 ? 380 : 460;
+    // Fotoğraf kapalıysa ad sütunu daralır, yer değer sütunlarına kalır
+    const adG0 = (sutunlar.length > 14 ? 380 : 460) - (s.foto === false ? 64 : 0);
     genislikKur(Math.max(TASARIM, Math.ceil(2 * P + adG0 + sutunlar.length * EN_DAR_KOLON)));
 
     const p = [''];
