@@ -313,7 +313,8 @@
         return {
             id: k.id, durum: k.durum, kayitTarihi: k.kayitTarihi, sonTarih: k.sonTarih, kriter: k.kriter,
             sikayet: k.sikayet, aciklama: k.aciklama, musteriNotu: k.musteriNotu, urun: k.urun, urunId: k.urunId,
-            itirazMetni: k.itirazMetni, itirazSebepId: k.itirazSebepId
+            itirazMetni: k.itirazMetni, itirazSebepId: k.itirazSebepId,
+            siparisId: k.siparisId || '', siparisTur: k.siparisTur
         };
     }
 
@@ -708,26 +709,13 @@
         var kayit = siparisler[k.id] = { yukleniyor: true };
         kayit.sozu = (async function () {
             try {
-                var r = await global.franchiseOturum.istek('/orders/' + k.siparisId + (k.siparisTur != null ? '?domainType=' + k.siparisTur : ''));
-                if (!r.ok) throw new Error('http');
-                var j = await r.json();
-                var o = j && j.basket ? j : (j && j.data && j.data.basket ? j.data : j);
-                var urunler = (o && o.basket && Array.isArray(o.basket.products) ? o.basket.products : []).map(function (u) {
-                    var ad = u && u.name && typeof u.name === 'object' ? (u.name.tr || u.name.en || '') : (u && u.name) || '';
-                    var pid = u && (u.product && typeof u.product === 'object' ? (u.product.id || u.product._id) : (u.product || u.productId || u.id || u._id));
-                    return {
-                        ad: String(ad).slice(0, 120), adet: Number(u && u.count) || 0,
-                        id: /^[a-f0-9]{24}$/i.test(String(pid || '')) ? String(pid) : '',
-                        gorsel: picAdresi(u) || picAdresi(u && u.product)
-                    };
-                }).filter(function (u) { return u.ad; });
-                var t = function (yol) { var x = o && o[yol] && o[yol].date; var ms = Date.parse(x); return Number.isFinite(ms) ? ms : null; };
-                var bas = t('checkout');
-                var teslim = t('deliver');
-                kayit.urunler = urunler;
-                kayit.kalem = urunler.length;
-                kayit.adet = urunler.reduce(function (a, u) { return a + u.adet; }, 0);
-                kayit.teslimDk = bas && teslim && teslim > bas ? Math.round((teslim - bas) / 60000) : null;
+                var o = await global.franchiseOturum.siparisOzeti(k.siparisId, k.siparisTur);
+                kayit.urunler = o.urunler;
+                kayit.kalem = o.kalem;
+                kayit.adet = o.adet;
+                kayit.teslimDk = o.teslimDk;
+                // Telegram itiraz raporu için sunucuya da (yalnız ürünler, süreler, kurye ve toplayıcı)
+                if (d.sunucu === 'hazir') postJson('/api/itiraz/siparis', { liste: [{ id: k.id, siparis: o }] }).catch(function () { /* sessiz */ });
             } catch (e) {
                 kayit.hata = true;
                 kayit.zaman = Date.now();

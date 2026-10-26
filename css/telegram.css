@@ -31,6 +31,8 @@
 .tg-sekmeler button svg { width: 16px; height: 16px; }
 .tg-sekmeler button[aria-selected="true"] { background: var(--yuzey); color: var(--yazi); box-shadow: var(--golge-s); }
 
+.tg-not { margin: 0; padding: 0 4px; font-size: 12px; line-height: 16px; color: var(--sonuk); }
+
 .tg-gorunum { display: none; }
 .tg-kisa { display: none; }
 
@@ -237,7 +239,8 @@ body:has(.tg-cubuk:not([hidden])) .jbd-serit { bottom: calc(84px + env(safe-area
 @media (max-width: 640px) {
     .tg { padding-top: 16px; }
     .tg-baslik p { display: none; }
-    .tg-sekmeler button { flex: 1 1 0; min-width: 0; padding: 0 8px; font-size: 12px; }
+    /* Yedi sekme sığmaz: şerit yatay kayar, seçili sekme görünür tutulur */
+    .tg-sekmeler button { flex: 0 0 auto; padding: 0 12px; font-size: 12px; }
     .tg-uzun { display: none; }
     .tg-kisa { display: inline; }
     .tg-sekmeler button svg { display: none; }
@@ -252,7 +255,7 @@ body:has(.tg-cubuk:not([hidden])) .jbd-serit { bottom: calc(84px + env(safe-area
     body:has(.tg-cubuk:not([hidden])) .jbd-serit { bottom: calc(108px + env(safe-area-inset-bottom)) !important; }
 }
 @media (pointer: coarse) {
-    .tg-cip, .tg-segment button, .tg-saat, .tg-saat-ekle, .tg-guncelle { min-height: 44px; }
+    .tg-cip, .tg-segment button, .tg-saat, .tg-saat-ekle, .tg-guncelle, .tg-sekmeler button { min-height: 44px; }
     .tg-sutunlar button { width: 44px; height: 44px; }
     .tg-saat button { width: 40px; height: 40px; }
 }

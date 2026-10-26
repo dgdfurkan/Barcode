@@ -96,16 +96,17 @@ function svgPng(parcalar, H) {
     }).render().asPng();
 }
 
-/** Üst bant: solda logo, etiket ve başlık; sağda büyük tarih. Dönen y: içeriğin başı */
-function ustBant(p, { etiket, baslik, bas, son }) {
+/** Üst bant: solda logo, etiket ve başlık; sağda büyük tarih. Dönen y: içeriğin başı.
+    tarih / alt verilirse tarih aralığı ve altındaki çip yerine onlar yazılır. */
+function ustBant(p, { etiket, baslik, bas, son, tarih: tarihMetni, alt: altMetni }) {
     const y = 56;
     p.push(`<rect x="${P}" y="${y}" width="88" height="88" rx="24" fill="#ffffff" stroke="${C.cizgi}"/>`);
     p.push(`<image href="${LOGO}" x="${P + 8}" y="${y + 8}" width="72" height="72"/>`);
     // Sağda tarih (ön planda)
-    const tarih = tarihAraligi(bas, son);
+    const tarih = tarihMetni || tarihAraligi(bas, son);
     const tarihBoy = genislik(OLCU.baslik, tarih, 56) > 820 ? 44 : 56;
     p.push(yazi(W - P, y + 52, tarih, { boy: tarihBoy, aile: 'Manrope', agirlik: 800, renk: C.yazi, hiza: 'end' }));
-    const alt = tarihAlti(bas, son);
+    const alt = altMetni || tarihAlti(bas, son);
     const altG = genislik(OLCU.govdeKalin, alt, 20) + 32;
     p.push(`<rect x="${W - P - altG}" y="${y + 66}" width="${altG}" height="36" rx="18" fill="${C.maviZemin}"/>`);
     p.push(yazi(W - P - altG / 2, y + 91, alt, { boy: 20, agirlik: 600, renk: C.mavi, hiza: 'middle' }));
@@ -500,4 +501,10 @@ async function kuryeFotolari(liste, butceMs = 8000) {
     return sonuc;
 }
 
-module.exports = { dpsKarti, kuryeKarti, kuryeFotolari, tarihAraligi, donemAdi, ondalik };
+/* Aynı görünümdeki diğer raporlar (gece-raporu/yatay.js) için ortak çizim */
+const yatay = {
+    C, P, TASARIM, genislikKur, svgPng, ustBant, altBant, kuryeFoto, sayiYaz,
+    genislik: () => W,
+};
+
+module.exports = { dpsKarti, kuryeKarti, kuryeFotolari, tarihAraligi, donemAdi, ondalik, yatay };

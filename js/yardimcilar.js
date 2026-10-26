@@ -50,10 +50,28 @@
                     kimlik: 'telegram',
                     haklar: TELEGRAM_HAKLARI,
                     ad: 'Telegram Raporları',
-                    ozet: 'Zamanlı rapor, anlık bildirim ve gönderilen görselleri ayarla, önizle.',
+                    ozet: 'Gece raporu, anlık bildirim ve gönderilen görselleri ayarla, önizle.',
                     adres: '../telegram/',
                     renk: 'mavi',
                     ikon: '<path d="m3.5 11.5 16-7-3 15-5.5-4.5z"/><path d="m11 15 8.5-10.5"/>'
+                },
+                {
+                    kimlik: 'kaldirmaRapor',
+                    haklar: TELEGRAM_HAKLARI,
+                    ad: 'Satıştan Kaldırma Raporu',
+                    ozet: 'Reddedilen, iptal edilen ve onay bekleyen kaldırmalar, seçtiğin saatte Telegram\'a.',
+                    adres: '../telegram/?sekme=kaldirma',
+                    renk: 'kirmizi',
+                    ikon: '<path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>'
+                },
+                {
+                    kimlik: 'itirazRapor',
+                    haklar: TELEGRAM_HAKLARI,
+                    ad: 'İtiraz Raporu',
+                    ozet: 'İtiraz bekleyen kayıtlar siparişi, kuryesi ve kalan süresiyle Telegram\'a.',
+                    adres: '../telegram/?sekme=itiraz',
+                    renk: 'mor',
+                    ikon: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>'
                 },
                 {
                     kimlik: 'kuryeCdi',
@@ -161,16 +179,20 @@
         }
         var j = c.j;
         var adlar = (j.hesaplar || []).map(function (h) { return h.ad || (h.kullanici ? '@' + h.kullanici : ''); }).filter(Boolean);
-        var gece = j.ayar && j.ayar.gece;
-        var saatler = gece && gece.acik ? (gece.saatler || [60]).map(saatYazi).join(', ') : '';
+        var A = j.ayar || {};
+        var pf = A.performans;
+        // Bütün zamanlı raporların saatleri (gece, kaldırma, itiraz, DPS, Kurye CDI)
+        var tum = [A.gece, A.kaldirmaRapor, A.itirazRapor, pf && pf.dps, pf && pf.kurye].filter(function (x) { return x && x.acik; })
+            .reduce(function (l, x) { return l.concat(x.saatler || []); }, [])
+            .filter(function (x, i, l) { return l.indexOf(x) === i; }).sort(function (a, b) { return a - b; });
+        var saatler = tum.map(saatYazi).join(', ');
         var bagli = (j.hesaplar || []).length > 0;
         seritYaz(serit, bagli ? 'bagli' : 'yok', bagli ? 'Telegram bağlı' : 'Telegram bağlı değil',
             bagli ? (adlar.join(', ') || j.hesaplar.length + ' hesap') + (saatler ? ' · Rapor ' + saatler : ' · Zamanlı rapor kapalı')
                 : 'Raporlar ve anlık bildirimler için bir kez bağla.',
             bagli ? '<a class="yrd-tg__dugme" href="../telegram/">Ayarla</a>' : '<button type="button" class="yrd-tg__dugme yrd-tg__dugme--ana" id="yrdBagla">Bağla</button>');
-        canliYaz('telegram', saatler ? 'Sonraki rapor ' + siradaki(gece.saatler) : bagli ? 'Zamanlı rapor kapalı' : 'Telegram bağlı değil', saatler ? '' : 'uyari');
-        var pf = j.ayar && j.ayar.performans;
-        [['kuryeCdi', pf && pf.kurye], ['dps', pf && pf.dps]].forEach(function (x) {
+        canliYaz('telegram', saatler ? 'Sonraki rapor ' + siradaki(tum) : bagli ? 'Zamanlı rapor kapalı' : 'Telegram bağlı değil', saatler ? '' : 'uyari');
+        [['kaldirmaRapor', A.kaldirmaRapor], ['itirazRapor', A.itirazRapor], ['kuryeCdi', pf && pf.kurye], ['dps', pf && pf.dps]].forEach(function (x) {
             var r = x[1];
             if (r) canliYaz(x[0], r.acik ? 'Her gün ' + (r.saatler || [600]).map(saatYazi).join(', ') : 'Zamanlı gönderim kapalı · elle gönderilebilir', r.acik ? '' : 'uyari');
         });

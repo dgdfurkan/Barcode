@@ -2,8 +2,13 @@
  * Telegram Raporları (/telegram/)
  * ============================================================================
  *
- * Üç sekme, hepsi tek ayar nesnesinde (vps-api/telegram-ayar.js):
- *   Zamanlı Rapor   ayar.gece: saatler (en çok 4), bölümler ve seçenekleri
+ * Sekmeler, hepsi tek ayar nesnesinde (vps-api/telegram-ayar.js):
+ *   Gece Raporu     ayar.gece: saatler (en çok 4), özet kartı ve sayımlar
+ *   Kaldırma        ayar.kaldirmaRapor: kendi saatleri; gruplar, fotoğraf, sebepler
+ *   İtiraz          ayar.itirazRapor: kendi saatleri; bekleyen/sonuçlanan,
+ *                   siparişin içeriği, kurye ve toplayıcı. Önizlemeden ve
+ *                   gönderimden önce siparişi henüz okunmamış kayıtlar bu
+ *                   tarayıcıdaki franchise oturumuyla okunur (siparisleriTazele)
  *   Anlık Bildirim  ayar.anlik: satıştan kaldırma durum değişince giden mesaj
  *   Elle Gönderim   ayar.kaldirmaGonder: Satıştan Kaldırma sayfasındaki
  *                   "Telegram'a Gönder" panelinin açılış seçimi
@@ -75,11 +80,16 @@
         mesaj: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 5.5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-3.5 3v-3a2 2 0 0 1-2-2z"/></svg>',
         gonder: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m3.5 9.5 13-6-4 13-2.5-5.5z"/><path d="m10 11 6.5-7.5"/></svg>',
         bos: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="3"/><path d="M8 10h8M8 14h5"/></svg>',
-        uyari: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17v.5"/></svg>'
+        uyari: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17v.5"/></svg>',
+        siparis: '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 6.5h11l-1 9.5h-9z"/><path d="M7.5 8V5.5a2.5 2.5 0 0 1 5 0V8"/></svg>',
+        kisi: '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="7" r="3"/><path d="M4.5 16.5a5.5 5.5 0 0 1 11 0"/></svg>'
     };
 
+    /* Sekme → ayar alanı (zamanlı raporlar) */
+    var BOLUM = { gece: 'gece', kaldirma: 'kaldirmaRapor', itiraz: 'itirazRapor' };
+
     // ------------------------------------------------------------------
-    // Ayar okuma ve yazma (yol: 'gece.kaldirma.red.goster')
+    // Ayar okuma ve yazma (yol: 'kaldirmaRapor.red.goster')
     // ------------------------------------------------------------------
 
     function al(yol) {
@@ -223,7 +233,7 @@
 
     function sebeplerHtml() {
         if (!d.sebepler.length) return '<p class="tg-satir__metin"><small>Son 60 günde kayıt yok; bütün sebepler gönderilir.</small></p>';
-        var secili = al('gece.kaldirma.sebepler');
+        var secili = al('kaldirmaRapor.sebepler');
         var hepsi = !secili;
         return '<div class="tg-cipler">' +
             '<button type="button" class="tg-cip" data-sebep-hepsi data-odak="sebep-hepsi" aria-pressed="' + hepsi + '"><i>' + IKON.tik + '</i>Bütün Sebepler</button>' +
@@ -238,31 +248,23 @@
     // Sekmeler
     // ------------------------------------------------------------------
 
-    function geceHtml() {
-        var acik = !!al('gece.acik');
-        var sonuc = !!al('gece.itiraz.sonuc');
+    /** Zamanlı gönderim kartı: açık/kapalı ve saatler (yol: 'gece' | 'kaldirmaRapor' | 'itirazRapor') */
+    function zamanKarti(yol, acikMetin) {
+        var acik = !!al(yol + '.acik');
         return kartHtml({
-            ikon: IKON.saat, baslik: 'Gönderim', anahtar: 'gece.acik',
-            aciklama: acik ? 'Her gün seçtiğin saatlerde. Her rapor bir öncekinden bu yana olanları içerir.' : 'Zamanlı rapor kapalı.',
-            govde: '<div class="tg-satir tg-satir--dikey"><span class="tg-satir__metin"><b>Saatler</b><small>Gün içinde en çok ' + EN_COK_SAAT + ' saat seçebilirsin.</small></span>' + saatlerHtml() + '</div>'
-        }) +
-        kartHtml({ ikon: IKON.ozet, baslik: 'Özet Kartı', aciklama: 'Albümün ilk kartı: sayılar ve günlük sayımın durumu.', anahtar: 'gece.bolumler.ozet' }) +
-        kartHtml({
-            ikon: IKON.kaldirma, baslik: 'Satıştan Kaldırma', aciklama: 'Her grup ayrı açılır; hasar fotoğrafı grup başına seçilir.', anahtar: 'gece.bolumler.kaldirma',
-            govde: grupSatiri('Reddedilen ve İptal Edilen', 'Rapor aralığında reddedilen ya da iptal edilenler', 'gece.kaldirma.red') +
-                grupSatiri('Onay Bekleyen', 'Şu an sonuç bekleyen kayıtlar', 'gece.kaldirma.bekleyen') +
-                grupSatiri('Tamamlanan', 'Rapor aralığında tamamlananlar', 'gece.kaldirma.tamam') +
-                satirAnahtar('Yeniden Girilenleri Gizle', 'İptalden sonra depo aynı ürünü yeniden girdiyse gösterme', 'gece.kaldirma.yenidenGizle', !al('gece.kaldirma.red.goster')) +
-                satirSegment('Grup Başına En Çok', null, 'gece.kaldirma.sinir', [[10, '10'], [20, '20'], [40, '40']]) +
-                '<p class="tg-alt-baslik">Sebepler</p>' + sebeplerHtml()
-        }) +
-        kartHtml({
-            ikon: IKON.itiraz, baslik: 'İtirazlar', aciklama: 'Depo değerlendirme kayıtları.', anahtar: 'gece.bolumler.itiraz',
-            govde: satirSegment('İtiraz Bekleyenler', 'Süresi dolmamış kayıtlar', 'gece.itiraz.bekleyen', [['hepsi', 'Hepsi'], ['acil', '24 Saatten Az'], ['yok', 'Gösterme']]) +
-                satirAnahtar('Müşteri Notu', 'Bekleyen kaydın altında', 'gece.itiraz.not', al('gece.itiraz.bekleyen') === 'yok') +
-                satirAnahtar('Sonuçlananlar', 'Rapor aralığında kabul ya da red gelenler', 'gece.itiraz.sonuc') +
-                satirAnahtar('Gönderilen İtiraz Metni', 'Sonuçlanan kaydın altında', 'gece.itiraz.metin', !sonuc)
-        }) +
+            ikon: IKON.saat, baslik: 'Zamanlı Gönderim', anahtar: yol + '.acik',
+            aciklama: acik ? acikMetin : 'Kapalı. Alttaki "Kendime Gönder" ile istediğin an gönderebilirsin.',
+            govde: '<div class="tg-satir tg-satir--dikey"><span class="tg-satir__metin"><b>Saatler</b><small>Gün içinde en çok ' + EN_COK_SAAT + ' saat seçebilirsin.</small></span>' + saatlerHtml(yol + '.saatler') + '</div>'
+        });
+    }
+
+    function tamKaliteSatiri(yol) {
+        return satirAnahtar('Tam Kalite Dosya', 'Görsel ayrıca dosya olarak gider; yakınlaştırınca bozulmaz', yol);
+    }
+
+    function geceHtml() {
+        return zamanKarti('gece', 'Her gün seçtiğin saatlerde. Her rapor bir öncekinden bu yana olanları içerir.') +
+        kartHtml({ ikon: IKON.ozet, baslik: 'Özet Kartı', aciklama: 'Albümün ilk kartı: kaldırma, itiraz ve sayım sayıları, günlük sayımın durumu.', anahtar: 'gece.bolumler.ozet' }) +
         kartHtml({
             ikon: IKON.sayim, baslik: 'Sayımlar', aciklama: 'Rapor aralığında tamamlanan sayımlar.', anahtar: 'gece.bolumler.sayim',
             govde: satirAnahtar('Günlük Sayım', 'Otomatik 50\'lik sayım, paneldeki durumuyla', 'gece.sayim.gunluk') +
@@ -271,6 +273,42 @@
                 satirAnahtar('Farksız Sayımlar', 'Kapalıysa yalnız farkı olan sayımlar gelir', 'gece.sayim.farksiz') +
                 satirSegment('Ürün Listesi', null, 'gece.sayim.liste', [['fark', 'Yalnız Farklar'], ['hepsi', 'Bütün Ürünler']]) +
                 satirSegment('Fark Eşiği', 'Bu kadar ve daha büyük farklar', 'gece.sayim.esik', [[0, 'Her Fark'], [2, '±2'], [5, '±5'], [10, '±10']])
+        }) +
+        '<p class="tg-not">Satıştan kaldırma ve itirazlar kendi sekmelerinde, kendi saatleriyle gider.</p>';
+    }
+
+    function kaldirmaHtml() {
+        return zamanKarti('kaldirmaRapor', 'Her gün seçtiğin saatlerde. Her rapor bir öncekinden bu yana olanları içerir; onay bekleyenler o anki hâliyle.') +
+        kartHtml({
+            ikon: IKON.kaldirma, baslik: 'Gruplar', aciklama: 'Her grup ayrı açılır; hasar fotoğrafı grup başına seçilir.',
+            govde: grupSatiri('Reddedilen ve İptal Edilen', 'Rapor aralığında reddedilen ya da iptal edilenler', 'kaldirmaRapor.red') +
+                grupSatiri('Onay Bekleyen', 'Şu an sonuç bekleyen kayıtlar', 'kaldirmaRapor.bekleyen') +
+                grupSatiri('Tamamlanan', 'Rapor aralığında tamamlananlar', 'kaldirmaRapor.tamam') +
+                satirAnahtar('Yeniden Girilenleri Gizle', 'İptalden sonra depo aynı ürünü yeniden girdiyse gösterme', 'kaldirmaRapor.yenidenGizle', !al('kaldirmaRapor.red.goster')) +
+                satirSegment('Grup Başına En Çok', null, 'kaldirmaRapor.sinir', [[10, '10'], [20, '20'], [40, '40']]) +
+                tamKaliteSatiri('kaldirmaRapor.tamKalite')
+        }) +
+        kartHtml({ ikon: IKON.ozet, baslik: 'Sebepler', aciklama: 'Yalnız seçili sebeplerdeki kayıtlar gelir.', govde: sebeplerHtml() });
+    }
+
+    function itirazHtml() {
+        var sonuc = !!al('itirazRapor.sonuc');
+        var bekleyenYok = al('itirazRapor.bekleyen') === 'yok';
+        var siparis = !!al('itirazRapor.siparis');
+        return zamanKarti('itirazRapor', 'Her gün seçtiğin saatlerde. Asistan rapordan önce listeyi ve siparişleri tazeler.') +
+        kartHtml({
+            ikon: IKON.itiraz, baslik: 'Kayıtlar', aciklama: 'Depo değerlendirme kayıtları.',
+            govde: satirSegment('İtiraz Bekleyenler', 'Süresi dolmamış kayıtlar', 'itirazRapor.bekleyen', [['hepsi', 'Hepsi'], ['acil', '24 Saatten Az'], ['yok', 'Gösterme']]) +
+                satirAnahtar('Müşteri Notu', 'Bekleyen kaydın altında', 'itirazRapor.not', bekleyenYok) +
+                satirAnahtar('Sonuçlananlar', 'Rapor aralığında kabul ya da red gelenler', 'itirazRapor.sonuc') +
+                satirAnahtar('Gönderilen İtiraz Metni', 'Sonuçlanan kaydın altında', 'itirazRapor.metin', !sonuc) +
+                tamKaliteSatiri('itirazRapor.tamKalite')
+        }) +
+        kartHtml({
+            ikon: IKON.siparis, baslik: 'Sipariş', aciklama: 'Kaydın siparişi: ürünler, şikâyet edilen ürün işaretli.', anahtar: 'itirazRapor.siparis',
+            govde: satirAnahtar('Kurye', 'Adı ve profil fotoğrafı', 'itirazRapor.kurye') +
+                satirAnahtar('Toplayıcı', 'Siparişi hazırlayan depocu', 'itirazRapor.toplayici') +
+                (siparis ? '' : '<p class="tg-satir__metin"><small>Sipariş kapalıyken de kurye ve toplayıcı görünebilir.</small></p>')
         });
     }
 
@@ -518,7 +556,8 @@
     function ayarCiz() {
         var kutu = el('tgAyarlar');
         var odak = document.activeElement && document.activeElement.getAttribute ? document.activeElement.getAttribute('data-odak') : null;
-        kutu.innerHTML = d.sekme === 'anlik' ? anlikHtml() : d.sekme === 'gonder' ? gonderHtml() : d.sekme === 'dps' ? dpsHtml() : d.sekme === 'kurye' ? kuryeHtml() : geceHtml();
+        kutu.innerHTML = d.sekme === 'anlik' ? anlikHtml() : d.sekme === 'gonder' ? gonderHtml() : d.sekme === 'dps' ? dpsHtml()
+            : d.sekme === 'kurye' ? kuryeHtml() : d.sekme === 'kaldirma' ? kaldirmaHtml() : d.sekme === 'itiraz' ? itirazHtml() : geceHtml();
         if (odak) {
             var hedef = kutu.querySelector('[data-odak="' + odak.replace(/"/g, '\\"') + '"]');
             if (hedef) hedef.focus({ preventScroll: true });
@@ -553,15 +592,16 @@
     }
 
     function sonYazi() {
-        if (!d.son || !d.son.gonderildi) return 'Henüz zamanlı rapor gönderilmedi.';
-        var t = new Date(d.son.gonderildi).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
-        return 'Son rapor: ' + t + (d.son.kart ? ' · ' + d.son.kart + ' kart' : '');
+        var son = (d.sonlar || {})[d.sekme] || (d.sekme === 'gece' ? d.son : null);
+        if (!son || !son.gonderildi) return 'Henüz zamanlı rapor gönderilmedi.';
+        var t = new Date(son.gonderildi).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+        return 'Son rapor: ' + t + (son.kart ? ' · ' + son.kart + ' kart' : '');
     }
 
     function cubukCiz() {
         var degis = degistiMi();
         var durum = el('tgKayitDurum');
-        durum.textContent = d.kaydediyor ? 'Kaydediliyor...' : degis ? 'Kaydedilmemiş değişiklik var' : (d.sekme === 'gece' ? sonYazi() : 'Kaydedildi');
+        durum.textContent = d.kaydediyor ? 'Kaydediliyor...' : degis ? 'Kaydedilmemiş değişiklik var' : (BOLUM[d.sekme] ? sonYazi() : 'Kaydedildi');
         durum.classList.toggle('is-degisti', degis && !d.kaydediyor);
         el('tgKaydet').disabled = !degis || d.kaydediyor;
         var test = el('tgTest');
@@ -578,7 +618,7 @@
         if (pfSekmesi()) {
             return d.sekme + '|' + (d.veri === 'ornek' ? 'o' : d.pf.bas + '|' + d.pf.son) + '|' + JSON.stringify(d.ayar.performans[d.sekme]);
         }
-        var parca = d.sekme === 'anlik' ? d.ayar.anlik : d.sekme === 'gonder' ? d.ayar.kaldirmaGonder : d.ayar.gece;
+        var parca = d.sekme === 'anlik' ? d.ayar.anlik : d.sekme === 'gonder' ? d.ayar.kaldirmaGonder : d.ayar[BOLUM[d.sekme] || 'gece'];
         return d.sekme + '|' + (d.sekme === 'gonder' ? 'g' : d.veri) + '|' + JSON.stringify(parca);
     }
 
@@ -608,8 +648,8 @@
         } else if (d.sekme === 'gonder') {
             c = await istek('/api/kaldirma/onizleme', { secim: d.ayar.kaldirmaGonder });
         } else {
-            var ayar = d.sekme === 'anlik' ? { anlik: d.ayar.anlik } : { gece: d.ayar.gece };
-            c = await istek('/api/telegram-ayar/onizleme', { rapor: d.sekme === 'anlik' ? 'anlik' : 'gece', veri: d.veri, ayar: ayar });
+            if (d.sekme === 'itiraz' && d.veri === 'gercek') await siparisleriTazele();
+            c = await istek('/api/telegram-ayar/onizleme', { rapor: d.sekme === 'anlik' ? 'anlik' : BOLUM[d.sekme] ? d.sekme : 'gece', veri: d.veri, ayar: sekmeAyari() });
         }
         if (no !== o.no) return; // daha yeni bir istek var
         o.yukleniyor = false;
@@ -624,6 +664,38 @@
         o.sonuc[anahtar] = c.kod === 200 && c.j.ok ? { ok: true, j: c.j } : { ok: false, metin: c.metin || hataMetni(c) };
         o.goster = anahtar;
         onizlemeCiz();
+    }
+
+    /** Sunucuya giden ayar parçası: yalnız açık sekmenin bölümü */
+    function sekmeAyari() {
+        var a = {};
+        var alan = d.sekme === 'anlik' ? 'anlik' : BOLUM[d.sekme] || 'gece';
+        a[alan] = d.ayar[alan];
+        return a;
+    }
+
+    /* İtiraz kayıtlarının siparişi: sunucuda özeti olmayanlar bu tarayıcıdaki
+       franchise oturumuyla okunur (panelin kendi isteği, 5 dakikada bir, en çok 10).
+       Oturum yoksa sessizce geçilir; kartta "henüz okunmadı" yazar. */
+    var siparisSon = 0;
+    async function siparisleriTazele() {
+        if (Date.now() - siparisSon < 5 * 60 * 1000 || !global.franchiseOturum || !global.franchiseOturum.siparisOzeti) return;
+        siparisSon = Date.now();
+        var c = await istek('/api/itiraz/siparis-eksik');
+        var liste = c.kod === 200 && c.j && Array.isArray(c.j.liste) ? c.j.liste.slice(0, 10) : [];
+        if (!liste.length) return;
+        try { await global.franchiseOturum.al(); } catch (e) { return; }
+        var sonuc = [];
+        for (var i = 0; i < liste.length; i++) {
+            if (i) await new Promise(function (r) { setTimeout(r, 500); });
+            var sp = null;
+            try { sp = await global.franchiseOturum.siparisOzeti(liste[i].siparisId, liste[i].siparisTur); } catch (e) {
+                if (e && e.kod === 'oturum') break;
+                sp = null;
+            }
+            sonuc.push({ id: liste[i].id, siparis: sp });
+        }
+        if (sonuc.length) await istek('/api/itiraz/siparis', { liste: sonuc });
     }
 
     function iskeletHtml() {
@@ -682,17 +754,20 @@
                 kutu.innerHTML = d.sekme === 'gonder'
                     ? bosHtml('Gönderilecek kart yok', 'Son 7 günde seçili gruplarda kayıt yok.')
                     : pfSekmesi() ? bosHtml('Gönderilecek kart yok', d.sekme === 'kurye' ? 'Bu tarihlerde sipariş taşıyan kurye görünmüyor.' : 'Bu tarihler için DPS verisi gelmedi.')
+                    : d.sekme === 'kaldirma' ? bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? 'Son 24 saatte seçili gruplarda kayıt yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.' : 'Bütün gruplar kapalı.')
+                    : d.sekme === 'itiraz' ? bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? 'İtiraz bekleyen ya da son 24 saatte sonuçlanan kayıt yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.' : 'Bekleyenler ve sonuçlananlar kapalı.')
                     : bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? 'Bu ayarla rapor aralığında içerik yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.' : 'Bütün bölümler kapalı.');
             } else {
-                var saatler = (d.ayar.gece.saatler || [60]).map(saatYazi);
+                var zb = BOLUM[d.sekme] ? d.ayar[BOLUM[d.sekme]] : null;
+                var saatler = zb ? (zb.saatler || [60]).map(saatYazi) : [];
                 var yazi = d.sekme === 'gonder'
                     ? 'Satıştan Kaldırma · son 7 gün' + (j.gruplar ? '\n' + [j.gruplar.red ? j.gruplar.red + ' reddedilen / iptal' : '', j.gruplar.bekleyen ? j.gruplar.bekleyen + ' onay bekleyen' : '', j.gruplar.tamam ? j.gruplar.tamam + ' tamamlanan' : ''].filter(Boolean).join('\n') : '')
                     : j.baslik;
                 var pr = pfSekmesi() ? d.ayar.performans[d.sekme] : null;
                 var pfSaatler = pr ? (pr.saatler || [600]).map(saatYazi) : null;
-                kutu.innerHTML = (d.sekme === 'gece' ? '<span class="tg-etiket">' + kacis(saatler.join(' · ')) + '</span>'
+                kutu.innerHTML = (zb && zb.acik ? '<span class="tg-etiket">' + kacis(saatler.join(' · ')) + '</span>'
                     : pfSaatler && pr.acik ? '<span class="tg-etiket">' + kacis(pfSaatler.join(' · ')) + '</span>' : '') +
-                    albumHtml(kartlar, yazi, d.sekme === 'gece' ? saatler[0] : simdiSaat());
+                    albumHtml(kartlar, yazi, zb ? saatler[0] : simdiSaat());
             }
         }
         kutu.scrollTop = kaydir;
@@ -746,8 +821,8 @@
             var a = sonYediGun();
             c = await istek('/api/kaldirma/rapor', { bas: a.bas, son: a.son, secim: d.ayar.kaldirmaGonder });
         } else {
-            var ayar = d.sekme === 'anlik' ? { anlik: d.ayar.anlik } : { gece: d.ayar.gece };
-            c = await istek('/api/telegram-ayar/test', { rapor: d.sekme === 'anlik' ? 'anlik' : 'gece', ayar: ayar });
+            if (d.sekme === 'itiraz') { siparisSon = 0; await siparisleriTazele(); }
+            c = await istek('/api/telegram-ayar/test', { rapor: d.sekme === 'anlik' ? 'anlik' : BOLUM[d.sekme] ? d.sekme : 'gece', ayar: sekmeAyari() });
         }
         d.gonderiyor = false;
         cubukCiz();
@@ -756,7 +831,7 @@
     }
 
     async function varsayilanaDon() {
-        var alan = d.sekme === 'anlik' ? 'anlik' : d.sekme === 'gonder' ? 'kaldirmaGonder' : 'gece';
+        var alan = d.sekme === 'anlik' ? 'anlik' : d.sekme === 'gonder' ? 'kaldirmaGonder' : BOLUM[d.sekme] || 'gece';
         var onay = global.JBDiyalog && global.JBDiyalog.onay
             ? await global.JBDiyalog.onay('Bu sekmedeki seçimler ilk hâline döner. Kaydetmeden önce önizlemede görebilirsin.', { baslik: 'Varsayılana dönülsün mü?', onayYazi: 'Varsayılana Dön' })
             : global.confirm('Varsayılana dönülsün mü?');
@@ -770,7 +845,7 @@
         kok[alan] = kopya(vkok[alan]);
         // Saatler varsayılana dönmez: kullanıcının en sık değiştirmeyeceği seçim
         if (saatler) kok[alan].saatler = saatler;
-        if (pfSekmesi() && typeof acikti === 'boolean') kok[alan].acik = acikti;
+        if (typeof acikti === 'boolean') kok[alan].acik = acikti;
         if (alan === 'kurye' && d.pfKatalog) { kok.kurye.sutunlar = d.pfKatalog.varsayilan.slice(); kok.kurye.ozet = d.pfKatalog.ozetVarsayilan.slice(); }
         degisti();
     }
@@ -792,7 +867,10 @@
     function sekmeSec(sekme) {
         d.sekme = sekme;
         document.querySelectorAll('#tgSekmeler [data-sekme]').forEach(function (b) {
-            b.setAttribute('aria-selected', String(b.getAttribute('data-sekme') === sekme));
+            var secili = b.getAttribute('data-sekme') === sekme;
+            b.setAttribute('aria-selected', String(secili));
+            // Telefonda sekme şeridi kayar: seçili sekme görünsün
+            if (secili && b.scrollIntoView) { try { b.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { /* eski tarayıcı */ } }
         });
         ayarCiz();
         cubukCiz();
@@ -861,18 +939,18 @@
             var ls = e.target.closest('[data-liste]');
             if (ls && !ls.disabled) { listeIslem(ls); return; }
             if (e.target.closest('[data-sebep-hepsi]')) {
-                if (al('gece.kaldirma.sebepler')) koy('gece.kaldirma.sebepler', null);
+                if (al('kaldirmaRapor.sebepler')) koy('kaldirmaRapor.sebepler', null);
                 return;
             }
             var sb = e.target.closest('[data-sebep]');
             if (sb) {
                 var ad = sb.getAttribute('data-sebep');
                 var tum = d.sebepler.map(function (x) { return x.ad; });
-                var secili = al('gece.kaldirma.sebepler') || tum.slice();
+                var secili = al('kaldirmaRapor.sebepler') || tum.slice();
                 var yeni = secili.indexOf(ad) === -1 ? secili.concat(ad) : secili.filter(function (x) { return x !== ad; });
                 if (!yeni.length) { bildir('En az bir sebep seçili kalmalı.'); return; }
                 var hepsi = tum.every(function (x) { return yeni.indexOf(x) !== -1; });
-                koy('gece.kaldirma.sebepler', hepsi ? null : yeni);
+                koy('kaldirmaRapor.sebepler', hepsi ? null : yeni);
             }
         });
 
@@ -933,15 +1011,16 @@
         d.hesaplar = c.j.hesaplar || [];
         d.sebepler = c.j.sebepler || [];
         d.son = c.j.son;
+        d.sonlar = c.j.sonlar || { gece: c.j.son };
         d.bot = c.j.bot !== false;
         // Yeni sebep listede yoksa seçimde de görünsün
-        var secili = d.ayar.gece.kaldirma.sebepler;
+        var secili = d.ayar.kaldirmaRapor && d.ayar.kaldirmaRapor.sebepler;
         if (secili) secili.forEach(function (s) {
             if (!d.sebepler.some(function (x) { return x.ad === s; })) d.sebepler.push({ ad: s, adet: 0 });
         });
         try {
             var q = new URLSearchParams(location.search).get('sekme');
-            if (q === 'anlik' || q === 'gonder' || q === 'dps' || q === 'kurye') d.sekme = q;
+            if (['anlik', 'gonder', 'dps', 'kurye', 'kaldirma', 'itiraz'].indexOf(q) !== -1) d.sekme = q;
             else if (q === 'performans') d.sekme = 'kurye';
         } catch (e) { /* adres okunamadı */ }
         d.pf.bas = d.pf.son = pfDun();

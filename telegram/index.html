@@ -20,7 +20,7 @@
     <link rel="stylesheet" href="../css/motion.css?v=20260907a" />
     <link rel="stylesheet" href="../css/siparisler.css?v=20261014c" />
     <link rel="stylesheet" href="../css/urun-foto.css?v=20261018a" />
-    <link rel="stylesheet" href="../css/telegram.css?v=20261023c" />
+    <link rel="stylesheet" href="../css/telegram.css?v=20261026a" />
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20261014a"></script>
@@ -28,7 +28,7 @@
     <script src="../js/oturum-yeri.js?v=20260902a"></script>
     <script src="../js/user-manager.js?v=20260919b"></script>
     <script src="../js/premium-features.js?v=20260828i"></script>
-    <script src="../js/franchise-oturum.js?v=20261017a"></script>
+    <script src="../js/franchise-oturum.js?v=20261026a"></script>
 </head>
 <body class="min-h-screen sip-kok">
     <header class="sip-ust">
@@ -76,16 +76,22 @@
 
             <div class="tg-sekmeler" role="tablist" aria-label="Rapor türü" id="tgSekmeler">
                 <button type="button" role="tab" data-sekme="gece" aria-selected="true">
-                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8z"/></svg><span class="tg-uzun">Zamanlı Rapor</span><span class="tg-kisa">Zamanlı</span>
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8z"/></svg><span class="tg-uzun">Gece Raporu</span><span class="tg-kisa">Gece</span>
                 </button>
-                <button type="button" role="tab" data-sekme="anlik" aria-selected="false">
-                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5a4.5 4.5 0 0 0-4.5 4.5v3l-1.5 2.5h12L14.5 11V8A4.5 4.5 0 0 0 10 3.5zM8.5 16a1.5 1.5 0 0 0 3 0"/></svg><span class="tg-uzun">Anlık Bildirim</span><span class="tg-kisa">Anlık</span>
+                <button type="button" role="tab" data-sekme="kaldirma" aria-selected="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M8.5 9v5M11.5 9v5M4.5 6l.8 9.5a1.5 1.5 0 0 0 1.5 1.5h6.4a1.5 1.5 0 0 0 1.5-1.5L15.5 6M7.5 6V3.5h5V6"/></svg><span class="tg-uzun">Satıştan Kaldırma</span><span class="tg-kisa">Kaldırma</span>
+                </button>
+                <button type="button" role="tab" data-sekme="itiraz" aria-selected="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 4.5h13v9h-8l-5 3.5z"/><path d="M7 8h6M7 10.5h4"/></svg><span class="tg-uzun">İtirazlar</span><span class="tg-kisa">İtiraz</span>
                 </button>
                 <button type="button" role="tab" data-sekme="dps" aria-selected="false">
                     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 16.5h13M5.5 13V9M9 13V5.5M12.5 13v-5M16 13V7"/></svg><span class="tg-uzun">DPS</span><span class="tg-kisa">DPS</span>
                 </button>
                 <button type="button" role="tab" data-sekme="kurye" aria-selected="false">
                     <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="6" cy="14" r="2.5"/><circle cx="15" cy="14" r="2.5"/><path d="M8.5 14h4M10 6h3l2 8M6 11.5 8 8h4"/></svg><span class="tg-uzun">Kurye CDI</span><span class="tg-kisa">Kurye</span>
+                </button>
+                <button type="button" role="tab" data-sekme="anlik" aria-selected="false">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5a4.5 4.5 0 0 0-4.5 4.5v3l-1.5 2.5h12L14.5 11V8A4.5 4.5 0 0 0 10 3.5zM8.5 16a1.5 1.5 0 0 0 3 0"/></svg><span class="tg-uzun">Anlık Bildirim</span><span class="tg-kisa">Anlık</span>
                 </button>
                 <button type="button" role="tab" data-sekme="gonder" aria-selected="false">
                     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m3.5 9.5 13-6-4 13-2.5-5.5z"/><path d="m10 11 6.5-7.5"/></svg><span class="tg-uzun">Elle Gönderim</span><span class="tg-kisa">Elle</span>
@@ -138,6 +144,6 @@
     </div>
 
     <script src="../js/urun-foto.js?v=20261018a"></script>
-    <script src="../js/telegram.js?v=20261023c"></script>
+    <script src="../js/telegram.js?v=20261026a"></script>
 </body>
 </html>

@@ -12,6 +12,11 @@
  *    tarayıcıya hiç geri dönmez.
  * 3. POST /api/itiraz/sec: kullanıcının seçip düzenlediği son metin saklanır;
  *    sonraki taslaklarda üslup örneği olur.
+ * 4. Sipariş özeti (Telegram itiraz raporu için): kayıtla gelen sipariş
+ *    kimliği saklanır; özeti henüz olmayanlar /api/itiraz/kayitlar yanıtında
+ *    (siparisEksik) ve GET /api/itiraz/siparis-eksik ile döner. Asistan ya da
+ *    sayfa panelin "Sipariş Detayı" isteğini atıp POST /api/itiraz/siparis
+ *    ile yalnız ürünleri, süreleri, kurye ve toplayıcıyı bırakır (siparis.js).
  *
  * Getir'e buradan hiçbir istek gitmez.
  *
@@ -24,6 +29,7 @@
 
 const crypto = require('crypto');
 const { katalogAl, sadeAd, KIMLIK: KATALOG_KIMLIK } = require('../katalog');
+const { siparisDuzelt } = require('./siparis');
 
 const GEMINI = 'https://generativelanguage.googleapis.com/v1beta';
 const MODELLER = [process.env.ITIRAZ_MODEL || 'gemini-flash-latest', 'gemini-2.5-flash'];
@@ -322,7 +328,38 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             urunId: /^[a-f0-9]{24}$/.test(metin(k.urunId, 40)) ? metin(k.urunId, 40) : '',
             itirazMetni: metin(k.itirazMetni, 2000),
             itirazSebepId: metin(k.itirazSebepId, 40),
+            siparisId: /^[a-f0-9]{24}$/.test(metin(k.siparisId, 40)) ? metin(k.siparisId, 40) : '',
+            siparisTur: Number.isInteger(Number(k.siparisTur)) && Number(k.siparisTur) >= 0 && Number(k.siparisTur) < 100 && k.siparisTur !== null && k.siparisTur !== '' ? Number(k.siparisTur) : null,
         };
+    }
+
+    /* Sipariş kolonları itiraz_rapor.sql ile geliyor; yoksa sessizce atlanır */
+    let siparisKolonu = null;
+    const SIPARIS_EKSIK = `SELECT kayit_id AS id, siparis_id AS "siparisId", siparis_tur AS "siparisTur" FROM itiraz.kayitlar
+                            WHERE username = $1 AND siparis_id IS NOT NULL AND siparis IS NULL
+                              AND (siparis_deneme IS NULL OR siparis_deneme < now() - interval '1 hour')
+                              AND ((durum = 100 AND son_tarih > now()) OR durum_degisti_at > now() - interval '2 days')`;
+
+    async function siparisKimlikYaz(kim, kayitlar) {
+        if (siparisKolonu === false) return [];
+        const l = kayitlar.filter((k) => k.siparisId).map((k) => ({ id: k.id, s: k.siparisId, t: k.siparisTur }));
+        try {
+            if (l.length) {
+                await pool.query(
+                    `UPDATE itiraz.kayitlar k SET siparis_id = x.s, siparis_tur = x.t
+                       FROM jsonb_to_recordset($2::jsonb) AS x(id text, s text, t int)
+                      WHERE k.username = $1 AND k.kayit_id = x.id AND k.siparis_id IS DISTINCT FROM x.s`,
+                    [kim, JSON.stringify(l)]
+                );
+            }
+            siparisKolonu = true;
+            const r = await pool.query(SIPARIS_EKSIK + ' AND kayit_id = ANY($2::text[]) LIMIT 20', [kim, kayitlar.map((k) => k.id)]);
+            return r.rows;
+        } catch (e) {
+            if (e.code !== '42703') throw e;
+            siparisKolonu = false;
+            return [];
+        }
     }
 
     app.post('/api/itiraz/kayitlar', uye, async (req, res) => {
@@ -378,13 +415,14 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                     [kim, idler]
                 );
             }
+            const siparisEksik = await siparisKimlikYaz(kim, kayitlar).catch((e) => { console.error('itiraz siparis kimlik:', e.message); return []; });
             const secilenler = {};
             const taslaklar = {};
             r.rows.forEach((s) => {
                 if (s.secilen_metin) secilenler[s.kayit_id] = { metin: s.secilen_metin, sebep: s.secilen_sebep || '' };
                 if (s.taslak && Array.isArray(s.taslak.taslaklar)) taslaklar[s.kayit_id] = s.taslak;
             });
-            res.json({ ok: true, secilenler, taslaklar });
+            res.json({ ok: true, secilenler, taslaklar, siparisEksik });
         } catch (e) { hata(res, e, 'kayit yaz'); }
     });
 
@@ -558,6 +596,54 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             );
             res.json({ ok: true });
         } catch (e) { hata(res, e, 'sec'); }
+    });
+
+    // -----------------------------------------------------------------
+    // Sipariş özeti: Telegram itiraz raporunda siparişin içeriği ve kişileri
+    // -----------------------------------------------------------------
+
+    app.get('/api/itiraz/siparis-eksik', uye, async (req, res) => {
+        if (siparisKolonu === false) return res.json({ ok: true, liste: [], kurulum: false });
+        try {
+            const r = await pool.query(SIPARIS_EKSIK + ' ORDER BY son_tarih LIMIT 20', [req.auth.username]);
+            siparisKolonu = true;
+            res.json({ ok: true, liste: r.rows });
+        } catch (e) {
+            if (e.code === '42703') { siparisKolonu = false; return res.json({ ok: true, liste: [], kurulum: false }); }
+            hata(res, e, 'siparis eksik');
+        }
+    });
+
+    /** { liste: [{ id, siparis | null }] } null: okunamadı, bir saat sonra yeniden denenir */
+    app.post('/api/itiraz/siparis', uye, async (req, res) => {
+        const ham = Array.isArray(req.body && req.body.liste) ? req.body.liste.slice(0, 40) : [];
+        const tamam = [];
+        const olmadi = [];
+        ham.forEach((x) => {
+            const id = x && metin(x.id, 40);
+            if (!/^[a-f0-9]{24}$/.test(id || '')) return;
+            const sp = siparisDuzelt(x.siparis);
+            if (sp) tamam.push({ id, sp }); else olmadi.push(id);
+        });
+        if (siparisKolonu === false) return res.status(503).json({ ok: false, error: 'kurulum_bekleniyor' });
+        try {
+            if (tamam.length) {
+                await pool.query(
+                    `UPDATE itiraz.kayitlar k SET siparis = x.sp, siparis_deneme = now()
+                       FROM jsonb_to_recordset($2::jsonb) AS x(id text, sp jsonb)
+                      WHERE k.username = $1 AND k.kayit_id = x.id`,
+                    [req.auth.username, JSON.stringify(tamam)]
+                );
+            }
+            if (olmadi.length) {
+                await pool.query('UPDATE itiraz.kayitlar SET siparis_deneme = now() WHERE username = $1 AND kayit_id = ANY($2::text[])', [req.auth.username, olmadi]);
+            }
+            siparisKolonu = true;
+            res.json({ ok: true, yazilan: tamam.length });
+        } catch (e) {
+            if (e.code === '42703') { siparisKolonu = false; return res.status(503).json({ ok: false, error: 'kurulum_bekleniyor' }); }
+            hata(res, e, 'siparis yaz');
+        }
     });
 }
 

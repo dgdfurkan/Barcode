@@ -1,12 +1,15 @@
 /**
- * Telegram raporu için veri tazeliği (rapor sunucuda, hesabın seçtiği saatlerde)
+ * Telegram raporları için veri tazeliği (raporlar sunucuda, hesabın seçtiği saatlerde)
  * ============================================================================
  *
- * İTİRAZLAR (2 saatte bir, ayrıca 00:40'ta)
+ * İTİRAZLAR (2 saatte bir, ayrıca her itiraz raporundan önceki 20 dakikada)
  *   Franchise oturumu (sayim-hazirligi.js'in yakaladığı jeton) geçerliyse
  *   Depo Değerlendirme listesi son 30 gün için okunur, Jet Barkod'a
  *   (/api/itiraz/kayitlar) yazılır. Panelin kendi isteği; 1-2 sayfa.
- *   Böylece rapor İtiraz Yazıcı sayfası açılmadan da güncel olur.
+ *   Sunucu siparişi henüz okunmamış kayıtları döner (siparisEksik); her
+ *   turda en çok 10 tanesinin "Sipariş Detayı" okunur ve yalnız ürünler,
+ *   süreler, kurye ve toplayıcı /api/itiraz/siparis ile bırakılır. Müşteri
+ *   bilgisi okunmaz. Böylece rapor İtiraz Yazıcı sayfası açılmadan da güncel.
  *
  * SAYIM SONUÇLARI (her rapor saatinden 30-5 dk önce, saat başına bir kez)
  *   Depo paneli açık bilgisayarda dün ve bugünün tamamlanmış sayımları
@@ -16,11 +19,9 @@
  *   /api/gece-raporu/gunluk-durum ile bırakılır.
  *
  * RAPOR SAATLERİ
- *   Sunucudan (GET /api/gece-raporu/ayar) 6 saatte bir ve Asistan penceresi
- *   açıldıkça alınır; bilinmiyorsa 01:00.
- *
- * ASİSTAN PENCERESİ
- *   JBA_GECE_AYAR (oku/yaz) ve JBA_GECE_SIMDI (raporu şimdi gönder).
+ *   Sunucudan (GET /api/gece-raporu/ayar) saatte bir alınır: saatler (gece
+ *   raporu, sayımlar ondan önce) ve itirazSaatler; bilinmiyorsa 01:00.
+ *   Ayar ve elle gönderim Telegram Raporları sayfasında (/telegram/).
  * ============================================================================
  */
 
@@ -30,7 +31,11 @@ const GR_DDS = 'https://franchise-api-gateway.getirapi.com/dds100/logs/filter';
 const GR_ITIRAZ_SON = 'jbaItirazEsitlemeSon';
 const GR_SAYIM_SON = 'jbaGeceSayimSon';     // { anahtar: 'gün:dakika', zaman, ok, metin }
 const GR_SAATLER = 'jbaRaporSaatleri';      // { saatler: [dakika], zaman }
-const GR_SAAT_ARA_MS = 6 * 60 * 60 * 1000;
+const GR_SAAT_ARA_MS = 60 * 60 * 1000;
+const GR_SIPARIS_TUR = 10;                  // bir turda en çok okunan sipariş
+const GR_KOK = 'https://franchise-api-gateway.getirapi.com';
+const GR_URUN_GORSEL = /^https:\/\/(?:cdn-image\.getir\.com|cdn\.getir\.com|images\.getir\.com)\/[A-Za-z0-9._~%\/-]{1,300}$/;
+const GR_KISI_FOTO = /^https:\/\/cdn\.getir\.com\/person\/[A-Za-z0-9._-]+\.(?:png|jpe?g)(?:\?[0-9]+)?$/;
 const GR_ITIRAZ_ARA_MS = 2 * 60 * 60 * 1000;
 const GR_KIMLIK = /^[0-9a-f]{24}$/;
 
@@ -118,7 +123,71 @@ function grItirazSade(o) {
     urunId: veri.product && GR_KIMLIK.test(String(veri.product.id || '')) ? String(veri.product.id) : '',
     itirazMetni: typeof it.description === 'string' ? it.description : '',
     itirazSebepId: typeof it.reasonId === 'string' ? it.reasonId : '',
+    siparisId: veri.order && GR_KIMLIK.test(String(veri.order.id || '')) ? String(veri.order.id) : '',
+    siparisTur: Number.isFinite(parseInt(veri.domainType, 10)) ? parseInt(veri.domainType, 10) : null,
   };
+}
+
+function grGorsel(p) {
+  if (!p || typeof p !== 'object') return '';
+  let x = p.picURL || p.picUrl || p.picURLs || p.image || '';
+  if (Array.isArray(x)) x = x[0];
+  if (x && typeof x === 'object') x = x.tr || x.en || x['en-US'] || Object.values(x).find((v) => typeof v === 'string') || '';
+  if (Array.isArray(x)) x = x[0];
+  return typeof x === 'string' && GR_URUN_GORSEL.test(x) ? x : '';
+}
+
+function grKisi(k) {
+  if (!k || typeof k !== 'object') return null;
+  const ad = String(typeof k.name === 'string' ? k.name : typeof k.fullName === 'string' ? k.fullName : '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  const foto = typeof k.picURL === 'string' && GR_KISI_FOTO.test(k.picURL) ? k.picURL : '';
+  return ad || foto ? { ad, foto } : null;
+}
+
+/** Panelin "Sipariş Detayı" isteği: yalnız ürünler, süreler, kurye ve toplayıcı (müşteri bilgisi alınmaz) */
+async function grSiparisOzeti(jeton, id, tur) {
+  const r = await fetch(GR_KOK + '/orders/' + id + (tur != null ? '?domainType=' + Number(tur) : ''), {
+    headers: { Accept: 'application/json', Authorization: /^Bearer /.test(jeton) ? jeton : 'Bearer ' + jeton },
+  });
+  if (!r.ok) return null;
+  const j = await r.json().catch(() => null);
+  const o = j && j.basket ? j : j && j.data && j.data.basket ? j.data : j && j.data && j.data.order ? j.data.order : j;
+  const ham = o && o.basket && Array.isArray(o.basket.products) ? o.basket.products : o && Array.isArray(o.products) ? o.products : [];
+  const urunler = ham.map((u) => {
+    let ad = u && u.name && typeof u.name === 'object' ? (u.name.tr || u.name.en || '') : (u && (u.name || u.fullName)) || '';
+    if (ad && typeof ad === 'object') ad = ad.tr || ad.en || '';
+    const pid = u && (u.product && typeof u.product === 'object' ? (u.product.id || u.product._id) : (u.product || u.productId || u.id || u._id));
+    return {
+      ad: String(ad || '').slice(0, 120), adet: Number(u && u.count) || 1,
+      id: GR_KIMLIK.test(String(pid || '')) ? String(pid) : '',
+      gorsel: grGorsel(u) || grGorsel(u && u.product),
+    };
+  }).filter((u) => u.ad);
+  if (!urunler.length) return null;
+  const zaman = (yol) => { const ms = Date.parse(o && o[yol] && o[yol].date); return Number.isFinite(ms) ? ms : null; };
+  const bas = zaman('checkout') || Date.parse(o && o.checkoutDate) || null;
+  const teslim = zaman('deliver');
+  return {
+    urunler,
+    teslimDk: bas && teslim && teslim > bas ? Math.round((teslim - bas) / 60000) : null,
+    tarih: bas ? new Date(bas).toISOString() : null,
+    kurye: grKisi(o && o.courier),
+    toplayici: grKisi(o && o.picker),
+  };
+}
+
+/** Siparişi henüz okunmamış itiraz kayıtları: en çok GR_SIPARIS_TUR tane, panelin hızında */
+async function grSiparisleriOku(jeton, eksik) {
+  const liste = [];
+  for (const x of eksik.slice(0, GR_SIPARIS_TUR)) {
+    if (!GR_KIMLIK.test(String(x && x.id)) || !GR_KIMLIK.test(String(x && x.siparisId))) continue;
+    if (liste.length) await new Promise((r) => setTimeout(r, 700));
+    let sp = null;
+    try { sp = await grSiparisOzeti(jeton, x.siparisId, x.siparisTur); } catch (e) { sp = null; }
+    liste.push({ id: x.id, siparis: sp });
+  }
+  if (liste.length) await grApi('/api/itiraz/siparis', { method: 'POST', govde: { liste } }).catch(() => null);
+  return liste.filter((x) => x.siparis).length;
 }
 
 async function grItirazEsitle(zorla) {
@@ -158,12 +227,15 @@ async function grItirazEsitle(zorla) {
     if (parca.length < 50 || hepsi.length >= (Number(j.totalCount) || 0)) break;
   }
   const kayitlar = hepsi.map(grItirazSade).filter((k) => GR_KIMLIK.test(k.id));
+  const eksik = [];
   for (let i = 0; i < kayitlar.length; i += 60) {
     const c = await grApi('/api/itiraz/kayitlar', { method: 'POST', govde: { kayitlar: kayitlar.slice(i, i + 60) } });
     if (c.kod !== 200) return { ok: false, metin: 'Jet Barkod\'a yazılamadı (' + c.kod + ').' };
+    if (Array.isArray(c.j && c.j.siparisEksik)) eksik.push(...c.j.siparisEksik);
   }
   try { await chrome.storage.local.set({ [GR_ITIRAZ_SON]: Date.now() }); } catch (e) { /* sessiz */ }
-  return { ok: true, metin: kayitlar.length + ' itiraz kaydı eşitlendi.' };
+  const okunan = eksik.length ? await grSiparisleriOku(jeton, eksik).catch(() => 0) : 0;
+  return { ok: true, metin: kayitlar.length + ' itiraz kaydı eşitlendi' + (okunan ? ', ' + okunan + ' siparişin özeti okundu.' : '.') };
 }
 
 // ---------------------------------------------------------------------
@@ -205,15 +277,17 @@ async function grSaatler() {
   if (!v || Date.now() - (v.zaman || 0) > GR_SAAT_ARA_MS) {
     const c = await grApi('/api/gece-raporu/ayar').catch(() => null);
     if (c && c.kod === 200 && c.j && Array.isArray(c.j.saatler)) {
-      v = { saatler: c.j.saatler, zaman: Date.now() };
+      v = { saatler: c.j.saatler, itiraz: Array.isArray(c.j.itirazSaatler) ? c.j.itirazSaatler : null, zaman: Date.now() };
       try { await chrome.storage.local.set({ [GR_SAATLER]: v }); } catch (e) { /* sessiz */ }
     } else if (v) {
       // Okunamadı: eldekini kullan, bir saat sonra yeniden dene
       try { await chrome.storage.local.set({ [GR_SAATLER]: { ...v, zaman: Date.now() - GR_SAAT_ARA_MS + 3600000 } }); } catch (e) { /* sessiz */ }
     }
   }
-  const l = v && Array.isArray(v.saatler) ? v.saatler.filter((n) => Number.isInteger(n) && n >= 0 && n < 1440) : [];
-  return l.length ? l : [60];
+  const temiz = (x) => (Array.isArray(x) ? x.filter((n) => Number.isInteger(n) && n >= 0 && n < 1440) : []);
+  const l = temiz(v && v.saatler);
+  // itiraz: eski sunucu göndermiyorsa gece raporunun saatleri
+  return { gece: l.length ? l : [60], itiraz: v && Array.isArray(v.itiraz) ? temiz(v.itiraz) : (l.length ? l : [60]) };
 }
 
 /** Şu an hangi rapor saatine kaç dakika var (en yakın gelecekteki) */
@@ -249,7 +323,7 @@ async function grTur() {
   grCalisiyor = true;
   try {
     const saatler = await grSaatler();
-    const sira = grSiradaki(saatler);
+    const sira = grSiradaki(saatler.gece);
     // Sayım sonuçları: her rapor saatinden 30-5 dk önce, o saat için bir kez
     if (sira && sira.kalan >= 5 && sira.kalan <= 30 && await grModulAcik('gunlukSayim')) {
       const anahtar = grSaat(Date.now() + sira.kalan * 60000).gun + ':' + sira.dakika;
@@ -261,8 +335,9 @@ async function grTur() {
         try { await chrome.storage.local.set({ [GR_SAYIM_SON]: { anahtar, zaman: Date.now(), ok: !!s.ok, metin: s.metin } }); } catch (e) { /* sessiz */ }
       }
     }
-    // İtirazlar: 2 saatte bir; rapordan önceki 20 dakikada bir kez daha
-    const raporOncesi = sira && sira.kalan <= 20;
+    // İtirazlar: 2 saatte bir; itiraz raporundan önceki 20 dakikada bir kez daha
+    const itSira = saatler.itiraz.length ? grSiradaki(saatler.itiraz) : null;
+    const raporOncesi = itSira && itSira.kalan <= 20;
     let son = 0;
     try { son = Number((await chrome.storage.local.get(GR_ITIRAZ_SON))[GR_ITIRAZ_SON]) || 0; } catch (e) { son = 0; }
     const zorla = raporOncesi && Date.now() - son > 15 * 60 * 1000;
@@ -282,37 +357,5 @@ async function grAlarmKur() {
 chrome.alarms.onAlarm.addListener((a) => { if (a.name === GR_ALARM) grTur(); });
 chrome.runtime.onStartup.addListener(grAlarmKur);
 chrome.runtime.onInstalled.addListener(grAlarmKur);
-
-chrome.runtime.onMessage.addListener((istek, gonderen, cevapla) => {
-  if (!istek || typeof istek.type !== 'string') return false;
-  if (istek.type === 'JBA_GECE_AYAR') {
-    const govde = {};
-    ['acik', 'bekleyen', 'foto'].forEach((k) => { if (typeof istek[k] === 'boolean') govde[k] = istek[k]; });
-    const yaz = Object.keys(govde).length > 0;
-    grApi('/api/gece-raporu/ayar', yaz ? { method: 'POST', govde } : {})
-      .then((c) => cevapla(c.kod === 200 ? { ok: true, ...c.j } : { ok: false, kod: c.kod, hata: c.j && c.j.error }))
-      .catch(() => cevapla({ ok: false }));
-    return true;
-  }
-  if (istek.type === 'JBA_GECE_SIMDI') {
-    (async () => {
-      // Önce veriyi tazele: itirazlar hemen, sayımlar panel açıksa
-      await grItirazEsitle(true).catch(() => {});
-      const c = await grApi('/api/gece-raporu/simdi', { method: 'POST', govde: {} });
-      if (c.kod === 200) return { ok: true, metin: c.j.kart + ' kart Telegram\'a gönderildi.' };
-      const h = c.j && c.j.error;
-      return {
-        ok: false,
-        metin: h === 'baglanti_yok' ? 'Telegram bağlı değil. Sayım raporundan bir kez bağla.'
-          : h === 'cok_sik' ? '2 dakika sonra tekrar dene.'
-          : h === 'bot_hazir_degil' ? 'Telegram botu hazır değil.'
-          : c.kod === 404 || c.kod === 503 ? 'Sunucu güncellemesi bekleniyor.'
-          : 'Gönderilemedi (' + c.kod + ').',
-      };
-    })().then(cevapla, () => cevapla({ ok: false, metin: 'Gönderilemedi.' }));
-    return true;
-  }
-  return false;
-});
 
 grAlarmKur();

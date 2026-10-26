@@ -9,6 +9,9 @@
  *
  * window.franchiseOturum.al(zorla)  → { jeton, depo, bitis }   (hata.kod: 'oturum' | 'depo')
  * window.franchiseOturum.istek(yol, secenek) → Response; 401'de bir kez tazeleyip dener
+ * window.franchiseOturum.siparisOzeti(id, tur) → { urunler, kalem, adet, teslimDk, tarih, kurye, toplayici }
+ *   Panelin "Sipariş Detayı" isteği. Yalnız ürünler, süreler, kurye ve
+ *   toplayıcının adı ve fotoğraf adresi alınır; müşteri bilgisi hiç okunmaz.
  * ============================================================================
  */
 (function (global) {
@@ -114,5 +117,57 @@
         throw hata('oturum');
     }
 
-    global.franchiseOturum = { al: al, istek: istek, bitisMs: bitisMs };
+    var URUN_GORSEL = /^https:\/\/(?:cdn-image\.getir\.com|cdn\.getir\.com|images\.getir\.com)\/[A-Za-z0-9._~%\/-]{1,300}$/;
+    var KISI_FOTO = /^https:\/\/cdn\.getir\.com\/person\/[A-Za-z0-9._-]+\.(?:png|jpe?g)(?:\?[0-9]+)?$/;
+
+    /* Panel nesnesindeki görsel alanı: dize, { tr, en, ... } ya da dizi */
+    function gorselAl(p) {
+        if (!p || typeof p !== 'object') return '';
+        var x = p.picURL || p.picUrl || p.picURLs || p.image || '';
+        if (Array.isArray(x)) x = x[0];
+        if (x && typeof x === 'object') x = x.tr || x.en || x['en-US'] || Object.keys(x).map(function (k) { return x[k]; }).filter(function (v) { return typeof v === 'string'; })[0] || '';
+        if (Array.isArray(x)) x = x[0];
+        return typeof x === 'string' && URUN_GORSEL.test(x) ? x : '';
+    }
+
+    function kisiAl(k) {
+        if (!k || typeof k !== 'object') return null;
+        var ad = typeof k.name === 'string' ? k.name : typeof k.fullName === 'string' ? k.fullName : '';
+        var foto = typeof k.picURL === 'string' && KISI_FOTO.test(k.picURL) ? k.picURL : '';
+        ad = ad.replace(/\s+/g, ' ').trim().slice(0, 60);
+        return ad || foto ? { ad: ad, foto: foto } : null;
+    }
+
+    async function siparisOzeti(id, tur) {
+        if (!KIMLIK.test(String(id || ''))) throw hata('gecersiz');
+        var r = await istek('/orders/' + id + (tur != null && tur !== '' ? '?domainType=' + Number(tur) : ''));
+        if (!r.ok) throw hata('panel');
+        var j = await r.json();
+        var o = j && j.basket ? j : j && j.data && j.data.basket ? j.data : j && j.data && j.data.order ? j.data.order : j;
+        var ham = o && o.basket && Array.isArray(o.basket.products) ? o.basket.products : o && Array.isArray(o.products) ? o.products : [];
+        var urunler = ham.map(function (u) {
+            var ad = u && u.name && typeof u.name === 'object' ? (u.name.tr || u.name.en || '') : (u && (u.name || u.fullName)) || '';
+            if (ad && typeof ad === 'object') ad = ad.tr || ad.en || '';
+            var pid = u && (u.product && typeof u.product === 'object' ? (u.product.id || u.product._id) : (u.product || u.productId || u.id || u._id));
+            return {
+                ad: String(ad || '').slice(0, 120), adet: Number(u && u.count) || 1,
+                id: KIMLIK.test(String(pid || '')) ? String(pid).toLowerCase() : '',
+                gorsel: gorselAl(u) || gorselAl(u && u.product)
+            };
+        }).filter(function (u) { return u.ad; });
+        var zaman = function (yol) { var x = o && o[yol] && o[yol].date; var ms = Date.parse(x); return Number.isFinite(ms) ? ms : null; };
+        var bas = zaman('checkout') || Date.parse(o && o.checkoutDate) || null;
+        var teslim = zaman('deliver');
+        return {
+            urunler: urunler,
+            kalem: urunler.length,
+            adet: urunler.reduce(function (a, u) { return a + u.adet; }, 0),
+            teslimDk: bas && teslim && teslim > bas ? Math.round((teslim - bas) / 60000) : null,
+            tarih: bas ? new Date(bas).toISOString() : null,
+            kurye: kisiAl(o && o.courier),
+            toplayici: kisiAl(o && o.picker)
+        };
+    }
+
+    global.franchiseOturum = { al: al, istek: istek, bitisMs: bitisMs, siparisOzeti: siparisOzeti };
 })(window);

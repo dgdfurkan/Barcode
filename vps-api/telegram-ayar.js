@@ -8,6 +8,10 @@
  *   - Sayfa kaydedince eski kolonlar ayrıntıdan yeniden yazılır.
  * Böylece eski Asistan sürümleri de doğru çalışır.
  *
+ * Satıştan kaldırma ve itirazlar kendi raporlarında (kaldirmaRapor,
+ * itirazRapor: ayrı saat, ayrı mesaj). Eskiden gece raporunun bölümleriydi;
+ * kayıtlı ayarda yoksa gece raporundaki eski seçimden türetilir (gecedenTuret).
+ *
  * Tarayıcıdan gelen hiçbir alana güvenilmez: bilinmeyen alan atılır, her
  * değer izinli listeden ya da tipine göre düzeltilir (duzelt).
  * ============================================================================
@@ -22,17 +26,33 @@ const VARSAYILAN = Object.freeze({
     gece: {
         acik: true,
         saatler: [60],
-        bolumler: { ozet: true, kaldirma: true, itiraz: true, sayim: true },
-        kaldirma: {
-            red: { goster: true, foto: false },
-            bekleyen: { goster: false, foto: false },
-            tamam: { goster: false, foto: false },
-            yenidenGizle: false,
-            sebepler: null,          // null: hepsi
-            sinir: 20,
-        },
-        itiraz: { bekleyen: 'hepsi', sonuc: true, not: true, metin: true },
+        bolumler: { ozet: true, sayim: true },
         sayim: { gunluk: true, diger: true, saatler: true, liste: 'fark', esik: 0, farksiz: true },
+    },
+    /* Satıştan kaldırma raporu: grup başına göster/fotoğraf */
+    kaldirmaRapor: {
+        acik: true,
+        saatler: [60],
+        red: { goster: true, foto: false },
+        bekleyen: { goster: false, foto: false },
+        tamam: { goster: false, foto: false },
+        yenidenGizle: false,
+        sebepler: null,          // null: hepsi
+        sinir: 20,
+        tamKalite: false,
+    },
+    /* İtiraz raporu: bekleyenler ve sonuçlananlar; siparişin içeriği ve kişileri */
+    itirazRapor: {
+        acik: true,
+        saatler: [60],
+        bekleyen: 'hepsi',
+        sonuc: true,
+        not: true,
+        metin: true,
+        siparis: true,
+        kurye: true,
+        toplayici: true,
+        tamKalite: false,
     },
     anlik: { iptal: true, red: false, tamam: false, gorsel: true, olusturan: true },
     kaldirmaGonder: { ozet: true, red: true, bekleyen: true, tamam: false, foto: false },
@@ -73,13 +93,39 @@ function grup(v, d) {
     return { goster: mantik(g.goster, d.goster), foto: mantik(g.foto, d.foto) };
 }
 
+function sebeplerDuzelt(v) {
+    return Array.isArray(v)
+        ? [...new Set(v.filter((x) => typeof x === 'string').map((x) => x.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200)).filter(Boolean))].slice(0, 40)
+        : null;
+}
+
+/**
+ * Eski kayıtta kaldirmaRapor / itirazRapor yok: gece raporundaki bölüm
+ * seçiminden, saatlerinden ve alt seçeneklerinden türetilir. Böylece
+ * güncellemeden sonra rapor aynı saatte, aynı içerikle gitmeye devam eder.
+ */
+function gecedenTuret(h) {
+    const g = nesne(h.gece);
+    const gb = nesne(g.bolumler);
+    const geceAcik = mantik(g.acik, true);
+    const sonuc = {};
+    if (!h.kaldirmaRapor) {
+        sonuc.kaldirmaRapor = { ...nesne(g.kaldirma), acik: geceAcik && mantik(gb.kaldirma, true), saatler: g.saatler };
+    }
+    if (!h.itirazRapor) {
+        sonuc.itirazRapor = { ...nesne(g.itiraz), acik: geceAcik && mantik(gb.itiraz, true), saatler: g.saatler };
+    }
+    return sonuc;
+}
+
 /** Ham nesneyi izinli biçime çevirir; eksik alanlar varsayılandan */
 function duzelt(ham) {
     const h = nesne(ham);
     const V = VARSAYILAN;
     const g = nesne(h.gece);
-    const gk = nesne(g.kaldirma);
-    const gi = nesne(g.itiraz);
+    const turev = gecedenTuret(h);
+    const gk = nesne(h.kaldirmaRapor || turev.kaldirmaRapor);
+    const gi = nesne(h.itirazRapor || turev.itirazRapor);
     const gs = nesne(g.sayim);
     const gb = nesne(g.bolumler);
     const a = nesne(h.anlik);
@@ -94,30 +140,32 @@ function duzelt(ham) {
         gece: {
             acik: mantik(g.acik, V.gece.acik),
             saatler: saatleriDuzelt(g.saatler, V.gece.saatler),
-            bolumler: {
-                ozet: mantik(gb.ozet, true), kaldirma: mantik(gb.kaldirma, true),
-                itiraz: mantik(gb.itiraz, true), sayim: mantik(gb.sayim, true),
-            },
-            kaldirma: {
-                red: grup(gk.red, V.gece.kaldirma.red),
-                bekleyen: grup(gk.bekleyen, V.gece.kaldirma.bekleyen),
-                tamam: grup(gk.tamam, V.gece.kaldirma.tamam),
-                yenidenGizle: mantik(gk.yenidenGizle, false),
-                sebepler: Array.isArray(gk.sebepler)
-                    ? [...new Set(gk.sebepler.filter((x) => typeof x === 'string').map((x) => x.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 200)).filter(Boolean))].slice(0, 40)
-                    : null,
-                sinir: SINIRLAR.has(Number(gk.sinir)) ? Number(gk.sinir) : V.gece.kaldirma.sinir,
-            },
-            itiraz: {
-                bekleyen: BEKLEYEN_ITIRAZ.has(gi.bekleyen) ? gi.bekleyen : 'hepsi',
-                sonuc: mantik(gi.sonuc, true), not: mantik(gi.not, true), metin: mantik(gi.metin, true),
-            },
+            bolumler: { ozet: mantik(gb.ozet, true), sayim: mantik(gb.sayim, true) },
             sayim: {
                 gunluk: mantik(gs.gunluk, true), diger: mantik(gs.diger, true), saatler: mantik(gs.saatler, true),
                 liste: LISTE.has(gs.liste) ? gs.liste : 'fark',
                 esik: ESIKLER.has(Number(gs.esik)) ? Number(gs.esik) : 0,
                 farksiz: mantik(gs.farksiz, true),
             },
+        },
+        kaldirmaRapor: {
+            acik: mantik(gk.acik, V.kaldirmaRapor.acik),
+            saatler: saatleriDuzelt(gk.saatler, V.kaldirmaRapor.saatler),
+            red: grup(gk.red, V.kaldirmaRapor.red),
+            bekleyen: grup(gk.bekleyen, V.kaldirmaRapor.bekleyen),
+            tamam: grup(gk.tamam, V.kaldirmaRapor.tamam),
+            yenidenGizle: mantik(gk.yenidenGizle, false),
+            sebepler: sebeplerDuzelt(gk.sebepler),
+            sinir: SINIRLAR.has(Number(gk.sinir)) ? Number(gk.sinir) : V.kaldirmaRapor.sinir,
+            tamKalite: mantik(gk.tamKalite, false),
+        },
+        itirazRapor: {
+            acik: mantik(gi.acik, V.itirazRapor.acik),
+            saatler: saatleriDuzelt(gi.saatler, V.itirazRapor.saatler),
+            bekleyen: BEKLEYEN_ITIRAZ.has(gi.bekleyen) ? gi.bekleyen : 'hepsi',
+            sonuc: mantik(gi.sonuc, true), not: mantik(gi.not, true), metin: mantik(gi.metin, true),
+            siparis: mantik(gi.siparis, true), kurye: mantik(gi.kurye, true), toplayici: mantik(gi.toplayici, true),
+            tamKalite: mantik(gi.tamKalite, false),
         },
         anlik: {
             iptal: mantik(a.iptal, true), red: mantik(a.red, false), tamam: mantik(a.tamam, false),
@@ -158,7 +206,10 @@ function duzelt(ham) {
     };
     // Boş rapor olmasın: hiçbir bölüm seçilmediyse özet açık
     const b = sonuc.gece.bolumler;
-    if (!b.ozet && !b.kaldirma && !b.itiraz && !b.sayim) b.ozet = true;
+    if (!b.ozet && !b.sayim) b.ozet = true;
+    // Kaldırma raporunda en az bir grup
+    const k = sonuc.kaldirmaRapor;
+    if (!k.red.goster && !k.bekleyen.goster && !k.tamam.goster) k.red.goster = true;
     return sonuc;
 }
 
@@ -218,14 +269,15 @@ async function ayarOku(pool, username) {
 function eskidenKur(s) {
     const a = duzelt({});
     if (typeof s.acik === 'boolean') a.gece.acik = s.acik;
-    if (s.bekleyen === true) a.gece.kaldirma.bekleyen.goster = true;
-    if (s.foto === true) { a.gece.kaldirma.red.foto = true; a.gece.kaldirma.bekleyen.foto = true; }
+    if (typeof s.acik === 'boolean') { a.kaldirmaRapor.acik = s.acik; a.itirazRapor.acik = s.acik; }
+    if (s.bekleyen === true) a.kaldirmaRapor.bekleyen.goster = true;
+    if (s.foto === true) { a.kaldirmaRapor.red.foto = true; a.kaldirmaRapor.bekleyen.foto = true; }
     return a;
 }
 
 /** Ayrıntıdan eski kolonlar (Asistan penceresi bunları gösteriyor) */
 function eskiKolonlar(a) {
-    const k = a.gece.kaldirma;
+    const k = a.kaldirmaRapor;
     return { acik: a.gece.acik, bekleyen: k.bekleyen.goster, foto: !!(k.red.foto || k.bekleyen.foto) };
 }
 
@@ -263,8 +315,8 @@ async function ayarYaz(pool, username, ayar) {
 function pencereden(ayar, b) {
     const a = kopya(ayar);
     if (typeof b.acik === 'boolean') a.gece.acik = b.acik;
-    if (typeof b.bekleyen === 'boolean') a.gece.kaldirma.bekleyen.goster = b.bekleyen;
-    if (typeof b.foto === 'boolean') { a.gece.kaldirma.red.foto = b.foto; a.gece.kaldirma.bekleyen.foto = b.foto; }
+    if (typeof b.bekleyen === 'boolean') a.kaldirmaRapor.bekleyen.goster = b.bekleyen;
+    if (typeof b.foto === 'boolean') { a.kaldirmaRapor.red.foto = b.foto; a.kaldirmaRapor.bekleyen.foto = b.foto; }
     return a;
 }
 
