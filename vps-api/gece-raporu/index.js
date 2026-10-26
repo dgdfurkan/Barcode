@@ -49,6 +49,26 @@ const performansKart = require('../performans/kart');
 const { siparisDuzelt } = require('../itiraz/siparis');
 const siparisOku = (v) => siparisDuzelt(v);
 
+/**
+ * Aynı siparişin kayıtları art arda: grup, içindeki ilk kaydın yerine gelir
+ * (liste zaten son tarihe ya da sonuç zamanına göre sıralı). Grubu olan
+ * kayda ayniSiparis = gruptaki kayıt sayısı yazılır (kartta çip).
+ */
+function sipariseGore(liste) {
+    const gruplar = new Map();
+    liste.forEach((k, i) => {
+        const anahtar = k.siparisId || 'tek:' + i;
+        if (!gruplar.has(anahtar)) gruplar.set(anahtar, []);
+        gruplar.get(anahtar).push(k);
+    });
+    const sonuc = [];
+    for (const g of gruplar.values()) {
+        g.forEach((k) => { k.ayniSiparis = g.length; });
+        sonuc.push(...g);
+    }
+    return sonuc;
+}
+
 const HAKLAR = ['satistanKaldirma', 'itirazYazici', 'stokSayimi', 'jetBarkodAsistan'];
 const BEKLEYEN = new Set([100, 150, 200, 300]);
 const RED_OLAY = new Set([160, 700]);
@@ -212,7 +232,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             try {
                 b = await pool.query(
                     `SELECT k.kayit_id, k.urun, k.sikayet, k.musteri_notu, k.son_tarih, (k.secilen_metin IS NOT NULL) AS taslak,
-                            to_jsonb(k)->>'urun_id' AS urun_id, to_jsonb(k)->'siparis' AS siparis
+                            to_jsonb(k)->>'urun_id' AS urun_id, to_jsonb(k)->'siparis' AS siparis, to_jsonb(k)->>'siparis_id' AS siparis_id
                        FROM itiraz.kayitlar k
                       WHERE k.username = $1 AND k.durum = 100 AND k.son_tarih > now()
                         AND ($2::boolean OR k.son_tarih < now() + interval '24 hours')
@@ -226,7 +246,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             try {
                 s = await pool.query(
                     `SELECT k.kayit_id, k.urun, k.sikayet, k.durum, k.itiraz_metni, to_jsonb(k)->>'urun_id' AS urun_id,
-                            k.durum_degisti_at AS zaman, to_jsonb(k)->'siparis' AS siparis
+                            k.durum_degisti_at AS zaman, to_jsonb(k)->'siparis' AS siparis, to_jsonb(k)->>'siparis_id' AS siparis_id
                        FROM itiraz.kayitlar k
                       WHERE k.username = $1 AND k.durum IN (300, 400) AND k.durum_degisti_at > $2 AND k.durum_degisti_at <= $3
                       ORDER BY durum_degisti_at DESC LIMIT 30`,
@@ -235,8 +255,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             } catch (e) { if (!semaYok(e)) throw e; }
         }
         return {
-            bekleyen: b.rows.map((x) => ({ id: x.kayit_id, urun: x.urun, urunId: x.urun_id, sikayet: x.sikayet, musteriNotu: x.musteri_notu, sonTarih: x.son_tarih, taslak: x.taslak, siparis: siparisOku(x.siparis) })),
-            sonuc: s.rows.map((x) => ({ id: x.kayit_id, urun: x.urun, urunId: x.urun_id, sikayet: x.sikayet, durum: x.durum, itirazMetni: x.itiraz_metni, zaman: x.zaman, siparis: siparisOku(x.siparis) })),
+            bekleyen: sipariseGore(b.rows.map((x) => ({ id: x.kayit_id, siparisId: x.siparis_id || '', urun: x.urun, urunId: x.urun_id, sikayet: x.sikayet, musteriNotu: x.musteri_notu, sonTarih: x.son_tarih, taslak: x.taslak, siparis: siparisOku(x.siparis) }))),
+            sonuc: sipariseGore(s.rows.map((x) => ({ id: x.kayit_id, siparisId: x.siparis_id || '', urun: x.urun, urunId: x.urun_id, sikayet: x.sikayet, durum: x.durum, itirazMetni: x.itiraz_metni, zaman: x.zaman, siparis: siparisOku(x.siparis) }))),
         };
     }
 
@@ -336,6 +356,15 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     /** İtiraz kartları (yatay): ürün ve sipariş görselleri katalogdan, kişi fotoğrafları bellekte */
     async function itirazCiz(it, I, o) {
         const kayitlar = it.bekleyen.concat(it.sonuc);
+        // Aynı siparişin bir kaydında kişi okunmuşsa ötekine de (kurye kartta boş kalmasın)
+        const kisiler = new Map();
+        kayitlar.forEach((k) => { if (k.siparisId && k.siparis && k.siparis.kurye && k.siparis.kurye.ad) kisiler.set(k.siparisId, k.siparis); });
+        kayitlar.forEach((k) => {
+            const d = k.siparisId && kisiler.get(k.siparisId);
+            if (!d || d === k.siparis) return;
+            if (!k.siparis) k.siparis = d;
+            else { if (!(k.siparis.kurye && k.siparis.kurye.ad)) k.siparis.kurye = d.kurye; if (!(k.siparis.toplayici && k.siparis.toplayici.ad)) k.siparis.toplayici = d.toplayici; }
+        });
         let gorseller = o.gorseller;
         const kt = await katalogAl();
         const urunler = [];
@@ -566,8 +595,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         });
         const itiraz = {
             bekleyen: it.bekleyen === 'yok' ? [] : [
-                { id: 'ornek1', urun: urunler[6].ad, gorselId: urunler[6].id, sikayet: 'Eksik Ürün', musteriNotu: 'Siparişte bu ürün yoktu.', sonTarih: new Date(simdi + 9 * 3600000).toISOString(), taslak: true, siparis: siparis(6, [10, 11, 12, 13, 14, 15, 16, 17], 'Ali Yılmaz', 'Can Demir', 14) },
-                { id: 'ornek2', urun: urunler[7].ad, gorselId: urunler[7].id, sikayet: 'Bayat/Bozuk Ürün', musteriNotu: '', sonTarih: new Date(simdi + 40 * 3600000).toISOString(), taslak: false, siparis: siparis(7, [18, 19, 9], 'Mert Şahin', 'Ece Kaya', 21) },
+                { id: 'ornek1', siparisId: 'o1', ayniSiparis: 2, urun: urunler[6].ad, gorselId: urunler[6].id, sikayet: 'Eksik Ürün', musteriNotu: 'Siparişte bu ürün yoktu.', sonTarih: new Date(simdi + 9 * 3600000).toISOString(), taslak: true, siparis: siparis(6, [7, 10, 11, 12, 13, 14, 15], 'Ali Yılmaz', 'Can Demir', 14) },
+                { id: 'ornek2', siparisId: 'o1', ayniSiparis: 2, urun: urunler[7].ad, gorselId: urunler[7].id, sikayet: 'Bayat/Bozuk Ürün', musteriNotu: '', sonTarih: new Date(simdi + 9 * 3600000).toISOString(), taslak: false, siparis: siparis(7, [6, 10, 11, 12, 13, 14, 15], 'Ali Yılmaz', 'Can Demir', 14) },
             ].filter((x) => it.bekleyen === 'hepsi' || Date.parse(x.sonTarih) - simdi < GUN_MS),
             sonuc: it.sonuc ? [
                 { id: 'ornek3', urun: urunler[8].ad, gorselId: urunler[8].id, sikayet: 'Eksik Ürün', durum: 300, zaman: once(4), siparis: siparis(8, [12, 15, 18, 1], 'Deniz Koç', 'Can Demir', 16), itirazMetni: 'Ürünler bayi sahibi tarafından eksiksiz kontrol edilerek ve sayılarak hazırlanmıştır. Gereğinin yapılmasını talep ederiz. İyi çalışmalar dileriz.' },

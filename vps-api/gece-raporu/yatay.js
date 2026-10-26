@@ -350,7 +350,9 @@ function itirazKartlari(bekleyen, sonuc, s = {}) {
         let cx = mx;
         if (sonucMu) cx += cip(p, cx, y + 70, kabul ? 'Kabul Edildi' : 'Reddedildi', kabul ? C.yesil : C.kirmizi, kabul ? C.yesilZemin : C.kirmiziZemin, 17) + 10;
         cx += cip(p, cx, y + 70, k.sikayet || 'Kayıt', C.orta, C.cizgiAcik, 17) + 10;
-        if (!sonucMu && k.taslak) cip(p, cx, y + 70, 'Taslak Hazır', C.mavi, C.maviZemin, 17);
+        if (!sonucMu && k.taslak) cx += cip(p, cx, y + 70, 'Taslak Hazır', C.mavi, C.maviZemin, 17) + 10;
+        // Aynı siparişin başka kaydı da listede (art arda dizilir)
+        if (k.ayniSiparis > 1) cip(p, cx, y + 70, 'Aynı Sipariş · ' + k.ayniSiparis, C.mor, C.morZemin, 17);
         if (sonucMu && s.metin !== false && k.itirazMetni) {
             satirlar(OLCU.govde, k.itirazMetni, 19, w, 3).forEach((t, j) => p.push(yazi(mx, y + 136 + j * 27, t, { boy: 19, renk: C.orta })));
         } else if (!sonucMu && s.not !== false) {

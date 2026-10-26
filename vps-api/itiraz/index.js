@@ -337,7 +337,9 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     let siparisKolonu = null;
     const SIPARIS_EKSIK = `SELECT kayit_id AS id, siparis_id AS "siparisId", siparis_tur AS "siparisTur" FROM itiraz.kayitlar
                             WHERE username = $1 AND siparis_id IS NOT NULL
-                              AND (siparis IS NULL OR COALESCE(siparis->>'surum', '1') <> '2')
+                              -- özeti yok, eski biçimde ya da kuryesiz (teslim edilmiş siparişte kurye hep vardır)
+                              AND (siparis IS NULL OR COALESCE(siparis->>'surum', '1') <> '2'
+                                   OR COALESCE(jsonb_typeof(siparis->'kurye'), 'null') = 'null')
                               AND (siparis_deneme IS NULL OR siparis_deneme < now() - interval '1 hour')
                               AND ((durum = 100 AND son_tarih > now()) OR durum_degisti_at > now() - interval '2 days')`;
 
@@ -632,7 +634,10 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 await pool.query(
                     `UPDATE itiraz.kayitlar k SET siparis = x.sp, siparis_deneme = now()
                        FROM jsonb_to_recordset($2::jsonb) AS x(id text, sp jsonb)
-                      WHERE k.username = $1 AND k.kayit_id = x.id`,
+                      WHERE k.username = $1 AND k.kayit_id = x.id
+                        -- Eski sürümün (kuryeyi bulamayan) okuması iyi özeti ezmesin
+                        AND (k.siparis IS NULL OR x.sp->>'surum' = '2' OR COALESCE(k.siparis->>'surum', '1') <> '2')
+                        AND NOT (jsonb_typeof(k.siparis->'kurye') = 'object' AND COALESCE(jsonb_typeof(x.sp->'kurye'), 'null') = 'null')`,
                     [req.auth.username, JSON.stringify(tamam)]
                 );
             }
