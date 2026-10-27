@@ -718,6 +718,14 @@
             return;
         }
         o.durum = null;
+        // Seçilen tarih aralığı sunucuda uygulanmadıysa (eski sunucu) önizleme yanlış tarihi gösterir: hata say
+        var istenen = d.sekme === 'kaldirma' && d.veri === 'gercek' ? krAralik() : null;
+        if (istenen && c.kod === 200 && c.j.ok && !(c.j.aralik && c.j.aralik.bas === istenen.bas && c.j.aralik.son === istenen.son)) {
+            d.krDesteksiz = true;
+            c = { kod: -1, j: {}, metin: 'Sunucu güncellemesi bekleniyor: tarih aralığı henüz sunucuda yok, önizleme son 24 saati gösterirdi. Sunucu güncellenince seçtiğin tarihler gelir.' };
+        } else if (istenen && c.kod === 200) {
+            d.krDesteksiz = false;
+        }
         o.sonuc[anahtar] = c.kod === 200 && c.j.ok ? { ok: true, j: c.j } : { ok: false, metin: c.metin || hataMetni(c) };
         o.goster = anahtar;
         // Hasar fotoğraflarının linki süresi geçmişse depo panelindeki Asistan tazeler
@@ -877,6 +885,10 @@
     async function test() {
         if (d.gonderiyor) return;
         if (!d.hesaplar.length) { bildir('Önce Telegram\'ı bağla.', 'hata'); return; }
+        if (d.sekme === 'kaldirma' && krAralik() && d.krDesteksiz) {
+            bildir('Tarih aralığı henüz sunucuda yok; seçtiğin tarihler yerine son 24 saat giderdi. Sunucu güncellenince tekrar dene.', 'hata');
+            return;
+        }
         d.gonderiyor = true;
         cubukCiz();
         var c;

@@ -970,6 +970,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                     ok: true, tur, baslik: rapor.baslik,
                     kartlar: rapor.kartlar.map((k) => 'data:image/png;base64,' + kucult(k, en).toString('base64')),
                     fotoTazeleniyor: rapor.fotoTazeleniyor || 0,
+                    // Kullanılan aralık: sayfa seçtiği tarihin uygulandığını buradan doğrular
+                    aralik: aralik ? { bas: aralik.basGun, son: aralik.sonGun } : null,
                 };
             }
             if (onizlemeOnbellek.size > 300) onizlemeOnbellek.clear();
@@ -1070,7 +1072,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const s = await gonder(u, rapor);
             if (s.bos) return res.status(409).json({ ok: false, error: 'bos' });
             if (!s.giden) return res.status(502).json({ ok: false, error: 'gonderilemedi' });
-            res.json({ ok: true, kart: rapor.kartlar.length, giden: s.giden });
+            res.json({ ok: true, kart: rapor.kartlar.length, giden: s.giden, aralik: aralik ? { bas: aralik.basGun, son: aralik.sonGun } : null });
         } catch (e) {
             console.error('telegram-ayar test:', e.message);
             res.status(500).json({ ok: false, error: 'server_error' });
