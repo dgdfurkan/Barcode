@@ -65,7 +65,7 @@ const VARSAYILAN = Object.freeze({
     },
 });
 
-const SINIRLAR = new Set([10, 20, 40]);
+const SINIRLAR = new Set([0, 10, 20, 40]);   // 0: hepsi
 const ESIK = new Set([0, 50, 100, 150, 200, 250]);
 const ERTELEME_DK = new Set([15, 30, 60]);
 const ERTELEME_KEZ = new Set([0, 1, 2, 3, 4, 6, 8]);

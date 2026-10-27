@@ -338,7 +338,7 @@
                 grupSatiri('Onay Bekleyen', 'Şu an sonuç bekleyen kayıtlar', 'kaldirmaRapor.bekleyen') +
                 grupSatiri('Tamamlanan', 'Rapor aralığında tamamlananlar', 'kaldirmaRapor.tamam') +
                 satirAnahtar('Yeniden Girilenleri Gizle', 'İptalden sonra depo aynı ürünü yeniden girdiyse gösterme', 'kaldirmaRapor.yenidenGizle', !al('kaldirmaRapor.red.goster')) +
-                satirSegment('Grup Başına En Çok', null, 'kaldirmaRapor.sinir', [[10, '10'], [20, '20'], [40, '40']]) +
+                satirSegment('Grup Başına En Çok', 'Zamanlı rapor için. Tarih aralığı seçiliyken aralığın tamamı gelir; sığmayan sayfalara bölünür', 'kaldirmaRapor.sinir', [[10, '10'], [20, '20'], [40, '40'], [0, 'Hepsi']]) +
                 tamKaliteSatiri('kaldirmaRapor.tamKalite')
         }) +
         kartHtml({ ikon: IKON.ozet, baslik: 'Sebepler', aciklama: 'Yalnız seçili sebeplerdeki kayıtlar gelir.', govde: sebeplerHtml() });
@@ -914,7 +914,8 @@
         }
         d.gonderiyor = false;
         cubukCiz();
-        if (c.kod === 200 && c.j.ok) bildir((c.j.kart || 1) + (d.sekme === 'anlik' ? ' mesaj' : ' kart') + ' Telegram\'a gönderildi.', 'basari');
+        if (c.kod === 200 && c.j.ok && c.j.arkada) bildir('Rapor hazırlanıyor; sayfalar birazdan Telegram\'a gelir.', 'basari');
+        else if (c.kod === 200 && c.j.ok) bildir((c.j.kart || 1) + (d.sekme === 'anlik' ? ' mesaj' : ' kart') + ' Telegram\'a gönderildi.', 'basari');
         else bildir(hataMetni(c), 'hata');
     }
 

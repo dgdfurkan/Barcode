@@ -83,6 +83,8 @@ const GUN_MS = 24 * 3600 * 1000;
 /* gece.gonderim.dakika kayması (performans: 10000 / 12000) */
 const KAYMA = { kaldirma: 14000, itiraz: 16000 };
 const RAPOR_TURU = new Set(['gece', 'anlik', 'kaldirma', 'itiraz']);
+/* Bir rapordaki en çok kart: Telegram'a 10'arlı albümlerle gider (paylas.albumGonder) */
+const AZAMI_KART = 40;
 
 /**
  * Sayfadan gelen tarih aralığı (İstanbul günleri, en çok 62 gün):
@@ -238,7 +240,9 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         sonuc.red.sort((a, b) => (a.yeniden - b.yeniden) || (Date.parse(b.zaman) - Date.parse(a.zaman)));
         sonuc.bekleyen.sort((a, b) => Date.parse(b.zaman) - Date.parse(a.zaman));
         sonuc.tamam.sort((a, b) => Date.parse(b.zaman) - Date.parse(a.zaman));
-        Object.keys(sonuc).forEach((g) => { sonuc[g] = sonuc[g].slice(0, gk.sinir); });
+        // Grup sınırı (0: hepsi) zamanlı rapor için; sayfada tarih aralığı seçildiyse aralığın tamamı
+        const sinir = aralikli || !gk.sinir ? 400 : gk.sinir;
+        Object.keys(sonuc).forEach((g) => { sonuc[g] = sonuc[g].slice(0, sinir); });
         return sonuc;
     }
 
@@ -362,15 +366,16 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             fotoTazeleniyor = await kaldirmaModul.fotolariTazele(pool, o.u, hepsi, o.fotoBekleMs || 0);
             // Elle gönderimde istek 60 sn'yi geçmesin (bekleme 35 + indirme 15)
             const bitis = Date.now() + (o.onizleme ? 20000 : (o.fotoBekleMs || 0) >= 100000 ? 40000 : 15000);
-            const azami = o.onizleme ? 30 : 60;
+            const azami = 240;
             let sayi = 0;
             // Her kayıttan önce bir fotoğraf (hepsi görünsün), kalan bütçeyle ikinci ve üçüncüler
             for (const k of hepsi) k.fotolar = [];
             for (let sira = 0; sira < 3; sira++) {
                 const is = hepsi.filter((k) => (k.fotoAdres || [])[sira]);
-                await Promise.all([0, 1, 2, 3].map(async (j) => {
-                    for (let i = j; i < is.length; i += 4) {
+                await Promise.all([0, 1, 2, 3, 4, 5].map(async (j) => {
+                    for (let i = j; i < is.length; i += 6) {
                         if (sayi >= azami || Date.now() > bitis) return;
+                        is[i].fotoDenendi = true;
                         const f = await hasarFotosu(is[i].fotoAdres[sira]);
                         if (f) { is[i].fotolar[sira] = f; sayi++; }
                     }
@@ -381,7 +386,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 // Fotoğrafı olup gelmeyen kayıt: kartta yeri ve sebebi görünür
                 if ((k.fotoAdres || []).length && !k.fotolar.length) {
                     const taze = k.fotoAdres.every((a) => kaldirmaModul.linkTaze(a, 5000));
-                    k.fotoNot = taze ? 'Fotoğraf açılamadı' : o.onizleme && o.fotoBekleMs === 0 ? 'Tazeleniyor' : 'Depo paneli kapalı';
+                    k.fotoNot = !k.fotoDenendi && taze ? 'Süre yetmedi' : taze ? 'Fotoğraf açılamadı'
+                        : o.onizleme && o.fotoBekleMs === 0 ? 'Tazeleniyor' : 'Depo paneli kapalı';
                 }
             });
         }
@@ -472,7 +478,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         if (kd.bekleyen.length) parca.push(kd.bekleyen.length + ' onay bekliyor');
         if (kd.tamam.length) parca.push(kd.tamam.length + ' tamamlandı');
         return {
-            kartlar: kartlar.slice(0, 10),
+            kartlar: kartlar.slice(0, AZAMI_KART),
             baslik: ['🗑️ Satıştan Kaldırma · ' + (ar ? tarih : kisaGun(son) + ' · ' + alt.toLocaleLowerCase('tr')), parca.join(' · ')].filter(Boolean).join('\n'),
             tamKalite: K.tamKalite, ad: 'satistan-kaldirma-' + (ar ? ar.basGun + (ar.sonGun !== ar.basGun ? '_' + ar.sonGun : '') : istanbul(son.getTime()).gun), fotoTazeleniyor,
         };
@@ -497,7 +503,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         if (it.bekleyen.length) satir.push(it.bekleyen.length + ' kayıt itiraz bekliyor' + (acil ? ' (' + acil + ' kaydın süresi 12 saatten az)' : ''));
         if (it.sonuc.length) satir.push(it.sonuc.length + ' itiraz sonuçlandı: ' + kabul + ' kabul, ' + (it.sonuc.length - kabul) + ' red');
         return {
-            kartlar: kartlar.slice(0, 10), baslik: satir.join('\n'),
+            kartlar: kartlar.slice(0, AZAMI_KART), baslik: satir.join('\n'),
             tamKalite: I.tamKalite, ad: 'itirazlar-' + istanbul(son.getTime()).gun,
         };
     }
@@ -591,7 +597,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         }
         if (farkUrun) satir.push(farkUrun + ' üründe sayım farkı');
         if (satir.length === 1) satir.push(gece ? 'Temiz gece.' : 'Her şey yolunda.');
-        return { kartlar: kartlar.slice(0, 10), baslik: satir.join('\n') };
+        return { kartlar: kartlar.slice(0, AZAMI_KART), baslik: satir.join('\n') };
     }
 
     /**
@@ -964,8 +970,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 const dakika = bolum.saatler[0];
                 const hazirla = tur === 'kaldirma' ? kaldirmaRaporu : tur === 'itiraz' ? itirazRaporu : raporHazirla;
                 const rapor = await hazirla(u, new Date(), { ayar: A, onizleme: true, ornek, dakika, aralik });
-                // Yatay kartlar geniş: önizlemede 1600 px (yazılar okunsun)
-                const en = tur === 'gece' ? 720 : 1600;
+                // Yatay kartlar geniş: önizlemede 1600 px (yazılar okunsun); çok sayfada yanıt şişmesin
+                const en = tur === 'gece' ? 720 : rapor.kartlar.length > 6 ? 1100 : 1600;
                 sonuc = {
                     ok: true, tur, baslik: rapor.baslik,
                     kartlar: rapor.kartlar.map((k) => 'data:image/png;base64,' + kucult(k, en).toString('base64')),
@@ -1067,12 +1073,24 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const bolum = { kaldirma: A.kaldirmaRapor, itiraz: A.itirazRapor, gece: A.gece }[tur];
             // Süresi geçmiş hasar fotoğrafları için en çok 35 sn (Asistan 30 sn'de bir sorar; istek 60 sn'yi geçmesin)
             const aralik = tur === 'kaldirma' ? aralikOku(b.aralik) : null;
-            const rapor = await hazirla(u, new Date(), { ayar: A, dakika: bolum.saatler[0], fotoBekleMs: 35000, aralik });
-            rapor.baslik = '🧪 Deneme\n' + rapor.baslik;
-            const s = await gonder(u, rapor);
+            const ar = aralik ? { bas: aralik.basGun, son: aralik.sonGun } : null;
+            const is = (async () => {
+                const rapor = await hazirla(u, new Date(), { ayar: A, dakika: bolum.saatler[0], fotoBekleMs: 35000, aralik });
+                rapor.baslik = '🧪 Deneme\n' + rapor.baslik;
+                const s = await gonder(u, rapor);
+                return { rapor, s };
+            })();
+            // Uzun aralıkta (çok sayfa, fotoğraf bekleme) vekil sunucunun 60 sn sınırı aşılmasın:
+            // 45 sn'de bitmezse "hazırlanıyor" denir, gönderim arkada sürer
+            const sonuc = await Promise.race([is, new Promise((coz) => setTimeout(() => coz(null), 45000))]);
+            if (!sonuc) {
+                is.catch((e) => console.error('telegram-ayar test arka:', e.message));
+                return res.json({ ok: true, arkada: true, aralik: ar });
+            }
+            const { rapor, s } = sonuc;
             if (s.bos) return res.status(409).json({ ok: false, error: 'bos' });
             if (!s.giden) return res.status(502).json({ ok: false, error: 'gonderilemedi' });
-            res.json({ ok: true, kart: rapor.kartlar.length, giden: s.giden, aralik: aralik ? { bas: aralik.basGun, son: aralik.sonGun } : null });
+            res.json({ ok: true, kart: rapor.kartlar.length, giden: s.giden, aralik: ar });
         } catch (e) {
             console.error('telegram-ayar test:', e.message);
             res.status(500).json({ ok: false, error: 'server_error' });

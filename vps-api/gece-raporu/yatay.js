@@ -126,27 +126,59 @@ function bolumBandi(p, y, metin, sayi, renk, zemin, kolonlar) {
 /**
  * Sayfalar: ogeler [{ h, ciz(p, y), baslik?: true }] art arda; sığmayınca yeni kart.
  * ust(p, ilk) → içeriğin başladığı y. Bölüm başlığı sayfanın son ögesi olmaz.
+ * Dengeli: önce kaç sayfa gerektiği bulunur, sonra satırlar sayfalara eşit
+ * yayılır (son sayfa tek satırla kalmaz).
  */
 function sayfala(ogeler, ust, altSol, altSag) {
+    const ALT = 112;
+    const ilkY = ust([''], true);
+    const sonrakiY = ust([''], false);
+    // sinir: sayfa boyu üst sınırı; dönüş: her ögenin sayfa numarası
+    const dagit = (sinir) => {
+        const sayfa = [];
+        let n = 0;
+        let y = ilkY;
+        let bos = true;
+        ogeler.forEach((o, i) => {
+            const sonraki = ogeler[i + 1];
+            const gerek = o.baslik && sonraki ? o.h + sonraki.h : o.h;
+            if (!bos && y + gerek + ALT > sinir) { n++; y = sonrakiY; bos = true; }
+            sayfa.push(n);
+            y += o.h;
+            if (o.h > 30) bos = false;
+        });
+        return sayfa;
+    };
+    let sayfa = dagit(AZAMI_H);
+    const n = (sayfa[sayfa.length - 1] || 0) + 1;
+    if (n > 1) {
+        const icerik = ogeler.reduce((t, o) => t + o.h, 0);
+        const enBuyuk = Math.max(...ogeler.map((o) => o.h));
+        // Eşit pay: aynı sayfa sayısını koruyan en küçük sınır
+        let sinir = Math.min(AZAMI_H, Math.ceil((ilkY + (n - 1) * sonrakiY + icerik) / n) + ALT);
+        while (sinir < AZAMI_H) {
+            const d = dagit(sinir);
+            if (d[d.length - 1] + 1 <= n) { sayfa = d; break; }
+            sinir += Math.max(20, Math.round(enBuyuk / 4));
+        }
+    }
     const sayfalar = [];
-    let p = null;
-    let y = 0;
-    const yeni = (ilk) => { p = ['']; y = ust(p, ilk); };
-    const bitir = () => { sayfalar.push({ p, H: y + 16 + 72 + 24 }); };
-    yeni(true);
     ogeler.forEach((o, i) => {
-        const sonraki = ogeler[i + 1];
-        const gerek = o.baslik && sonraki ? o.h + sonraki.h : o.h;
-        if (y + gerek + 112 > AZAMI_H && !o.ilkSatir) { bitir(); yeni(false); }
-        o.ciz(p, y);
-        y += o.h;
+        const no = sayfa[i];
+        if (!sayfalar[no]) { const p = ['']; sayfalar[no] = { p, y: ust(p, no === 0) }; }
+        const s = sayfalar[no];
+        // Sayfanın başındaki boşluk ögesi atlanır
+        if (s.y === (no === 0 ? ilkY : sonrakiY) && o.h <= 30 && !o.baslik) return;
+        o.ciz(s.p, s.y);
+        s.y += o.h;
     });
-    bitir();
     genislikKur(TASARIM);
-    return sayfalar.map((s, i) => {
-        s.p[0] = `<rect width="${W}" height="${s.H}" fill="${C.zemin}"/>`;
-        altBant(s.p, s.H, altSol, (sayfalar.length > 1 ? (i + 1) + ' / ' + sayfalar.length + ' · ' : '') + altSag);
-        return svgPng(s.p, s.H);
+    const dolu = sayfalar.filter(Boolean);
+    return dolu.map((s, i) => {
+        const H = s.y + 16 + 72 + 24;
+        s.p[0] = `<rect width="${W}" height="${H}" fill="${C.zemin}"/>`;
+        altBant(s.p, H, altSol, (dolu.length > 1 ? (i + 1) + ' / ' + dolu.length + ' · ' : '') + altSag);
+        return svgPng(s.p, H);
     });
 }
 

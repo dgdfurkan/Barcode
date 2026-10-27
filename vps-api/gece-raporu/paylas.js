@@ -54,7 +54,24 @@ function kucult(png, genislik = 720) {
     }
 }
 
+/**
+ * Kartlar 10'arlı albümlerle (Telegram'ın sınırı); yazı ilk albümde,
+ * sonrakilerde "devam 2/3". Dönüş: ilk albümün ulaştığı hesap sayısı.
+ */
 async function albumGonder(pool, hedefler, kartlar, baslik, ad) {
+    const parcalar = [];
+    for (let i = 0; i < kartlar.length; i += 10) parcalar.push(kartlar.slice(i, i + 10));
+    let ilk = { giden: 0 };
+    for (let i = 0; i < parcalar.length; i++) {
+        const yazi = i === 0 ? baslik : (String(baslik || '').split('\n')[0] + ' · devam ' + (i + 1) + '/' + parcalar.length);
+        const s = await albumParcasi(pool, hedefler, parcalar[i], yazi, parcalar.length > 1 ? ad + '-' + (i + 1) : ad);
+        if (i === 0) ilk = s;
+        if (!s.giden) break;
+    }
+    return ilk;
+}
+
+async function albumParcasi(pool, hedefler, kartlar, baslik, ad) {
     const liste = kartlar.slice(0, 10);
     let giden = 0;
     let kimlikler = null;
@@ -108,6 +125,15 @@ async function albumGonder(pool, hedefler, kartlar, baslik, ad) {
  * Sessiz gider (bildirim sesi yok); ilk alıcıdan sonra dosya kimliğiyle.
  */
 async function belgeGonder(pool, hedefler, kartlar, ad) {
+    let ilk = { giden: 0 };
+    for (let i = 0; i < kartlar.length; i += 10) {
+        const s = await belgeParcasi(pool, hedefler, kartlar.slice(i, i + 10), kartlar.length > 10 ? ad + '-' + (i / 10 + 1) : ad);
+        if (i === 0) ilk = s;
+    }
+    return ilk;
+}
+
+async function belgeParcasi(pool, hedefler, kartlar, ad) {
     const liste = kartlar.slice(0, 10);
     let giden = 0;
     let kimlikler = null;
