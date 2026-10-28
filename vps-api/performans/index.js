@@ -233,7 +233,12 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const r = await raporHazirla(v, pf, rapor, { eksik });
             if (!r.kartlar.length) return res.status(409).json({ ok: false, error: 'bos' });
             const s = await albumGonder(pool, hedefler, r.kartlar, r.baslik, r.ad);
-            if (!s.giden) return res.status(502).json({ ok: false, error: 'gonderilemedi' });
+            if (!s.giden) {
+                // Gitmediyse işaret kalkar: bir sonraki denemede yeniden gönderilebilsin
+                if (oto) await pool.query('DELETE FROM gece.gonderim WHERE username = $1 AND gun = $2 AND dakika = $3', [u, oto.gun, GONDERIM_KAYMA[rapor] + oto.dakika]).catch(() => {});
+                return res.status(502).json({ ok: false, error: 'gonderilemedi' });
+            }
+            if (oto) await pool.query('UPDATE gece.gonderim SET kart = $4 WHERE username = $1 AND gun = $2 AND dakika = $3', [u, oto.gun, GONDERIM_KAYMA[rapor] + oto.dakika, r.kartlar.length]).catch(() => {});
             // Tam kalite: aynı kart dosya olarak (Telegram fotoğrafı küçültüyor)
             if (r.tamKalite) await belgeGonder(pool, hedefler, r.kartlar, r.ad).catch(() => null);
             res.json({ ok: true, kart: r.kartlar.length, giden: s.giden });
@@ -243,15 +248,44 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         }
     });
 
+    /**
+     * Bugün (o saatte) zaten gönderilmiş raporlar. Başka bir bilgisayardaki Asistan
+     * göndermiş olabilir: o zaman erteleme notu gitmez, Asistan o saati bitmiş sayar.
+     * dakikalar: { dps, kurye } (yeni Asistan); yoksa günün herhangi bir saati.
+     */
+    async function bugunGidenler(u, gun, raporlar, dakikalar) {
+        const giden = [];
+        for (const rp of raporlar) {
+            const d = dakikalar && Number.isInteger(dakikalar[rp]) && dakikalar[rp] >= 0 && dakikalar[rp] < 1440 ? dakikalar[rp] : null;
+            try {
+                const r = d != null
+                    ? await pool.query('SELECT 1 FROM gece.gonderim WHERE username = $1 AND gun = $2 AND dakika = $3', [u, gun, GONDERIM_KAYMA[rp] + d])
+                    : await pool.query('SELECT 1 FROM gece.gonderim WHERE username = $1 AND gun = $2 AND dakika >= $3 AND dakika < $3 + 1440 LIMIT 1', [u, gun, GONDERIM_KAYMA[rp]]);
+                if (r.rows.length) giden.push(rp);
+            } catch (e) {
+                if (!semaYok(e)) throw e;
+                if (d != null && bellekteGiden.has(u + '|' + gun + '|' + (GONDERIM_KAYMA[rp] + d))) giden.push(rp);
+            }
+        }
+        return giden;
+    }
+
     /** Asistan: veri henüz tamamlanmadı; ayar açıksa Telegram'a kısa not */
     app.post('/api/performans/ertele', uye, async (req, res) => {
         const u = req.auth.username;
         const b = req.body || {};
         if (!pencere('ertele:' + u, 12, 3600 * 1000)) return res.status(429).json({ ok: false, error: 'cok_sik' });
         try {
+            const istenen = b.rapor === 'ikisi' ? ['dps', 'kurye'] : RAPORLAR.has(b.rapor) ? [b.rapor] : [];
+            const gun = typeof b.gun === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.gun) ? b.gun
+                : new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul' }).format(new Date());
+            const zatenGitti = await bugunGidenler(u, gun, istenen, b.dakikalar);
+            const kalan = istenen.filter((x) => !zatenGitti.includes(x));
+            if (istenen.length && !kalan.length) return res.json({ ok: true, bildirildi: false, zatenGitti });
             const pf = await ayarAl(u);
-            if (!pf.kontrol.ertelemeBildir || !telegram.hazirMi()) return res.json({ ok: true, bildirildi: false });
-            const raporAd = b.rapor === 'dps' ? 'DPS raporu' : b.rapor === 'kurye' ? 'Kurye CDI raporu' : b.rapor === 'ikisi' ? 'DPS ve Kurye CDI raporları' : 'Performans raporu';
+            if (!pf.kontrol.ertelemeBildir || !telegram.hazirMi()) return res.json({ ok: true, bildirildi: false, zatenGitti });
+            const tek = kalan.length === 1 ? kalan[0] : null;
+            const raporAd = tek === 'dps' ? 'DPS raporu' : tek === 'kurye' ? 'Kurye CDI raporu' : kalan.length > 1 ? 'DPS ve Kurye CDI raporları' : 'Performans raporu';
             const hedefler = await alicilar(u);
             const n = (x, alt, ust) => (Number.isInteger(x) && x >= alt && x <= ust ? x : null);
             const deneme = n(b.deneme, 1, 20);
@@ -268,7 +302,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 try { await telegram.mesaj(h.chat_id, metin); giden++; } catch (e) { /* sessiz */ }
                 await new Promise((r) => setTimeout(r, 400));
             }
-            res.json({ ok: true, bildirildi: giden > 0 });
+            res.json({ ok: true, bildirildi: giden > 0, zatenGitti });
         } catch (e) {
             console.error('performans ertele:', e.message);
             res.status(500).json({ ok: false, error: 'server_error' });

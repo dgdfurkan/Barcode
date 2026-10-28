@@ -17,6 +17,8 @@
  *   Jeton yoksa Getir'e istek atılmaz, aynı erteleme kuralı uygulanır.
  *   Veri Jet Barkod'a (/api/performans/gonder) bırakılır; kartları sunucu
  *   çizip Telegram'a yollar. Aynı saat iki bilgisayardan bir kez gider.
+ *   Başka bir bilgisayar o saatin raporunu göndermişse (sunucu ertelemede
+ *   zatenGitti döner) bu bilgisayar not atmaz, o saati bitmiş sayar.
  *
  * Getir'e giden yük: rapor başına 1 DPS + 1-2 kurye isteği; ertelemede aynısı.
  * ============================================================================
@@ -195,14 +197,19 @@ async function pfTur() {
       const gidecek = sonDenemedeGonder ? biten : [];
       const vazgecilen = sonDenemedeGonder ? [] : biten;
       vazgecilen.forEach((x) => { x.st.bitti = true; });
+      // Sunucu başka bilgisayarın gönderdiğini bildirirse o rapor bu bilgisayarda da bitti
+      const bildir = async (liste, ek) => {
+        if (!liste.length) return;
+        const dakikalar = {};
+        liste.forEach((x) => { dakikalar[x.rapor] = x.dakika; });
+        const c = await pfApi('/api/performans/ertele', { rapor: liste.length > 1 ? 'ikisi' : liste[0].rapor, gun: z.gun, dakikalar, sebep, siparis, ...ek });
+        const giden = c && c.j && Array.isArray(c.j.zatenGitti) ? c.j.zatenGitti : [];
+        sirada.filter((x) => giden.includes(x.rapor)).forEach((x) => { x.st.bitti = true; });
+      };
+      await bildir(ertelenen, { deneme: ertelenen.length ? ertelenen[0].st.deneme : 0, kez, sonrakiDk: araDk });
+      await bildir(vazgecilen, { vazgecildi: true });
       await kaydet();
-      if (ertelenen.length) {
-        await pfApi('/api/performans/ertele', { rapor: ertelenen.length > 1 ? 'ikisi' : ertelenen[0].rapor, deneme: ertelenen[0].st.deneme, kez, siparis, sonrakiDk: araDk, sebep });
-      }
-      if (vazgecilen.length) {
-        await pfApi('/api/performans/ertele', { rapor: vazgecilen.length > 1 ? 'ikisi' : vazgecilen[0].rapor, vazgecildi: true, sebep, siparis });
-      }
-      return gidecek;
+      return gidecek.filter((x) => !x.st.bitti);
     };
 
     const o = await pfOturum();
