@@ -161,8 +161,18 @@ if (KURU) { console.log('✅ Önizleme bitti. Gerçek güncelleme için --kuru o
 
 if (YAYINLA) {
     try {
-        const dosyalar = [...PRODUCTS_HEDEF, ...TEMP_HEDEF, ...yazilan]
-            .map((r) => `'${r}'`).join(' ');
+        // .gitignore'daki kopyalar (pages/*, root temp_products.js) eklenemez; ayıkla
+        const aday = [...PRODUCTS_HEDEF, ...TEMP_HEDEF, ...yazilan];
+        const yoksay = new Set();
+        try {
+            const o = execSync(`git -C '${KOK}' check-ignore ${aday.map((r) => `'${r}'`).join(' ')}`, { encoding: 'utf8' });
+            o.split('\n').map((s) => s.trim()).filter(Boolean).forEach((s) => yoksay.add(s));
+        } catch (e) {
+            // check-ignore hiçbiri yok sayılmıyorsa 1 döner; eşleşenler yine stdout'ta
+            if (e.stdout) String(e.stdout).split('\n').map((s) => s.trim()).filter(Boolean).forEach((s) => yoksay.add(s));
+        }
+        const eklenecek = aday.filter((r) => !yoksay.has(r));
+        const dosyalar = eklenecek.map((r) => `'${r}'`).join(' ');
         execSync(`git -C '${KOK}' add ${dosyalar}`, { stdio: 'inherit' });
         execSync(`git -C '${KOK}' commit -m "🗂️ Ürün verisi güncellendi: ${yeniSayi} ürün, temp_products.js yeniden üretildi, sürüm ?v=${yeni}"`, { stdio: 'inherit' });
         execSync(`git -C '${KOK}' push origin main`, { stdio: 'inherit' });
