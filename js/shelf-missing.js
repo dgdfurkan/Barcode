@@ -11,7 +11,12 @@ const ShelfMissingEan = {
         for (let i = 0; i < 12; i++) t += Number(d[i]) * (i % 2 === 0 ? 1 : 3);
         return (10 - (t % 10)) % 10 === Number(d[12]);
     },
+    code128Zorla(s) {
+        return /^\d+$/.test(s) && ['0', '977'].some(o => s.indexOf(o) === 0);
+    },
     normalize(s) {
+        // 0 ile baslayan UPC-A ve 977 ISSN, EAN yerine Code128 (kod birebir okunsun diye)
+        if (this.code128Zorla(s)) return null;
         if (/^\d{13}$/.test(s)) return this.tutuyor(s) ? s : null;
         if (/^\d{12}$/.test(s) && this.tutuyor('0' + s)) return '0' + s;
         return null;

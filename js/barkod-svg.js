@@ -94,12 +94,17 @@
     }
 
     /** Kod için desen ve tür. Çizilemiyorsa null. */
+    // 0 ile baslayan UPC-A ve 977 ISSN, EAN yerine Code128 (kod birebir okunsun diye). Onekler elle genisletilir.
+    var CODE128_ONEK = ['0', '977'];
+    function code128Zorla(k) {
+        return /^\d+$/.test(k) && CODE128_ONEK.some(function (o) { return k.indexOf(o) === 0; });
+    }
     function desen(kod) {
         var k = String(kod == null ? '' : kod).trim();
         if (!k) return null;
-        if (/^\d{12}$/.test(k) && gecerliEan('0' + k)) return { tur: 'UPC-A', bitler: ean13Desen('0' + k), ean: '0' + k, metin: k };
-        if (/^\d{13}$/.test(k) && gecerliEan(k)) return { tur: 'EAN-13', bitler: ean13Desen(k), ean: k, metin: k };
-        if (/^\d{8}$/.test(k) && gecerliEan(k)) return { tur: 'EAN-8', bitler: ean8Desen(k), ean: k, metin: k };
+        if (!code128Zorla(k) && /^\d{12}$/.test(k) && gecerliEan('0' + k)) return { tur: 'UPC-A', bitler: ean13Desen('0' + k), ean: '0' + k, metin: k };
+        if (!code128Zorla(k) && /^\d{13}$/.test(k) && gecerliEan(k)) return { tur: 'EAN-13', bitler: ean13Desen(k), ean: k, metin: k };
+        if (!code128Zorla(k) && /^\d{8}$/.test(k) && gecerliEan(k)) return { tur: 'EAN-8', bitler: ean8Desen(k), ean: k, metin: k };
         var c = code128Desen(k);
         return c ? { tur: 'Code 128', bitler: c, metin: k } : null;
     }

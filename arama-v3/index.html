@@ -4091,8 +4091,14 @@
         function isEan13Compatible(text) {
             return normalizeToEan13(text) !== null;
         }
+        // 0 ile baslayan UPC-A ve 977 ISSN, EAN yerine Code128 cizilir (kod birebir okunsun diye). Onekler elle genisletilir.
+        const CODE128_ONEK = ['0', '977'];
+        function code128Zorla(k) {
+            return /^\d+$/.test(k) && CODE128_ONEK.some(function (o) { return k.indexOf(o) === 0; });
+        }
         function normalizeToEan13(text) {
             const s = String(text == null ? '' : text).trim();
+            if (code128Zorla(s)) return null;
             if (/^\d{13}$/.test(s)) return eanKontrolTutuyor(s) ? s : null;
             if (/^\d{12}$/.test(s) && eanKontrolTutuyor('0' + s)) return '0' + s;
             return null;
