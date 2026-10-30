@@ -973,6 +973,11 @@ require('./itiraz').kur(app, { pool, verifyToken, bearerOf });
 require('./gunluk-sayim').kur(app, { pool, verifyToken, bearerOf });
 
 // =====================================================================
+// Sayım farkı / sıfırlanan ürünler: Asistan panel sayımlarını tarar, farkları biriktirir
+// =====================================================================
+require('./sayim-fark').kur(app, { pool, verifyToken, bearerOf });
+
+// =====================================================================
 // Gece raporu: 01:00'de son 24 saat Telegram'a (kaldırma redleri, itirazlar, sayım farkları)
 // =====================================================================
 require('./gece-raporu').kur(app, { pool, verifyToken, bearerOf });
