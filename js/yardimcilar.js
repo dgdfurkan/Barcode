@@ -40,6 +40,15 @@
                     adres: '../itiraz/',
                     renk: 'mor',
                     ikon: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>'
+                },
+                {
+                    kimlik: 'sayimFark',
+                    haklar: ['stokSayimi', 'jetBarkodAsistan'],
+                    ad: 'Sayım Farkı',
+                    ozet: 'Sayımlarda sistem-fiziksel farkı ve sıfırlanan ürünler, rapor olarak.',
+                    adres: '../sifirlanan/',
+                    renk: 'kirmizi',
+                    ikon: '<path d="M4 20h16M6.5 16V9M11 16V5M15.5 16v-4M20 16v-8"/><path d="M4 12h5"/>'
                 }
             ]
         },

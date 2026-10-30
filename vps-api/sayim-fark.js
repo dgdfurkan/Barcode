@@ -1,25 +1,23 @@
 /**
- * Sayım farkı / sıfırlanan ürünler
+ * Sayım farkı / sıfırlanan ürünler (rapor)
  * ============================================================================
- * Jet Barkod Asistan, depo panelinin sayımlarını (gstore-inventory-checks)
- * API ile tarar; her sayımın ürünlerinde sistem vs fiziksel stok farkını ve
- * sıfırlananları hesaplayıp buraya bırakır. Ayda bir tam tarama, sonra yalnız
- * yeni günler: imleç (son_check_at) resume noktasını tutar.
+ * Veri KAYNAĞI: public.sayim_gecmisi. Bu tabloyu Sayım Geçmişi / gece raporu
+ * akışı dolduruyor (Asistan panelden sistem/fiziksel stoğu okuyup
+ * /api/sayim-gecmisi/yaz ile bırakıyor; artımlı, her gece). Burada yalnız O
+ * veriden ürün başına son fark ve sıfırlananlar derlenip rapora dönüyor.
+ * Yeni tarama, yeni tablo ya da eklenti değişikliği yok.
  *
- * Uçlar (hepsi imzalı jeton, kullanıcı adı jetondan):
- *   GET  /api/sayim-fark/imlec   Asistan kaldığı yeri sorar
- *   POST /api/sayim-fark         Asistan taradığı farkları + yeni imleci yazar
- *   GET  /api/sayim-fark/rapor   UI raporu okur (ürün başına son fark, sıfır vurgulu)
+ *   GET /api/sayim-fark/rapor[?sifir=1]
+ *     { ok, ozet:{urun,sifir,eksik,fazla}, satirlar:[{urunId, ad, sistem,
+ *       fiziksel, fark, sifir, otomatik, sifirKez, sayimKez, sayimAt}] }
  *
- * Getir'e buradan istek gitmez; tarama tarayıcı tarafında yapılır.
+ * Tablo yoksa (sayim_gecmisi_paylasim.sql çalışmadıysa) 503 kurulum_bekleniyor.
  * SINIR: kullanıcı başına dakikada 30 istek.
  * ============================================================================
  */
 'use strict';
 
-const KIMLIK = /^[a-f0-9]{24}$/;
 const HAKLAR = ['stokSayimi', 'jetBarkodAsistan'];
-const AZAMI_SATIR = 500; // tek POST'ta en çok fark satırı
 
 function hakAcik(pf) {
     if (!pf || typeof pf !== 'object') return false;
@@ -27,18 +25,6 @@ function hakAcik(pf) {
         const f = pf[h];
         return f === true || (f && typeof f === 'object' && f.enabled === true);
     });
-}
-
-const metin = (v, azami) => (typeof v === 'string' ? v.replace(/\u0000/g, '').trim().slice(0, azami) : '');
-
-function sayi(v) {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-}
-
-function zaman(v) {
-    const t = Date.parse(v);
-    return Number.isFinite(t) ? new Date(t).toISOString() : null;
 }
 
 function kur(app, { pool, verifyToken, bearerOf }) {
@@ -87,131 +73,54 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         next();
     }
 
-    // Asistan kaldığı yeri sorar
-    app.get('/api/sayim-fark/imlec', uye, async (req, res) => {
-        try {
-            const r = await pool.query(
-                'SELECT son_check_at, ilk_tarama_at FROM sayim_fark.imlec WHERE username = $1',
-                [req.auth.username]
-            );
-            const row = r.rows[0] || {};
-            res.json({ ok: true, sonCheckAt: row.son_check_at || null, ilkTarama: row.ilk_tarama_at || null });
-        } catch (e) { hata(res, e, 'imlec'); }
-    });
-
-    // Asistan taradığı farkları + yeni imleci yazar
-    // body: { farklar: [{checkId, urunId, urunAd, barkod, sistem, fiziksel, reasonTur, reasonAd, altKategori, sayimAt}], sonCheckAt, ilkTarama }
-    app.post('/api/sayim-fark', uye, async (req, res) => {
-        const b = req.body || {};
-        const gelen = Array.isArray(b.farklar) ? b.farklar : [];
-        if (gelen.length > AZAMI_SATIR) return res.status(400).json({ ok: false, error: 'cok_satir' });
-
-        const checkId = [], urunId = [], urunAd = [], barkod = [], sistem = [], fiziksel = [],
-            fark = [], sifir = [], reasonTur = [], reasonAd = [], altKat = [], sayimAt = [];
-        const gorulen = new Set();
-        for (const f of gelen) {
-            if (!f || typeof f !== 'object') continue;
-            const ci = metin(f.checkId, 40);
-            const ui = metin(f.urunId, 40);
-            if (!KIMLIK.test(ci) || !KIMLIK.test(ui)) continue;
-            const anahtar = ci + '|' + ui;
-            if (gorulen.has(anahtar)) continue;
-            gorulen.add(anahtar);
-            const sis = sayi(f.sistem);
-            const fiz = sayi(f.fiziksel);
-            const frk = sis !== null && fiz !== null ? fiz - sis : null;
-            checkId.push(ci);
-            urunId.push(ui);
-            urunAd.push(metin(f.urunAd, 200) || null);
-            barkod.push(metin(f.barkod, 32) || null);
-            sistem.push(sis);
-            fiziksel.push(fiz);
-            fark.push(frk);
-            sifir.push(fiz === 0 && sis !== null && sis > 0);
-            const rt = Number(f.reasonTur);
-            reasonTur.push(Number.isInteger(rt) && rt >= 0 && rt < 10000 ? rt : null);
-            reasonAd.push(metin(f.reasonAd, 120) || null);
-            altKat.push(metin(f.altKategori, 120) || null);
-            sayimAt.push(zaman(f.sayimAt));
-        }
-
-        const sonCheckAt = zaman(b.sonCheckAt);
-        const ilkTarama = b.ilkTarama === true;
-
-        const istemci = await pool.connect();
-        try {
-            await istemci.query('BEGIN');
-            if (urunId.length) {
-                await istemci.query(
-                    `INSERT INTO sayim_fark.farklar
-                        (username, check_id, urun_id, urun_ad, barkod, sistem, fiziksel, fark, sifir, reason_tur, reason_ad, alt_kategori, sayim_at)
-                     SELECT $1, * FROM unnest(
-                        $2::text[], $3::text[], $4::text[], $5::text[], $6::numeric[], $7::numeric[],
-                        $8::numeric[], $9::boolean[], $10::int[], $11::text[], $12::text[], $13::timestamptz[]
-                     ) AS t(check_id, urun_id, urun_ad, barkod, sistem, fiziksel, fark, sifir, reason_tur, reason_ad, alt_kategori, sayim_at)
-                     ON CONFLICT (username, check_id, urun_id) DO UPDATE SET
-                        urun_ad = EXCLUDED.urun_ad, barkod = EXCLUDED.barkod,
-                        sistem = EXCLUDED.sistem, fiziksel = EXCLUDED.fiziksel, fark = EXCLUDED.fark,
-                        sifir = EXCLUDED.sifir, reason_tur = EXCLUDED.reason_tur, reason_ad = EXCLUDED.reason_ad,
-                        alt_kategori = COALESCE(EXCLUDED.alt_kategori, sayim_fark.farklar.alt_kategori),
-                        sayim_at = EXCLUDED.sayim_at`,
-                    [req.auth.username, checkId, urunId, urunAd, barkod, sistem, fiziksel, fark, sifir, reasonTur, reasonAd, altKat, sayimAt]
-                );
-            }
-            // İmleç: yalnız ileri taşınır (geriye yazma, eşzamanlı tarama korunur)
-            await istemci.query(
-                `INSERT INTO sayim_fark.imlec (username, son_check_at, ilk_tarama_at, guncellendi_at)
-                 VALUES ($1, $2, CASE WHEN $3::boolean THEN now() ELSE NULL END, now())
-                 ON CONFLICT (username) DO UPDATE SET
-                    son_check_at = GREATEST(COALESCE(sayim_fark.imlec.son_check_at, 'epoch'::timestamptz), COALESCE(EXCLUDED.son_check_at, 'epoch'::timestamptz)),
-                    ilk_tarama_at = COALESCE(sayim_fark.imlec.ilk_tarama_at, EXCLUDED.ilk_tarama_at),
-                    guncellendi_at = now()`,
-                [req.auth.username, sonCheckAt, ilkTarama]
-            );
-            await istemci.query('COMMIT');
-            res.json({ ok: true, yazilan: urunId.length });
-        } catch (e) {
-            try { await istemci.query('ROLLBACK'); } catch (_) {}
-            hata(res, e, 'yaz');
-        } finally {
-            istemci.release();
-        }
-    });
-
-    // UI raporu: ürün başına son fark; fark olan ya da sıfırlanan ürünler
+    // Ürün başına son fark; fark olan ya da sıfırlanan ürünler, sıfır önce
     app.get('/api/sayim-fark/rapor', uye, async (req, res) => {
         const sadeceSifir = req.query.sifir === '1';
         try {
             const r = await pool.query(
-                `SELECT DISTINCT ON (urun_id)
-                    urun_id, urun_ad, barkod, sistem, fiziksel, fark, sifir, alt_kategori, reason_ad, sayim_at
-                 FROM sayim_fark.farklar
-                 WHERE username = $1 AND (sifir OR (fark IS NOT NULL AND fark <> 0))
-                 ORDER BY urun_id, sayim_at DESC NULLS LAST`,
+                `SELECT s.product_id, s.urun_adi, s.sistem, s.fiziksel, s.otomatik, s.sayim_at,
+                        (s.fiziksel - s.sistem) AS fark,
+                        (s.fiziksel = 0 AND s.sistem > 0) AS sifir,
+                        a.sifir_kez, a.sayim_kez
+                   FROM (
+                        SELECT DISTINCT ON (product_id)
+                               product_id, urun_adi, sistem, fiziksel, otomatik, sayim_at
+                          FROM public.sayim_gecmisi
+                         WHERE username = $1
+                         ORDER BY product_id, sayim_at DESC
+                   ) s
+                   JOIN (
+                        SELECT product_id,
+                               count(*) FILTER (WHERE fiziksel = 0 AND sistem > 0) AS sifir_kez,
+                               count(*) AS sayim_kez
+                          FROM public.sayim_gecmisi
+                         WHERE username = $1
+                         GROUP BY product_id
+                   ) a ON a.product_id = s.product_id
+                  WHERE (s.fiziksel - s.sistem) <> 0 OR (s.fiziksel = 0 AND s.sistem > 0)`,
                 [req.auth.username]
             );
             let satirlar = r.rows.map((x) => ({
-                urunId: x.urun_id,
-                ad: x.urun_ad,
-                barkod: x.barkod,
-                sistem: x.sistem === null ? null : Number(x.sistem),
-                fiziksel: x.fiziksel === null ? null : Number(x.fiziksel),
-                fark: x.fark === null ? null : Number(x.fark),
+                urunId: x.product_id,
+                ad: x.urun_adi,
+                sistem: Number(x.sistem),
+                fiziksel: Number(x.fiziksel),
+                fark: Number(x.fark),
                 sifir: x.sifir === true,
-                altKategori: x.alt_kategori,
-                reason: x.reason_ad,
+                otomatik: x.otomatik === true,
+                sifirKez: Number(x.sifir_kez) || 0,
+                sayimKez: Number(x.sayim_kez) || 0,
                 sayimAt: x.sayim_at,
             }));
             if (sadeceSifir) satirlar = satirlar.filter((s) => s.sifir);
-            // Sıfırlananlar önce, sonra farkı büyükten küçüğe
             satirlar.sort((a, b) =>
-                (b.sifir - a.sifir) || (Math.abs(b.fark || 0) - Math.abs(a.fark || 0))
+                (b.sifir - a.sifir) || (Math.abs(b.fark) - Math.abs(a.fark))
             );
             const ozet = {
                 urun: satirlar.length,
                 sifir: satirlar.filter((s) => s.sifir).length,
-                eksik: satirlar.filter((s) => (s.fark || 0) < 0).length,
-                fazla: satirlar.filter((s) => (s.fark || 0) > 0).length,
+                eksik: satirlar.filter((s) => s.fark < 0).length,
+                fazla: satirlar.filter((s) => s.fark > 0).length,
             };
             res.json({ ok: true, ozet, satirlar: satirlar.slice(0, 5000) });
         } catch (e) { hata(res, e, 'rapor'); }

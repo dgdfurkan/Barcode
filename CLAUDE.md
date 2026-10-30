@@ -166,6 +166,10 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
   alanından okunuyor (franchise sipariş detayı: `courier.courier`, `picking.picker`).
 - Performans raporu (DPS + kurye, Telegram Raporları > Performans): `vps-api/performans/` + `vps-api/telegram-ayar.js` +
   `server.js` VPS'e atılacak. Ayar `telegram_ayar.sql` ile kalıcı olur; çalışana kadar zamanlı gönderim ayarı saklanmaz, elle gönderim çalışır.
+- Sayım Farkı raporu (`/sifirlanan/`, Yardımcılar kartı): `vps-api/sayim-fark.js` VPS'e atılıp servis yeniden
+  başlatılacak (sunucudaki eski sürüm boş tablodan okuyor). Veri `public.sayim_gecmisi`'den, yani
+  `sayim_gecmisi_paylasim.sql` şart; çalışana kadar sayfa "sunucu güncellemesi bekleniyor" der.
+  `sql_files/sayim_fark.sql` ilk denemeden kalan boş `sayim_fark` şemasını siler (isteğe bağlı).
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.
