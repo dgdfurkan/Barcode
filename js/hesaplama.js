@@ -59,6 +59,7 @@
         yol: '<circle cx="5" cy="15" r="2"/><circle cx="15" cy="5" r="2"/><path d="M7 15h5.5a2.5 2.5 0 0 0 0-5h-5a2.5 2.5 0 0 1 0-5H13"/>',
         cuzdan: '<path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H15v3"/><rect x="3" y="7" width="14" height="9" rx="1.5"/><path d="M13.5 11.5h1"/>',
         bag: '<path d="M8.5 11.5a3 3 0 0 0 4.2.3l2.5-2.5a3 3 0 0 0-4.2-4.2l-.9.9"/><path d="M11.5 8.5a3 3 0 0 0-4.2-.3l-2.5 2.5a3 3 0 0 0 4.2 4.2l.9-.9"/>',
+        kilit: '<rect x="4.5" y="9" width="11" height="8.5" rx="2"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/>',
         tamam: '<path d="m5 10.5 3.5 3.5L15 7"/>',
         karistir: '<path d="M3 6h3.5l7 8H17M3 14h3.5l2-2.3M11.5 8.3l2-2.3H17"/><path d="m15 4 2 2-2 2M15 12l2 2-2 2"/>',
         not: '<circle cx="10" cy="8" r="4.5"/><path d="m7.5 11.8-1.2 5.2L10 15.3l3.7 1.7-1.2-5.2"/>',
@@ -369,7 +370,7 @@
     // Çizim
     // ------------------------------------------------------------------
 
-    function bolum(id) { ['hsGiris', 'hsYetkiYok', 'hsIcerik'].forEach(function (x) { el(x).hidden = x !== id; }); }
+    function bolum(id) { ['hsGiris', 'hsYetkiYok', 'hsKilit', 'hsIcerik'].forEach(function (x) { el(x).hidden = x !== id; }); }
 
     function donemCiz() {
         var r = aralik(d.ay);
@@ -559,6 +560,234 @@
     function hepsiniCiz() { donemCiz(); durumCiz(); listeCiz(); ozetCiz(); }
 
     // ------------------------------------------------------------------
+    // Kilit: her açılışta şifre (yalnız bu cihazda)
+    // ------------------------------------------------------------------
+    /*
+     * İlk girişte şifre sorulmaz, belirlenir; yanında bir hafıza kartı seçilir.
+     * Şifre unutulursa doğru kart seçilince yeni şifre yazılır. Şifrenin kendisi
+     * saklanmaz: PBKDF2 (SHA-256, 120 bin tur) özeti ve tuzu localStorage'da.
+     * Bu bir cihaz kilidi; sunucuya hiçbir şey gitmez.
+     */
+    var KARTLAR = [
+        { k: 'motor', ad: 'Motor', renk: '#2563eb', zemin: '#eff4ff', yol: '<circle cx="6" cy="16.5" r="3"/><circle cx="18" cy="16.5" r="3"/><path d="M6 16.5h5.5l3.5-6H18l-3 6M12.5 6.5H15l1.2 4"/>' },
+        { k: 'kahve', ad: 'Kahve', renk: '#92400e', zemin: '#fdf3e7', yol: '<path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M9 3.5c-.8 1 .8 2 0 3M12.5 3.5c-.8 1 .8 2 0 3"/>' },
+        { k: 'yildiz', ad: 'Yıldız', renk: '#d97706', zemin: '#fff7e6', yol: '<path d="m12 3.5 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/>' },
+        { k: 'ev', ad: 'Ev', renk: '#0e9f6e', zemin: '#ecfdf5', yol: '<path d="M4 11 12 4l8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/>' },
+        { k: 'kalp', ad: 'Kalp', renk: '#d92d20', zemin: '#fef3f2', yol: '<path d="M12 19.5s-7.5-4.4-7.5-10a4.2 4.2 0 0 1 7.5-2.6 4.2 4.2 0 0 1 7.5 2.6c0 5.6-7.5 10-7.5 10z"/>' },
+        { k: 'anahtar', ad: 'Anahtar', renk: '#7c3aed', zemin: '#f4f0ff', yol: '<circle cx="8" cy="12" r="4"/><path d="M12 12h8.5M17.5 12v3M20.5 12v2"/>' },
+        { k: 'agac', ad: 'Ağaç', renk: '#047857', zemin: '#ecfdf3', yol: '<path d="M12 3.5 6 12h3l-3.5 5h13L15 12h3z"/><path d="M12 17v3.5"/>' },
+        { k: 'balik', ad: 'Balık', renk: '#0891b2', zemin: '#ecfeff', yol: '<path d="M3.5 12c2.5-3.8 6-5.5 9.5-5.5 3 0 5.5 2 7 5.5-1.5 3.5-4 5.5-7 5.5-3.5 0-7-1.7-9.5-5.5z"/><path d="M3.5 12 1.8 9M3.5 12l-1.7 3"/><circle cx="16" cy="11" r="0.9"/>' },
+        { k: 'ay', ad: 'Ay', renk: '#334155', zemin: '#f1f5f9', yol: '<path d="M19 14.5A7.5 7.5 0 1 1 9.5 5a6 6 0 0 0 9.5 9.5z"/>' }
+    ];
+    var KILIT_IKON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><path d="M12 14.5v2.5"/></svg>';
+    var EN_AZ_SIFRE = 4;
+    var YANLIS_KART_SINIRI = 3;
+    var kilitCoz = null;
+    var kilitMod = '';
+    var kartSecim = '';
+
+    function kilitAnahtari() { return 'jb_hesaplama_kilit:' + (d.kim || 'misafir'); }
+    function kilitOku() {
+        var o = null;
+        try { o = JSON.parse(localStorage.getItem(kilitAnahtari()) || 'null'); } catch (e) { o = null; }
+        return o && o.ozet && o.tuz && o.kart ? o : null;
+    }
+    function kilitYaz(o) {
+        try { localStorage.setItem(kilitAnahtari(), JSON.stringify(o)); return true; }
+        catch (e) { bildir('Şifre kaydedilemedi: tarayıcı belleği dolu', 'hata'); return false; }
+    }
+
+    function onaltilik(tampon) {
+        return Array.prototype.map.call(new Uint8Array(tampon), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    }
+    async function sifreOzeti(sifre, tuz) {
+        var kod = new TextEncoder();
+        var anahtar = await crypto.subtle.importKey('raw', kod.encode(sifre), 'PBKDF2', false, ['deriveBits']);
+        var bit = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: kod.encode(tuz), iterations: 120000, hash: 'SHA-256' }, anahtar, 256);
+        return onaltilik(bit);
+    }
+    function yeniTuz() { var a = new Uint8Array(16); crypto.getRandomValues(a); return onaltilik(a.buffer); }
+
+    async function sifreKaydet(sifre, kart) {
+        var tuz = yeniTuz();
+        return kilitYaz({ s: 1, tuz: tuz, ozet: await sifreOzeti(sifre, tuz), kart: kart });
+    }
+    async function sifreDogruMu(sifre) {
+        var k = kilitOku();
+        return !!k && (await sifreOzeti(sifre, k.tuz)) === k.ozet;
+    }
+
+    function kartHtml(secili, karisik) {
+        var liste = KARTLAR.slice();
+        if (karisik) for (var i = liste.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = liste[i]; liste[i] = liste[j]; liste[j] = t; }
+        return '<div class="hs-kartlar" role="radiogroup" aria-label="Hafıza kartı">' + liste.map(function (x) {
+            return '<button type="button" role="radio" class="hs-kartim" data-kart="' + x.k + '" aria-checked="' + (secili === x.k) + '" style="--k-renk:' + x.renk + ';--k-zemin:' + x.zemin + '">' +
+                '<svg viewBox="0 0 24 24" aria-hidden="true">' + x.yol + '</svg><span>' + x.ad + '</span></button>';
+        }).join('') + '</div>';
+    }
+
+    function sifreAlanlari(ikinci) {
+        return '<label class="hs-sifre"><input type="password" data-sifre="1" autocomplete="new-password" placeholder="' + (ikinci ? 'Yeni şifre' : 'Şifre') + '" aria-label="Şifre" minlength="' + EN_AZ_SIFRE + '" maxlength="64"></label>' +
+            '<label class="hs-sifre"><input type="password" data-sifre="2" autocomplete="new-password" placeholder="Şifre tekrar" aria-label="Şifre tekrar" maxlength="64"></label>';
+    }
+
+    function kilitCiz(mod, mesaj) {
+        kilitMod = mod;
+        var k = el('hsKilitKart');
+        var kayitli = kilitOku();
+        var bekleme = kayitli && kayitli.kilitKadar && kayitli.kilitKadar > Date.now() ? Math.ceil((kayitli.kilitKadar - Date.now()) / 1000) : 0;
+        var hata = '<p class="hs-kilit__hata" data-hata>' + kacir(mesaj || '') + '</p>';
+        if (mod === 'ac') {
+            k.innerHTML = '<span class="hs-kilit__im">' + KILIT_IKON + '</span>' +
+                '<h1>Hesaplama Kilitli</h1><p>Devam etmek için şifreni gir.</p>' +
+                '<form class="hs-kilit__form" data-form="ac" novalidate>' +
+                    '<label class="hs-sifre"><input type="password" data-sifre="ac" autocomplete="current-password" placeholder="Şifre" aria-label="Şifre" maxlength="64"></label>' +
+                    hata + '<button type="submit" class="hs-dugme hs-dugme--ana hs-dugme--tam">Aç</button>' +
+                '</form>' +
+                '<button type="button" class="hs-kilit__bag" data-mod="unuttum">Şifremi Unuttum</button>';
+        } else if (mod === 'kur' || mod === 'yeni') {
+            kartSecim = mod === 'yeni' && kayitli ? kayitli.kart : '';
+            k.innerHTML = '<span class="hs-kilit__im">' + KILIT_IKON + '</span>' +
+                '<h1>' + (mod === 'kur' ? 'Şifre Belirle' : 'Yeni Şifre') + '</h1>' +
+                '<p>' + (mod === 'kur' ? 'Hesaplama bundan sonra her açılışta bu şifreyi sorar. Şifre yalnız bu cihazda tutulur.' : 'Hafıza kartın doğru. Yeni şifreni yaz.') + '</p>' +
+                '<form class="hs-kilit__form" data-form="' + mod + '" novalidate>' + sifreAlanlari(mod === 'yeni') +
+                    (mod === 'kur' ? '<div class="hs-kilit__kart"><b>Hafıza Kartı</b><small>Şifreni unutursan bu kartı seçerek sıfırlarsın. Aklında kalacak birini seç.</small>' + kartHtml('', false) + '</div>' : '') +
+                    hata + '<button type="submit" class="hs-dugme hs-dugme--ana hs-dugme--tam">' + (mod === 'kur' ? 'Kaydet ve Aç' : 'Şifreyi Kaydet') + '</button>' +
+                '</form>';
+        } else {
+            k.innerHTML = '<span class="hs-kilit__im hs-kilit__im--sari">' + KILIT_IKON + '</span>' +
+                '<h1>Hafıza Kartın Hangisi?</h1><p>Şifreyi belirlerken seçtiğin kartı bul. Doğru kartla yeni şifre yazarsın.</p>' +
+                (bekleme ? '<p class="hs-kilit__hata">Çok fazla yanlış deneme. ' + bekleme + ' sn sonra tekrar dene.</p>' : kartHtml('', true) + hata) +
+                '<button type="button" class="hs-kilit__bag" data-mod="ac">Şifreyi Hatırladım</button>';
+            if (bekleme) setTimeout(function () { if (kilitMod === 'unuttum') kilitCiz('unuttum'); }, Math.min(bekleme, 60) * 1000);
+        }
+        var ilk = k.querySelector('input');
+        if (ilk) ilk.focus();
+    }
+
+    function hataYaz(m) {
+        var h = el('hsKilitKart').querySelector('[data-hata]');
+        if (!h) return;
+        h.textContent = m;
+        var kart = el('hsKilitKart');
+        kart.classList.remove('is-salla');
+        void kart.offsetWidth;
+        kart.classList.add('is-salla');
+    }
+
+    function yeniSifreOku(kap) {
+        var a = kap.querySelector('[data-sifre="1"]').value;
+        var b = kap.querySelector('[data-sifre="2"]').value;
+        if (a.length < EN_AZ_SIFRE) return { hata: 'Şifre en az ' + EN_AZ_SIFRE + ' karakter olmalı.' };
+        if (a !== b) return { hata: 'İki şifre aynı değil.' };
+        return { sifre: a };
+    }
+
+    function kilitAcildi() {
+        var c = kilitCoz;
+        kilitCoz = null;
+        el('hsKilitKart').innerHTML = '';
+        if (c) c();
+    }
+
+    function kilitOlaylari() {
+        var k = el('hsKilitKart');
+        k.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-mod]');
+            if (b) { kilitCiz(b.getAttribute('data-mod')); return; }
+            var kart = e.target.closest('[data-kart]');
+            if (!kart) return;
+            if (kilitMod === 'kur') {
+                kartSecim = kart.getAttribute('data-kart');
+                k.querySelectorAll('[data-kart]').forEach(function (x) { x.setAttribute('aria-checked', String(x === kart)); });
+                return;
+            }
+            if (kilitMod !== 'unuttum') return;
+            var kayitli = kilitOku();
+            if (!kayitli) { kilitCiz('kur'); return; }
+            if (kart.getAttribute('data-kart') === kayitli.kart) {
+                delete kayitli.yanlis; delete kayitli.kilitKadar;
+                kilitYaz(kayitli);
+                kilitCiz('yeni');
+                return;
+            }
+            kayitli.yanlis = (kayitli.yanlis || 0) + 1;
+            if (kayitli.yanlis >= YANLIS_KART_SINIRI) { kayitli.yanlis = 0; kayitli.kilitKadar = Date.now() + 60000; }
+            kilitYaz(kayitli);
+            if (kayitli.kilitKadar && kayitli.kilitKadar > Date.now()) kilitCiz('unuttum');
+            else hataYaz('Bu kart değil. ' + (YANLIS_KART_SINIRI - kayitli.yanlis) + ' deneme hakkın kaldı.');
+        });
+        k.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            var form = e.target;
+            var tur = form.getAttribute('data-form');
+            var dugme = form.querySelector('[type="submit"]');
+            dugme.disabled = true;
+            try {
+                if (tur === 'ac') {
+                    var g = form.querySelector('[data-sifre="ac"]');
+                    if (!g.value) { hataYaz('Şifreni yaz.'); return; }
+                    if (await sifreDogruMu(g.value)) { kilitAcildi(); return; }
+                    g.value = '';
+                    g.focus();
+                    hataYaz('Şifre yanlış.');
+                    return;
+                }
+                var y = yeniSifreOku(form);
+                if (y.hata) { hataYaz(y.hata); return; }
+                if (tur === 'kur' && !kartSecim) { hataYaz('Bir hafıza kartı seç.'); return; }
+                var kart = tur === 'kur' ? kartSecim : (kilitOku() || {}).kart || kartSecim;
+                if (await sifreKaydet(y.sifre, kart)) {
+                    bildir(tur === 'kur' ? 'Şifre belirlendi' : 'Yeni şifre kaydedildi', 'basari');
+                    kilitAcildi();
+                }
+            } finally {
+                if (dugme.isConnected) dugme.disabled = false;
+            }
+        });
+    }
+
+    function kilitIste() {
+        return new Promise(function (coz) {
+            kilitCoz = coz;
+            bolum('hsKilit');
+            kilitOlaylari();
+            if (!(global.crypto && crypto.subtle)) {
+                /* Güvenli bağlam yoksa (http) özet alınamaz; kilit kurulamaz */
+                el('hsKilitKart').innerHTML = '<span class="hs-kilit__im hs-kilit__im--sari">' + KILIT_IKON + '</span><h1>Kilit kullanılamıyor</h1><p>Tarayıcı bu adreste şifreleme izni vermiyor. Siteyi https ile aç.</p>';
+                return;
+            }
+            kilitCiz(kilitOku() ? 'ac' : 'kur');
+        });
+    }
+
+    /* Ayarlar > Şifreyi Değiştir (kutu) */
+    function sifreKutusuHtml() {
+        var kayitli = kilitOku();
+        kartSecim = kayitli ? kayitli.kart : '';
+        return '<form class="hs-kilit__form" data-form="degis" novalidate>' +
+            '<label class="hs-sifre"><input type="password" data-sifre="eski" autocomplete="current-password" placeholder="Şu anki şifre" aria-label="Şu anki şifre" maxlength="64"></label>' +
+            sifreAlanlari(true) +
+            '<div class="hs-kilit__kart"><b>Hafıza Kartı</b><small>İstersen kartını da değiştir.</small>' + kartHtml(kartSecim, false) + '</div>' +
+            '<p class="hs-kilit__hata" data-kutu-hata></p>' +
+            '<div class="hs-pano__alt"><button type="button" class="hs-dugme" data-kapat>Vazgeç</button><button type="submit" class="hs-dugme hs-dugme--ana">Kaydet</button></div>' +
+            '</form>';
+    }
+
+    async function sifreDegistir(form) {
+        var h = form.querySelector('[data-kutu-hata]');
+        var yaz = function (m) { h.textContent = m; };
+        var eski = form.querySelector('[data-sifre="eski"]').value;
+        if (!(await sifreDogruMu(eski))) { yaz('Şu anki şifre yanlış.'); return; }
+        var y = yeniSifreOku(form);
+        if (y.hata) { yaz(y.hata); return; }
+        if (await sifreKaydet(y.sifre, kartSecim || (kilitOku() || {}).kart)) {
+            kutuKapat();
+            bildir('Şifre değiştirildi', 'basari');
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Fiyatlar paneli
     // ------------------------------------------------------------------
 
@@ -586,19 +815,21 @@
                 TURLER.map(function (t) {
                     return '<button type="button" class="hs-secim" data-tur-gizle="' + t.k + '" aria-pressed="' + !kayit.gizli[t.k] + '">' + ikon(t.ikon) + kacir(t.ad) + '</button>';
                 }).join('') + '</div></div>' +
+            '<div class="hs-pano__satir"><span class="hs-pano__ad"><b>' + ikon('kilit') + 'Şifre</b><small>Hesaplama her açılışta şifre sorar. Şifre ve hafıza kartı yalnız bu cihazda.</small></span>' +
+                '<button type="button" class="hs-dugme" data-sifre-degis>' + ikon('kilit') + '<span>Şifreyi Değiştir</span></button></div>' +
             '<div class="hs-pano__alt"><button type="button" class="hs-dugme" data-fiyat-kopyala>' + ikon('katman') + '<span>' + (arac === 'car' ? 'Motorlu fiyatlarını buraya kopyala' : 'Bu fiyatları Arabalıya kopyala') + '</span></button></div>';
     }
 
     function fiyatAc() {
         fiyatCiz();
         el('hsFiyat').hidden = false;
-        document.body.classList.add('hs-kilit');
+        document.body.classList.add('hs-kaydirma-yok');
         var ilk = el('hsFiyatGovde').querySelector('input');
         if (ilk && matchMedia('(pointer: fine)').matches) ilk.focus();
     }
     function fiyatKapat() {
         el('hsFiyat').hidden = true;
-        document.body.classList.remove('hs-kilit');
+        document.body.classList.remove('hs-kaydirma-yok');
         kaydet(true);
         listeCiz();
         ozetCiz();
@@ -625,18 +856,24 @@
         kutuDurum = { tur: tur, id: id };
         kutuCiz();
         el('hsKutu').hidden = false;
-        document.body.classList.add('hs-kilit');
+        document.body.classList.add('hs-kaydirma-yok');
         var g = el('hsKutuGovde').querySelector('input');
         if (g && matchMedia('(pointer: fine)').matches) g.focus();
     }
     function kutuKapat() {
         el('hsKutu').hidden = true;
-        document.body.classList.remove('hs-kilit');
+        document.body.classList.remove('hs-kaydirma-yok');
         kutuDurum = null;
     }
 
     function kutuCiz() {
         if (!kutuDurum) return;
+        if (kutuDurum.tur === 'sifre') {
+            el('hsKutuBaslik').textContent = 'Şifreyi Değiştir';
+            el('hsKutuAlt').textContent = 'Önce şu anki şifreni yaz.';
+            el('hsKutuGovde').innerHTML = sifreKutusuHtml();
+            return;
+        }
         if (kutuDurum.tur === 'sifirla') {
             el('hsKutuBaslik').textContent = 'Sıfırla';
             el('hsKutuAlt').textContent = ayAdi(d.ay) + ' için neyin silineceğini seç. Fiyatlar ve araç ayarları değişmez.';
@@ -842,6 +1079,11 @@
             if (e.target === kutu || e.target.closest('[data-kapat]')) { kutuKapat(); return; }
             if (!kutuDurum) return;
             var b;
+            if (kutuDurum.tur === 'sifre' && (b = e.target.closest('[data-kart]'))) {
+                kartSecim = b.getAttribute('data-kart');
+                kutu.querySelectorAll('[data-kart]').forEach(function (x) { x.setAttribute('aria-checked', String(x === b)); });
+                return;
+            }
             if ((b = e.target.closest('[data-sifir]'))) {
                 var sk = b.getAttribute('data-sifir');
                 sifirSecim[sk] = !sifirSecim[sk];
@@ -863,6 +1105,10 @@
                 kaydet(); kutuCiz(); listeCiz(); ozetCiz();
             }
         });
+        kutu.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (e.target.getAttribute('data-form') === 'degis') sifreDegistir(e.target);
+        });
         kutu.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && e.target.matches('[data-avans-tutar], [data-avans-not]')) { e.preventDefault(); avansEkle(); }
         });
@@ -876,6 +1122,7 @@
         perde.addEventListener('click', function (e) {
             if (e.target === perde || e.target.closest('[data-kapat]')) { fiyatKapat(); return; }
             var b;
+            if (e.target.closest('[data-sifre-degis]')) { fiyatKapat(); kutuAc('sifre', null); return; }
             if ((b = e.target.closest('[data-fiyat-arac]'))) { d.fiyatArac = b.getAttribute('data-fiyat-arac'); fiyatCiz(); return; }
             if ((b = e.target.closest('[data-tur-gizle]'))) {
                 var k = b.getAttribute('data-tur-gizle');
@@ -989,13 +1236,17 @@
         var ad = el('headerUserName');
         if (ad) ad.textContent = o.username;
 
+        /* Kilit ilk karede; haklar arkada yükleniyor */
+        var haklar = haklariYukle();
+        await kilitIste();
+
         kayit = kayitOku();
         veriOku();
         d.ay = varsayilanAy();
         bolum('hsIcerik');
         hepsiniCiz();
 
-        var p = await haklariYukle();
+        var p = await haklar;
         if (!d.ornek && !(p && p.checkPremiumFeature(HAK))) { bolum('hsYetkiYok'); return; }
         olaylar();
         yukle(false);

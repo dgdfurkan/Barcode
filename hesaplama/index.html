@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="../css/siparisler.css?v=20261031a" />
     <link rel="stylesheet" href="../css/yardimcilar.css?v=20261022b" />
     <link rel="stylesheet" href="../css/urun-foto.css?v=20261018a" />
-    <link rel="stylesheet" href="../css/hesaplama.css?v=20261031c" />
+    <link rel="stylesheet" href="../css/hesaplama.css?v=20261031d" />
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20261014a"></script>
@@ -64,6 +64,10 @@
             </div>
         </div>
 
+        <div id="hsKilit" class="sip-icerik" hidden>
+            <section class="hs-kilit" id="hsKilitKart" aria-live="polite"></section>
+        </div>
+
         <div id="hsIcerik" class="sip-icerik" hidden>
             <section class="hs-bas">
                 <div class="yrd-baslik">
@@ -78,7 +82,7 @@
                         <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="7" width="9.5" height="9.5" rx="2"/><path d="M13 7V5.5a2 2 0 0 0-2-2H5.5a2 2 0 0 0-2 2V11a2 2 0 0 0 2 2H7"/></svg><span>Özeti Kopyala</span>
                     </button>
                     <button type="button" class="hs-dugme hs-dugme--ana" id="hsFiyatAc">
-                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h8M15 5h1M4 10h2M9 10h7M4 15h6M13 15h3"/><circle cx="13.5" cy="5" r="1.5"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="11.5" cy="15" r="1.5"/></svg><span>Fiyatlar</span>
+                        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h8M15 5h1M4 10h2M9 10h7M4 15h6M13 15h3"/><circle cx="13.5" cy="5" r="1.5"/><circle cx="7.5" cy="10" r="1.5"/><circle cx="11.5" cy="15" r="1.5"/></svg><span>Ayarlar</span>
                     </button>
                 </div>
             </section>
@@ -120,7 +124,7 @@
     <div class="hs-perde" id="hsFiyat" hidden>
         <div class="hs-pano" role="dialog" aria-modal="true" aria-labelledby="hsFiyatBaslik">
             <div class="hs-pano__bas">
-                <div><h2 id="hsFiyatBaslik">Fiyatlar</h2><p>Not ve araca göre paket başı ücret, km desteği. Değişiklik anında hesaba yansır.</p></div>
+                <div><h2 id="hsFiyatBaslik">Ayarlar</h2><p>Not ve araca göre paket başı ücret, km desteği ve şifre. Fiyat değişikliği anında hesaba yansır.</p></div>
                 <button type="button" class="hs-kapat" data-kapat aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
             </div>
             <div class="hs-pano__govde" id="hsFiyatGovde"></div>
@@ -138,6 +142,6 @@
     </div>
 
     <script src="../js/urun-foto.js?v=20261018a"></script>
-    <script src="../js/hesaplama.js?v=20261031c"></script>
+    <script src="../js/hesaplama.js?v=20261031d"></script>
 </body>
 </html>
