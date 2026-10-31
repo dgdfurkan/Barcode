@@ -58,7 +58,6 @@
         araba: '<path d="M3 13V10l1.8-4h10.4L17 10v3z"/><path d="M3 10h14"/><circle cx="6" cy="14" r="1.6"/><circle cx="14" cy="14" r="1.6"/>',
         yol: '<circle cx="5" cy="15" r="2"/><circle cx="15" cy="5" r="2"/><path d="M7 15h5.5a2.5 2.5 0 0 0 0-5h-5a2.5 2.5 0 0 1 0-5H13"/>',
         cuzdan: '<path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H15v3"/><rect x="3" y="7" width="14" height="9" rx="1.5"/><path d="M13.5 11.5h1"/>',
-        bag: '<path d="M8.5 11.5a3 3 0 0 0 4.2.3l2.5-2.5a3 3 0 0 0-4.2-4.2l-.9.9"/><path d="M11.5 8.5a3 3 0 0 0-4.2-.3l-2.5 2.5a3 3 0 0 0 4.2 4.2l.9-.9"/>',
         kilit: '<rect x="4.5" y="9" width="11" height="8.5" rx="2"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/>',
         tamam: '<path d="m5 10.5 3.5 3.5L15 7"/>',
         karistir: '<path d="M3 6h3.5l7 8H17M3 14h3.5l2-2.3M11.5 8.3l2-2.3H17"/><path d="m15 4 2 2-2 2M15 12l2 2-2 2"/>',
@@ -84,6 +83,7 @@
         ara: '',
         sira: 'ad',
         fiyatArac: 'moto',
+        acik: {},              // kurye id → başka hesap satırı açık mı
         ornek: /[?&]ornek\b/.test(location.search)
     };
     var kayit = null;
@@ -153,11 +153,10 @@
     function ayKaydi(yaz) {
         var a = kayit.ay[d.ay];
         if (!a) {
-            if (!yaz) return { k: {}, bagli: {} };
-            a = kayit.ay[d.ay] = { k: {}, bagli: {} };
+            if (!yaz) return { k: {} };
+            a = kayit.ay[d.ay] = { k: {} };
         }
         a.k = nesne(a.k);
-        a.bagli = nesne(a.bagli);
         return a;
     }
     function kuryeAyi(id, yaz) {
@@ -315,16 +314,16 @@
         var s = a.k[k.id] || {};
         var kalici = kayit.kurye[k.id] || {};
         var arac = kalici.arac === 'car' ? 'car' : 'moto';
-        var bagli = veri.kuryeler.filter(function (x) { return a.bagli[x.id] === k.id; });
         var not = (s.not && notListesi().indexOf(s.not) !== -1) ? s.not : k.not;
         var tablo = nesne(nesne(kayit.fiyat[arac])[not]);
 
-        var paket = 0, paketTutar = 0;
+        var paket = 0, paketTutar = 0, digerToplam = 0;
         var satirlar = gorunenTurler().map(function (t) {
             var kendi = k.say[t.k] || 0;
-            var diger = bagli.reduce(function (t2, b) { return t2 + (b.say[t.k] || 0); }, 0);
+            var diger = Math.max(0, Math.round(num(nesne(s.diger)[t.k])));
             var ek = Math.round(num(nesne(s.ek)[t.k]));
-            var toplam = Math.max(0, kendi + diger + ek);
+            var toplam = Math.max(0, kendi + ek) + diger;
+            digerToplam += diger;
             var fiyat = num(tablo[t.k]);
             var tutar = toplam * fiyat;
             paket += toplam;
@@ -332,7 +331,7 @@
             return { t: t, kendi: kendi, diger: diger, ek: ek, toplam: toplam, fiyat: fiyat, tutar: tutar };
         });
 
-        var g10 = Math.round((k.km + bagli.reduce(function (t2, b) { return t2 + b.km; }, 0)) * 10) / 10;
+        var g10 = Math.round(k.km * 10) / 10;
         var kmDestek = !!kalici.km;
         var elleKm = s.km != null && s.km !== '';
         var km = kmDestek ? (elleKm ? num(s.km) : g10) : 0;
@@ -343,20 +342,14 @@
         var avans = avanslar.reduce(function (t2, x) { return t2 + num(x && x.tutar); }, 0);
         var brut = paketTutar + kmTutar;
         return {
-            arac: arac, not: not, yukseltildi: !!(s.not && s.not !== k.not && not === s.not), bagli: bagli,
+            arac: arac, not: not, yukseltildi: !!(s.not && s.not !== k.not && not === s.not), diger: digerToplam,
             satirlar: satirlar, paket: paket, paketTutar: paketTutar,
             g10: g10, kmDestek: kmDestek, elleKm: elleKm, km: km, kmFiyat: kmFiyat, kmTutar: kmTutar,
             avanslar: avanslar, avans: avans, brut: brut, net: brut - avans
         };
     }
 
-    function anaKuryeler(veri) {
-        var a = ayKaydi(false);
-        var idler = {};
-        veri.kuryeler.forEach(function (k) { idler[k.id] = true; });
-        /* Ana kurye bu ay listede yoksa bağ geçersiz, satır yine görünsün */
-        return veri.kuryeler.filter(function (k) { return !(a.bagli[k.id] && idler[a.bagli[k.id]] && a.bagli[k.id] !== k.id); });
-    }
+    function anaKuryeler(veri) { return veri.kuryeler; }
 
     function fiyatVarMi() {
         if (ARACLAR.some(function (a) { return num(kayit.km[a.k]) > 0; })) return true;
@@ -469,18 +462,24 @@
             ? '<img class="hs-av" src="' + kacir(k.foto) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{className:\'hs-av hs-av--bas\',textContent:' + kacir(JSON.stringify(bas(k.ad))) + '}))">'
             : '<span class="hs-av hs-av--bas">' + kacir(bas(k.ad)) + '</span>';
         var arac = ARACLAR.filter(function (a) { return a.k === h.arac; })[0];
+        /* Başka hesap satırı: elle açılır, sayı girilmişse kendiliğinden açık */
+        var acik = d.acik[k.id] != null ? d.acik[k.id] : h.diger > 0;
         var kurye = '<td class="hs-t__kurye"><div class="hs-kurye">' + foto +
             '<div class="hs-kurye__ad"><strong title="' + kacir(k.ad) + '">' + kacir(k.ad) + '</strong><span class="hs-kurye__araclar">' +
                 '<button type="button" class="hs-mini" data-arac-degis title="' + arac.ad + ' · değiştirmek için dokun" aria-label="Araç: ' + arac.ad + '">' + ikon(arac.ikon) + '</button>' +
-                '<button type="button" class="hs-mini' + (h.bagli.length ? ' is-on' : '') + '" data-bagla-ac title="Başka hesap bağla" aria-label="Başka hesap">' + ikon('karistir') + (h.bagli.length ? '<b>' + h.bagli.length + '</b>' : '') + '</button>' +
+                '<button type="button" class="hs-mini' + (acik || h.diger ? ' is-on' : '') + '" data-diger-ac aria-pressed="' + acik + '" title="Başka hesaptan çıkan paketler" aria-label="Başka hesap">' + ikon('karistir') + (!acik && h.diger ? '<b>' + adet(h.diger) + '</b>' : '') + '</button>' +
             '</span></div></div></td>';
 
         var hucreler = h.satirlar.map(function (r) {
             var elle = r.ek !== 0;
-            var baslik = (r.t.alan ? 'Panel ' + adet(r.kendi) : 'Panel vermiyor') + (r.diger ? ' · bağlı hesap ' + adet(r.diger) : '') + (elle ? ' · elle ' + (r.ek > 0 ? '+' : '') + r.ek : '');
+            var kendi = Math.max(0, r.kendi + r.ek);
+            var baslik = (r.t.alan ? 'Panel ' + adet(r.kendi) : 'Panel vermiyor') + (elle ? ' · elle ' + (r.ek > 0 ? '+' : '') + r.ek : '');
             return '<td><div class="hs-hucre">' +
-                '<input class="hs-sayi' + (elle ? ' is-elle' : '') + (r.diger ? ' is-bagli' : '') + '" type="text" inputmode="numeric" data-say="' + r.t.k + '" value="' + (r.toplam || (r.t.alan ? 0 : '')) + '" placeholder="–" title="' + kacir(baslik) + '" aria-label="' + kacir(k.ad + ' ' + r.t.ad) + '">' +
-                '<small data-o="f-' + r.t.k + '">' + fiyatYazi(r.fiyat) + '</small></div></td>';
+                '<input class="hs-sayi' + (elle ? ' is-elle' : '') + '" type="text" inputmode="numeric" data-say="' + r.t.k + '" value="' + (kendi || (r.t.alan ? 0 : '')) + '" placeholder="–" title="' + kacir(baslik) + '" aria-label="' + kacir(k.ad + ' ' + r.t.ad) + '">' +
+                '<small data-o="f-' + r.t.k + '">' + fiyatYazi(r.fiyat) + '</small>' +
+                (acik ? '<label class="hs-diger" title="Başka hesaptan çıkan ' + kacir(r.t.ad) + '">' + ikon('karistir') +
+                    '<input class="hs-sayi hs-sayi--diger" type="text" inputmode="numeric" data-diger="' + r.t.k + '" value="' + (r.diger || '') + '" placeholder="–" aria-label="' + kacir(k.ad + ' başka hesap ' + r.t.ad) + '"></label>' : '') +
+                '</div></td>';
         }).join('');
 
         var kmDeger = h.kmDestek ? (h.elleKm ? s.km : String(h.g10).replace('.', ',')) : '';
@@ -511,18 +510,17 @@
         var ayak = el('hsListe').querySelector('tfoot');
         if (!v || !ayak) return;
         var turler = gorunenTurler();
-        var t = { say: {}, km: 0, kmTutar: 0, avans: 0, net: 0, paket: 0, kurye: 0 };
+        var t = { say: {}, km: 0, paket: 0, kurye: 0 };
         turler.forEach(function (x) { t.say[x.k] = 0; });
         anaKuryeler(v).forEach(function (k) {
             var h = hesapla(k, v);
             h.satirlar.forEach(function (r) { t.say[r.t.k] += r.toplam; });
-            t.km += h.km; t.kmTutar += h.kmTutar; t.avans += h.avans; t.net += h.net; t.paket += h.paket; t.kurye++;
+            t.km += h.km; t.paket += h.paket; t.kurye++;
         });
         ayak.innerHTML = '<tr><td class="hs-t__kurye"><div class="hs-hucre hs-hucre--sol"><strong>Toplam</strong><small>' + t.kurye + ' kurye</small></div></td>' +
             turler.map(function (x) { return '<td><div class="hs-hucre"><strong>' + adet(t.say[x.k]) + '</strong><small>&nbsp;</small></div></td>'; }).join('') +
-            '<td><div class="hs-hucre"><strong>' + para(t.kmTutar) + '</strong><small>' + adet(t.km) + ' km</small></div></td>' +
-            '<td><div class="hs-hucre"><strong class="' + (t.avans ? 'eksi' : '') + '">' + (t.avans ? '−' : '') + para(t.avans) + '</strong><small>&nbsp;</small></div></td>' +
-            '<td class="hs-t__toplam"><div class="hs-hucre"><strong>' + para(t.net) + '</strong><small>' + adet(t.paket) + ' paket</small></div></td><td></td></tr>';
+            '<td><div class="hs-hucre"><strong>' + adet(t.km) + '</strong><small>km</small></div></td><td></td>' +
+            '<td class="hs-t__toplam"><div class="hs-hucre"><strong>' + adet(t.paket) + '</strong><small>paket</small></div></td><td></td></tr>';
     }
 
     function kuryeBul(id) {
@@ -839,14 +837,14 @@
     // Avans ve başka hesap kutusu
     // ------------------------------------------------------------------
 
-    var kutuDurum = null;   // { tur: 'avans' | 'bagla' | 'sifirla', id }
+    var kutuDurum = null;   // { tur: 'avans' | 'sifirla' | 'sifre', id }
 
     /* Sıfırla: seçilen ayın girdileri. Fiyatlar ayrı (Fiyatlar penceresinde). */
     var SIFIR_SECENEK = [
         { k: 'ek', ikon: 'kutu', ad: 'Paket düzeltmeleri', not: 'Hücreye elle yazılan sayılar panel değerine döner', acik: true },
         { k: 'not', ikon: 'not', ad: 'Not değişiklikleri', not: 'Yükseltilen ya da düşürülen notlar panel notuna döner', acik: true },
         { k: 'km', ikon: 'yol', ad: 'Elle yazılan km', not: 'Km desteği açık kuryelerde G10 km kullanılır', acik: true },
-        { k: 'bagli', ikon: 'karistir', ad: 'Bağlı hesaplar', not: 'Bağlanan hesaplar yine ayrı satır olur', acik: false },
+        { k: 'diger', ikon: 'karistir', ad: 'Başka hesap paketleri', not: 'Başka hesaptan girilen sayılar silinir', acik: false },
         { k: 'avans', ikon: 'cuzdan', ad: 'Avanslar', not: 'Bu ay girilen bütün avanslar silinir', acik: false },
         { k: 'veri', ikon: 'geri', ad: 'Panel verisi', not: 'Bu cihazdaki kopya silinir; Panelden Al ile yeniden alınır', acik: false }
     ];
@@ -903,23 +901,7 @@
                 '<input class="hs-girdi" type="text" data-avans-not placeholder="Not (isteğe bağlı)" maxlength="60" aria-label="Avans notu">' +
                 '<button type="button" class="hs-dugme hs-dugme--ana" data-avans-ekle>' + ikon('arti') + '<span>Ekle</span></button></div>' +
                 '<div class="hs-kutu-alt"><span>Brüt <b>' + para(h.brut) + '</b></span><span>Avans <b class="eksi">−' + para(h.avans) + '</b></span><span>Net <b>' + para(h.net) + '</b></span></div>';
-            return;
         }
-        var a = ayKaydi(false);
-        var adaylar = v.kuryeler.filter(function (x) {
-            if (x.id === k.id || a.bagli[x.id]) return false;
-            return !v.kuryeler.some(function (y) { return a.bagli[y.id] === x.id; });
-        });
-        var paketi = function (x) { return TURLER.reduce(function (t, tur) { return t + (x.say[tur.k] || 0); }, 0); };
-        el('hsKutuBaslik').textContent = 'Başka Hesap · ' + k.ad;
-        el('hsKutuAlt').textContent = 'Kurye bu ay başka birinin hesabından da çıktıysa o hesabı bağla. Paketleri ve G10 km\'si bu kuryeye eklenir, bağlanan satır listeden düşer.';
-        g.innerHTML =
-            (h.bagli.length ? '<div class="hs-liste-k"><span class="hs-alan__ad">Bağlı</span>' + h.bagli.map(function (b) {
-                return '<div class="hs-secenek is-bagli"><span><b>' + kacir(b.ad) + '</b><small>' + adet(paketi(b)) + ' paket · G10 ' + adet(b.km) + ' km</small></span><button type="button" class="hs-dugme hs-dugme--kucuk" data-coz="' + kacir(b.id) + '">Kaldır</button></div>';
-            }).join('') + '</div>' : '') +
-            '<div class="hs-liste-k"><span class="hs-alan__ad">Bağlanabilir</span>' + (adaylar.length ? adaylar.map(function (x) {
-                return '<div class="hs-secenek"><span><b>' + kacir(x.ad) + '</b><small>' + adet(paketi(x)) + ' paket · G10 ' + adet(x.km) + ' km</small></span><button type="button" class="hs-dugme hs-dugme--kucuk" data-bagla="' + kacir(x.id) + '">' + ikon('bag') + '<span>Bağla</span></button></div>';
-            }).join('') : '<p class="hs-blok__not">Bağlanabilecek başka hesap yok.</p>') + '</div>';
     }
 
     function sifirla() {
@@ -932,10 +914,11 @@
                 if (s.not) delete x.not;
                 if (s.km) delete x.km;
                 if (s.avans) delete x.avans;
+                if (s.diger) delete x.diger;
                 if (!Object.keys(x).length) delete a.k[id];
             });
-            if (s.bagli) a.bagli = {};
-            if (!Object.keys(nesne(a.k)).length && !Object.keys(nesne(a.bagli)).length) delete kayit.ay[d.ay];
+            delete a.bagli;
+            if (!Object.keys(nesne(a.k)).length) delete kayit.ay[d.ay];
         }
         kaydet(true);
         if (s.veri) { d.veri.delete(d.ay); veriYaz(); }
@@ -1012,7 +995,13 @@
                 bildir(kal.arac === 'car' ? 'Arabalı fiyatı uygulanıyor' : 'Motorlu fiyatı uygulanıyor', 'bilgi');
                 return;
             }
-            if (e.target.closest('[data-bagla-ac]')) { kutuAc('bagla', id); return; }
+            if ((b = e.target.closest('[data-diger-ac]'))) {
+                var ac = b.getAttribute('aria-pressed') !== 'true';
+                d.acik[id] = ac;
+                satirYenidenCiz(id);
+                if (ac) { var ilk = el('hsListe').querySelector('tr[data-id="' + id + '"] [data-diger]'); if (ilk) ilk.focus(); }
+                return;
+            }
             if (e.target.closest('[data-avans-ac]')) { kutuAc('avans', id); return; }
             if (e.target.closest('[data-g10]')) {
                 var k1 = kuryeKalici(id, true);
@@ -1049,10 +1038,19 @@
                 var v = d.veri.get(d.ay);
                 var k = kuryeBul(id);
                 var r = hesapla(k, v).satirlar.filter(function (x) { return x.t.k === tur; })[0];
-                var panel = r.kendi + r.diger;
+                var panel = r.kendi;
                 var s = kuryeAyi(id, true);
                 s.ek = nesne(s.ek);
                 if (deger === '' || Number(deger) === panel) delete s.ek[tur]; else s.ek[tur] = Number(deger) - panel;
+                kaydet(); rakamYaz(tr); return;
+            }
+            if (t.matches('[data-diger]')) {
+                var dg = temizSayi(t.value, false);
+                if (dg !== t.value) t.value = dg;
+                var s3 = kuryeAyi(id, true);
+                s3.diger = nesne(s3.diger);
+                if (dg === '' || Number(dg) === 0) delete s3.diger[t.getAttribute('data-diger')]; else s3.diger[t.getAttribute('data-diger')] = Number(dg);
+                if (!Object.keys(s3.diger).length) delete s3.diger;
                 kaydet(); rakamYaz(tr); return;
             }
             if (t.matches('[data-km]')) {
@@ -1095,14 +1093,6 @@
                 var s = kuryeAyi(kutuDurum.id, true);
                 if (Array.isArray(s.avans)) s.avans.splice(Number(b.getAttribute('data-avans-sil')), 1);
                 kaydet(); kutuCiz(); satirYenidenCiz(kutuDurum.id); return;
-            }
-            if ((b = e.target.closest('[data-bagla]'))) {
-                ayKaydi(true).bagli[b.getAttribute('data-bagla')] = kutuDurum.id;
-                kaydet(); kutuCiz(); listeCiz(); ozetCiz(); return;
-            }
-            if ((b = e.target.closest('[data-coz]'))) {
-                delete ayKaydi(true).bagli[b.getAttribute('data-coz')];
-                kaydet(); kutuCiz(); listeCiz(); ozetCiz();
             }
         });
         kutu.addEventListener('submit', function (e) {

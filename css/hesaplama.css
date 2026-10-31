@@ -143,9 +143,14 @@ th.hs-t__toplam { color: var(--yesil-koyu); }
 .hs-sayi::placeholder { color: var(--soluk); font-weight: 400; }
 .hs-sayi:hover { border-color: var(--cizgi-sert); }
 .hs-sayi:focus { border-color: var(--mavi); background: var(--yuzey); box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
-.hs-sayi.is-bagli { box-shadow: inset 0 -2px 0 var(--mor); }
 .hs-sayi.is-elle { background: #f4f0ff; color: var(--mor); }
 .hs-sayi--km { width: 72px; font-size: 15px; }
+
+/* Başka hesap: çarpanın altında açılan ikinci sayı */
+.hs-diger { display: flex; align-items: center; gap: 4px; margin-top: 4px; color: var(--mor); cursor: text; }
+.hs-diger svg { width: 16px; height: 16px; flex: none; }
+.hs-sayi--diger { width: 56px; height: 40px; font-size: 15px; border-color: #d9ccff; background: #f8f5ff; color: var(--mor); }
+.hs-sayi--diger:hover { border-color: var(--mor); }
 
 .hs-km2 { display: flex; align-items: center; gap: 4px; }
 .hs-g10 {
@@ -203,7 +208,6 @@ th.hs-t__toplam { color: var(--yesil-koyu); }
 .hs-pano__alt { gap: 8px; }
 .hs-dugme--tehlike { border-color: var(--kirmizi); background: var(--kirmizi); color: #fff; }
 .hs-dugme--tehlike:hover:not(:disabled) { border-color: #b42318; background: #b42318; color: #fff; }
-.hs-secenek.is-bagli { border-color: #d9ccff; background: #f8f5ff; }
 
 /* Not rozeti */
 .hs-not {
