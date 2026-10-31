@@ -1,7 +1,7 @@
 /**
  * Jet Barkod'un kendi ürün kataloğu (herkese açık products.json)
  * ============================================================================
- * Ürün kimliği ve adıyla görsel adresi. Gece raporu ve İtiraz Yazıcı ortak
+ * Ürün kimliği ve adıyla görsel adresi; kimlikle barkod ve kategori. Gece raporu ve İtiraz Yazıcı ortak
  * kullanır; bellekte tek kopya. 12 saatte bir tazelenir; alınamazsa bir
  * saat sonra yeniden denenir.
  * ============================================================================
@@ -11,7 +11,7 @@ const KIMLIK = /^[0-9a-f]{24}$/;
 
 const sadeAd = (s) => String(s || '').toLocaleLowerCase('tr').replace(/\s+/g, ' ').trim();
 
-let katalog = { zaman: 0, id: new Map(), ad: new Map() };
+let katalog = { zaman: 0, id: new Map(), ad: new Map(), bilgi: new Map() };
 let suruyor = null;
 
 async function yukle() {
@@ -24,12 +24,17 @@ async function yukle() {
         const liste = Array.isArray(j && j.products) ? j.products : [];
         const id = new Map();
         const ad = new Map();
+        const bilgi = new Map();   // kimlik → { barkod, kategori } (Sayım Farkı kartı)
         liste.forEach((u) => {
+            if (u && KIMLIK.test(String(u.id || ''))) {
+                const b = Array.isArray(u.barcodes) && u.barcodes[0] && u.barcodes[0].code;
+                bilgi.set(String(u.id), { barkod: b ? String(b).slice(0, 40) : '', kategori: String(u.category || '').slice(0, 80) });
+            }
             if (!u || typeof u.image !== 'string' || !/^https:\/\//.test(u.image)) return;
             if (KIMLIK.test(String(u.id || ''))) id.set(String(u.id), u.image);
             if (u.name) ad.set(sadeAd(u.name), { id: String(u.id || ''), image: u.image, ad: String(u.name).slice(0, 200) });
         });
-        katalog = { zaman: Date.now(), id, ad };
+        katalog = { zaman: Date.now(), id, ad, bilgi };
     } catch (e) {
         katalog.zaman = Date.now() - 11 * 3600 * 1000;
     } finally {

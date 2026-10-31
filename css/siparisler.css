@@ -1517,6 +1517,9 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
     .sip-marka small { font-size: 11px; }
     .sip-ust__yol > a { width: 44px; padding: 0; justify-content: center; }
     .sip-ust__yol > a span { display: none; }
+    /* Yardımcılar sekmelerinde tek bağlantı: telefonda da yazısıyla görünür */
+    .sip-ust__yol > a.sip-ust__yrd { width: auto; padding: 0 12px; }
+    .sip-ust__yol > a.sip-ust__yrd span { display: inline; }
     .sip-hesap b { display: none; }
     .sip-sayfa { padding-top: 21px; }
     .sip-baslik { align-items: center; }
@@ -1568,6 +1571,9 @@ body.sip-detay-acik, body.sip-kat-acik { overflow: hidden; }
 }
 @media (max-width: 560px) {
     .sip-ust__yol > a:first-child { display: none; }
+    .sip-ust__yol > a.sip-ust__yrd { display: flex; }
+    /* Telefonda yer dar: Yardımcılar dönüşü hesap adından önemli */
+    .sip-ust__yol:has(> a.sip-ust__yrd) .sip-hesap { display: none; }
 
     .sip-akis { margin-top: 10px; gap: 3px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .sip-serit__ust { top: calc(68px + env(safe-area-inset-top)); min-height: 0; margin-bottom: 5px; padding: 6px; gap: 5px; border-radius: 9px; }

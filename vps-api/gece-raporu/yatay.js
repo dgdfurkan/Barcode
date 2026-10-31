@@ -13,6 +13,8 @@
  *                     müşteri notu ya da gönderilen metin, kalan süre,
  *                     siparişin içeriği (şikâyet edilen ürün işaretli),
  *                     kurye ve toplayıcı.
+ *   sayimFarkKartlari Sayımlarda sıfırlanan, eksik ve fazla çıkan ürünler:
+ *                     görsel, barkod, kategori, sistem → sayılan, fark.
  *
  * Görseller (ürün, hasar, kişi) yalnız çizim için bellekte gelir.
  * ============================================================================
@@ -538,4 +540,89 @@ function itirazKartlari(bekleyen, sonuc, s = {}) {
     return sayfala(ogeler, ust, 'Jet Barkod · İtirazlar', s.altSag || 'jetbarkod.com.tr');
 }
 
-module.exports = { kaldirmaKartlari, itirazKartlari, kalanYazi };
+// ---------------------------------------------------------------------
+// Sayım farkı
+// ---------------------------------------------------------------------
+
+const SAYIM_GRUP = {
+    sifir: { ad: 'SIFIRLANAN', renk: C.kirmizi, zemin: '#ffe4e6', cip: 'Sıfırlandı', cipZemin: C.kirmiziZemin },
+    eksik: { ad: 'EKSİK ÇIKAN', renk: C.turuncu, zemin: '#fef3c7', cip: 'Eksik', cipZemin: C.turuncuZemin },
+    fazla: { ad: 'FAZLA ÇIKAN', renk: C.yesil, zemin: '#d1fae5', cip: 'Fazla', cipZemin: C.yesilZemin },
+};
+
+/**
+ * olaylar: [{ p, ad, sis, fiz, fark, durum: sifir|eksik|fazla, o (günlük), z (bitiş) }] (süzülmüş)
+ * s: { ozet: { sifir, eksik, fazla, net, urun, sayim }, gorseller: Map, bilgi: Map (kimlik → { barkod, kategori }),
+ *      barkod, kategori, sinir (grup başına, 0 hepsi), baslik, etiket, tarih, alt, altSag }
+ * İki sütunlu ürün kartları; gruplar sıfırlanan, eksik, fazla sırasıyla.
+ */
+function sayimFarkKartlari(olaylar, s = {}) {
+    genislikKur(TASARIM);
+    const gorseller = s.gorseller || new Map();
+    const bilgi = s.bilgi || new Map();
+    const KART_G = (IC - 20) / 2;
+    const H = 152;
+
+    function kartCiz(p, x, y, k) {
+        const G = SAYIM_GRUP[k.durum] || SAYIM_GRUP.eksik;
+        p.push(`<rect x="${x}" y="${y}" width="${KART_G}" height="${H}" rx="22" fill="${C.kart}" stroke="${C.cizgi}"/>`);
+        p.push(`<rect x="${x}" y="${y + 24}" width="6" height="${H - 48}" rx="3" fill="${G.renk}"/>`);
+        gorselKutu(p, x + 20, y + 20, 112, gorseller.get(k.p));
+        const sagG = 230;
+        const mx = x + 152;
+        const mG = KART_G - 152 - 24 - sagG - 16;
+        const ad = ikiSatir(OLCU.govdeKalin, k.ad || 'Ürün', 22, mG);
+        ad.forEach((t, j) => p.push(yazi(mx, y + 44 + j * 29, t, { boy: 22, agirlik: 600, renk: C.yazi })));
+        const b = bilgi.get(k.p) || {};
+        const ek = [s.barkod !== false ? b.barkod : '', s.kategori !== false ? b.kategori : ''].filter(Boolean).join(' · ');
+        if (ek) p.push(yazi(mx, y + (ad.length > 1 ? 104 : 84), kirp(OLCU.govde, ek, 18, mG), { boy: 18, renk: C.sonuk }));
+        p.push(yazi(mx, y + 134, kirp(OLCU.govde, (k.o ? 'Günlük Sayım · ' : 'Sayım · ') + tarihSaat(k.z), 17, mG), { boy: 17, renk: C.soluk }));
+        const sx = x + KART_G - 24;
+        p.push(yazi(sx, y + 58, adetYaz(k.sis) + ' → ' + adetYaz(k.fiz), { boy: 32, aile: 'Manrope', agirlik: 800, renk: C.yazi, hiza: 'end' }));
+        const cipYazi = G.cip + ' · ' + (k.fark > 0 ? '+' : '−') + adetYaz(Math.abs(k.fark));
+        const dG = genislik(OLCU.govdeKalin, cipYazi, 17) + 28;
+        cip(p, sx - dG, y + 74, cipYazi, G.renk, G.cipZemin, 17);
+        p.push(yazi(sx, y + 134, 'sistem → sayılan', { boy: 15, renk: C.soluk, hiza: 'end' }));
+    }
+
+    const sira = {
+        sifir: (a, b) => (b.sis - a.sis) || String(a.ad).localeCompare(String(b.ad), 'tr'),
+        eksik: (a, b) => (a.fark - b.fark) || String(a.ad).localeCompare(String(b.ad), 'tr'),
+        fazla: (a, b) => (b.fark - a.fark) || String(a.ad).localeCompare(String(b.ad), 'tr'),
+    };
+    const ogeler = [];
+    ['sifir', 'eksik', 'fazla'].forEach((ad) => {
+        const hepsi = olaylar.filter((k) => k.durum === ad).sort(sira[ad]);
+        if (!hepsi.length) return;
+        const l = s.sinir ? hepsi.slice(0, s.sinir) : hepsi;
+        const G = SAYIM_GRUP[ad];
+        ogeler.push({ baslik: true, h: 40 + 14 + 4, ciz: (p, y) => bolumBandi(p, y, G.ad, hepsi.length, G.renk, G.zemin) });
+        for (let i = 0; i < l.length; i += 2) {
+            const ikili = l.slice(i, i + 2);
+            ogeler.push({ h: H + ARA + 8, ciz: (p, y) => ikili.forEach((k, j) => kartCiz(p, P + j * (KART_G + 20), y, k)) });
+        }
+        if (hepsi.length > l.length) {
+            const kalan = hepsi.length - l.length;
+            ogeler.push({ h: 44, ciz: (p, y) => p.push(yazi(P + 8, y + 26, '+' + kalan + ' ürün daha. Hepsi Jet Barkod > Yardımcılar > Sayım Farkı sayfasında.', { boy: 18, agirlik: 600, renk: C.sonuk })) });
+        }
+        ogeler.push({ h: 20, ciz: () => {} });
+    });
+
+    const o = s.ozet || {};
+    const sayiRenk = (n, r) => (n ? r : C.yazi);
+    const kutular = [
+        { ad: 'SIFIRLANAN', deger: o.sifir || 0, renk: sayiRenk(o.sifir, C.kirmizi) },
+        { ad: 'EKSİK ÇIKAN', deger: o.eksik || 0, renk: sayiRenk(o.eksik, C.turuncu) },
+        { ad: 'FAZLA ÇIKAN', deger: o.fazla || 0, renk: sayiRenk(o.fazla, C.yesil) },
+        { ad: 'NET FARK', deger: (o.net > 0 ? '+' : o.net < 0 ? '−' : '') + adetYaz(Math.abs(o.net || 0)), renk: o.net < 0 ? C.kirmizi : o.net > 0 ? C.yesil : C.yazi },
+        { ad: 'SAYILAN ÜRÜN', deger: (o.urun || 0) + (o.sayim ? ' · ' + o.sayim + ' sayım' : ''), vurgu: true },
+    ];
+    const ust = (p, ilk) => {
+        let y = ustBant(p, { etiket: s.etiket || 'SAYIM FARKI RAPORU', baslik: (s.baslik || 'Sayım Farkı') + (ilk ? '' : ' (devam)'), tarih: s.tarih, alt: s.alt });
+        if (ilk) y = ozetSeridi(p, y, kutular);
+        return y;
+    };
+    return sayfala(ogeler, ust, 'Jet Barkod · Sayım Farkı', s.altSag || 'jetbarkod.com.tr');
+}
+
+module.exports = { kaldirmaKartlari, itirazKartlari, sayimFarkKartlari, kalanYazi };

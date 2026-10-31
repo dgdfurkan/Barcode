@@ -12,6 +12,9 @@
  *                    fotoğrafı grup başına (yatay kart, yatay.js)
  *   İtirazlar        Bekleyenler ve pencerede sonuçlananlar; siparişin
  *                    içeriği, kurye ve toplayıcı (yatay kart)
+ *   Sayım farkı      Yeni sayımlarda sıfırlanan, eksik, fazla çıkan ürünler
+ *                    (yatay kart). siklik gün başına bir kez kontrol; daha
+ *                    önce raporlanan görev gelmez (vps-api/sayim-fark.js)
  * Telegram'da albüm (sendMediaGroup); tek kart varsa sendPhoto; istenirse
  * tam kalite dosya. İçerik yoksa o rapor gitmez.
  *
@@ -32,7 +35,7 @@
  *   POST /api/gece-raporu/gunluk-durum  Asistan: günlük sayımın paneldeki durumu
  *   GET  /api/telegram-ayar           Sayfa: ayar, hesaplar, sebepler, son gönderimler
  *   POST /api/telegram-ayar           Sayfa: kısmi güncelleme
- *   POST /api/telegram-ayar/onizleme  Sayfa: { rapor: gece|anlik|kaldirma|itiraz } kartların aynısı
+ *   POST /api/telegram-ayar/onizleme  Sayfa: { rapor: gece|anlik|kaldirma|itiraz|sayim } kartların aynısı
  *   POST /api/telegram-ayar/test      Sayfa: kendine deneme gönderimi
  *   POST /api/sayim-gecmisi/yaz       Asistan'ın okuduğu sayım sonuçları
  * ============================================================================
@@ -78,11 +81,12 @@ const kaldirmaModul = require('../kaldirma');
 
 /* Jet Barkod'un kendi ürün kataloğu (herkese açık): ürün kimliği ve adıyla görsel */
 const { katalogAl, sadeAd } = require('../katalog');
+const sayimFark = require('../sayim-fark');
 
 const GUN_MS = 24 * 3600 * 1000;
 /* gece.gonderim.dakika kayması (performans: 10000 / 12000) */
-const KAYMA = { kaldirma: 14000, itiraz: 16000 };
-const RAPOR_TURU = new Set(['gece', 'anlik', 'kaldirma', 'itiraz']);
+const KAYMA = { kaldirma: 14000, itiraz: 16000, sayim: 18000 };
+const RAPOR_TURU = new Set(['gece', 'anlik', 'kaldirma', 'itiraz', 'sayim']);
 /* Bir rapordaki en çok kart: Telegram'a 10'arlı albümlerle gider (paylas.albumGonder) */
 const AZAMI_KART = 40;
 
@@ -484,6 +488,81 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         };
     }
 
+    /**
+     * Sayım farkı raporu: sıfırlanan, eksik ve fazla çıkan ürünler.
+     * Zamanlı rapor ve aralıksız önizleme henüz raporlanmamış görevleri alır
+     * (son siklik + 3 gün); aralık seçiliyse o günlerin bütün farkları.
+     * Dönüş ayrıca gorevler: gönderim sonrası işaretlenecek görevler.
+     */
+    async function sayimFarkRaporu(u, son = new Date(), secenek = {}) {
+        const A = secenek.ayar || await ayarOku(u);
+        const F = A.sayimFark;
+        const ar = secenek.aralik || null;
+        if (ar) son = ar.son;
+        const bas = ar ? ar.bas : secenek.bas || new Date(son.getTime() - F.siklik * GUN_MS);
+        const v = secenek.ornek ? await sayimOrnek()
+            : await sayimFark.raporVerisi(pool, u, { bas, son, tur: F.tur, yeni: !ar, geriGun: F.siklik + 3 });
+        const gorevler = v.yeniMod ? v.gorevler : [];
+        const tum = v.olaylar;
+        const uygun = tum.filter((k) => k.durum === 'sifir' ||
+            ((F.icerik === 'hepsi' || (F.icerik === 'eksik' && k.durum === 'eksik')) && Math.abs(k.fark) >= Math.max(F.esik, 0.001)));
+        if (!uygun.length) return { kartlar: [], baslik: '', gorevler };
+        const ozet = {
+            sifir: tum.filter((k) => k.durum === 'sifir').length,
+            eksik: tum.filter((k) => k.durum === 'eksik').length,
+            fazla: tum.filter((k) => k.durum === 'fazla').length,
+            net: Math.round(tum.reduce((t, k) => t + k.fark, 0) * 1000) / 1000,
+            urun: v.urun, sayim: v.sayim,
+        };
+        const kt = await katalogAl();
+        let gorseller = v.gorseller;
+        if (!gorseller) {
+            const iste = [];
+            const gorulen = new Set();
+            uygun.forEach((k) => {
+                const adres = kt.id.get(k.p);
+                if (adres && !gorulen.has(k.p)) { gorulen.add(k.p); iste.push({ id: k.p, gorsel: adres }); }
+            });
+            gorseller = iste.length ? await gorsel.topluGetir(iste.slice(0, 160), secenek.onizleme ? 12000 : 25000) : new Map();
+        }
+        const alt = ar ? performansKart.tarihAlti(ar.basGun, ar.sonGun) : v.yeniMod ? 'Son rapordan bu yana' : pencereMetni(bas, son);
+        const tarih = ar ? performansKart.tarihAraligi(ar.basGun, ar.sonGun) : uzunGun(son);
+        const kartlar = yatay.sayimFarkKartlari(uygun, {
+            ozet, gorseller, bilgi: kt.bilgi || new Map(), barkod: F.barkod, kategori: F.kategori,
+            sinir: ar ? 0 : F.sinir, tarih, alt,
+        });
+        const parca = [];
+        if (ozet.sifir) parca.push(ozet.sifir + ' ürün sıfırlandı');
+        if (ozet.eksik) parca.push(ozet.eksik + ' eksik');
+        if (ozet.fazla) parca.push(ozet.fazla + ' fazla');
+        return {
+            kartlar: kartlar.slice(0, AZAMI_KART),
+            baslik: ['📋 Sayım Farkı · ' + (ar ? tarih : kisaGun(son) + ' · ' + alt.toLocaleLowerCase('tr')), parca.join(' · ')].filter(Boolean).join('\n'),
+            tamKalite: F.tamKalite, ad: 'sayim-farki-' + (ar ? ar.basGun + (ar.sonGun !== ar.basGun ? '_' + ar.sonGun : '') : istanbul(son.getTime()).gun),
+            gorevler,
+        };
+    }
+
+    /** Sayım farkı önizlemesi: ürün adı ve görseli katalogdan, adetler uydurma */
+    async function sayimOrnek() {
+        const kt = await katalogAl();
+        const UYGUNSUZ = /prezervatif|kondom|okey|durex|ped\b|tampon|sigara|tütün|bira|şarap|rakı|votka|viski|cin\b|likör|jel/i;
+        const adaylar = [];
+        for (const x of kt.ad.values()) {
+            if (x && KIMLIK.test(x.id) && x.ad && !UYGUNSUZ.test(x.ad)) adaylar.push(x);
+            if (adaylar.length >= 400) break;
+        }
+        const simdi = Date.now();
+        const ornek = [[6, 0, true], [3, 0, false], [12, 9, true], [8, 5, true], [4, 2, false], [2, 1, true], [5, 7, true], [10, 11, false]];
+        const olaylar = ornek.map(([sis, fiz, o], i) => {
+            const x = adaylar.length ? adaylar[(i * 41 + 7) % adaylar.length] : { id: '', ad: 'Örnek ürün ' + (i + 1) };
+            return { p: x.id, ad: x.ad, sis, fiz, fark: fiz - sis, durum: sayimFark.durumu(sis, fiz), o, z: new Date(simdi - (2 + i * 3) * 3600000).toISOString() };
+        });
+        const iste = olaylar.filter((k) => kt.id.get(k.p)).map((k) => ({ id: k.p, gorsel: kt.id.get(k.p) }));
+        const gorseller = iste.length ? await gorsel.topluGetir(iste, 12000) : new Map();
+        return { olaylar, urun: 58, sayim: 2, yeniMod: true, gorevler: [], gorseller };
+    }
+
     /** İtiraz raporu: bekleyenler ve pencerede sonuçlananlar, siparişleriyle */
     async function itirazRaporu(u, son = new Date(), secenek = {}) {
         const A = secenek.ayar || await ayarOku(u);
@@ -693,6 +772,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         gece: { kayma: 0, bolum: (A) => A.gece, hazirla: (u, son, s) => raporHazirla(u, son, s) },
         kaldirma: { kayma: KAYMA.kaldirma, bolum: (A) => A.kaldirmaRapor, hazirla: (u, son, s) => kaldirmaRaporu(u, son, s) },
         itiraz: { kayma: KAYMA.itiraz, bolum: (A) => A.itirazRapor, hazirla: (u, son, s) => itirazRaporu(u, son, s) },
+        sayim: { kayma: KAYMA.sayim, bolum: (A) => A.sayimFark, hazirla: (u, son, s) => sayimFarkRaporu(u, son, s) },
     };
 
     let calisiyor = false;
@@ -737,6 +817,15 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                     const dakika = saatler.find((s) => simdiDk >= s && simdiDk < s + 30);
                     if (dakika == null) continue;
                     try {
+                        // Sayım farkı "n günde bir": önceki n-1 günde bu rapor kontrol edildiyse bugün sırası değil
+                        if (tur === 'sayim' && B.siklik > 1) {
+                            const once = await pool.query(
+                                `SELECT 1 FROM gece.gonderim WHERE username = $1 AND dakika >= $2 AND dakika < $2 + 1440
+                                    AND gun < $3::date AND gun > $3::date - $4::int LIMIT 1`,
+                                [u.username, T.kayma, z.gun, B.siklik]
+                            );
+                            if (once.rows.length) continue;
+                        }
                         // Önce işaretle: sunucu yarıda düşse de aynı rapor ikinci kez gitmesin
                         let isaret;
                         if (dakikaKolonu) {
@@ -760,7 +849,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                         }
                         if (!isaret.rows.length) continue;
                         const son = new Date();
-                        let bas = new Date(son.getTime() - GUN_MS);
+                        let bas = new Date(son.getTime() - (tur === 'sayim' ? B.siklik : 1) * GUN_MS);
                         if (dakikaKolonu) {
                             const o = await pool.query(
                                 `SELECT max(gonderildi) AS t FROM gece.gonderim
@@ -773,6 +862,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                         }
                         const rapor = await T.hazirla(u.username, son, { ayar: A, bas, dakika, birlesik: !dakikaKolonu });
                         const s = await gonder(u.username, rapor);
+                        // Sayım farkı: gönderilen (ya da süzgece takılıp gönderilecek bir şeyi olmayan) görevler bir daha gelmez
+                        if (tur === 'sayim' && (s.giden || s.bos) && rapor.gorevler) await sayimFark.raporlandi(pool, u.username, rapor.gorevler);
                         await pool.query(
                             dakikaKolonu ? 'UPDATE gece.gonderim SET kart = $4 WHERE username = $1 AND gun = $2 AND dakika = $3'
                                 : 'UPDATE gece.gonderim SET kart = $3 WHERE username = $1 AND gun = $2',
@@ -803,17 +894,20 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         ]);
         const e = ta.eskiKolonlar(o.ayar);
         const it = o.ayar.itirazRapor;
+        const sf = o.ayar.sayimFark;
+        // Asistan bu saatlerden önce sayım sonuçlarını okur: gece raporu ve sayım farkı raporu
+        const sayimSaatleri = [...new Set(o.ayar.gece.saatler.concat(sf.acik ? sf.saatler : []))].sort((a, b) => a - b);
         return {
             ok: true, acik: e.acik, bekleyen: e.bekleyen, foto: e.foto, hesap: h.length,
             // saatler: gece raporu (sayım sonuçları ondan önce okunur); itirazSaatler: itirazlar ondan önce eşitlenir
-            saatler: o.ayar.gece.saatler,
+            saatler: sayimSaatleri,
             itirazSaatler: it.acik ? it.saatler : [],
             hesaplar: h.map((x) => ({ ad: x.tg_ad || '', kullanici: x.tg_kullanici_adi || '' })),
             son: g.gece || null,
         };
     }
 
-    /** Her raporun son gönderimi: { gece, kaldirma, itiraz } (dakika kolonu yoksa yalnız gece) */
+    /** Her raporun son gönderimi: { gece, kaldirma, itiraz, sayim } (dakika kolonu yoksa yalnız gece) */
     async function sonGonderimler(u) {
         try {
             const r = await pool.query(
@@ -824,7 +918,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const sonuc = {};
             r.rows.forEach((x) => {
                 const d = Number(x.dakika);
-                const tur = d >= KAYMA.itiraz ? 'itiraz' : d >= KAYMA.kaldirma ? 'kaldirma' : d < 1440 ? 'gece' : null;
+                const tur = d >= KAYMA.sayim ? 'sayim' : d >= KAYMA.itiraz ? 'itiraz' : d >= KAYMA.kaldirma ? 'kaldirma' : d < 1440 ? 'gece' : null;
                 if (tur && !sonuc[tur]) sonuc[tur] = { gun: x.gun, gonderildi: x.gonderildi, kart: x.kart };
             });
             return sonuc;
@@ -956,8 +1050,8 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         try {
             const o = await ta.ayarOku(pool, u);
             const A = b.ayar && typeof b.ayar === 'object' ? ta.duzelt(ta.birlestir(o.ayar, b.ayar)) : o.ayar;
-            const bolum = { anlik: A.anlik, kaldirma: A.kaldirmaRapor, itiraz: A.itirazRapor, gece: A.gece }[tur];
-            const aralik = tur === 'kaldirma' ? aralikOku(b.aralik) : null;
+            const bolum = { anlik: A.anlik, kaldirma: A.kaldirmaRapor, itiraz: A.itirazRapor, sayim: A.sayimFark, gece: A.gece }[tur];
+            const aralik = tur === 'kaldirma' || tur === 'sayim' ? aralikOku(b.aralik) : null;
             const anahtar = u + '|' + tur + '|' + (ornek ? 'o' : 'g') + '|' + (aralik ? aralik.basGun + '_' + aralik.sonGun : '') + '|' + JSON.stringify(bolum);
             const eski = onizlemeOnbellek.get(anahtar);
             if (eski && Date.now() - eski.zaman < ONIZLEME_MS) return res.json(eski.sonuc);
@@ -968,7 +1062,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 sonuc = { ok: true, tur, mesajlar: await anlikOrnek(u, A.anlik, ornek) };
             } else {
                 const dakika = bolum.saatler[0];
-                const hazirla = tur === 'kaldirma' ? kaldirmaRaporu : tur === 'itiraz' ? itirazRaporu : raporHazirla;
+                const hazirla = tur === 'kaldirma' ? kaldirmaRaporu : tur === 'itiraz' ? itirazRaporu : tur === 'sayim' ? sayimFarkRaporu : raporHazirla;
                 const rapor = await hazirla(u, new Date(), { ayar: A, onizleme: true, ornek, dakika, aralik });
                 // Yatay kartlar geniş: önizlemede 1600 px (yazılar okunsun); çok sayfada yanıt şişmesin
                 const en = tur === 'gece' ? 720 : rapor.kartlar.length > 6 ? 1100 : 1600;
@@ -1069,10 +1163,10 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 }
                 return res.json({ ok: true, giden, kart: mesajlar.length });
             }
-            const hazirla = tur === 'kaldirma' ? kaldirmaRaporu : tur === 'itiraz' ? itirazRaporu : raporHazirla;
-            const bolum = { kaldirma: A.kaldirmaRapor, itiraz: A.itirazRapor, gece: A.gece }[tur];
+            const hazirla = tur === 'kaldirma' ? kaldirmaRaporu : tur === 'itiraz' ? itirazRaporu : tur === 'sayim' ? sayimFarkRaporu : raporHazirla;
+            const bolum = { kaldirma: A.kaldirmaRapor, itiraz: A.itirazRapor, sayim: A.sayimFark, gece: A.gece }[tur];
             // Süresi geçmiş hasar fotoğrafları için en çok 35 sn (Asistan 30 sn'de bir sorar; istek 60 sn'yi geçmesin)
-            const aralik = tur === 'kaldirma' ? aralikOku(b.aralik) : null;
+            const aralik = tur === 'kaldirma' || tur === 'sayim' ? aralikOku(b.aralik) : null;
             const ar = aralik ? { bas: aralik.basGun, son: aralik.sonGun } : null;
             const is = (async () => {
                 const rapor = await hazirla(u, new Date(), { ayar: A, dakika: bolum.saatler[0], fotoBekleMs: 35000, aralik });

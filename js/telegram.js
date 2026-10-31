@@ -88,7 +88,10 @@
     };
 
     /* Sekme → ayar alanı (zamanlı raporlar) */
-    var BOLUM = { gece: 'gece', kaldirma: 'kaldirmaRapor', itiraz: 'itirazRapor' };
+    var BOLUM = { gece: 'gece', kaldirma: 'kaldirmaRapor', itiraz: 'itirazRapor', sayim: 'sayimFark' };
+
+    /* Tarih aralığı seçilebilen sekmeler (önizleme ve Kendime Gönder) */
+    function krSekmesi() { return d.sekme === 'kaldirma' || d.sekme === 'sayim'; }
 
     // ------------------------------------------------------------------
     // Ayar okuma ve yazma (yol: 'kaldirmaRapor.red.goster')
@@ -321,8 +324,11 @@
         var bas = k.tur === 'son24' ? bugun : k.bas;
         var son = k.tur === 'son24' ? bugun : k.son;
         return kartHtml({
-            ikon: IKON.mesaj, baslik: 'Tarih Aralığı', aciklama: 'Önizleme ve "Kendime Gönder" bu aralıkla. Zamanlı rapor her zaman bir öncekinden bu yana olanları gönderir.',
-            govde: '<div class="tg-satir tg-satir--dikey"><div class="tg-cipler">' + [['son24', 'Son 24 Saat'], ['bugun', 'Bugün'], ['dun', 'Dün'], ['hafta', 'Son 7 Gün'], ['ay', 'Bu Ay'], ['gecenAy', 'Geçen Ay']].map(function (x) {
+            ikon: IKON.mesaj, baslik: 'Tarih Aralığı',
+            aciklama: d.sekme === 'sayim'
+                ? 'Önizleme ve "Kendime Gönder" bu aralıkla. "Sıradaki Rapor" zamanlı raporun göndereceği, henüz raporlanmamış sayımlar.'
+                : 'Önizleme ve "Kendime Gönder" bu aralıkla. Zamanlı rapor her zaman bir öncekinden bu yana olanları gönderir.',
+            govde: '<div class="tg-satir tg-satir--dikey"><div class="tg-cipler">' + [['son24', d.sekme === 'sayim' ? 'Sıradaki Rapor' : 'Son 24 Saat'], ['bugun', 'Bugün'], ['dun', 'Dün'], ['hafta', 'Son 7 Gün'], ['ay', 'Bu Ay'], ['gecenAy', 'Geçen Ay']].map(function (x) {
                     return '<button type="button" class="tg-cip" data-kr-hazir="' + x[0] + '" data-odak="kr-hazir:' + x[0] + '" aria-pressed="' + (k.tur === x[0]) + '"><i>' + IKON.tik + '</i>' + x[1] + '</button>';
                 }).join('') + '</div>' +
                 '<div class="tg-tarih"><label><span>Başlangıç</span><input type="date" data-kr-tarih="bas" data-odak="kr-bas" value="' + bas + '" max="' + son + '"></label>' +
@@ -363,6 +369,35 @@
                 satirAnahtar('Toplayıcı', 'Siparişi hazırlayan depocu', 'itirazRapor.toplayici') +
                 (siparis ? '' : '<p class="tg-satir__metin"><small>Sipariş kapalıyken de kurye ve toplayıcı görünebilir.</small></p>')
         });
+    }
+
+    function sayimHtml() {
+        if (!d.ayar.sayimFark) {
+            return kartHtml({ ikon: IKON.sayim, baslik: 'Sunucu güncellemesi bekleniyor', aciklama: 'Sayım farkı raporu sunucu güncellenince burada ayarlanır. Ayrıntılı liste şimdiden Sayım Farkı sayfasında.' }) +
+                '<p class="tg-not"><a href="../sifirlanan/">Sayım Farkı sayfasını aç</a></p>';
+        }
+        var acik = !!al('sayimFark.acik');
+        var sk = al('sayimFark.siklik');
+        var siklikYazi = sk === 1 ? 'Her gün' : sk === 7 ? 'Haftada bir' : sk + ' günde bir';
+        return krKarti() +
+        kartHtml({
+            ikon: IKON.saat, baslik: 'Zamanlı Gönderim', anahtar: 'sayimFark.acik',
+            aciklama: acik ? siklikYazi + ', seçtiğin saatlerde. Asistan rapordan önce depo panelindeki yeni sayımları okur; her ürün sayımı bir kez raporlanır.'
+                : 'Kapalı. Alttaki "Kendime Gönder" ile istediğin an gönderebilirsin.',
+            govde: satirSegment('Sıklık', 'Rapor günü seçili saatlerin hepsinde gider', 'sayimFark.siklik', [[1, 'Her Gün'], [2, '2 Günde Bir'], [3, '3 Günde Bir'], [7, 'Haftada Bir']]) +
+                '<div class="tg-satir tg-satir--dikey"><span class="tg-satir__metin"><b>Saatler</b><small>Gün içinde en çok ' + EN_COK_SAAT + ' saat seçebilirsin.</small></span>' + saatlerHtml('sayimFark.saatler') + '</div>'
+        }) +
+        kartHtml({
+            ikon: IKON.sayim, baslik: 'İçerik', aciklama: 'Panelde tamamlanan sayımlarda sistemle sayılan adet arasındaki farklar.',
+            govde: satirSegment('Ürünler', null, 'sayimFark.icerik', [['sifir', 'Yalnız Sıfırlanan'], ['eksik', 'Sıfırlanan ve Eksik'], ['hepsi', 'Bütün Farklar']]) +
+                satirSegment('Sayım Türü', null, 'sayimFark.tur', [['hepsi', 'Hepsi'], ['gunluk', 'Günlük'], ['elle', 'Elle']]) +
+                satirSegment('Fark Eşiği', 'Sıfırlananlar her zaman gelir', 'sayimFark.esik', [[0, 'Her Fark'], [2, '±2'], [5, '±5'], [10, '±10']]) +
+                satirAnahtar('Barkod', 'Ürün adının altında', 'sayimFark.barkod') +
+                satirAnahtar('Kategori', 'Barkodun yanında', 'sayimFark.kategori') +
+                satirSegment('Grup Başına En Çok', 'Zamanlı rapor için; fazlası Sayım Farkı sayfasında', 'sayimFark.sinir', [[20, '20'], [40, '40'], [80, '80'], [0, 'Hepsi']]) +
+                tamKaliteSatiri('sayimFark.tamKalite')
+        }) +
+        '<p class="tg-not">Ayrıntılı liste, tarih aralığı, barkod kopyalama ve panelden güncelleme <a href="../sifirlanan/">Sayım Farkı</a> sayfasında.</p>';
     }
 
     function anlikHtml() {
@@ -610,7 +645,8 @@
         var kutu = el('tgAyarlar');
         var odak = document.activeElement && document.activeElement.getAttribute ? document.activeElement.getAttribute('data-odak') : null;
         kutu.innerHTML = d.sekme === 'anlik' ? anlikHtml() : d.sekme === 'gonder' ? gonderHtml() : d.sekme === 'dps' ? dpsHtml()
-            : d.sekme === 'kurye' ? kuryeHtml() : d.sekme === 'kaldirma' ? kaldirmaHtml() : d.sekme === 'itiraz' ? itirazHtml() : geceHtml();
+            : d.sekme === 'kurye' ? kuryeHtml() : d.sekme === 'kaldirma' ? kaldirmaHtml() : d.sekme === 'itiraz' ? itirazHtml()
+            : d.sekme === 'sayim' ? sayimHtml() : geceHtml();
         if (odak) {
             var hedef = kutu.querySelector('[data-odak="' + odak.replace(/"/g, '\\"') + '"]');
             if (hedef) hedef.focus({ preventScroll: true });
@@ -672,7 +708,7 @@
             return d.sekme + '|' + (d.veri === 'ornek' ? 'o' : d.pf.bas + '|' + d.pf.son) + '|' + JSON.stringify(d.ayar.performans[d.sekme]);
         }
         var parca = d.sekme === 'anlik' ? d.ayar.anlik : d.sekme === 'gonder' ? d.ayar.kaldirmaGonder : d.ayar[BOLUM[d.sekme] || 'gece'];
-        var ar = d.sekme === 'kaldirma' && d.veri === 'gercek' ? JSON.stringify(krAralik()) : '';
+        var ar = krSekmesi() && d.veri === 'gercek' ? JSON.stringify(krAralik()) : '';
         return d.sekme + '|' + (d.sekme === 'gonder' ? 'g' : d.veri) + '|' + ar + '|' + JSON.stringify(parca);
     }
 
@@ -705,7 +741,7 @@
             if (d.sekme === 'itiraz' && d.veri === 'gercek') await siparisleriTazele();
             c = await istek('/api/telegram-ayar/onizleme', {
                 rapor: d.sekme === 'anlik' ? 'anlik' : BOLUM[d.sekme] ? d.sekme : 'gece', veri: d.veri, ayar: sekmeAyari(),
-                aralik: d.sekme === 'kaldirma' ? krAralik() : undefined
+                aralik: krSekmesi() ? krAralik() : undefined
             });
         }
         if (no !== o.no) return; // daha yeni bir istek var
@@ -719,7 +755,7 @@
         }
         o.durum = null;
         // Seçilen tarih aralığı sunucuda uygulanmadıysa (eski sunucu) önizleme yanlış tarihi gösterir: hata say
-        var istenen = d.sekme === 'kaldirma' && d.veri === 'gercek' ? krAralik() : null;
+        var istenen = krSekmesi() && d.veri === 'gercek' ? krAralik() : null;
         if (istenen && c.kod === 200 && c.j.ok && !(c.j.aralik && c.j.aralik.bas === istenen.bas && c.j.aralik.son === istenen.son)) {
             d.krDesteksiz = true;
             c = { kod: -1, j: {}, metin: 'Sunucu güncellemesi bekleniyor: tarih aralığı henüz sunucuda yok, önizleme son 24 saati gösterirdi. Sunucu güncellenince seçtiğin tarihler gelir.' };
@@ -811,7 +847,7 @@
         el('tgVeri').hidden = d.sekme === 'gonder';
         el('tgSohbetAlt').textContent = d.sekme === 'gonder' ? 'son 7 günün kayıtlarıyla' : d.veri === 'ornek' ? 'örnek veriyle'
             : pfSekmesi() ? aralikYazi(d.pf.bas, d.pf.son) + ' verisiyle'
-            : d.sekme === 'kaldirma' && krAralik() ? aralikYazi(d.kr.bas, d.kr.son) + ' verisiyle' : 'gerçek verinle';
+            : krSekmesi() && krAralik() ? aralikYazi(d.kr.bas, d.kr.son) + ' verisiyle' : 'gerçek verinle';
 
         var anahtar = onizlemeAnahtari();
         var s = o.sonuc[o.goster];
@@ -836,6 +872,7 @@
                     ? bosHtml('Gönderilecek kart yok', 'Son 7 günde seçili gruplarda kayıt yok.')
                     : pfSekmesi() ? bosHtml('Gönderilecek kart yok', d.sekme === 'kurye' ? 'Bu tarihlerde sipariş taşıyan kurye görünmüyor.' : 'Bu tarihler için DPS verisi gelmedi.')
                     : d.sekme === 'kaldirma' ? bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? (krAralik() ? 'Seçilen tarihlerde seçili gruplarda kayıt yok. Aralığı genişletebilir ya da Örnek Veri ile görünümü inceleyebilirsin.' : 'Son 24 saatte seçili gruplarda kayıt yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.') : 'Bütün gruplar kapalı.')
+                    : d.sekme === 'sayim' ? bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? (krAralik() ? 'Seçilen tarihlerde bu ayara uyan fark yok. Sayımlar Sayım Farkı sayfasındaki "Panelden Güncelle" ile ya da rapor saatinden önce Asistan tarafından okunur.' : 'Henüz raporlanmamış yeni bir fark yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.') : 'Bu ayarla gösterilecek ürün yok.')
                     : d.sekme === 'itiraz' ? bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? 'İtiraz bekleyen ya da son 24 saatte sonuçlanan kayıt yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.' : 'Bekleyenler ve sonuçlananlar kapalı.')
                     : bosHtml('Gönderilecek kart yok', d.veri === 'gercek' ? 'Bu ayarla rapor aralığında içerik yok; rapor bu saatte gitmez. Örnek Veri ile görünümü inceleyebilirsin.' : 'Bütün bölümler kapalı.');
             } else {
@@ -885,7 +922,7 @@
     async function test() {
         if (d.gonderiyor) return;
         if (!d.hesaplar.length) { bildir('Önce Telegram\'ı bağla.', 'hata'); return; }
-        if (d.sekme === 'kaldirma' && krAralik() && d.krDesteksiz) {
+        if (krSekmesi() && krAralik() && d.krDesteksiz) {
             bildir('Tarih aralığı henüz sunucuda yok; seçtiğin tarihler yerine son 24 saat giderdi. Sunucu güncellenince tekrar dene.', 'hata');
             return;
         }
@@ -909,7 +946,7 @@
             if (d.sekme === 'itiraz') { siparisSon = 0; await siparisleriTazele(); }
             c = await istek('/api/telegram-ayar/test', {
                 rapor: d.sekme === 'anlik' ? 'anlik' : BOLUM[d.sekme] ? d.sekme : 'gece', ayar: sekmeAyari(),
-                aralik: d.sekme === 'kaldirma' ? krAralik() : undefined
+                aralik: krSekmesi() ? krAralik() : undefined
             });
         }
         d.gonderiyor = false;
@@ -1112,7 +1149,7 @@
         });
         try {
             var q = new URLSearchParams(location.search).get('sekme');
-            if (['anlik', 'gonder', 'dps', 'kurye', 'kaldirma', 'itiraz'].indexOf(q) !== -1) d.sekme = q;
+            if (['anlik', 'gonder', 'dps', 'kurye', 'kaldirma', 'itiraz', 'sayim'].indexOf(q) !== -1) d.sekme = q;
             else if (q === 'performans') d.sekme = 'kurye';
         } catch (e) { /* adres okunamadı */ }
         d.pf.bas = d.pf.son = pfDun();

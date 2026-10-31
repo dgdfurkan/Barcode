@@ -1,28 +1,43 @@
 -- =============================================================
--- Sayım farkı / sıfırlanan ürünler
+-- Sayım farkı: Telegram'a raporlanmış görevler
 -- =============================================================
 -- Çalıştırma (VPS):  sudo -u postgres psql -d jetbarkod < sayim_fark.sql
+-- Önce: sayim_gecmisi_paylasim.sql (public.sayim_gecmisi)
 --
--- Rapor artık AYRI bir tablo tutmuyor: veri zaten public.sayim_gecmisi'de
--- (Sayım Geçmişi / gece raporu akışı panelden sistem/fiziksel stoğu okuyup
--- oraya artımlı yazıyor). Rapor o tablodan derleniyor (vps-api/sayim-fark.js).
+-- Sayım sonuçları public.sayim_gecmisi'de (Sayım Geçmişi, gece raporu ve
+-- Sayım Farkı sayfasının "Panelden Güncelle"si yazıyor). Burada yalnız
+-- zamanlı Sayım Farkı raporunun hangi görevi gönderdiği tutulur: panel
+-- açık değilken yapılmış bir sayım ertesi gün okunsa da raporda bir kez
+-- görünür, ikinci kez gelmez.
 --
--- Bu dosya, ilk denemede açılan ama kullanılmayan `sayim_fark` şemasını
--- temizler. GÜVENLİ: yalnız o boş şemayı siler, birden çok kez çalıştırılabilir.
--- Çalıştırmasan da zarar yok (boş dururlar); sadece düzen için.
+-- Tablo yoksa rapor çalışır; yeni satırları sayımın bitiş saatine göre
+-- seçer (geç okunan sayım o zaman kaçabilir).
 --
--- GEREKLİ KURULUM: Raporun veri görmesi için public.sayim_gecmisi'nin kurulu
--- olması lazım (sql_files/sayim_gecmisi_paylasim.sql). Kurulu değilse rapor
--- "sunucu güncellemesi bekleniyor" der.
+-- GÜVENLİ: birden çok kez çalıştırılabilir. İlk denemeden kalan
+-- kullanılmayan tablolar (farklar, imlec) silinir.
 -- =============================================================
 
 BEGIN;
 
+CREATE SCHEMA IF NOT EXISTS sayim_fark;
+
 DROP TABLE IF EXISTS sayim_fark.farklar;
 DROP TABLE IF EXISTS sayim_fark.imlec;
-DROP SCHEMA IF EXISTS sayim_fark;
+
+CREATE TABLE IF NOT EXISTS sayim_fark.raporlanan (
+    username    TEXT        NOT NULL,
+    gorev_id    TEXT        NOT NULL,
+    gonderildi  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (username, gorev_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_sayim_fark_raporlanan_zaman ON sayim_fark.raporlanan (username, gonderildi);
+
+GRANT USAGE ON SCHEMA sayim_fark TO jetbarkod;
+GRANT SELECT, INSERT, UPDATE, DELETE ON sayim_fark.raporlanan TO jetbarkod;
 
 COMMIT;
 
--- Kontrol: 0 satır gelmeli (şema kalmadı)
-SELECT nspname FROM pg_namespace WHERE nspname = 'sayim_fark';
+-- Kontrol: raporlanan tablosu ve API'nin yazma izni
+SELECT to_regclass('sayim_fark.raporlanan') AS tablo,
+       has_table_privilege('jetbarkod', 'sayim_fark.raporlanan', 'INSERT') AS api_yazabilir;

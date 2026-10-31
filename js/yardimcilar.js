@@ -45,7 +45,7 @@
                     kimlik: 'sayimFark',
                     haklar: ['stokSayimi', 'jetBarkodAsistan'],
                     ad: 'Sayım Farkı',
-                    ozet: 'Sayımlarda sistem-fiziksel farkı ve sıfırlanan ürünler, rapor olarak.',
+                    ozet: 'Sıfırlanan, eksik ve fazla çıkan ürünler; tarih aralığı, barkod kopyalama, zamanlı Telegram raporu.',
                     adres: '../sifirlanan/',
                     renk: 'kirmizi',
                     ikon: '<path d="M4 20h16M6.5 16V9M11 16V5M15.5 16v-4M20 16v-8"/><path d="M4 12h5"/>'
@@ -81,6 +81,15 @@
                     adres: '../telegram/?sekme=itiraz',
                     renk: 'mor',
                     ikon: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>'
+                },
+                {
+                    kimlik: 'sayimFarkRapor',
+                    haklar: ['stokSayimi', 'jetBarkodAsistan'],
+                    ad: 'Sayım Farkı Raporu',
+                    ozet: 'Yeni sayımlarda sıfırlanan ve eksik çıkan ürünler; her gün, 2 ya da 3 günde bir Telegram\'a.',
+                    adres: '../telegram/?sekme=sayim',
+                    renk: 'kirmizi',
+                    ikon: '<rect x="5.5" y="4" width="13" height="16.5" rx="2.5"/><path d="M9 4h6v3H9z"/><path d="M9 12h6M9 15.5h3.5"/>'
                 },
                 {
                     kimlik: 'kuryeCdi',

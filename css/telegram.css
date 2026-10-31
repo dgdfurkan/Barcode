@@ -32,6 +32,8 @@
 .tg-sekmeler button[aria-selected="true"] { background: var(--yuzey); color: var(--yazi); box-shadow: var(--golge-s); }
 
 .tg-not { margin: 0; padding: 0 4px; font-size: 12px; line-height: 16px; color: var(--sonuk); }
+.tg-not a { color: var(--mavi); font-weight: 600; text-decoration: none; }
+.tg-not a:hover { text-decoration: underline; }
 
 .tg-gorunum { display: none; }
 .tg-kisa { display: none; }

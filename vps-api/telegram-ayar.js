@@ -8,8 +8,8 @@
  *   - Sayfa kaydedince eski kolonlar ayrıntıdan yeniden yazılır.
  * Böylece eski Asistan sürümleri de doğru çalışır.
  *
- * Satıştan kaldırma ve itirazlar kendi raporlarında (kaldirmaRapor,
- * itirazRapor: ayrı saat, ayrı mesaj). Eskiden gece raporunun bölümleriydi;
+ * Satıştan kaldırma, itirazlar ve sayım farkı kendi raporlarında
+ * (kaldirmaRapor, itirazRapor, sayimFark: ayrı saat, ayrı mesaj). Eskiden gece raporunun bölümleriydi;
  * kayıtlı ayarda yoksa gece raporundaki eski seçimden türetilir (gecedenTuret).
  *
  * Tarayıcıdan gelen hiçbir alana güvenilmez: bilinmeyen alan atılır, her
@@ -54,6 +54,20 @@ const VARSAYILAN = Object.freeze({
         toplayici: true,
         tamKalite: false,
     },
+    /* Sayım farkı raporu: yeni sayımlarda sıfırlanan / eksik / fazla çıkan ürünler.
+       siklik: kaç günde bir (1, 2, 3, 7); o günlerde seçili saatlerde. */
+    sayimFark: {
+        acik: false,
+        saatler: [540],
+        siklik: 1,
+        icerik: 'eksik',         // sifir | eksik (sıfırlanan + eksik) | hepsi
+        tur: 'hepsi',            // hepsi | gunluk | elle
+        esik: 0,
+        sinir: 40,
+        barkod: true,
+        kategori: true,
+        tamKalite: false,
+    },
     anlik: { iptal: true, red: false, tamam: false, gorsel: true, olusturan: true },
     kaldirmaGonder: { ozet: true, red: true, bekleyen: true, tamam: false, foto: false },
     /* Performans raporları: DPS ve Kurye CDI ayrı ayrı (ayrı saat, ayrı mesaj).
@@ -75,6 +89,10 @@ const { sutunlariDuzelt, ozetDuzelt } = require('./performans/sutunlar');
 const ESIKLER = new Set([0, 1, 2, 5, 10]);
 const BEKLEYEN_ITIRAZ = new Set(['hepsi', 'acil', 'yok']);
 const LISTE = new Set(['fark', 'hepsi']);
+const SIKLIK = new Set([1, 2, 3, 7]);
+const SF_ICERIK = new Set(['sifir', 'eksik', 'hepsi']);
+const SF_TUR = new Set(['hepsi', 'gunluk', 'elle']);
+const SF_SINIR = new Set([0, 20, 40, 80]);
 
 const kopya = (o) => JSON.parse(JSON.stringify(o));
 const mantik = (v, varsayilan) => (typeof v === 'boolean' ? v : varsayilan);
@@ -129,6 +147,8 @@ function duzelt(ham) {
     const gs = nesne(g.sayim);
     const gb = nesne(g.bolumler);
     const a = nesne(h.anlik);
+    const sf = nesne(h.sayimFark);
+    const VS = V.sayimFark;
     const kg = nesne(h.kaldirmaGonder);
     const pf = nesne(h.performans);
     const pk = nesne(pf.kontrol);
@@ -166,6 +186,18 @@ function duzelt(ham) {
             sonuc: mantik(gi.sonuc, true), not: mantik(gi.not, true), metin: mantik(gi.metin, true),
             siparis: mantik(gi.siparis, true), kurye: mantik(gi.kurye, true), toplayici: mantik(gi.toplayici, true),
             tamKalite: mantik(gi.tamKalite, false),
+        },
+        sayimFark: {
+            acik: mantik(sf.acik, VS.acik),
+            saatler: saatleriDuzelt(sf.saatler, VS.saatler),
+            siklik: SIKLIK.has(Number(sf.siklik)) ? Number(sf.siklik) : VS.siklik,
+            icerik: SF_ICERIK.has(sf.icerik) ? sf.icerik : VS.icerik,
+            tur: SF_TUR.has(sf.tur) ? sf.tur : VS.tur,
+            esik: ESIKLER.has(Number(sf.esik)) ? Number(sf.esik) : 0,
+            sinir: SF_SINIR.has(Number(sf.sinir)) ? Number(sf.sinir) : VS.sinir,
+            barkod: mantik(sf.barkod, true),
+            kategori: mantik(sf.kategori, true),
+            tamKalite: mantik(sf.tamKalite, false),
         },
         anlik: {
             iptal: mantik(a.iptal, true), red: mantik(a.red, false), tamam: mantik(a.tamam, false),
