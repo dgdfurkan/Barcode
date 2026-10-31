@@ -59,6 +59,7 @@
         yol: '<circle cx="5" cy="15" r="2"/><circle cx="15" cy="5" r="2"/><path d="M7 15h5.5a2.5 2.5 0 0 0 0-5h-5a2.5 2.5 0 0 1 0-5H13"/>',
         cuzdan: '<path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H15v3"/><rect x="3" y="7" width="14" height="9" rx="1.5"/><path d="M13.5 11.5h1"/>',
         bag: '<path d="M8.5 11.5a3 3 0 0 0 4.2.3l2.5-2.5a3 3 0 0 0-4.2-4.2l-.9.9"/><path d="M11.5 8.5a3 3 0 0 0-4.2-.3l-2.5 2.5a3 3 0 0 0 4.2 4.2l.9-.9"/>',
+        tamam: '<path d="m5 10.5 3.5 3.5L15 7"/>',
         karistir: '<path d="M3 6h3.5l7 8H17M3 14h3.5l2-2.3M11.5 8.3l2-2.3H17"/><path d="m15 4 2 2-2 2M15 12l2 2-2 2"/>',
         not: '<circle cx="10" cy="8" r="4.5"/><path d="m7.5 11.8-1.2 5.2L10 15.3l3.7 1.7-1.2-5.2"/>',
         yukari: '<path d="m5 12.5 5-5 5 5"/>',
@@ -124,6 +125,28 @@
             catch (e) { bildir('Kaydedilemedi: tarayıcı belleği dolu', 'hata'); }
         };
         if (hemen) yaz(); else yazZaman = setTimeout(yaz, 250);
+    }
+
+    /* Panelden alınan aylık liste: Yenile'ye basılınca alınır, sonra bu cihazda
+       tutulur; sayfa her açılışta panele gitmez. En çok son 6 ay. */
+    var VERI_AY = 6;
+    function veriAnahtari() { return 'jb_hesaplama_veri:' + (d.kim || 'misafir'); }
+    function veriOku() {
+        var o = null;
+        try { o = JSON.parse(localStorage.getItem(veriAnahtari()) || 'null'); } catch (e) { o = null; }
+        o = nesne(o);
+        Object.keys(o).forEach(function (ay) {
+            var v = o[ay];
+            if (/^\d{4}-\d{2}$/.test(ay) && v && Array.isArray(v.kuryeler)) d.veri.set(ay, v);
+        });
+    }
+    function veriYaz() {
+        if (d.ornek) return;
+        var aylar = Array.from(d.veri.keys()).sort().slice(-VERI_AY);
+        var o = {};
+        aylar.forEach(function (ay) { o[ay] = d.veri.get(ay); });
+        try { localStorage.setItem(veriAnahtari(), JSON.stringify(o)); }
+        catch (e) { bildir('Panel verisi bu cihaza kaydedilemedi: tarayıcı belleği dolu', 'uyari'); }
     }
 
     function ayKaydi(yaz) {
@@ -240,6 +263,7 @@
         });
         var v = { kuryeler: kuryeler, zaman: Date.now(), bas: r.bas, son: r.son };
         d.veri.set(ay, v);
+        veriYaz();
         return v;
     }
 
@@ -364,13 +388,14 @@
         if (d.yukleniyor) { metin = 'Panelden okunuyor'; tur = 'yukleniyor'; }
         else if (d.hata) { metin = hataMetni(d.hata); tur = 'hata'; }
         else if (v) {
-            var t = new Date(v.zaman).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+            var t = new Date(v.zaman).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
             metin = (d.ornek ? 'Örnek veri' : 'Panelden alındı') + ' · ' + t + ' · ' + v.kuryeler.length + ' kurye';
             tur = 'tamam';
-        } else { metin = ' '; tur = ''; }
+        } else { metin = 'Bu ayın verisi henüz alınmadı'; tur = ''; }
         kutu.setAttribute('data-tur', tur);
         el('hsDurumMetin').textContent = metin;
         el('hsYenile').disabled = d.yukleniyor;
+        el('hsYenile').querySelector('span').textContent = v ? 'Yenile' : 'Panelden Al';
     }
 
     /* Üstte toplam kutusu yok (kullanıcı istemedi); toplam tablonun alt satırında */
@@ -401,6 +426,8 @@
         if (!v) {
             if (d.hata) {
                 kutu.innerHTML = '<div class="hs-bos">' + ikon('kurye') + '<strong>Kurye verisi alınamadı</strong><p>' + kacir(hataMetni(d.hata)) + '</p><button type="button" class="hs-dugme" data-yenile>' + ikon('geri') + '<span>Tekrar Dene</span></button></div>';
+            } else if (!d.yukleniyor) {
+                kutu.innerHTML = '<div class="hs-bos">' + ikon('kurye') + '<strong>' + kacir(ayAdi(d.ay)) + ' verisi alınmadı</strong><p>Kurye paketleri, not ve km panelden bir kez alınır, sonra bu cihazda durur. Güncellemek istediğinde Yenile\'ye basarsın.</p><button type="button" class="hs-dugme hs-dugme--ana" data-yenile>' + ikon('geri') + '<span>Panelden Al</span></button></div>';
             } else {
                 kutu.innerHTML = '<div class="hs-t-kap"><table class="hs-t">' + basHtml() + '<tbody>' +
                     [0, 1, 2, 3, 4].map(function () { return '<tr class="hs-t__iskelet"><td colspan="' + sutunSayisi() + '"><span class="hs-iskelet"></span></td></tr>'; }).join('') +
@@ -581,7 +608,18 @@
     // Avans ve başka hesap kutusu
     // ------------------------------------------------------------------
 
-    var kutuDurum = null;   // { tur: 'avans' | 'bagla', id }
+    var kutuDurum = null;   // { tur: 'avans' | 'bagla' | 'sifirla', id }
+
+    /* Sıfırla: seçilen ayın girdileri. Fiyatlar ayrı (Fiyatlar penceresinde). */
+    var SIFIR_SECENEK = [
+        { k: 'ek', ikon: 'kutu', ad: 'Paket düzeltmeleri', not: 'Hücreye elle yazılan sayılar panel değerine döner', acik: true },
+        { k: 'not', ikon: 'not', ad: 'Not değişiklikleri', not: 'Yükseltilen ya da düşürülen notlar panel notuna döner', acik: true },
+        { k: 'km', ikon: 'yol', ad: 'Elle yazılan km', not: 'Km desteği açık kuryelerde G10 km kullanılır', acik: true },
+        { k: 'bagli', ikon: 'karistir', ad: 'Bağlı hesaplar', not: 'Bağlanan hesaplar yine ayrı satır olur', acik: false },
+        { k: 'avans', ikon: 'cuzdan', ad: 'Avanslar', not: 'Bu ay girilen bütün avanslar silinir', acik: false },
+        { k: 'veri', ikon: 'geri', ad: 'Panel verisi', not: 'Bu cihazdaki kopya silinir; Panelden Al ile yeniden alınır', acik: false }
+    ];
+    var sifirSecim = {};
 
     function kutuAc(tur, id) {
         kutuDurum = { tur: tur, id: id };
@@ -599,6 +637,19 @@
 
     function kutuCiz() {
         if (!kutuDurum) return;
+        if (kutuDurum.tur === 'sifirla') {
+            el('hsKutuBaslik').textContent = 'Sıfırla';
+            el('hsKutuAlt').textContent = ayAdi(d.ay) + ' için neyin silineceğini seç. Fiyatlar ve araç ayarları değişmez.';
+            var secili = SIFIR_SECENEK.some(function (x) { return sifirSecim[x.k]; });
+            el('hsKutuGovde').innerHTML = '<div class="hs-liste-k">' + SIFIR_SECENEK.map(function (x) {
+                return '<button type="button" class="hs-secenek hs-secenek--sec" data-sifir="' + x.k + '" aria-pressed="' + !!sifirSecim[x.k] + '">' +
+                    '<span class="hs-secenek__ikon">' + ikon(x.ikon) + '</span><span><b>' + kacir(x.ad) + '</b><small>' + kacir(x.not) + '</small></span>' +
+                    '<span class="hs-isaret">' + ikon('tamam') + '</span></button>';
+            }).join('') + '</div>' +
+                '<div class="hs-pano__alt"><button type="button" class="hs-dugme" data-kapat>Vazgeç</button>' +
+                '<button type="button" class="hs-dugme hs-dugme--tehlike" data-sifirla-onay' + (secili ? '' : ' disabled') + '>' + ikon('sil') + '<span>Sıfırla</span></button></div>';
+            return;
+        }
         var v = d.veri.get(d.ay);
         var k = kuryeBul(kutuDurum.id);
         if (!v || !k) { kutuKapat(); return; }
@@ -632,6 +683,28 @@
             '<div class="hs-liste-k"><span class="hs-alan__ad">Bağlanabilir</span>' + (adaylar.length ? adaylar.map(function (x) {
                 return '<div class="hs-secenek"><span><b>' + kacir(x.ad) + '</b><small>' + adet(paketi(x)) + ' paket · G10 ' + adet(x.km) + ' km</small></span><button type="button" class="hs-dugme hs-dugme--kucuk" data-bagla="' + kacir(x.id) + '">' + ikon('bag') + '<span>Bağla</span></button></div>';
             }).join('') : '<p class="hs-blok__not">Bağlanabilecek başka hesap yok.</p>') + '</div>';
+    }
+
+    function sifirla() {
+        var a = kayit.ay[d.ay];
+        var s = sifirSecim;
+        if (a) {
+            Object.keys(nesne(a.k)).forEach(function (id) {
+                var x = a.k[id];
+                if (s.ek) delete x.ek;
+                if (s.not) delete x.not;
+                if (s.km) delete x.km;
+                if (s.avans) delete x.avans;
+                if (!Object.keys(x).length) delete a.k[id];
+            });
+            if (s.bagli) a.bagli = {};
+            if (!Object.keys(nesne(a.k)).length && !Object.keys(nesne(a.bagli)).length) delete kayit.ay[d.ay];
+        }
+        kaydet(true);
+        if (s.veri) { d.veri.delete(d.ay); veriYaz(); }
+        kutuKapat();
+        hepsiniCiz();
+        bildir(ayAdi(d.ay) + ' sıfırlandı', 'basari');
     }
 
     function avansEkle() {
@@ -671,6 +744,11 @@
         el('hsYenile').addEventListener('click', function () { yukle(true); });
         el('hsFiyatAc').addEventListener('click', fiyatAc);
         el('hsKopyala').addEventListener('click', ozetKopyala);
+        el('hsSifirla').addEventListener('click', function () {
+            sifirSecim = {};
+            SIFIR_SECENEK.forEach(function (x) { sifirSecim[x.k] = x.acik; });
+            kutuAc('sifirla', null);
+        });
         el('hsAra').addEventListener('input', function (e) { d.ara = e.target.value.trim(); listeCiz(); });
         el('hsSira').addEventListener('click', function (e) {
             var b = e.target.closest('[data-sira]');
@@ -764,6 +842,12 @@
             if (e.target === kutu || e.target.closest('[data-kapat]')) { kutuKapat(); return; }
             if (!kutuDurum) return;
             var b;
+            if ((b = e.target.closest('[data-sifir]'))) {
+                var sk = b.getAttribute('data-sifir');
+                sifirSecim[sk] = !sifirSecim[sk];
+                kutuCiz(); return;
+            }
+            if (e.target.closest('[data-sifirla-onay]')) { sifirla(); return; }
             if (e.target.closest('[data-avans-ekle]')) { avansEkle(); return; }
             if ((b = e.target.closest('[data-avans-sil]'))) {
                 var s = kuryeAyi(kutuDurum.id, true);
@@ -868,10 +952,9 @@
     async function yukle(zorla) {
         var no = ++istekNo;
         var ay = d.ay;
-        if (!zorla && d.veri.has(ay)) { hepsiniCiz(); return; }
+        if (!zorla && (d.veri.has(ay) || !d.ornek)) { hepsiniCiz(); return; }
         d.yukleniyor = true;
         d.hata = null;
-        if (zorla) d.veri.delete(ay);
         hepsiniCiz();
         try {
             await veriAl(ay, zorla);
@@ -880,9 +963,12 @@
         } catch (e) {
             if (no !== istekNo) return;
             d.yukleniyor = false;
+            /* Elde eski veri varsa tablo kalır, hata yalnız durum satırında */
             d.hata = e;
+            if (d.veri.has(ay)) bildir(hataMetni(e), 'hata');
         }
         hepsiniCiz();
+        if (!d.hata && zorla) bildir(ayAdi(ay) + ' verisi güncellendi', 'basari');
     }
 
     async function haklariYukle() {
@@ -904,6 +990,7 @@
         if (ad) ad.textContent = o.username;
 
         kayit = kayitOku();
+        veriOku();
         d.ay = varsayilanAy();
         bolum('hsIcerik');
         hepsiniCiz();
