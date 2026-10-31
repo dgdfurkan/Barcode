@@ -3763,6 +3763,7 @@ AdminPanel.prototype.loadPremiumFeatures = async function(username) {
             'siparisTakibi': 'Sipariş Takibi',
             'satistanKaldirma': 'Satıştan Kaldırma',
             'itirazYazici': 'İtiraz Yazıcı',
+            'hesaplama': 'Hesaplama (kurye hak edişi)',
             'raftakiEksikler': 'Raftaki Eksikler',
             'bulkCopy': 'Toplu Yapıştırma (barkod ve görsel eşleme)'
         };
@@ -3880,6 +3881,7 @@ AdminPanel.prototype.getFeatureDescription = function(featureKey) {
         'siparisTakibi': 'Depo panelindeki siparişleri telefona düşürür; banko, parça ve poşet sayısıyla birlikte toplama listesi çıkarır',
         'satistanKaldirma': 'Depo panelindeki satıştan kaldırma listesini (fırın hariç) saatte bir aktarır; görsel rapor ve iptal bildirimi Telegram\'a',
         'itirazYazici': 'Depo değerlendirme kayıtlarına Gemini ile duruma uygun itiraz taslağı; formu Asistan doldurur, Kaydet kullanıcıda',
+        'hesaplama': 'Kurye hak edişi: panelden paket sayıları, nota ve araca göre fiyat, km desteği ve avans; veriler kullanıcının cihazında kalır',
         'raftakiEksikler': 'Depo raflarında eksik ürün takibi — sepet ve cihazlar arası senkron',
     };
     return descriptions[featureKey] || '';

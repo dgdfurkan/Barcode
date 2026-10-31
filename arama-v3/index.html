@@ -8949,6 +8949,15 @@
                 storageKey: null
             },
 
+            'hesaplama': {
+                renk: ['#0f766e', '#99f6e4'],
+                name: 'Hesaplama',
+                description: 'Kurye hak edişi: panelden ilk paket, birleşen, finans ve çarşı; nota ve araca göre fiyat, km desteği, avans. Veriler yalnız bu cihazda',
+                ikon: '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h4"/></svg>',
+                storageKey: null,
+                anahtarYok: true
+            },
+
             /*
              * ---- Chrome eklentileri ----
              * Bunlar tarayıcıya kurulan ayrı yazılımlar. `eklenti` alanı
@@ -8997,6 +9006,7 @@
             siparisTakibi: { label: 'Siparişler', run: () => window.location.replace('../siparisler/') },
             satistanKaldirma: { label: 'Aç', run: () => window.location.replace('../kaldirma/') },
             itirazYazici: { label: 'Aç', run: () => window.location.replace('../itiraz/') },
+            hesaplama: { label: 'Aç', run: () => window.location.replace('../hesaplama/') },
             keyboardShortcuts: { label: 'Kısayolları yönet', run: () => showKeyboardShortcutsModal() }
         };
 
@@ -9116,14 +9126,14 @@
                     <div class="settings-feature__actions">
                         ${hasPremium ? '' : PREMIUM_LOCK_BADGE}
                         ${action ? `<button type="button" class="settings-btn" data-role="action">${escapeHtml(action.label)}</button>` : ''}
-                        <label class="settings-switch">
+                        ${config.anahtarYok ? '' : `<label class="settings-switch">
                             <input type="checkbox"
                                    data-feature="${featureKey}"
                                    aria-label="${escapeHtml(config.name)}"
                                    ${isEnabled && hasPremium ? 'checked' : ''}
                                    ${hasPremium ? '' : 'disabled'}>
                             <span class="settings-switch__track"></span>
-                        </label>
+                        </label>`}
                     </div>
                 `;
 

@@ -364,6 +364,7 @@ class NotificationSystem {
             'siparisTakibi': 'Sipariş Takibi',
             'satistanKaldirma': 'Satıştan Kaldırma',
             'itirazYazici': 'İtiraz Yazıcı',
+            'hesaplama': 'Hesaplama',
             'raftakiEksikler': 'Raftaki Eksikler'
         };
         return featureNames[featureName] || featureName;
