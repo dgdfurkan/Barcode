@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="../css/siparisler.css?v=20261031a" />
     <link rel="stylesheet" href="../css/yardimcilar.css?v=20261022b" />
     <link rel="stylesheet" href="../css/urun-foto.css?v=20261018a" />
-    <link rel="stylesheet" href="../css/hesaplama.css?v=20261031a" />
+    <link rel="stylesheet" href="../css/hesaplama.css?v=20261031b" />
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20261014a"></script>
@@ -100,18 +100,17 @@
                 <button type="button" class="hs-dugme hs-dugme--kucuk" data-fiyat-ac>Fiyatları Gir</button>
             </div>
 
-            <section class="hs-ozet" id="hsOzet" aria-label="Özet"></section>
-
             <div class="hs-arac">
-                <label class="hs-ara"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="m13 13 3.5 3.5"/></svg><input type="search" id="hsAra" placeholder="Kurye ara" autocomplete="off" aria-label="Kurye ara"></label>
                 <div class="hs-segment" id="hsSira" role="radiogroup" aria-label="Sıralama">
-                    <button type="button" role="radio" data-sira="net" aria-checked="true">Hak Ediş</button>
+                    <button type="button" role="radio" data-sira="ad" aria-checked="true">Ad</button>
+                    <button type="button" role="radio" data-sira="net" aria-checked="false">Hak Ediş</button>
+                    <button type="button" role="radio" data-sira="puan" aria-checked="false">Puan</button>
                     <button type="button" role="radio" data-sira="paket" aria-checked="false">Paket</button>
-                    <button type="button" role="radio" data-sira="ad" aria-checked="false">Ad</button>
                 </div>
+                <label class="hs-ara"><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="m13 13 3.5 3.5"/></svg><input type="search" id="hsAra" placeholder="Kurye ara" autocomplete="off" aria-label="Kurye ara"></label>
             </div>
 
-            <section class="hs-liste" id="hsListe" aria-label="Kuryeler"></section>
+            <section class="hs-tablo-kap" id="hsListe" aria-label="Kuryeler"></section>
         </div>
     </main>
 
@@ -125,7 +124,17 @@
         </div>
     </div>
 
+    <div class="hs-perde" id="hsKutu" hidden>
+        <div class="hs-pano hs-pano--dar" role="dialog" aria-modal="true" aria-labelledby="hsKutuBaslik">
+            <div class="hs-pano__bas">
+                <div><h2 id="hsKutuBaslik">&nbsp;</h2><p id="hsKutuAlt">&nbsp;</p></div>
+                <button type="button" class="hs-kapat" data-kapat aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
+            </div>
+            <div class="hs-pano__govde" id="hsKutuGovde"></div>
+        </div>
+    </div>
+
     <script src="../js/urun-foto.js?v=20261018a"></script>
-    <script src="../js/hesaplama.js?v=20261031a"></script>
+    <script src="../js/hesaplama.js?v=20261031b"></script>
 </body>
 </html>
