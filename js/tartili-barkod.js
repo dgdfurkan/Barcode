@@ -16,6 +16,11 @@
  * okunan 2836xxx; TERCIH listesi onu seçiyor. Listede olmayan yeni üründe
  * son kök alınıyor (katalog yeni kodu sona ekliyor).
  *
+ * GÖRÜNÜM
+ * Sonuç tablosunun kendi dili: başlık bandı, ürün başına bir satır, satırda
+ * gram kutusu ve sayfanın kendi barkod çizimi (generateBarcodeSVG). Seçim
+ * adımı yok; her ürün kendi gramını tutuyor.
+ *
  * SAYFANIN KENDİ KODUNA DOKUNULMUYOR
  * `products`, `lastSearchResults` ve `generateBarcodeSVG` adıyla okunuyor.
  * Panel yalnız tek terimli aramada ve sonuçta kg ürünü varken görünüyor;
@@ -32,11 +37,9 @@
     var aramaKutusu = document.getElementById('searchInput');
     if (!sonucBolumu) return;
 
-    var tartili = null;      // id → { id, ad, kisa, kok, gorsel }
+    var tartili = null;      // id → { id, ad, marka, kok, gorsel }
     var panel = null;
-    var secili = null;       // ürün id
-    var gram = '';
-    var sonBarkod = '';
+    var gramlar = {};        // ürün id → gram metni (arama değişse de kalır)
     var gosterilenImza = '';
 
     function katalog() {
@@ -69,9 +72,7 @@
             if (!p || !/\(\s*kg\s*\)\s*$/i.test(String(p.name || ''))) return;
             var kok = kokBul(p);
             if (!kok) return;
-            var kisa = String(p.name).replace(/\(\s*kg\s*\)\s*$/i, '').trim();
-            if (p.brand) kisa = kisa.replace(new RegExp('^' + String(p.brand).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+', 'i'), '');
-            tartili[p.id] = { id: p.id, ad: p.name, kisa: kisa || p.name, kok: kok, gorsel: p.image || '' };
+            tartili[p.id] = { id: p.id, ad: p.name, marka: p.brand || '', kok: kok, gorsel: p.image || '' };
         });
         return tartili;
     }
@@ -87,7 +88,7 @@
         var n = parseInt(g, 10);
         if (!KOK.test(kok) || !(n >= 1 && n <= 99999)) return null;
         var on2 = kok + String(n).padStart(5, '0');
-        return { kod: on2 + kontrolHanesi(on2), gram: n, kontrol: kontrolHanesi(on2) };
+        return { kod: on2 + kontrolHanesi(on2), gram: n };
     }
 
     function terimTek() {
@@ -109,13 +110,17 @@
         }).map(function (p) { return t[p.id]; });
     }
 
+    function kiloYazi(gram) {
+        return (gram / 1000).toLocaleString('tr-TR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' kg';
+    }
+
     // ------------------------------------------------------------------
     // Panel
     // ------------------------------------------------------------------
 
-    var BARKOD_IM = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5v10M5.5 5v10M8 5v10M11 5v10M13.5 5v10M17 5v10"/></svg>';
-    var KOPYA_IM = '<svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="7" width="9.5" height="9.5" rx="2"/><path d="M13 7V5.5a2 2 0 0 0-2-2H5.5a2 2 0 0 0-2 2V11a2 2 0 0 0 2 2H7"/></svg>';
-    var TAMAM_IM = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="m4.5 10.5 3.5 3.5 7.5-8"/></svg>';
+    var TERAZI_IM = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M7 20h10M5 8h14"/><path d="M5 8l-2.5 6a3 3 0 0 0 5 0z"/><path d="M19 8l-2.5 6a3 3 0 0 0 5 0z"/><circle cx="12" cy="4" r="1"/></svg>';
+    var KOPYA_IM = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>';
+    var TAMAM_IM = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
 
     function panelKur() {
         panel = document.createElement('section');
@@ -124,119 +129,95 @@
         panel.hidden = true;
         panel.innerHTML =
             '<div class="trt__bas">' +
-                '<span class="trt__im">' + BARKOD_IM + '</span>' +
-                '<div class="trt__baslik"><strong>Tartılı Barkod</strong><span>Gramı yaz, terazi barkodu hazır</span></div>' +
+                '<span class="trt__im">' + TERAZI_IM + '</span>' +
+                '<div class="trt__baslik"><h3>Tartılı Barkod</h3><p>Kilo ile satılan ürün. Terazideki gramı yaz, barkod hazır.</p></div>' +
             '</div>' +
-            '<div class="trt__urunler" role="radiogroup" aria-label="Ürün"></div>' +
-            '<div class="trt__govde">' +
-                '<div class="trt__giris">' +
-                    '<label class="trt__kutu">' +
-                        '<input type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="Örn. 937" aria-label="Ağırlık (gram)">' +
-                        '<span>g</span>' +
-                    '</label>' +
-                    '<div class="trt__ipucu" aria-live="polite"></div>' +
-                '</div>' +
-                '<button type="button" class="trt__barkod" title="Barkodu kopyalamak için dokun" disabled>' +
-                    '<span class="trt__cizim"></span>' +
-                    '<span class="trt__numara"></span>' +
-                    '<span class="trt__bos">Gram gir, barkod burada belirsin</span>' +
-                '</button>' +
-                '<button type="button" class="trt__kopyala" disabled>' + KOPYA_IM + '<span>Barkodu Kopyala</span></button>' +
-            '</div>';
+            '<div class="trt__satirlar"></div>';
 
         sonucBolumu.parentNode.insertBefore(panel, sonucBolumu);
 
-        var girdi = panel.querySelector('input');
-        girdi.addEventListener('input', function () {
+        var satirlar = panel.querySelector('.trt__satirlar');
+        satirlar.addEventListener('input', function (e) {
+            var girdi = e.target.closest('input[data-urun]');
+            if (!girdi) return;
             var temiz = girdi.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 5);
             if (temiz !== girdi.value) girdi.value = temiz;
-            gram = temiz;
-            ciz();
+            gramlar[girdi.getAttribute('data-urun')] = temiz;
+            satirCiz(girdi.closest('.trt__satir'));
         });
-        girdi.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') { e.preventDefault(); kopyala(); }
+        satirlar.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            var girdi = e.target.closest('input[data-urun]');
+            if (!girdi) return;
+            e.preventDefault();
+            kopyala(girdi.closest('.trt__satir'));
         });
-        panel.querySelector('.trt__barkod').addEventListener('click', kopyala);
-        panel.querySelector('.trt__kopyala').addEventListener('click', kopyala);
-        panel.querySelector('.trt__urunler').addEventListener('click', function (e) {
-            var d = e.target.closest('[data-urun]');
-            if (!d) return;
-            secili = d.getAttribute('data-urun');
-            urunleriCiz(sonuctakiler());
-            ciz();
-            girdi.focus();
+        satirlar.addEventListener('click', function (e) {
+            var hedef = e.target.closest('.trt__barkod, .trt__kopyala');
+            if (!hedef || hedef.disabled) return;
+            kopyala(hedef.closest('.trt__satir'));
         });
     }
 
-    function urunleriCiz(liste) {
-        var kap = panel.querySelector('.trt__urunler');
-        kap.innerHTML = liste.map(function (u) {
-            var acik = u.id === secili;
-            return '<button type="button" role="radio" class="trt__urun" data-urun="' + kacir(u.id) + '" aria-checked="' + acik + '">' +
-                (u.gorsel ? '<img src="' + kacir(u.gorsel) + '" alt="" loading="lazy" decoding="async" onerror="this.remove()">' : '') +
-                '<span><strong>' + kacir(u.kisa) + '</strong><small>' + kacir(u.kok) + '</small></span>' +
-            '</button>';
+    function satirlariCiz(liste) {
+        panel.querySelector('.trt__satirlar').innerHTML = liste.map(function (u) {
+            var id = kacir(u.id);
+            return '<div class="trt__satir" data-satir="' + id + '" data-kok="' + kacir(u.kok) + '">' +
+                '<div class="trt__urun">' +
+                    (u.gorsel ? '<img src="' + kacir(u.gorsel) + '" alt="" loading="lazy" decoding="async" onerror="this.style.visibility=\'hidden\'">' : '<span class="trt__resimsiz"></span>') +
+                    '<div><h4>' + kacir(u.ad) + '</h4><p>' + (u.marka ? kacir(u.marka) + ' • ' : '') + 'Kök ' + kacir(u.kok) + '</p></div>' +
+                '</div>' +
+                '<label class="trt__kutu">' +
+                    '<input type="text" inputmode="numeric" autocomplete="off" maxlength="5" placeholder="Gram" data-urun="' + id + '" value="' + kacir(gramlar[u.id] || '') + '" aria-label="' + kacir(u.ad) + ' ağırlığı (gram)">' +
+                    '<span>g</span>' +
+                '</label>' +
+                '<button type="button" class="trt__barkod" disabled><span class="trt__cizim"></span><span class="trt__bos">Gram bekleniyor</span></button>' +
+                '<button type="button" class="trt__kopyala" disabled title="Barkodu kopyala" aria-label="Barkodu kopyala">' + KOPYA_IM + '</button>' +
+            '</div>';
         }).join('');
+        panel.querySelectorAll('.trt__satir').forEach(satirCiz);
     }
 
-    function ciz() {
-        if (!panel) return;
-        var t = tartiliHazirla() || {};
-        var u = t[secili];
-        var b = u ? barkodUret(u.kok, gram) : null;
-        var kutu = panel.querySelector('.trt__barkod');
-        var dugme = panel.querySelector('.trt__kopyala');
-        var ipucu = panel.querySelector('.trt__ipucu');
+    function satirCiz(satir) {
+        if (!satir) return;
+        var girdi = satir.querySelector('input');
+        var b = barkodUret(satir.getAttribute('data-kok'), girdi.value);
+        var kutu = satir.querySelector('.trt__barkod');
+        var dugme = satir.querySelector('.trt__kopyala');
+        var ad = girdi.getAttribute('aria-label').replace(/ ağırlığı \(gram\)$/, '');
 
-        sonBarkod = b ? b.kod : '';
+        satir.setAttribute('data-barkod', b ? b.kod : '');
         kutu.disabled = !b;
         dugme.disabled = !b;
-        kutu.classList.toggle('trt__barkod--dolu', !!b);
-        dugmeSifirla();
+        satir.classList.toggle('trt__satir--dolu', !!b);
+        dugmeSifirla(satir);
 
-        if (!b) {
-            panel.querySelector('.trt__cizim').innerHTML = '';
-            panel.querySelector('.trt__numara').textContent = '';
-            ipucu.textContent = 'Örn. 937 g = 0,937 kg';
-            ipucu.classList.remove('trt__ipucu--etkin');
-            return;
+        satir.querySelector('.trt__bos').textContent = b ? '' : 'Gram bekleniyor';
+        satir.querySelector('.trt__cizim').innerHTML = b ? cizim(b.kod) : '';
+        satir.querySelector('.trt__kutu').setAttribute('data-kilo', b ? kiloYazi(b.gram) : '');
+        if (b) {
+            kutu.title = 'Kopyalamak için dokun';
+            kutu.setAttribute('aria-label', ad + ', ' + kiloYazi(b.gram) + ', barkod ' + b.kod + '. Kopyalamak için dokun.');
+        } else {
+            kutu.removeAttribute('title');
+            kutu.removeAttribute('aria-label');
         }
-
-        ipucu.textContent = b.gram.toLocaleString('tr-TR') + ' g = ' +
-            (b.gram / 1000).toLocaleString('tr-TR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' kg';
-        ipucu.classList.add('trt__ipucu--etkin');
-
-        panel.querySelector('.trt__cizim').innerHTML = cizgiler(b.kod);
-        panel.querySelector('.trt__numara').innerHTML =
-            kacir(b.kod.charAt(0)) + ' <b>' + kacir(b.kod.slice(1, 7)) + '</b> ' +
-            '<i>' + kacir(b.kod.slice(7, 12)) + '</i> ' + kacir(b.kod.charAt(12));
-        kutu.setAttribute('aria-label', u.kisa + ', ' + b.gram + ' gram, barkod ' + b.kod + '. Kopyalamak için dokun.');
     }
 
-    /* Rakamlar SVG'nin altında değil, gram kısmı vurgulu ayrı satırda; o yüzden
-       sayfanın generateBarcodeSVG'si (rakamlı çiziyor) yalnız yedek. */
-    function cizgiler(kod) {
-        if (typeof JsBarcode === 'function') {
-            try {
-                var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                JsBarcode(svg, kod, {
-                    format: 'EAN13', width: 2, height: 80, margin: 0,
-                    displayValue: false, background: 'transparent', lineColor: '#000000'
-                });
-                // Okuyucu geniş çizgiyi daha kolay alıyor: kutunun enine yayılıyor
-                svg.setAttribute('preserveAspectRatio', 'none');
-                return svg.outerHTML;
-            } catch (e) { /* aşağıdaki yedeğe düş */ }
+    // Sonuç tablosundaki barkodlarla aynı çizim (rakamlar altında)
+    function cizim(kod) {
+        if (typeof generateBarcodeSVG === 'function') {
+            var s = generateBarcodeSVG(kod, 240, 80);
+            if (s) return s;
         }
-        return typeof generateBarcodeSVG === 'function' ? (generateBarcodeSVG(kod, 300, 80) || '') : '';
+        return '<span class="trt__yedek">' + kacir(kod) + '</span>';
     }
 
-    var dugmeZaman = 0;
-    function dugmeSifirla() {
-        clearTimeout(dugmeZaman);
-        var d = panel.querySelector('.trt__kopyala');
+    function dugmeSifirla(satir) {
+        clearTimeout(satir._zaman);
+        var d = satir.querySelector('.trt__kopyala');
         d.classList.remove('trt__kopyala--tamam');
-        d.innerHTML = KOPYA_IM + '<span>Barkodu Kopyala</span>';
+        d.innerHTML = KOPYA_IM;
     }
 
     function panoya(metin) {
@@ -261,15 +242,15 @@
         });
     }
 
-    function kopyala() {
-        if (!sonBarkod) return;
-        var kod = sonBarkod;
+    function kopyala(satir) {
+        var kod = satir && satir.getAttribute('data-barkod');
+        if (!kod) return;
         panoya(kod).then(function () {
-            var d = panel.querySelector('.trt__kopyala');
+            var d = satir.querySelector('.trt__kopyala');
             d.classList.add('trt__kopyala--tamam');
-            d.innerHTML = TAMAM_IM + '<span>Kopyalandı</span>';
-            clearTimeout(dugmeZaman);
-            dugmeZaman = setTimeout(dugmeSifirla, 1600);
+            d.innerHTML = TAMAM_IM;
+            clearTimeout(satir._zaman);
+            satir._zaman = setTimeout(function () { dugmeSifirla(satir); }, 1600);
             if (window.JBDiyalog && JBDiyalog.bildir) JBDiyalog.bildir(kod + ' kopyalandı', 'basari');
         }, function () {
             if (window.JBDiyalog && JBDiyalog.bildir) JBDiyalog.bildir('Kopyalanamadı, barkodu elle seç', 'hata');
@@ -290,11 +271,9 @@
         if (!panel) panelKur();
 
         var imza = liste.map(function (u) { return u.id; }).join('|');
-        if (!secili || !liste.some(function (u) { return u.id === secili; })) secili = liste[0].id;
         if (imza !== gosterilenImza) {
             gosterilenImza = imza;
-            urunleriCiz(liste);
-            ciz();
+            satirlariCiz(liste);
         }
         panel.hidden = false;
     }
