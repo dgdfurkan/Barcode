@@ -1,0 +1,278 @@
+/**
+ * Tartılı barkod paneli (js/tartili-barkod.js).
+ * Renkler banko panelindekilerle aynı: beyaz yüzey, slate kenarlık, mavi vurgu.
+ * Barkod kutusu boşken de dolu boyunda; gram yazılırken panel boyu oynamıyor.
+ */
+
+.trt {
+    --trt-yuzey: var(--color-surface, #ffffff);
+    --trt-zemin: var(--color-background, #f8fafc);
+    --trt-cizgi: var(--color-border, #e2e8f0);
+    --trt-cizgi-koyu: #cbd5e1;
+    --trt-yazi: var(--color-text-primary, #0f172a);
+    --trt-soluk: var(--color-text-secondary, #475569);
+    --trt-cok-soluk: #94a3b8;
+    --trt-mavi: #2563eb;
+    --trt-mavi-soft: #eff6ff;
+    --trt-yesil: #15803d;
+    --trt-yesil-soft: #f0fdf4;
+
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid var(--trt-cizgi);
+    border-radius: 12px;
+    background: var(--trt-yuzey);
+    box-shadow: 0 1px 3px rgb(15 23 42 / 0.06);
+    font-variant-numeric: tabular-nums;
+    animation: trt-gir var(--motion-normal, 240ms) var(--motion-ease-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+.trt[hidden] { display: none; }
+
+@keyframes trt-gir {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: none; }
+}
+
+.trt svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* ---------- Başlık ---------- */
+
+.trt__bas {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.trt__im {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    background: var(--trt-mavi-soft);
+    color: var(--trt-mavi);
+}
+
+.trt__im svg { width: 16px; height: 16px; }
+
+.trt__baslik { display: flex; flex-direction: column; min-width: 0; }
+.trt__baslik strong { color: var(--trt-yazi); font-size: 15px; font-weight: 600; line-height: 1.3; }
+.trt__baslik span { color: var(--trt-soluk); font-size: 12px; line-height: 1.4; }
+
+/* ---------- Ürün seçimi ---------- */
+
+.trt__urunler {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.trt__urun {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 4px 12px 4px 4px;
+    border: 1px solid var(--trt-cizgi);
+    border-radius: 12px;
+    background: var(--trt-yuzey);
+    color: var(--trt-yazi);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color var(--motion-fast, 160ms) ease, background-color var(--motion-fast, 160ms) ease;
+}
+
+.trt__urun:hover { border-color: var(--trt-cizgi-koyu); }
+
+.trt__urun[aria-checked="true"] {
+    border-color: var(--trt-mavi);
+    background: var(--trt-mavi-soft);
+    box-shadow: inset 0 0 0 1px var(--trt-mavi);
+}
+
+.trt__urun img {
+    width: 36px;
+    height: 36px;
+    flex: none;
+    border-radius: 9px;
+    background: var(--trt-zemin);
+    object-fit: contain;
+    mix-blend-mode: multiply;
+}
+
+.trt__urun span { display: flex; flex-direction: column; min-width: 0; }
+.trt__urun strong { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.trt__urun small { color: var(--trt-soluk); font-size: 11px; line-height: 1.3; }
+.trt__urun[aria-checked="true"] small { color: var(--trt-mavi); }
+
+/* ---------- Gram, barkod, kopyala ---------- */
+
+.trt__govde {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+    margin-top: 16px;
+}
+
+.trt__giris { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+.trt__kutu {
+    display: flex;
+    align-items: center;
+    height: 48px;
+    padding: 0 12px;
+    border: 1px solid var(--trt-cizgi);
+    border-radius: 9px;
+    background: var(--trt-zemin);
+    cursor: text;
+    transition: border-color var(--motion-fast, 160ms) ease, box-shadow var(--motion-fast, 160ms) ease;
+}
+
+.trt__kutu:focus-within {
+    border-color: var(--trt-mavi);
+    background: var(--trt-yuzey);
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.15);
+}
+
+.trt__kutu input {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--trt-yazi);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.trt__kutu input::placeholder { color: var(--trt-cok-soluk); font-weight: 400; }
+.trt__kutu span { color: var(--trt-soluk); font-size: 13px; font-weight: 600; }
+
+.trt__ipucu {
+    min-height: 16px;
+    color: var(--trt-soluk);
+    font-size: 12px;
+    line-height: 16px;
+}
+
+.trt__ipucu--etkin { color: var(--trt-mavi); font-weight: 600; }
+
+.trt__barkod {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 128px;
+    padding: 8px 12px;
+    border: 1px dashed var(--trt-cizgi-koyu);
+    border-radius: 12px;
+    background: var(--trt-zemin);
+    color: var(--trt-yazi);
+    cursor: default;
+    overflow: hidden;
+    transition: border-color var(--motion-fast, 160ms) ease, background-color var(--motion-fast, 160ms) ease;
+}
+
+.trt__barkod--dolu {
+    border-style: solid;
+    border-color: var(--trt-cizgi);
+    background: #ffffff;
+    cursor: copy;
+}
+
+.trt__barkod--dolu:hover { border-color: var(--trt-mavi); }
+
+.trt__cizim {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    height: 80px;
+}
+
+.trt__cizim svg {
+    width: 100%;
+    max-width: 280px;
+    height: 80px;
+    stroke: none;
+}
+
+.trt__numara {
+    min-height: 20px;
+    color: var(--trt-yazi);
+    font-size: 15px;
+    line-height: 20px;
+    letter-spacing: 0.04em;
+}
+
+.trt__numara b { font-weight: 600; }
+.trt__numara i { color: var(--trt-mavi); font-style: normal; font-weight: 700; }
+
+.trt__bos {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16px;
+    color: var(--trt-soluk);
+    font-size: 13px;
+    text-align: center;
+}
+
+.trt__barkod--dolu .trt__bos { display: none; }
+
+.trt__kopyala {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 168px;
+    height: 48px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 9px;
+    background: var(--trt-mavi);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color var(--motion-fast, 160ms) ease, opacity var(--motion-fast, 160ms) ease;
+}
+
+.trt__kopyala svg { width: 16px; height: 16px; stroke-width: 1.8; }
+.trt__kopyala:hover:not(:disabled) { background: #1d4ed8; }
+.trt__kopyala:disabled { opacity: 0.4; cursor: not-allowed; }
+.trt__kopyala--tamam, .trt__kopyala--tamam:hover:not(:disabled) { background: var(--trt-yesil); }
+
+@media (max-width: 860px) {
+    .trt__govde { grid-template-columns: 160px minmax(0, 1fr); }
+    .trt__kopyala { grid-column: 1 / -1; width: 100%; }
+}
+
+@media (max-width: 560px) {
+    .trt { padding: 12px; }
+    .trt__urunler { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .trt__urun { min-width: 0; }
+    .trt__govde { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    .trt__kutu input { font-size: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .trt { animation: none; }
+    .trt__urun, .trt__kutu, .trt__barkod, .trt__kopyala { transition: none; }
+}
