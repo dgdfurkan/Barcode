@@ -101,6 +101,7 @@
         eksikYukMetin: '',
         eksikHata: '',
         eksikRapor: {},        // ay → 'yok' (Raporlar'da o ayın raporu bulunamadı)
+        yazdirHaric: {},       // PDF / Yazdır: çıktıya girmeyen kurye adları (her açılışta boş)
         ornek: /[?&]ornek\b/.test(location.search)
     };
     var kayit = null;
@@ -132,7 +133,7 @@
         var o = null;
         try { o = JSON.parse(localStorage.getItem(anahtar()) || 'null'); } catch (e) { o = null; }
         o = nesne(o);
-        return { v: 1, fiyat: nesne(o.fiyat), km: nesne(o.km), gizli: nesne(o.gizli), kurye: nesne(o.kurye), ay: nesne(o.ay), esle: nesne(o.esle), kopya: nesne(o.kopya) };
+        return { v: 1, fiyat: nesne(o.fiyat), km: nesne(o.km), gizli: nesne(o.gizli), kurye: nesne(o.kurye), ay: nesne(o.ay), esle: nesne(o.esle), kopya: nesne(o.kopya), yazdir: nesne(o.yazdir) };
     }
 
     var yazZaman = 0;
@@ -1055,8 +1056,61 @@
     }
     function kutuKapat() {
         el('hsKutu').hidden = true;
-        document.body.classList.remove('hs-kaydirma-yok');
+        /* Altta Eksik Ürünler ya da Ayarlar açıksa sayfa kilitli kalır */
+        if (el('hsEksik').hidden && el('hsFiyat').hidden) document.body.classList.remove('hs-kaydirma-yok');
         kutuDurum = null;
+    }
+
+    /* PDF / Yazdır öncesi: hangi kuryeler, kurye özeti, her kurye ayrı sayfa, Genel Toplam.
+       Kurye seçimi her açılışta hepsi; seçenekler bu cihazda kalır (kayit.yazdir). */
+    var YAZDIR_SECENEK = [
+        { k: 'ozet', ad: 'Kurye özeti', not: 'Başta kurye başına ürün sayısı ve tutar tablosu', varsayilan: false },
+        { k: 'ayri', ad: 'Her kurye ayrı sayfada', not: 'Kuryeye tek tek vermek için', varsayilan: false },
+        { k: 'genel', ad: 'Genel Toplam satırı', not: 'Listenin en sonunda bir kez', varsayilan: true }
+    ];
+    function yazdirAyari(k) {
+        var a = nesne(kayit.yazdir);
+        if (a[k] != null) return !!a[k];
+        return YAZDIR_SECENEK.filter(function (x) { return x.k === k; })[0].varsayilan;
+    }
+    function yazdirGruplari() { return eksikCiktisi().filter(function (g) { return !d.yazdirHaric[g.ad]; }); }
+
+    function yazdirKutusu() {
+        var hepsi = eksikCiktisi();
+        var secili = yazdirGruplari();
+        var urun = secili.reduce(function (t, g) { return t + g.satirlar.length; }, 0);
+        el('hsKutuBaslik').textContent = 'PDF / Yazdır';
+        el('hsKutuAlt').textContent = ayAdi(d.ay) + ' eksik ürün çıktısı. A4 dikey; bir kurye sayfaya sığmazsa bütünüyle sonraki sayfaya geçer.';
+        var isaret = '<span class="hs-isaret">' + ikon('tamam') + '</span>';
+        el('hsKutuGovde').innerHTML =
+            '<div class="hs-yz-bas"><b>Kuryeler</b><span>' + secili.length + ' / ' + hepsi.length + '</span>' +
+                '<button type="button" class="hs-dugme hs-dugme--kucuk" data-yz-hepsi>' + (secili.length === hepsi.length ? 'Hiçbirini Seçme' : 'Hepsini Seç') + '</button></div>' +
+            '<div class="hs-liste-k hs-liste-k--sik">' + hepsi.map(function (g) {
+                var t = g.satirlar.reduce(function (a, x) { return a + x.tutar; }, 0);
+                return '<button type="button" class="hs-secenek hs-secenek--sec hs-secenek--mavi hs-secenek--ince" data-yz-kurye="' + kacir(g.ad) + '" aria-pressed="' + !d.yazdirHaric[g.ad] + '">' +
+                    isaret + '<span><b>' + kacir(g.ad) + '</b></span><small class="hs-yz-say">' + adet(g.satirlar.length) + ' ürün · ' + para(t) + '</small></button>';
+            }).join('') + '</div>' +
+            '<div class="hs-yz-bas"><b>Seçenekler</b></div>' +
+            '<div class="hs-liste-k hs-liste-k--sik">' + YAZDIR_SECENEK.map(function (x) {
+                return '<button type="button" class="hs-secenek hs-secenek--sec hs-secenek--mavi hs-secenek--ince" data-yz-ayar="' + x.k + '" aria-pressed="' + yazdirAyari(x.k) + '">' +
+                    isaret + '<span><b>' + kacir(x.ad) + '</b><small>' + kacir(x.not) + '</small></span></button>';
+            }).join('') + '</div>' +
+            '<div class="hs-pano__alt"><button type="button" class="hs-dugme" data-kapat>Vazgeç</button>' +
+                '<button type="button" class="hs-dugme hs-dugme--ana" data-yz-bas' + (secili.length ? '' : ' disabled') + '>' + ikon('yazdir') +
+                '<span>Yazdır' + (secili.length ? ' · ' + adet(urun) + ' ürün' : '') + '</span></button></div>';
+    }
+
+    function yazdirBas() {
+        var g = yazdirGruplari();
+        if (!g.length) return;
+        var tek = g.length === 1 ? g[0].ad : '';
+        kutuKapat();
+        global.JBEksik.yazdir(g, {
+            baslik: 'Kurye Bazlı Eksik Ürün Raporu',
+            alt: ayAdi(d.ay) + ' · ' + aralikYazi(aralik(d.ay)) + (tek ? ' · ' + tek : ''),
+            dosya: eksikDosyaAdi('pdf').replace(/\.pdf$/, '') + (tek ? '_' + dosyaAdiYap(tek) : ''),
+            ozet: yazdirAyari('ozet'), ayri: yazdirAyari('ayri'), genel: yazdirAyari('genel')
+        });
     }
 
     function kutuCiz() {
@@ -1080,6 +1134,7 @@
                 '<button type="button" class="hs-dugme hs-dugme--tehlike" data-sifirla-onay' + (secili ? '' : ' disabled') + '>' + ikon('sil') + '<span>Sıfırla</span></button></div>';
             return;
         }
+        if (kutuDurum.tur === 'yazdir') { yazdirKutusu(); return; }
         var v = d.veri.get(d.ay);
         var k = kuryeBul(kutuDurum.id);
         if (!v || !k) { kutuKapat(); return; }
@@ -1335,12 +1390,13 @@
         ozetCiz();
     }
 
-    function eksikDosyaAdi(uzanti) {
-        return 'Kurye_Bazli_Eksik_Urun_' + ayAdi(d.ay).replace(/\s+/g, '_').replace(/[ğüşıöçĞÜŞİÖÇ]/g, function (h) {
+    function dosyaAdiYap(t) {
+        return String(t).replace(/\s+/g, '_').replace(/[ğüşıöçĞÜŞİÖÇ]/g, function (h) {
             var k = HARF[h.toLocaleLowerCase('tr')];
             return h === h.toLocaleLowerCase('tr') ? k : k.toUpperCase();
-        }) + '.' + uzanti;
+        });
     }
+    function eksikDosyaAdi(uzanti) { return 'Kurye_Bazli_Eksik_Urun_' + dosyaAdiYap(ayAdi(d.ay)) + '.' + uzanti; }
 
     function eksikOlaylari() {
         var perde = el('hsEksik');
@@ -1373,14 +1429,7 @@
                 global.JBEksik.excel(eksikCiktisi(), eksikDosyaAdi('xlsx'));
                 return;
             }
-            if (e.target.closest('[data-eksik-yazdir]')) {
-                var o = eksikOzet();
-                global.JBEksik.yazdir(eksikCiktisi(), {
-                    baslik: 'Kurye Bazlı Eksik Ürün Raporu',
-                    alt: ayAdi(d.ay) + ' · Genel toplam ' + para(o.toplam),
-                    dosya: eksikDosyaAdi('pdf').replace(/\.pdf$/, '')
-                });
-            }
+            if (e.target.closest('[data-eksik-yazdir]')) { d.yazdirHaric = {}; kutuAc('yazdir'); }
         });
         perde.addEventListener('change', function (e) {
             var t = e.target;
@@ -1560,6 +1609,26 @@
                 kutuCiz(); return;
             }
             if (e.target.closest('[data-sifirla-onay]')) { sifirla(); return; }
+            if (kutuDurum.tur === 'yazdir') {
+                var ust = el('hsKutuGovde').scrollTop;
+                if ((b = e.target.closest('[data-yz-kurye]'))) {
+                    var ad = b.getAttribute('data-yz-kurye');
+                    if (d.yazdirHaric[ad]) delete d.yazdirHaric[ad]; else d.yazdirHaric[ad] = true;
+                } else if (e.target.closest('[data-yz-hepsi]')) {
+                    var tumu = yazdirGruplari().length === eksikCiktisi().length;
+                    d.yazdirHaric = {};
+                    if (tumu) eksikCiktisi().forEach(function (g) { d.yazdirHaric[g.ad] = true; });
+                } else if ((b = e.target.closest('[data-yz-ayar]'))) {
+                    var ak = b.getAttribute('data-yz-ayar');
+                    kayit.yazdir = nesne(kayit.yazdir);
+                    kayit.yazdir[ak] = !yazdirAyari(ak);
+                    kaydet();
+                } else if (e.target.closest('[data-yz-bas]')) { yazdirBas(); return; }
+                else return;
+                kutuCiz();
+                el('hsKutuGovde').scrollTop = ust;
+                return;
+            }
             if (e.target.closest('[data-avans-ekle]')) { avansEkle(); return; }
             if ((b = e.target.closest('[data-avans-sil]'))) {
                 var s = kuryeAyi(kutuDurum.id, true);

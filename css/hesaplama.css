@@ -205,6 +205,16 @@ th.hs-t__toplam { color: var(--yesil-koyu); }
 .hs-isaret { width: 24px; height: 24px; flex: none !important; display: grid !important; place-items: center; border: 1.5px solid var(--cizgi-sert); border-radius: 6px; color: transparent; }
 .hs-isaret svg { width: 16px; height: 16px; stroke-width: 2.4; }
 .hs-secenek--sec[aria-pressed="true"] .hs-isaret { border-color: var(--kirmizi); background: var(--kirmizi); color: #fff; }
+/* PDF / Yazdır seçimi: mavi işaret, sık liste */
+.hs-secenek--mavi[aria-pressed="true"] { border-color: var(--mavi); background: var(--mavi-50); }
+.hs-secenek--mavi[aria-pressed="true"] .hs-isaret { border-color: var(--mavi); background: var(--mavi); }
+.hs-secenek--ince { min-height: 44px; padding: 4px 16px 4px 12px; }
+.hs-secenek--ince > span:not(.hs-isaret) { flex: 1; }
+.hs-liste-k--sik { gap: 4px; }
+.hs-yz-bas { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.hs-yz-bas b { font-weight: 800; }
+.hs-yz-bas span { margin-right: auto; color: var(--sonuk); font-variant-numeric: tabular-nums; }
+.hs-yz-say { flex: none; font-size: 12px; color: var(--sonuk); font-variant-numeric: tabular-nums; }
 .hs-pano__alt { gap: 8px; }
 .hs-dugme--tehlike { border-color: var(--kirmizi); background: var(--kirmizi); color: #fff; }
 .hs-dugme--tehlike:hover:not(:disabled) { border-color: #b42318; background: #b42318; color: #fff; }
