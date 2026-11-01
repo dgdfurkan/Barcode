@@ -17,8 +17,8 @@
  * NEREDE DURUYOR
  * Panel verisi (ayın 1'inden son gününe) bir kez okunur ve hesaba yazılır
  * (vps-api/hesaplama-kilit.js, /api/hesaplama/veri); sonraki açılışlarda her
- * cihaz oradan açar, panele yalnız Yenile ile gidilir. Sunucu yoksa her
- * açılışta panelden okunur. Açılış şifresi de hesapta (yalnız bcrypt özeti). Fiyatlar, araç, km desteği, not yükseltme, ek paket,
+ * cihaz oradan açar. Panele yalnız kullanıcı Panelden Al / Yenile deyince
+ * gidilir; kaydı olmayan ay boş açılır. Açılış şifresi de hesapta (yalnız bcrypt özeti). Fiyatlar, araç, km desteği, not yükseltme, ek paket,
  * başka hesap paketleri, avanslar ve eksik ürün listesi localStorage'da,
  * kullanıcı adına göre ayrı anahtarda; sunucuya gitmez.
  *
@@ -254,9 +254,11 @@
             return v0;
         }
         d.panelden = false;
+        /* Panele kendiliğinden gidilmez: kayıt yoksa boş kalır, kullanıcı Panelden Al / Yenile der */
         if (!zorla) {
             var kayitli = await hesaptanVeri(ay);
-            if (kayitli) { d.veri.set(ay, kayitli); return kayitli; }
+            if (kayitli) d.veri.set(ay, kayitli);
+            return kayitli;
         }
         d.panelden = true;
         durumCiz();
@@ -539,7 +541,7 @@
             if (d.hata) {
                 kutu.innerHTML = '<div class="hs-bos">' + ikon('kurye') + '<strong>Kurye verisi alınamadı</strong><p>' + kacir(hataMetni(d.hata)) + '</p><button type="button" class="hs-dugme" data-yenile>' + ikon('geri') + '<span>Tekrar Dene</span></button></div>';
             } else if (!d.yukleniyor) {
-                kutu.innerHTML = '<div class="hs-bos">' + ikon('kurye') + '<strong>' + kacir(ayAdi(d.ay)) + ' verisi alınmadı</strong><p>Kurye paketleri, not ve km ayın 1\'inden son gününe panelden bir kez alınır ve hesabına kaydedilir. Sonra her cihazda kayıttan açılır; güncellemek için Yenile\'ye basarsın.</p><button type="button" class="hs-dugme hs-dugme--ana" data-yenile>' + ikon('geri') + '<span>Panelden Al</span></button></div>';
+                kutu.innerHTML = '<div class="hs-bos">' + ikon('kurye') + '<strong>' + kacir(ayAdi(d.ay)) + ' verisi alınmadı</strong><p>Kurye paketleri, not ve km ayın 1\'inden son gününe Panelden Al\'a basınca okunur ve hesabına kaydedilir. Sonra her cihazda kayıttan açılır; güncellemek için Yenile\'ye basarsın.</p><button type="button" class="hs-dugme hs-dugme--ana" data-yenile>' + ikon('geri') + '<span>Panelden Al</span></button></div>';
             } else {
                 kutu.innerHTML = '<div class="hs-t-kap"><table class="hs-t">' + basHtml() + '<tbody>' +
                     [0, 1, 2, 3, 4].map(function () { return '<tr class="hs-t__iskelet"><td colspan="' + sutunSayisi() + '"><span class="hs-iskelet"></span></td></tr>'; }).join('') +
@@ -1291,7 +1293,7 @@
                 '<span class="hs-ek-islem__metin"><b>' + (e.islendi ? 'Hak edişe eklendi' : 'Hak edişe eklenmedi') + '</b>' +
                     '<small>' + (e.islendi ? 'Tablodaki toplamlar eksik ürün tutarı düşülmüş halde.' : 'Tutarlar tabloda görünür ama toplamdan düşülmez.') + '</small></span>' +
                 '<button type="button" class="hs-dugme' + (e.islendi ? '' : ' hs-dugme--ana') + '" data-eksik-isle' + (o.adet || e.islendi ? '' : ' disabled') + '>' + ikon(e.islendi ? 'geri' : 'tamam') + '<span>' + (e.islendi ? 'Hak Edişten Çıkar' : 'Hak Edişe Ekle') + '</span></button></div>' +
-            (!v ? '<div class="hs-uyari">' + ikon('kurye') + '<span>Bu ayın kurye verisi henüz alınmadı. Tablo yüklenince kuryelerle eşleşir.</span></div>'
+            (!v ? '<div class="hs-uyari">' + ikon('kurye') + '<span>Bu ayın kurye verisi alınmadı. Kuryelerle eşleşmesi için tabloda Panelden Al\'a bas.</span></div>'
                 : o.eslesmeyen ? '<div class="hs-uyari">' + ikon('kurye') + '<span>' + o.eslesmeyen + ' kurye tabloda eşleşmedi. Adının yanından seç.</span></div>' : '') +
             '<div class="hs-ek-liste">' + gruplar + '</div>';
 
