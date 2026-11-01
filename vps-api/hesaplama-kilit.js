@@ -1,6 +1,16 @@
 /**
- * Hesaplama kilidi: sayfanın açılış şifresi hesapta (cihazda değil)
+ * Hesaplama: açılış şifresi ve panelden okunan aylık kurye verisi hesapta
  * ============================================================================
+ *
+ * AYLIK VERİ
+ * Sayfa bir ayı panelden bir kez okur (POST /courier/v2/metrics, kullanıcının
+ * tarayıcısından) ve buraya yazar; sonraki açılışlarda her cihaz buradan
+ * okur, panele yalnız Yenile ile gidilir. Kullanıcı başına son 12 ay.
+ *   GET  /api/hesaplama/veri?ay=YYYY-MM   { veri: { kuryeler, bas, son, zaman } | null }
+ *   POST /api/hesaplama/veri              { ay, veri: { kuryeler, bas, son } }
+ * Getir'e buradan istek gitmez.
+ *
+ * KİLİT
  *
  * Şifrenin kendisi saklanmaz, bcrypt özeti saklanır. Unutulursa şifre
  * belirlenirken seçilen hafıza kartı (9 resimden biri) sorulur; doğru kart
@@ -41,6 +51,30 @@ function hakAcik(pf) {
 }
 
 const sifreGecerli = (v) => typeof v === 'string' && v.length >= EN_AZ && v.length <= EN_COK;
+
+const AY = /^\d{4}-(0[1-9]|1[0-2])$/;
+const GUN = /^\d{4}-\d{2}-\d{2}$/;
+const KIMLIK = /^[a-f0-9]{24}$/;
+const FOTO = /^https:\/\/cdn\.getir\.com\/person\/[A-Za-z0-9._-]+\.(?:png|jpe?g)(?:\?[0-9]+)?$/;
+const NOT = /^[A-F][+-]{0,2}$/;
+const KALEMLER = ['ilk', 'birlesen', 'finans', 'carsi', 'carsiBirlesen'];
+const sayi = (v, azami) => { const n = Number(v); return Number.isFinite(n) ? Math.min(Math.max(n, 0), azami) : 0; };
+
+/** Sayfanın gönderdiği kurye listesi; tanımadığı alan ve biçim düşer */
+function kuryeTemizle(k) {
+    if (!k || typeof k !== 'object' || !KIMLIK.test(String(k.id))) return null;
+    const say = {};
+    KALEMLER.forEach((t) => { say[t] = Math.round(sayi(k.say && k.say[t], 100000)); });
+    return {
+        id: String(k.id),
+        ad: (typeof k.ad === 'string' ? k.ad.replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, 80) : '') || 'Kurye',
+        foto: typeof k.foto === 'string' && FOTO.test(k.foto) ? k.foto : '',
+        say,
+        km: Math.round(sayi(k.km, 1000000) * 10) / 10,
+        not: typeof k.not === 'string' && NOT.test(k.not) ? k.not : null,
+        cdi: k.cdi == null || k.cdi === '' || !Number.isFinite(Number(k.cdi)) ? null : Number(k.cdi),
+    };
+}
 
 function kur(app, { pool, verifyToken, bearerOf }) {
     const sayac = new Map();
@@ -126,6 +160,44 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             [username, ozet, kart || null]
         );
     }
+
+    app.get('/api/hesaplama/veri', uye, async (req, res) => {
+        const ay = String(req.query.ay || '');
+        if (!AY.test(ay)) return res.status(400).json({ ok: false, error: 'gecersiz' });
+        try {
+            const r = await pool.query(
+                `SELECT veri, (extract(epoch FROM zaman) * 1000)::bigint AS zaman FROM hesaplama.veri WHERE username = $1 AND ay = $2`,
+                [req.auth.username, ay]
+            );
+            const x = r.rows[0];
+            res.json({ ok: true, veri: x ? Object.assign({}, x.veri, { zaman: Number(x.zaman) }) : null });
+        } catch (e) { hata(res, e, 'veri oku'); }
+    });
+
+    app.post('/api/hesaplama/veri', uye, async (req, res) => {
+        const b = req.body || {};
+        const v = b.veri && typeof b.veri === 'object' ? b.veri : {};
+        if (!AY.test(String(b.ay)) || !Array.isArray(v.kuryeler) || !GUN.test(String(v.bas)) || !GUN.test(String(v.son))) {
+            return res.status(400).json({ ok: false, error: 'gecersiz' });
+        }
+        const gorulen = new Set();
+        const kuryeler = v.kuryeler.slice(0, 500).map(kuryeTemizle).filter((k) => k && !gorulen.has(k.id) && gorulen.add(k.id));
+        try {
+            const r = await pool.query(
+                `INSERT INTO hesaplama.veri (username, ay, veri) VALUES ($1, $2, $3::jsonb)
+                 ON CONFLICT (username, ay) DO UPDATE SET veri = EXCLUDED.veri, zaman = now()
+                 RETURNING (extract(epoch FROM zaman) * 1000)::bigint AS zaman`,
+                [req.auth.username, b.ay, JSON.stringify({ kuryeler, bas: v.bas, son: v.son })]
+            );
+            // Kullanıcı başına son 12 ay
+            await pool.query(
+                `DELETE FROM hesaplama.veri WHERE username = $1 AND ay NOT IN
+                    (SELECT ay FROM hesaplama.veri WHERE username = $1 ORDER BY ay DESC LIMIT 12)`,
+                [req.auth.username]
+            );
+            res.json({ ok: true, zaman: Number(r.rows[0].zaman), adet: kuryeler.length });
+        } catch (e) { hata(res, e, 'veri yaz'); }
+    });
 
     app.get('/api/hesaplama/kilit', uye, async (req, res) => {
         try {

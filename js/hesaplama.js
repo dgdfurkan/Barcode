@@ -15,9 +15,10 @@
  *   not            cdi_letter_grade
  *
  * NEREDE DURUYOR
- * Panel verisi saklanmaz: ay açılınca panelden alınır, yalnız bellekte durur
- * (ayın 1'inden son gününe). Açılış şifresi hesapta (vps-api/hesaplama-kilit.js,
- * yalnız bcrypt özeti). Fiyatlar, araç, km desteği, not yükseltme, ek paket,
+ * Panel verisi (ayın 1'inden son gününe) bir kez okunur ve hesaba yazılır
+ * (vps-api/hesaplama-kilit.js, /api/hesaplama/veri); sonraki açılışlarda her
+ * cihaz oradan açar, panele yalnız Yenile ile gidilir. Sunucu yoksa her
+ * açılışta panelden okunur. Açılış şifresi de hesapta (yalnız bcrypt özeti). Fiyatlar, araç, km desteği, not yükseltme, ek paket,
  * başka hesap paketleri, avanslar ve eksik ürün listesi localStorage'da,
  * kullanıcı adına göre ayrı anahtarda; sunucuya gitmez.
  *
@@ -91,6 +92,7 @@
         ay: '',
         veri: new Map(),       // ay → { kuryeler, zaman, bas, son }
         yukleniyor: false,
+        panelden: false,       // yükleniyor: hesaptan mı panelden mi
         hata: null,
         ara: '',
         sira: 'ad',
@@ -228,6 +230,21 @@
         };
     }
 
+    /* Hesaptaki kayıt: varsa panele gidilmez. Sunucu yoksa ya da kayıt yoksa null. */
+    async function hesaptanVeri(ay) {
+        var c = await hsIstek('/api/hesaplama/veri?ay=' + ay);
+        var v = c.j && c.j.ok && c.j.veri;
+        if (!v || !Array.isArray(v.kuryeler)) return null;
+        var kuryeler = v.kuryeler.filter(function (k) { return k && KIMLIK.test(String(k.id)) && k.say && typeof k.say === 'object'; });
+        return { kuryeler: kuryeler, zaman: Number(v.zaman) || Date.now(), bas: v.bas, son: v.son };
+    }
+    async function hesabaYaz(ay, v) {
+        var c = await hsIstek('/api/hesaplama/veri', { ay: ay, veri: { kuryeler: v.kuryeler, bas: v.bas, son: v.son } });
+        if (c.j && c.j.ok) return;
+        if (c.kod === 404 || (c.j && c.j.error === 'kurulum_bekleniyor')) return;   // sunucu güncellenmedi: sessiz
+        bildir('Veri hesaba kaydedilemedi; bir dahaki açılışta panelden yeniden okunur', 'uyari');
+    }
+
     async function veriAl(ay, zorla) {
         if (!zorla && d.veri.has(ay)) return d.veri.get(ay);
         var r = aralik(ay);
@@ -236,6 +253,13 @@
             d.veri.set(ay, v0);
             return v0;
         }
+        d.panelden = false;
+        if (!zorla) {
+            var kayitli = await hesaptanVeri(ay);
+            if (kayitli) { d.veri.set(ay, kayitli); return kayitli; }
+        }
+        d.panelden = true;
+        durumCiz();
         if (!global.franchiseOturum) throw hataYap('oturum');
         var o = await global.franchiseOturum.al();
         if (!o || !o.depo) throw hataYap('depo');
@@ -263,6 +287,7 @@
         });
         var v = { kuryeler: kuryeler, zaman: Date.now(), bas: r.bas, son: r.son };
         d.veri.set(ay, v);
+        hesabaYaz(ay, v);
         return v;
     }
 
@@ -467,7 +492,7 @@
         var kutu = el('hsDurum');
         var v = d.veri.get(d.ay);
         var metin, tur;
-        if (d.yukleniyor) { metin = 'Panelden okunuyor'; tur = 'yukleniyor'; }
+        if (d.yukleniyor) { metin = d.panelden ? 'Panelden okunuyor' : 'Yükleniyor'; tur = 'yukleniyor'; }
         else if (d.hata) { metin = hataMetni(d.hata); tur = 'hata'; }
         else if (v) {
             var t = new Date(v.zaman).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -514,7 +539,7 @@
             if (d.hata) {
                 kutu.innerHTML = '<div class="hs-bos">' + ikon('kurye') + '<strong>Kurye verisi alınamadı</strong><p>' + kacir(hataMetni(d.hata)) + '</p><button type="button" class="hs-dugme" data-yenile>' + ikon('geri') + '<span>Tekrar Dene</span></button></div>';
             } else if (!d.yukleniyor) {
-                kutu.innerHTML = '<div class="hs-bos">' + ikon('kurye') + '<strong>' + kacir(ayAdi(d.ay)) + ' verisi alınmadı</strong><p>Kurye paketleri, not ve km ayın 1\'inden son gününe panelden alınır. Bu cihazda saklanmaz, sayfa her açıldığında yeniden alınır.</p><button type="button" class="hs-dugme hs-dugme--ana" data-yenile>' + ikon('geri') + '<span>Panelden Al</span></button></div>';
+                kutu.innerHTML = '<div class="hs-bos">' + ikon('kurye') + '<strong>' + kacir(ayAdi(d.ay)) + ' verisi alınmadı</strong><p>Kurye paketleri, not ve km ayın 1\'inden son gününe panelden bir kez alınır ve hesabına kaydedilir. Sonra her cihazda kayıttan açılır; güncellemek için Yenile\'ye basarsın.</p><button type="button" class="hs-dugme hs-dugme--ana" data-yenile>' + ikon('geri') + '<span>Panelden Al</span></button></div>';
             } else {
                 kutu.innerHTML = '<div class="hs-t-kap"><table class="hs-t">' + basHtml() + '<tbody>' +
                     [0, 1, 2, 3, 4].map(function () { return '<tr class="hs-t__iskelet"><td colspan="' + sutunSayisi() + '"><span class="hs-iskelet"></span></td></tr>'; }).join('') +
@@ -686,11 +711,13 @@
     var kilitBekle = 0;   // sunucunun verdiği bekleme bitişi (ms)
     var kilitSunucuYok = false;
 
-    async function kilitIstek(yol, govde) {
+    function kilitIstek(yol, govde) { return hsIstek('/api/hesaplama/kilit' + yol, govde); }
+
+    async function hsIstek(yol, govde) {
         var a = global.jetbarkodAuth;
         if (!a || !a.apiFetch || !a.get || !a.get()) return { kod: 401, j: {} };
         try {
-            var r = await a.apiFetch('/api/hesaplama/kilit' + yol, govde ? {
+            var r = await a.apiFetch(yol, govde ? {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(govde)
             } : {});
             var j = null;
