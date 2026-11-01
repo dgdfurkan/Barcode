@@ -8,6 +8,8 @@
  * okur, panele yalnız Yenile ile gidilir. Kullanıcı başına son 12 ay.
  *   GET  /api/hesaplama/veri?ay=YYYY-MM   { veri: { kuryeler, bas, son, zaman } | null }
  *   POST /api/hesaplama/veri              { ay, veri: { kuryeler, bas, son } }
+ *   GET  /api/hesaplama/veri/aylar        { aylar: [{ ay, zaman, adet }] }
+ *   POST /api/hesaplama/veri/sil          { ay }
  * Getir'e buradan istek gitmez.
  *
  * KİLİT
@@ -197,6 +199,26 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             );
             res.json({ ok: true, zaman: Number(r.rows[0].zaman), adet: kuryeler.length });
         } catch (e) { hata(res, e, 'veri yaz'); }
+    });
+
+    app.get('/api/hesaplama/veri/aylar', uye, async (req, res) => {
+        try {
+            const r = await pool.query(
+                `SELECT ay, (extract(epoch FROM zaman) * 1000)::bigint AS zaman, jsonb_array_length(veri->'kuryeler') AS adet
+                   FROM hesaplama.veri WHERE username = $1 ORDER BY ay DESC`,
+                [req.auth.username]
+            );
+            res.json({ ok: true, aylar: r.rows.map((x) => ({ ay: x.ay, zaman: Number(x.zaman), adet: Number(x.adet) || 0 })) });
+        } catch (e) { hata(res, e, 'aylar'); }
+    });
+
+    app.post('/api/hesaplama/veri/sil', uye, async (req, res) => {
+        const ay = String((req.body || {}).ay || '');
+        if (!AY.test(ay)) return res.status(400).json({ ok: false, error: 'gecersiz' });
+        try {
+            const r = await pool.query('DELETE FROM hesaplama.veri WHERE username = $1 AND ay = $2', [req.auth.username, ay]);
+            res.json({ ok: true, silindi: r.rowCount });
+        } catch (e) { hata(res, e, 'sil'); }
     });
 
     app.get('/api/hesaplama/kilit', uye, async (req, res) => {
