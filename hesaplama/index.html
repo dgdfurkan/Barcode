@@ -21,7 +21,7 @@
     <link rel="stylesheet" href="../css/siparisler.css?v=20261031a" />
     <link rel="stylesheet" href="../css/yardimcilar.css?v=20261022b" />
     <link rel="stylesheet" href="../css/urun-foto.css?v=20261018a" />
-    <link rel="stylesheet" href="../css/hesaplama.css?v=20261031e" />
+    <link rel="stylesheet" href="../css/hesaplama.css?v=20261101a" />
     <script src="../js/auth-token.js?v=20261007a"></script>
     <script src="../js/db-config.js?v=20260828i"></script>
     <script src="../js/jb-db.js?v=20261014a"></script>
@@ -93,6 +93,9 @@
                     <div class="hs-ay__metin"><strong id="hsAyAd">&nbsp;</strong><span id="hsAyAlt">&nbsp;</span></div>
                     <button type="button" class="hs-ay__ok" id="hsAyIleri" aria-label="Sonraki ay"><svg viewBox="0 0 20 20"><path d="m8 4 6 6-6 6"/></svg></button>
                 </div>
+                <button type="button" class="hs-dugme hs-eksik-ac" id="hsEksikAc">
+                    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6.5 10 3l6.5 3.5v7L10 17l-6.5-3.5z"/><path d="M7.5 10.5h5"/></svg><span>Eksik Ürünler</span><b id="hsEksikRozet" hidden></b>
+                </button>
                 <div class="hs-durum" id="hsDurum" aria-live="polite">
                     <span class="hs-durum__nokta"></span><span id="hsDurumMetin">&nbsp;</span>
                     <button type="button" class="hs-dugme hs-dugme--kucuk" id="hsYenile">
@@ -131,6 +134,23 @@
         </div>
     </div>
 
+    <div class="hs-perde" id="hsEksik" hidden>
+        <div class="hs-pano hs-pano--eksik" role="dialog" aria-modal="true" aria-labelledby="hsEksikBaslik">
+            <div class="hs-pano__bas">
+                <div><h2 id="hsEksikBaslik">Eksik Ürünler</h2><p>Kuryeye göre eksik ürünler. İstemediğin ürünü listeden çıkar; Excel ve çıktı ona göre güncellenir.</p></div>
+                <button type="button" class="hs-kapat" data-kapat aria-label="Kapat"><svg viewBox="0 0 20 20"><path d="m5 5 10 10M15 5 5 15"/></svg></button>
+            </div>
+            <div class="hs-pano__govde" id="hsEksikGovde"></div>
+            <div class="hs-pano__ayak" id="hsEksikAyak" hidden>
+                <span class="hs-pano__toplam" id="hsEksikToplam"></span>
+                <div class="hs-pano__ayak-d">
+                    <button type="button" class="hs-dugme" data-eksik-excel><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3.5v9M6 8.5l4 4 4-4M4 16.5h12"/></svg><span>Excel İndir</span></button>
+                    <button type="button" class="hs-dugme hs-dugme--ana" data-eksik-yazdir><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 7V3.5h8V7"/><rect x="3" y="7" width="14" height="7" rx="1.5"/><path d="M6 12h8v4.5H6z"/></svg><span>PDF / Yazdır</span></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="hs-perde" id="hsKutu" hidden>
         <div class="hs-pano hs-pano--dar" role="dialog" aria-modal="true" aria-labelledby="hsKutuBaslik">
             <div class="hs-pano__bas">
@@ -142,6 +162,7 @@
     </div>
 
     <script src="../js/urun-foto.js?v=20261018a"></script>
-    <script src="../js/hesaplama.js?v=20261031e"></script>
+    <script src="../js/hesaplama-eksik.js?v=20261101a"></script>
+    <script src="../js/hesaplama.js?v=20261101a"></script>
 </body>
 </html>
