@@ -430,40 +430,92 @@
 
     function paraYaz(n) { return '₺' + kurus(n).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+    /* A4 çıktı ayrı bir belgede (gizli iframe): sayfanın stilleri ve kaydırma
+       kilidi çıktıya karışmaz. Önce kurye özeti, sonra şablondaki tablo
+       (Kurye / Tarih / Ürün Adı / Tutar, "… Toplamı", Genel Toplam). */
+    var BASKI_STIL =
+        '@page{size:A4 portrait;margin:14mm 12mm 16mm;@bottom-right{content:"Sayfa " counter(page) " / " counter(pages);font:8pt Arial,sans-serif;color:#667085}@bottom-left{content:var(--alt,"");font:8pt Arial,sans-serif;color:#667085}}' +
+        '*{box-sizing:border-box}html,body{margin:0;background:#fff}' +
+        'body{font:9pt/1.35 Calibri,Carlito,Arial,sans-serif;color:#101828;-webkit-print-color-adjust:exact;print-color-adjust:exact}' +
+        '.bas{display:flex;justify-content:space-between;align-items:flex-end;gap:8mm;padding-bottom:3mm;margin-bottom:5mm;border-bottom:1.5pt solid #17365d}' +
+        '.bas h1{margin:0;font-size:15pt;color:#17365d;letter-spacing:.2pt}.bas p{margin:1mm 0 0;font-size:9pt;color:#475467}' +
+        '.top{text-align:right;white-space:nowrap}.top b{display:block;font-size:15pt;color:#17365d}.top span{font-size:8pt;color:#475467}' +
+        'h2{margin:0 0 2mm;font-size:10pt;color:#17365d;text-transform:uppercase;letter-spacing:.4pt}' +
+        'table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}' +
+        'th,td{border:.5pt solid #c3ccd9;padding:1.3mm 2mm;text-align:left;vertical-align:top;overflow-wrap:anywhere}' +
+        'th{background:#17365d;color:#fff;font-weight:700;font-size:8.5pt}' +
+        'tr{break-inside:avoid}.sag{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.orta{text-align:center}' +
+        '.ozet{margin-bottom:7mm}.ozet td{padding:1.1mm 2mm}.ozet tr:nth-child(even) td{background:#f5f7fa}' +
+        '.ozet tfoot td,.genel td{background:#17365d;color:#fff;font-weight:700;border-color:#17365d}' +
+        '.kurye td{background:#f5f7fa}.kurye.ilk td{border-top:1pt solid #8da2bf}.ara td{background:#dce6f1;font-weight:700}' +
+        '.bos{color:#98a2b3}';
+
+    function yazdirHtml(gruplar, bilgi) {
+        var genel = 0, adet = 0;
+        var ozet = gruplar.map(function (g) {
+            var t = kurus(g.satirlar.reduce(function (a, s) { return a + s.tutar; }, 0));
+            genel += t; adet += g.satirlar.length;
+            return { ad: g.ad, adet: g.satirlar.length, toplam: t };
+        });
+        genel = kurus(genel);
+        var bugun = new Date().toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        var detay = gruplar.map(function (g, gi) {
+            return '<tbody>' + g.satirlar.map(function (s, i) {
+                return '<tr class="kurye' + (i === 0 ? ' ilk' : '') + '"><td>' + (i === 0 ? x(g.ad) : '<span class="bos">' + x(g.ad) + '</span>') + '</td><td>' + trTarih(s.tarih) + '</td><td>' + x(s.urun) + '</td><td class="sag">' + paraYaz(s.tutar) + '</td></tr>';
+            }).join('') + '<tr class="ara"><td colspan="3">' + x(g.ad) + ' Toplamı</td><td class="sag">' + paraYaz(ozet[gi].toplam) + '</td></tr></tbody>';
+        }).join('');
+        return '<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>' + x(bilgi.dosya || bilgi.baslik) + '</title>' +
+            '<style>' + BASKI_STIL + ':root{--alt:"' + x(bilgi.baslik + ' · ' + bilgi.alt).replace(/"/g, '') + '"}</style></head><body>' +
+            '<header class="bas"><div><h1>' + x(bilgi.baslik) + '</h1><p>' + x(bilgi.alt) + ' · Hazırlanma ' + bugun + '</p></div>' +
+                '<div class="top"><b>' + paraYaz(genel) + '</b><span>' + gruplar.length + ' kurye · ' + adet + ' ürün</span></div></header>' +
+            '<section class="ozet"><h2>Kurye Özeti</h2><table><colgroup><col style="width:58%"><col style="width:14%"><col style="width:28%"></colgroup>' +
+                '<thead><tr><th>Kurye</th><th class="orta">Ürün</th><th class="sag">Tutar</th></tr></thead><tbody>' +
+                ozet.map(function (o) { return '<tr><td>' + x(o.ad) + '</td><td class="orta">' + o.adet + '</td><td class="sag">' + paraYaz(o.toplam) + '</td></tr>'; }).join('') +
+                '</tbody><tfoot><tr><td>Genel Toplam</td><td class="orta">' + adet + '</td><td class="sag">' + paraYaz(genel) + '</td></tr></tfoot></table></section>' +
+            '<section><h2>Ürün Listesi</h2><table><colgroup><col style="width:25%"><col style="width:13%"><col style="width:46%"><col style="width:16%"></colgroup>' +
+                '<thead><tr><th>Kurye</th><th>Tarih</th><th>Ürün Adı</th><th class="sag">Tutar</th></tr></thead>' + detay +
+                /* tfoot her sayfada tekrar basılır; Genel Toplam yalnız sonda */
+                '<tbody><tr class="genel"><td colspan="3">Genel Toplam</td><td class="sag">' + paraYaz(genel) + '</td></tr></tbody></table></section>' +
+            '</body></html>';
+    }
+
     function yazdir(gruplar, bilgi) {
         var eski = document.getElementById('hsYazdir');
         if (eski) eski.remove();
-        var genel = 0, adet = 0;
-        var govde = gruplar.map(function (g, i) {
-            var toplam = 0;
-            var satirlar = g.satirlar.map(function (s) {
-                toplam += s.tutar; adet++;
-                return '<tr class="' + (i % 2 ? 'is-cift' : '') + '"><td>' + x(g.ad) + '</td><td>' + trTarih(s.tarih) + '</td><td>' + x(s.urun) + '</td><td class="sag">' + paraYaz(s.tutar) + '</td></tr>';
-            }).join('');
-            genel += kurus(toplam);
-            return '<tbody>' + satirlar + '<tr class="ara"><td colspan="3">' + x(g.ad) + ' Toplamı</td><td class="sag">' + paraYaz(toplam) + '</td></tr></tbody>';
-        }).join('');
-        var kap = document.createElement('div');
-        kap.id = 'hsYazdir';
-        kap.className = 'hs-yazdir';
-        kap.innerHTML =
-            '<header><h1>' + x(bilgi.baslik) + '</h1><p>' + x(bilgi.alt) + ' · ' + gruplar.length + ' kurye · ' + adet + ' ürün</p></header>' +
-            '<table><colgroup><col style="width:27%"><col style="width:13%"><col style="width:46%"><col style="width:14%"></colgroup>' +
-            '<thead><tr><th>Kurye</th><th>Tarih</th><th>Ürün Adı</th><th class="sag">Tutar</th></tr></thead>' + govde +
-            /* tfoot her sayfada tekrar basılır; Genel Toplam yalnız sonda */
-            '<tbody><tr class="genel"><td colspan="3">Genel Toplam</td><td class="sag">' + paraYaz(genel) + '</td></tr></tbody></table>';
-        document.body.appendChild(kap);
+        /* iOS Safari iframe'i değil bütün sayfayı basar; orada rapor yeni sekmede açılır */
+        var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        if (ios) {
+            var p = global.open('', '_blank');
+            if (p) {
+                p.document.open();
+                p.document.write(yazdirHtml(gruplar, bilgi).replace('</body>', '<script>setTimeout(function(){print()},300)<\/script></body>'));
+                p.document.close();
+                return;
+            }
+        }
+        var f = document.createElement('iframe');
+        f.id = 'hsYazdir';
+        f.setAttribute('aria-hidden', 'true');
+        f.tabIndex = -1;
+        f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+        document.body.appendChild(f);
         var eskiBaslik = document.title;
+        /* PDF olarak kaydederken dosya adı */
         document.title = bilgi.dosya || eskiBaslik;
-        document.body.classList.add('hs-yazdiriliyor');
+        var w = f.contentWindow;
+        w.document.open();
+        w.document.write(yazdirHtml(gruplar, bilgi));
+        w.document.close();
         var bitti = function () {
-            document.body.classList.remove('hs-yazdiriliyor');
             document.title = eskiBaslik;
-            removeEventListener('afterprint', bitti);
+            setTimeout(function () { f.remove(); }, 1000);
         };
-        addEventListener('afterprint', bitti);
-        setTimeout(function () { global.print(); }, 30);
+        w.addEventListener('afterprint', bitti);
+        setTimeout(function () {
+            w.focus();
+            w.print();
+        }, 60);
     }
 
-    global.JBEksik = { oku: oku, excel: excel, yazdir: yazdir, excelBlob: excelBlob };
+    global.JBEksik = { oku: oku, excel: excel, yazdir: yazdir, yazdirHtml: yazdirHtml, excelBlob: excelBlob };
 })(window);

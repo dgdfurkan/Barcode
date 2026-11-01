@@ -170,6 +170,9 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
   `sql_files/sayim_fark.sql` (raporlanan görevler) çalıştırılacak; `vps-api/sayim-fark.js` + `vps-api/katalog.js` +
   `vps-api/telegram-ayar.js` + `vps-api/gece-raporu/` VPS'e atılıp servis yeniden başlatılacak. Asistan değişmedi:
   sunucu `/api/gece-raporu/ayar` saatlerine sayım farkı saatlerini de ekliyor, Asistan sayımları o saatlerden önce okuyor.
+- Hesaplama kilidi: `sql_files/hesaplama_kilit.sql` çalıştırılacak, `vps-api/hesaplama-kilit.js` + `server.js` VPS'e atılıp
+  servis yeniden başlatılacak. Şifre artık hesapta (bcrypt özeti); çalışana kadar Hesaplama şifre sormadan açılır,
+  Ayarlar'da "sunucu güncellemesi bekleniyor" yazar.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

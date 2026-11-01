@@ -14,15 +14,17 @@
  *   km             g10_distance_km (yalnız km desteği açık kuryede)
  *   not            cdi_letter_grade
  *
- * HİÇBİR ŞEY SUNUCUYA GİTMİYOR
- * Panel verisi, fiyatlar, araç, km desteği, not yükseltme, ek paket, başka
- * hesap paketleri, avanslar ve eksik ürün listesi localStorage'da, kullanıcı
- * adına göre ayrı anahtarda.
+ * NEREDE DURUYOR
+ * Panel verisi saklanmaz: ay açılınca panelden alınır, yalnız bellekte durur
+ * (ayın 1'inden son gününe). Açılış şifresi hesapta (vps-api/hesaplama-kilit.js,
+ * yalnız bcrypt özeti). Fiyatlar, araç, km desteği, not yükseltme, ek paket,
+ * başka hesap paketleri, avanslar ve eksik ürün listesi localStorage'da,
+ * kullanıcı adına göre ayrı anahtarda; sunucuya gitmez.
  *
  * HESAP
  *   paket tutarı = Σ (panel + elle ek + başka hesap) × fiyat[araç][not][kalem]
  *   km desteği   = km × km fiyatı[araç]   (km: elle yazılan, yoksa G10 km)
- *   net          = paket tutarı + km desteği − avanslar − eksik ürün (işlendiyse)
+ *   net          = paket tutarı + km desteği − avanslar − eksik ürün (eklendiyse)
  * Not, panelin notudur; kullanıcı bir tık yükseltip düşürebilir (yalnız fiyat
  * değişir). Başka hesap: kurye başka birinin hesabından da çıktıysa o
  * paketler satırda elle girilir.
@@ -31,7 +33,7 @@
  * Franchise panelinin eksik ürün Excel'i (js/hesaplama-eksik.js okur) ayın
  * kaydına girer. Excel'deki kurye adı tablodaki kuryeyle adından eşleşir,
  * eşleşmeyen elle seçilir (kayit.esle, aylar arası kalır). Tutar tabloda
- * görünür ama "Hak Edişe İşle" denene kadar netten düşülmez.
+ * görünür ama "Hak Edişe Ekle" denene kadar netten düşülmez.
  * ============================================================================
  */
 (function (global) {
@@ -93,9 +95,12 @@
         ara: '',
         sira: 'ad',
         fiyatArac: 'moto',
+        fiyatKopya: false,     // Ayarlar: Arabalıya kopyala modu
         acik: {},              // kurye id → başka hesap satırı açık mı
         eksikYukleniyor: false,
+        eksikYukMetin: '',
         eksikHata: '',
+        eksikRapor: {},        // ay → 'yok' (Raporlar'da o ayın raporu bulunamadı)
         ornek: /[?&]ornek\b/.test(location.search)
     };
     var kayit = null;
@@ -127,7 +132,7 @@
         var o = null;
         try { o = JSON.parse(localStorage.getItem(anahtar()) || 'null'); } catch (e) { o = null; }
         o = nesne(o);
-        return { v: 1, fiyat: nesne(o.fiyat), km: nesne(o.km), gizli: nesne(o.gizli), kurye: nesne(o.kurye), ay: nesne(o.ay), esle: nesne(o.esle) };
+        return { v: 1, fiyat: nesne(o.fiyat), km: nesne(o.km), gizli: nesne(o.gizli), kurye: nesne(o.kurye), ay: nesne(o.ay), esle: nesne(o.esle), kopya: nesne(o.kopya) };
     }
 
     var yazZaman = 0;
@@ -140,26 +145,11 @@
         if (hemen) yaz(); else yazZaman = setTimeout(yaz, 250);
     }
 
-    /* Panelden alınan aylık liste: Yenile'ye basılınca alınır, sonra bu cihazda
-       tutulur; sayfa her açılışta panele gitmez. En çok son 6 ay. */
-    var VERI_AY = 6;
-    function veriAnahtari() { return 'jb_hesaplama_veri:' + (d.kim || 'misafir'); }
-    function veriOku() {
-        var o = null;
-        try { o = JSON.parse(localStorage.getItem(veriAnahtari()) || 'null'); } catch (e) { o = null; }
-        o = nesne(o);
-        Object.keys(o).forEach(function (ay) {
-            var v = o[ay];
-            if (/^\d{4}-\d{2}$/.test(ay) && v && Array.isArray(v.kuryeler)) d.veri.set(ay, v);
+    /* Eski sürümler panel verisini ve kilit özetini bu cihazda tutuyordu; artık tutulmuyor */
+    function eskiYerelSil() {
+        ['jb_hesaplama_veri:', 'jb_hesaplama_kilit:'].forEach(function (on) {
+            try { localStorage.removeItem(on + (d.kim || 'misafir')); } catch (e) { /* sessiz */ }
         });
-    }
-    function veriYaz() {
-        if (d.ornek) return;
-        var aylar = Array.from(d.veri.keys()).sort().slice(-VERI_AY);
-        var o = {};
-        aylar.forEach(function (ay) { o[ay] = d.veri.get(ay); });
-        try { localStorage.setItem(veriAnahtari(), JSON.stringify(o)); }
-        catch (e) { bildir('Panel verisi bu cihaza kaydedilemedi: tarayıcı belleği dolu', 'uyari'); }
     }
 
     function ayKaydi(yaz) {
@@ -197,16 +187,13 @@
         return +b.slice(8, 10) <= 7 ? ayKaydir(b.slice(0, 7), -1) : b.slice(0, 7);
     }
 
+    /* Her zaman ayın 1'inden son gününe; süren ayda da (panel olmayan günleri boş sayar) */
     function aralik(ay) {
-        var b = bugun();
-        var bas = ay + '-01';
-        var son = new Date(Date.UTC(+ay.slice(0, 4), +ay.slice(5, 7), 0)).toISOString().slice(0, 10);
-        var surer = b.slice(0, 7) === ay;
-        if (surer) {
-            var dun = new Date(Date.parse(b + 'T12:00:00Z') - 864e5).toISOString().slice(0, 10);
-            son = dun < bas ? bas : dun;
-        }
-        return { bas: bas, son: son, surer: surer };
+        return {
+            bas: ay + '-01',
+            son: new Date(Date.UTC(+ay.slice(0, 4), +ay.slice(5, 7), 0)).toISOString().slice(0, 10),
+            surer: bugun().slice(0, 7) === ay
+        };
     }
 
     function aralikYazi(r) {
@@ -275,7 +262,6 @@
         });
         var v = { kuryeler: kuryeler, zaman: Date.now(), bas: r.bas, son: r.son };
         d.veri.set(ay, v);
-        veriYaz();
         return v;
     }
 
@@ -470,7 +456,7 @@
         var r = aralik(d.ay);
         el('hsAyAd').textContent = ayAdi(d.ay);
         var alt = aralikYazi(r);
-        if (r.surer) alt += ' · Ay sürüyor, dün dahil';
+        if (r.surer) alt += ' · Ay sürüyor';
         else if (ayKaydir(d.ay, 1) === bugun().slice(0, 7) && +bugun().slice(8, 10) === 1 && saat() < 13) alt += ' · Son gün öğleden sonra tamamlanır';
         el('hsAyAlt').textContent = alt;
         el('hsAyIleri').disabled = d.ay >= bugun().slice(0, 7);
@@ -527,7 +513,7 @@
             if (d.hata) {
                 kutu.innerHTML = '<div class="hs-bos">' + ikon('kurye') + '<strong>Kurye verisi alınamadı</strong><p>' + kacir(hataMetni(d.hata)) + '</p><button type="button" class="hs-dugme" data-yenile>' + ikon('geri') + '<span>Tekrar Dene</span></button></div>';
             } else if (!d.yukleniyor) {
-                kutu.innerHTML = '<div class="hs-bos">' + ikon('kurye') + '<strong>' + kacir(ayAdi(d.ay)) + ' verisi alınmadı</strong><p>Kurye paketleri, not ve km panelden bir kez alınır, sonra bu cihazda durur. Güncellemek istediğinde Yenile\'ye basarsın.</p><button type="button" class="hs-dugme hs-dugme--ana" data-yenile>' + ikon('geri') + '<span>Panelden Al</span></button></div>';
+                kutu.innerHTML = '<div class="hs-bos">' + ikon('kurye') + '<strong>' + kacir(ayAdi(d.ay)) + ' verisi alınmadı</strong><p>Kurye paketleri, not ve km ayın 1\'inden son gününe panelden alınır. Bu cihazda saklanmaz, sayfa her açıldığında yeniden alınır.</p><button type="button" class="hs-dugme hs-dugme--ana" data-yenile>' + ikon('geri') + '<span>Panelden Al</span></button></div>';
             } else {
                 kutu.innerHTML = '<div class="hs-t-kap"><table class="hs-t">' + basHtml() + '<tbody>' +
                     [0, 1, 2, 3, 4].map(function () { return '<tr class="hs-t__iskelet"><td colspan="' + sutunSayisi() + '"><span class="hs-iskelet"></span></td></tr>'; }).join('') +
@@ -595,8 +581,8 @@
             '</div><small>G10 ' + adet(h.g10) + '</small></div></td>';
 
         var eksik = '<td><div class="hs-hucre">' + (h.eksikAdet
-            ? '<button type="button" class="hs-eksik-d' + (h.eksikIslendi ? ' is-islendi' : '') + '" data-eksik-ac title="' + (h.eksikIslendi ? 'Hak edişten düşülüyor' : 'Hak edişe işlenmedi') + '" aria-label="' + kacir(k.ad) + ' eksik ürün">−' + para(h.eksik) + '</button>' +
-                '<small>' + (h.eksikIslendi ? adet(h.eksikAdet) + ' ürün' : 'İşlenmedi') + '</small>'
+            ? '<button type="button" class="hs-eksik-d' + (h.eksikIslendi ? ' is-islendi' : '') + '" data-eksik-ac title="' + (h.eksikIslendi ? 'Hak edişten düşülüyor' : 'Hak edişe eklenmedi') + '" aria-label="' + kacir(k.ad) + ' eksik ürün">−' + para(h.eksik) + '</button>' +
+                '<small>' + (h.eksikIslendi ? adet(h.eksikAdet) + ' ürün' : 'Eklenmedi') + '</small>'
             : '<span class="hs-eksik-bos">–</span><small>&nbsp;</small>') + '</div></td>';
 
         var avans = '<td><div class="hs-hucre"><button type="button" class="hs-avans-d' + (h.avans ? ' is-var' : '') + '" data-avans-ac aria-label="' + kacir(k.ad) + ' avans">' +
@@ -670,13 +656,14 @@
     function hepsiniCiz() { donemCiz(); durumCiz(); listeCiz(); ozetCiz(); }
 
     // ------------------------------------------------------------------
-    // Kilit: her açılışta şifre (yalnız bu cihazda)
+    // Kilit: her açılışta şifre (hesapta)
     // ------------------------------------------------------------------
     /*
      * İlk girişte şifre sorulmaz, belirlenir; yanında bir hafıza kartı seçilir.
-     * Şifre unutulursa doğru kart seçilince yeni şifre yazılır. Şifrenin kendisi
-     * saklanmaz: PBKDF2 (SHA-256, 120 bin tur) özeti ve tuzu localStorage'da.
-     * Bu bir cihaz kilidi; sunucuya hiçbir şey gitmez.
+     * Şifre unutulursa doğru kart seçilince yeni şifre yazılır. Şifre ve kart
+     * hesapta (vps-api/hesaplama-kilit.js): sunucu bcrypt özetini tutar, kartı
+     * hiçbir yanıtta geri vermez, yanlış denemede bekletir. Bu cihazda bir şey
+     * tutulmaz. Sunucu güncellenene kadar (404) sayfa kilitsiz açılır.
      */
     var KARTLAR = [
         { k: 'motor', ad: 'Motor', renk: '#2563eb', zemin: '#eff4ff', yol: '<circle cx="6" cy="16.5" r="3"/><circle cx="18" cy="16.5" r="3"/><path d="M6 16.5h5.5l3.5-6H18l-3 6M12.5 6.5H15l1.2 4"/>' },
@@ -691,40 +678,39 @@
     ];
     var KILIT_IKON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><path d="M12 14.5v2.5"/></svg>';
     var EN_AZ_SIFRE = 4;
-    var YANLIS_KART_SINIRI = 3;
     var kilitCoz = null;
     var kilitMod = '';
     var kartSecim = '';
+    var kilitJeton = '';
+    var kilitBekle = 0;   // sunucunun verdiği bekleme bitişi (ms)
+    var kilitSunucuYok = false;
 
-    function kilitAnahtari() { return 'jb_hesaplama_kilit:' + (d.kim || 'misafir'); }
-    function kilitOku() {
-        var o = null;
-        try { o = JSON.parse(localStorage.getItem(kilitAnahtari()) || 'null'); } catch (e) { o = null; }
-        return o && o.ozet && o.tuz && o.kart ? o : null;
-    }
-    function kilitYaz(o) {
-        try { localStorage.setItem(kilitAnahtari(), JSON.stringify(o)); return true; }
-        catch (e) { bildir('Şifre kaydedilemedi: tarayıcı belleği dolu', 'hata'); return false; }
+    async function kilitIstek(yol, govde) {
+        var a = global.jetbarkodAuth;
+        if (!a || !a.apiFetch || !a.get || !a.get()) return { kod: 401, j: {} };
+        try {
+            var r = await a.apiFetch('/api/hesaplama/kilit' + yol, govde ? {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(govde)
+            } : {});
+            var j = null;
+            try { j = await r.json(); } catch (e) { /* gövde yok */ }
+            return { kod: r.status, j: j || {} };
+        } catch (e) {
+            return { kod: 0, j: { error: 'ag' } };
+        }
     }
 
-    function onaltilik(tampon) {
-        return Array.prototype.map.call(new Uint8Array(tampon), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
-    }
-    async function sifreOzeti(sifre, tuz) {
-        var kod = new TextEncoder();
-        var anahtar = await crypto.subtle.importKey('raw', kod.encode(sifre), 'PBKDF2', false, ['deriveBits']);
-        var bit = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: kod.encode(tuz), iterations: 120000, hash: 'SHA-256' }, anahtar, 256);
-        return onaltilik(bit);
-    }
-    function yeniTuz() { var a = new Uint8Array(16); crypto.getRandomValues(a); return onaltilik(a.buffer); }
-
-    async function sifreKaydet(sifre, kart) {
-        var tuz = yeniTuz();
-        return kilitYaz({ s: 1, tuz: tuz, ozet: await sifreOzeti(sifre, tuz), kart: kart });
-    }
-    async function sifreDogruMu(sifre) {
-        var k = kilitOku();
-        return !!k && (await sifreOzeti(sifre, k.tuz)) === k.ozet;
+    /* Sunucu yanıtı → ekrandaki cümle. Bekleme varsa kilitBekle'ye yazılır. */
+    function kilitHatasi(c, yanlisMetni) {
+        var k = c.j && c.j.error;
+        if (c.j && c.j.bekleSn > 0) kilitBekle = Date.now() + c.j.bekleSn * 1000;
+        if (k === 'bekle' || (k === 'yanlis' && c.j.bekleSn > 0)) return 'Çok fazla yanlış deneme. ' + c.j.bekleSn + ' sn sonra tekrar dene.';
+        if (k === 'yanlis') return yanlisMetni + (c.j.kalan > 0 ? ' ' + c.j.kalan + ' deneme hakkın kaldı.' : '');
+        if (k === 'jeton') return 'Süre doldu. Hafıza kartını yeniden seç.';
+        if (k === 'cok_istek') return 'Çok sık denendi. Birkaç saniye sonra tekrar dene.';
+        if (c.kod === 401) return 'Oturum doldu. Sayfayı yenileyip tekrar giriş yap.';
+        if (c.kod === 0) return 'Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.';
+        return 'İşlem yapılamadı. Biraz sonra tekrar dene.';
     }
 
     function kartHtml(secili, karisik) {
@@ -744,8 +730,7 @@
     function kilitCiz(mod, mesaj) {
         kilitMod = mod;
         var k = el('hsKilitKart');
-        var kayitli = kilitOku();
-        var bekleme = kayitli && kayitli.kilitKadar && kayitli.kilitKadar > Date.now() ? Math.ceil((kayitli.kilitKadar - Date.now()) / 1000) : 0;
+        var bekleme = kilitBekle > Date.now() ? Math.ceil((kilitBekle - Date.now()) / 1000) : 0;
         var hata = '<p class="hs-kilit__hata" data-hata>' + kacir(mesaj || '') + '</p>';
         if (mod === 'ac') {
             k.innerHTML = '<span class="hs-kilit__im">' + KILIT_IKON + '</span>' +
@@ -756,14 +741,18 @@
                 '</form>' +
                 '<button type="button" class="hs-kilit__bag" data-mod="unuttum">Şifremi Unuttum</button>';
         } else if (mod === 'kur' || mod === 'yeni') {
-            kartSecim = mod === 'yeni' && kayitli ? kayitli.kart : '';
+            kartSecim = '';
             k.innerHTML = '<span class="hs-kilit__im">' + KILIT_IKON + '</span>' +
                 '<h1>' + (mod === 'kur' ? 'Şifre Belirle' : 'Yeni Şifre') + '</h1>' +
-                '<p>' + (mod === 'kur' ? 'Hesaplama bundan sonra her açılışta bu şifreyi sorar. Şifre yalnız bu cihazda tutulur.' : 'Hafıza kartın doğru. Yeni şifreni yaz.') + '</p>' +
+                '<p>' + (mod === 'kur' ? 'Hesaplama bundan sonra her açılışta bu şifreyi sorar. Şifre hesabında tutulur, her cihazda aynıdır.' : 'Hafıza kartın doğru. Yeni şifreni yaz.') + '</p>' +
                 '<form class="hs-kilit__form" data-form="' + mod + '" novalidate>' + sifreAlanlari(mod === 'yeni') +
                     (mod === 'kur' ? '<div class="hs-kilit__kart"><b>Hafıza Kartı</b><small>Şifreni unutursan bu kartı seçerek sıfırlarsın. Aklında kalacak birini seç.</small>' + kartHtml('', false) + '</div>' : '') +
                     hata + '<button type="submit" class="hs-dugme hs-dugme--ana hs-dugme--tam">' + (mod === 'kur' ? 'Kaydet ve Aç' : 'Şifreyi Kaydet') + '</button>' +
                 '</form>';
+        } else if (mod === 'hata') {
+            k.innerHTML = '<span class="hs-kilit__im hs-kilit__im--sari">' + KILIT_IKON + '</span>' +
+                '<h1>Kilit Açılamadı</h1><p>' + kacir(mesaj || '') + '</p>' +
+                '<button type="button" class="hs-dugme hs-dugme--ana hs-dugme--tam" data-mod="yokla">Tekrar Dene</button>';
         } else {
             k.innerHTML = '<span class="hs-kilit__im hs-kilit__im--sari">' + KILIT_IKON + '</span>' +
                 '<h1>Hafıza Kartın Hangisi?</h1><p>Şifreyi belirlerken seçtiğin kartı bul. Doğru kartla yeni şifre yazarsın.</p>' +
@@ -796,15 +785,34 @@
     function kilitAcildi() {
         var c = kilitCoz;
         kilitCoz = null;
+        kilitJeton = '';
         el('hsKilitKart').innerHTML = '';
         if (c) c();
     }
 
+    /* Sunucuya sor: şifre var mı. Yoksa belirlenir; sunucu güncellenmediyse kilitsiz açılır. */
+    async function kilitYokla() {
+        el('hsKilitKart').innerHTML = '<span class="hs-kilit__im">' + KILIT_IKON + '</span><h1>Hesaplama Kilitli</h1><p>Hesabın kontrol ediliyor.</p>';
+        var c = await kilitIstek('');
+        if (c.kod === 404 || (c.j && c.j.error === 'kurulum_bekleniyor')) {
+            kilitSunucuYok = true;
+            kilitAcildi();
+            return;
+        }
+        if (!c.j.ok) { kilitCiz('hata', kilitHatasi(c, '')); return; }
+        if (c.j.bekleSn > 0) kilitBekle = Date.now() + c.j.bekleSn * 1000;
+        kilitCiz(c.j.kurulu ? 'ac' : 'kur');
+    }
+
     function kilitOlaylari() {
         var k = el('hsKilitKart');
-        k.addEventListener('click', function (e) {
+        k.addEventListener('click', async function (e) {
             var b = e.target.closest('[data-mod]');
-            if (b) { kilitCiz(b.getAttribute('data-mod')); return; }
+            if (b) {
+                if (b.getAttribute('data-mod') === 'yokla') kilitYokla();
+                else kilitCiz(b.getAttribute('data-mod'));
+                return;
+            }
             var kart = e.target.closest('[data-kart]');
             if (!kart) return;
             if (kilitMod === 'kur') {
@@ -812,20 +820,14 @@
                 k.querySelectorAll('[data-kart]').forEach(function (x) { x.setAttribute('aria-checked', String(x === kart)); });
                 return;
             }
-            if (kilitMod !== 'unuttum') return;
-            var kayitli = kilitOku();
-            if (!kayitli) { kilitCiz('kur'); return; }
-            if (kart.getAttribute('data-kart') === kayitli.kart) {
-                delete kayitli.yanlis; delete kayitli.kilitKadar;
-                kilitYaz(kayitli);
-                kilitCiz('yeni');
-                return;
-            }
-            kayitli.yanlis = (kayitli.yanlis || 0) + 1;
-            if (kayitli.yanlis >= YANLIS_KART_SINIRI) { kayitli.yanlis = 0; kayitli.kilitKadar = Date.now() + 60000; }
-            kilitYaz(kayitli);
-            if (kayitli.kilitKadar && kayitli.kilitKadar > Date.now()) kilitCiz('unuttum');
-            else hataYaz('Bu kart değil. ' + (YANLIS_KART_SINIRI - kayitli.yanlis) + ' deneme hakkın kaldı.');
+            if (kilitMod !== 'unuttum' || k.classList.contains('is-bekliyor')) return;
+            k.classList.add('is-bekliyor');
+            var c = await kilitIstek('/kart', { kart: kart.getAttribute('data-kart') });
+            k.classList.remove('is-bekliyor');
+            if (c.j.ok && c.j.jeton) { kilitJeton = c.j.jeton; kilitCiz('yeni'); return; }
+            var m = kilitHatasi(c, 'Bu kart değil.');
+            if (kilitBekle > Date.now()) kilitCiz('unuttum');
+            else hataYaz(m);
         });
         k.addEventListener('submit', async function (e) {
             e.preventDefault();
@@ -837,20 +839,27 @@
                 if (tur === 'ac') {
                     var g = form.querySelector('[data-sifre="ac"]');
                     if (!g.value) { hataYaz('Şifreni yaz.'); return; }
-                    if (await sifreDogruMu(g.value)) { kilitAcildi(); return; }
+                    var c = await kilitIstek('/ac', { sifre: g.value });
+                    if (c.j.ok) { kilitAcildi(); return; }
                     g.value = '';
                     g.focus();
-                    hataYaz('Şifre yanlış.');
+                    hataYaz(kilitHatasi(c, 'Şifre yanlış.'));
                     return;
                 }
                 var y = yeniSifreOku(form);
                 if (y.hata) { hataYaz(y.hata); return; }
                 if (tur === 'kur' && !kartSecim) { hataYaz('Bir hafıza kartı seç.'); return; }
-                var kart = tur === 'kur' ? kartSecim : (kilitOku() || {}).kart || kartSecim;
-                if (await sifreKaydet(y.sifre, kart)) {
+                var c2 = tur === 'kur'
+                    ? await kilitIstek('/kur', { sifre: y.sifre, kart: kartSecim })
+                    : await kilitIstek('/yeni', { sifre: y.sifre, jeton: kilitJeton });
+                if (c2.j.ok) {
                     bildir(tur === 'kur' ? 'Şifre belirlendi' : 'Yeni şifre kaydedildi', 'basari');
                     kilitAcildi();
+                    return;
                 }
+                if (c2.j.error === 'kurulu') { kilitCiz('ac', 'Bu hesapta şifre zaten var. Şifreni gir.'); return; }
+                if (c2.j.error === 'jeton') { kilitCiz('unuttum', kilitHatasi(c2, '')); return; }
+                hataYaz(kilitHatasi(c2, ''));
             } finally {
                 if (dugme.isConnected) dugme.disabled = false;
             }
@@ -862,23 +871,18 @@
             kilitCoz = coz;
             bolum('hsKilit');
             kilitOlaylari();
-            if (!(global.crypto && crypto.subtle)) {
-                /* Güvenli bağlam yoksa (http) özet alınamaz; kilit kurulamaz */
-                el('hsKilitKart').innerHTML = '<span class="hs-kilit__im hs-kilit__im--sari">' + KILIT_IKON + '</span><h1>Kilit kullanılamıyor</h1><p>Tarayıcı bu adreste şifreleme izni vermiyor. Siteyi https ile aç.</p>';
-                return;
-            }
-            kilitCiz(kilitOku() ? 'ac' : 'kur');
+            if (d.ornek) { kilitAcildi(); return; }
+            kilitYokla();
         });
     }
 
-    /* Ayarlar > Şifreyi Değiştir (kutu) */
+    /* Ayarlar > Şifreyi Değiştir (kutu). Kart sunucudan dönmez; seçilmezse eskisi kalır. */
     function sifreKutusuHtml() {
-        var kayitli = kilitOku();
-        kartSecim = kayitli ? kayitli.kart : '';
+        kartSecim = '';
         return '<form class="hs-kilit__form" data-form="degis" novalidate>' +
             '<label class="hs-sifre"><input type="password" data-sifre="eski" autocomplete="current-password" placeholder="Şu anki şifre" aria-label="Şu anki şifre" maxlength="64"></label>' +
             sifreAlanlari(true) +
-            '<div class="hs-kilit__kart"><b>Hafıza Kartı</b><small>İstersen kartını da değiştir.</small>' + kartHtml(kartSecim, false) + '</div>' +
+            '<div class="hs-kilit__kart"><b>Hafıza Kartı</b><small>Değiştirmek istersen yeni kartı seç. Seçmezsen eski kartın kalır.</small>' + kartHtml('', false) + '</div>' +
             '<p class="hs-kilit__hata" data-kutu-hata></p>' +
             '<div class="hs-pano__alt"><button type="button" class="hs-dugme" data-kapat>Vazgeç</button><button type="submit" class="hs-dugme hs-dugme--ana">Kaydet</button></div>' +
             '</form>';
@@ -888,49 +892,127 @@
         var h = form.querySelector('[data-kutu-hata]');
         var yaz = function (m) { h.textContent = m; };
         var eski = form.querySelector('[data-sifre="eski"]').value;
-        if (!(await sifreDogruMu(eski))) { yaz('Şu anki şifre yanlış.'); return; }
+        if (!eski) { yaz('Şu anki şifreni yaz.'); return; }
         var y = yeniSifreOku(form);
         if (y.hata) { yaz(y.hata); return; }
-        if (await sifreKaydet(y.sifre, kartSecim || (kilitOku() || {}).kart)) {
+        var c = await kilitIstek('/degis', { eski: eski, sifre: y.sifre, kart: kartSecim || '' });
+        if (c.j.ok) {
             kutuKapat();
             bildir('Şifre değiştirildi', 'basari');
+            return;
         }
+        if (c.kod === 404 && !c.j.error) { yaz('Sunucu güncellemesi bekleniyor.'); return; }
+        yaz(kilitHatasi(c, 'Şu anki şifre yanlış.'));
     }
 
     // ------------------------------------------------------------------
     // Fiyatlar paneli
     // ------------------------------------------------------------------
 
+    function fiyatSayi(n) { return String(Math.round(n * 100) / 100).replace('.', ','); }
+
+    /* Arabalıya kopyalarken seçilen kutulara eklenecek fark (kayit.kopya: { fark, sec }) */
+    function kopyaFark() { return num(nesne(kayit.kopya).fark != null ? kayit.kopya.fark : 10); }
+    function kopyaSecili(n, t) { return !!nesne(nesne(kayit.kopya).sec)[n + '|' + t]; }
+
     function fiyatCiz() {
-        var arac = d.fiyatArac;
+        var kopya = d.fiyatKopya;
+        var arac = kopya ? 'moto' : d.fiyatArac;
         var tablo = nesne(kayit.fiyat[arac]);
         var turler = gorunenTurler();
+        var notlar = notListesi();
+        var fark = kopyaFark();
         var g = el('hsFiyatGovde');
+        var bas = '<div class="hs-fiyat__satir hs-fiyat__satir--bas"><span>Not</span>' + turler.map(function (t) {
+            var ad = '<span class="hs-fiyat__bas-ad">' + ikon(t.ikon) + '<span>' + kacir(t.ad) + '</span></span>';
+            return kopya ? '<button type="button" class="hs-fiyat__bas-d" data-kopya-sutun="' + t.k + '" title="Bütün sütunu seç">' + ad + '</button>' : ad;
+        }).join('') + '</div>';
+
+        var satirlar = notlar.map(function (n) {
+            var satir = nesne(tablo[n]);
+            var etiket = '<b class="hs-not hs-not--' + notSinif(n) + '">' + kacir(n) + '</b>';
+            if (kopya) {
+                return '<div class="hs-fiyat__satir"><button type="button" class="hs-fiyat__not-d" data-kopya-satir="' + kacir(n) + '" title="Bütün satırı seç">' + etiket + '</button>' + turler.map(function (t) {
+                    var ham = satir[t.k];
+                    var bos = ham == null || ham === '';
+                    var sec = kopyaSecili(n, t.k);
+                    var sonuc = bos ? '–' : fiyatSayi(num(ham) + (sec ? fark : 0));
+                    return '<button type="button" class="hs-kopya-h" data-kopya-hucre="' + kacir(n) + '|' + t.k + '" aria-pressed="' + sec + '"' + (bos ? ' disabled' : '') +
+                        ' aria-label="' + kacir(n + ' ' + t.ad) + (sec ? ', fazla' : '') + '"><b>' + sonuc + '</b><small>' + (sec ? '+' + fiyatSayi(fark) : bos ? '' : 'aynı') + '</small></button>';
+                }).join('') + '</div>';
+            }
+            return '<div class="hs-fiyat__satir"><span>' + etiket + '</span>' + turler.map(function (t) {
+                return '<label class="hs-girdi-kap hs-girdi-kap--fiyat"><input class="hs-girdi" type="text" inputmode="decimal" data-fiyat="' + kacir(n) + '|' + t.k + '" value="' + kacir(satir[t.k] != null ? satir[t.k] : '') + '" placeholder="0" aria-label="' + kacir(n + ' ' + t.ad) + ' fiyatı"><span>₺</span></label>';
+            }).join('') + '</div>';
+        }).join('');
+
+        var izgara = '<div class="hs-fiyat' + (kopya ? ' hs-fiyat--kopya' : '') + '" style="--sutun:' + turler.length + '">' + bas + satirlar + '</div>';
+
+        if (kopya) {
+            var secilen = notlar.reduce(function (t, n) { return t + turler.filter(function (x) { return kopyaSecili(n, x.k); }).length; }, 0);
+            g.innerHTML =
+                '<div class="hs-kopya-ust">' +
+                    '<span class="hs-pano__ad"><b>' + ikon('araba') + 'Arabalıya Kopyala</b><small>Motorlu fiyatları kopyalanır. Fazla olacak kutulara dokun; not ya da kalem adına dokunursan bütün satır ya da sütun seçilir.</small></span>' +
+                    '<label class="hs-kopya-fark"><span>Fark</span><span class="hs-girdi-kap hs-girdi-kap--fiyat"><input class="hs-girdi" type="text" inputmode="decimal" data-kopya-fark value="' + kacir(fiyatSayi(fark)) + '" aria-label="Seçilen kutulara eklenecek fark"><span>₺</span></span></label>' +
+                '</div>' +
+                izgara +
+                '<div class="hs-pano__alt"><span class="hs-kopya-say">' + (secilen ? adet(secilen) + ' kutu +' + fiyatSayi(fark) + ' ₺' : 'Hepsi motorluyla aynı') + '</span>' +
+                    '<button type="button" class="hs-dugme" data-kopya-vazgec>Vazgeç</button>' +
+                    '<button type="button" class="hs-dugme hs-dugme--ana" data-kopya-uygula>' + ikon('tamam') + '<span>Arabalıya Kopyala</span></button></div>';
+            return;
+        }
+
         g.innerHTML =
             '<div class="hs-segment hs-segment--genis" role="radiogroup" aria-label="Araç">' + ARACLAR.map(function (a) {
                 return '<button type="button" role="radio" data-fiyat-arac="' + a.k + '" aria-checked="' + (a.k === arac) + '">' + ikon(a.ikon) + a.ad + '</button>';
             }).join('') + '</div>' +
-            '<div class="hs-fiyat" style="--sutun:' + turler.length + '">' +
-                '<div class="hs-fiyat__satir hs-fiyat__satir--bas"><span>Not</span>' + turler.map(function (t) { return '<span>' + ikon(t.ikon) + kacir(t.ad) + '</span>'; }).join('') + '</div>' +
-                notListesi().map(function (n) {
-                    var satir = nesne(tablo[n]);
-                    return '<div class="hs-fiyat__satir"><span><b class="hs-not hs-not--' + notSinif(n) + '">' + kacir(n) + '</b></span>' + turler.map(function (t) {
-                        return '<label class="hs-girdi-kap hs-girdi-kap--fiyat"><input class="hs-girdi" type="text" inputmode="decimal" data-fiyat="' + kacir(n) + '|' + t.k + '" value="' + kacir(satir[t.k] != null ? satir[t.k] : '') + '" placeholder="0" aria-label="' + kacir(n + ' ' + t.ad) + ' fiyatı"><span>₺</span></label>';
-                    }).join('') + '</div>';
-                }).join('') +
+            izgara +
+            '<div class="hs-fiyat-alt">' +
+                '<div class="hs-pano__satir"><span class="hs-pano__ad"><b>' + ikon('yol') + 'Km Desteği</b><small>' + (arac === 'car' ? 'Arabalı' : 'Motorlu') + ' kurye, km başına</small></span>' +
+                    '<label class="hs-girdi-kap hs-girdi-kap--fiyat"><input class="hs-girdi" type="text" inputmode="decimal" data-km-fiyat value="' + kacir(kayit.km[arac] != null ? kayit.km[arac] : '') + '" placeholder="0" aria-label="Km başına ücret"><span>₺</span></label></div>' +
+                '<div class="hs-pano__satir"><span class="hs-pano__ad"><b>' + ikon('araba') + 'Arabalı Fiyatlar</b><small>Motorlu fiyatlarından, istediğin kutulara fark ekleyerek</small></span>' +
+                    '<button type="button" class="hs-dugme" data-fiyat-kopyala>' + ikon('katman') + '<span>Arabalıya Kopyala</span></button></div>' +
             '</div>' +
-            '<div class="hs-pano__satir"><span class="hs-pano__ad"><b>' + ikon('yol') + 'Km Desteği</b><small>' + (arac === 'car' ? 'Arabalı' : 'Motorlu') + ' kurye, km başına</small></span>' +
-                '<label class="hs-girdi-kap hs-girdi-kap--fiyat"><input class="hs-girdi" type="text" inputmode="decimal" data-km-fiyat value="' + kacir(kayit.km[arac] != null ? kayit.km[arac] : '') + '" placeholder="0" aria-label="Km başına ücret"><span>₺</span></label></div>' +
             '<div class="hs-pano__satir hs-pano__satir--dikey"><span class="hs-pano__ad"><b>Hesaba Giren Kalemler</b><small>Kapalı kalem listede ve tutarda görünmez</small></span><div class="hs-cipler">' +
                 TURLER.map(function (t) {
                     return '<button type="button" class="hs-secim" data-tur-gizle="' + t.k + '" aria-pressed="' + !kayit.gizli[t.k] + '">' + ikon(t.ikon) + kacir(t.ad) + '</button>';
                 }).join('') + '</div></div>' +
-            '<div class="hs-pano__satir"><span class="hs-pano__ad"><b>' + ikon('kilit') + 'Şifre</b><small>Hesaplama her açılışta şifre sorar. Şifre ve hafıza kartı yalnız bu cihazda.</small></span>' +
-                '<button type="button" class="hs-dugme" data-sifre-degis>' + ikon('kilit') + '<span>Şifreyi Değiştir</span></button></div>' +
-            '<div class="hs-pano__alt"><button type="button" class="hs-dugme" data-fiyat-kopyala>' + ikon('katman') + '<span>' + (arac === 'car' ? 'Motorlu fiyatlarını buraya kopyala' : 'Bu fiyatları Arabalıya kopyala') + '</span></button></div>';
+            '<div class="hs-pano__satir"><span class="hs-pano__ad"><b>' + ikon('kilit') + 'Şifre</b><small>' + (kilitSunucuYok ? 'Sunucu güncellemesi bekleniyor; o zamana kadar şifre sorulmaz.' : 'Hesaplama her açılışta şifre sorar. Şifre hesabında tutulur, her cihazda aynıdır.') + '</small></span>' +
+                '<button type="button" class="hs-dugme" data-sifre-degis' + (kilitSunucuYok ? ' disabled' : '') + '>' + ikon('kilit') + '<span>Şifreyi Değiştir</span></button></div>';
+    }
+
+    function kopyaUygula() {
+        var fark = kopyaFark();
+        var moto = nesne(kayit.fiyat.moto);
+        var car = {};
+        Object.keys(moto).forEach(function (n) {
+            var satir = nesne(moto[n]);
+            Object.keys(satir).forEach(function (t) {
+                if (satir[t] == null || satir[t] === '') return;
+                car[n] = car[n] || {};
+                car[n][t] = fiyatSayi(num(satir[t]) + (kopyaSecili(n, t) ? fark : 0));
+            });
+        });
+        kayit.fiyat.car = car;
+        if (kayit.km.moto != null && kayit.km.car == null) kayit.km.car = kayit.km.moto;
+        kaydet();
+        d.fiyatKopya = false;
+        d.fiyatArac = 'car';
+        fiyatCiz();
+        listeGecikmeli();
+        bildir('Arabalı fiyatlar kopyalandı', 'basari');
+    }
+
+    /* Satır ya da sütun: hepsi seçiliyse kaldırır, değilse hepsini seçer */
+    function kopyaTopluSec(anahtarlar) {
+        kayit.kopya = nesne(kayit.kopya);
+        var sec = kayit.kopya.sec = nesne(kayit.kopya.sec);
+        var hepsi = anahtarlar.every(function (a) { return sec[a]; });
+        anahtarlar.forEach(function (a) { if (hepsi) delete sec[a]; else sec[a] = 1; });
     }
 
     function fiyatAc() {
+        d.fiyatKopya = false;
         fiyatCiz();
         el('hsFiyat').hidden = false;
         document.body.classList.add('hs-kaydirma-yok');
@@ -959,7 +1041,7 @@
         { k: 'diger', ikon: 'karistir', ad: 'Başka hesap paketleri', not: 'Başka hesaptan girilen sayılar silinir', acik: false },
         { k: 'avans', ikon: 'cuzdan', ad: 'Avanslar', not: 'Bu ay girilen bütün avanslar silinir', acik: false },
         { k: 'eksik', ikon: 'eksik', ad: 'Eksik ürün listesi', not: 'Eklenen Excel ve listeden çıkarılan ürünler silinir', acik: false },
-        { k: 'veri', ikon: 'geri', ad: 'Panel verisi', not: 'Bu cihazdaki kopya silinir; Panelden Al ile yeniden alınır', acik: false }
+
     ];
     var sifirSecim = {};
 
@@ -1037,7 +1119,6 @@
         }
         eksikSurum++;
         kaydet(true);
-        if (s.veri) { d.veri.delete(d.ay); veriYaz(); }
         kutuKapat();
         hepsiniCiz();
         bildir(ayAdi(d.ay) + ' sıfırlandı', 'basari');
@@ -1072,14 +1153,19 @@
         el('hsEksikBaslik').textContent = 'Eksik Ürünler · ' + ayAdi(d.ay);
         var hata = d.eksikHata ? '<div class="hs-uyari hs-uyari--hata">' + ikon('carpi') + '<span>' + kacir(d.eksikHata) + '</span></div>' : '';
         var dosyaGirdi = '<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-eksik-dosya hidden>';
+        var rr = aralik(d.ay);
         if (!e || d.eksikYukleniyor) {
             ayak.hidden = true;
+            var yok = !d.eksikYukleniyor && d.eksikRapor[d.ay] === 'yok';
             g.innerHTML = hata +
+                (yok ? '<div class="hs-uyari">' + ikon('dosya') + '<span>Raporlar\'da ' + kacir(aralikYazi(rr)) + ' tarihli eksik ürün raporu yok. Franchise panelinde Raporlar &gt; Rapor İsteği ile ayın 1\'inden son gününe iste ya da dosyayı kendin ekle.</span>' +
+                    '<button type="button" class="hs-dugme hs-dugme--kucuk" data-rapor-al>' + ikon('geri') + '<span>Tekrar Ara</span></button></div>' : '') +
                 '<label class="hs-yukle' + (d.eksikYukleniyor ? ' is-yukleniyor' : '') + '" data-yukle>' + dosyaGirdi +
                     '<span class="hs-yukle__im">' + ikon('dosya') + '</span>' +
-                    '<strong>' + (d.eksikYukleniyor ? 'Okunuyor' : 'Excel Dosyasını Seç') + '</strong>' +
-                    '<span>' + (d.eksikYukleniyor ? 'Sayfalar birleştiriliyor' : 'ya da buraya sürükle · .xlsx') + '</span></label>' +
-                '<p class="hs-blok__not">Franchise panelinden indirilen eksik ürün raporu. Ürün Kırılımı ve Sipariş Kırılımı sayfaları birlikte okunur, aynı ürün iki kez sayılmaz. Buradan indirdiğin Kurye Raporu\'nu Excel\'de düzenleyip yeniden de ekleyebilirsin. Dosya bu cihazdan çıkmaz.</p>';
+                    '<strong>' + (d.eksikYukleniyor ? (d.eksikYukMetin === 'Raporlar\'da aranıyor' ? 'Raporlar\'da Aranıyor' : 'Okunuyor') : 'Excel Dosyasını Seç') + '</strong>' +
+                    '<span>' + (d.eksikYukleniyor ? (d.eksikYukMetin === 'Raporlar\'da aranıyor' ? aralikYazi(rr) + ' eksik ürün raporu' : d.eksikYukMetin) : 'ya da buraya sürükle · .xlsx') + '</span></label>' +
+                (!yok && !d.eksikYukleniyor && !d.ornek ? '<div class="hs-pano__alt"><button type="button" class="hs-dugme" data-rapor-al>' + ikon('indir') + '<span>Raporlar\'dan Al</span></button></div>' : '') +
+                '<p class="hs-blok__not">Açılınca franchise panelinin Raporlar sayfasında bu ayın (' + kacir(aralikYazi(rr)) + ') eksik ürün raporu aranır, varsa doğrudan alınır. Ürün Kırılımı ve Sipariş Kırılımı sayfaları birlikte okunur, aynı ürün iki kez sayılmaz. Buradan indirdiğin Kurye Raporu\'nu Excel\'de düzenleyip yeniden de ekleyebilirsin.</p>';
             return;
         }
         var o = eksikOzet();
@@ -1116,13 +1202,14 @@
         g.innerHTML = hata +
             '<div class="hs-ek-ust"><span class="hs-ek-dosya">' + ikon('dosya') + '<span><b title="' + kacir(e.dosya) + '">' + kacir(e.dosya) + '</b>' +
                 '<small>' + adet(e.satirlar.length) + ' ürün · ' + adet(o.gruplar.length) + ' kurye · ' + zaman + (ek.length ? ' · ' + ek.join(' · ') : '') + '</small></span></span>' +
-                '<label class="hs-dugme hs-dugme--kucuk">' + dosyaGirdi + ikon('geri') + '<span>Yeni Dosya</span></label></div>' +
+                '<span class="hs-ek-ust__d">' + (d.ornek ? '' : '<button type="button" class="hs-dugme hs-dugme--kucuk" data-rapor-al title="Raporlar\'daki son raporu yeniden al">' + ikon('indir') + '<span>Raporlar\'dan Al</span></button>') +
+                '<label class="hs-dugme hs-dugme--kucuk">' + dosyaGirdi + ikon('geri') + '<span>Yeni Dosya</span></label></span></div>' +
             '<div class="hs-ek-islem' + (e.islendi ? ' is-islendi' : '') + '">' +
                 '<span class="hs-ek-islem__im">' + ikon(e.islendi ? 'tamam' : 'para') + '</span>' +
-                '<span class="hs-ek-islem__metin"><b>' + (e.islendi ? 'Hak edişten düşülüyor' : 'Hak edişe işlenmedi') + '</b>' +
+                '<span class="hs-ek-islem__metin"><b>' + (e.islendi ? 'Hak edişe eklendi' : 'Hak edişe eklenmedi') + '</b>' +
                     '<small>' + (e.islendi ? 'Tablodaki toplamlar eksik ürün tutarı düşülmüş halde.' : 'Tutarlar tabloda görünür ama toplamdan düşülmez.') + '</small></span>' +
-                '<button type="button" class="hs-dugme' + (e.islendi ? '' : ' hs-dugme--ana') + '" data-eksik-isle' + (o.adet || e.islendi ? '' : ' disabled') + '>' + ikon(e.islendi ? 'geri' : 'tamam') + '<span>' + (e.islendi ? 'İşlemeyi Geri Al' : 'Hak Edişe İşle') + '</span></button></div>' +
-            (!v ? '<div class="hs-uyari">' + ikon('kurye') + '<span>Bu ayın kurye verisi alınmadı. Tablodaki kuryelerle eşleştirmek için önce Panelden Al.</span></div>'
+                '<button type="button" class="hs-dugme' + (e.islendi ? '' : ' hs-dugme--ana') + '" data-eksik-isle' + (o.adet || e.islendi ? '' : ' disabled') + '>' + ikon(e.islendi ? 'geri' : 'tamam') + '<span>' + (e.islendi ? 'Hak Edişten Çıkar' : 'Hak Edişe Ekle') + '</span></button></div>' +
+            (!v ? '<div class="hs-uyari">' + ikon('kurye') + '<span>Bu ayın kurye verisi henüz alınmadı. Tablo yüklenince kuryelerle eşleşir.</span></div>'
                 : o.eslesmeyen ? '<div class="hs-uyari">' + ikon('kurye') + '<span>' + o.eslesmeyen + ' kurye tabloda eşleşmedi. Adının yanından seç.</span></div>' : '') +
             '<div class="hs-ek-liste">' + gruplar + '</div>';
 
@@ -1135,6 +1222,7 @@
         d.eksikHata = '';
         eksikCiz();
         el('hsEksik').hidden = false;
+        if (!eksikKaydi() && !d.eksikRapor[d.ay] && !d.ornek) rapordanAl();
         document.body.classList.add('hs-kaydirma-yok');
         var g = el('hsEksikGovde');
         g.scrollTop = 0;
@@ -1151,18 +1239,82 @@
         ozetCiz();
     }
 
-    async function eksikDosya(f) {
+    /*
+     * Franchise paneli > Raporlar'daki "Eksik Ürünler Raporu" (reportKey
+     * discountAndRefundReport.py). Panelin Raporlar sayfasının attığı istekler:
+     * liste (POST /generic-report/report-request/list), İndir
+     * (GET /generic-report/<id>/download-url/<token> → S3 adresi). Yalnız ayın
+     * 1'inden son gününe istenmiş, hazır (status 1) ve bu depoya ait rapor
+     * alınır; birden çok varsa en yenisi. Yoksa null: dosya elle eklenir.
+     */
+    var RAPOR_ANAHTARI = 'discountAndRefundReport.py';
+    var S3 = /^https:\/\/[a-z0-9.-]+\.s3[a-z0-9.-]*\.amazonaws\.com\//;
+
+    async function rapordanDosya(ay) {
+        if (!global.franchiseOturum) throw hataYap('oturum');
+        var o = await global.franchiseOturum.al();
+        var r = aralik(ay);
+        var uygun = function (x) {
+            var b = nesne(x && x.dataReportRequestBody);
+            var depolar = Array.isArray(b.warehouse_ids) ? b.warehouse_ids : [];
+            return x.reportKey === RAPOR_ANAHTARI && x.status === 1 && typeof x.downloadToken === 'string' && KIMLIK.test(String(x._id)) &&
+                String(b.start_date || '').slice(0, 10) === r.bas && String(b.end_date || '').slice(0, 10) === r.son &&
+                (!o || !o.depo || !depolar.length || depolar.indexOf(o.depo) !== -1);
+        };
+        var bulunan = [];
+        for (var s = 0; s < 4; s++) {
+            if (s) await bekle(400);
+            var y = await global.franchiseOturum.istek('/generic-report/report-request/list?limit=50&offset=' + s * 50, { method: 'POST', govde: {} });
+            if (!y.ok) throw hataYap('panel');
+            var j = await y.json();
+            var liste = Array.isArray(j && j.data) ? j.data : [];
+            bulunan = bulunan.concat(liste.filter(uygun));
+            if (liste.length < 50 || s * 50 + liste.length >= (Number(j && j.totalCount) || 0)) break;
+        }
+        if (!bulunan.length) return null;
+        bulunan.sort(function (a, b) { return String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+        var x = bulunan[0];
+        var u = await global.franchiseOturum.istek('/generic-report/' + x._id + '/download-url/' + encodeURIComponent(x.downloadToken));
+        if (!u.ok) throw hataYap('panel');
+        var adres = String(nesne(await u.json()).url || '');
+        if (!S3.test(adres)) throw hataYap('panel');
+        var dosya;
+        try { dosya = await fetch(adres); } catch (e) { throw hataYap('ag'); }
+        if (!dosya.ok) throw hataYap('panel');
+        var ad = decodeURIComponent(new URL(adres).pathname.split('/').pop() || '').replace(/_[a-f0-9]{24}(?=\.xlsx$)/i, '');
+        return new File([await dosya.blob()], /\.xlsx$/i.test(ad) ? ad.slice(0, 120) : 'Eksik_Urunler_Raporu.xlsx',
+            { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    }
+
+    async function rapordanAl() {
+        if (d.eksikYukleniyor) return;
+        var ay = d.ay;
+        d.eksikHata = '';
+        d.eksikYukleniyor = true;
+        d.eksikYukMetin = 'Raporlar\'da aranıyor';
+        eksikCiz();
+        var f = null;
+        try { f = await rapordanDosya(ay); }
+        catch (e) { d.eksikHata = 'Raporlar okunamadı. ' + hataMetni(e); }
+        d.eksikYukleniyor = false;
+        if (f) { delete d.eksikRapor[ay]; await eksikDosya(f, 'rapor'); return; }
+        if (!d.eksikHata) d.eksikRapor[ay] = 'yok';
+        eksikCiz();
+    }
+
+    async function eksikDosya(f, kaynak) {
         if (!f || d.eksikYukleniyor) return;
         if (!global.JBEksik) { d.eksikHata = 'Excel okuyucu yüklenemedi. Sayfayı yenile.'; eksikCiz(); return; }
         d.eksikHata = '';
         d.eksikYukleniyor = true;
+        d.eksikYukMetin = 'Sayfalar birleştiriliyor';
         eksikCiz();
         try {
             var r = await global.JBEksik.oku(f);
             var ay = r.ay && /^\d{4}-\d{2}$/.test(r.ay) && r.ay <= bugun().slice(0, 7) ? r.ay : d.ay;
             if (ay !== d.ay) { d.ay = ay; d.hata = null; hepsiniCiz(); }
             ayKaydi(true).eksik = {
-                dosya: String(f.name || 'Eksik ürünler.xlsx').slice(0, 120), zaman: Date.now(), tur: r.tur,
+                dosya: String(f.name || 'Eksik ürünler.xlsx').slice(0, 120), zaman: Date.now(), tur: r.tur, kaynak: kaynak === 'rapor' ? 'rapor' : 'dosya',
                 cift: r.cift || 0, ekSiparis: r.ekSiparis || 0, sil: {}, islendi: false,
                 satirlar: r.satirlar.map(function (x) {
                     var o = { kurye: x.kurye.slice(0, 80), tarih: x.tarih, urun: x.urun.slice(0, 160), tutar: x.tutar };
@@ -1173,7 +1325,7 @@
             };
             eksikSurum++;
             kaydet(true);
-            bildir(ayAdi(d.ay) + ': ' + adet(r.satirlar.length) + ' eksik ürün eklendi', 'basari');
+            bildir(ayAdi(d.ay) + ': ' + adet(r.satirlar.length) + ' eksik ürün ' + (kaynak === 'rapor' ? 'Raporlar\'dan alındı' : 'eklendi'), 'basari');
         } catch (e) {
             d.eksikHata = e && e.kullanici ? e.message : 'Dosya okunamadı. Franchise panelinden indirilen .xlsx dosyasını ekle.';
         }
@@ -1196,6 +1348,7 @@
             if (e.target === perde || e.target.closest('[data-kapat]')) { eksikKapat(); return; }
             var ek = eksikKaydi();
             var b;
+            if (e.target.closest('[data-rapor-al]')) { rapordanAl(); return; }
             if (ek && (b = e.target.closest('[data-eksik-sil]'))) {
                 var i = b.getAttribute('data-eksik-sil');
                 ek.sil = nesne(ek.sil);
@@ -1213,7 +1366,7 @@
                 eksikCiz();
                 el('hsEksikGovde').scrollTop = ust2;
                 listeCiz(); ozetCiz();
-                bildir(ek.islendi ? 'Eksik ürünler hak edişten düşüldü' : 'Eksik ürünler hak edişten çıkarıldı', ek.islendi ? 'basari' : 'bilgi');
+                bildir(ek.islendi ? 'Eksik ürünler hak edişe eklendi, netten düşülüyor' : 'Eksik ürünler hak edişten çıkarıldı', ek.islendi ? 'basari' : 'bilgi');
                 return;
             }
             if (e.target.closest('[data-eksik-excel]')) {
@@ -1439,17 +1592,50 @@
                 else if (gorunenTurler().length > 1) kayit.gizli[k] = true;
                 kaydet(); fiyatCiz(); return;
             }
-            if (e.target.closest('[data-fiyat-kopyala]')) {
-                kayit.fiyat.car = JSON.parse(JSON.stringify(nesne(kayit.fiyat.moto)));
-                if (kayit.km.moto != null) kayit.km.car = kayit.km.moto;
+            if (e.target.closest('[data-fiyat-kopyala]')) { d.fiyatKopya = true; fiyatCiz(); el('hsFiyatGovde').scrollTop = 0; return; }
+            if (e.target.closest('[data-kopya-vazgec]')) { d.fiyatKopya = false; fiyatCiz(); return; }
+            if (e.target.closest('[data-kopya-uygula]')) { kopyaUygula(); return; }
+            var turK = gorunenTurler().map(function (t) { return t.k; });
+            var anahtarlar = null;
+            if ((b = e.target.closest('[data-kopya-hucre]'))) anahtarlar = [b.getAttribute('data-kopya-hucre')];
+            else if ((b = e.target.closest('[data-kopya-satir]'))) { var n = b.getAttribute('data-kopya-satir'); anahtarlar = turK.map(function (t) { return n + '|' + t; }); }
+            else if ((b = e.target.closest('[data-kopya-sutun]'))) { var t = b.getAttribute('data-kopya-sutun'); anahtarlar = notListesi().map(function (n2) { return n2 + '|' + t; }); }
+            if (anahtarlar) {
+                /* Motorlu fiyatı boş kutu seçilmez */
+                var moto = nesne(kayit.fiyat.moto);
+                anahtarlar = anahtarlar.filter(function (a) { var p = a.split('|'); var v = nesne(moto[p[0]])[p[1]]; return v != null && v !== ''; });
+                if (!anahtarlar.length) return;
+                if (anahtarlar.length === 1) {
+                    kayit.kopya = nesne(kayit.kopya);
+                    var sec = kayit.kopya.sec = nesne(kayit.kopya.sec);
+                    if (sec[anahtarlar[0]]) delete sec[anahtarlar[0]]; else sec[anahtarlar[0]] = 1;
+                } else kopyaTopluSec(anahtarlar);
                 kaydet();
-                d.fiyatArac = 'car';
+                var ust = el('hsFiyatGovde').scrollTop;
                 fiyatCiz();
-                bildir('Motorlu fiyatları Arabalıya kopyalandı', 'basari');
+                el('hsFiyatGovde').scrollTop = ust;
             }
         });
         perde.addEventListener('input', function (e) {
             var t = e.target;
+            if (t.matches('[data-kopya-fark]')) {
+                var f = temizSayi(t.value, true);
+                if (f !== t.value) t.value = f;
+                kayit.kopya = nesne(kayit.kopya);
+                kayit.kopya.fark = f === '' ? 0 : num(f);
+                kaydet();
+                /* Girdi yeniden çizilmez (imleç kaçmasın); yalnız kutular ve sayaç */
+                var fk = fiyatSayi(kopyaFark());
+                el('hsFiyatGovde').querySelectorAll('[data-kopya-hucre][aria-pressed="true"]').forEach(function (h) {
+                    var p = h.getAttribute('data-kopya-hucre').split('|');
+                    h.querySelector('b').textContent = fiyatSayi(num(nesne(nesne(kayit.fiyat.moto)[p[0]])[p[1]]) + kopyaFark());
+                    h.querySelector('small').textContent = '+' + fk;
+                });
+                var say = el('hsFiyatGovde').querySelector('.hs-kopya-say');
+                var n = el('hsFiyatGovde').querySelectorAll('[data-kopya-hucre][aria-pressed="true"]').length;
+                if (say) say.textContent = n ? adet(n) + ' kutu +' + fk + ' ₺' : 'Hepsi motorluyla aynı';
+                return;
+            }
             if (!t.matches('[data-fiyat], [data-km-fiyat]')) return;
             var deger = temizSayi(t.value, true);
             if (deger !== t.value) t.value = deger;
@@ -1512,7 +1698,7 @@
     async function yukle(zorla) {
         var no = ++istekNo;
         var ay = d.ay;
-        if (!zorla && (d.veri.has(ay) || !d.ornek)) { hepsiniCiz(); return; }
+        if (!zorla && d.veri.has(ay)) { hepsiniCiz(); return; }
         d.yukleniyor = true;
         d.hata = null;
         hepsiniCiz();
@@ -1554,7 +1740,7 @@
         await kilitIste();
 
         kayit = kayitOku();
-        veriOku();
+        eskiYerelSil();
         d.ay = varsayilanAy();
         bolum('hsIcerik');
         hepsiniCiz();

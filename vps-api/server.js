@@ -985,6 +985,9 @@ require('./gece-raporu').kur(app, { pool, verifyToken, bearerOf });
 // Performans raporu: DPS ve kurye performansı Telegram'a (veri kullanıcının tarayıcısından)
 require('./performans').kur(app, { pool, verifyToken, bearerOf });
 
+// Hesaplama kilidi: açılış şifresinin özeti hesapta
+require('./hesaplama-kilit').kur(app, { pool, verifyToken, bearerOf });
+
 // =====================================================================
 // Canlı kanal: sipariş ve sayım değişikliği cihazlara anında (vps-api/canli.js)
 // =====================================================================
