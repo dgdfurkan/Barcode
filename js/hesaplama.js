@@ -1010,7 +1010,7 @@
                 TURLER.map(function (t) {
                     return '<button type="button" class="hs-secim" data-tur-gizle="' + t.k + '" aria-pressed="' + !kayit.gizli[t.k] + '">' + ikon(t.ikon) + kacir(t.ad) + '</button>';
                 }).join('') + '</div></div>' +
-            '<div class="hs-pano__satir"><span class="hs-pano__ad"><b>' + ikon('katman') + 'Kayıtlı Aylar</b><small>Geçmiş ayların panel verisini ve girdilerini sil</small></span>' +
+            '<div class="hs-pano__satir"><span class="hs-pano__ad"><b>' + ikon('katman') + 'Kayıtlı Aylar</b><small>Geçmiş ayları topluca sil. Üstteki ay adına dokunarak da açılır.</small></span>' +
                 '<button type="button" class="hs-dugme" data-aylar-ac>' + ikon('sil') + '<span>Ayları Yönet</span></button></div>' +
             '<div class="hs-pano__satir"><span class="hs-pano__ad"><b>' + ikon('kilit') + 'Şifre</b><small>' + (kilitSunucuYok ? 'Sunucu güncellemesi bekleniyor; o zamana kadar şifre sorulmaz.' : 'Hesaplama her açılışta şifre sorar. Şifre hesabında tutulur, her cihazda aynıdır.') + '</small></span>' +
                 '<button type="button" class="hs-dugme" data-sifre-degis' + (kilitSunucuYok ? ' disabled' : '') + '>' + ikon('kilit') + '<span>Şifreyi Değiştir</span></button></div>';
@@ -1099,6 +1099,8 @@
     /* Ayarlar > Kayıtlı Aylar: hesaptaki panel kayıtları ve bu cihazdaki ay girdileri.
        Seçilen ayların panel verisi (hesaptan) ve/veya girdileri (avans, düzeltme,
        eksik ürün; bu cihazdan) silinir. Fiyatlar ve kurye ayarları kalır. */
+    function aylarAc() { d.aySil = {}; d.aylar = null; kutuAc('aylar', null); aylarYukle(); }
+
     async function aylarYukle() {
         var c = await hsIstek('/api/hesaplama/veri/aylar');
         if (c.j && c.j.ok && Array.isArray(c.j.aylar)) d.aylar = { liste: c.j.aylar };
@@ -1120,25 +1122,31 @@
         });
     }
     function aylarKutusu() {
-        el('hsKutuBaslik').textContent = 'Kayıtlı Aylar';
-        el('hsKutuAlt').textContent = 'Silmek istediğin ayları seç. Fiyatlar ve kurye ayarları değişmez.';
+        el('hsKutuBaslik').textContent = 'Aylar';
+        el('hsKutuAlt').textContent = 'Aç ile o aya geçersin. Silmek için ayları işaretle; fiyatlar ve kurye ayarları değişmez.';
         var g = el('hsKutuGovde');
         if (!d.aylar) { g.innerHTML = '<div class="hs-liste-k hs-liste-k--sik">' + [0, 1, 2].map(function () { return '<span class="hs-iskelet hs-iskelet--satir"></span>'; }).join('') + '</div>'; return; }
         var satirlar = aySatirlari();
         var tur = nesne(d.aySilTur);
         var secili = satirlar.filter(function (x) { return d.aySil[x.ay]; });
+        var buAy = bugun().slice(0, 7);
+        var gecmis = satirlar.filter(function (x) { return x.ay < buAy; });
+        var gecmisSecili = gecmis.length && gecmis.every(function (x) { return d.aySil[x.ay]; });
         var isaret = '<span class="hs-isaret">' + ikon('tamam') + '</span>';
         g.innerHTML =
             (d.aylar.bekliyor ? '<div class="hs-uyari">' + ikon('kurye') + '<span>Sunucu güncellemesi bekleniyor; yalnız bu cihazdaki girdiler listeleniyor.</span></div>' : '') +
             (d.aylar.hata ? '<div class="hs-uyari hs-uyari--hata">' + ikon('carpi') + '<span>Hesaptaki aylar okunamadı. Biraz sonra tekrar dene.</span></div>' : '') +
             (!satirlar.length ? '<p class="hs-blok__not">Kayıtlı ay yok.</p>' :
+            '<div class="hs-yz-bas"><b>Kayıtlı Aylar</b><span>' + satirlar.length + '</span>' +
+                (gecmis.length ? '<button type="button" class="hs-dugme hs-dugme--kucuk" data-ay-gecmis>' + (gecmisSecili ? 'Seçimi Kaldır' : 'Geçmiş Ayların Hepsini Seç') + '</button>' : '') + '</div>' +
             '<div class="hs-liste-k hs-liste-k--sik">' + satirlar.map(function (x) {
                 var not = [];
                 if (x.panel) not.push('Panel: ' + adet(x.panel.adet) + ' kurye · ' + new Date(x.panel.zaman).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }));
                 if (x.girdi) not.push(adet(x.girdi) + ' kuryede girdi');
                 if (x.eksik) not.push('eksik ürün listesi');
-                return '<button type="button" class="hs-secenek hs-secenek--sec hs-secenek--ince" data-ay-sec="' + x.ay + '" aria-pressed="' + !!d.aySil[x.ay] + '">' +
-                    isaret + '<span><b>' + kacir(ayAdi(x.ay)) + (x.ay === d.ay ? ' · açık ay' : '') + '</b><small>' + kacir(not.join(' · ')) + '</small></span></button>';
+                return '<div class="hs-ay-satir"><button type="button" class="hs-secenek hs-secenek--sec hs-secenek--ince" data-ay-sec="' + x.ay + '" aria-pressed="' + !!d.aySil[x.ay] + '" aria-label="' + kacir(ayAdi(x.ay)) + ' silinecek">' +
+                    isaret + '<span><b>' + kacir(ayAdi(x.ay)) + '</b><small>' + kacir(not.join(' · ')) + '</small></span></button>' +
+                    '<button type="button" class="hs-dugme hs-dugme--kucuk hs-ay-git" data-ay-git="' + x.ay + '"' + (x.ay === d.ay ? ' disabled>Açık' : '>Aç') + '</button></div>';
             }).join('') + '</div>') +
             '<div class="hs-yz-bas"><b>Silinecekler</b></div>' +
             '<div class="hs-cipler">' +
@@ -1592,6 +1600,7 @@
 
     function olaylar() {
         el('hsAyGeri').addEventListener('click', function () { ayDegis(ayKaydir(d.ay, -1)); });
+        el('hsAyListe').addEventListener('click', aylarAc);
         el('hsAyIleri').addEventListener('click', function () { if (d.ay < bugun().slice(0, 7)) ayDegis(ayKaydir(d.ay, 1)); });
         el('hsYenile').addEventListener('click', function () { yukle(true); });
         el('hsFiyatAc').addEventListener('click', fiyatAc);
@@ -1724,7 +1733,14 @@
             }
             if (e.target.closest('[data-sifirla-onay]')) { sifirla(); return; }
             if (kutuDurum.tur === 'aylar') {
+                if ((b = e.target.closest('[data-ay-git]'))) { var git = b.getAttribute('data-ay-git'); kutuKapat(); if (git <= bugun().slice(0, 7)) ayDegis(git); return; }
                 if ((b = e.target.closest('[data-ay-sec]'))) { var sa = b.getAttribute('data-ay-sec'); d.aySil[sa] = !d.aySil[sa]; }
+                else if (e.target.closest('[data-ay-gecmis]')) {
+                    var ba = bugun().slice(0, 7);
+                    var gl = aySatirlari().filter(function (x) { return x.ay < ba; });
+                    var hepsi = gl.every(function (x) { return d.aySil[x.ay]; });
+                    gl.forEach(function (x) { d.aySil[x.ay] = !hepsi; });
+                }
                 else if ((b = e.target.closest('[data-ay-tur]'))) { d.aySilTur = nesne(d.aySilTur); var tk = b.getAttribute('data-ay-tur'); d.aySilTur[tk] = d.aySilTur[tk] === false; }
                 else if (e.target.closest('[data-ay-sil]')) { aylariSil(); return; }
                 else return;
@@ -1778,7 +1794,7 @@
             if (e.target === perde || e.target.closest('[data-kapat]')) { fiyatKapat(); return; }
             var b;
             if (e.target.closest('[data-sifre-degis]')) { fiyatKapat(); kutuAc('sifre', null); return; }
-            if (e.target.closest('[data-aylar-ac]')) { fiyatKapat(); d.aySil = {}; d.aylar = null; kutuAc('aylar', null); aylarYukle(); return; }
+            if (e.target.closest('[data-aylar-ac]')) { fiyatKapat(); aylarAc(); return; }
             if ((b = e.target.closest('[data-fiyat-arac]'))) { d.fiyatArac = b.getAttribute('data-fiyat-arac'); fiyatCiz(); return; }
             if ((b = e.target.closest('[data-tur-gizle]'))) {
                 var k = b.getAttribute('data-tur-gizle');
