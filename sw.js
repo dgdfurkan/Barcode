@@ -10,8 +10,8 @@
  * sürüm değişince adres de değişiyor. Bu yüzden sürümlü dosya güvenle
  * telefonda saklanabilir.
  *
- *   Sayfa (HTML)          Önce ağ. Ağ 4 saniyede gelmezse son kopya açılır.
- *                         Yeni sürüm her zaman ağdan gelir.
+ *   Sayfa (HTML)          Önce ağ, tarayıcı önbelleği atlanarak (no-cache).
+ *                         Ağ 4 saniyede gelmezse son kopya açılır.
  *   Sürümlü dosya         Önbellekten. Yoksa ağdan alınır, saklanır; aynı
  *                         dosyanın eski sürümleri silinir.
  *   Sürümsüz yerel dosya  Önbellekten anında, arkada tazelenir.
@@ -77,7 +77,11 @@ function zamanAsimi(soz, ms) {
 async function sayfaGetir(e) {
     const istek = e.request;
     const kutu = await caches.open(SAYFA);
-    const ag = fetch(istek).then((yanit) => {
+    /* `no-cache`: GitHub Pages sayfayı 10 dakika önbellekte tutturuyor.
+       Yayından sonra eski sayfa eski sürümlü betikleri istiyordu ve
+       değişiklik telefonda 10 dakika görünmüyordu. Artık sayfa her açılışta
+       sunucuya soruluyor; değişmediyse 304 döner, yük yok. */
+    const ag = fetch(new Request(istek, { cache: 'no-cache' })).then((yanit) => {
         if (yanit && yanit.ok && yanit.type === 'basic') {
             kutu.put(istek, yanit.clone()).catch(() => {});
         }
@@ -122,7 +126,11 @@ async function tazeleyerekGetir(e) {
     const istek = e.request;
     const kutu = await caches.open(DOSYA);
     const var_ = await kutu.match(istek);
-    const ag = fetch(istek).then((yanit) => {
+    /* `no-cache`: GitHub Pages sayfayı 10 dakika önbellekte tutturuyor.
+       Yayından sonra eski sayfa eski sürümlü betikleri istiyordu ve
+       değişiklik telefonda 10 dakika görünmüyordu. Artık sayfa her açılışta
+       sunucuya soruluyor; değişmediyse 304 döner, yük yok. */
+    const ag = fetch(new Request(istek, { cache: 'no-cache' })).then((yanit) => {
         if (yanit && yanit.ok && yanit.type === 'basic') {
             kutu.put(istek, yanit.clone()).catch(() => {});
         }
