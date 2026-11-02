@@ -1,0 +1,287 @@
+/*
+ * Ürün kartı köşe düğmeleri ve Ürün Hareketi penceresi
+ * ============================================================================
+ * Sol üst: stok düğmesi (js/urun-stok.js). Sağ üst: ürün hareketi düğmesi
+ * (js/urun-hareketi.js). Ürün Arama ve Ajanda aynı kartı kullanıyor.
+ * Renkler css/siparisler.css :root ile aynı değerler; bu sayfalar sip-kok
+ * altında olmadığı için burada sabit yazıldı.
+ * ============================================================================
+ */
+
+/* ── Stok düğmesi ────────────────────────────────────────────────────────
+   Boşta küçük buzlu hap. Basınca aynı köşede sade bir bilgi kartı: STOK ve
+   sayı, altında varsa Rezerv, Sayımda ve "Bugün geldi". Görselin üstünü
+   kapatmasın diye ince tutuldu. */
+.arama-stok {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 32px;
+    padding: 0 12px 0 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    -webkit-backdrop-filter: blur(8px) saturate(1.4);
+    backdrop-filter: blur(8px) saturate(1.4);
+    border: 1px solid rgba(16, 24, 40, 0.1);
+    color: #475467;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+    cursor: pointer;
+    transition: border-color 140ms ease-out, box-shadow 140ms ease-out, transform 100ms ease-out;
+}
+.arama-stok::before { content: ''; position: absolute; inset: -6px; }
+.arama-stok:hover { border-color: rgba(16, 24, 40, 0.22); color: #344054; }
+.arama-stok:active { transform: scale(0.97); }
+.arama-stok:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.arama-stok > svg { flex: none; width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.arama-stok.is-yuk { cursor: progress; }
+.arama-stok.is-yuk > svg { animation: aramaStokDon 800ms linear infinite; }
+@keyframes aramaStokDon { to { transform: rotate(360deg); } }
+
+.arama-stok.is-dolu,
+.arama-stok.is-hata {
+    height: auto;
+    min-width: 80px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+    animation: aramaStokGir 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes aramaStokGir { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+.arama-stok__ana { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.arama-stok__etiket { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #667085; }
+.arama-stok__sayi { font-size: 15px; font-weight: 800; line-height: 16px; color: #111827; }
+.arama-stok.is-sifir .arama-stok__sayi { color: #d92d20; }
+.arama-stok.is-sifir { border-color: rgba(217, 45, 32, 0.28); }
+.arama-stok__ayrac { height: 1px; background: rgba(16, 24, 40, 0.08); }
+.arama-stok__satir { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; font-weight: 600; line-height: 16px; color: #667085; white-space: nowrap; }
+.arama-stok__satir b { font-weight: 700; color: #111827; }
+.arama-stok__satir--sayim span,
+.arama-stok__satir--yeni span { display: inline-flex; align-items: center; gap: 4px; }
+.arama-stok__satir--sayim span::before,
+.arama-stok__satir--yeni span::before { content: ''; width: 6px; height: 6px; border-radius: 999px; background: #6366f1; }
+.arama-stok__satir--sayim b { color: #4338ca; }
+.arama-stok__satir--yeni span { color: #047857; }
+.arama-stok__satir--yeni span::before { background: #0e9f6e; }
+.arama-stok__satir--yeni b { color: #047857; }
+/* Bugün ya da dün transferle geldi: çerçeve yeşil */
+.arama-stok.is-yeni { border-color: #0e9f6e; box-shadow: 0 0 0 3px rgba(14, 159, 110, 0.16); }
+.arama-stok.is-hata { border-color: rgba(181, 71, 8, 0.3); }
+.arama-stok.is-hata .arama-stok__etiket { color: #b54708; }
+.arama-stok__not { font-size: 11px; font-weight: 500; line-height: 16px; color: #667085; white-space: nowrap; }
+
+/* ── Ürün hareketi düğmesi (sağ üst) ─────────────────────────────────────
+   Stok kadar belirgin değil: yalnız ikon, aynı buzlu yüzey. Toplu kopyalama
+   adedi (×N) varsa onun altına iner. */
+.uh-dugme {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    -webkit-backdrop-filter: blur(8px) saturate(1.4);
+    backdrop-filter: blur(8px) saturate(1.4);
+    border: 1px solid rgba(16, 24, 40, 0.1);
+    color: #475467;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+    cursor: pointer;
+    transition: border-color 140ms ease-out, color 140ms ease-out, transform 100ms ease-out;
+}
+.uh-dugme::before { content: ''; position: absolute; inset: -6px; }
+.uh-dugme:hover { border-color: rgba(16, 24, 40, 0.22); color: #111827; }
+.uh-dugme:active { transform: scale(0.94); }
+.uh-dugme:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.uh-dugme svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.arama-adet ~ .uh-dugme { top: 52px; }
+
+/* ── Pencere ─────────────────────────────────────────────────────────────
+   Masaüstünde ortada küçük bir kart, telefonda alttan çıkan yaprak. */
+html.uh-acik, html.uh-acik body { overflow: hidden; }
+
+.uh-perde {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(16, 24, 40, 0.45);
+    opacity: 0;
+    transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    font-family: 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+.uh-perde[hidden] { display: none; }
+.uh-perde.is-acik { opacity: 1; }
+
+.uh-pano {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 400px;
+    max-height: min(640px, calc(100vh - 32px));
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 24px 70px rgba(7, 21, 45, 0.18);
+    overflow: hidden;
+    transform: translateY(8px) scale(0.98);
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.uh-perde.is-acik .uh-pano { transform: none; }
+
+.uh-pano svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.uh-bas {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 12px 16px 16px;
+    border-bottom: 1px solid #e4e7ec;
+}
+.uh-foto {
+    width: 56px;
+    height: 56px;
+    padding: 4px;
+    border: 0;
+    border-radius: 12px;
+    background: #f4f6f9;
+    cursor: zoom-in;
+}
+.uh-foto:disabled { cursor: default; }
+.uh-foto:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.uh-foto img { display: block; width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+.uh-kim { min-width: 0; }
+.uh-kim strong {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 15px;
+    line-height: 20px;
+    font-weight: 600;
+    color: #111827;
+    overflow-wrap: anywhere;
+}
+.uh-kim span { display: block; margin-top: 4px; font-size: 12px; line-height: 16px; color: #667085; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.uh-kim span:empty { display: none; }
+.uh-kapat {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #667085;
+    cursor: pointer;
+}
+.uh-kapat:hover { background: #f4f6f9; color: #111827; }
+.uh-kapat:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.uh-kapat svg { width: 20px; height: 20px; }
+
+.uh-govde { padding: 0 16px 16px; overflow-y: auto; overscroll-behavior: contain; }
+
+.uh-bolum { padding: 12px 0; }
+.uh-bolum + .uh-bolum { border-top: 1px solid #e4e7ec; }
+.uh-bolum h3 { margin: 0 0 4px; font-size: 10px; line-height: 16px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #667085; }
+
+.uh-satir {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 32px;
+    font-size: 13px;
+    line-height: 20px;
+    color: #344054;
+}
+.uh-satir__sol { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.uh-satir__sol em { font-style: normal; color: #667085; }
+.uh-satir--ana { font-size: 15px; font-weight: 600; color: #111827; }
+.uh-adet { flex: none; font-size: 13px; font-weight: 700; color: #111827; font-variant-numeric: tabular-nums; }
+.uh-adet.is-yeni { padding: 2px 8px; border-radius: 999px; background: #eafaf4; color: #047857; }
+
+.uh-durum { flex: none; width: 8px; height: 8px; border-radius: 999px; background: #98a2b3; }
+.uh-durum--bekle { background: #d97706; }
+.uh-durum--tamam { background: #0e9f6e; }
+.uh-durum--sorun { background: #d92d20; }
+
+.uh-bos { margin: 0; min-height: 32px; display: flex; align-items: center; font-size: 13px; color: #667085; }
+
+.uh-ipucu { margin: 8px 0 0; padding: 8px 12px; border-radius: 9px; font-size: 12px; line-height: 16px; font-weight: 500; }
+.uh-ipucu--yesil { background: #eafaf4; color: #047857; }
+.uh-ipucu--sari { background: #fff6e8; color: #b54708; }
+
+.uh-satir--iskelet { pointer-events: none; }
+.uh-isk { display: block; width: 40px; height: 12px; border-radius: 6px; background: #eef0f3; animation: uhIsk 1200ms ease-in-out infinite; }
+.uh-isk--uzun { width: 128px; }
+@keyframes uhIsk { 50% { opacity: 0.5; } }
+
+.uh-not { margin-top: 12px; padding: 12px; border-radius: 12px; background: #fff6e8; border: 1px solid #fbdba7; }
+.uh-not strong { display: block; font-size: 13px; line-height: 20px; font-weight: 600; color: #111827; }
+.uh-not span { display: block; margin-top: 4px; font-size: 12px; line-height: 16px; color: #344054; }
+.uh-metin-dugme { min-height: 44px; margin-top: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: #2563eb; cursor: pointer; }
+
+.uh-ajanda {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    margin-top: 4px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: #eff6ff;
+    border: 1px solid #dbe7ff;
+    color: #111827;
+    text-decoration: none;
+}
+.uh-ajanda:hover { border-color: #2563eb; }
+.uh-ajanda:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.uh-ajanda svg { flex: none; width: 16px; height: 16px; margin-left: auto; color: #2563eb; }
+.uh-ajanda__rozet { flex: none; min-width: 36px; height: 28px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; background: #ffffff; color: #d92d20; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.uh-ajanda__rozet.is-fazla { color: #1d4ed8; }
+.uh-ajanda__metin { min-width: 0; display: flex; flex-direction: column; }
+.uh-ajanda__metin b { font-size: 13px; line-height: 20px; font-weight: 600; }
+.uh-ajanda__metin em { font-style: normal; font-size: 12px; line-height: 16px; color: #667085; }
+
+@media (max-width: 640px) {
+    .uh-perde { align-items: flex-end; padding: 0; }
+    .uh-pano {
+        max-width: none;
+        max-height: 85vh;
+        border-radius: 16px 16px 0 0;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        transform: translateY(100%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .arama-stok, .arama-stok.is-dolu, .arama-stok.is-hata, .uh-dugme { transition: none; animation: none; }
+    .arama-stok.is-yuk > svg { animation: none; opacity: 0.5; }
+    .uh-perde, .uh-pano { transition: none; transform: none; }
+    .uh-isk { animation: none; }
+}

@@ -962,6 +962,9 @@ require('./kaldirma').kur(app, { pool, verifyToken, bearerOf });
 // =====================================================================
 require('./franchise-jeton').kur(app, { pool, verifyToken, bearerOf });
 
+// Depo paneli oturumu: Asistan depo panelinin jetonunu hesaba yazar (Ürün Hareketi telefonda da çalışsın)
+require('./depo-jeton').kur(app, { pool, verifyToken, bearerOf });
+
 // =====================================================================
 // İtiraz Yazıcı: Depo Değerlendirme kayıtlarına Gemini ile itiraz taslağı
 // =====================================================================

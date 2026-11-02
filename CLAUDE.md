@@ -170,6 +170,9 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
   `sql_files/sayim_fark.sql` (raporlanan görevler) çalıştırılacak; `vps-api/sayim-fark.js` + `vps-api/katalog.js` +
   `vps-api/telegram-ayar.js` + `vps-api/gece-raporu/` VPS'e atılıp servis yeniden başlatılacak. Asistan değişmedi:
   sunucu `/api/gece-raporu/ayar` saatlerine sayım farkı saatlerini de ekliyor, Asistan sayımları o saatlerden önce okuyor.
+- Ürün Hareketi (arama ve ajanda kartının sağ üstü, stoktaki "Bugün +24"): `vps-api/depo-jeton.js` + `server.js`
+  VPS'e atılıp servis yeniden başlatılacak (SQL yok, `users.counting_data._depo_info`). Asistan 0.48.0 depo panelinin
+  jetonunu oraya yazıyor. Jeton 15 dk yaşıyor ve panel yalnız istek attıkça yenileniyor; sipariş panosu açık bilgisayar şart.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

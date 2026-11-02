@@ -1,81 +1,75 @@
 /**
- * Ürün Ajandası — müşteri eksik / gönderim takibi (premium: urunAjandasi)
+ * Ajanda: müşteriye eksik giden ve fazla giden/gelen ürünler (premium: urunAjandasi)
+ * ============================================================================
+ *
+ * Kart Ürün Arama'daki kartın sade hâli:
+ *   sol üst  stok düğmesi (js/urun-stok.js), basınca anlık stok
+ *   sağ üst  eksik (−3) ya da fazla (+2) adet
+ *   sağ alt  ürün hareketi (js/urun-hareketi.js): son transfer, son satış, bugün gelen paletler
+ *   fotoğraf büyür (js/urun-foto.js); ad ve barkoda basınca kayıt düzenlenir
+ *
+ * Eksik/fazla ayrımı ayrı bir sütun değil: fazla kayıtlarda reason_preset
+ * "Fazla Ürün". Şema değişmeden eski kayıtlar eksik olarak okunuyor.
+ * Düzenlemede adet, durum (eksik ↔ fazla), tarih, sebep ve not değişir;
+ * "Tamamlandı" kaydı siler.
+ * ============================================================================
  */
 class DispatchAgendaApp {
     constructor() {
-        this.REASON_PRESETS = ['Eksik Ürün', 'Yanlış Adet', 'Hasarlı', 'Diğer'];
+        this.EKSIK_SEBEPLER = ['Eksik Ürün', 'Yanlış Adet', 'Hasarlı', 'Diğer'];
+        this.FAZLA = 'Fazla Ürün';
         this.items = [];
         this.allProducts = [];
         this.productIndex = new Map();
-        this.selectedProduct = null;
-        this.detailItem = null;
+        this.suzgec = 'hepsi';
+        this.form = null;          // { mod: 'ekle' | 'duzenle', item, urun, tur, sebep, ilk }
         this._username = null;
-        this._searchDebounce = null;
         this._eventsBound = false;
         this._ready = false;
-        this._toastTimer = null;
+        this._searchDebounce = null;
         this._searchHighlight = -1;
+        this._yuklemeHatali = false;
     }
 
     async init() {
         this._bindEvents();
-        this._bindVisibilityRefresh();
 
         const session = window.authUtils?.checkAuth();
         if (!session) {
-            this._updateHeaderUser(null);
             this._show('noAuth');
-            // Perdeyi bekletme: kullanıcı "giriş yapın" mesajını hemen görmeli
-            window.AppBoot?.dismiss('oturum-yok');
             return;
         }
         this._username = session.username;
-        this._updateHeaderUser(session);
-        window.AppBoot?.step('auth');
+        const hesap = document.getElementById('headerUserName');
+        if (hesap) hesap.textContent = session.username || '';
 
         await this._waitForDb();
 
         try {
-            if (window.premiumFeatures) {
-                await window.premiumFeatures.init();
-            }
+            if (window.premiumFeatures) await window.premiumFeatures.init();
         } catch (e) {
             console.error('Premium yüklenemedi:', e);
         }
-
         if (!window.premiumFeatures?.checkPremiumFeature('urunAjandasi')) {
-            try {
-                await window.premiumFeatures?.loadPremiumFeatures();
-            } catch (e) { /* ignore */ }
+            try { await window.premiumFeatures?.loadPremiumFeatures(); } catch (e) { /* ignore */ }
         }
-
         if (!window.premiumFeatures?.checkPremiumFeature('urunAjandasi')) {
             this._show('noPremium');
-            // Perdeyi bekletme: yetki yoksa mesaj anında görünmeli
-            window.AppBoot?.dismiss('yetki-yok');
             return;
         }
 
         this._ready = true;
         this._show('mainContent');
+        this._iskeletCiz();
 
-        if (window.SkeletonUI) {
-            window.SkeletonUI.enter('agendaHost');
-        }
+        window.JBUrunHareketi?.saglayici((id) => this._hareketUrunu(id));
 
-        try {
-            await this._loadProducts();
-            await this.loadItems();
-            window.AppBoot?.step('data');
-        } finally {
-            if (window.SkeletonUI) {
-                window.SkeletonUI.leave('agendaHost');
-            }
-            // Veri gelmese bile perde kalksın — hata mesajı görünsün
-            window.AppBoot?.step('data');
-        }
-        this._setDefaultDate();
-        window.AppBoot?.step('ui');
+        await this._loadProducts();
+        await this.loadItems();
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && this._ready && !this.form) void this.loadItems();
+        });
     }
 
     async _waitForDb(maxWait = 10000) {
@@ -90,52 +84,29 @@ class DispatchAgendaApp {
         }
     }
 
-    _bindVisibilityRefresh() {
-        if (this._visibilityBound) return;
-        this._visibilityBound = true;
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState !== 'visible' || !this._ready) return;
-            void this.loadItems();
-        });
-    }
-
-    _updateHeaderUser(session) {
-        const nameEl = document.getElementById('headerUserName');
-        const companyEl = document.getElementById('headerUserCompany');
-        if (!session) {
-            if (nameEl) nameEl.textContent = 'Misafir';
-            if (companyEl) companyEl.textContent = '';
-            return;
-        }
-        if (nameEl) nameEl.textContent = session.username || session.user_id || 'Kullanıcı';
-        if (companyEl) companyEl.textContent = session.company || '';
-    }
-
     _show(id) {
         ['noAuth', 'noPremium', 'mainContent'].forEach((k) => {
             const el = document.getElementById(k);
-            if (el) el.classList.toggle('hidden', k !== id);
+            if (el) el.hidden = k !== id;
         });
     }
 
-    _productId(p) {
-        return p?.id || p?.productId || null;
+    // ==================================================================
+    // Ürün kataloğu ve arama
+    // ==================================================================
+
+    _productId(p) { return p?.id || p?.productId || null; }
+    _productName(p) { return p?.name || p?.productName || 'Ürün'; }
+    _productImage(p) { return p?.image || p?.imageUrl || ''; }
+
+    _barkodlar(liste) {
+        return (Array.isArray(liste) ? liste : [])
+            .map((b) => (b && typeof b === 'object' ? b.code : b))
+            .filter(Boolean)
+            .map(String);
     }
 
-    _productName(p) {
-        return p?.name || p?.productName || 'Ürün';
-    }
-
-    _productImage(p) {
-        return p?.image || p?.imageUrl || '../assets/logo.png';
-    }
-
-    _productBarcode(p) {
-        const barcodes = Array.isArray(p?.barcodes) ? p.barcodes : [];
-        const first = barcodes[0];
-        if (!first) return '';
-        return typeof first === 'object' ? first.code || '' : String(first);
-    }
+    _productBarcode(p) { return this._barkodlar(p?.barcodes)[0] || ''; }
 
     async _loadProducts() {
         try {
@@ -145,19 +116,11 @@ class DispatchAgendaApp {
             }
             if ((!this.allProducts || !this.allProducts.length) && typeof PRODUCTS_DATA !== 'undefined') {
                 this.allProducts = PRODUCTS_DATA.products || [];
-            } else if (typeof activeResults !== 'undefined') {
-                const fallback = [...(activeResults || []), ...(outOfStockResults || [])];
-                if (fallback.length) this.allProducts = fallback;
             }
-            this._rebuildProductIndex();
         } catch (e) {
             console.error('Ürün kataloğu yüklenemedi:', e);
             this.allProducts = typeof PRODUCTS_DATA !== 'undefined' ? PRODUCTS_DATA.products || [] : [];
-            this._rebuildProductIndex();
         }
-    }
-
-    _rebuildProductIndex() {
         this.productIndex = new Map();
         for (const p of this.allProducts || []) {
             const id = this._productId(p);
@@ -166,23 +129,16 @@ class DispatchAgendaApp {
     }
 
     /*
-     * Arama metnini sadeleştirir.
-     *
-     * Önceki hâlinde yalnızca küçük harfe çevriliyordu. Türkçe harfler
-     * olduğu gibi kaldığı için "sutas" yazan "Sütaş"ı bulamıyordu; depoda
-     * çalışan biri Türkçe klavye kullanmak zorunda kalıyordu. Noktalama da
-     * duruyordu: "kraker (45" yazınca parantez bir kelime sayılıyordu.
-     *
-     * Arama sayfası ve sayım sayfasıyla aynı kural: Türkçe harfler
-     * karşılıklarına iniyor, noktalama boşluğa dönüyor. Sonuç önbellekte.
+     * Arama metnini sadeleştirir: Türkçe harfler karşılıklarına iner, noktalama
+     * boşluğa döner. "sutas" yazan "Sütaş"ı bulur. Arama ve sayım sayfasıyla
+     * aynı kural.
      */
     _sadelestir(metin) {
         if (!metin) return '';
         if (!this._sadeOnbellek) this._sadeOnbellek = new Map();
         const hazir = this._sadeOnbellek.get(metin);
         if (hazir !== undefined) return hazir;
-        const HARF = { 'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c',
-                       'â': 'a', 'î': 'i', 'û': 'u' };
+        const HARF = { 'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'â': 'a', 'î': 'i', 'û': 'u' };
         const sonuc = String(metin)
             .toLocaleLowerCase('tr')
             .replace(/[ığüşöçâîû]/g, (h) => HARF[h] || h)
@@ -193,59 +149,37 @@ class DispatchAgendaApp {
         return sonuc;
     }
 
-    /** Ürünün aranabilir metni. Ürün başına bir kez hesaplanıyor. */
     _urunMetni(p) {
         if (!this._urunMetinleri) this._urunMetinleri = new WeakMap();
         const hazir = this._urunMetinleri.get(p);
         if (hazir !== undefined) return hazir;
-        const barkodlar = (Array.isArray(p.barcodes) ? p.barcodes : [])
-            .map((b) => (typeof b === 'object' ? b.code : b))
-            .filter(Boolean)
-            .join(' ');
-        const metin = this._sadelestir(
-            `${this._productName(p)} ${p.brand || ''} ${barkodlar} ${this._productId(p)}`
-        );
+        const metin = this._sadelestir(`${this._productName(p)} ${p.brand || ''} ${this._barkodlar(p.barcodes).join(' ')} ${this._productId(p)}`);
         this._urunMetinleri.set(p, metin);
         return metin;
     }
 
     _searchProducts(query, limit = 30) {
         const sade = this._sadelestir(query);
-        // Rakamla aranıyorsa tek karakter bile anlamlı: barkodun ilk hanesi
         const enAz = /^\d/.test(sade) ? 1 : 2;
         if (sade.length < enAz) return [];
-
         const tokens = sade.split(' ').filter(Boolean);
         if (!tokens.length) return [];
-
         const results = [];
         for (const p of this.allProducts || []) {
-            const id = this._productId(p);
-            if (!id) continue;
+            if (!this._productId(p)) continue;
             const metin = this._urunMetni(p);
-            let hit = true;
-            for (let i = 0; i < tokens.length; i++) {
-                if (metin.indexOf(tokens[i]) === -1) { hit = false; break; }
-            }
-            if (hit) results.push(p);
+            if (tokens.every((t) => metin.indexOf(t) !== -1)) results.push(p);
             if (results.length >= limit) break;
         }
         return results;
     }
 
-    // ==================================================================
-    // Son eklenenler
-    // ==================================================================
-    //
-    // Aynı ürünler tekrar tekrar giriliyor. Arama kutusu boşken son
-    // eklenenler listeleniyor; kullanıcı çoğu zaman hiç yazmadan tek
-    // dokunuşla seçiyor.
-
+    /* Aynı ürünler tekrar tekrar giriliyor; kutu boşken son eklenenler duruyor */
     _sonEklenenler(adet = 6) {
         const gorulen = new Set();
         const cikti = [];
         for (const item of this.items || []) {
-            const pid = String(item.product_id || item.productId || '');
+            const pid = String(item.product_id || '');
             if (!pid || gorulen.has(pid)) continue;
             const p = this.productIndex.get(pid);
             if (!p) continue;
@@ -256,56 +190,37 @@ class DispatchAgendaApp {
         return cikti;
     }
 
-    /**
-     * Eşleşen parçayı kalınlaştırır: göz satırı taramadan buluyor.
-     *
-     * Sadeleştirme sırasında konum haritası da tutuluyor. İlk sürümde
-     * "sadeleştirilen metnin uzunluğu aynı kalır" varsayılmıştı; oysa
-     * noktalama tek boşluğa iniyor ve uzunluk değişiyor. "cubuk 45" için
-     * "45" yerine "(4" işaretleniyordu. Harita bu kaymayı kapatıyor.
-     */
+    /* Eşleşen parçayı işaretler. Sadeleştirmede uzunluk değiştiği için konum haritası tutulur. */
     _sadeHarita(metin) {
-        const HARF = { 'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c',
-                       'â': 'a', 'î': 'i', 'û': 'u' };
+        const HARF = { 'ı': 'i', 'ğ': 'g', 'ü': 'u', 'ş': 's', 'ö': 'o', 'ç': 'c', 'â': 'a', 'î': 'i', 'û': 'u' };
         let sade = '';
         const konum = [];
         let bosluktaydi = true;
-
         for (let i = 0; i < metin.length; i++) {
             let ch = metin[i].toLocaleLowerCase('tr');
             ch = HARF[ch] || ch;
             if (/[a-z0-9]/.test(ch)) {
-                sade += ch;
-                konum.push(i);
-                bosluktaydi = false;
+                sade += ch; konum.push(i); bosluktaydi = false;
             } else if (!bosluktaydi) {
-                sade += ' ';
-                konum.push(i);
-                bosluktaydi = true;
+                sade += ' '; konum.push(i); bosluktaydi = true;
             }
         }
-        // Sondaki boşluğu at
         while (sade.endsWith(' ')) { sade = sade.slice(0, -1); konum.pop(); }
-        return { sade: sade, konum: konum };
+        return { sade, konum };
     }
 
     _vurgula(ad, sorgu) {
         const tokens = this._sadelestir(sorgu).split(' ').filter(Boolean);
         if (!tokens.length) return this._esc(ad);
-
         const { sade, konum } = this._sadeHarita(ad);
         const isaret = new Array(ad.length).fill(false);
-
         for (const t of tokens) {
             let bas = sade.indexOf(t);
             while (bas !== -1) {
-                for (let i = bas; i < bas + t.length && i < konum.length; i++) {
-                    isaret[konum[i]] = true;
-                }
+                for (let i = bas; i < bas + t.length && i < konum.length; i++) isaret[konum[i]] = true;
                 bas = sade.indexOf(t, bas + t.length);
             }
         }
-
         let cikti = '';
         let acik = false;
         for (let i = 0; i < ad.length; i++) {
@@ -317,27 +232,29 @@ class DispatchAgendaApp {
         return cikti;
     }
 
+    // ==================================================================
+    // Kayıtlar
+    // ==================================================================
+
+    _fazlaMi(item) { return /^fazla/i.test(String(item?.reason_preset || '')); }
+
     async loadItems(retry = 0) {
-        const listEl = document.getElementById('agendaCardStrip');
-        const emptyEl = document.getElementById('agendaEmpty');
-        const countEl = document.getElementById('agendaCountBadge');
         if (!this._username) return;
         if (!window.jbDb?.from) {
             if (retry < 3) {
                 await this._waitForDb(3000);
                 return this.loadItems(retry + 1);
             }
-            this._toast('Ajanda yüklenemedi — bağlantı yok', 'error');
+            this._yuklemeHatali = true;
+            this._listeCiz();
             return;
         }
-
         try {
             const { data, error } = await window.jbDb
                 .from('dispatch_agenda_items')
                 .select('*')
                 .eq('username', this._username)
                 .order('created_at', { ascending: false });
-
             if (error) throw error;
             this.items = Array.isArray(data) ? data : [];
             this._yuklemeHatali = false;
@@ -345,19 +262,8 @@ class DispatchAgendaApp {
         } catch (e) {
             console.error('Ajanda yüklenemedi:', e);
             this._yuklemeHatali = true;
-            this.items = [];
-            this._toast('Kayıtlar yüklenemedi', 'error');
         }
-
-        if (countEl) countEl.textContent = String(this.items.length);
-
-        if (!this.items.length) {
-            if (listEl) listEl.innerHTML = '';
-            emptyEl?.classList.remove('hidden');
-        } else {
-            emptyEl?.classList.add('hidden');
-            if (listEl) this._renderAgendaList(listEl);
-        }
+        this._listeCiz();
         this._derinBaglantiyiAc();
     }
 
@@ -365,547 +271,518 @@ class DispatchAgendaApp {
         const raw = item?.event_date || item?.created_at;
         if (!raw) return '0000-00-00';
         const s = String(raw);
-        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}/.test(s) && !s.includes('T')) return s.slice(0, 10);
         const d = new Date(raw);
-        if (Number.isNaN(d.getTime())) return s.split('T')[0] || '0000-00-00';
+        if (Number.isNaN(d.getTime())) return s.slice(0, 10);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
-    _groupItemsByDate() {
-        const sorted = [...this.items].sort((a, b) => {
+    _gunBasligi(key) {
+        const d = new Date(`${key}T12:00:00`);
+        if (Number.isNaN(d.getTime())) return { ad: 'Tarihsiz', alt: '' };
+        const bugun = new Date(); bugun.setHours(12, 0, 0, 0);
+        const fark = Math.round((bugun - d) / 86400000);
+        const tam = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
+        if (fark === 0) return { ad: 'Bugün', alt: tam };
+        if (fark === 1) return { ad: 'Dün', alt: tam };
+        return { ad: tam, alt: d.getFullYear() !== bugun.getFullYear() ? String(d.getFullYear()) : '' };
+    }
+
+    _gruplar(liste) {
+        const sirali = [...liste].sort((a, b) => {
             const ka = this._dateKey(a);
             const kb = this._dateKey(b);
             if (ka !== kb) return kb.localeCompare(ka);
-            const ca = new Date(a.created_at || 0).getTime();
-            const cb = new Date(b.created_at || 0).getTime();
-            return cb - ca;
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
         });
+        const gruplar = new Map();
+        for (const item of sirali) {
+            const k = this._dateKey(item);
+            if (!gruplar.has(k)) gruplar.set(k, []);
+            gruplar.get(k).push(item);
+        }
+        return [...gruplar.entries()];
+    }
 
-        const groups = new Map();
-        const order = [];
-        for (const item of sorted) {
-            const key = this._dateKey(item);
-            if (!groups.has(key)) {
-                groups.set(key, []);
-                order.push(key);
-            }
-            groups.get(key).push(item);
+    _iskeletCiz() {
+        const el = document.getElementById('agendaCardStrip');
+        if (!el) return;
+        const kart = `<div class="aj-kart aj-iskelet" aria-hidden="true">
+                <div class="aj-kart__gorsel"><span class="aj-isk aj-isk--gorsel"></span></div>
+                <div class="aj-kart__govde"><span class="aj-isk aj-isk--satir"></span><span class="aj-isk aj-isk--satir aj-isk--kisa"></span></div>
+            </div>`;
+        el.setAttribute('aria-busy', 'true');
+        el.innerHTML = `<section class="aj-gun"><div class="aj-gun__bas"><span class="aj-isk aj-isk--satir" style="width:96px"></span></div><div class="aj-izgara">${kart.repeat(6)}</div></section>`;
+    }
+
+    _listeCiz() {
+        const el = document.getElementById('agendaCardStrip');
+        if (!el) return;
+        el.setAttribute('aria-busy', 'false');
+
+        const eksik = this.items.filter((x) => !this._fazlaMi(x));
+        const fazla = this.items.filter((x) => this._fazlaMi(x));
+        const say = { hepsi: this.items.length, eksik: eksik.length, fazla: fazla.length };
+        document.querySelectorAll('[data-say]').forEach((b) => { b.textContent = String(say[b.getAttribute('data-say')] || 0); });
+        const ozet = document.getElementById('ajOzet');
+        if (ozet) {
+            ozet.textContent = this.items.length
+                ? [eksik.length ? `${eksik.length} eksik` : '', fazla.length ? `${fazla.length} fazla` : ''].filter(Boolean).join(' · ') + ' kayıt açık.'
+                : 'Müşteriye eksik giden ve fazla gelen ürünler.';
         }
 
-        return order.map((key) => ({
-            key,
-            label: this._formatDate(`${key}T12:00:00`),
-            items: groups.get(key),
-        }));
+        if (this._yuklemeHatali && !this.items.length) {
+            el.innerHTML = `<div class="aj-bos aj-bos--hata">
+                <span class="aj-bos__im"><svg viewBox="0 0 24 24"><path d="M10.3 4.3 2.5 18a1.5 1.5 0 0 0 1.3 2.2h16.4A1.5 1.5 0 0 0 21.5 18L13.7 4.3a1.5 1.5 0 0 0-2.6 0z"/><path d="M12 9.5v4M12 17h.01"/></svg></span>
+                <strong>Kayıtlar yüklenemedi</strong><p>Bağlantı koptu ya da sunucu cevap vermedi.</p>
+                <button type="button" class="aj-dugme" data-aj-yenile>Tekrar Dene</button></div>`;
+            return;
+        }
+
+        const liste = this.suzgec === 'eksik' ? eksik : this.suzgec === 'fazla' ? fazla : this.items;
+        if (!liste.length) {
+            const bos = this.items.length
+                ? { b: this.suzgec === 'eksik' ? 'Eksik kayıt yok' : 'Fazla kayıt yok', p: 'Bu süzgeçte gösterilecek ürün kalmadı.', d: '' }
+                : { b: 'Ajanda boş', p: 'Müşteriye eksik ya da fazla giden ürünü ekle, bulununca Tamamlandı de.', d: '<button type="button" class="aj-dugme aj-dugme--ana" data-aj-ekle><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg><span>Ürün Ekle</span></button>' };
+            el.innerHTML = `<div class="aj-bos">
+                <span class="aj-bos__im"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></span>
+                <strong>${bos.b}</strong><p>${bos.p}</p>${bos.d}</div>`;
+            return;
+        }
+
+        el.innerHTML = this._gruplar(liste).map(([key, kayitlar]) => {
+            const g = this._gunBasligi(key);
+            return `<section class="aj-gun" data-date-key="${this._esc(key)}">
+                <div class="aj-gun__bas"><h2>${this._esc(g.ad)}</h2><span>${this._esc([g.alt, `${kayitlar.length} ürün`].filter(Boolean).join(' · '))}</span></div>
+                <div class="aj-izgara" role="list">${kayitlar.map((it) => this._kart(it)).join('')}</div>
+            </section>`;
+        }).join('');
     }
 
-    _renderAgendaList(listEl) {
-        const groups = this._groupItemsByDate();
-        listEl.innerHTML = groups.map((group) => `
-            <section class="agenda-date-section" data-date-key="${this._esc(group.key)}">
-                <h3 class="agenda-date-head">${this._esc(group.label)}</h3>
-                <div class="agenda-strip" role="list">
-                    ${group.items.map((item) => this._renderCard(item)).join('')}
-                </div>
-            </section>`).join('');
+    _kartBarkodu(item) {
+        const kayitli = this._barkodlar(item.barcodes)[0];
+        if (kayitli) return kayitli;
+        return this._productBarcode(this.productIndex.get(String(item.product_id)));
     }
 
-    _renderCard(item) {
-        const img = this._esc(item.product_image || '../assets/logo.png');
-        const name = this._esc(item.product_name || 'Ürün');
-        const qty = Number(item.quantity) || 1;
-        const pickup = item.pickup_required
-            ? '<span class="rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-semibold text-blue-800">Alınacak</span>'
-            : '';
-        const meta = pickup
-            ? `<div class="flex flex-wrap items-center gap-1 mt-1.5">${pickup}</div>`
-            : '';
-        const zil = this._hatirlaticiAcikMi(item)
-            ? `<span class="agenda-zil-isaret" title="Hatırlatıcı açık" aria-label="Hatırlatıcı açık">${this._zilSvg()}</span>`
-            : '';
+    _kartGorseli(item) {
+        return item.product_image || this._productImage(this.productIndex.get(String(item.product_id))) || '';
+    }
+
+    _kart(item) {
+        const id = this._esc(item.id);
+        const ad = this._esc(item.product_name || 'Ürün');
+        const adet = Number(item.quantity) || 1;
+        const fazla = this._fazlaMi(item);
+        const gorsel = this._kartGorseli(item);
+        const barkod = this._kartBarkodu(item);
+        const pid = String(item.product_id || '');
+        const isaretler = [];
+        if (this._hatirlaticiAcikMi(item)) isaretler.push(`<span class="aj-isaret aj-isaret--zil">${this._zilSvg()}Hatırlatıcı</span>`);
+        if (item.pickup_required) isaretler.push('<span class="aj-isaret aj-isaret--al">Alınacak</span>');
+        const sebep = String(item.reason_preset || '');
+        if (!fazla && sebep && !/^eksik ürün$/i.test(sebep)) isaretler.push(`<span class="aj-isaret">${this._esc(sebep)}</span>`);
         return `
-            <button type="button" class="agenda-card" data-item-id="${this._esc(item.id)}" aria-label="${name}">
-                <div class="relative">
-                    <img src="${img}" alt="" class="agenda-card-img" loading="lazy" />
-                    <span class="agenda-qty-badge">−${qty}</span>
-                    ${zil}
+            <article class="aj-kart" data-item-id="${id}" role="listitem">
+                <div class="aj-kart__gorsel">
+                    <button type="button" class="aj-kart__foto" data-aj-foto="${id}" aria-label="${ad} fotoğrafını büyüt" ${gorsel ? '' : 'disabled'}>
+                        <img src="${this._esc(gorsel || '../assets/logo.png')}" alt="" loading="lazy" decoding="async">
+                    </button>
+                    ${window.JBUrunStok ? window.JBUrunStok.dugme(pid) : ''}
+                    <span class="aj-adet${fazla ? ' is-fazla' : ''}" aria-label="${adet} adet ${fazla ? 'fazla' : 'eksik'}">${fazla ? '+' : '−'}${adet}</span>
+                    ${window.JBUrunHareketi ? window.JBUrunHareketi.dugme({ id: pid }) : ''}
                 </div>
-                <p class="agenda-card-title">${name}</p>
-                ${meta}
-            </button>`;
+                <button type="button" class="aj-kart__govde" data-aj-duzenle="${id}" aria-label="${ad}, düzenle">
+                    <span class="aj-kart__ad">${ad}</span>
+                    <span class="aj-kart__barkod">${this._esc(barkod || 'Barkod yok')}</span>
+                    ${isaretler.length ? `<span class="aj-kart__isaret">${isaretler.join('')}</span>` : ''}
+                </button>
+            </article>`;
     }
+
+    _hareketUrunu(id) {
+        const item = this.items.find((x) => String(x.product_id) === String(id));
+        const p = this.productIndex.get(String(id));
+        return {
+            id,
+            ad: item?.product_name || this._productName(p),
+            gorsel: item ? this._kartGorseli(item) : this._productImage(p),
+            barkod: item ? this._kartBarkodu(item) : this._productBarcode(p)
+        };
+    }
+
+    // ==================================================================
+    // Olaylar
+    // ==================================================================
 
     _bindEvents() {
         if (this._eventsBound) return;
         this._eventsBound = true;
 
-        const openAdd = () => {
-            if (!this._ready) {
-                this._toast('Bu özellik için yetkiniz yok', 'warning');
+        document.getElementById('agendaAddBtn')?.addEventListener('click', () => this.openAddModal());
+
+        document.getElementById('ajSuzgec')?.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-suzgec]');
+            if (!b) return;
+            this.suzgec = b.getAttribute('data-suzgec');
+            document.querySelectorAll('#ajSuzgec [data-suzgec]').forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+            this._listeCiz();
+        });
+
+        document.getElementById('agendaCardStrip')?.addEventListener('click', (e) => {
+            if (e.target.closest('[data-aj-ekle]')) { this.openAddModal(); return; }
+            if (e.target.closest('[data-aj-yenile]')) { this._iskeletCiz(); void this.loadItems(); return; }
+            const foto = e.target.closest('[data-aj-foto]');
+            if (foto) {
+                const item = this.items.find((x) => String(x.id) === foto.getAttribute('data-aj-foto'));
+                const g = item && this._kartGorseli(item);
+                if (g && window.JBUrunFoto) window.JBUrunFoto.ac(g, item.product_name || '');
                 return;
             }
-            this.openAddModal();
-        };
-
-        document.getElementById('agendaAddBtn')?.addEventListener('click', openAdd);
-        document.getElementById('agendaEmptyAddBtn')?.addEventListener('click', openAdd);
-        document.getElementById('addModalClose')?.addEventListener('click', () => this.closeAddModal());
-        document.getElementById('addModalCancel')?.addEventListener('click', () => this.closeAddModal());
-        document.getElementById('addModalSave')?.addEventListener('click', () => void this.saveNewItem());
-        document.getElementById('addClearProductBtn')?.addEventListener('click', () => this._clearSelectedProduct());
-        document.getElementById('addSearchClearBtn')?.addEventListener('click', () => this._clearSearchInput());
-        document.getElementById('detailCloseBtn')?.addEventListener('click', () => this.closeDetailSheet());
-        document.getElementById('detailDeleteBtn')?.addEventListener('click', () => this.openDeleteConfirmModal());
-        document.getElementById('detailReminderBtn')?.addEventListener('click', () => void this._hatirlaticiyiCevir());
-        document.getElementById('detailSheetBackdrop')?.addEventListener('click', () => this.closeDetailSheet());
-
-        document.getElementById('agendaDeleteConfirmClose')?.addEventListener('click', () => this.closeDeleteConfirmModal());
-        document.getElementById('agendaDeleteConfirmCancel')?.addEventListener('click', () => this.closeDeleteConfirmModal());
-        document.getElementById('agendaDeleteConfirmConfirm')?.addEventListener('click', () => void this.completeAndDelete());
-        document.getElementById('agendaDeleteConfirmModal')?.addEventListener('click', (e) => {
-            if (e.target.id === 'agendaDeleteConfirmModal') this.closeDeleteConfirmModal();
-        });
-
-        document.getElementById('headerLogoutBtn')?.addEventListener('click', () => {
-            window.authUtils?.logout?.();
-            window.location.href = '/';
-        });
-
-        document.querySelectorAll('#addReasonPills .agenda-reason-pill').forEach((pill) => {
-            pill.addEventListener('click', () => this._setReasonPreset(pill.getAttribute('data-reason')));
-        });
-
-        const searchInput = document.getElementById('addProductSearch');
-        if (searchInput) {
-            searchInput.addEventListener('input', () => {
-                this._updateSearchClearBtn(searchInput.value);
-                clearTimeout(this._searchDebounce);
-                this._searchDebounce = setTimeout(() => this._renderProductSearchResults(searchInput.value), 120);
-            });
-            searchInput.addEventListener('keydown', (e) => this._handleSearchKeydown(e));
-        }
-
-        const strip = document.getElementById('agendaCardStrip');
-        strip?.addEventListener('click', (e) => {
-            const card = e.target.closest('[data-item-id]');
-            if (!card) return;
-            const id = card.getAttribute('data-item-id');
-            const item = this.items.find((x) => String(x.id) === String(id));
-            if (item) this.openDetailSheet(item);
-        });
-
-        document.getElementById('addAgendaModal')?.addEventListener('click', (e) => {
-            if (e.target.id === 'addAgendaModal') this.closeAddModal();
-        });
-
-        document.getElementById('addProductResults')?.addEventListener('click', (e) => {
-            const row = e.target.closest('[data-pick-id]');
-            if (!row) return;
-            const pid = row.getAttribute('data-pick-id');
-            const product = this.productIndex.get(String(pid));
-            if (product) this._selectProduct(product);
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                const deleteModal = document.getElementById('agendaDeleteConfirmModal');
-                if (deleteModal?.classList.contains('agenda-modal-open')) {
-                    this.closeDeleteConfirmModal();
-                    return;
-                }
-                const modal = document.getElementById('addAgendaModal');
-                if (modal?.classList.contains('agenda-modal-open')) {
-                    this.closeAddModal();
-                } else if (document.getElementById('detailSheet')?.classList.contains('agenda-sheet-open')) {
-                    this.closeDetailSheet();
-                }
+            const d = e.target.closest('[data-aj-duzenle]');
+            if (d) {
+                const item = this.items.find((x) => String(x.id) === d.getAttribute('data-aj-duzenle'));
+                if (item) this.openDetailSheet(item);
             }
         });
-    }
 
-    _updateSearchClearBtn(value) {
-        const btn = document.getElementById('addSearchClearBtn');
-        if (btn) btn.classList.toggle('hidden', !(value || '').trim());
-    }
-
-    _clearSearchInput() {
-        const search = document.getElementById('addProductSearch');
-        if (search) {
-            search.value = '';
-            search.focus();
-        }
-        this._updateSearchClearBtn('');
-        this._renderProductSearchResults('');
-    }
-
-    _setReasonPreset(reason) {
-        const preset = reason || this.REASON_PRESETS[0];
-        document.querySelectorAll('#addReasonPills .agenda-reason-pill').forEach((pill) => {
-            pill.classList.toggle('is-active', pill.getAttribute('data-reason') === preset);
+        const perde = document.getElementById('ajForm');
+        perde?.addEventListener('click', (e) => {
+            if (e.target === perde || e.target.closest('[data-aj-kapat]')) { void this.formKapat(); return; }
+            const tur = e.target.closest('[data-tur]');
+            if (tur) { this._turSec(tur.getAttribute('data-tur')); return; }
+            const cip = e.target.closest('#addReasonPills [data-reason]');
+            if (cip) { this._sebepSec(cip.getAttribute('data-reason')); return; }
+            const adim = e.target.closest('[data-adim]');
+            if (adim) { this._adimla(Number(adim.getAttribute('data-adim'))); return; }
+            const sonuc = e.target.closest('[data-pick-id]');
+            if (sonuc) {
+                const p = this.productIndex.get(String(sonuc.getAttribute('data-pick-id')));
+                if (p) this._urunSec(p);
+            }
         });
-        const select = document.getElementById('addReasonPreset');
-        if (select) select.value = preset;
+        perde?.addEventListener('input', () => this._degisimDenetle());
+        perde?.addEventListener('change', () => this._degisimDenetle());
+
+        document.getElementById('addClearProductBtn')?.addEventListener('click', () => this._urunBirak());
+        document.getElementById('addModalSave')?.addEventListener('click', () => void this.kaydet());
+        document.getElementById('detailDeleteBtn')?.addEventListener('click', () => void this.completeAndDelete());
+        document.getElementById('ajUrunFoto')?.addEventListener('click', () => {
+            const u = this.form?.urun;
+            if (u?.gorsel && window.JBUrunFoto) window.JBUrunFoto.ac(u.gorsel, u.ad);
+        });
+        document.getElementById('addSelectedBarcode')?.addEventListener('click', (e) => {
+            const t = e.currentTarget.textContent.trim();
+            if (!t) return;
+            navigator.clipboard?.writeText(t).then(() => window.JBDiyalog?.bildir('Barkod kopyalandı', 'basari', 1800), () => {});
+        });
+        document.getElementById('addPickupRequired')?.addEventListener('change', (e) => {
+            document.getElementById('ajAdresAlan').hidden = !e.target.checked;
+        });
+
+        const ara = document.getElementById('addProductSearch');
+        if (ara) {
+            ara.addEventListener('input', () => {
+                clearTimeout(this._searchDebounce);
+                this._searchDebounce = setTimeout(() => this._sonuclariCiz(ara.value), 120);
+            });
+            ara.addEventListener('keydown', (e) => this._handleSearchKeydown(e));
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape' || !this.form) return;
+            if (document.querySelector('.uf-perde') || document.body.classList.contains('jbd-acik')) return;
+            void this.formKapat();
+        });
     }
 
-    _getReasonPreset() {
-        const active = document.querySelector('#addReasonPills .agenda-reason-pill.is-active');
-        return active?.getAttribute('data-reason') || this.REASON_PRESETS[0];
+    // ==================================================================
+    // Form: ekle ve düzenle tek pencerede
+    // ==================================================================
+
+    _formAc(baslik) {
+        const perde = document.getElementById('ajForm');
+        document.getElementById('ajFormBaslik').textContent = baslik;
+        perde.hidden = false;
+        document.documentElement.classList.add('aj-acik');
+        requestAnimationFrame(() => perde.classList.add('is-acik'));
     }
 
-    _showFormSection(show) {
-        const section = document.getElementById('addFormSection');
-        const saveBtn = document.getElementById('addModalSave');
-        if (section) section.classList.toggle('is-visible', show);
-        if (saveBtn) saveBtn.disabled = !show;
+    async formKapat(zorla) {
+        if (!this.form) return;
+        if (!zorla && this.form.mod === 'duzenle' && this._degistiMi()) {
+            const tamam = await window.JBDiyalog?.onay('Yaptığın değişiklikler kaydedilmedi.', { baslik: 'Kaydetmeden çıkılsın mı?', onayYazi: 'Çık', vazgecYazi: 'Kal' });
+            if (!tamam) return;
+        }
+        this.form = null;
+        const perde = document.getElementById('ajForm');
+        perde.classList.remove('is-acik');
+        document.documentElement.classList.remove('aj-acik');
+        let bitti = false;
+        const bitir = () => { if (bitti) return; bitti = true; if (!this.form) perde.hidden = true; };
+        perde.addEventListener('transitionend', bitir, { once: true });
+        setTimeout(bitir, 260);
     }
 
     openAddModal() {
-        this.selectedProduct = null;
-        this._searchHighlight = -1;
-        const modal = document.getElementById('addAgendaModal');
-        const search = document.getElementById('addProductSearch');
-        const picked = document.getElementById('addSelectedProduct');
-        const results = document.getElementById('addProductResults');
-        const hint = document.getElementById('addSearchHint');
-
-        if (search) search.value = '';
-        this._updateSearchClearBtn('');
-        picked?.classList.add('hidden');
-        if (results) {
-            results.innerHTML = '';
-            results.classList.add('hidden');
-        }
-        hint?.classList.remove('hidden');
-        this._showFormSection(false);
-
-        const qtyEl = document.getElementById('addQuantity');
-        const noteEl = document.getElementById('addReasonNote');
-        const addrEl = document.getElementById('addAddress');
-        const pickupEl = document.getElementById('addPickupRequired');
-        if (qtyEl) qtyEl.value = '1';
-        if (noteEl) noteEl.value = '';
-        if (addrEl) addrEl.value = '';
-        if (pickupEl) pickupEl.checked = false;
-        const reminderEl = document.getElementById('addReminder');
-        if (reminderEl) reminderEl.checked = false;
-        this._setReasonPreset(this.REASON_PRESETS[0]);
-        this._setDefaultDate('addEventDate');
-
-        if (modal) {
-            modal.classList.add('agenda-modal-open');
-            modal.setAttribute('aria-hidden', 'false');
-            document.body.style.overflow = 'hidden';
-        }
-        setTimeout(() => search?.focus(), 80);
-    }
-
-    closeAddModal() {
-        const modal = document.getElementById('addAgendaModal');
-        if (modal) {
-            modal.classList.remove('agenda-modal-open');
-            modal.setAttribute('aria-hidden', 'true');
-            document.body.style.overflow = '';
-        }
-    }
-
-    _clearSelectedProduct() {
-        this.selectedProduct = null;
-        const picked = document.getElementById('addSelectedProduct');
-        picked?.classList.add('hidden');
-        this._showFormSection(false);
-        document.getElementById('addSearchHint')?.classList.remove('hidden');
-        document.getElementById('addProductSearch')?.focus();
-        this._renderProductSearchResults('');
-    }
-
-    _selectProduct(product) {
-        this.selectedProduct = product;
-        const picked = document.getElementById('addSelectedProduct');
-        const nameEl = document.getElementById('addSelectedName');
-        const imgEl = document.getElementById('addSelectedImg');
-        const barcodeEl = document.getElementById('addSelectedBarcode');
-        const results = document.getElementById('addProductResults');
-        const hint = document.getElementById('addSearchHint');
-
-        if (nameEl) nameEl.textContent = this._productName(product);
-        if (imgEl) imgEl.src = this._productImage(product);
-        if (barcodeEl) {
-            const bc = this._productBarcode(product);
-            barcodeEl.textContent = bc ? `Barkod: ${bc}` : '';
-            barcodeEl.classList.toggle('hidden', !bc);
-        }
-        picked?.classList.remove('hidden');
-        if (results) {
-            results.innerHTML = '';
-            results.classList.add('hidden');
-        }
-        hint?.classList.add('hidden');
-        this._showFormSection(true);
-        document.getElementById('addQuantity')?.focus();
-    }
-
-    _handleSearchKeydown(e) {
-        const container = document.getElementById('addProductResults');
-        const hits = container ? [...container.querySelectorAll('[data-pick-id]')] : [];
-        if (!hits.length) {
-            if (e.key === 'Enter') e.preventDefault();
-            return;
-        }
-
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            this._searchHighlight = Math.min(this._searchHighlight + 1, hits.length - 1);
-            this._updateSearchHighlight(hits);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            this._searchHighlight = Math.max(this._searchHighlight - 1, 0);
-            this._updateSearchHighlight(hits);
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            const target = hits[this._searchHighlight >= 0 ? this._searchHighlight : 0];
-            target?.click();
-        }
-    }
-
-    _updateSearchHighlight(hits) {
-        hits.forEach((el, i) => {
-            el.setAttribute('aria-selected', i === this._searchHighlight ? 'true' : 'false');
-            if (i === this._searchHighlight) el.scrollIntoView({ block: 'nearest' });
-        });
-    }
-
-    _renderProductSearchResults(query) {
-        const container = document.getElementById('addProductResults');
-        if (!container) return;
-
-        this._searchHighlight = -1;
-        const q = (query || '').trim();
-
-        /* Kutu boşken son eklenen ürünler duruyor. Aynı ürünler tekrar
-           tekrar giriliyor; kullanıcı çoğu zaman hiç yazmadan seçiyor. */
-        if (!q) {
-            const son = this._sonEklenenler(6);
-            if (!son.length) {
-                container.innerHTML = '';
-                container.classList.add('hidden');
-                return;
-            }
-            container.innerHTML =
-                '<p class="agenda-search-basluk">Son eklediklerin</p>' +
-                son.map((p) => this._sonucSatiri(p, '')).join('');
-            container.classList.remove('hidden');
-            return;
-        }
-
-        if (q.length < 2 && !/^\d/.test(q)) {
-            container.innerHTML = '';
-            container.classList.add('hidden');
-            return;
-        }
-
-        if (!this.allProducts.length) {
-            container.innerHTML =
-                '<p class="px-4 py-4 text-sm text-center text-amber-700">Ürün kataloğu yüklenemedi. Sayfayı yenileyin.</p>';
-            container.classList.remove('hidden');
-            return;
-        }
-
-        const matches = this._searchProducts(q);
-        if (!matches.length) {
-            container.innerHTML =
-                '<p class="px-4 py-6 text-sm text-center text-slate-500">Eşleşen ürün bulunamadı</p>';
-            container.classList.remove('hidden');
-            return;
-        }
-
-        container.innerHTML =
-            `<p class="agenda-search-basluk">${matches.length} sonuç` +
-            (matches.length >= 30 ? ' (ilk 30)' : '') +
-            ' <span>↑↓ gez · Enter seç</span></p>' +
-            matches.map((p) => this._sonucSatiri(p, q)).join('');
-
-        container.classList.remove('hidden');
-    }
-
-    /** Sonuç satırı. Hem arama hem "son eklediklerin" için tek biçim. */
-    _sonucSatiri(p, sorgu) {
-        const id = this._esc(this._productId(p));
-        const ad = this._productName(p);
-        const img = this._esc(this._productImage(p));
-        const barcode = this._esc(this._productBarcode(p));
-        const brand = this._esc(p.brand || '');
-        const meta = [brand, barcode ? `Barkod: ${barcode}` : ''].filter(Boolean).join(' · ');
-        return `
-            <button type="button" class="agenda-search-hit" data-pick-id="${id}" aria-selected="false">
-                <img src="${img}" alt="" class="agenda-search-hit__img" loading="lazy" />
-                <span class="agenda-search-hit__yazi">
-                    <span class="agenda-search-hit__ad">${this._vurgula(ad, sorgu)}</span>
-                    ${meta ? `<span class="agenda-search-hit__meta">${meta}</span>` : ''}
-                </span>
-                <span class="agenda-search-hit__sec" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
-                         stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                </span>
-            </button>`;
-    }
-
-    async saveNewItem() {
-        if (!this.selectedProduct || !this._productId(this.selectedProduct)) {
-            this._toast('Önce bir ürün seçin', 'warning');
-            document.getElementById('addProductSearch')?.focus();
-            return;
-        }
-
-        const qty = parseInt(document.getElementById('addQuantity')?.value, 10);
-        if (!qty || qty < 1) {
-            this._toast('Geçerli adet girin', 'warning');
-            return;
-        }
-
-        const reasonPreset = this._getReasonPreset();
-        const reasonNote = (document.getElementById('addReasonNote')?.value || '').trim();
-        const pickupRequired = !!document.getElementById('addPickupRequired')?.checked;
-        const address = (document.getElementById('addAddress')?.value || '').trim();
-        const eventDate = document.getElementById('addEventDate')?.value || null;
-        const reminder = !!document.getElementById('addReminder')?.checked;
-        const H = window.JBAjandaHatirlatici;
-        if (reminder && H) await H.kolonVarMi();
-
-        const barcodes = Array.isArray(this.selectedProduct.barcodes) ? this.selectedProduct.barcodes : [];
-        const row = {
-            username: this._username,
-            product_id: String(this._productId(this.selectedProduct)),
-            product_name: this._productName(this.selectedProduct),
-            product_image: this._productImage(this.selectedProduct),
-            barcodes,
-            quantity: qty,
-            reason_preset: reasonPreset,
-            reason_note: reasonNote || null,
-            pickup_required: pickupRequired,
-            address: address || null,
-            event_date: eventDate,
-            updated_at: new Date().toISOString(),
-            ...(H ? H.eklemeAlani(reminder) : {}),
-        };
-
-        const saveBtn = document.getElementById('addModalSave');
-        if (saveBtn) saveBtn.disabled = true;
-
-        try {
-            const { data, error } = await window.jbDb.from('dispatch_agenda_items').insert(row).select('id');
-            if (error) throw error;
-            const yeniId = Array.isArray(data) ? data[0]?.id : data?.id;
-            if (H && yeniId) H.eklendi(yeniId, reminder);
-            this._toast(reminder ? 'Kayıt eklendi, hatırlatıcı kuruldu' : 'Kayıt eklendi', 'success');
-            this.closeAddModal();
-            await this.loadItems();
-        } catch (e) {
-            console.error(e);
-            this._toast(e.message || 'Kayıt eklenemedi', 'error');
-        } finally {
-            if (saveBtn) saveBtn.disabled = !this.selectedProduct;
-        }
+        if (!this._ready) return;
+        this.form = { mod: 'ekle', item: null, urun: null, tur: 'eksik', sebep: this.EKSIK_SEBEPLER[0], ilk: null };
+        document.getElementById('ajAra').hidden = false;
+        document.getElementById('ajFormAlan').hidden = true;
+        document.getElementById('ajFormAyak').hidden = true;
+        document.getElementById('detailDeleteBtn').hidden = true;
+        document.getElementById('addClearProductBtn').hidden = false;
+        const ara = document.getElementById('addProductSearch');
+        ara.value = '';
+        this._sonuclariCiz('');
+        this._formAc('Ürün Ekle');
+        document.getElementById('ajFormGovde').scrollTop = 0;
+        setTimeout(() => ara.focus(), 60);
     }
 
     openDetailSheet(item) {
-        this.detailItem = item;
-        const sheet = document.getElementById('detailSheet');
-        const body = document.getElementById('detailSheetBody');
-        if (!sheet || !body) return;
-
-        const barcodes = Array.isArray(item.barcodes) ? item.barcodes : [];
-        const barcodeText = barcodes
-            .map((b) => (typeof b === 'object' ? b.code : b))
-            .filter(Boolean)
-            .join(', ');
-
-        body.innerHTML = `
-            <div class="flex items-start gap-3.5 rounded-xl border border-slate-100 bg-gradient-to-br from-slate-50 to-blue-50/40 p-3.5">
-                <img src="${this._esc(item.product_image || '../assets/logo.png')}" alt="" class="h-16 w-16 shrink-0 rounded-xl border-2 border-white object-cover shadow-sm" />
-                <div class="min-w-0 flex-1">
-                    <h3 class="text-base font-bold text-slate-900 [overflow-wrap:anywhere] leading-snug">${this._esc(item.product_name)}</h3>
-                    <p class="mt-1.5 inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-700">−${Number(item.quantity) || 1} Adet Eksik</p>
-                </div>
-            </div>
-            <dl class="mt-4 space-y-0 text-sm">
-                <div class="flex justify-between gap-3 border-b border-slate-100 py-2.5">
-                    <dt class="text-slate-500 shrink-0">Sebep</dt>
-                    <dd class="text-right font-semibold text-slate-900">${this._esc(item.reason_preset || '—')}</dd>
-                </div>
-                ${item.reason_note ? `<div class="flex justify-between gap-3 border-b border-slate-100 py-2.5"><dt class="text-slate-500 shrink-0">Not</dt><dd class="text-right text-slate-800 [overflow-wrap:anywhere]">${this._esc(item.reason_note)}</dd></div>` : ''}
-                <div class="flex justify-between gap-3 border-b border-slate-100 py-2.5">
-                    <dt class="text-slate-500 shrink-0">Tarih</dt>
-                    <dd class="text-right text-slate-900">${this._esc(this._formatDate(item.event_date || item.created_at))}</dd>
-                </div>
-                <div class="flex justify-between gap-3 border-b border-slate-100 py-2.5">
-                    <dt class="text-slate-500 shrink-0">Hatırlatıcı</dt>
-                    <dd class="text-right font-semibold ${this._hatirlaticiAcikMi(item) ? 'text-rose-700' : 'text-slate-400'}">${this._hatirlaticiAcikMi(item) ? 'Açık · arama sayfasında görünüyor' : 'Kapalı'}</dd>
-                </div>
-                <div class="flex justify-between gap-3 border-b border-slate-100 py-2.5">
-                    <dt class="text-slate-500 shrink-0">Müşteriden Alınacak</dt>
-                    <dd class="text-right font-semibold ${item.pickup_required ? 'text-blue-700' : 'text-slate-400'}">${item.pickup_required ? 'Evet' : 'Hayır'}</dd>
-                </div>
-                ${item.address ? `<div class="flex justify-between gap-3 border-b border-slate-100 py-2.5"><dt class="text-slate-500 shrink-0">Adres</dt><dd class="text-right text-slate-800 [overflow-wrap:anywhere]">${this._esc(item.address)}</dd></div>` : ''}
-                ${barcodeText ? `<div class="flex justify-between gap-3 py-2.5"><dt class="text-slate-500 shrink-0">Barkod</dt><dd class="text-right text-xs font-mono text-slate-600 [overflow-wrap:anywhere]">${this._esc(barcodeText)}</dd></div>` : ''}
-            </dl>`;
-
-        this._hatirlaticiDugmesiniYaz(item);
-        sheet.classList.remove('hidden');
-        sheet.setAttribute('aria-hidden', 'false');
-        requestAnimationFrame(() => sheet.classList.add('agenda-sheet-open'));
+        const p = this.productIndex.get(String(item.product_id));
+        const fazla = this._fazlaMi(item);
+        this.form = {
+            mod: 'duzenle',
+            item,
+            urun: { id: String(item.product_id), ad: item.product_name || this._productName(p), gorsel: this._kartGorseli(item), barkod: this._kartBarkodu(item) },
+            tur: fazla ? 'fazla' : 'eksik',
+            sebep: fazla ? this.EKSIK_SEBEPLER[0] : (this.EKSIK_SEBEPLER.find((s) => s.toLocaleLowerCase('tr') === String(item.reason_preset || '').toLocaleLowerCase('tr')) || this.EKSIK_SEBEPLER[0]),
+            ilk: null
+        };
+        document.getElementById('ajAra').hidden = true;
+        document.getElementById('addClearProductBtn').hidden = true;
+        this._formDoldur({
+            adet: Number(item.quantity) || 1,
+            tarih: this._dateKey(item),
+            not: item.reason_note || '',
+            al: !!item.pickup_required,
+            adres: item.address || '',
+            zil: this._hatirlaticiAcikMi(item)
+        });
+        document.getElementById('detailDeleteBtn').hidden = false;
+        this._formAc('Kaydı Düzenle');
+        document.getElementById('ajFormGovde').scrollTop = 0;
+        this.form.ilk = this._formDegeri();
+        this._degisimDenetle();
     }
 
-    closeDetailSheet() {
-        const sheet = document.getElementById('detailSheet');
-        if (!sheet) return;
-        sheet.classList.remove('agenda-sheet-open');
-        sheet.setAttribute('aria-hidden', 'true');
-        setTimeout(() => sheet.classList.add('hidden'), 280);
-        this.detailItem = null;
+    _formDoldur(v) {
+        const u = this.form.urun;
+        document.getElementById('addSelectedImg').src = u.gorsel || '../assets/logo.png';
+        document.getElementById('ajUrunFoto').disabled = !u.gorsel;
+        document.getElementById('addSelectedName').textContent = u.ad || 'Ürün';
+        document.getElementById('addSelectedBarcode').textContent = u.barkod || '';
+        document.getElementById('addQuantity').value = String(v.adet);
+        document.getElementById('addEventDate').value = v.tarih;
+        document.getElementById('addReasonNote').value = v.not;
+        document.getElementById('addPickupRequired').checked = v.al;
+        document.getElementById('addAddress').value = v.adres;
+        document.getElementById('ajAdresAlan').hidden = !v.al;
+        document.getElementById('addReminder').checked = v.zil;
+        this._turSec(this.form.tur);
+        this._sebepSec(this.form.sebep);
+        document.getElementById('ajFormAlan').hidden = false;
+        document.getElementById('ajFormAyak').hidden = false;
     }
 
-    openDeleteConfirmModal() {
-        if (!this.detailItem?.id) return;
-        const modal = document.getElementById('agendaDeleteConfirmModal');
-        const nameEl = document.getElementById('agendaDeleteConfirmProduct');
-        if (nameEl) nameEl.textContent = this.detailItem.product_name || 'Bu';
-        if (modal) {
-            modal.classList.add('agenda-modal-open');
-            modal.setAttribute('aria-hidden', 'false');
+    _bugun() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    _urunSec(p) {
+        if (!this.form) return;
+        this.form.urun = { id: String(this._productId(p)), ad: this._productName(p), gorsel: this._productImage(p), barkod: this._productBarcode(p), barkodlar: Array.isArray(p.barcodes) ? p.barcodes : [] };
+        document.getElementById('ajAra').hidden = true;
+        this._formDoldur({ adet: 1, tarih: this._bugun(), not: '', al: false, adres: '', zil: false });
+        this._degisimDenetle();
+        setTimeout(() => { const q = document.getElementById('addQuantity'); q.focus(); q.select(); }, 60);
+    }
+
+    _urunBirak() {
+        if (!this.form || this.form.mod !== 'ekle') return;
+        this.form.urun = null;
+        document.getElementById('ajFormAlan').hidden = true;
+        document.getElementById('ajFormAyak').hidden = true;
+        document.getElementById('ajAra').hidden = false;
+        const ara = document.getElementById('addProductSearch');
+        this._sonuclariCiz(ara.value);
+        ara.focus();
+    }
+
+    _turSec(tur) {
+        if (!this.form) return;
+        this.form.tur = tur === 'fazla' ? 'fazla' : 'eksik';
+        document.querySelectorAll('#ajForm [data-tur]').forEach((b) => b.setAttribute('aria-checked', String(b.getAttribute('data-tur') === this.form.tur)));
+        document.getElementById('ajSebepAlan').hidden = this.form.tur === 'fazla';
+        this._degisimDenetle();
+    }
+
+    _sebepSec(sebep) {
+        if (!this.form) return;
+        this.form.sebep = this.EKSIK_SEBEPLER.includes(sebep) ? sebep : this.EKSIK_SEBEPLER[0];
+        document.querySelectorAll('#addReasonPills [data-reason]').forEach((b) => {
+            const secili = b.getAttribute('data-reason') === this.form.sebep;
+            b.classList.toggle('is-active', secili);
+            b.setAttribute('aria-pressed', String(secili));
+        });
+        this._degisimDenetle();
+    }
+
+    _adimla(fark) {
+        const q = document.getElementById('addQuantity');
+        const n = Math.min(999, Math.max(1, (parseInt(q.value, 10) || 1) + fark));
+        q.value = String(n);
+        this._degisimDenetle();
+    }
+
+    _formDegeri() {
+        return {
+            adet: parseInt(document.getElementById('addQuantity').value, 10) || 0,
+            tur: this.form.tur,
+            sebep: this.form.tur === 'fazla' ? this.FAZLA : this.form.sebep,
+            tarih: document.getElementById('addEventDate').value || null,
+            not: (document.getElementById('addReasonNote').value || '').trim(),
+            al: document.getElementById('addPickupRequired').checked,
+            adres: (document.getElementById('addAddress').value || '').trim(),
+            zil: document.getElementById('addReminder').checked
+        };
+    }
+
+    _degistiMi() {
+        if (!this.form?.ilk) return true;
+        return JSON.stringify(this._formDegeri()) !== JSON.stringify(this.form.ilk);
+    }
+
+    _degisimDenetle() {
+        const btn = document.getElementById('addModalSave');
+        if (!btn || !this.form) return;
+        const v = this.form.urun ? this._formDegeri() : null;
+        const gecerli = !!v && v.adet >= 1 && v.adet <= 999;
+        btn.disabled = !gecerli || (this.form.mod === 'duzenle' && !this._degistiMi());
+    }
+
+    async kaydet() {
+        if (!this.form?.urun) return;
+        const v = this._formDegeri();
+        if (v.adet < 1 || v.adet > 999) {
+            window.JBDiyalog?.bildir('Adet 1 ile 999 arasında olmalı', 'uyari');
+            return;
         }
-    }
-
-    closeDeleteConfirmModal() {
-        const modal = document.getElementById('agendaDeleteConfirmModal');
-        if (modal) {
-            modal.classList.remove('agenda-modal-open');
-            modal.setAttribute('aria-hidden', 'true');
+        const btn = document.getElementById('addModalSave');
+        btn.disabled = true;
+        const H = window.JBAjandaHatirlatici;
+        const ortak = {
+            quantity: v.adet,
+            reason_preset: v.sebep,
+            reason_note: v.not || null,
+            pickup_required: v.al,
+            address: v.al ? (v.adres || null) : null,
+            event_date: v.tarih,
+            updated_at: new Date().toISOString()
+        };
+        try {
+            if (this.form.mod === 'ekle') {
+                if (v.zil && H) await H.kolonVarMi();
+                const u = this.form.urun;
+                const row = {
+                    username: this._username,
+                    product_id: u.id,
+                    product_name: u.ad,
+                    product_image: u.gorsel || null,
+                    barcodes: u.barkodlar || [],
+                    ...ortak,
+                    ...(H ? H.eklemeAlani(v.zil) : {})
+                };
+                const { data, error } = await window.jbDb.from('dispatch_agenda_items').insert(row).select('id');
+                if (error) throw error;
+                const yeniId = Array.isArray(data) ? data[0]?.id : data?.id;
+                if (H && yeniId) H.eklendi(yeniId, v.zil);
+                window.JBDiyalog?.bildir(`${v.tur === 'fazla' ? 'Fazla' : 'Eksik'} kaydı eklendi`, 'basari');
+            } else {
+                const item = this.form.item;
+                const { error } = await window.jbDb.from('dispatch_agenda_items').update(ortak).eq('id', item.id).eq('username', this._username);
+                if (error) throw error;
+                if (H && v.zil !== this.form.ilk.zil) await H.ayarla(item.id, v.zil);
+                window.JBDiyalog?.bildir('Kayıt güncellendi', 'basari');
+            }
+            await this.formKapat(true);
+            await this.loadItems();
+        } catch (e) {
+            console.error(e);
+            window.JBDiyalog?.bildir(this.form?.mod === 'ekle' ? 'Kayıt eklenemedi' : 'Kayıt güncellenemedi', 'hata');
+            btn.disabled = false;
         }
     }
 
     async completeAndDelete() {
-        if (!this.detailItem?.id) return;
-
-        const confirmBtn = document.getElementById('agendaDeleteConfirmConfirm');
-        if (confirmBtn) confirmBtn.disabled = true;
-
+        const item = this.form?.item;
+        if (!item?.id) return;
+        const tamam = await window.JBDiyalog?.onay(`${item.product_name || 'Bu ürün'} ajandadan kaldırılacak.`, { baslik: 'Tamamlandı mı?', onayYazi: 'Tamamlandı', vazgecYazi: 'Vazgeç' });
+        if (!tamam) return;
+        const btn = document.getElementById('detailDeleteBtn');
+        btn.disabled = true;
         try {
-            const { error } = await window.jbDb
-                .from('dispatch_agenda_items')
-                .delete()
-                .eq('id', this.detailItem.id)
-                .eq('username', this._username);
+            const { error } = await window.jbDb.from('dispatch_agenda_items').delete().eq('id', item.id).eq('username', this._username);
             if (error) throw error;
-            window.JBAjandaHatirlatici?.kaldirildi(this.detailItem.id);
-            this.closeDeleteConfirmModal();
-            this._toast('Kayıt silindi', 'success');
-            this.closeDetailSheet();
+            window.JBAjandaHatirlatici?.kaldirildi(item.id);
+            window.JBDiyalog?.bildir('Kayıt kapatıldı', 'basari');
+            await this.formKapat(true);
             await this.loadItems();
         } catch (e) {
             console.error(e);
-            this._toast(e.message || 'Silinemedi', 'error');
+            window.JBDiyalog?.bildir('Kayıt kapatılamadı', 'hata');
         } finally {
-            if (confirmBtn) confirmBtn.disabled = false;
+            btn.disabled = false;
+        }
+    }
+
+    // Ürün arama sonuçları
+
+    _sonuclariCiz(sorgu) {
+        const kap = document.getElementById('addProductResults');
+        if (!kap) return;
+        this._searchHighlight = -1;
+        const q = (sorgu || '').trim();
+        if (!q) {
+            const son = this._sonEklenenler(6);
+            kap.innerHTML = son.length
+                ? '<p class="aj-sonuclar__bas">Son eklediklerin</p>' + son.map((p) => this._sonucSatiri(p, '')).join('')
+                : '<p class="aj-sonuclar__bos">Ürün adı ya da barkodla ara.</p>';
+            return;
+        }
+        if (q.length < 2 && !/^\d/.test(q)) { kap.innerHTML = '<p class="aj-sonuclar__bos">En az 2 harf yaz.</p>'; return; }
+        if (!this.allProducts.length) { kap.innerHTML = '<p class="aj-sonuclar__bos">Ürün kataloğu yüklenemedi. Sayfayı yenile.</p>'; return; }
+        const bulunan = this._searchProducts(q);
+        if (!bulunan.length) { kap.innerHTML = '<p class="aj-sonuclar__bos">Eşleşen ürün yok.</p>'; return; }
+        kap.innerHTML = `<p class="aj-sonuclar__bas">${bulunan.length >= 30 ? 'İlk 30 sonuç' : `${bulunan.length} sonuç`}</p>` + bulunan.map((p) => this._sonucSatiri(p, q)).join('');
+    }
+
+    _sonucSatiri(p, sorgu) {
+        const barkod = this._productBarcode(p);
+        return `<button type="button" class="aj-sonuc" role="option" data-pick-id="${this._esc(this._productId(p))}" aria-selected="false">
+                <img src="${this._esc(this._productImage(p) || '../assets/logo.png')}" alt="" loading="lazy">
+                <span><b>${this._vurgula(this._productName(p), sorgu)}</b>${barkod ? `<small>${this._esc(barkod)}</small>` : ''}</span>
+            </button>`;
+    }
+
+    _handleSearchKeydown(e) {
+        const hits = [...document.querySelectorAll('#addProductResults [data-pick-id]')];
+        if (!hits.length) { if (e.key === 'Enter') e.preventDefault(); return; }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            this._searchHighlight = e.key === 'ArrowDown'
+                ? Math.min(this._searchHighlight + 1, hits.length - 1)
+                : Math.max(this._searchHighlight - 1, 0);
+            hits.forEach((el, i) => {
+                el.setAttribute('aria-selected', String(i === this._searchHighlight));
+                if (i === this._searchHighlight) el.scrollIntoView({ block: 'nearest' });
+            });
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            hits[this._searchHighlight >= 0 ? this._searchHighlight : 0]?.click();
         }
     }
 
@@ -919,7 +796,7 @@ class DispatchAgendaApp {
     }
 
     _zilSvg() {
-        return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>';
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>';
     }
 
     /** Sütun durumunu öğren, arama sayfasının okuduğu önbelleği tazele. */
@@ -930,54 +807,16 @@ class DispatchAgendaApp {
         H.onbellekYaz(this.items.filter((it) => H.aciklarMi(it, this._username)), this._username);
     }
 
-    _hatirlaticiDugmesiniYaz(item) {
-        const btn = document.getElementById('detailReminderBtn');
-        if (!btn) return;
-        if (!window.JBAjandaHatirlatici) {
-            btn.classList.add('hidden');
-            return;
-        }
-        const acik = this._hatirlaticiAcikMi(item);
-        btn.classList.remove('hidden');
-        btn.classList.toggle('is-acik', acik);
-        btn.disabled = false;
-        btn.innerHTML = `${this._zilSvg()}<span>${acik ? 'Hatırlatıcıyı kapat' : 'Hatırlatıcı kur'}</span>`;
-    }
-
-    async _hatirlaticiyiCevir() {
-        const H = window.JBAjandaHatirlatici;
-        const item = this.detailItem;
-        if (!H || !item?.id) return;
-        const btn = document.getElementById('detailReminderBtn');
-        const yeni = !this._hatirlaticiAcikMi(item);
-        if (btn) btn.disabled = true;
-        try {
-            await H.ayarla(item.id, yeni);
-            if (H.kolonDurumu() === true) item.reminder = yeni;
-            H.onbellekYaz(this.items.filter((it) => H.aciklarMi(it, this._username)), this._username);
-            const listEl = document.getElementById('agendaCardStrip');
-            if (listEl && this.items.length) this._renderAgendaList(listEl);
-            this.openDetailSheet(item);
-            this._toast(yeni ? 'Hatırlatıcı kuruldu' : 'Hatırlatıcı kapatıldı', 'success');
-        } catch (e) {
-            console.error(e);
-            this._toast('Hatırlatıcı değiştirilemedi', 'error');
-            if (btn) btn.disabled = false;
-        }
-    }
-
     /**
-     * Arama sayfasındaki zilden gelindiyse (?kayit=<id>) o kaydı aç.
-     * Bir kez çalışır; adres çubuğundaki parametre temizlenir ki
-     * yenileyince yeniden açılmasın.
+     * Arama sayfasındaki zilden ya da Ürün Hareketi penceresinden gelindiyse
+     * (?kayit=<id>) o kaydı aç. Bir kez çalışır; parametre adresten silinir.
      */
     _derinBaglantiyiAc() {
-        // Liste yüklenemediyse bekle; bir sonraki başarılı yüklemede açılır
         if (this._derinBaglantiBitti || this._yuklemeHatali) return;
         let id = null;
         try { id = new URLSearchParams(window.location.search).get('kayit'); } catch (e) { id = null; }
-        if (!id) { this._derinBaglantiBitti = true; return; }
         this._derinBaglantiBitti = true;
+        if (!id) return;
         try {
             const url = new URL(window.location.href);
             url.searchParams.delete('kayit');
@@ -985,10 +824,10 @@ class DispatchAgendaApp {
         } catch (e) { /* ignore */ }
         const item = this.items.find((x) => String(x.id) === String(id));
         if (!item) {
-            this._toast('Bu kayıt artık yok', 'info');
+            window.JBDiyalog?.bildir('Bu kayıt artık yok', 'bilgi');
             return;
         }
-        const kart = document.querySelector(`[data-item-id="${CSS.escape(String(id))}"]`);
+        const kart = document.querySelector(`.aj-kart[data-item-id="${CSS.escape(String(id))}"]`);
         if (kart) {
             kart.scrollIntoView({ block: 'center' });
             kart.classList.add('is-vurgu');
@@ -997,50 +836,9 @@ class DispatchAgendaApp {
         this.openDetailSheet(item);
     }
 
-    _setDefaultDate(inputId = 'addEventDate') {
-        const el = document.getElementById(inputId);
-        if (!el) return;
-        const d = new Date();
-        el.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    }
-
-    _formatDate(val) {
-        if (!val) return '—';
-        try {
-            const d = new Date(val);
-            if (Number.isNaN(d.getTime())) return String(val).split('T')[0];
-            return d.toLocaleDateString('tr-TR');
-        } catch {
-            return String(val);
-        }
-    }
-
     _esc(s) {
         if (s == null) return '';
-        return String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
-    _toast(msg, type = 'info') {
-        const el = document.getElementById('agendaToast');
-        if (!el) {
-            if (type === 'error') JBDiyalog.uyari(msg);
-            return;
-        }
-        const colors = {
-            success: 'bg-emerald-600',
-            error: 'bg-rose-600',
-            warning: 'bg-amber-600',
-            info: 'bg-slate-800',
-        };
-        el.textContent = msg;
-        el.className = `fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 max-w-[90vw] rounded-xl px-4 py-2.5 text-sm font-medium text-white shadow-xl ${colors[type] || colors.info}`;
-        el.classList.remove('hidden');
-        clearTimeout(this._toastTimer);
-        this._toastTimer = setTimeout(() => el.classList.add('hidden'), type === 'error' ? 4500 : 2800);
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 }
 
