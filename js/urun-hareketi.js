@@ -11,9 +11,11 @@
  *     listesi. Mal kabul bitmeden ürün hareketlerde görünmez, burada görünür.
  *   - Ajanda: bu ürün için açık eksik/fazla kaydı.
  *
- * Getir istekleri js/depo-oturum.js ile, panelin attığı biçimde gider.
+ * Getir'in ağ geçidi başka siteden gelen tarayıcı isteğini kesiyor; sorular
+ * Jet Barkod sunucusundan, Asistan'ın hesaba yazdığı depo jetonuyla gider
+ * (js/depo-oturum.js → /api/depo-panel).
  * Teslimatların ürün listesi değişmediği için cihazda saklanır, yalnız
- * durumu değişen teslimat yeniden istenir. İstekler arası en az 350 ms.
+ * durumu değişen teslimat yeniden istenir. Sunucu istekleri 350 ms arayla atar.
  *
  * window.JBUrunHareketi.dugme(urun)        → kart için sağ üst düğme HTML
  * window.JBUrunHareketi.ac(urun)           → pencereyi aç
@@ -28,7 +30,6 @@
     var TRANSFER = 'IncomingTransferAcceptance-IncreaseStock';
     var SATIS = 'PickingBasketDeliver';
     var GUN = 12;
-    var ARA_MS = 350;
     var PALET_ANAHTAR = 'jb_palet_v1';
     var PALET_LISTE_MS = 60000;
 
@@ -50,16 +51,8 @@
     };
     var IPTAL = /CANCEL/;
 
-    var sonIstek = 0;
 
     function bekle(ms) { return new Promise(function (c) { setTimeout(c, ms); }); }
-
-    async function sirayla(fn) {
-        var b = sonIstek + ARA_MS - Date.now();
-        sonIstek = Date.now() + Math.max(0, b);
-        if (b > 0) await bekle(b);
-        return fn();
-    }
 
     function esc(s) {
         return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -86,40 +79,24 @@
     // Veri
     // ==================================================================
 
-    function oturum() {
-        if (!global.depoOturum) { var h = new Error('oturum'); h.kod = 'oturum'; return Promise.reject(h); }
-        return global.depoOturum.al();
+    function sor(islem, veri) {
+        if (!global.depoPaneli) { var h = new Error('oturum'); h.kod = 'oturum'; return Promise.reject(h); }
+        return global.depoPaneli.istek(islem, veri);
     }
 
-    /* Ürün Hareketleri: panelin "Açıklama" filtresiyle aynı istek */
+    /* Ürün Hareketleri: panelin "Açıklama" filtresiyle aynı istek, sunucu üzerinden */
     async function hareketler(ids, aciklama, gun, limit, sayfaSiniri) {
-        var o = await oturum();
-        var bas = gunBasi(Date.now() - (gun - 1) * GUN_MS);
+        var bas = new Date(gunBasi(Date.now() - (gun - 1) * GUN_MS)).toISOString();
+        var bit = new Date().toISOString();
         var liste = [];
         for (var sayfa = 0; sayfa < (sayfaSiniri || 1); sayfa++) {
-            var r = await sirayla(function () {
-                return global.depoOturum.istek('/stock-movement-logs/filter?offset=' + (sayfa * limit) + '&limit=' + limit, {
-                    method: 'POST',
-                    govde: {
-                        startDate: new Date(bas).toISOString(),
-                        endDate: new Date().toISOString(),
-                        warehouses: [o.depo],
-                        products: ids,
-                        descriptions: [aciklama]
-                    }
-                });
+            var v = await sor('hareket', { urunler: ids, aciklama: aciklama, bas: bas, bit: bit, limit: limit, offset: sayfa * limit });
+            (v && Array.isArray(v.liste) ? v.liste : []).forEach(function (x) {
+                var z = Date.parse(x.z);
+                if (!KIMLIK.test(String(x.id || '')) || !Number.isFinite(z)) return;
+                liste.push({ id: String(x.id).toLowerCase(), zaman: z, adet: Math.abs(Number(x.q) || 0) });
             });
-            if (!r.ok) { var h = new Error('panel'); h.kod = 'panel'; throw h; }
-            var j = await r.json().catch(function () { return null; });
-            var k = j && j.data && j.data.stockMovementLogs;
-            var veri = k && Array.isArray(k.data) ? k.data : [];
-            veri.forEach(function (x) {
-                var id = x && x.product && String(x.product.id || '');
-                var z = Date.parse(x && x.createdAt);
-                if (!KIMLIK.test(id) || !Number.isFinite(z)) return;
-                liste.push({ id: id.toLowerCase(), zaman: z, adet: Math.abs(Number(x.quantity) || 0) });
-            });
-            if (!k || !k.hasNext) break;
+            if (!v || !v.devam) break;
         }
         liste.sort(function (a, b) { return b.zaman - a.zaman; });
         return liste;
@@ -159,43 +136,27 @@
     }
 
     async function paletleriTopla() {
-        var o = await oturum();
         var bas = gunBasi(Date.now() - GUN_MS);
         var son = gunBasi(Date.now()) + GUN_MS - 1;
-        var r = await sirayla(function () {
-            return global.depoOturum.istek('/warehouse/{depo}/inbound/transfer?offset=0&limit=50', {
-                method: 'POST',
-                govde: { createdAt: { startDate: new Date(bas).toISOString(), endDate: new Date(son).toISOString() } }
-            });
-        });
-        if (!r.ok) { var h = new Error('panel'); h.kod = 'panel'; throw h; }
-        var j = await r.json().catch(function () { return null; });
-        var teslimatlar = (j && j.data && Array.isArray(j.data.deliveries) ? j.data.deliveries : [])
-            .filter(function (t) { return t && KIMLIK.test(String(t.id || '')) && !IPTAL.test(String(t.status || '')); });
+        var v = await sor('paletler', { bas: new Date(bas).toISOString(), bit: new Date(son).toISOString() });
+        var teslimatlar = (v && Array.isArray(v.liste) ? v.liste : [])
+            .filter(function (t) { return KIMLIK.test(String(t.id || '')) && !IPTAL.test(String(t.durum || '')); });
 
         var depo = paletDepoOku();
         for (var i = 0; i < teslimatlar.length; i++) {
             var t = teslimatlar[i];
             var kayit = depo[t.id];
-            if (kayit && kayit.d === t.status) continue;
-            var rd = await sirayla(function () { return global.depoOturum.istek('/warehouse/{depo}/inbound/transfer/' + t.id); });
-            if (!rd.ok) continue;
-            var jd = await rd.json().catch(function () { return null; });
-            var goods = jd && jd.data && Array.isArray(jd.data.goods) ? jd.data.goods : [];
-            var u = {};
-            goods.forEach(function (g) {
-                var gid = String(g && g.id || '').toLowerCase();
-                if (!KIMLIK.test(gid)) return;
-                u[gid] = [Number(g.orderedCount) || 0, g.receivedCount == null ? null : Number(g.receivedCount) || 0];
-            });
-            depo[t.id] = { d: t.status, u: u, t: Date.now() };
+            if (kayit && kayit.d === t.durum) continue;
+            var d;
+            try { d = await sor('palet', { id: t.id }); } catch (e) { if (e.kod === 'oturum') throw e; continue; }
+            depo[t.id] = { d: t.durum, u: (d && d.urunler) || {}, t: Date.now() };
         }
         paletDepoYaz(depo);
         return teslimatlar.map(function (t) {
             return {
                 id: t.id,
-                durum: String(t.status || ''),
-                zaman: Date.parse(t.createdAt) || Date.now(),
+                durum: t.durum,
+                zaman: Date.parse(t.z) || Date.now(),
                 urunler: (depo[t.id] && depo[t.id].u) || null
             };
         });
@@ -293,7 +254,12 @@
     function hataNotu(kod) {
         if (kod === 'oturum') {
             return '<div class="uh-not uh-not--uyari"><strong>Depo paneli bağlı değil</strong>' +
-                '<span>Asistan kurulu bir bilgisayarda depo panelini açık tut. Jeton oradan bu cihaza gelir.</span></div>';
+                '<span>Asistan kurulu bir bilgisayarda depo paneli açık durmalı. Panel kapalıyken jeton 15 dakikada eskir.</span>' +
+                '<button type="button" class="uh-metin-dugme" data-uh-yenile>Tekrar Dene</button></div>';
+        }
+        if (kod === 'kurulum') {
+            return '<div class="uh-not uh-not--uyari"><strong>Sunucu güncellemesi bekleniyor</strong>' +
+                '<span>Ürün hareketi için sunucuya yeni dosya atılacak.</span></div>';
         }
         return '<div class="uh-not uh-not--uyari"><strong>Panelden okunamadı</strong>' +
             '<span>Bağlantı ya da panel cevap vermedi.</span><button type="button" class="uh-metin-dugme" data-uh-yenile>Tekrar Dene</button></div>';
@@ -377,23 +343,16 @@
 
         ajandaKayitlari(urun.id).then(function (v) { d.ajanda = v; guncelle(); }, function () { /* ajanda okunamadı */ });
 
-        try {
-            await oturum();
-        } catch (e) {
-            d.hata = e.kod === 'oturum' ? 'oturum' : 'ag';
-            guncelle();
-            return;
-        }
         var t = hareketler([urun.id], TRANSFER, GUN, 20).then(function (v) { d.transfer = v; guncelle(); });
         var s = hareketler([urun.id], SATIS, GUN, 1).then(function (v) { d.satis = v.slice(0, 1); guncelle(); });
         var p = paletler(zorla).then(function (v) { d.palet = v; guncelle(); }, function () { d.paletHata = true; guncelle(); });
         try {
             await Promise.all([t, s]);
         } catch (e) {
-            d.hata = e && e.kod === 'oturum' ? 'oturum' : 'ag';
+            d.hata = e && (e.kod === 'oturum' || e.kod === 'kurulum') ? e.kod : 'ag';
             guncelle();
         }
-        await p;
+        await p.catch(function () {});
     }
 
     function ac(urun) {

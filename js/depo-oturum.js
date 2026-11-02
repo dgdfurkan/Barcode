@@ -1,94 +1,39 @@
 /**
- * Depo paneli oturumu: sitedeki sayfaların depo paneline istek atması için
+ * Depo paneli: sitedeki sayfaların depo paneline soru sorması için
  * ============================================================================
  *
- * Jeton hesaptan gelir (users.counting_data._depo_info). Depo paneli bir
- * bilgisayarda açık durdukça Asistan her yeni jetonu oraya yazar
- * (vps-api/depo-jeton.js). Jeton 15 dakika yaşıyor; süresi dolmak üzereyse
- * hesaptan yenisi okunur.
+ * Getir'in depo paneli ağ geçidi başka sitelerden gelen tarayıcı isteğini
+ * 503'le kesiyor; jetbarkod.com.tr doğrudan soramıyor. Soru Jet Barkod
+ * sunucusuna gider (/api/depo-panel), sunucu Asistan'ın hesaba yazdığı depo
+ * jetonuyla ve panelin başlıklarıyla sorar (vps-api/depo-jeton.js). Depo
+ * paneli bir bilgisayarda açık durdukça jeton tazedir; telefon da çalışır.
  *
- * İstekler panelin kendi başlıklarıyla gider: countrycode, language,
- * x-requester-client. Yeni bir istek üretmiyoruz, panelin attığının aynısı.
+ * Yalnız üç işlem: hareket, paletler, palet. Gövdeyi sunucu kurar.
  *
- * window.depoOturum.al(zorla)          → { jeton, depo, bitis }   (hata.kod: 'oturum')
- * window.depoOturum.istek(yol, secenek) → Response; 401'de hesaptan bir kez tazeler
+ * window.depoPaneli.istek(islem, veri) → cevabın `veri`si
+ *   hata.kod: 'oturum' (jeton yok ya da eski) · 'kurulum' (sunucu güncel değil) · 'panel' · 'ag'
  * ============================================================================
  */
 (function (global) {
     'use strict';
 
-    var KIMLIK = /^[0-9a-f]{24}$/i;
-    var KOK = 'https://warehouse-panel-api-gateway.getirapi.com';
-    var PAY_MS = 45000;
-    var onbellek = null;
-    var bekleyen = null;
-
     function hata(kod) { var h = new Error(kod); h.kod = kod; return h; }
 
-    function kim() {
+    async function istek(islem, veri) {
+        var a = global.jetbarkodAuth;
+        if (!a || typeof a.apiFetch !== 'function') throw hata('oturum');
+        var r;
         try {
-            return (global.userDataManager && global.userDataManager.currentUser && global.userDataManager.currentUser.username) ||
-                (global.authUtils && global.authUtils.checkAuth() && global.authUtils.checkAuth().username) || null;
-        } catch (e) { return null; }
-    }
-
-    async function topla() {
-        var k = kim();
-        if (!k || !global.jbDb) throw hata('oturum');
-        var b = null;
-        try {
-            var r = await global.jbDb.from('users').select('depo:counting_data->_depo_info').eq('username', k).maybeSingle();
-            b = r && r.data && r.data.depo;
-            if (typeof b === 'string') b = JSON.parse(b);
-        } catch (e) { throw hata('ag'); }
-        if (!b || typeof b.token !== 'string' || !KIMLIK.test(String(b.depo || ''))) throw hata('oturum');
-        var bitis = Number(b.bitis) || 0;
-        if (bitis < Date.now() + PAY_MS) {
-            var h = hata('oturum');
-            h.sonGorulme = Number(b.zaman) || null;
-            throw h;
+            r = await a.apiFetch('/api/depo-panel', { method: 'POST', body: JSON.stringify({ islem: islem, veri: veri || {} }) });
+        } catch (e) {
+            throw hata('ag');
         }
-        onbellek = { jeton: /^Bearer /.test(b.token) ? b.token : 'Bearer ' + b.token, depo: String(b.depo).toLowerCase(), bitis: bitis };
-        return onbellek;
+        if (r.status === 404) throw hata('kurulum');
+        var j = await r.json().catch(function () { return null; });
+        if (r.ok && j && j.ok) return j.veri;
+        var k = j && j.error;
+        throw hata(k === 'oturum' ? 'oturum' : k === 'ag' ? 'ag' : 'panel');
     }
 
-    function al(zorla) {
-        if (!zorla && onbellek && onbellek.bitis > Date.now() + PAY_MS) return Promise.resolve(onbellek);
-        if (zorla) onbellek = null;
-        if (!bekleyen) bekleyen = topla().finally(function () { bekleyen = null; });
-        return bekleyen;
-    }
-
-    async function istek(yol, secenek) {
-        secenek = secenek || {};
-        for (var deneme = 0; deneme < 2; deneme++) {
-            var o = await al(deneme > 0);
-            var r;
-            try {
-                r = await fetch(KOK + yol.replace('{depo}', o.depo), {
-                    method: secenek.method || 'GET',
-                    headers: {
-                        accept: 'application/json',
-                        authorization: o.jeton,
-                        'content-type': 'application/json',
-                        countrycode: 'TR',
-                        language: 'tr',
-                        'x-requester-client': 'warehouse-panel-frontend'
-                    },
-                    body: secenek.govde ? JSON.stringify(secenek.govde) : undefined
-                });
-            } catch (e) {
-                throw hata('ag');
-            }
-            if (r.status === 401 || r.status === 403) {
-                onbellek = null;
-                if (deneme === 0) continue;
-                throw hata('oturum');
-            }
-            return r;
-        }
-        throw hata('oturum');
-    }
-
-    global.depoOturum = { al: al, istek: istek };
+    global.depoPaneli = { istek: istek };
 })(window);

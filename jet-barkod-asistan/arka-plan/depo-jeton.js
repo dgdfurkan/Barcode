@@ -53,8 +53,9 @@ async function djGonder() {
             }
             break;
         }
-        // 404: sunucu henüz güncellenmedi. 400: jeton geçersiz. Aynısını tekrar göndermeye gerek yok.
-        if (cevap && (cevap.ok || cevap.status === 400 || cevap.status === 404)) {
+        // 400: jeton geçersiz, aynısını tekrar göndermeye gerek yok. 404 (sunucu
+        // henüz güncellenmedi) sayılmaz: kurulunca aynı jeton yine gider.
+        if (cevap && (cevap.ok || cevap.status === 400)) {
             await chrome.storage.local.set({ [DJ_SON]: { token: is.jeton, zaman: Date.now() } });
         }
     } catch (e) {
@@ -85,3 +86,20 @@ chrome.runtime.onMessage.addListener((istek) => {
     djPlanla();
     return false;
 });
+
+/* Chrome güncellenen eklentinin içerik betiğini önceden açık sekmelere
+   sokmuyor. Depo paneli sekmesi güncellemeden önce açıldıysa jeton hiç
+   gelmiyordu. Kurulum, güncelleme ve tarayıcı açılışında açık panel
+   sekmelerine betik elle sokulur; betik iki kez çalışmaz (__jbaDepoJeton). */
+async function djSekmelereSok() {
+    let sekmeler = [];
+    try { sekmeler = await chrome.tabs.query({ url: 'https://warehouse.getir.com/r/*' }); } catch (e) { return; }
+    for (const t of sekmeler) {
+        if (t.discarded || t.status !== 'complete') continue;
+        try { await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ['moduller/depo-jeton.js'] }); }
+        catch (e) { /* sekme kapanmış ya da izin yok */ }
+    }
+}
+
+chrome.runtime.onInstalled.addListener(() => { djSekmelereSok(); });
+chrome.runtime.onStartup.addListener(() => { djSekmelereSok(); });
