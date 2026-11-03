@@ -68,7 +68,7 @@ class DispatchAgendaApp {
         await this.loadItems();
 
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && this._ready && !this.form) void this.loadItems();
+            if (document.visibilityState === 'visible' && this._ready && !this.form && !this._yaziyor) void this.loadItems();
         });
     }
 
@@ -664,15 +664,48 @@ class DispatchAgendaApp {
         btn.disabled = !gecerli || (this.form.mod === 'duzenle' && !this._degistiMi());
     }
 
-    async kaydet() {
+    /**
+     * Ekle, güncelle ve Tamamlandı ekranı beklemez: liste hemen değişir,
+     * pencere hemen kapanır, yazma arkada gider. Yazma düşerse kayıt eski
+     * hâline döner ve uyarı çıkar. Kimliği tarayıcı üretir (sütun UUID).
+     */
+    _yeniKimlik() {
+        if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+        const b = window.crypto.getRandomValues(new Uint8Array(16));
+        b[6] = (b[6] & 15) | 64;
+        b[8] = (b[8] & 63) | 128;
+        const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+        return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+    }
+
+    /** Arama sayfasındaki zilin okuduğu önbellek; ağ yok. */
+    _zilOnbellegi() {
+        const H = window.JBAjandaHatirlatici;
+        if (H) H.onbellekYaz(this.items.filter((it) => H.aciklarMi(it, this._username)), this._username);
+    }
+
+    async _arkadaYaz(is, geriAl, hataYazi) {
+        this._yaziyor = (this._yaziyor || 0) + 1;
+        try {
+            await is();
+        } catch (e) {
+            console.error(e);
+            geriAl();
+            this._listeCiz();
+            this._zilOnbellegi();
+            window.JBDiyalog?.bildir(hataYazi, 'hata');
+        } finally {
+            this._yaziyor--;
+        }
+    }
+
+    kaydet() {
         if (!this.form?.urun) return;
         const v = this._formDegeri();
         if (v.adet < 1 || v.adet > 999) {
             window.JBDiyalog?.bildir('Adet 1 ile 999 arasında olmalı', 'uyari');
             return;
         }
-        const btn = document.getElementById('addModalSave');
-        btn.disabled = true;
         const H = window.JBAjandaHatirlatici;
         const ortak = {
             quantity: v.adet,
@@ -683,60 +716,73 @@ class DispatchAgendaApp {
             event_date: v.tarih,
             updated_at: new Date().toISOString()
         };
-        try {
-            if (this.form.mod === 'ekle') {
+        const mod = this.form.mod;
+        const ilkZil = this.form.ilk?.zil;
+        const u = this.form.urun;
+        const eski = this.form.item;
+        void this.formKapat(true);
+
+        if (mod === 'ekle') {
+            const row = {
+                id: this._yeniKimlik(),
+                username: this._username,
+                product_id: u.id,
+                product_name: u.ad,
+                product_image: u.gorsel || null,
+                barcodes: u.barkodlar || [],
+                ...ortak
+            };
+            this.items.unshift({ ...row, created_at: ortak.updated_at, ...(v.zil ? { reminder: true } : {}) });
+            if (H) H.eklendi(row.id, v.zil);
+            this._listeCiz();
+            this._zilOnbellegi();
+            window.JBDiyalog?.bildir(`${v.tur === 'fazla' ? 'Fazla' : 'Eksik'} kaydı eklendi`, 'basari');
+            void this._arkadaYaz(async () => {
                 if (v.zil && H) await H.kolonVarMi();
-                const u = this.form.urun;
-                const row = {
-                    username: this._username,
-                    product_id: u.id,
-                    product_name: u.ad,
-                    product_image: u.gorsel || null,
-                    barcodes: u.barkodlar || [],
-                    ...ortak,
-                    ...(H ? H.eklemeAlani(v.zil) : {})
-                };
-                const { data, error } = await window.jbDb.from('dispatch_agenda_items').insert(row).select('id');
+                const { error } = await window.jbDb.from('dispatch_agenda_items').insert({ ...row, ...(H ? H.eklemeAlani(v.zil) : {}) });
                 if (error) throw error;
-                const yeniId = Array.isArray(data) ? data[0]?.id : data?.id;
-                if (H && yeniId) H.eklendi(yeniId, v.zil);
-                window.JBDiyalog?.bildir(`${v.tur === 'fazla' ? 'Fazla' : 'Eksik'} kaydı eklendi`, 'basari');
-            } else {
-                const item = this.form.item;
-                const { error } = await window.jbDb.from('dispatch_agenda_items').update(ortak).eq('id', item.id).eq('username', this._username);
-                if (error) throw error;
-                if (H && v.zil !== this.form.ilk.zil) await H.ayarla(item.id, v.zil);
-                window.JBDiyalog?.bildir('Kayıt güncellendi', 'basari');
-            }
-            await this.formKapat(true);
-            await this.loadItems();
-        } catch (e) {
-            console.error(e);
-            window.JBDiyalog?.bildir(this.form?.mod === 'ekle' ? 'Kayıt eklenemedi' : 'Kayıt güncellenemedi', 'hata');
-            btn.disabled = false;
+            }, () => {
+                this.items = this.items.filter((x) => x.id !== row.id);
+                if (H) H.kaldirildi(row.id);
+            }, 'Kayıt eklenemedi');
+            return;
         }
+
+        const once = { ...eski };
+        Object.assign(eski, ortak);
+        if (v.zil !== ilkZil) eski.reminder = v.zil;
+        this._listeCiz();
+        this._zilOnbellegi();
+        window.JBDiyalog?.bildir('Kayıt güncellendi', 'basari');
+        void this._arkadaYaz(async () => {
+            const { error } = await window.jbDb.from('dispatch_agenda_items').update(ortak).eq('id', eski.id).eq('username', this._username);
+            if (error) throw error;
+            if (H && v.zil !== ilkZil) await H.ayarla(eski.id, v.zil);
+        }, () => {
+            Object.keys(eski).forEach((k) => { delete eski[k]; });
+            Object.assign(eski, once);
+        }, 'Kayıt güncellenemedi');
     }
 
     async completeAndDelete() {
         const item = this.form?.item;
         if (!item?.id) return;
         const tamam = await window.JBDiyalog?.onay(`${item.product_name || 'Bu ürün'} ajandadan kaldırılacak.`, { baslik: 'Tamamlandı mı?', onayYazi: 'Tamamlandı', vazgecYazi: 'Vazgeç' });
-        if (!tamam) return;
-        const btn = document.getElementById('detailDeleteBtn');
-        btn.disabled = true;
-        try {
+        if (!tamam || this.form?.item !== item) return;
+        const sira = this.items.indexOf(item);
+        this.items = this.items.filter((x) => x !== item);
+        void this.formKapat(true);
+        this._listeCiz();
+        window.JBAjandaHatirlatici?.kaldirildi(item.id);
+        this._zilOnbellegi();
+        window.JBDiyalog?.bildir('Kayıt kapatıldı', 'basari');
+        void this._arkadaYaz(async () => {
             const { error } = await window.jbDb.from('dispatch_agenda_items').delete().eq('id', item.id).eq('username', this._username);
             if (error) throw error;
-            window.JBAjandaHatirlatici?.kaldirildi(item.id);
-            window.JBDiyalog?.bildir('Kayıt kapatıldı', 'basari');
-            await this.formKapat(true);
-            await this.loadItems();
-        } catch (e) {
-            console.error(e);
-            window.JBDiyalog?.bildir('Kayıt kapatılamadı', 'hata');
-        } finally {
-            btn.disabled = false;
-        }
+        }, () => {
+            this.items.splice(Math.max(0, Math.min(sira, this.items.length)), 0, item);
+            if (item.reminder) window.JBAjandaHatirlatici?.eklendi(item.id, true);
+        }, 'Kayıt kapatılamadı');
     }
 
     // Ürün arama sonuçları

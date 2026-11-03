@@ -196,6 +196,11 @@
 /* ── Form penceresi ──────────────────────────────────────────────────── */
 html.aj-acik, html.aj-acik body { overflow: hidden; }
 
+/* Onay ve bildirim, form penceresinin (8000) ve Ürün Hareketi'nin (9000)
+   önünde; fotoğraf büyütme (9990) yine en üstte. */
+.jbd { z-index: 9500; }
+.jbd-serit { z-index: 9400; }
+
 .aj-perde {
     position: fixed;
     inset: 0;
