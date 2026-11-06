@@ -37,6 +37,54 @@
     <button type="button" class="eylem" id="firinSim">Simülasyonu Göster</button>
   </section>
 
+  <section class="kat" id="katSes">
+    <button type="button" class="kat__bas" aria-expanded="false" aria-controls="katSesGovde">
+      <span class="kat__metin"><span class="ayar__ad">Fırın Sesi</span><span class="kat__ozet" id="sesOzet">Her fırın satışında</span></span>
+      <svg class="kat__ok" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
+    </button>
+    <div class="kat__govde" id="katSesGovde" hidden>
+      <p class="ayar__ozet">Ekmek (200 g) gibi taze ekmekler hariç fırın ürünü satılınca ses çalar. 08:00-23:30 arası, depo paneli açıkken. Ses en yüksek düzeyde çalar, müzik açıkken de duyulur; bilgisayarın ana sesini eklenti açamaz.</p>
+      <div class="ses-satir">
+        <label class="ses-satir__ad" for="sesSatis">Ne Zaman</label>
+        <select class="ayar__secim" id="sesSatis">
+          <option value="her">Her satışta</option>
+          <option value="kritik">Yalnız kritik stokta</option>
+          <option value="kapali">Kapalı</option>
+        </select>
+      </div>
+      <div class="ses-satir">
+        <label class="ses-satir__ad" for="sesTur">Ses</label>
+        <select class="ayar__secim" id="sesTur"></select>
+        <button type="button" class="eylem ses-dinle" data-dinle="sesTur" aria-label="Satış sesini dinle">Dinle</button>
+      </div>
+      <div class="ses-satir">
+        <label class="ses-satir__ad" for="sesTekrar">Kaç Kez</label>
+        <select class="ayar__secim" id="sesTekrar">
+          <option value="1">Bir kez</option>
+          <option value="3">Üç kez</option>
+        </select>
+      </div>
+      <p class="ayar__ozet" id="sesKritikNot" hidden>Kritik: satılan ürün pişirme bildirimine düşerse çalar. Fırın Bildirimi açık olmalı.</p>
+      <div class="ses-ayrac"></div>
+      <label class="secenek"><input type="checkbox" id="sesCikis" checked><span>23:30 fırın ürünlerini çıkar sesi</span></label>
+      <div class="ses-satir">
+        <label class="ses-satir__ad" for="sesCikisTur">Çıkış Sesi</label>
+        <select class="ayar__secim" id="sesCikisTur"></select>
+        <button type="button" class="eylem ses-dinle" data-dinle="sesCikisTur" data-tekrar="3" aria-label="Çıkış sesini dinle">Dinle</button>
+      </div>
+      <div class="ses-satir">
+        <label class="ses-satir__ad" for="sesHatirlat">Duyulmazsa</label>
+        <select class="ayar__secim" id="sesHatirlat">
+          <option value="50">23:50'de tekrar</option>
+          <option value="45">23:45'te tekrar</option>
+          <option value="40">23:40'ta tekrar</option>
+          <option value="0">Tekrar etme</option>
+        </select>
+      </div>
+      <p class="ayar__durum" id="sesDurum">Henüz çalmadı.</p>
+    </div>
+  </section>
+
   <section class="kat" id="katGunluk">
     <button type="button" class="kat__bas" aria-expanded="false" aria-controls="katGunlukGovde">
       <span class="kat__metin"><span class="ayar__ad">Günlük Sayım</span><span class="kat__ozet" id="gunlukOzet">Bugün henüz eklenmedi</span></span>
@@ -63,6 +111,7 @@
     <a class="alt__bag" id="siteBag" href="https://jetbarkod.com.tr/arama/" target="_blank" rel="noopener">Jet Barkod'u aç</a>
   </footer>
 
+  <script src="../ortak/ses-sentez.js"></script>
   <script src="kapi.js"></script>
 </body>
 </html>

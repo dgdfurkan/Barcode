@@ -171,6 +171,10 @@ async function kontrol(sebep) {
             return;
         }
         await yay(await panolar(), cevap);
+        // Fırın sesi: ürün adları, kritik satış ve gün sonu durumu (firin-ses.js)
+        if (typeof globalThis.jbaFirinKontrolSonucu === 'function') {
+            try { globalThis.jbaFirinKontrolSonucu(cevap, gunSonu ? 'cikar' : 'pisir'); } catch (e) { /* yan iş */ }
+        }
         const n = typeof cevap.gorunenSayisi === 'number' ? cevap.gorunenSayisi : (cevap.liste || []).length;
         const ert = cevap.ertelenenSayisi ? ' ' + cevap.ertelenenSayisi + ' ürün ertelendi.' : '';
         durumYaz(cevap.stokluSayisi === 0 && cevap.urunSayisi > 0
@@ -221,7 +225,12 @@ async function simulasyon() {
 
 /** Sipariş köprüsü yeni sipariş yazınca çağırır: fırın ürünü satıldıysa kısa süre sonra bak */
 globalThis.jbaFirinSatis = function (urunler) {
-    const firinVar = (urunler || []).some((u) => u && FIRIN_URUNU.test([u.ad, u.anaKategori, u.sinif, u.altSinif].join(' ')));
+    if (typeof globalThis.jbaFirinSatisSesi === 'function') {
+        globalThis.jbaFirinSatisSesi(urunler).catch(() => {});
+    }
+    const adMi = globalThis.jbaFirinAdiMi;
+    const firinVar = (urunler || []).some((u) => u && (FIRIN_URUNU.test([u.ad, u.anaKategori, u.sinif, u.altSinif].join(' ')) ||
+        (typeof adMi === 'function' && adMi(u))));
     if (!firinVar) return;
     clearTimeout(satisZamanlayici);
     satisZamanlayici = setTimeout(() => kontrol('satis'), SATIS_GECIKMESI_MS);

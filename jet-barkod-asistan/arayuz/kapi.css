@@ -273,3 +273,11 @@ body {
 .kat__dugmeler { display: flex; gap: 6px; }
 .kat__dugmeler .eylem { flex: 1 1 0; min-width: 0; min-height: 30px; text-align: center; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .kat__ok { transition: none; } }
+
+/* ---------- Fırın Sesi ---------- */
+.ses-satir { display: flex; align-items: center; gap: 8px; }
+.ses-satir__ad { flex: none; width: 76px; font-size: 12px; color: var(--renk-yazi); }
+.ses-satir .ayar__secim { flex: 1 1 0; min-width: 0; }
+.ses-dinle { flex: none; min-height: 32px; }
+.ses-ayrac { height: 1px; background: var(--renk-cizgi); }
+.kat__govde .ses-satir[hidden], .kat__govde .ayar__ozet[hidden] { display: none; }

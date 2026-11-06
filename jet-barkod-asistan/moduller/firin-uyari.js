@@ -299,6 +299,8 @@
             gorunenSayisi: liste.length - ertelenen,
             ertelenenSayisi: ertelenen,
             urunSayisi: urunler.length,
+            // Fırın sesi (arka-plan/firin-ses.js) satılan ürünü bu adlarla tanır
+            adlar: sim ? undefined : urunler.map(function (p) { return p.name; }),
             stokluSayisi: urunler.filter(function (p) { return p.stokOkundu; }).length,
             dilimler: DILIM_AD,
             simdiki: JBA.firinHesap.dilim(new Date(simdi).getHours()).index,

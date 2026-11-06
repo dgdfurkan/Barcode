@@ -14,6 +14,7 @@ import './arka-plan/siteye-git.js';
 import './arka-plan/sayim-gecmisi.js';
 import './arka-plan/pano-nobet.js';
 import './arka-plan/firin-nobet.js';
+import './arka-plan/firin-ses.js';
 import './arka-plan/kaldirma-nobet.js';
 import './arka-plan/franchise-jeton.js';
 import './arka-plan/depo-jeton.js';

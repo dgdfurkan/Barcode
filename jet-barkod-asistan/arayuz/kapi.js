@@ -265,6 +265,77 @@
     });
     gunlukDugme('gunlukEkle', { type: 'JBA_GUNLUK_EKLE' }, 'Okunuyor...');
 
+    /* Fırın sesi (arka-plan/firin-ses.js okuyor) */
+    var SES_VARSAYILAN = { satis: 'her', ses: 'zil', tekrar: 1, cikis: true, cikisSes: 'alarm', hatirlat: 50 };
+    var sesler = (globalThis.JBASes && globalThis.JBASes.SESLER) || [];
+    ['sesTur', 'sesCikisTur'].forEach(function (id) {
+        var s = document.getElementById(id);
+        if (!s) return;
+        sesler.forEach(function (x) {
+            var o = document.createElement('option');
+            o.value = x.ad;
+            o.textContent = x.baslik;
+            s.appendChild(o);
+        });
+    });
+    function sesFormu(a) {
+        document.getElementById('sesSatis').value = a.satis;
+        document.getElementById('sesTur').value = a.ses;
+        document.getElementById('sesTekrar').value = String(a.tekrar);
+        document.getElementById('sesCikis').checked = a.cikis;
+        document.getElementById('sesCikisTur').value = a.cikisSes;
+        document.getElementById('sesHatirlat').value = String(a.hatirlat);
+        var kapali = a.satis === 'kapali';
+        ['sesTur', 'sesTekrar'].forEach(function (id) { document.getElementById(id).closest('.ses-satir').hidden = kapali; });
+        document.getElementById('sesKritikNot').hidden = a.satis !== 'kritik';
+        ['sesCikisTur', 'sesHatirlat'].forEach(function (id) { document.getElementById(id).closest('.ses-satir').hidden = !a.cikis; });
+        var ozet = document.getElementById('sesOzet');
+        var sat = a.satis === 'her' ? 'Her fırın satışında' : a.satis === 'kritik' ? 'Kritik stokta' : 'Satış sesi kapalı';
+        if (ozet) ozet.textContent = sat + ' · ' + (a.cikis ? '23:30 açık' : '23:30 kapalı');
+    }
+    if (document.getElementById('sesSatis')) {
+        chrome.storage.local.get('jbaFirinSes', function (r) {
+            var a = Object.assign({}, SES_VARSAYILAN, (r && r.jbaFirinSes) || {});
+            sesFormu(a);
+            function kaydet() {
+                var y = {
+                    satis: document.getElementById('sesSatis').value,
+                    ses: document.getElementById('sesTur').value,
+                    tekrar: document.getElementById('sesTekrar').value === '3' ? 3 : 1,
+                    cikis: document.getElementById('sesCikis').checked,
+                    cikisSes: document.getElementById('sesCikisTur').value,
+                    hatirlat: parseInt(document.getElementById('sesHatirlat').value, 10) || 0
+                };
+                sesFormu(y);
+                chrome.storage.local.set({ jbaFirinSes: y });
+            }
+            ['sesSatis', 'sesTur', 'sesTekrar', 'sesCikis', 'sesCikisTur', 'sesHatirlat'].forEach(function (id) {
+                document.getElementById(id).addEventListener('change', kaydet);
+            });
+        });
+        Array.prototype.forEach.call(document.querySelectorAll('[data-dinle]'), function (b) {
+            b.addEventListener('click', function () {
+                var secim = document.getElementById(b.getAttribute('data-dinle'));
+                var tekrar = b.getAttribute('data-tekrar') ? 3 : (document.getElementById('sesTekrar').value === '3' ? 3 : 1);
+                try { globalThis.JBASes.cal(secim.value, tekrar); } catch (e) { /* ses yok */ }
+            });
+        });
+        var sesDurum = document.getElementById('sesDurum');
+        var sesSonCiz = function (v) {
+            if (!sesDurum) return;
+            if (!v || !v.zaman) { sesDurum.textContent = 'Henüz çalmadı.'; return; }
+            sesDurum.textContent = '';
+            var b = document.createElement('b');
+            b.textContent = 'Son çalma ' + saatYaz(v.zaman);
+            sesDurum.appendChild(b);
+            sesDurum.appendChild(document.createTextNode(' · ' + String(v.metin || '')));
+        };
+        chrome.storage.local.get('jbaFirinSesSon', function (r) { sesSonCiz(r && r.jbaFirinSesSon); });
+        chrome.storage.onChanged.addListener(function (d, alan) {
+            if (alan === 'local' && d.jbaFirinSesSon) sesSonCiz(d.jbaFirinSesSon.newValue);
+        });
+    }
+
     /* Açılır kapanır bölümler: son durum hatırlanır */
     Array.prototype.forEach.call(document.querySelectorAll('.kat__bas'), function (b) {
         var govde = document.getElementById(b.getAttribute('aria-controls'));
