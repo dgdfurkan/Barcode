@@ -269,26 +269,33 @@
     var SES_VARSAYILAN = {
         duzey: 100, satis: 'her', ses: 'zil', tekrar: 1,
         kritik: true, kritikSes: 'siren', kritikSure: 5, kritikTekrar: 2, kritikAralik: 30, kritikEnCok: 0,
-        cikis: true, cikisSes: 'alarm', hatirlat: 50
+        cikis: true, cikisSes: 'alarm', cikisSure: 5, cikisTekrar: 2, hatirlat: 50
     };
     /* Ayar alanı -> öğe kimliği; sayılar sayı olarak saklanır */
     var SES_ALAN = {
         satis: 'sesSatis', ses: 'sesTur', tekrar: 'sesTekrar',
         kritikSes: 'sesKritikTur', kritikSure: 'sesKritikSure', kritikTekrar: 'sesKritikTekrar',
         kritikAralik: 'sesKritikAralik', kritikEnCok: 'sesKritikEnCok',
-        cikisSes: 'sesCikisTur', hatirlat: 'sesHatirlat'
+        cikisSes: 'sesCikisTur', cikisSure: 'sesCikisSure', cikisTekrar: 'sesCikisTekrar', hatirlat: 'sesHatirlat'
     };
-    var SAYI_ALAN = ['tekrar', 'kritikSure', 'kritikTekrar', 'kritikAralik', 'kritikEnCok', 'hatirlat'];
+    var SAYI_ALAN = ['tekrar', 'kritikSure', 'kritikTekrar', 'kritikAralik', 'kritikEnCok', 'cikisSure', 'cikisTekrar', 'hatirlat'];
     var sesEl = function (id) { return document.getElementById(id); };
     var sesler = (globalThis.JBASes && globalThis.JBASes.SESLER) || [];
+    var sesGruplari = (globalThis.JBASes && globalThis.JBASes.GRUPLAR) || [];
     ['sesTur', 'sesKritikTur', 'sesCikisTur'].forEach(function (id) {
         var s = sesEl(id);
         if (!s) return;
-        sesler.forEach(function (x) {
-            var o = document.createElement('option');
-            o.value = x.ad;
-            o.textContent = x.baslik;
-            s.appendChild(o);
+        sesGruplari.forEach(function (g) {
+            var og = document.createElement('optgroup');
+            og.label = g.baslik;
+            sesler.forEach(function (x) {
+                if (x.grup !== g.ad) return;
+                var o = document.createElement('option');
+                o.value = x.ad;
+                o.textContent = x.baslik;
+                og.appendChild(o);
+            });
+            s.appendChild(og);
         });
     });
     function sesGrup(ad, acik) {
@@ -344,9 +351,9 @@
                 var a = sesOku();
                 var tur = b.getAttribute('data-dinle');
                 var c = tur === 'kritik' ? { ses: a.kritikSes, tekrar: a.kritikTekrar, sure: a.kritikSure }
-                    : tur === 'cikis' ? { ses: a.cikisSes, tekrar: 3, sure: 3 }
+                    : tur === 'cikis' ? { ses: a.cikisSes, tekrar: a.cikisTekrar, sure: a.cikisSure }
                     : { ses: a.ses, tekrar: a.tekrar, sure: 0 };
-                try { globalThis.JBASes.cal(c.ses, { tekrar: c.tekrar, sure: c.sure, duzey: a.duzey }); } catch (e) { /* ses yok */ }
+                try { globalThis.JBASes.dur(); globalThis.JBASes.cal(c.ses, { tekrar: c.tekrar, sure: c.sure, duzey: a.duzey }); } catch (e) { /* ses yok */ }
             });
         });
         var sesDurum = sesEl('sesDurum');

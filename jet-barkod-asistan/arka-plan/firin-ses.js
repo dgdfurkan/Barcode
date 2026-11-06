@@ -21,9 +21,10 @@
  * onun kontrolünden gelir; son kontrol 2 dk'dan eskiyse alarm beklemede kalır.
  *
  * GÜN SONU
- * 23:30'da "fırın ürünlerini çıkar" sesi; seçilirse 23:40/45/50'de bir daha.
- * Hatırlatma yalnız rafta hâlâ fırın ürünü görünüyorsa (son gün sonu
- * kontrolü) ya da bu bilinmiyorsa çalar.
+ * 23:30'da "fırın ürünlerini çıkar" sesi: seçilen ses, uzunluk (3/5/10 sn) ve
+ * kaç kez. Duyulmazsa 23:40/45/50'de bir daha ya da 23:35-23:55 arası 5 dk'da
+ * bir. Hatırlatma yalnız rafta hâlâ fırın ürünü görünüyorsa (son gün sonu
+ * kontrolü) ya da bu bilinmiyorsa çalar; raf boşalınca susar.
  *
  * Satış ve kritik sesler 08:00-23:30, hepsi yalnız depo paneli açık
  * bilgisayarda. Ses chrome.offscreen belgesinde (arayuz/ses.html) üretilir;
@@ -32,13 +33,18 @@
  * ============================================================================
  */
 
+import '../ortak/ses-sentez.js';
+
 const ANAHTAR = 'jbaFirinSes';
-const SESLER = ['zil', 'can', 'melodi', 'kampana', 'alarm', 'siren', 'acil', 'korna'];
+const SESLER = globalThis.JBASes.SESLER.map((x) => x.ad);
+/* hatirlat: dakika (23:40/45/50), 5 = 23:35-23:55 arası 5 dk'da bir, 0 = yok */
+const HER_5 = 5;
+const HER_5_DAKIKALAR = [35, 40, 45, 50, 55];
 const VARSAYILAN = {
     duzey: 100,
     satis: 'her', ses: 'zil', tekrar: 1,
     kritik: true, kritikSes: 'siren', kritikSure: 5, kritikTekrar: 2, kritikAralik: 30, kritikEnCok: 0,
-    cikis: true, cikisSes: 'alarm', hatirlat: 50,
+    cikis: true, cikisSes: 'alarm', cikisSure: 5, cikisTekrar: 2, hatirlat: 50,
 };
 const ALARM_CIKIS = 'jba-firin-ses-cikis';
 const ALARM_HATIRLAT = 'jba-firin-ses-hatirlat';
@@ -98,7 +104,9 @@ async function ayarOku() {
             kritikEnCok: secim(Number(k.kritikEnCok), [0, 5, 15, 30], VARSAYILAN.kritikEnCok),
             cikis: k.cikis !== false,
             cikisSes: secim(k.cikisSes, SESLER, VARSAYILAN.cikisSes),
-            hatirlat: secim(Number(k.hatirlat), [0, 40, 45, 50], VARSAYILAN.hatirlat),
+            cikisSure: secim(Number(k.cikisSure), [3, 5, 10], VARSAYILAN.cikisSure),
+            cikisTekrar: secim(Number(k.cikisTekrar), [1, 2, 3], VARSAYILAN.cikisTekrar),
+            hatirlat: secim(Number(k.hatirlat), [0, 40, 45, 50, HER_5], VARSAYILAN.hatirlat),
         };
         const a = r && r[ADLAR_ANAHTARI];
         if (a && Array.isArray(a.adlar) && !firinAdlari.size) firinAdlari = new Set(a.adlar);
@@ -273,27 +281,32 @@ function sonrakiZaman(saat, dakika) {
 async function alarmlariKur() {
     await ayarOku();
     await chrome.alarms.clear(ALARM_CIKIS);
-    await chrome.alarms.clear(ALARM_HATIRLAT);
+    const eski = await chrome.alarms.getAll().catch(() => []);
+    await Promise.all((eski || []).filter((a) => a.name.startsWith(ALARM_HATIRLAT)).map((a) => chrome.alarms.clear(a.name)));
     if (!ayar.cikis) return;
     chrome.alarms.create(ALARM_CIKIS, { when: sonrakiZaman(23, 30), periodInMinutes: 1440 });
-    if (ayar.hatirlat) chrome.alarms.create(ALARM_HATIRLAT, { when: sonrakiZaman(23, ayar.hatirlat), periodInMinutes: 1440 });
+    const dakikalar = ayar.hatirlat === HER_5 ? HER_5_DAKIKALAR : ayar.hatirlat ? [ayar.hatirlat] : [];
+    for (const d of dakikalar) {
+        chrome.alarms.create(ALARM_HATIRLAT + '-' + d, { when: sonrakiZaman(23, d), periodInMinutes: 1440 });
+    }
 }
 
 async function gunSonuSesi(hatirlatma) {
     await ayarOku();
     if (!ayar.cikis) return;
+    if (hatirlatma && !ayar.hatirlat) return;
     const m = gunDakikasi();
     // Bilgisayar uykudaydı, alarm geç geldi: saati geçtiyse çalmaz
-    const bas = hatirlatma ? 23 * 60 + ayar.hatirlat : 23 * 60 + 30;
-    if (m < bas || m > bas + 5) return;
+    const bas = 23 * 60 + (hatirlatma || 30);
+    if (m < bas || m > bas + 4) return;
     if (!(await panelAcikMi())) return;
     if (hatirlatma && sonCikar && Date.now() - sonCikar.zaman < 2 * 60 * 1000 && sonCikar.sayi === 0) return;
-    await cal(ayar.cikisSes, 3, 3, hatirlatma ? 'Hatırlatma: fırın ürünlerini çıkar' : '23:30 fırın ürünlerini çıkar');
+    await cal(ayar.cikisSes, ayar.cikisTekrar, ayar.cikisSure, hatirlatma ? 'Hatırlatma: fırın ürünlerini çıkar' : '23:30 fırın ürünlerini çıkar');
 }
 
 chrome.alarms.onAlarm.addListener((a) => {
     if (a.name === ALARM_CIKIS) gunSonuSesi(false);
-    else if (a.name === ALARM_HATIRLAT) gunSonuSesi(true);
+    else if (a.name.startsWith(ALARM_HATIRLAT + '-')) gunSonuSesi(Number(a.name.slice(ALARM_HATIRLAT.length + 1)) || 0);
 });
 chrome.runtime.onStartup.addListener(alarmlariKur);
 chrome.runtime.onInstalled.addListener(alarmlariKur);

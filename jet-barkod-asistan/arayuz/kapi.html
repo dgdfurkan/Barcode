@@ -127,14 +127,32 @@
         <button type="button" class="eylem ses-dinle" data-dinle="cikis" aria-label="Çıkış sesini dinle">Dinle</button>
       </div>
       <div class="ses-satir" data-grup="cikis">
-        <label class="ses-satir__ad" for="sesHatirlat">Duyulmazsa</label>
+        <label class="ses-satir__ad" for="sesCikisSure">Uzunluk</label>
+        <select class="ayar__secim" id="sesCikisSure">
+          <option value="3">3 saniye</option>
+          <option value="5">5 saniye</option>
+          <option value="10">10 saniye</option>
+        </select>
+      </div>
+      <div class="ses-satir" data-grup="cikis">
+        <label class="ses-satir__ad" for="sesCikisTekrar">Kaç Kez</label>
+        <select class="ayar__secim" id="sesCikisTekrar">
+          <option value="1">Bir kez</option>
+          <option value="2">İki kez</option>
+          <option value="3">Üç kez</option>
+        </select>
+      </div>
+      <div class="ses-satir" data-grup="cikis">
+        <label class="ses-satir__ad" for="sesHatirlat">Tekrar</label>
         <select class="ayar__secim" id="sesHatirlat">
-          <option value="50">23:50'de tekrar</option>
-          <option value="45">23:45'te tekrar</option>
-          <option value="40">23:40'ta tekrar</option>
+          <option value="5">5 dakikada bir, 23:55'e kadar</option>
+          <option value="40">23:40'ta bir daha</option>
+          <option value="45">23:45'te bir daha</option>
+          <option value="50">23:50'de bir daha</option>
           <option value="0">Tekrar etme</option>
         </select>
       </div>
+      <p class="ayar__ozet" data-grup="cikis">Raftaki fırın ürünleri çıkarılınca tekrar susar.</p>
       <p class="ayar__durum" id="sesDurum">Henüz çalmadı.</p>
     </div>
   </section>
