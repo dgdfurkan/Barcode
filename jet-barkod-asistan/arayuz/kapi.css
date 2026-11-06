@@ -280,4 +280,10 @@ body {
 .ses-satir .ayar__secim { flex: 1 1 0; min-width: 0; }
 .ses-dinle { flex: none; min-height: 32px; }
 .ses-ayrac { height: 1px; background: var(--renk-cizgi); }
-.kat__govde .ses-satir[hidden], .kat__govde .ayar__ozet[hidden] { display: none; }
+.ses-baslik { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--renk-soluk); }
+.ses-kaydirac { flex: 1 1 0; min-width: 0; height: 32px; margin: 0; accent-color: var(--renk-vurgu); cursor: pointer; }
+.ses-deger { flex: none; width: 40px; font-size: 12px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; color: var(--renk-yazi); }
+.ses-calan { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px; background: #fef2f2; border: 1px solid #fecaca; }
+.ses-calan__yazi { flex: 1; min-width: 0; margin: 0; font-size: 12px; line-height: 1.35; color: #b91c1c; }
+.ses-calan .eylem { flex: none; min-height: 32px; }
+.kat__govde [data-grup][hidden], .kat__govde .ses-calan[hidden] { display: none; }

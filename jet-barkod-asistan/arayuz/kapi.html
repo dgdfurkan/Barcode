@@ -43,36 +43,90 @@
       <svg class="kat__ok" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5"/></svg>
     </button>
     <div class="kat__govde" id="katSesGovde" hidden>
-      <p class="ayar__ozet">Ekmek (200 g) gibi taze ekmekler hariç fırın ürünü satılınca ses çalar. 08:00-23:30 arası, depo paneli açıkken. Ses en yüksek düzeyde çalar, müzik açıkken de duyulur; bilgisayarın ana sesini eklenti açamaz.</p>
+      <p class="ayar__ozet">Ekmek (200 g) gibi taze ekmekler hariç fırın ürünleri için. 08:00-23:30 arası, depo paneli açıkken çalar; müzik açıkken de duyulur. Bilgisayarın ana sesini eklenti açamaz, onu açık tut.</p>
       <div class="ses-satir">
-        <label class="ses-satir__ad" for="sesSatis">Ne Zaman</label>
+        <label class="ses-satir__ad" for="sesDuzey">Ses Düzeyi</label>
+        <input type="range" class="ses-kaydirac" id="sesDuzey" min="10" max="100" step="10" value="100">
+        <output class="ses-deger" id="sesDuzeyYazi" for="sesDuzey">%100</output>
+      </div>
+
+      <p class="ses-baslik">Satış</p>
+      <div class="ses-satir">
+        <label class="ses-satir__ad" for="sesSatis">Satınca</label>
         <select class="ayar__secim" id="sesSatis">
-          <option value="her">Her satışta</option>
-          <option value="kritik">Yalnız kritik stokta</option>
-          <option value="kapali">Kapalı</option>
+          <option value="her">Her satışta çal</option>
+          <option value="kapali">Çalma</option>
         </select>
       </div>
-      <div class="ses-satir">
+      <div class="ses-satir" data-grup="satis">
         <label class="ses-satir__ad" for="sesTur">Ses</label>
         <select class="ayar__secim" id="sesTur"></select>
-        <button type="button" class="eylem ses-dinle" data-dinle="sesTur" aria-label="Satış sesini dinle">Dinle</button>
+        <button type="button" class="eylem ses-dinle" data-dinle="satis" aria-label="Satış sesini dinle">Dinle</button>
       </div>
-      <div class="ses-satir">
+      <div class="ses-satir" data-grup="satis">
         <label class="ses-satir__ad" for="sesTekrar">Kaç Kez</label>
         <select class="ayar__secim" id="sesTekrar">
           <option value="1">Bir kez</option>
+          <option value="2">İki kez</option>
           <option value="3">Üç kez</option>
         </select>
       </div>
-      <p class="ayar__ozet" id="sesKritikNot" hidden>Kritik: satılan ürün pişirme bildirimine düşerse çalar. Fırın Bildirimi açık olmalı.</p>
+
+      <div class="ses-ayrac"></div>
+      <label class="secenek"><input type="checkbox" id="sesKritik" checked><span>Kritik stokta alarm</span></label>
+      <p class="ayar__ozet" data-grup="kritik">Satılan ürün pişirme bildirimine düşerse uzun alarm çalar ve ürün pişirilip rafa eklenene kadar tekrarlar. Bildirim kartından ertelenen ürün çalmaz. Fırın Bildirimi açık olmalı.</p>
+      <div class="ses-satir" data-grup="kritik">
+        <label class="ses-satir__ad" for="sesKritikTur">Alarm Sesi</label>
+        <select class="ayar__secim" id="sesKritikTur"></select>
+        <button type="button" class="eylem ses-dinle" data-dinle="kritik" aria-label="Kritik alarmı dinle">Dinle</button>
+      </div>
+      <div class="ses-satir" data-grup="kritik">
+        <label class="ses-satir__ad" for="sesKritikSure">Uzunluk</label>
+        <select class="ayar__secim" id="sesKritikSure">
+          <option value="3">3 saniye</option>
+          <option value="5">5 saniye</option>
+          <option value="10">10 saniye</option>
+        </select>
+      </div>
+      <div class="ses-satir" data-grup="kritik">
+        <label class="ses-satir__ad" for="sesKritikTekrar">Kaç Kez</label>
+        <select class="ayar__secim" id="sesKritikTekrar">
+          <option value="1">Bir kez</option>
+          <option value="2">İki kez</option>
+          <option value="3">Üç kez</option>
+        </select>
+      </div>
+      <div class="ses-satir" data-grup="kritik">
+        <label class="ses-satir__ad" for="sesKritikAralik">Tekrar</label>
+        <select class="ayar__secim" id="sesKritikAralik">
+          <option value="15">15 saniyede bir</option>
+          <option value="30">30 saniyede bir</option>
+          <option value="60">Dakikada bir</option>
+          <option value="120">2 dakikada bir</option>
+        </select>
+      </div>
+      <div class="ses-satir" data-grup="kritik">
+        <label class="ses-satir__ad" for="sesKritikEnCok">En Çok</label>
+        <select class="ayar__secim" id="sesKritikEnCok">
+          <option value="0">Rafa eklenene kadar</option>
+          <option value="5">5 dakika</option>
+          <option value="15">15 dakika</option>
+          <option value="30">30 dakika</option>
+        </select>
+      </div>
+      <div class="ses-calan" id="sesCalan" hidden>
+        <p class="ses-calan__yazi" id="sesCalanYazi"></p>
+        <button type="button" class="eylem" id="sesSustur">Sustur</button>
+      </div>
+
       <div class="ses-ayrac"></div>
       <label class="secenek"><input type="checkbox" id="sesCikis" checked><span>23:30 fırın ürünlerini çıkar sesi</span></label>
-      <div class="ses-satir">
+      <div class="ses-satir" data-grup="cikis">
         <label class="ses-satir__ad" for="sesCikisTur">Çıkış Sesi</label>
         <select class="ayar__secim" id="sesCikisTur"></select>
-        <button type="button" class="eylem ses-dinle" data-dinle="sesCikisTur" data-tekrar="3" aria-label="Çıkış sesini dinle">Dinle</button>
+        <button type="button" class="eylem ses-dinle" data-dinle="cikis" aria-label="Çıkış sesini dinle">Dinle</button>
       </div>
-      <div class="ses-satir">
+      <div class="ses-satir" data-grup="cikis">
         <label class="ses-satir__ad" for="sesHatirlat">Duyulmazsa</label>
         <select class="ayar__secim" id="sesHatirlat">
           <option value="50">23:50'de tekrar</option>

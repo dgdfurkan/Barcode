@@ -292,7 +292,11 @@
         var cikar = mod === 'cikar' && !sim;
         var liste = cikar ? cikarilacaklar(urunler, simdi)
             : bildirimListesi(sim ? simUrunleri(urunler, simdi) : urunler, simdi);
-        var ertelenen = sim ? 0 : liste.filter(function (u) { return ertelenmisMi(u.ad, simdi); }).length;
+        var ertelenen = 0;
+        if (!sim) liste.forEach(function (u) {
+            // Fırın sesi (arka-plan/firin-ses.js) ertelenen ürün için kritik alarm çalmaz
+            if (ertelenmisMi(u.ad, simdi)) { u.ertelendi = true; ertelenen++; }
+        });
         return {
             ok: true,
             liste: liste,

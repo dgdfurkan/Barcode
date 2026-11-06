@@ -265,11 +265,24 @@
     });
     gunlukDugme('gunlukEkle', { type: 'JBA_GUNLUK_EKLE' }, 'Okunuyor...');
 
-    /* Fırın sesi (arka-plan/firin-ses.js okuyor) */
-    var SES_VARSAYILAN = { satis: 'her', ses: 'zil', tekrar: 1, cikis: true, cikisSes: 'alarm', hatirlat: 50 };
+    /* Fırın sesi (arka-plan/firin-ses.js okuyor; varsayılanlar orada da aynı) */
+    var SES_VARSAYILAN = {
+        duzey: 100, satis: 'her', ses: 'zil', tekrar: 1,
+        kritik: true, kritikSes: 'siren', kritikSure: 5, kritikTekrar: 2, kritikAralik: 30, kritikEnCok: 0,
+        cikis: true, cikisSes: 'alarm', hatirlat: 50
+    };
+    /* Ayar alanı -> öğe kimliği; sayılar sayı olarak saklanır */
+    var SES_ALAN = {
+        satis: 'sesSatis', ses: 'sesTur', tekrar: 'sesTekrar',
+        kritikSes: 'sesKritikTur', kritikSure: 'sesKritikSure', kritikTekrar: 'sesKritikTekrar',
+        kritikAralik: 'sesKritikAralik', kritikEnCok: 'sesKritikEnCok',
+        cikisSes: 'sesCikisTur', hatirlat: 'sesHatirlat'
+    };
+    var SAYI_ALAN = ['tekrar', 'kritikSure', 'kritikTekrar', 'kritikAralik', 'kritikEnCok', 'hatirlat'];
+    var sesEl = function (id) { return document.getElementById(id); };
     var sesler = (globalThis.JBASes && globalThis.JBASes.SESLER) || [];
-    ['sesTur', 'sesCikisTur'].forEach(function (id) {
-        var s = document.getElementById(id);
+    ['sesTur', 'sesKritikTur', 'sesCikisTur'].forEach(function (id) {
+        var s = sesEl(id);
         if (!s) return;
         sesler.forEach(function (x) {
             var o = document.createElement('option');
@@ -278,49 +291,65 @@
             s.appendChild(o);
         });
     });
-    function sesFormu(a) {
-        document.getElementById('sesSatis').value = a.satis;
-        document.getElementById('sesTur').value = a.ses;
-        document.getElementById('sesTekrar').value = String(a.tekrar);
-        document.getElementById('sesCikis').checked = a.cikis;
-        document.getElementById('sesCikisTur').value = a.cikisSes;
-        document.getElementById('sesHatirlat').value = String(a.hatirlat);
-        var kapali = a.satis === 'kapali';
-        ['sesTur', 'sesTekrar'].forEach(function (id) { document.getElementById(id).closest('.ses-satir').hidden = kapali; });
-        document.getElementById('sesKritikNot').hidden = a.satis !== 'kritik';
-        ['sesCikisTur', 'sesHatirlat'].forEach(function (id) { document.getElementById(id).closest('.ses-satir').hidden = !a.cikis; });
-        var ozet = document.getElementById('sesOzet');
-        var sat = a.satis === 'her' ? 'Her fırın satışında' : a.satis === 'kritik' ? 'Kritik stokta' : 'Satış sesi kapalı';
-        if (ozet) ozet.textContent = sat + ' · ' + (a.cikis ? '23:30 açık' : '23:30 kapalı');
+    function sesGrup(ad, acik) {
+        Array.prototype.forEach.call(document.querySelectorAll('[data-grup="' + ad + '"]'), function (e) { e.hidden = !acik; });
     }
-    if (document.getElementById('sesSatis')) {
+    function sesFormu(a) {
+        Object.keys(SES_ALAN).forEach(function (k) { sesEl(SES_ALAN[k]).value = String(a[k]); });
+        sesEl('sesDuzey').value = String(a.duzey);
+        sesEl('sesDuzeyYazi').textContent = '%' + a.duzey;
+        sesEl('sesKritik').checked = a.kritik;
+        sesEl('sesCikis').checked = a.cikis;
+        sesGrup('satis', a.satis === 'her');
+        sesGrup('kritik', a.kritik);
+        sesGrup('cikis', a.cikis);
+        var parca = [a.satis === 'her' ? 'Her satışta' : 'Satış sessiz', a.kritik ? 'kritik alarm açık' : 'kritik alarm kapalı', '%' + a.duzey];
+        var ozet = sesEl('sesOzet');
+        if (ozet) ozet.textContent = parca.join(' · ');
+    }
+    function sesOku() {
+        var y = {
+            duzey: parseInt(sesEl('sesDuzey').value, 10) || 100,
+            kritik: sesEl('sesKritik').checked,
+            cikis: sesEl('sesCikis').checked
+        };
+        Object.keys(SES_ALAN).forEach(function (k) {
+            var v = sesEl(SES_ALAN[k]).value;
+            y[k] = SAYI_ALAN.indexOf(k) !== -1 ? parseInt(v, 10) || 0 : v;
+        });
+        return y;
+    }
+    if (sesEl('sesSatis')) {
         chrome.storage.local.get('jbaFirinSes', function (r) {
-            var a = Object.assign({}, SES_VARSAYILAN, (r && r.jbaFirinSes) || {});
+            var k = (r && r.jbaFirinSes) || {};
+            var a = Object.assign({}, SES_VARSAYILAN, k);
+            // 0.49.0'daki "yalnız kritik stokta" satış seçeneği
+            if (a.satis === 'kritik') { a.satis = 'kapali'; a.kritik = true; }
             sesFormu(a);
-            function kaydet() {
-                var y = {
-                    satis: document.getElementById('sesSatis').value,
-                    ses: document.getElementById('sesTur').value,
-                    tekrar: document.getElementById('sesTekrar').value === '3' ? 3 : 1,
-                    cikis: document.getElementById('sesCikis').checked,
-                    cikisSes: document.getElementById('sesCikisTur').value,
-                    hatirlat: parseInt(document.getElementById('sesHatirlat').value, 10) || 0
-                };
+            var kaydet = function () {
+                var y = sesOku();
                 sesFormu(y);
                 chrome.storage.local.set({ jbaFirinSes: y });
-            }
-            ['sesSatis', 'sesTur', 'sesTekrar', 'sesCikis', 'sesCikisTur', 'sesHatirlat'].forEach(function (id) {
-                document.getElementById(id).addEventListener('change', kaydet);
+            };
+            Object.keys(SES_ALAN).map(function (x) { return SES_ALAN[x]; }).concat(['sesKritik', 'sesCikis', 'sesDuzey']).forEach(function (id) {
+                sesEl(id).addEventListener('change', kaydet);
+            });
+            sesEl('sesDuzey').addEventListener('input', function () {
+                sesEl('sesDuzeyYazi').textContent = '%' + sesEl('sesDuzey').value;
             });
         });
+        /* Dinle: seçili ayarla, bu pencerede */
         Array.prototype.forEach.call(document.querySelectorAll('[data-dinle]'), function (b) {
             b.addEventListener('click', function () {
-                var secim = document.getElementById(b.getAttribute('data-dinle'));
-                var tekrar = b.getAttribute('data-tekrar') ? 3 : (document.getElementById('sesTekrar').value === '3' ? 3 : 1);
-                try { globalThis.JBASes.cal(secim.value, tekrar); } catch (e) { /* ses yok */ }
+                var a = sesOku();
+                var tur = b.getAttribute('data-dinle');
+                var c = tur === 'kritik' ? { ses: a.kritikSes, tekrar: a.kritikTekrar, sure: a.kritikSure }
+                    : tur === 'cikis' ? { ses: a.cikisSes, tekrar: 3, sure: 3 }
+                    : { ses: a.ses, tekrar: a.tekrar, sure: 0 };
+                try { globalThis.JBASes.cal(c.ses, { tekrar: c.tekrar, sure: c.sure, duzey: a.duzey }); } catch (e) { /* ses yok */ }
             });
         });
-        var sesDurum = document.getElementById('sesDurum');
+        var sesDurum = sesEl('sesDurum');
         var sesSonCiz = function (v) {
             if (!sesDurum) return;
             if (!v || !v.zaman) { sesDurum.textContent = 'Henüz çalmadı.'; return; }
@@ -330,9 +359,23 @@
             sesDurum.appendChild(b);
             sesDurum.appendChild(document.createTextNode(' · ' + String(v.metin || '')));
         };
-        chrome.storage.local.get('jbaFirinSesSon', function (r) { sesSonCiz(r && r.jbaFirinSesSon); });
+        /* Çalan kritik alarm ve Sustur */
+        var alarmCiz = function (v) {
+            var adlar = (v && Array.isArray(v.adlar)) ? v.adlar : [];
+            sesEl('sesCalan').hidden = !adlar.length;
+            sesEl('sesCalanYazi').textContent = adlar.length ? 'Alarm çalıyor: ' + adlar.slice(0, 3).join(', ') + (adlar.length > 3 ? ' +' + (adlar.length - 3) : '') : '';
+        };
+        chrome.storage.local.get(['jbaFirinSesSon', 'jbaFirinAlarm'], function (r) {
+            sesSonCiz(r && r.jbaFirinSesSon);
+            alarmCiz(r && r.jbaFirinAlarm);
+        });
         chrome.storage.onChanged.addListener(function (d, alan) {
-            if (alan === 'local' && d.jbaFirinSesSon) sesSonCiz(d.jbaFirinSesSon.newValue);
+            if (alan !== 'local') return;
+            if (d.jbaFirinSesSon) sesSonCiz(d.jbaFirinSesSon.newValue);
+            if (d.jbaFirinAlarm) alarmCiz(d.jbaFirinAlarm.newValue);
+        });
+        sesEl('sesSustur').addEventListener('click', function () {
+            chrome.runtime.sendMessage({ type: 'JBA_FIRIN_SES_SUSTUR' }, function () { void chrome.runtime.lastError; });
         });
     }
 

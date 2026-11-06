@@ -52,6 +52,8 @@ async function tur() {
     }
     // Fırın bildirimi 15 sn'lik kontrolünü bu nabza bağlıyor (alarm en az 30 sn)
     if (typeof globalThis.jbaFirinNabiz === 'function') globalThis.jbaFirinNabiz();
+    // Kritik stok alarmının tekrar aralığı (firin-ses.js)
+    if (typeof globalThis.jbaFirinSesNabiz === 'function') globalThis.jbaFirinSesNabiz();
 }
 
 function basla() {
