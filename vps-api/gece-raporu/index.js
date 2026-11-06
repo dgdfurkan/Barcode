@@ -402,6 +402,21 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         return { kartlar, fotoTazeleniyor };
     }
 
+    /**
+     * Anlık red/iptal kartı: zamanlı raporun "Reddedilen" grubunun aynısı,
+     * hasar fotoğraflarıyla. Gerçek bildirim (kaldirma, 2 dk toplanmış redler),
+     * önizleme ve deneme gönderimi bu tek işlevden geçer.
+     */
+    function anlikRedCiz(u, red, o = {}) {
+        return kaldirmaCiz({ red, bekleyen: [], tamam: [] }, {
+            red: { goster: true }, bekleyen: { goster: false }, tamam: { goster: false },
+        }, {
+            u, onizleme: o.onizleme, ornek: o.ornek, gorseller: o.gorseller,
+            tarih: uzunGun(Date.now()), alt: 'Anlık bildirim', fotoBekleMs: o.fotoBekleMs || 0,
+        });
+    }
+    kaldirmaModul.anlikCiziciKur(anlikRedCiz);
+
     /** İtiraz kartları (yatay): ürün ve sipariş görselleri katalogdan, kişi fotoğrafları bellekte */
     async function itirazCiz(it, I, o) {
         const kayitlar = it.bekleyen.concat(it.sonuc);
@@ -1059,7 +1074,14 @@ function kur(app, { pool, verifyToken, bearerOf }) {
 
             let sonuc;
             if (tur === 'anlik') {
-                sonuc = { ok: true, tur, mesajlar: await anlikOrnek(u, A.anlik, ornek) };
+                const mesajlar = await anlikOrnek(u, A.anlik, ornek);
+                sonuc = {
+                    ok: true, tur,
+                    fotoTazeleniyor: mesajlar.reduce((t, m) => t + (m.fotoTazeleniyor || 0), 0),
+                    mesajlar: mesajlar.map(({ kartlar, fotoTazeleniyor, ...m }) => (kartlar
+                        ? { ...m, kartlar: kartlar.slice(0, 4).map((x) => 'data:image/png;base64,' + kucult(x, 1600).toString('base64')) }
+                        : m)),
+                };
             } else {
                 const dakika = bolum.saatler[0];
                 const hazirla = tur === 'kaldirma' ? kaldirmaRaporu : tur === 'itiraz' ? itirazRaporu : tur === 'sayim' ? sayimFarkRaporu : raporHazirla;
@@ -1089,7 +1111,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
      * Anlık bildirim örnekleri: seçili durumlar için birer mesaj.
      * Gerçek veride son 30 günün o durumdaki en yeni kaydı; yoksa kurgusal.
      */
-    async function anlikOrnek(u, an, ornek) {
+    async function anlikOrnek(u, an, ornek, onizleme = true) {
         const durumlar = [];
         if (an.iptal) durumlar.push(700);
         if (an.red) durumlar.push(160);
@@ -1100,7 +1122,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             if (!ornek) {
                 try {
                     const r = await pool.query(
-                        `SELECT durum, sebep, adet, olusturma, veri FROM kaldirma.kayitlar
+                        `SELECT kayit_id, durum, sebep, adet, olusturma, veri FROM kaldirma.kayitlar
                           WHERE username = $1 AND durum = $2 AND olusturma > now() - interval '30 days'
                           ORDER BY olusturma DESC LIMIT 1`,
                         [u, durum]
@@ -1115,7 +1137,7 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                     durum, sebep: durum === 160 ? 'Son Kullanma Tarihi Geçti' : 'Ürün Bozuk', adet: 2,
                     olusturma: new Date(Date.now() - 3 * 3600000).toISOString(),
                     veri: {
-                        urun: { ad: x ? x.ad : 'Örnek ürün', gorsel: x ? x.image : '' },
+                        urun: { id: x ? x.id : '', ad: x ? x.ad : 'Örnek ürün', gorsel: x ? x.image : '' },
                         altNeden: '', olusturan: 'Örnek Kişi',
                         red: durum === 160 ? { baslik: 'Fotoğraf yetersiz', aciklama: '' } : null,
                     },
@@ -1127,9 +1149,26 @@ function kur(app, { pool, verifyToken, bearerOf }) {
                 gorsel: an.gorsel && k.veri && k.veri.urun && /^https:\/\//.test(k.veri.urun.gorsel || '') ? k.veri.urun.gorsel : null,
                 metin: kaldirmaModul.bildirimMetni(k, an),
                 ornek: !!k.ornek,
+                k,
             });
         }
-        return sonuc;
+        // Red ve iptal gerçekte 2 dk toplanıp tek kartla gider: önizleme de öyle
+        const redler = sonuc.filter((m) => m.durum !== 600);
+        const tek = sonuc.filter((m) => m.durum === 600).map(({ k, ...m }) => m);
+        if (!redler.length) return tek;
+        const red = redler.map(({ k }) => {
+            const v = k.veri || {};
+            const urun = v.urun || {};
+            return {
+                id: k.kayit_id || '', urun: { id: urun.id, ad: urun.ad, gorsel: urun.gorsel }, adet: Number(k.adet) || 0,
+                sebep: k.sebep || '', altNeden: v.altNeden || '', durum: k.durum, red: v.red || null, yeniden: false,
+                zaman: k.olusturma,
+                fotoAdres: (Array.isArray(v.fotolar) ? v.fotolar : []).filter((x) => S3.test(x)).slice(0, 3),
+            };
+        });
+        const hepsiOrnek = redler.every((m) => m.ornek);
+        const { kartlar, fotoTazeleniyor } = await anlikRedCiz(u, red, { onizleme, ornek: hepsiOrnek, fotoBekleMs: onizleme ? 0 : 35000 });
+        return [{ kartlar, metin: kaldirmaModul.redBasligi(red), ornek: hepsiOrnek, fotoTazeleniyor }].concat(tek);
     }
 
     /** Deneme gönderimi: sayfadaki (kaydedilmemiş olabilir) ayarla, kendi Telegram'ına */
@@ -1146,10 +1185,17 @@ function kur(app, { pool, verifyToken, bearerOf }) {
             const hedefler = await alicilar(u);
             if (!hedefler.length) return res.status(409).json({ ok: false, error: 'baglanti_yok' });
             if (tur === 'anlik') {
-                const mesajlar = await anlikOrnek(u, A.anlik, false);
+                const mesajlar = await anlikOrnek(u, A.anlik, false, false);
                 if (!mesajlar.length) return res.status(409).json({ ok: false, error: 'bos' });
                 let giden = 0;
                 for (const m of mesajlar) {
+                    if (m.kartlar) {
+                        if (m.kartlar.length) {
+                            const s = await albumGonder(pool, hedefler, m.kartlar, '🧪 Deneme\n' + m.metin, 'satistan-kaldirma-red');
+                            giden += s.giden;
+                        }
+                        continue;
+                    }
                     for (const h of hedefler) {
                         try {
                             if (m.gorsel) await telegram.cagir('sendPhoto', { chat_id: h.chat_id, photo: m.gorsel, caption: '🧪 Deneme\n' + m.metin });

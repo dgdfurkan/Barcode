@@ -174,6 +174,9 @@ Arayüze dokunan her işte üçü sırayla kullanılır:
   servis yeniden başlatılacak (SQL yok). Asistan 0.48.1 depo panelinin jetonunu `users.counting_data._depo_info`'ya
   yazıyor, sorular sunucudan `/api/depo-panel` ile gidiyor: Getir'in depo ağ geçidi başka siteden gelen tarayıcı
   isteğini 503'le kesiyor. Jeton 15 dk yaşıyor ve panel yalnız istek attıkça yenileniyor; sipariş panosu açık bilgisayar şart.
+- Anlık red/iptal kartı: `vps-api/kaldirma/index.js` + `vps-api/gece-raporu/index.js` VPS'e atılıp servis yeniden
+  başlatılacak (SQL yok). Red ve iptal 2 dk toplanıp (en çok 6 dk) zamanlı raporun red kartıyla, hasar fotoğraflarıyla
+  gidiyor; kart çizilemezse eski tek tek mesaj. Bekleyen kuyruk bellekte: servis tam o 2 dk içinde yeniden başlarsa o redler gitmez.
 - `sw.js` (kök) sürümlü dosyaları telefonda saklıyor. Bir sorun olursa dosyanın başındaki "KAPATMAK
   GEREKİRSE" bloğu yayınlanır.
 - VPS'te apt upgrade + reboot bekliyor.

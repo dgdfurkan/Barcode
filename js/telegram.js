@@ -402,14 +402,14 @@
 
     function anlikHtml() {
         return kartHtml({
-            ikon: IKON.zil, baslik: 'Hangi Durumda Gelsin', aciklama: 'Satıştan kaldırma kaydının durumu değişince hemen gelir.',
+            ikon: IKON.zil, baslik: 'Hangi Durumda Gelsin', aciklama: 'Satıştan kaldırma kaydının durumu değişince gelir. Red ve iptal 2 dk beklenir, peş peşe düşenler hasar fotoğraflarıyla tek kartta gelir.',
             govde: satirAnahtar('İptal Edildiğinde', null, 'anlik.iptal') +
                 satirAnahtar('Reddedildiğinde', 'Depo aksiyonu bekleniyor durumuna düşünce', 'anlik.red') +
                 satirAnahtar('Tamamlandığında', 'Onaylanıp bittiğinde, kayıt başına bir kez', 'anlik.tamam')
         }) +
         kartHtml({
             ikon: IKON.mesaj, baslik: 'Mesaj İçeriği',
-            govde: satirAnahtar('Ürün Görseli', 'Kapalıysa yalnız yazı gelir', 'anlik.gorsel') +
+            govde: satirAnahtar('Ürün Görseli', 'Tamamlananlarda; kapalıysa yalnız yazı gelir', 'anlik.gorsel') +
                 satirAnahtar('Oluşturan Kişi', 'Kaydı panelde kimin açtığı', 'anlik.olusturan')
         });
     }
@@ -862,6 +862,10 @@
         if (d.sekme === 'anlik') {
             var m = j.mesajlar || [];
             kutu.innerHTML = m.length ? m.map(function (x) {
+                if (x.kartlar) {
+                    return x.kartlar.length ? albumHtml(x.kartlar, x.metin, (x.ornek ? 'örnek · ' : '') + simdiSaat())
+                        : '<div class="tg-mesaj"><p class="tg-mesaj__yazi">' + kacis(x.metin) + '</p></div>';
+                }
                 return '<div class="tg-mesaj">' + (x.gorsel ? '<img class="tg-mesaj__resim" src="' + kacis(x.gorsel) + '" alt="" referrerpolicy="no-referrer">' : '') +
                     '<p class="tg-mesaj__yazi">' + kacis(x.metin) + '</p><span class="tg-mesaj__saat">' + (x.ornek ? 'örnek · ' : '') + simdiSaat() + '</span></div>';
             }).join('') : bosHtml('Anlık bildirim kapalı', 'Hiçbir durum seçili değil; bildirim gelmez.');
@@ -1092,7 +1096,7 @@
             var k = e.target.closest('[data-kart]');
             if (!k || !global.JBUrunFoto) return;
             var s = d.onizleme.sonuc[d.onizleme.goster];
-            var kartlar = s && s.j && s.j.kartlar;
+            var kartlar = s && s.j && (s.j.kartlar || ((s.j.mesajlar || []).filter(function (m) { return m.kartlar; })[0] || {}).kartlar);
             if (kartlar && kartlar.length) global.JBUrunFoto.ac('', 'Önizleme', { galeri: kartlar, sira: Number(k.getAttribute('data-kart')) });
         });
 

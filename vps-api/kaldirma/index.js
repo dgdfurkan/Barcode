@@ -8,9 +8,13 @@
  *    ile buraya bırakır. Satırlar hesap + Getir kayıt kimliğiyle tutulur.
  * 2. Durumu değişen kayıt, hesabın anlık bildirim ayarına göre (Telegram
  *    Raporları sayfası: iptal, red, tamamlanan; varsayılan yalnız iptal)
- *    bağlı Telegram hesaplarına anında bildirilir. Her durum bir kez.
+ *    bağlı Telegram hesaplarına bildirilir. Her durum bir kez.
  *    Hesabın İLK eşitlemesinde geçmiş kayıtlar bildirilmez (eski iptaller
  *    yığılmasın), yalnız işaretlenir.
+ *    Red ve iptal tek tek gitmez: peş peşe düşenler 2 dk beklenip
+ *    Satıştan Kaldırma raporunun red kartıyla (hasar fotoğraflarıyla) tek
+ *    seferde gider. Kart gece raporundan çizilir (anlikCiziciKur); çizilemez
+ *    ya da gönderilemezse eski tek tek mesaja düşer.
  * 3. Site sayfası (/kaldirma/) GET /api/kaldirma/liste ile okur. "Rapor"
  *    düğmesi kare olmayan uzun bir PNG üretip Telegram'a yollar ya da
  *    indirir (galeriye kaydetmek için).
@@ -67,6 +71,20 @@ function bildirimMetni(k, an = {}) {
     if (k.olusturma) satirlar.push('Oluşturulma: ' + saatYaz(k.olusturma));
     return satirlar.join('\n');
 }
+/** Red kartının yazısı: "⚠️ Satıştan Kaldırma · 2 reddedildi · 1 iptal edildi" */
+function redBasligi(red) {
+    const iptal = red.filter((k) => k.durum === 700).length;
+    const parca = [];
+    if (red.length - iptal) parca.push((red.length - iptal) + ' reddedildi');
+    if (iptal) parca.push(iptal + ' iptal edildi');
+    return '⚠️ Satıştan Kaldırma · ' + parca.join(' · ');
+}
+
+/* Red kartını çizen işlev: gece raporu kurulurken verir (döngüsel require olmasın).
+   (username, red, { onizleme, fotoBekleMs }) -> { kartlar, fotoTazeleniyor } */
+let anlikCizici = null;
+function anlikCiziciKur(fn) { anlikCizici = typeof fn === 'function' ? fn : null; }
+
 const AZAMI_KAYIT = 3000;
 const GUN_MS = 24 * 3600 * 1000;
 
@@ -267,10 +285,72 @@ function kur(app, { pool, verifyToken, bearerOf }) {
         }
     }
 
-    async function bildir(username, kayitlar, an) {
+    // Red ve iptal: 2 dk sessizlik beklenir (onay sürecinden peş peşe düşerler),
+    // en çok 6 dk. username -> { kayitlar: Map, an, ilk, zaman }
+    const RED_BEKLE_MS = 2 * 60 * 1000;
+    const RED_AZAMI_MS = 6 * 60 * 1000;
+    const redKuyrugu = new Map();
+
+    function redBekle(username, kayitlar, an) {
+        let q = redKuyrugu.get(username);
+        if (!q) { q = { kayitlar: new Map(), ilk: Date.now(), zaman: null }; redKuyrugu.set(username, q); }
+        q.an = an;
+        kayitlar.forEach((k) => q.kayitlar.set(k.id, k));
+        clearTimeout(q.zaman);
+        const bekle = Math.max(0, Math.min(RED_BEKLE_MS, q.ilk + RED_AZAMI_MS - Date.now()));
+        q.zaman = setTimeout(() => {
+            redKuyrugu.delete(username);
+            redGonder(username, [...q.kayitlar.values()], q.an).catch((e) => console.warn('kaldirma red karti:', e && e.message));
+        }, bekle);
+    }
+
+    /** Kartla gönderir; olmazsa tek tek mesaj */
+    async function redGonder(username, kayitlar, an) {
         if (!kayitlar.length || !telegram.hazirMi()) return;
         const hedefler = await alicilar(username);
         if (!hedefler.length) return;
+        if (anlikCizici) {
+            try {
+                // Veritabanındaki son hâli: red sebebi ve fotoğraf linkleri sonradan gelmiş olabilir
+                const r = await pool.query(
+                    'SELECT kayit_id, veri FROM kaldirma.kayitlar WHERE username = $1 AND kayit_id = ANY($2::text[])',
+                    [username, kayitlar.map((k) => k.id)]
+                );
+                const veri = new Map(r.rows.map((x) => [x.kayit_id, x.veri || {}]));
+                const red = kayitlar.map((k) => {
+                    const v = { ...k.veri, ...(veri.get(k.id) || {}) };
+                    const u = v.urun || {};
+                    return {
+                        id: k.id, urun: { id: u.id, ad: u.ad, gorsel: u.gorsel }, adet: Number(k.adet) || 0,
+                        sebep: k.sebep || '', altNeden: v.altNeden || '', durum: k.durum, red: v.red || null, yeniden: false,
+                        zaman: k.guncelleme || k.olusturma,
+                        fotoAdres: (Array.isArray(v.fotolar) ? v.fotolar : []).filter((x) => s3Mi(x)).slice(0, 3),
+                    };
+                }).sort((a, b) => Date.parse(b.zaman) - Date.parse(a.zaman));
+                // Süresi geçmiş fotoğraf: depo panelindeki Asistan tazeler, zamanlı rapor kadar beklenir
+                const { kartlar } = await anlikCizici(username, red, { fotoBekleMs: 100000 });
+                if (kartlar.length) {
+                    const s = await albumGonder(pool, hedefler, kartlar.slice(0, 20), redBasligi(red), 'satistan-kaldirma-red');
+                    if (s.giden) return;
+                }
+            } catch (e) {
+                console.warn('kaldirma red karti cizilemedi:', e && e.message);
+            }
+        }
+        await tekTekGonder(hedefler, kayitlar, an);
+    }
+
+    async function bildir(username, kayitlar, an) {
+        if (!kayitlar.length || !telegram.hazirMi()) return;
+        const kartli = kayitlar.filter((k) => k.durum === 700 || k.durum === 160);
+        if (kartli.length) redBekle(username, kartli, an);
+        const tek = kayitlar.filter((k) => !kartli.includes(k));
+        if (!tek.length) return;
+        const hedefler = await alicilar(username);
+        if (hedefler.length) await tekTekGonder(hedefler, tek, an);
+    }
+
+    async function tekTekGonder(hedefler, kayitlar, an) {
         for (const k of kayitlar) {
             const yazi = bildirimMetni(k, an);
             for (const h of hedefler) {
@@ -687,4 +767,4 @@ function kur(app, { pool, verifyToken, bearerOf }) {
     });
 }
 
-module.exports = { kur, bildirimMetni, fotoIsteToplu, fotolariTazele, linkTaze };
+module.exports = { kur, bildirimMetni, redBasligi, anlikCiziciKur, fotoIsteToplu, fotolariTazele, linkTaze };
