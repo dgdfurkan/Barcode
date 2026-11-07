@@ -760,8 +760,13 @@ async function kuyrugaBak() {
                    denenmez ve eksik ürünle kalır. */
                 if (!yazma.toplam || yazma.yazilan === yazma.toplam) {
                     const imzalar = await imzalariOku();
-                    // İlk kez ürünleriyle yazılan sipariş: fırın ürünü varsa fırın nöbetçisine haber ver
-                    if (!imzalar[s.siparisId] && yazma.toplam && typeof globalThis.jbaFirinSatis === 'function') {
+                    /* İlk kez ürünleriyle yazılan sipariş: fırın ürünü varsa fırın nöbetçisine haber ver.
+                       Toplayıcı Bekliyor'da detay önce ürünsüz gelir, adres ve fotoğraf ürünsüz paketle
+                       yazılır; imzanın son parçası (ürünler) o zaman boştur. Yalnız imzanın varlığına
+                       bakılırsa ürünler gelince satış hiç bildirilmiyordu. */
+                    const onceki = imzalar[s.siparisId];
+                    const oncedenUrunlu = !!onceki && onceki.slice(onceki.lastIndexOf('~') + 1) !== '';
+                    if (!oncedenUrunlu && yazma.toplam && typeof globalThis.jbaFirinSatis === 'function') {
                         try { globalThis.jbaFirinSatis(s.urunler); } catch (e) { /* yan iş */ }
                     }
                     imzalar[s.siparisId] = siparisImzasi(s);

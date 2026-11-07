@@ -71,7 +71,9 @@ const aktif = new Map();
 const susturulan = new Set();
 let sonAlarm = 0;
 
-const sade = (s) => String(s || '').toLocaleLowerCase('tr').replace(/\s+/g, ' ').trim();
+/* Karşılaştırma için ad: küçük harf, noktalama yok. Sipariş detayı ürünün
+   kısa adını (name), fırın listesi tam adını (fullName) verebiliyor. */
+const sade = (s) => String(s || '').toLocaleLowerCase('tr').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const secim = (v, liste, varsayilan) => (liste.includes(v) ? v : varsayilan);
 
 /* Pişirme panelinin taze üretim ayrımı (firin-hesap.js isBreadProduct) */
@@ -79,11 +81,20 @@ function tazeEkmekMi(ad) {
     return /^\s*(ekmek|ramazan\s+pidesi)\s*\(\s*\d+\s*(g|gr)\s*\)\s*$/i.test(ad || '');
 }
 
-function firinUrunuMu(u) {
-    if (!u || !u.ad || tazeEkmekMi(u.ad)) return false;
-    if (firinAdlari.size) return firinAdlari.has(sade(u.ad));
-    return FIRIN_URUNU.test([u.ad, u.anaKategori, u.sinif, u.altSinif].join(' '));
+/* Fırın listesindeki karşılığı (sade ad) ya da ''. Biri ötekinin başıysa
+   da sayılır: "Simit" ile "Simit 110 g" aynı ürün. */
+function firinAdi(u) {
+    if (!u || !u.ad || tazeEkmekMi(u.ad)) return '';
+    const n = sade(u.ad);
+    if (!n) return '';
+    if (firinAdlari.size) {
+        if (firinAdlari.has(n)) return n;
+        for (const f of firinAdlari) if (n.startsWith(f + ' ') || f.startsWith(n + ' ')) return f;
+        return '';
+    }
+    return FIRIN_URUNU.test([u.ad, u.anaKategori, u.sinif, u.altSinif].join(' ')) ? n : '';
 }
+const firinUrunuMu = (u) => !!firinAdi(u);
 
 async function ayarOku() {
     try {
@@ -109,7 +120,7 @@ async function ayarOku() {
             hatirlat: secim(Number(k.hatirlat), [0, 40, 45, 50, HER_5], VARSAYILAN.hatirlat),
         };
         const a = r && r[ADLAR_ANAHTARI];
-        if (a && Array.isArray(a.adlar) && !firinAdlari.size) firinAdlari = new Set(a.adlar);
+        if (a && Array.isArray(a.adlar) && !firinAdlari.size) firinAdlari = new Set(a.adlar.map(sade).filter(Boolean));
     } catch (e) {
         ayar = Object.assign({}, VARSAYILAN);
     }
@@ -177,9 +188,14 @@ const kisaListe = (adlar) => adlar.slice(0, 2).join(', ') + (adlar.length > 2 ? 
 globalThis.jbaFirinSatisSesi = async function (urunler) {
     await ayarOku();
     if (!satisSaatiMi()) return;
-    const satilan = (urunler || []).filter(firinUrunuMu).map((u) => u.ad);
+    const satilan = [];
+    (urunler || []).forEach((u) => {
+        const k = firinAdi(u);
+        if (!k) return;
+        satilan.push(u.ad);
+        if (ayar.kritik) adaylar.set(k, { ad: u.ad, zaman: Date.now() });
+    });
     if (!satilan.length) return;
-    if (ayar.kritik) satilan.forEach((a) => adaylar.set(sade(a), { ad: a, zaman: Date.now() }));
     if (ayar.satis !== 'her') return;
     if (Date.now() - sonSatisSesi < SATIS_ARA_MS) return;
     if (!(await panelAcikMi())) return;
