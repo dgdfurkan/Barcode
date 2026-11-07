@@ -60,6 +60,8 @@ const FIRIN_URUNU = /f[ıi]r[ıi]n|unlu|simit|po[ğg]a[çc]a|b[öo]rek|kruvasan|
 
 let ayar = Object.assign({}, VARSAYILAN);
 let firinAdlari = new Set();
+/* Taze üretim ve donuksuz ürünler (sade ad): fırın listesinde olsalar da çalmaz */
+let tazeAdlar = new Set();
 let sonSatisSesi = 0;
 let calmaBitis = 0;
 let sonCikar = null; // { zaman, sayi }
@@ -81,17 +83,20 @@ const secim = (v, liste, varsayilan) => (liste.includes(v) ? v : varsayilan);
 function tazeEkmekMi(ad) {
     return /^\s*(ekmek|ramazan\s+pidesi)\s*\(\s*\d+\s*(g|gr)\s*\)\s*$/i.test(ad || '');
 }
+/* Sade adla: sipariş ürünün kısa adını ("Ekmek") verebiliyor, gramajsız da sayılır */
+const TAZE_SADE = /^(ekmek|ramazan pidesi)( \d+ (g|gr))?$/;
+const tazeMi = (ad) => tazeEkmekMi(ad) || TAZE_SADE.test(sade(ad)) || tazeAdlar.has(sade(ad));
 
 /* Fırın listesindeki karşılığı (sade ad) ya da ''. Biri ötekinin başıysa
    da sayılır: "Simit" ile "Simit 110 g" aynı ürün. */
 function firinAdi(u) {
-    if (!u || !u.ad || tazeEkmekMi(u.ad)) return '';
+    if (!u || !u.ad || tazeMi(u.ad)) return '';
     const n = sade(u.ad);
     if (!n) return '';
     if (firinAdlari.size) {
-        if (firinAdlari.has(n)) return n;
-        for (const f of firinAdlari) if (n.startsWith(f + ' ') || f.startsWith(n + ' ')) return f;
-        return '';
+        let k = firinAdlari.has(n) ? n : '';
+        if (!k) for (const f of firinAdlari) if (n.startsWith(f + ' ') || f.startsWith(n + ' ')) { k = f; break; }
+        return k && !tazeAdlar.has(k) && !TAZE_SADE.test(k) ? k : '';
     }
     return FIRIN_URUNU.test([u.ad, u.anaKategori, u.sinif, u.altSinif].join(' ')) ? n : '';
 }
@@ -122,6 +127,7 @@ async function ayarOku() {
         };
         const a = r && r[ADLAR_ANAHTARI];
         if (a && Array.isArray(a.adlar) && !firinAdlari.size) firinAdlari = new Set(a.adlar.map(sade).filter(Boolean));
+        if (a && Array.isArray(a.taze) && !tazeAdlar.size) tazeAdlar = new Set(a.taze.map(sade).filter(Boolean));
     } catch (e) {
         ayar = Object.assign({}, VARSAYILAN);
     }
@@ -223,9 +229,12 @@ globalThis.jbaFirinKontrolSonucu = function (cevap, mod) {
     if (!cevap) return;
     if (Array.isArray(cevap.adlar) && cevap.adlar.length) {
         const yeni = new Set(cevap.adlar.map(sade));
-        if (yeni.size !== firinAdlari.size || [...yeni].some((a) => !firinAdlari.has(a))) {
+        const taze = new Set((cevap.tazeAdlar || []).map(sade));
+        const farkli = (x, y) => x.size !== y.size || [...x].some((a) => !y.has(a));
+        if (farkli(yeni, firinAdlari) || farkli(taze, tazeAdlar)) {
             firinAdlari = yeni;
-            chrome.storage.local.set({ [ADLAR_ANAHTARI]: { zaman: Date.now(), adlar: [...yeni] } }).catch(() => {});
+            tazeAdlar = taze;
+            chrome.storage.local.set({ [ADLAR_ANAHTARI]: { zaman: Date.now(), adlar: [...yeni], taze: [...taze] } }).catch(() => {});
         }
     }
     if (mod === 'cikar') {
@@ -238,7 +247,7 @@ globalThis.jbaFirinKontrolSonucu = function (cevap, mod) {
     // Pişirme bildirimindeki ürünler; ertelenen sayılmaz
     const kritik = new Map();
     (cevap.liste || []).forEach((u) => {
-        if (u && u.ad && !u.ertelendi && !tazeEkmekMi(u.ad)) kritik.set(sade(u.ad), u.ad);
+        if (u && u.ad && !u.ertelendi && !u.ekmek && !tazeMi(u.ad)) kritik.set(sade(u.ad), u.ad);
     });
     const once = aktif.size;
     // Eklendi / pişirildi / ertelendi: alarm o ürün için biter

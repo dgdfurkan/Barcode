@@ -305,6 +305,11 @@
             urunSayisi: urunler.length,
             // Fırın sesi (arka-plan/firin-ses.js) satılan ürünü bu adlarla tanır
             adlar: sim ? undefined : urunler.map(function (p) { return p.name; }),
+            // Taze üretim (donuk stoku olmayan Ekmek (N g) gibi): satış sesi ve alarm çalmaz.
+            // Donuğu o an 0 olan sıradan ürün sayılmaz; kritik olan tam da o.
+            tazeAdlar: sim ? undefined : urunler.filter(function (p) {
+                return JBA.firinHesap.ekmekMi(p.name);
+            }).map(function (p) { return p.name; }),
             stokluSayisi: urunler.filter(function (p) { return p.stokOkundu; }).length,
             dilimler: DILIM_AD,
             simdiki: JBA.firinHesap.dilim(new Date(simdi).getHours()).index,
