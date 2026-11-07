@@ -9,7 +9,8 @@
  * panelinin kendi ayrımı (moduller/firin-hesap.js isBreadProduct).
  * Fırın ürünü = fırın sayfasının listesindeki ad. Liste son kontrolde
  * (firin-uyari.js hesapla → adlar) saklanır; henüz yoksa ad ve kategoriden.
- * Peş peşe satışlarda 6 sn içinde ikinci kez çalmaz.
+ * Peş peşe satışlarda 6 sn içinde ikinci kez çalmaz; başka ses çalarken de
+ * çalmaz (sesler üst üste binmez, kritik alarm satış sesi bitince çalar).
  *
  * KRİTİK STOK ALARMI
  * Satılan ürün sonraki fırın kontrollerinde (satıştan 15 sn - 3 dk sonra)
@@ -198,6 +199,8 @@ globalThis.jbaFirinSatisSesi = async function (urunler) {
     if (!satilan.length) return;
     if (ayar.satis !== 'her') return;
     if (Date.now() - sonSatisSesi < SATIS_ARA_MS) return;
+    // Başka ses (uzun satış sesi, kritik alarm) çalarken üstüne binmesin
+    if (Date.now() < calmaBitis) return;
     if (!(await panelAcikMi())) return;
     sonSatisSesi = Date.now();
     await cal(ayar.ses, ayar.tekrar, 0, 'Satış: ' + kisaListe(satilan));
